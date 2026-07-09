@@ -10,18 +10,15 @@ import EmployeeViewModal from "../../employee/components/EmployeeViewModal";
 import CustomButton from "../../../components/ui/Button/Button";
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import { useEmployees } from "../../../hooks/useEmployees";
-import { useDesignations } from "../../../hooks/useDesignations";
-import { hasPermission } from "../../../utils/permission";
 import Select from "react-select";
-import type { SingleValue } from "react-select";
-
+import { hasPermission } from "../../../utils/permission";
 
 const ITEMS_PER_PAGE = 10;
 
 const Employeelist: React.FC = () => {
   const navigate = useNavigate();
   const { employees, loading, error, loadEmployees, removeEmployee, totalPages } = useEmployees();
-  const { designations: allDesignations, loadDesignations } = useDesignations();
+
   const canCreateEmployee = hasPermission("employees.create");
   const canEditEmployee = hasPermission("employees.edit");
   const canDeleteEmployee = hasPermission("employees.delete");
@@ -30,28 +27,23 @@ const Employeelist: React.FC = () => {
   const [selectedEmployee, setSelectedEmployee] = useState<any>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedDesignation, setSelectedDesignation] = useState<DesignationOption | null>(null);
+
 
   // Custom Delete Modal State
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [employeeToDelete, setEmployeeToDelete] = useState<string | null>(null);
 
   useEffect(() => {
-    loadDesignations();
-  }, [loadDesignations]);
-
-  useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
       loadEmployees({
         search: searchTerm,
-        designationId: selectedDesignation?.value,
         page: currentPage,
         limit: ITEMS_PER_PAGE,
       });
     }, 300);
 
     return () => clearTimeout(delayDebounceFn);
-  }, [loadEmployees, searchTerm, selectedDesignation, currentPage]);
+  }, [loadEmployees, searchTerm, currentPage]);
 
   useEffect(() => {
     if (error) {
@@ -59,17 +51,7 @@ const Employeelist: React.FC = () => {
     }
   }, [error]);
 
-  const designationsOptions = useMemo(() => {
-    return allDesignations.map((d) => ({
-      value: String(d.id),
-      label: d.name,
-    }));
-  }, [allDesignations]);
 
-  const handleDesignationFilter = (option: SingleValue<DesignationOption>) => {
-    setSelectedDesignation(option);
-    setCurrentPage(1);
-  };
 
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(e.target.value);
@@ -106,10 +88,7 @@ const Employeelist: React.FC = () => {
       }
     }
   };
-  interface DesignationOption {
-    value: string;
-    label: string;
-  }
+
 
   const paginatedEmployees = employees;
 
@@ -129,17 +108,7 @@ const Employeelist: React.FC = () => {
             </Col>
             <Col lg={6} md={12}>
               <div className="page-header-actions">
-                <div className="page-filter-wrap" style={{ minWidth: "200px" }}>
-                  <Select<DesignationOption>
-                    options={designationsOptions}
-                    value={selectedDesignation}
-                    onChange={handleDesignationFilter}
-                    placeholder="All Designations"
-                    isClearable
-                    isSearchable
-                    classNamePrefix="rs"
-                  />
-                </div>
+
                 <div className="page-search-wrap">
                   <FaSearch className="page-search-icon" />
                   <input

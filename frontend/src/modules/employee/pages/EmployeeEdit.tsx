@@ -8,7 +8,7 @@ import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import CustomButton from "../../../components/ui/custombutton/CustomButton";
 import { useEmployees } from "../../../hooks/useEmployees";
 import { useDepartments } from "../../../hooks/useDepartments";
-import { useDesignations } from "../../../hooks/useDesignations";
+
 import { useRoles } from "../../../hooks/useRoles";
 import { useSelector } from "react-redux";
 
@@ -20,7 +20,6 @@ const EmployeeEdit: React.FC = () => {
 
   const { editEmployee, employees, loadEmployees } = useEmployees();
   const { departments, loadDepartments } = useDepartments();
-  const { designations, loadDesignations } = useDesignations();
   const { roles, loadRoles } = useRoles();
   const user = useSelector((state: any) => state.auth.user);
 
@@ -30,7 +29,6 @@ const EmployeeEdit: React.FC = () => {
     mobile: "",
     email: "",
     departmentId: "",
-    designationId: "",
     status: "active",
     createLoginAccount: false,
     username: "",
@@ -63,7 +61,7 @@ const EmployeeEdit: React.FC = () => {
       newErrors.fullName = "Employee name is required";
     }
 
-    if (!/^\d{10}$/.test(formData.mobile.trim())) {
+    if (formData.mobile.trim() && !/^\d{10}$/.test(formData.mobile.trim())) {
       newErrors.mobile = "Enter a valid 10-digit mobile number";
     }
 
@@ -108,14 +106,7 @@ const EmployeeEdit: React.FC = () => {
     loadEmployees({ limit: 1000 });
   }, [loadDepartments, loadRoles, loadEmployees]);
 
-  // Load designations whenever the selected department changes
-  useEffect(() => {
-    if (formData.departmentId) {
-      loadDesignations(Number(formData.departmentId));
-    } else {
-      loadDesignations(undefined as any); // or clear list if you support it
-    }
-  }, [formData.departmentId, loadDesignations]);
+
 
   // Populate form when employee data arrives
   useEffect(() => {
@@ -128,7 +119,6 @@ const EmployeeEdit: React.FC = () => {
         mobile: employeeData.mobile || "",
         email: employeeData.email || "",
         departmentId: deptId ? String(deptId) : "",
-        designationId: employeeData.designationId ? String(employeeData.designationId) : "",
         status: employeeData.status || "active",
         createLoginAccount: !!employeeData.user,
         username: employeeData.user?.username || "",
@@ -138,10 +128,7 @@ const EmployeeEdit: React.FC = () => {
         updatedByOn: user?.username,
       });
 
-      // Trigger correct designations load for the employee's existing department
-      if (deptId) {
-        loadDesignations(Number(deptId));
-      }
+
     }
   }, [employeeData]);
 
@@ -171,7 +158,6 @@ const EmployeeEdit: React.FC = () => {
         mobile: formData.mobile || undefined,
         email: formData.email || undefined,
         departmentId: formData.departmentId ? Number(formData.departmentId) : undefined,
-        designationId: formData.designationId ? Number(formData.designationId) : undefined,
         status: formData.status as any,
         createLoginAccount: formData.createLoginAccount,
         updatedBy: user ? user?.userId : undefined,
@@ -200,9 +186,7 @@ const EmployeeEdit: React.FC = () => {
     return departments.map(d => ({ value: String(d.id), label: d.name }));
   }, [departments]);
 
-  const designationOptions = useMemo(() => {
-    return designations.map(d => ({ value: String(d.id), label: d.name }));
-  }, [designations]);
+
 
   const roleOptions = useMemo(() => {
     return roles.map(r => ({ value: String(r.id), label: r.name }));
@@ -288,15 +272,7 @@ const EmployeeEdit: React.FC = () => {
               />
             </Col>
 
-            <Col lg={4} md={6}>
-              <SelectInput
-                label="Designation"
-                name="designationId"
-                value={formData.designationId}
-                options={designationOptions}
-                onChange={handleChange}
-              />
-            </Col>
+
 
             <Col lg={4} md={6}>
               <SelectInput
@@ -378,8 +354,10 @@ const EmployeeEdit: React.FC = () => {
                     name="roleId"
                     value={formData.roleId}
                     options={roleOptions}
+                    defaultOptionLabel="Select Role"
                     required
                     onChange={handleChange}
+                    error={errors.roleId}
                   />
                 </Col>
 

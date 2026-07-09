@@ -44,6 +44,7 @@ const Sidebar = () => {
     if (!perm) return true;
 
     if (
+      user?.isSuperAdmin ||
       user?.roleId === "ROLE_ADMIN" ||
       user?.roleId === "SUPER_ADMIN" ||
       user?.roleId === "ADMIN"

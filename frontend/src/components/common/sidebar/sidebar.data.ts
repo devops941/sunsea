@@ -50,73 +50,18 @@ export const sidebarItems: SidebarItem[] = [
       },
       {
         title: "Product Masters",
-        children: [
-          {
-            title: "Products",
-            path: "/products",
-            permission: "products.view",
-          },
-          {
-            title: "Categories",
-            path: "/categories",
-            permission: "categories.view",
-          },
-          // {
-          //   title: "Sub Categories",
-          //   path: "/sub-categories",
-          //   permission: "sub-categories.view",
-          // },
-          {
-            title: "UOM",
-            path: "/uoms",
-            permission: "uoms.view",
-          },
-          {
-            title: "Colors",
-            path: "/colours",
-            permission: "colors.view",
-          },
-          {
-            title: "Sizes",
-            path: "/sizes",
-            permission: "sizes.view",
-          },
-        ]
+        path: "/products",
+        permission: "products.view",
       },
       {
         title: "Raw Material Masters",
-        children: [
-          {
-            title: "Raw Materials",
-            path: "/raw-materials",
-            permission: "raw_materials.view",
-          },
-          {
-            title: "RM Categories",
-            path: "/raw-material-categories",
-            permission: "raw_materials.view",
-          },
-        ]
+        path: "/raw-materials",
+        permission: "raw_materials.view",
       },
       {
         title: "Store & Locations",
-        children: [
-          {
-            title: "Store Types",
-            path: "/store-types",
-            permission: "stores.view",
-          },
-          {
-            title: "Storage Stores",
-            path: "/storage-stores",
-            permission: "storage-stores.view",
-          },
-          {
-            title: "Locations",
-            path: "/locations",
-            permission: "locations.view",
-          },
-        ]
+        path: "/store-types",
+        permission: "stores.view",
       },
       {
         title: "Production Masters",
@@ -130,28 +75,8 @@ export const sidebarItems: SidebarItem[] = [
       },
       {
         title: "HR & Organization",
-        children: [
-          {
-            title: "Employees",
-            path: "/employees",
-            permission: "employees.view",
-          },
-          {
-            title: "Departments",
-            path: "/departments",
-            permission: "departments.view",
-          },
-          {
-            title: "Designations",
-            path: "/designations",
-            permission: "designations.view",
-          },
-          {
-            title: "Shift Management",
-            path: "/shifts",
-            permission: "shifts.view",
-          },
-        ]
+        path: "/employees",
+        permission: "employees.view",
       }
     ],
   },

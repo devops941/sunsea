@@ -48,7 +48,7 @@ const ProfilePage: React.FC = () => {
                             <h2 className="cp-company-name">{employee.fullName || "N/A"}</h2>
                             <span className="cp-company-type">
                                 <FaIdBadge style={{ marginRight: '6px' }} />
-                                {employee.designation?.name || "Employee Profile"}
+                                {employee.department?.name || "Employee Profile"}
                             </span>
                         </div>
                     </div>
@@ -78,10 +78,6 @@ const ProfilePage: React.FC = () => {
                             <div className="cp-info-item">
                                 <span className="cp-info-label">Department</span>
                                 <span className="cp-info-value">{employee.department?.name || "N/A"}</span>
-                            </div>
-                            <div className="cp-info-item">
-                                <span className="cp-info-label">Designation</span>
-                                <span className="cp-info-value">{employee.designation?.name || "N/A"}</span>
                             </div>
                             <div className="cp-info-item">
                                 <span className="cp-info-label">Date of Joining</span>

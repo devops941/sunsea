@@ -8,7 +8,7 @@ import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import CustomButton from "../../../components/ui/custombutton/CustomButton";
 import { useEmployees } from "../../../hooks/useEmployees";
 import { useDepartments } from "../../../hooks/useDepartments";
-import { useDesignations } from "../../../hooks/useDesignations";
+
 import { useRoles } from "../../../hooks/useRoles";
 import { employeeService } from "../../../services/employeeService";
 import { useSelector } from "react-redux";
@@ -17,7 +17,6 @@ const EmployeeCreatePage: React.FC = () => {
   const navigate = useNavigate();
   const { addEmployee, employees, loadEmployees } = useEmployees();
   const { departments, loadDepartments } = useDepartments();
-  const { designations, loadDesignations } = useDesignations();
   const { roles, loadRoles } = useRoles();
   const user = useSelector((state: any) => state.auth.user);
 
@@ -29,7 +28,6 @@ const EmployeeCreatePage: React.FC = () => {
     mobile: "",
     email: "",
     departmentId: "",
-    designationId: "",
     status: "active",
     createLoginAccount: false,
     username: "",
@@ -77,17 +75,6 @@ const EmployeeCreatePage: React.FC = () => {
   //     loadDesignations(Number(firstDeptId));
   //   }
   // }, [departments]);
-useEffect(() => {
-  if (!formData.departmentId) return;
-
-  loadDesignations(Number(formData.departmentId));
-}, [formData.departmentId, loadDesignations]);
-  useEffect(() => {
-    if (formData.departmentId) {
-      loadDesignations(Number(formData.departmentId));
-    }
-  }, [formData.departmentId, loadDesignations]);
-
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -105,7 +92,7 @@ useEffect(() => {
 
       // RESET DESIGNATION WHEN DEPARTMENT CHANGES
       if (name === "departmentId") {
-        updated.designationId = "";
+        // Nothing to reset
       }
 
       return updated;
@@ -123,7 +110,6 @@ useEffect(() => {
       mobile: "",
       email: "",
       departmentId: "",
-      designationId: "",
       status: "active",
       createLoginAccount: false,
       username: "",
@@ -147,7 +133,6 @@ useEffect(() => {
         mobile: formData.mobile || undefined,
         email: formData.email || undefined,
         departmentId: formData.departmentId ? Number(formData.departmentId) : undefined,
-        designationId: formData.designationId ? Number(formData.designationId) : undefined,
         status: formData.status as any,
         createLoginAccount: formData.createLoginAccount,
         createdBy: user ? user?.userId : undefined,
@@ -176,12 +161,7 @@ useEffect(() => {
     }));
   }, [departments]);
 
-  const designationOptions = useMemo(() => {
-    return designations.map((d) => ({
-      value: String(d.id),
-      label: d.name,
-    }));
-  }, [designations]);
+
 
   const roleOptions = useMemo(() => {
     return roles.map(r => ({ value: String(r.id), label: r.name }));
@@ -210,11 +190,11 @@ useEffect(() => {
       newErrors.fullName = "Employee name is required";
     }
 
-    if (! /^\d{10}$/.test(formData.mobile.trim())) {
+    if (formData.mobile.trim() && !/^\d{10}$/.test(formData.mobile.trim())) {
       newErrors.mobile = "Enter a valid 10-digit mobile number";
     }
 
-    if (!formData.email) {
+    if (formData.email.trim()) {
       const emailFormatValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim());
       if (!emailFormatValid) {
         newErrors.email = "Enter a valid email address";
@@ -324,18 +304,7 @@ useEffect(() => {
               />
             </Col>
 
-            <Col lg={4} md={6}>
-              <SelectInput
-                label="Designation"
-                name="designationId"
-                value={formData.designationId}
-                options={designationOptions}
-                defaultOptionLabel="Select Designation"
-                required
-                disabled={!formData.departmentId}
-                onChange={handleChange}
-              />
-            </Col>
+
 
             <Col lg={4} md={6}>
               <SelectInput
@@ -416,8 +385,10 @@ useEffect(() => {
                     name="roleId"
                     value={formData.roleId}
                     options={roleOptions}
+                    defaultOptionLabel="Select Role"
                     required
                     onChange={handleChange}
+                    error={errors.roleId}
                   />
                 </Col>
 

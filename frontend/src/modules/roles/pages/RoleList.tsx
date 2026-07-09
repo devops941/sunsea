@@ -11,11 +11,14 @@ import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import CommonViewModal from "../../../components/ui/CommonViewModal/CommonViewModal";
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import { useRoles } from "../../../hooks/useRoles";
+import { useAppSelector } from "../../../hooks/reduxHooks";
+import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 
 const ITEMS_PER_PAGE = 10;
 
 const RoleList: React.FC = () => {
     const { roles, loading, error, loadRoles, addRole, editRole, removeRole } = useRoles();
+    const { user } = useAppSelector((state) => state.auth);
 
     const [searchTerm, setSearchTerm] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
@@ -24,7 +27,7 @@ const RoleList: React.FC = () => {
     const [editMode, setEditMode] = useState(false);
     const [selectedRole, setSelectedRole] = useState<any>(null);
     const [formErrors, setFormErrors] = useState<{
-        code?: string;
+        
         name?: string;
     }>({});
 
@@ -34,7 +37,7 @@ const RoleList: React.FC = () => {
 
     const [formData, setFormData] = useState({
         id: "",
-        code: "",
+        
         name: "",
         description: "",
         status: "active",
@@ -57,7 +60,7 @@ const RoleList: React.FC = () => {
 
     const filteredRoles = useMemo(() => {
         return roles.filter(role =>
-            role.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            
             role.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
             (role.description && role.description.toLowerCase().includes(searchTerm.toLowerCase()))
         );
@@ -71,7 +74,7 @@ const RoleList: React.FC = () => {
         setEditMode(false);
         setFormData({
             id: "",
-            code: "",
+            
             name: "",
             description: "",
             status: "active",
@@ -83,7 +86,7 @@ const RoleList: React.FC = () => {
         setEditMode(true);
         setFormData({
             id: String(role.id),
-            code: role.code,
+            
             name: role.name,
             description: role.description || "",
             status: role.status,
@@ -126,9 +129,7 @@ const RoleList: React.FC = () => {
     const validateRoleForm = () => {
         const errors: any = {};
 
-        if (!formData.code.trim()) {
-            errors.code = "Role code is required";
-        }
+        
 
         if (!formData.name.trim()) {
             errors.name = "Role name is required";
@@ -143,7 +144,7 @@ const RoleList: React.FC = () => {
         if (!validateRoleForm()) return;
         try {
             const payload = {
-                code: formData.code,
+                
                 name: formData.name,
                 description: formData.description,
                 status: formData.status
@@ -208,7 +209,6 @@ const RoleList: React.FC = () => {
                                 <thead>
                                     <tr>
                                         <th style={{ width: "60px" }}>#</th>
-                                        <th>Role Code</th>
                                         <th>Role Name</th>
                                         <th>Description</th>
                                         <th>Status</th>
@@ -220,30 +220,24 @@ const RoleList: React.FC = () => {
                                         paginatedRoles.map((role, index) => (
                                             <tr key={role.id} className="master-data-row">
                                                 <td className="master-data-cell">{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</td>
-                                                <td className="master-data-cell">{role.code}</td>
+                                                
                                                 <td className="master-data-cell">{role.name}</td>
                                                 <td className="master-data-cell">{role.description}</td>
                                                 <td className="master-data-cell">
-                                                    <span className={`status-pill status-pill--${role.status === "active" ? "active" : "inactive"}`}>
-                                                        {role.status}
-                                                    </span>
+                                                    <StatusBadge status={role.status} />
                                                 </td>
                                                 <td className="master-data-cell">
                                                     <div className="table-action-group">
                                                         <ViewButton onClick={() => handleOpenView(role)} />
-                                                        {!role.isSystem && (
-                                                            <>
-                                                                <EditButton onClick={() => handleOpenEdit(role)} />
-                                                                <DeleteButton onClick={() => triggerDelete(role.id)} />
-                                                            </>
-                                                        )}
+                                                        <EditButton onClick={() => handleOpenEdit(role)} />
+                                                        <DeleteButton onClick={() => triggerDelete(role.id)} />
                                                     </div>
                                                 </td>
                                             </tr>
                                         ))
                                     ) : (
                                         <tr>
-                                            <td colSpan={6} className="text-center p-4">No roles found.</td>
+                                            <td colSpan={5} className="text-center p-4">No roles found.</td>
                                         </tr>
                                     )}
                                 </tbody>
@@ -283,18 +277,7 @@ const RoleList: React.FC = () => {
                     <form onSubmit={handleSubmit}>
                         <Modal.Body>
                             <Row className="g-3">
-                                <Col md={12}>
-                                    <TextInput
-                                        label="Role Code"
-                                        name="code"
-                                        value={formData.code}
-                                        placeholder="e.g. SADMIN"
-                                        required
-                                        onChange={handleChange}
-                                        error={formErrors.code}
-
-                                    />
-                                </Col>
+                                
                                 <Col md={12}>
                                     <TextInput
                                         label="Role Name"
@@ -336,7 +319,7 @@ const RoleList: React.FC = () => {
                                 icon={FaEraser}
                                 onClick={() => setFormData({
                                     id: formData.id,
-                                    code: "",
+                                    
                                     name: "",
                                     description: "",
                                     status: "active",
@@ -361,20 +344,16 @@ const RoleList: React.FC = () => {
                     modalTitle="Role Details"
                     avatarText={selectedRole ? selectedRole.name.charAt(0).toUpperCase() : ""}
                     headerTitle={selectedRole ? selectedRole.name : ""}
-                    headerSubtitle={selectedRole ? `Code: ${selectedRole.code}` : ""}
+                    
                     sections={selectedRole ? [
                         {
                             fields: [
-                                { label: "Role Code", value: selectedRole.code },
+                                
                                 { label: "Role Name", value: selectedRole.name },
                                 { label: "Description", value: selectedRole.description || "N/A" },
                                 {
                                     label: "Status",
-                                    value: (
-                                        <span className={`badge bg-${selectedRole.status === "active" ? "success" : "secondary"}`}>
-                                            {selectedRole.status}
-                                        </span>
-                                    )
+                                    value: <StatusBadge status={selectedRole.status} />
                                 },
                                 { label: "System Role", value: selectedRole.isSystem ? "Yes" : "No" },
                                 { label: "Role ID", value: <span className="text-muted font-monospace small">{String(selectedRole.id)}</span> }

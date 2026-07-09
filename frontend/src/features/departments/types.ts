@@ -1,14 +1,14 @@
 export interface Department {
   id: number;
-  code: string;
   name: string;
+  description?: string | null;
   createdAt: string;
   updatedAt: string;
 }
 
 export interface CreateDepartmentDto {
-  code: string;
   name: string;
+  description?: string | null;
 }
 
 export type UpdateDepartmentDto = Partial<CreateDepartmentDto>;

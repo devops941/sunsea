@@ -14,8 +14,9 @@ import {
 
 export interface UserProfile {
   fullName: string;
-  roleId?: string;
+  roleId?: string | null;
   avatarUrl?: string;
+  isSuperAdmin?: boolean;
 }
 
 export interface SearchCategory {
@@ -74,9 +75,10 @@ const TopNavbar: React.FC<NavbarProps> = ({
   };
 
   // Helper to format role
-  const formatRole = (role?: string) => {
-    if (!role) return "User";
-    return role.replace("ROLE_", "").replace("_", " ");
+  const formatRole = (userObj?: UserProfile | null) => {
+    if (userObj?.isSuperAdmin) return "Super Admin";
+    if (!userObj?.roleId) return "User";
+    return userObj.roleId.replace("ROLE_", "").replace("_", " ");
   };
 
   return (
@@ -174,7 +176,7 @@ const TopNavbar: React.FC<NavbarProps> = ({
                 {user ? user.fullName : "Guest"}
               </div>
               <div className="header-user-role">
-                {user ? formatRole(user.roleId) : "Visitor"}
+                {user ? formatRole(user) : "Visitor"}
               </div>
             </div>
           </div>

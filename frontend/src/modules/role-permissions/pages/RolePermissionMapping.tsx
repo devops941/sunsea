@@ -49,15 +49,22 @@ const RolePermissionMapping: React.FC = () => {
         return assignedPermissionsForRole.map((p) => p.id);
     }, [assignedPermissionsForRole]);
 
+    // Helper function to recursively extract permission keys
+    const extractPermissions = (items: any[]): string[] => {
+        let perms: string[] = [];
+        for (const item of items) {
+            if (item.permission) perms.push(item.permission);
+            if (item.children) perms = perms.concat(extractPermissions(item.children));
+        }
+        return perms;
+    };
+
     // Group permissions by sidebar section, matching on the resource
     // prefix of each permission key (e.g. "users" from "users.view").
     const permissionsByModule = useMemo(() => {
         return sidebarItems
             .map((sidebar) => {
-                const childPermissionKeys =
-                    sidebar.children
-                        ?.map((child) => child.permission)
-                        .filter((p): p is string => Boolean(p)) || [];
+                const childPermissionKeys = extractPermissions(sidebar.children || []);
 
                 const groupedPermissions = permissions.filter((perm) => {
                     const resource = perm.key.split(".")[0];
