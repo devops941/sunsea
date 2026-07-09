@@ -9,6 +9,8 @@ import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import ImageUpload from "../../../components/form/ImageUpload/ImageUpload";
 import CustomButton from "../../../components/ui/custombutton/CustomButton";
 import Section from "../../../components/ui/Section/Section";
+import CityStateSelect from "../../../components/ui/CityStateSelect/CityStateSelect";
+import IndiaPhoneInput from "../../../components/ui/PhoneInput/PhoneInput";
 import type { RootState, AppDispatch } from '../../../app/store';
 import { fetchCompany, updateCompany } from '../../../features/company/companySlice';
 import type { UpdateCompanyDto } from '../../../features/company/types';
@@ -30,7 +32,7 @@ const CompanySettings: React.FC = () => {
   useEffect(() => {
     if (company) {
       setFormData({
-        companyCode: company.companyCode || "",
+        companyCode: company.companyCode || `CMP-${Math.floor(10000 + Math.random() * 90000)}`,
         legalName: company.legalName || company.companyName || "",
         shortName: company.shortName || "",
         gstin: company.gstin || "",
@@ -75,6 +77,16 @@ const CompanySettings: React.FC = () => {
     if (errors[name]) {
       setErrors((prev: any) => ({ ...prev, [name]: undefined }));
     }
+  };
+
+  const handleStateChange = (stateData: any) => {
+    setFormData((prev) => ({ ...prev, state: stateData.name, city: "" }));
+    setErrors((prev: any) => ({ ...prev, state: undefined, city: undefined }));
+  };
+
+  const handleCityChange = (cityData: any) => {
+    setFormData((prev) => ({ ...prev, city: cityData.name }));
+    setErrors((prev: any) => ({ ...prev, city: undefined }));
   };
 
   const validate = (): boolean => {
@@ -128,11 +140,11 @@ const CompanySettings: React.FC = () => {
                     <TextInput label="Legal Company Name" name="legalName" value={formData.legalName || ""} onChange={handleChange} placeholder="Enter Legal Name" required error={errors.legalName} />
                   </Col>
                   <Col md={4}>
-                    <TextInput label="Company Code" name="companyCode" value={formData.companyCode || ""} onChange={handleChange} placeholder="Enter Company Code" required error={errors.companyCode} />
+                    <TextInput label="Company Code (Auto Generated)" name="companyCode" value={formData.companyCode || ""} onChange={handleChange} placeholder="Auto Generated" disabled error={errors.companyCode} />
                   </Col>
                   <Col md={4}>
                     <SelectInput label="Currency Code" name="currencyCode" value={formData.currencyCode || "INR"} onChange={handleChange as any} required disabled={isEditMode} options={[
-                      { value: "INR", label: "INR - Indian Rupee" }, { value: "USD", label: "USD - US Dollar" }, { value: "EUR", label: "EUR - Euro" }
+                      { value: "INR", label: "INR - Indian Rupee" }
                     ]} />
                   </Col>
                   <Col md={12}>
@@ -157,11 +169,17 @@ const CompanySettings: React.FC = () => {
                   <Col lg={6} md={12}>
                     <TextInput label="Address Line 2" name="addressLine2" value={formData.addressLine2 || ""} onChange={handleChange} placeholder="Enter Address Line 2" error={errors.addressLine2} />
                   </Col>
-                  <Col lg={3} md={6}>
-                    <TextInput label="City" name="city" value={formData.city || ""} onChange={handleChange} placeholder="Enter City" required error={errors.city} />
-                  </Col>
-                  <Col lg={3} md={6}>
-                    <TextInput label="State" name="state" value={formData.state || ""} onChange={handleChange} placeholder="Enter State" required error={errors.state} />
+                  <Col lg={6} md={12}>
+                    <CityStateSelect
+                      stateLabel="State"
+                      stateValue={formData.state || ""}
+                      onStateChange={handleStateChange}
+                      stateError={errors.state}
+                      cityLabel="City"
+                      cityValue={formData.city || ""}
+                      onCityChange={handleCityChange}
+                      cityError={errors.city}
+                    />
                   </Col>
                   <Col lg={3} md={6}>
                     <TextInput label="Zipcode" name="zipcode" value={formData.zipcode || ""} onChange={handleChange} placeholder="Enter Zipcode" required error={errors.zipcode} />
@@ -178,7 +196,19 @@ const CompanySettings: React.FC = () => {
                     <TextInput label="Email Address" name="email" type="email" value={formData.email || ""} onChange={handleChange} placeholder="Enter Email" required error={errors.email} />
                   </Col>
                   <Col md={6}>
-                    <TextInput label="Phone Number" name="phone" value={formData.phone || ""} onChange={handleChange} placeholder="Enter Phone" required error={errors.phone} />
+                    <div className="mb-3">
+                      <label className="form-label">Phone Number <span className="text-danger">*</span></label>
+                      <IndiaPhoneInput 
+                        name="phone"
+                        value={formData.phone || ""} 
+                        onChange={(e) => {
+                          setFormData(prev => ({...prev, phone: e.target.value}));
+                          if (errors.phone) setErrors((prev: any) => ({...prev, phone: undefined}));
+                        }} 
+                        required={true} 
+                      />
+                      {errors.phone && <div className="text-danger small mt-1">{errors.phone}</div>}
+                    </div>
                   </Col>
                 </Row>
               </Section>
@@ -214,14 +244,14 @@ const CompanySettings: React.FC = () => {
                 <TextInput label="Legal Name" name="legalName" value={formData.legalName || ""} onChange={handleChange} placeholder="Enter Legal Name" required error={errors.legalName} />
               </Col>
               <Col lg={4} md={6}>
-                <TextInput label="Company Code" name="companyCode" value={formData.companyCode || ""} onChange={handleChange} placeholder="Enter Company Code" required error={errors.companyCode} />
+                <TextInput label="Company Code (Auto Generated)" name="companyCode" value={formData.companyCode || ""} onChange={handleChange} placeholder="Auto Generated" disabled error={errors.companyCode} />
               </Col>
               <Col lg={4} md={6}>
                 <TextInput label="Short Name" name="shortName" value={formData.shortName || ""} onChange={handleChange} placeholder="Enter Short Name" />
               </Col>
               <Col lg={4} md={6}>
                 <SelectInput label="Currency Code" name="currencyCode" value={formData.currencyCode || "INR"} onChange={handleChange as any} required disabled={isEditMode} options={[
-                  { value: "INR", label: "INR - Indian Rupee" }, { value: "USD", label: "USD - US Dollar" }, { value: "EUR", label: "EUR - Euro" }
+                  { value: "INR", label: "INR - Indian Rupee" }
                 ]} />
               </Col>
             </Row>
@@ -243,11 +273,17 @@ const CompanySettings: React.FC = () => {
               <Col lg={6} md={12}>
                 <TextInput label="Address Line 2" name="addressLine2" value={formData.addressLine2 || ""} onChange={handleChange} placeholder="Enter Address Line 2" error={errors.addressLine2} />
               </Col>
-              <Col lg={3} md={6}>
-                <TextInput label="City" name="city" value={formData.city || ""} onChange={handleChange} placeholder="Enter City" required error={errors.city} />
-              </Col>
-              <Col lg={3} md={6}>
-                <TextInput label="State" name="state" value={formData.state || ""} onChange={handleChange} placeholder="Enter State" required error={errors.state} />
+              <Col lg={4} md={6}>
+                <CityStateSelect
+                  stateLabel="State"
+                  stateValue={formData.state || ""}
+                  onStateChange={handleStateChange}
+                  stateError={errors.state}
+                  cityLabel="City"
+                  cityValue={formData.city || ""}
+                  onCityChange={handleCityChange}
+                  cityError={errors.city}
+                />
               </Col>
               <Col lg={3} md={6}>
                 <TextInput label="Zipcode" name="zipcode" value={formData.zipcode || ""} onChange={handleChange} placeholder="Enter Zipcode" required error={errors.zipcode} />
@@ -264,7 +300,19 @@ const CompanySettings: React.FC = () => {
                 <TextInput label="Email Address" name="email" type="email" value={formData.email || ""} onChange={handleChange} placeholder="Enter Email" required error={errors.email} />
               </Col>
               <Col lg={4} md={6}>
-                <TextInput label="Phone Number" name="phone" value={formData.phone || ""} onChange={handleChange} placeholder="Enter Phone" required error={errors.phone} />
+                <div className="mb-3">
+                  <label className="form-label">Phone Number <span className="text-danger">*</span></label>
+                  <IndiaPhoneInput 
+                    name="phone"
+                    value={formData.phone || ""} 
+                    onChange={(e) => {
+                      setFormData(prev => ({...prev, phone: e.target.value}));
+                      if (errors.phone) setErrors((prev: any) => ({...prev, phone: undefined}));
+                    }} 
+                    required={true} 
+                  />
+                  {errors.phone && <div className="text-danger small mt-1">{errors.phone}</div>}
+                </div>
               </Col>
               <Col lg={4} md={6}>
                 <TextInput label="Mobile Number" name="mobile" value={formData.mobile || ""} onChange={handleChange} placeholder="Enter Mobile" />
