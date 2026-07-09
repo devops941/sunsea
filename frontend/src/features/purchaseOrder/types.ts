@@ -43,6 +43,16 @@ export interface PurchaseOrderItem {
     unitPrice: number;
     discount: number;
     tax: number;
+    discountType?: "PERCENT" | "FLAT";
+    discountValue?: number;
+    discountAmount?: number;
+    taxableAmount?: number;
+    cgstRate?: number;
+    cgstAmount?: number;
+    sgstRate?: number;
+    sgstAmount?: number;
+    igstRate?: number;
+    igstAmount?: number;
     lineTotal: number;
 }
 
@@ -72,6 +82,9 @@ export interface PurchaseOrder {
     subtotal: number;
     totalDiscount: number;
     totalTax: number;
+    totalCgst?: number;
+    totalSgst?: number;
+    totalIgst?: number;
     netAmount: number;
 
     companyId?: string;
@@ -93,8 +106,6 @@ export interface PurchaseOrderFormData {
     billingCity: string;
     billingState: string;
     billingPincode: string;
-
-    sameAsBilling: boolean;
 
     shippingAddressLine1: string;
     shippingCity: string;
@@ -129,9 +140,18 @@ export interface CreatePurchaseOrderDto {
         uom: string;
         quantity: number;
         unitPrice: number;
-        subtotal: number;
         discount: number;
         tax: number;
+        discountType?: "PERCENT" | "FLAT";
+        discountValue?: number;
+        discountAmount?: number;
+        taxableAmount?: number;
+        cgstRate?: number;
+        cgstAmount?: number;
+        sgstRate?: number;
+        sgstAmount?: number;
+        igstRate?: number;
+        igstAmount?: number;
     }>;
 }
 

@@ -12,9 +12,7 @@ import CustomButton from "../../components/ui/custombutton/CustomButton";
 export const gstTaxSchema = z.object({
     id: z.string().optional(),
     taxName: z.string().min(1, "Tax name is required").max(50, "Max 50 characters"),
-    taxType: z.enum(["INTRA_STATE", "INTER_STATE"], {
-        error: () => ({ message: "Tax type is required" }),
-    }),
+    taxType: z.enum(["INTRA_STATE", "INTER_STATE"]).default("INTRA_STATE"),
     taxRate: z
         .string()
         .min(1, "Tax rate is required")
@@ -136,24 +134,6 @@ const GstTaxModal: React.FC<GstTaxModalProps> = ({ show, onClose, onSave, initia
                     </Row>
 
                     <Row className="mb-3">
-                        <Col md={6}>
-                            <Controller
-                                name="taxType"
-                                control={control}
-                                render={({ field }) => (
-                                    <SelectInput
-                                        label="Tax Type"
-                                        name={field.name}
-                                        value={field.value}
-                                        options={TAX_TYPE_OPTIONS}
-                                        onChange={field.onChange}
-                                        required
-                                        error={errors.taxType?.message}
-                                    />
-                                )}
-                            />
-                        </Col>
-
                         {/* ── Group 3: Status ── */}
                         <Col md={6}>
                             <Controller

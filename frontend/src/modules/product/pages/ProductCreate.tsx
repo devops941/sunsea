@@ -85,7 +85,7 @@ const ProductCreatePage: React.FC = () => {
     // Load initial data
     useEffect(() => {
         loadCategories({ isActive: true });
-        loadActiveUOMs();
+        // loadActiveUOMs();
         dispatch(fetchGstTaxes({ status: "ACTIVE" }));
         loadColors({ isActive: true });
         loadSizes({ isActive: true });

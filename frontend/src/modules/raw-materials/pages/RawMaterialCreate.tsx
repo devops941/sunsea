@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Container, Row, Col } from "react-bootstrap";
 import { FaSave, FaEraser, FaArrowLeft } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
@@ -10,6 +10,7 @@ import QuantityInput from "../../../components/form/QuantityInput/QuantityInput"
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
 import { createRawMaterial } from "../../../features/raw-materials/rawMaterialSlice";
 import { fetchStores } from "../../../features/stores/storeSlice";
+import { fetchGstTaxes, selectActiveGstTaxes } from "../../../features/gst/gstSlice";
 import { rawMaterialService } from "../../../services/rawMaterialService";
 import { useRawMaterialCategories } from "../../../hooks/useRawMaterialCategories";
 import UOMSelect from "../../../components/form/SelectInput/UOMSelect";
@@ -40,6 +41,7 @@ const initialFormState = {
     batchNo: "",
     onHandQty: "",
     reservedQty: "",
+    gstTaxRateId:"",
     avgCost: "",
     remarks: "",
     lastMovementAt: "",
@@ -193,6 +195,11 @@ const rawMaterialSchema = z
         status: z.enum(["Active", "Inactive"], {
             error: "Status is required",
         }),
+
+        gstTaxRateId: z
+            .string()
+            .trim()
+            .min(1, "GST Tax Type is required"),
     })
     .refine(
         data =>
@@ -215,9 +222,21 @@ const RawMaterialCreate: React.FC = () => {
     const { data: stores } = useAppSelector(state => state.stores);
     const { rawMaterialCategories, loadCategories } = useRawMaterialCategories();
 
+    const gstTaxes = useAppSelector(selectActiveGstTaxes);
+    const gstLoading = useAppSelector((state) => state.gst.loading);
+
+    const gstOptions = useMemo(() => [
+        { value: "", label: gstLoading ? "Loading GST rates..." : "-- Select GST Rate --" },
+        ...(gstTaxes || []).map((t: any) => ({
+            value: String(t.id),
+            label: `${t.taxName} (${t.taxRate}%)`,
+        })),
+    ], [gstTaxes, gstLoading]);
+
     useEffect(() => {
         dispatch(fetchStores(undefined));
         loadCategories();
+        dispatch(fetchGstTaxes({ status: "ACTIVE" }));
         const getNextId = async () => {
             try {
                 const nextId = await rawMaterialService.fetchNextId();
@@ -425,7 +444,7 @@ const RawMaterialCreate: React.FC = () => {
                                     "kg", "g", "t", "ton",
                                     "l", "ml", "ltr",
                                     "m", "cm", "mtr",
-                                    "dz","ea"
+                                    "dz", "ea"
                                 ]}
                                 onChange={(value) => {
                                     setFormData(prev => ({ ...prev, baseUom: value }));
@@ -447,7 +466,7 @@ const RawMaterialCreate: React.FC = () => {
                                 onChange={handleChange}
                             />
                         </Col>
-                        
+
                         <Col lg={4} md={6}>
                             <SelectInput
                                 label="Status"
@@ -542,6 +561,18 @@ const RawMaterialCreate: React.FC = () => {
                                 required
                                 error={errors.unitPrice}
                                 onChange={handleChange}
+                            />
+                        </Col>
+                        <Col lg={4} md={6}>
+                            <SelectInput
+                                label="GST TYPE (%)"
+                                name="gstTaxRateId"
+                                value={formData.gstTaxRateId}
+                                options={gstOptions}
+                                required
+                                onChange={handleChange}
+                                error={errors.gstTaxRateId}
+                                disabled={gstLoading}
                             />
                         </Col>
                     </Row>

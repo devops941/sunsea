@@ -32,6 +32,7 @@ export interface RawMaterial {
 
   remarks?: string | null;
   lastMovementAt?: string | null;
+  gstTaxRateId?: string | null;
 
   status?: string;
   isActive: boolean;
@@ -69,6 +70,7 @@ export interface CreateRawMaterialDto {
   batchNo?: string | null;
   remarks?: string | null;
   lastMovementAt?: string | null;
+  gstTaxRateId?: string | null;
 
   isActive?: boolean;
 }
@@ -94,6 +96,7 @@ export interface UpdateRawMaterialDto {
 
   remarks?: string | null;
   lastMovementAt?: string | null;
+  gstTaxRateId?: string | null;
 
   status?: string;
   isActive?: boolean;

@@ -52,6 +52,7 @@ const mapRawMaterial = (item: any): RawMaterial => ({
 
   remarks: item.remarks,
   lastMovementAt: item.lastMovementAt,
+  gstTaxRateId: item.gstTaxRateId,
 
   status: item.status,
   isActive: item.isActive,

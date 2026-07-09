@@ -38,22 +38,7 @@ export const validatePurchaseOrder = (data: PurchaseOrderFormData): Record<strin
   }
 
   // Shipping Address (only if not same as billing)
-  if (!data.sameAsBilling) {
-    if (!data.shippingAddressLine1) {
-      errors.shippingAddressLine1 = "Shipping address line is required";
-    }
-    if (!data.shippingCity) {
-      errors.shippingCity = "Shipping city is required";
-    }
-    if (!data.shippingState) {
-      errors.shippingState = "Shipping state is required";
-    }
-    if (!data.shippingPincode) {
-      errors.shippingPincode = "Shipping pincode is required";
-    } else if (!/^\d{6}$/.test(data.shippingPincode)) {
-      errors.shippingPincode = "Invalid pincode format";
-    }
-  }
+
 
   // Items
   if (data.items.length === 0) {

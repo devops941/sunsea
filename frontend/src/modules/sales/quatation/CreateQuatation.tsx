@@ -17,6 +17,7 @@ import { salesOrderService, type SalesOrder } from "../../../services/salesOrder
 import { DISPATCH_TYPE_OPTIONS, ORDER_TYPE_OPTIONS } from "../../../constants/selectOption";
 import { fetchGstTaxes, selectActiveGstTaxes } from "../../../features/gst/gstSlice";
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
+import { useSelector } from "react-redux";
 
 // ─── Options ────────────────────────────────────────────────────────────────
 const COLOR_TYPE_LABELS: Record<string, string> = {
@@ -60,6 +61,7 @@ const quotationSchema = z.object({
     shippingState: z.string().optional(),
     shippingPincode: z.string().optional(),
     items: z.array(orderItemSchema).min(1, "At least one item is required"),
+    isInterState: z.boolean().default(false),
     remarks: z.string().optional(),
     internalNotes: z.string().optional(),
     // ── Order-level discount (the ONLY discount input in this form) ──
@@ -88,6 +90,7 @@ const defaultValues: QuotationFormValues = {
     billingState: "",
     billingPincode: "",
     sameAsBilling: false,
+    isInterState: false,
     shippingAddressLine1: "",
     shippingCity: "",
     shippingState: "",
@@ -239,6 +242,10 @@ const QuotationForm: React.FC = () => {
     const internalNotes = watch("internalNotes");
     const orderDiscountType = watch("orderDiscountType");
     const orderDiscountValue = watch("orderDiscountValue");
+    const isInterState = watch("isInterState");
+    const billingState = watch("billingState");
+    const { data: company } = useSelector((state: any) => state.company);
+    const companyState = company?.state;
 
     const gstTaxes = useAppSelector(selectActiveGstTaxes);
     const gstLoading = useAppSelector((state) => state.gst.loading);
@@ -414,6 +421,15 @@ const QuotationForm: React.FC = () => {
             setValue("quotationNo", qtNo);
         });
     }, [location, setValue, isEditMode]);
+
+    const computedIsInterState = useMemo(() => {
+        if (!companyState || !billingState) return false;
+        return companyState.toLowerCase().trim() !== billingState.toLowerCase().trim();
+    }, [companyState, billingState]);
+
+    useEffect(() => {
+        setValue("isInterState", computedIsInterState, { shouldValidate: true });
+    }, [computedIsInterState, setValue]);
 
     // ─── Re-populate product IDs when products load ──
     useEffect(() => {
@@ -600,6 +616,7 @@ const QuotationForm: React.FC = () => {
                 shippingCity: data.sameAsBilling ? (data.billingCity ?? "") : (data.shippingCity ?? ""),
                 shippingState: data.sameAsBilling ? (data.billingState ?? "") : (data.shippingState ?? ""),
                 shippingPincode: data.sameAsBilling ? (data.billingPincode ?? "") : (data.shippingPincode ?? ""),
+                isInterState: data.isInterState,
                 remarks: data.remarks,
                 internalNotes: data.internalNotes,
                 items: transformedItems,
@@ -902,8 +919,25 @@ const QuotationForm: React.FC = () => {
                                                         <span>- ₹{totals.totalDiscount.toFixed(2)}</span>
                                                     </div>
                                                 )}
+                                                {isInterState ? (
+                                                    <div className="d-flex justify-content-between py-1 small text-success">
+                                                        <span>IGST</span>
+                                                        <span>+ ₹{totals.totalGst.toFixed(2)}</span>
+                                                    </div>
+                                                ) : (
+                                                    <>
+                                                        <div className="d-flex justify-content-between py-1 small text-success">
+                                                            <span>CGST</span>
+                                                            <span>+ ₹{(totals.totalGst / 2).toFixed(2)}</span>
+                                                        </div>
+                                                        <div className="d-flex justify-content-between py-1 small text-success">
+                                                            <span>SGST</span>
+                                                            <span>+ ₹{(totals.totalGst / 2).toFixed(2)}</span>
+                                                        </div>
+                                                    </>
+                                                )}
                                                 <div className="d-flex justify-content-between py-1">
-                                                    <span className="text-muted">GST</span>
+                                                    <span className="text-muted">Total GST</span>
                                                     <span>+ ₹{totals.totalGst.toFixed(2)}</span>
                                                 </div>
 

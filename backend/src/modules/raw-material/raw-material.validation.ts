@@ -108,6 +108,12 @@ export const createRawMaterialSchema = z.object({
       .optional()
       .nullable(),
 
+    gstTaxRateId: z
+      .string()
+      .uuid("GST Tax Rate ID must be a valid UUID")
+      .optional()
+      .nullable(),
+
     status: z
       .string()
       .max(20, "Status cannot exceed 20 characters")
