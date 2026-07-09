@@ -1,0 +1,638 @@
+import { Suspense, lazy } from "react";
+import { Routes, Route } from "react-router-dom";
+import { Spinner } from "react-bootstrap";
+
+import BaseLayout from "../components/layout/BaseLayout";
+import ProtectedRoute from "./ProtectedRoute";
+import PublicRoute from "./PublicRoute";
+
+const Dashboard = lazy(() => import("../modules/dashboard/pages/DashboardPage"));
+const CompanySettings = lazy(() => import("../modules/company/pages/CompanySettings"));
+const CompanyProfile = lazy(() => import("../modules/company/pages/CompanyProfile"));
+const Sample = lazy(() => import("../modules/sample"));
+const NotFoundPage = lazy(() => import("../modules/not-found/pages/NotFoundPage"));
+const LoginPage = lazy(() => import("../modules/login/pages/LoginPage"));
+const ResetPassword = lazy(() => import("../modules/passwordreset/pages/ResetPassword"));
+
+// Customers
+const CustomerListPage = lazy(() => import("../modules/customers/pages/CustomerListPage"));
+const CustomerCreatePage = lazy(() => import("../modules/customers/pages/CustomerCreatePage"));
+const CustomerEditPage = lazy(() => import("../modules/customers/pages/CustomerEditPage"));
+
+// Employees
+const Employeelist = lazy(() => import("../modules/employee/pages/EmployeeList"));
+const EmployeeCreatePage = lazy(() => import("../modules/employee/pages/EmployeeCreate"));
+const EmployeeEdit = lazy(() => import("../modules/employee/pages/EmployeeEdit"));
+
+// Suppliers
+const SupplierListPage = lazy(() => import("../modules/supplier/pages/SupplierList"));
+const SupplierCreatePage = lazy(() => import("../modules/supplier/pages/SupplierCreate"));
+const SupplierEditPage = lazy(() => import("../modules/supplier/pages/SupplierEdit"));
+const SupplierMaterialPricingList = lazy(() => import("../modules/supplier/pages/Suppliermaterialpricinglist"));
+
+// Products
+const ProductList = lazy(() => import("../modules/product/pages/ProductList"));
+const ProductEdit = lazy(() => import("../modules/product/pages/ProductEdit"));
+const ProductCreatePage = lazy(() => import("../modules/product/pages/ProductCreate"));
+
+// Categories & Sub Categories (Product Master)
+const CategoryList = lazy(() => import("../modules/product/pages/CategoryList"));
+const SubcategoryList = lazy(() => import("../modules/product/pages/SubCategoryList"));
+
+// Administration
+const UserList = lazy(() => import("../modules/users/pages/UserList"));
+const RoleList = lazy(() => import("../modules/roles/pages/RoleList"));
+const PermissionList = lazy(() => import("../modules/permissions/pages/PermissionList"));
+const RolePermissionMapping = lazy(() => import("../modules/role-permissions/pages/RolePermissionMapping"));
+
+// HR
+const DepartmentList = lazy(() => import("../modules/departments/pages/DepartmentList"));
+const DesignationList = lazy(() => import("../modules/designations/pages/DesignationList"));
+
+// Product Master Attributes
+const ColourList = lazy(() => import("../modules/product/pages/ColorList"));
+const SizeList = lazy(() => import("../modules/product/pages/SizeList"));
+const UomList = lazy(() => import("../modules/product/pages/UOMList"));
+
+// Product Management
+const ProductPricing = lazy(() => import("../modules/product-pricing/pages/ProductPricing"));
+const ProductImageUpload = lazy(() => import("../modules/product-images/pages/ProductImageUpload"));
+
+// New modules
+const StorageStoreList = lazy(() => import("../modules/storage-stores/pages/StorageStoreList"));
+const StorageStoreCreate = lazy(() => import("../modules/storage-stores/pages/StorageStoreCreate"));
+const StorageStoreEdit = lazy(() => import("../modules/storage-stores/pages/StorageStoreEdit"));
+
+const StoreTypeList = lazy(() => import("../modules/store-types/pages/StoreTypeList"));
+const StoreTypeCreate = lazy(() => import("../modules/store-types/pages/StoreTypeCreate"));
+const StoreTypeEdit = lazy(() => import("../modules/store-types/pages/StoreTypeEdit"));
+
+const LocationList = lazy(() => import("../modules/locations/pages/LocationList"));
+const LocationCreate = lazy(() => import("../modules/locations/pages/LocationCreate"));
+const LocationEdit = lazy(() => import("../modules/locations/pages/LocationEdit"));
+
+const MachineList = lazy(() => import("../modules/machines/pages/MachineList"));
+const MachineCreate = lazy(() => import("../modules/machines/pages/MachineCreate"));
+const MachineEdit = lazy(() => import("../modules/machines/pages/MachineEdit"));
+
+// shift
+const ShiftList = lazy(() => import("../modules/shifts/pages/ShiftList"));
+const ShiftCreate = lazy(() => import("../modules/shifts/pages/ShiftCreate"));
+const ShiftEdit = lazy(() => import("../modules/shifts/pages/ShiftEdit"));
+
+const RawMaterialList = lazy(() => import("../modules/raw-materials/pages/RawMaterialList"));
+const RawMaterialCreate = lazy(() => import("../modules/raw-materials/pages/RawMaterialCreate"));
+const RawMaterialEdit = lazy(() => import("../modules/raw-materials/pages/RawMaterialEdit"));
+const RawMaterialCategoryList = lazy(() => import("../modules/raw-material-categories/pages/RawMaterialCategoryList"));
+const RawMaterialCategoryCreate = lazy(() => import("../modules/raw-material-categories/pages/RawMaterialCategoryCreate"));
+const RawMaterialCategoryEdit = lazy(() => import("../modules/raw-material-categories/pages/RawMaterialCategoryEdit"));
+
+const StockList = lazy(() => import("../modules/stock/pages/StockList"));
+
+const StockAdjustmentList = lazy(() => import("../modules/stock-adjustments/pages/StockAdjustmentList"));
+const StockAdjustmentForm = lazy(() => import("../modules/stock-adjustments/pages/StockAdjustmentForm"));
+const StockAdjustmentView = lazy(() => import("../modules/stock-adjustments/pages/StockAdjustmentView"));
+
+const FinishedStockList = lazy(() => import("../modules/finished-stock/pages/FinishedStockList"));
+const FinishedStockCreate = lazy(() => import("../modules/finished-stock/pages/FinishedStockCreate"));
+const FinishedStockEdit = lazy(() => import("../modules/finished-stock/pages/FinishedStockEdit"));
+
+const WastageStockList = lazy(() => import("../modules/wastage-stock/pages/WastageStockList"));
+const WastageStockCreate = lazy(() => import("../modules/wastage-stock/pages/WastageStockCreate"));
+const WastageStockEdit = lazy(() => import("../modules/wastage-stock/pages/WastageStockEdit"));
+
+const WeeklyMachineScheduleList = lazy(() => import("../modules/weekly-machine-schedules/pages/WeeklyMachineScheduleList"));
+
+const WeeklyMachineScheduleCreate = lazy(() => import("../modules/weekly-machine-schedules/pages/WeeklyMachineScheduleCreate"));
+const WeeklyMachineScheduleEdit = lazy(() => import("../modules/weekly-machine-schedules/pages/WeeklyMachineScheduleEdit"));
+
+const DailyMachinePlanning = lazy(() => import("../modules/daily-machine-planning/pages/DailyMachinePlanning"));
+const ShiftExecutionBoard = lazy(() => import("../modules/shift-execution/pages/ShiftExecutionBoard"));
+const ProductionDashboard = lazy(() => import("../modules/dashboard/pages/ProductionDashboard"));
+const ProductionReportsCenter = lazy(() => import("../modules/reports/pages/ProductionReportsCenter"));
+
+const HourlyWorkReportList = lazy(() => import("../modules/hourly-work-reports/pages/HourlyWorkReportList"));
+const HourlyWorkReportCreate = lazy(() => import("../modules/hourly-work-reports/pages/HourlyWorkReportCreate"));
+const HourlyWorkReportEdit = lazy(() => import("../modules/hourly-work-reports/pages/HourlyWorkReportEdit"));
+
+const WastageList = lazy(() => import("../modules/production-wastage/pages/WastageList"));
+const WastageForm = lazy(() => import("../modules/production-wastage/pages/WastageCreate"));
+
+const ProductionOrderList = lazy(() => import("../modules/production-orders/pages/ProductionOrderList"));
+const AllProductionOrderList = lazy(() => import("../modules/production-orders/pages/AllProductionOrderList"));
+const ApprovedSalesOrderList = lazy(() => import("../modules/production-orders/pages/ApprovedSalesOrderList"));
+const ProductionOrderCreate = lazy(() => import("../modules/production-orders/pages/ProductionOrderCreate"));
+
+
+const BillOfMaterialList = lazy(() => import("../modules/bill-of-material/pages/BillOfMaterialList"));
+const BillOfMaterialCreate = lazy(() => import("../modules/bill-of-material/pages/BillOfMaterialCreate"));
+const BillOfMaterialEdit = lazy(() => import("../modules/bill-of-material/pages/BillOfMaterialEdit"));
+const SalesOrderList = lazy(() => import("../modules/sales/salesorder/SalesOrderList"));
+const SalesOrderCreate = lazy(() => import("../modules/sales/salesorder/CreateOrder"));
+const AllSalesOrderList = lazy(() => import("../modules/sales/salesorder/AllSalesOrderList"))
+const OrderDetails = lazy(() => import("../modules/sales/salesorder/SalesOrderDetail"))
+const QuotationList = lazy(() => import("../modules/sales/quatation/QuatationList"));
+const QuotationCreate = lazy(() => import("../modules/sales/quatation/CreateQuatation"));
+const PendingQuatationList = lazy(() => import("../modules/sales/quatation/PendingQuatation"));
+const UpdateQuatation = lazy(() => import("../modules/sales/quatation/UpdateQuatation"));
+
+
+// Purchase Order Module
+const PurchaseOrderListPage = lazy(() => import("../modules/purchase/purchase-order/pages/PurchaseOrderListPage"));
+const PurchaseOrderCreatePage = lazy(() => import("../modules/purchase/purchase-order/pages/PurchaseOrderCreatePage"));
+const PurchaseOrderEditPage = lazy(() => import("../modules/purchase/purchase-order/pages/PurchaseOrderEditPage"));
+const POMDApproval = lazy(() => import("../modules/purchase/purchase-order/purchaseordeappovals/PurchaseOrderapprovalList"));
+const PurchaseOrderViewPage = lazy(() => import("../modules/purchase/purchase-order/purchaseordeappovals/PurchaseOrderapprovalEdit"));
+const UpComingOrderList = lazy(() => import("../modules/purchase/purchase-order/upcoming-orders/UpComingOrderList"));
+const UpComingOrderDetail = lazy(() => import("../modules/purchase/purchase-order/upcoming-orders/UpComingOrderDetail"));
+// profile
+const ProfilePage = lazy(() => import("../modules/profile/ProfilePage"));
+const Settings = lazy(() => import("../modules/settings/Setting"))
+
+const LoadingFallback = () => (
+  <div className="d-flex justify-content-center align-items-center" style={{ minHeight: "100vh" }}>
+    <Spinner animation="border" variant="primary" />
+  </div>
+);
+
+const AppRoutes = () => {
+  return (
+    <Suspense fallback={<LoadingFallback />}>
+      <Routes>
+
+        {/* Protected Routes */}
+        <Route element={<ProtectedRoute />}>
+          {/* Onboarding Route (Rendered without BaseLayout) */}
+          <Route path="/company/create" element={<CompanySettings />} />
+
+          <Route element={<BaseLayout />}>
+
+            {/* ========================================================================= */}
+            {/* CORE & DASHBOARD                                                          */}
+            {/* ========================================================================= */}
+            <Route path="/" element={<Dashboard />} />
+            {/* Dashboard Route */}
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/company/edit" element={<CompanySettings />} />
+            <Route path="/company/view" element={<CompanyProfile />} />
+            {/* Sample Route */}
+            <Route path="/sample" element={<Sample />} />
+
+            {/* ========================================================================= */}
+            {/* MASTER DATA MANAGEMENT                                                    */}
+            {/* ========================================================================= */}
+
+            {/* Customers */}
+            <Route element={<ProtectedRoute permission="customers.view" />}>
+              <Route path="/customers" element={<CustomerListPage />} />
+            </Route>
+            {/* Customers Create Route */}
+            <Route element={<ProtectedRoute permission="customers.create" />}>
+              <Route path="/customers/create" element={<CustomerCreatePage />} />
+            </Route>
+            {/* Customers Edit :Id Route */}
+            <Route element={<ProtectedRoute permission="customers.edit" />}>
+              <Route path="/customers/edit/:id" element={<CustomerEditPage />} />
+            </Route>
+
+            {/* Suppliers */}
+            <Route element={<ProtectedRoute permission="suppliers.view" />}>
+              <Route path="/suppliers" element={<SupplierListPage />} />
+            </Route>
+            {/* Suppliers Create Route */}
+            <Route element={<ProtectedRoute permission="suppliers.create" />}>
+              <Route path="/suppliers/create" element={<SupplierCreatePage />} />
+            </Route>
+            {/* Suppliers Edit :Id Route */}
+            <Route element={<ProtectedRoute permission="suppliers.edit" />}>
+              <Route path="/suppliers/edit/:id" element={<SupplierEditPage />} />
+            </Route>
+            <Route element={<ProtectedRoute permission="supplierpricelist.view" />}>
+              <Route path="/suppliers/:supplierId/material-prices" element={<SupplierMaterialPricingList />} />
+            </Route>
+
+            {/* Profile */}
+            <Route element={<ProtectedRoute permission="profile.view" />}>
+              <Route path="/profile" element={<ProfilePage />} />
+            </Route>
+
+            {/* Employees Management (RBAC guarded) */}
+            <Route element={<ProtectedRoute permission="employees.view" />}>
+              <Route path="/employees" element={<Employeelist />} />
+            </Route>
+            {/* Employees Create Route */}
+            <Route element={<ProtectedRoute permission="employees.create" />}>
+              <Route path="/employees/create" element={<EmployeeCreatePage />} />
+            </Route>
+            {/* Employees Edit :Id Route */}
+            <Route element={<ProtectedRoute permission="employees.edit" />}>
+              <Route path="/employees/edit/:id" element={<EmployeeEdit />} />
+            </Route>
+
+            {/* Products Management (RBAC guarded) */}
+            <Route element={<ProtectedRoute permission="products.view" />}>
+              <Route path="/products" element={<ProductList />} />
+            </Route>
+            {/* Products Create Route */}
+            <Route element={<ProtectedRoute permission="products.create" />}>
+              <Route path="/products/create" element={<ProductCreatePage />} />
+            </Route>
+            {/* Products Edit :Id Route */}
+            <Route element={<ProtectedRoute permission="products.edit" />}>
+              <Route path="/products/edit/:id" element={<ProductEdit />} />
+            </Route>
+
+            {/* Categories & Subcategories */}
+            <Route element={<ProtectedRoute permission="categories.view" />}>
+              <Route path="/categories" element={<CategoryList />} />
+            </Route>
+            {/* Sub Categories Route */}
+            <Route element={<ProtectedRoute permission="sub-categories.view" />}>
+              <Route path="/sub-categories" element={<SubcategoryList />} />
+            </Route>
+
+            {/* Administration (RBAC guarded) */}
+            <Route element={<ProtectedRoute permission="users.view" />}>
+              <Route path="/users" element={<UserList />} />
+            </Route>
+            {/* Roles Route */}
+            <Route element={<ProtectedRoute permission="roles.view" />}>
+              <Route path="/roles" element={<RoleList />} />
+            </Route>
+            {/* Permissions Route */}
+            <Route element={<ProtectedRoute permission="permissions.view" />}>
+              <Route path="/permissions" element={<PermissionList />} />
+            </Route>
+            {/* Role Permissions Route */}
+            <Route element={<ProtectedRoute permission="role-permissions.view" />}>
+              <Route path="/role-permissions" element={<RolePermissionMapping />} />
+            </Route>
+
+            {/* Department / Designation */}
+            <Route element={<ProtectedRoute permission="departments.view" />}>
+              <Route path="/departments" element={<DepartmentList />} />
+            </Route>
+            {/* Designations Route */}
+            <Route element={<ProtectedRoute permission="designations.view" />}>
+              <Route path="/designations" element={<DesignationList />} />
+            </Route>
+
+            {/* Product Master Attributes */}
+            <Route element={<ProtectedRoute permission="colors.view" />}>
+              <Route path="/colours" element={<ColourList />} />
+            </Route>
+            {/* Sizes Route */}
+            <Route element={<ProtectedRoute permission="sizes.view" />}>
+              <Route path="/sizes" element={<SizeList />} />
+            </Route>
+            {/* Uoms Route */}
+            <Route element={<ProtectedRoute permission="uoms.view" />}>
+              <Route path="/uoms" element={<UomList />} />
+            </Route>
+
+            {/* Product Management Extras */}
+            <Route element={<ProtectedRoute permission="product-pricing.view" />}>
+              <Route path="/product-pricing" element={<ProductPricing />} />
+            </Route>
+            {/* Product Images Route */}
+            <Route element={<ProtectedRoute permission="product-images.view" />}>
+              <Route path="/product-images" element={<ProductImageUpload />} />
+            </Route>
+
+            {/* ========================================================================= */}
+            {/* INVENTORY & STORES                                                        */}
+            {/* ========================================================================= */}
+
+            {/* Storage Stores */}
+            <Route element={<ProtectedRoute permission="stores.view" />}>
+              <Route path="/storage-stores" element={<StorageStoreList />} />
+            </Route>
+            {/* Storage Stores Create Route */}
+            <Route element={<ProtectedRoute permission="stores.create" />}>
+              <Route path="/storage-stores/create" element={<StorageStoreCreate />} />
+            </Route>
+            {/* Storage Stores Edit :Id Route */}
+            <Route element={<ProtectedRoute permission="stores.edit" />}>
+              <Route path="/storage-stores/edit/:id" element={<StorageStoreEdit />} />
+            </Route>
+
+            {/* Store Types */}
+            <Route element={<ProtectedRoute permission="store-types.view" />}>
+              <Route path="/store-types" element={<StoreTypeList />} />
+            </Route>
+            {/* Store Types Create Route */}
+            <Route element={<ProtectedRoute permission="store-types.create" />}>
+              <Route path="/store-types/create" element={<StoreTypeCreate />} />
+            </Route>
+            {/* Store Types Edit :Id Route */}
+            <Route element={<ProtectedRoute permission="store-types.edit" />}>
+              <Route path="/store-types/edit/:id" element={<StoreTypeEdit />} />
+            </Route>
+
+            {/* Locations */}
+            <Route element={<ProtectedRoute permission="locations.view" />}>
+              <Route path="/locations" element={<LocationList />} />
+            </Route>
+            {/* Locations Create Route */}
+            <Route element={<ProtectedRoute permission="locations.create" />}>
+              <Route path="/locations/create" element={<LocationCreate />} />
+            </Route>
+            {/* Locations Edit :Id Route */}
+            <Route element={<ProtectedRoute permission="locations.edit" />}>
+              <Route path="/locations/edit/:id" element={<LocationEdit />} />
+            </Route>
+
+            {/* Machines */}
+            <Route element={<ProtectedRoute permission="machines.view" />}>
+              <Route path="/machines" element={<MachineList />} />
+            </Route>
+            {/* Machines Create Route */}
+            <Route element={<ProtectedRoute permission="machines.create" />}>
+              <Route path="/machines/create" element={<MachineCreate />} />
+            </Route>
+            {/* Machines Edit :Id Route */}
+            <Route element={<ProtectedRoute permission="machines.edit" />}>
+              <Route path="/machines/edit/:id" element={<MachineEdit />} />
+            </Route>
+
+            {/* Shifts */}
+            <Route element={<ProtectedRoute permission="shift.view" />}>
+              <Route path="/shifts" element={<ShiftList />} />
+            </Route>
+            {/* Shifts Create Route */}
+            <Route element={<ProtectedRoute permission="shift.create" />}>
+              <Route path="/shifts/create" element={<ShiftCreate />} />
+            </Route>
+            {/* Shifts Edit :Id Route */}
+            <Route element={<ProtectedRoute permission="shift.edit" />}>
+              <Route path="/shifts/edit/:id" element={<ShiftEdit />} />
+            </Route>
+
+            {/* Raw Materials */}
+            <Route element={<ProtectedRoute permission="raw_materials.view" />}>
+              <Route path="/raw-materials" element={<RawMaterialList />} />
+            </Route>
+            {/* Raw Material Categories Route */}
+            <Route element={<ProtectedRoute permission="raw_materials.view" />}>
+              <Route path="/raw-material-categories" element={<RawMaterialCategoryList />} />
+            </Route>
+            {/* Raw Materials Create Route */}
+            <Route element={<ProtectedRoute permission="raw_materials.create" />}>
+              <Route path="/raw-materials/create" element={<RawMaterialCreate />} />
+              {/* Raw Material Categories Create Route */}
+              <Route path="/raw-material-categories/create" element={<RawMaterialCategoryCreate />} />
+            </Route>
+            {/* Raw Materials Edit :Id Route */}
+            <Route element={<ProtectedRoute permission="raw_materials.edit" />}>
+              <Route path="/raw-materials/edit/:id" element={<RawMaterialEdit />} />
+              {/* Raw Material Categories Edit :Id Route */}
+              <Route path="/raw-material-categories/edit/:id" element={<RawMaterialCategoryEdit />} />
+            </Route>
+
+            {/* Stock */}
+            <Route element={<ProtectedRoute permission="raw_material_stocks.view" />}>
+              <Route path="/stock" element={<StockList />} />
+            </Route>
+
+            {/* Stock Adjustments */}
+            <Route element={<ProtectedRoute permission="raw_material_stocks.view" />}>
+              <Route path="/inventory/stock-adjustments" element={<StockAdjustmentList />} />
+            </Route>
+            {/* Stock Adjustments Create Route */}
+            <Route element={<ProtectedRoute permission="raw_material_stocks.create" />}>
+              <Route path="/inventory/stock-adjustments/create" element={<StockAdjustmentForm />} />
+            </Route>
+            {/* Stock Adjustments Edit Route */}
+            <Route element={<ProtectedRoute permission="raw_material_stocks.edit" />}>
+              <Route path="/inventory/stock-adjustments/edit/:id" element={<StockAdjustmentForm />} />
+            </Route>
+            {/* Stock Adjustments View Route */}
+            <Route element={<ProtectedRoute permission="raw_material_stocks.view" />}>
+              <Route path="/inventory/stock-adjustments/view/:id" element={<StockAdjustmentView />} />
+            </Route>
+
+            {/* Wastage Stock */}
+            <Route element={<ProtectedRoute permission="raw_material_stocks.view" />}>
+              <Route path="/wastage-stock" element={<WastageStockList />} />
+            </Route>
+            {/* Wastage Stock Create Route */}
+            <Route element={<ProtectedRoute permission="raw_material_stocks.view" />}>
+              <Route path="/wastage-stock/create" element={<WastageStockCreate />} />
+            </Route>
+            {/* Wastage Stock Edit :Id Route */}
+            <Route element={<ProtectedRoute permission="raw_material_stocks.view" />}>
+              <Route path="/wastage-stock/edit/:id" element={<WastageStockEdit />} />
+            </Route>
+
+            {/* Finished Stock */}
+            <Route element={<ProtectedRoute permission="finished_goods_stocks.view" />}>
+              <Route path="/finished-stock" element={<FinishedStockList />} />
+            </Route>
+            {/* Finished Stock Create Route */}
+            <Route element={<ProtectedRoute permission="finished_goods_stocks.create" />}>
+              <Route path="/finished-stock/create" element={<FinishedStockCreate />} />
+            </Route>
+            {/* Finished Stock Edit :Id Route */}
+            <Route element={<ProtectedRoute permission="finished_goods_stocks.edit" />}>
+              <Route path="/finished-stock/edit/:id" element={<FinishedStockEdit />} />
+            </Route>
+
+            {/* ========================================================================= */}
+            {/* PRODUCTION & PLANNING                                                     */}
+            {/* ========================================================================= */}
+
+            {/* Weekly Machine Schedules */}
+            <Route element={<ProtectedRoute permission="weekly_programs.view" />}>
+              <Route path="/weekly-machine-schedules" element={<WeeklyMachineScheduleList />} />
+            </Route>
+
+
+            {/* Weekly Machine Schedules Board Route */}
+            <Route element={<ProtectedRoute permission="weekly_programs.view" />}>
+              {/* <Route path="/weekly-machine-schedules/board" element={<WeeklyMachinePlanningBoard />} /> */}
+            </Route>
+
+            {/* Weekly Machine Schedules Create Route */}
+            <Route element={<ProtectedRoute permission="weekly_programs.create" />}>
+              <Route path="/weekly-machine-schedules/create" element={<WeeklyMachineScheduleCreate />} />
+            </Route>
+            {/* Weekly Machine Schedules Edit :Id Route */}
+            <Route element={<ProtectedRoute permission="weekly_programs.edit" />}>
+              <Route path="/weekly-machine-schedules/edit/:id" element={<WeeklyMachineScheduleEdit />} />
+            </Route>
+
+            {/* Daily Machine Planning */}
+            <Route element={<ProtectedRoute permission="weekly_programs.view" />}>
+              <Route path="/daily-machine-planning" element={<DailyMachinePlanning />} />
+            </Route>
+
+            {/* Shift Execution Board */}
+            <Route element={<ProtectedRoute permission="weekly_programs.view" />}>
+              <Route path="/shift-execution" element={<ShiftExecutionBoard />} />
+            </Route>
+
+            {/* Production Dashboard */}
+            <Route element={<ProtectedRoute permission="machines.view" />}>
+              <Route path="/production-dashboard" element={<ProductionDashboard />} />
+            </Route>
+
+            {/* Hourly Machine Work Reports */}
+            <Route element={<ProtectedRoute permission="hourly_productions.view" />}>
+              <Route path="/hourly-work-reports" element={<HourlyWorkReportList />} />
+            </Route>
+            {/* Hourly Work Reports Create Route */}
+            <Route element={<ProtectedRoute permission="hourly_productions.create" />}>
+              <Route path="/hourly-work-reports/create" element={<HourlyWorkReportCreate />} />
+            </Route>
+            {/* Hourly Work Reports Edit :Id Route */}
+            <Route element={<ProtectedRoute permission="hourly_productions.edit" />}>
+              <Route path="/hourly-work-reports/edit/:id" element={<HourlyWorkReportEdit />} />
+            </Route>
+
+            {/* Production Wastage Audits */}
+            <Route element={<ProtectedRoute permission="machines.view" />}>
+              <Route path="/production-wastages" element={<WastageList />} />
+              <Route path="/production-wastages/create" element={<WastageForm />} />
+              <Route path="/production-wastages/edit/:id" element={<WastageForm />} />
+            </Route>
+
+            {/* Production Orders */}
+            <Route element={<ProtectedRoute permission="production_orders.view" />}>
+              <Route path="/production-orders" element={<ProductionOrderList />} />
+              <Route path="allproduction-orders" element={<AllProductionOrderList />} />
+              {/* Approved Sales Orders Route */}
+              <Route path="/approved-sales-orders" element={<ApprovedSalesOrderList />} />
+            </Route>
+            {/* Production Orders Create Route */}
+            <Route element={<ProtectedRoute permission="production_orders.create" />}>
+              <Route path="/production-orders/create" element={<ProductionOrderCreate />} />
+            </Route>
+            {/* Production Orders Edit :Id Route */}
+            <Route element={<ProtectedRoute permission="production_orders.edit" />}>
+              <Route path="/production-orders/edit/:id" element={<ProductionOrderCreate />} />
+            </Route>
+
+            {/* Bill Of Material */}
+            <Route element={<ProtectedRoute permission="bill_of_materials.view" />}>
+              <Route path="/bill-of-materials" element={<BillOfMaterialList />} />
+            </Route>
+            {/* Bill Of Materials Create Route */}
+            <Route element={<ProtectedRoute permission="bill_of_materials.create" />}>
+              <Route path="/bill-of-materials/create" element={<BillOfMaterialCreate />} />
+            </Route>
+            {/* Bill Of Materials Edit :Id Route */}
+            <Route element={<ProtectedRoute permission="bill_of_materials.edit" />}>
+              <Route path="/bill-of-materials/edit/:id" element={<BillOfMaterialEdit />} />
+            </Route>
+
+            {/* ========================================================================= */}
+            {/* REPORTS                                                                   */}
+            {/* ========================================================================= */}
+
+            {/* Reports */}
+            <Route element={<ProtectedRoute permission="reports.view" />}>
+              <Route path="/reports/production" element={<ProductionReportsCenter />} />
+            </Route>
+
+            {/* ========================================================================= */}
+            {/* SALES & QUOTATIONS                                                        */}
+            {/* ========================================================================= */}
+
+            {/* Sales */}
+            <Route element={<ProtectedRoute permission="reports.view" />}>
+              <Route path="/draft-order" element={<SalesOrderList />} />
+            </Route>
+            {/* All Order Route */}
+            <Route element={<ProtectedRoute permission="reports.view" />}>
+              <Route path="/sales-order" element={<AllSalesOrderList />} />
+            </Route>
+            {/* All Order Details :Id Route */}
+            <Route element={<ProtectedRoute permission="reports.view" />}>
+              <Route path="/sales-order/details/:id" element={<OrderDetails />} />
+            </Route>
+            {/* Sales Order Create Route */}
+            <Route element={<ProtectedRoute permission="reports.view" />}>
+              <Route path="/sales-order/create" element={<SalesOrderCreate />} />
+            </Route>
+            {/* Sales Order Edit :Id Route */}
+            <Route element={<ProtectedRoute permission="reports.view" />}>
+              <Route path="/draft-order/edit/:id" element={<SalesOrderCreate />} />
+            </Route>
+
+            {/* Quatation Order Route */}
+            <Route element={<ProtectedRoute permission="reports.view" />}>
+              <Route path="/quatation-order" element={<QuotationList />} />
+            </Route>
+
+            {/* Quatation Order Edit :Id Route */}
+            <Route element={<ProtectedRoute permission="reports.view" />}>
+              <Route path="/quatation-order/edit/:id" element={<QuotationCreate />} />
+            </Route>
+
+            {/* Pending Quotations Route */}
+            <Route element={<ProtectedRoute permission="reports.view" />}>
+              <Route path="/pending-quotations" element={<PendingQuatationList />} />
+            </Route>
+
+            {/* Pending Quotations Edit :Id Route */}
+            <Route element={<ProtectedRoute permission="reports.view" />}>
+              <Route path="/pending-quotations/edit/:id" element={<UpdateQuatation />} />
+            </Route>
+
+            {/* ========================================================================= */}
+            {/* PURCHASE ORDERS                                                           */}
+            {/* ========================================================================= */}
+
+            {/* Purchase Orders - List */}
+            <Route element={<ProtectedRoute permission="purchase_orders.view" />}>
+              <Route path="/purchase-orders" element={<PurchaseOrderListPage />} />
+            </Route>
+
+            {/* Purchase Orders - Create */}
+            <Route element={<ProtectedRoute permission="purchase_orders.create" />}>
+              <Route path="/purchase-orders/create" element={<PurchaseOrderCreatePage />} />
+            </Route>
+
+            {/* Purchase Orders - Edit */}
+            <Route element={<ProtectedRoute permission="purchase_orders.edit" />}>
+              <Route path="/purchase-orders/edit/:id" element={<PurchaseOrderEditPage />} />
+            </Route>
+
+            {/* ============================================ */}
+            {/* END PURCHASE ORDER MODULE */}
+            {/* ============================================ */}
+
+            <Route element={<ProtectedRoute permission="purchase_orders.view" />}>
+              <Route path="/purchase-order-approvals" element={<POMDApproval />} />
+            </Route>
+
+            <Route element={<ProtectedRoute permission="purchase_orders.view" />}>
+              <Route path="/purchase-orders/view/:id" element={<PurchaseOrderViewPage />} />
+              <Route path="/upcoming-orders" element={<UpComingOrderList />} />
+            </Route>
+            <Route element={<ProtectedRoute permission="purchase_orders.view" />}>
+              <Route path="/upcoming-orders/detail/:id" element={<UpComingOrderDetail />} />
+            </Route>
+            <Route element={<ProtectedRoute permission="purchase_orders.view" />}>
+              <Route path="/settings" element={<Settings />} />
+            </Route>
+
+          </Route>
+        </Route>
+
+        {/* Public Routes */}
+        <Route element={<PublicRoute />}>
+          <Route path="/login" element={<LoginPage />} />
+          {/* Reset Route */}
+          <Route path="/reset" element={<ResetPassword />} />
+        </Route>
+
+        {/* 404 */}
+        <Route path="*" element={<NotFoundPage />} />
+
+      </Routes>
+    </Suspense>
+  );
+};
+
+export default AppRoutes;

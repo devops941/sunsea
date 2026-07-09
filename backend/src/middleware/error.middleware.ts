@@ -1,0 +1,81 @@
+import { NextFunction, Request, Response } from "express";
+import { ZodError, ZodIssue } from "zod";
+import { Prisma } from "@prisma/client";
+
+import { ApiError } from "../utils/ApiError";
+
+export const errorMiddleware = (
+  err: unknown,
+  _req: Request,
+  res: Response,
+  _next: NextFunction
+) => {
+  console.error("API ERROR DETECTED:", err);
+
+  if (err instanceof ApiError) {
+    res.status(err.statusCode).json({
+      success: false,
+      message: err.message,
+      errors: [] as unknown[]
+    });
+    return;
+  }
+
+  if (err instanceof ZodError) {
+    const issues: ZodIssue[] = err.issues;
+
+    const errors = issues.map((issue) => ({
+      path: issue.path.join("."),
+      message: issue.message
+    }));
+
+    res.status(400).json({
+      success: false,
+      message: "Validation failed",
+      errors
+    });
+    return;
+  }
+
+  if (err instanceof Prisma.PrismaClientKnownRequestError) {
+    if (err.code === "P2002") {
+      res.status(409).json({
+        success: false,
+        message: "A record with this value already exists (Unique constraint failed).",
+        errors: []
+      });
+      return;
+    }
+    if (err.code === "P2003") {
+      res.status(409).json({
+        success: false,
+        message: "Foreign key constraint failed. Either a referenced record does not exist, or it is referenced by other records and cannot be deleted.",
+        errors: []
+      });
+      return;
+    }
+    if (err.code === "P2025") {
+      res.status(404).json({
+        success: false,
+        message: "Record not found.",
+        errors: []
+      });
+      return;
+    }
+  }
+
+  if (err instanceof Error) {
+    res.status(500).json({
+      success: false,
+      message: err.message || "Internal server error",
+      errors: [] as unknown[]
+    });
+    return;
+  }
+
+  res.status(500).json({
+    success: false,
+    message: "Internal server error",
+    errors: [] as unknown[]
+  });
+};

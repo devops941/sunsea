@@ -1,0 +1,238 @@
+/* PlanningBoardGrid.css */
+
+.planning-board-container {
+    background-color: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+    overflow: hidden;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.planning-board-table {
+    width: 100%;
+    min-width: 1100px;
+    table-layout: fixed;
+    margin-bottom: 0;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+/* Headers */
+.pb-header-row th {
+    background-color: #f8f9fa;
+    border-bottom: 2px solid #e9ecef;
+    border-right: 1px solid #e9ecef;
+    padding: 16px 12px;
+    text-align: center;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.pb-header-row th:first-child {
+    background-color: #ffffff;
+    left: 0;
+    z-index: 20;
+    border-right: 2px solid #e9ecef;
+    box-shadow: 2px 0 5px rgba(0,0,0,0.02);
+}
+
+.pb-machine-th {
+    width: 250px;
+}
+
+.pb-day-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #2c3e50;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.pb-date-subtitle {
+    font-size: 11px;
+    color: #6c757d;
+    margin-top: 4px;
+    font-family: monospace;
+}
+
+/* Machine Cell (Sticky Left) */
+.pb-machine-cell {
+    background-color: #ffffff;
+    border-right: 2px solid #e9ecef !important;
+    border-bottom: 1px solid #e9ecef;
+    padding: 20px 16px;
+    vertical-align: top;
+    position: sticky;
+    left: 0;
+    z-index: 10;
+    box-shadow: 2px 0 5px rgba(0,0,0,0.02);
+}
+
+.pb-machine-name {
+    font-size: 15px;
+    font-weight: 700;
+    color: #1a202c;
+    margin-bottom: 4px;
+}
+
+.pb-machine-id {
+    font-size: 12px;
+    color: #718096;
+    margin-bottom: 12px;
+}
+
+/* Day Cells */
+.pb-day-cell {
+    background-color: #fcfcfc;
+    border-right: 1px solid #e9ecef;
+    border-bottom: 1px solid #e9ecef;
+    padding: 12px;
+    vertical-align: top;
+}
+
+.pb-shift-container {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    height: 100%;
+}
+
+/* Shift Slot */
+.pb-shift-slot {
+    border-radius: 8px;
+    padding: 10px;
+    min-height: 130px;
+    display: flex;
+    flex-direction: column;
+    transition: all 0.2s ease-in-out;
+    position: relative;
+    overflow: hidden;
+}
+
+.pb-shift-slot:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
+.pb-slot-empty {
+    background-color: #ffffff;
+    border: 2px dashed #cbd5e0;
+}
+
+.pb-slot-partial {
+    background-color: #fffaf0;
+    border: 2px solid #fbd38d;
+}
+
+.pb-slot-full {
+    background-color: #fff5f5;
+    border: 2px solid #fc8181;
+}
+
+/* Slot Header */
+.pb-slot-header {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(0,0,0,0.05);
+}
+
+.pb-shift-name {
+    font-size: 11px;
+    font-weight: 700;
+    color: #4a5568;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    line-height: 1.3;
+}
+
+.pb-rem-badge {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+.pb-rem-badge.success {
+    background-color: #e6fffa;
+    color: #319795;
+}
+
+.pb-rem-badge.danger {
+    background-color: #fff5f5;
+    color: #e53e3e;
+}
+
+/* Program Card */
+.pb-program-card {
+    background-color: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-left: 4px solid #3182ce;
+    border-radius: 6px;
+    padding: 10px 12px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+    position: relative;
+    transition: transform 0.15s ease;
+    margin-bottom: 8px;
+}
+
+.pb-program-card:last-child {
+    margin-bottom: 0;
+}
+
+.pb-program-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(0,0,0,0.08);
+}
+
+.pb-program-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #2d3748;
+    margin-bottom: 4px;
+    padding-right: 14px;
+}
+
+.pb-program-details {
+    font-size: 11px;
+    color: #718096;
+    font-family: monospace;
+    background: #f7fafc;
+    padding: 4px 6px;
+    border-radius: 4px;
+    display: inline-block;
+}
+
+.pb-remove-btn {
+    position: absolute;
+    top: 4px;
+    right: 6px;
+    color: #a0aec0;
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+    transition: color 0.2s;
+}
+
+.pb-remove-btn:hover {
+    color: #e53e3e;
+}
+
+/* Drop Placeholder */
+.pb-drop-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: #a0aec0;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    flex-grow: 1;
+    padding: 16px 0;
+    opacity: 0.7;
+}

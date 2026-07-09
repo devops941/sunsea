@@ -1,0 +1,28 @@
+.delete-btn {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  background: rgba(239, 68, 68, 0.12);
+  color: var(--color-danger);
+  transition: all 0.25s ease;
+}
+
+.delete-btn-icon {
+  font-size: 18px;
+}
+
+.delete-btn:hover {
+  transform: translateY(-3px);
+  background: rgba(239, 68, 68, 0.22);
+  box-shadow:
+    0 8px 18px rgba(239, 68, 68, 0.18);
+}
+
+.delete-btn:active {
+  transform: scale(0.95);
+}

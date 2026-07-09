@@ -1,0 +1,80 @@
+.icon-btn {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.icon-btn-icon {
+  font-size: 14px;
+}
+
+.icon-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Success */
+.icon-btn-success {
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+}
+.icon-btn-success:hover:not(:disabled) {
+  transform: translateY(-3px);
+  background: #10b981;
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+/* Warning */
+.icon-btn-warning {
+  background: rgba(245, 158, 11, 0.12);
+  color: #f59e0b;
+}
+.icon-btn-warning:hover:not(:disabled) {
+  transform: translateY(-3px);
+  background: #f59e0b;
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+}
+
+/* Danger */
+.icon-btn-danger {
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+}
+.icon-btn-danger:hover:not(:disabled) {
+  transform: translateY(-3px);
+  background: #ef4444;
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+}
+
+/* Info */
+.icon-btn-info {
+  background: rgba(59, 130, 246, 0.12);
+  color: #3b82f6;
+}
+.icon-btn-info:hover:not(:disabled) {
+  transform: translateY(-3px);
+  background: #3b82f6;
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+/* Primary */
+.icon-btn-primary {
+  background: rgba(99, 102, 241, 0.12);
+  color: #6366f1;
+}
+.icon-btn-primary:hover:not(:disabled) {
+  transform: translateY(-3px);
+  background: #6366f1;
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+}

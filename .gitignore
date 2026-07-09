@@ -1,0 +1,139 @@
+# ============================================================
+# Root .gitignore — covers both frontend (Next.js) and backend (Python/FastAPI)
+# ============================================================
+
+
+# ============================================================
+# SECRETS & ENVIRONMENT
+# ============================================================
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+secrets.json
+
+
+# ============================================================
+# PYTHON / FASTAPI (backend)
+# ============================================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+parts/
+var/
+sdist/
+wheels/
+*.egg-link
+.installed.cfg
+lib/
+lib64/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+.env/
+.Python
+
+# pytest / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+*.cover
+
+# mypy / type checkers
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pytype/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Distribution / packaging
+MANIFEST
+
+
+# ============================================================
+# NODE / NEXT.JS (frontend)
+# ============================================================
+node_modules/
+.pnp
+.pnp.js
+
+# Next.js build output
+.next/
+out/
+
+# Production build
+build/
+dist/
+
+# Vercel
+.vercel
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# Package manager locks (keep one — remove whichever you don't use)
+# yarn.lock
+# pnpm-lock.yaml
+
+# Debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+
+# ============================================================
+# OS & EDITOR
+# ============================================================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+Thumbs.db:encdata
+Desktop.ini
+$RECYCLE.BIN/
+
+# VS Code / Kiro
+.vscode/
+.kiro/
+*.code-workspace
+
+# JetBrains IDEs
+.idea/
+*.iml
+*.iws
+
+# Vim / Emacs
+*.swp
+*.swo
+*~
+\#*\#
+
+
+# ============================================================
+# LOGS & TEMP
+# ============================================================
+*.log
+logs/
+tmp/
+temp/
+.cache/

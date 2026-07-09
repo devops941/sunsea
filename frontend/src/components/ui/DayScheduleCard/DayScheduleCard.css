@@ -1,0 +1,8 @@
+/* Cleaned up custom styles - reverting to Bootstrap utilities for better visibility and theme consistency */
+.day-schedule-card {
+  transition: all 0.2s ease;
+}
+
+.day-schedule-card:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08) !important;
+}

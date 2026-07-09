@@ -1,0 +1,92 @@
+import {
+  createSlice,
+  createAsyncThunk
+} from "@reduxjs/toolkit";
+
+import type {
+  PayloadAction
+} from "@reduxjs/toolkit";
+
+import type {
+  Department,
+  DepartmentState,
+  CreateDepartmentDto,
+  UpdateDepartmentDto
+} from "./types";
+
+import { departmentService } from "../../services/departmentService";
+
+
+export const fetchDepartments = createAsyncThunk("departments/fetchAll", async (_, { rejectWithValue }) => {
+  try {
+    return await departmentService.fetchAll();
+  } catch (error: any) {
+    return rejectWithValue(error.response?.data?.message || "Failed to fetch departments");
+  }
+});
+
+export const createDepartment = createAsyncThunk("departments/create", async (data: CreateDepartmentDto, { rejectWithValue }) => {
+  try {
+    return await departmentService.create(data);
+  } catch (error: any) {
+    return rejectWithValue(error.response?.data?.message || "Failed to create department");
+  }
+});
+
+export const updateDepartment = createAsyncThunk("departments/update", async ({ id, data }: { id: number; data: UpdateDepartmentDto }, { rejectWithValue }) => {
+  try {
+    return await departmentService.update(id, data);
+  } catch (error: any) {
+    return rejectWithValue(error.response?.data?.message || "Failed to update department");
+  }
+});
+
+export const deleteDepartment = createAsyncThunk("departments/delete", async (id: number, { rejectWithValue }) => {
+  try {
+    await departmentService.delete(id);
+    return id;
+  } catch (error: any) {
+    return rejectWithValue(error.response?.data?.message || "Failed to delete department");
+  }
+});
+
+const initialState: DepartmentState = {
+  data: [],
+  loading: false,
+  error: null,
+};
+
+const departmentSlice = createSlice({
+  name: "departments",
+  initialState,
+  reducers: {},
+  extraReducers: (builder) => {
+    builder
+      .addCase(fetchDepartments.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchDepartments.fulfilled, (state, action: PayloadAction<Department[]>) => {
+        state.loading = false;
+        state.data = action.payload;
+      })
+      .addCase(fetchDepartments.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
+      })
+      .addCase(createDepartment.fulfilled, (state, action: PayloadAction<Department>) => {
+        state.data.push(action.payload);
+      })
+      .addCase(updateDepartment.fulfilled, (state, action: PayloadAction<Department>) => {
+        const index = state.data.findIndex((item) => item.id === action.payload.id);
+        if (index !== -1) {
+          state.data[index] = action.payload;
+        }
+      })
+      .addCase(deleteDepartment.fulfilled, (state, action: PayloadAction<number>) => {
+        state.data = state.data.filter((item) => item.id !== action.payload);
+      });
+  },
+});
+
+export default departmentSlice.reducer;

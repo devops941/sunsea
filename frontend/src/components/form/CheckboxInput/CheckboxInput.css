@@ -1,0 +1,47 @@
+/* ==========================
+   CHECKBOX
+========================== */
+.checkbox-group {
+  margin-bottom:18px;
+}
+
+.checkbox-group .form-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.checkbox-group .form-check-input {
+  width: 18px;
+  height: 18px;
+
+  border: 2px solid #cfd8d3;
+  border-radius: 5px;
+
+  cursor: pointer;
+
+  transition: all 0.25s ease;
+}
+
+.checkbox-group .form-check-input:hover {
+  border-color: var(--color-primary);
+}
+
+.checkbox-group .form-check-input:checked {
+  background-color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.checkbox-group .form-check-input:focus {
+  box-shadow:
+    0 0 0 4px rgba(76, 175, 80, 0.15);
+}
+
+.checkbox-group .form-check-label {
+  font-size: 14px;
+  font-weight: 500;
+
+  color: #374151;
+
+  cursor: pointer;
+}
