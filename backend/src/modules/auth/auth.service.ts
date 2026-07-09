@@ -1,5 +1,6 @@
 import crypto from "crypto";
 
+import { prisma } from "../../config/prisma";
 import { ApiError } from "../../utils/ApiError";
 import { authRepository } from "./auth.repository";
 import { hashPassword, comparePassword } from "../../utils/hashPassword";
@@ -78,9 +79,32 @@ export class AuthService {
     ipAddress?: string,
     userAgent?: string
   ): Promise<AuthResult> {
-    let user = await authRepository.findUserByEmail(payload.email);
-    if (!user) {
-      user = await authRepository.findUserByUsername(payload.email);
+    let isAdminLogin = false;
+    let admin = await authRepository.findAdminByEmail(payload.email);
+    if (!admin) {
+      admin = await authRepository.findAdminByUsername(payload.email);
+    }
+
+    let user: any = null;
+    if (admin) {
+      isAdminLogin = true;
+      user = {
+        userId: "admin_" + admin.id.toString(),
+        email: admin.email,
+        username: admin.username,
+        passwordHash: admin.passwordHash,
+        fullName: admin.fullName,
+        status: admin.status || "active",
+        roleId: null,
+        role: null,
+        failedAttempts: 0,
+        lockedUntil: null
+      };
+    } else {
+      user = await authRepository.findUserByEmail(payload.email);
+      if (!user) {
+        user = await authRepository.findUserByUsername(payload.email);
+      }
     }
 
     // Record attempt regardless of result
@@ -150,24 +174,27 @@ export class AuthService {
     );
 
     if (!passwordMatches) {
-      // Increment failed attempts
-      await authRepository.incrementFailedAttempts(user.userId);
+      if (!isAdminLogin) {
+        // Increment failed attempts
+        await authRepository.incrementFailedAttempts(user.userId);
 
-      await authRepository.recordLoginAttempt({
-        username: payload.email,
-        userId: user.userId,
-        ipAddress: ipAddress ?? "unknown",
-        success: false,
-        failureReason: "invalid_password",
-        userAgent
-      });
+        await authRepository.recordLoginAttempt({
+          username: payload.email,
+          userId: user.userId,
+          ipAddress: ipAddress ?? "unknown",
+          success: false,
+          failureReason: "invalid_password",
+          userAgent
+        });
+      }
 
       await authRepository.createAuditLog({
-        entityName: "User",
-        entityId: user.userId,
+        entityName: isAdminLogin ? "Admin" : "User",
+        entityId: isAdminLogin ? admin!.id.toString() : user.userId,
         action: "LOGIN_FAILED",
         newValues: { reason: "invalid_password" },
-        changedBy: user.userId,
+        changedBy: isAdminLogin ? undefined : user.userId,
+        changedByAdmin: isAdminLogin ? admin!.id : undefined,
         ipAddress,
         userAgent
       });
@@ -177,13 +204,14 @@ export class AuthService {
 
     // Successful login
     const permissions = await authRepository.findPermissionsByRole(user.roleId);
-    const roleCode = user.role?.code ?? (user.roleId !== null ? user.roleId.toString() : "");
+    const roleCode = user.role?.name ?? (user.roleId !== null ? user.roleId.toString() : "");
 
     const accessPayload: AccessTokenPayload = {
       userId: user.userId,
       email: user.email!,
       roleId: roleCode,
-      permissions
+      permissions,
+      isSuperAdmin: isAdminLogin
     };
 
     const accessToken = generateAccessToken(accessPayload);
@@ -192,7 +220,8 @@ export class AuthService {
 
     // Create session
     await authRepository.createUserSession({
-      userId: user.userId,
+      userId: isAdminLogin ? undefined : user.userId,
+      adminId: isAdminLogin ? admin!.id : undefined,
       refreshTokenHash,
       ipAddress,
       userAgent,
@@ -200,28 +229,33 @@ export class AuthService {
     });
 
     // Update user
-    await authRepository.updateLastLogin(user.userId, ipAddress);
-
-    await authRepository.recordLoginAttempt({
-      username: payload.email,
-      userId: user.userId,
-      ipAddress: ipAddress ?? "unknown",
-      success: true,
-      userAgent
-    });
+    if (isAdminLogin) {
+      await prisma.admin.update({
+        where: { id: admin!.id },
+        data: { lastLoginAt: new Date() }
+      });
+    } else {
+      await authRepository.updateLastLogin(user.userId, ipAddress);
+      
+      await authRepository.recordLoginAttempt({
+        username: payload.email,
+        userId: user.userId,
+        ipAddress: ipAddress ?? "unknown",
+        success: true,
+        userAgent
+      });
+    }
 
     await authRepository.createAuditLog({
-      entityName: "User",
-      entityId: user.userId,
+      entityName: isAdminLogin ? "Admin" : "User",
+      entityId: isAdminLogin ? admin!.id.toString() : user.userId,
       action: "LOGIN_SUCCESS",
-      newValues: { lastLoginAt: new Date() },
-      changedBy: user.userId,
       ipAddress,
       userAgent
     });
 
     return {
-      user: this.formatUserResponse(user),
+      user: this.formatUserResponse(user, isAdminLogin),
       tokens: {
         accessToken,
         refreshToken,
@@ -295,21 +329,47 @@ export class AuthService {
       throw new ApiError(401, "Refresh token has expired");
     }
 
-    const user = await authRepository.findUserById(session.userId);
+    let user;
+    let isAdminLogin = false;
+
+    if (session.adminId) {
+      isAdminLogin = true;
+      const admin = await prisma.admin.findUnique({
+        where: { id: session.adminId }
+      });
+      if (!admin) {
+        throw new ApiError(401, "Admin account not found");
+      }
+      user = {
+        userId: "admin_" + admin.id.toString(),
+        email: admin.email,
+        username: admin.username,
+        passwordHash: admin.passwordHash,
+        fullName: admin.fullName,
+        status: admin.status || "active",
+        roleId: null,
+        role: null,
+        failedAttempts: 0,
+        lockedUntil: null
+      };
+    } else {
+      user = await authRepository.findUserById(session.userId!);
+    }
 
     if (!user || user.status !== UserStatus.ACTIVE) {
       await authRepository.revokeUserSession(session.id);
       throw new ApiError(401, "User account is not active");
     }
 
-    const permissions = await authRepository.findPermissionsByRole(user.roleId);
-    const roleCode = user.role?.code ?? (user.roleId !== null ? user.roleId.toString() : "");
+    const permissions = isAdminLogin ? [] : await authRepository.findPermissionsByRole(user.roleId);
+    const roleCode = isAdminLogin ? "" : (user.role?.name ?? (user.roleId !== null ? user.roleId.toString() : ""));
 
     const accessPayload: AccessTokenPayload = {
       userId: user.userId,
       email: user.email!,
       roleId: roleCode,
-      permissions
+      permissions,
+      isSuperAdmin: isAdminLogin
     };
 
     const accessToken = generateAccessToken(accessPayload);
@@ -319,7 +379,8 @@ export class AuthService {
 
     // Create new session (this automatically removes previous sessions)
     await authRepository.createUserSession({
-      userId: user.userId,
+      userId: isAdminLogin ? undefined : user.userId,
+      adminId: isAdminLogin ? session.adminId : undefined,
       refreshTokenHash: newRefreshTokenHash,
       ipAddress,
       userAgent,
@@ -327,10 +388,11 @@ export class AuthService {
     });
 
     await authRepository.createAuditLog({
-      entityName: "User",
-      entityId: user.userId,
+      entityName: isAdminLogin ? "Admin" : "User",
+      entityId: isAdminLogin ? session.adminId.toString() : user.userId,
       action: "TOKEN_REFRESHED",
-      changedBy: user.userId,
+      changedBy: isAdminLogin ? undefined : user.userId,
+      changedByAdmin: isAdminLogin ? session.adminId : undefined,
       ipAddress,
       userAgent
     });
@@ -446,6 +508,30 @@ export class AuthService {
   // ============================================================
 
   async getProfile(userId: string): Promise<ProfileResponseDto> {
+    if (userId.startsWith("admin_")) {
+      const adminId = BigInt(userId.replace("admin_", ""));
+      const admin = await authRepository.findAdminById(adminId);
+      if (!admin) {
+        throw new ApiError(404, "Admin not found");
+      }
+      
+      const mockedUser = {
+        userId: userId,
+        email: admin.email,
+        username: admin.username,
+        fullName: admin.fullName,
+        status: admin.status || "active",
+        roleId: null,
+        role: null
+      };
+
+      return {
+        user: this.formatUserResponse(mockedUser, true),
+        permissions: [],
+        isSuperAdmin: true
+      };
+    }
+
     const user = await authRepository.findUserById(userId);
 
     if (!user) {
@@ -455,8 +541,9 @@ export class AuthService {
     const permissions = await authRepository.findPermissionsByRole(user.roleId);
 
     return {
-      user: this.formatUserResponse(user),
-      permissions
+      user: this.formatUserResponse(user, false),
+      permissions,
+      isSuperAdmin: false
     };
   }
 
@@ -464,18 +551,19 @@ export class AuthService {
   // HELPER METHODS
   // ============================================================
 
-  private formatUserResponse(user: any): UserResponseDto {
+  private formatUserResponse(user: any, isSuperAdmin: boolean = false): UserResponseDto {
     return {
       userId: user.userId,
       fullName: user.fullName,
       email: user.email,
       username: user.username,
       roleId:
-        user.role?.code ??
-        (user.roleId !== undefined && user.roleId !== null ? user.roleId.toString() : ""),
+        user.role?.name ??
+        (user.roleId !== undefined && user.roleId !== null ? user.roleId.toString() : null),
       status: user.status,
       lastLoginAt: user.lastLoginAt,
-      mfaEnabled: user.mfaEnabled || false
+      mfaEnabled: user.mfaEnabled || false,
+      isSuperAdmin
     };
   }
 

@@ -2,7 +2,6 @@ import { z } from "zod";
 
 export const createRoleSchema = z.object({
   body: z.object({
-    code: z.string().min(3),
     name: z.string().min(2),
     description: z.string().optional(),
   }),

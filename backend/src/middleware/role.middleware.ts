@@ -32,7 +32,7 @@ export const roleMiddleware =
 
     // Verify user role is allowed to access the resource
     const isAllowed =
-      allowedRoles.includes(
+      userRole !== null && allowedRoles.includes(
         userRole
       );
 

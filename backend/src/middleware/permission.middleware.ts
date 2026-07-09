@@ -4,6 +4,33 @@ import { ApiError } from "../utils/ApiError";
 /**
  * Ensures the authenticated user has the required permission.
  */
+export const requireSuperAdmin = () => {
+  return (
+    req: Request,
+    _res: Response,
+    next: NextFunction
+  ) => {
+    const user = req.user;
+
+    if (!user) {
+      return next(
+        new ApiError(401, "Unauthorized")
+      );
+    }
+
+    if (!user.isSuperAdmin) {
+      return next(
+        new ApiError(
+          403,
+          "Access Denied: Super Admin only"
+        )
+      );
+    }
+
+    next();
+  };
+};
+
 export const requirePermission = (permission: string) => {
   return (
     req: Request,
@@ -17,6 +44,11 @@ export const requirePermission = (permission: string) => {
       return next(
         new ApiError(401, "Unauthorized")
       );
+    }
+
+    // Bypass for Super Admin and Admin role
+    if (user.isSuperAdmin || user.roleId === "ROLE_ADMIN") {
+      return next();
     }
 
     // Validate required permission
@@ -57,6 +89,11 @@ export const requireAnyPermission = (
       );
     }
 
+    // Bypass for Super Admin and Admin role
+    if (user.isSuperAdmin || user.roleId === "ROLE_ADMIN") {
+      return next();
+    }
+
     const hasPermission =
       permissions.some((permission) =>
         user.permissions.includes(
@@ -95,6 +132,11 @@ export const requireAllPermissions = (
       return next(
         new ApiError(401, "Unauthorized")
       );
+    }
+
+    // Bypass for Super Admin and Admin role
+    if (user.isSuperAdmin || user.roleId === "ROLE_ADMIN") {
+      return next();
     }
 
     const hasAllPermissions =

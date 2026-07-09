@@ -8,7 +8,7 @@ export class UserRepository {
       include: {
         role: {
           select: {
-            code: true,
+            name: true,
           },
         },
         employee: true,
@@ -21,7 +21,7 @@ export class UserRepository {
       include: {
         role: {
           select: {
-            code: true,
+            name: true,
           },
         },
         employee: true,
@@ -40,7 +40,7 @@ export class UserRepository {
       include: {
         role: {
           select: {
-            code: true,
+            name: true,
           },
         },
         employee: true,
@@ -74,7 +74,7 @@ export class UserRepository {
       include: {
         role: {
           select: {
-            code: true,
+            name: true,
           },
         },
         employee: true,
@@ -96,7 +96,7 @@ export class UserRepository {
       include: {
         role: {
           select: {
-            code: true,
+            name: true,
           },
         },
         employee: true,
@@ -120,7 +120,7 @@ export class UserRepository {
       include: {
         role: {
           select: {
-            code: true,
+            name: true,
           },
         },
         employee: true,

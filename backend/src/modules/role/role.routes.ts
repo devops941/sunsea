@@ -9,7 +9,7 @@ import {
 } from "./role.controller";
 
 import { authMiddleware } from "../../middleware/auth.middleware";
-import { requirePermission } from "../../middleware/permission.middleware";
+import { requirePermission, requireSuperAdmin } from "../../middleware/permission.middleware";
 import { validateMiddleware } from "../../middleware/validate.middleware";
 
 import {
@@ -46,7 +46,7 @@ router.get(
 router.patch(
   "/:id",
   authMiddleware,
-  requirePermission("roles.edit"),
+  requireSuperAdmin(),
   validateMiddleware(
     updateRoleSchema
   ),
@@ -56,7 +56,7 @@ router.patch(
 router.delete(
   "/:id",
   authMiddleware,
-  requirePermission("roles.delete"),
+  requireSuperAdmin(),
   deleteRole
 );
 

@@ -2,6 +2,8 @@ import { ApiError } from "../../utils/ApiError";
 import { UserResponse } from "../../types/user.types";
 import { userRepository } from "./user.repository";
 import { UserStatus } from "../../types/auth.types";
+import employeeService from "../employee/employee.service";
+import { prisma } from "../../config/prisma";
 import bcrypt from "bcrypt";
 export class UserService {
   async getProfile(userId: string): Promise<UserResponse> {
@@ -70,7 +72,7 @@ export class UserService {
   fullName: string;
   email?: string;
   password: string;
-  employeeId: number;
+  employeeId?: number | null;
   roleId: number;
 }): Promise<UserResponse> {
 
@@ -92,13 +94,29 @@ export class UserService {
       10
     );
 
+  let finalEmployeeId: bigint;
+  if (data.employeeId) {
+    finalEmployeeId = BigInt(data.employeeId);
+  } else {
+    const empCode = await employeeService.getNextEmployeeCode();
+    const employee = await prisma.employee.create({
+      data: {
+        empCode,
+        fullName: data.fullName,
+        email: data.email,
+        status: "active",
+      }
+    });
+    finalEmployeeId = employee.id;
+  }
+
   const user =
     await userRepository.createUser({
       username: data.username,
       fullName: data.fullName,
       email: data.email,
       passwordHash,
-      employeeId: BigInt(data.employeeId),
+      employeeId: finalEmployeeId,
       roleId: data.roleId,
       status: UserStatus.ACTIVE,
       mustChangePw: false,
@@ -116,7 +134,7 @@ export class UserService {
       email: user.email,
       username: user.username,
       roleId:
-        user.role?.code ??
+        user.role?.name ??
         (user.roleId !== undefined && user.roleId !== null ? user.roleId.toString() : ""),
       status: user.status as UserStatus,
       lastLoginAt: user.lastLoginAt,

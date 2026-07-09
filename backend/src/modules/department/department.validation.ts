@@ -2,31 +2,30 @@ import { z } from "zod";
 
 export const createDepartmentSchema = z.object({
   body: z.object({
-    code: z
-      .string()
-      .min(2, "Department code is required")
-      .max(20),
-
     name: z
       .string()
       .min(2, "Department name is required")
       .max(100),
+    description: z
+      .string()
+      .max(500)
+      .optional()
+      .nullable(),
   }),
 });
 
 export const updateDepartmentSchema = z.object({
   body: z.object({
-    code: z
-      .string()
-      .min(2)
-      .max(20)
-      .optional(),
-
     name: z
       .string()
       .min(2)
       .max(100)
       .optional(),
+    description: z
+      .string()
+      .max(500)
+      .optional()
+      .nullable(),
   }),
 
   params: z.object({

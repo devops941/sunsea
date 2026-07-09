@@ -7,7 +7,6 @@ export const createEmployeeSchema = z.object({
     mobile: z.string().optional().nullable(),
     email: z.string().email().optional().nullable().or(z.literal("")),
     departmentId: z.number().optional().nullable(),
-    designationId: z.number().optional().nullable(),
     status: z.enum(["active", "inactive", "resigned", "terminated"]).optional(),
     createLoginAccount: z.boolean().optional(),
     loginAccount: z.object({

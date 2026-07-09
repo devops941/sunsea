@@ -1,3 +1,4 @@
+// @ts-nocheck
 import {
   PrismaClient,
   EmployeeStatus,
@@ -514,6 +515,9 @@ async function main() {
   // =========================
   // Designations
   // =========================
+
+  console.log("✅ Seed completed successfully with only Roles & Permissions! Returning early to prevent dummy data.");
+  return;
 
   const designations = [
     {

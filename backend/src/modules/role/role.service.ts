@@ -2,7 +2,6 @@ import { prisma } from "../../config/prisma";
 
 export const createRole = async (
   data: {
-    code: string;
     name: string;
     description?: string;
   }

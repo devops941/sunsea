@@ -55,8 +55,9 @@ export interface ChangePasswordDto {
 export interface AccessTokenPayload {
   userId: string;
   email: string;
-  roleId: string;
+  roleId: string | null;
   permissions: string[];
+  isSuperAdmin?: boolean;
 }
 
 export type JwtPayload = AccessTokenPayload;
@@ -75,15 +76,17 @@ export interface UserResponseDto {
   fullName: string;
   email: string;
   username: string;
-  roleId: string;
+  roleId: string | null;
   status: UserStatus;
   lastLoginAt: Date | null;
   mfaEnabled: boolean;
+  isSuperAdmin?: boolean;
 }
 
 export interface ProfileResponseDto {
   user: UserResponseDto;
   permissions: string[];
+  isSuperAdmin?: boolean;
 }
 
 export interface AuthTokens {
@@ -108,6 +111,7 @@ export interface CreateAuditLogDto {
   oldValues?: Record<string, any>;
   newValues?: Record<string, any>;
   changedBy?: string;
+  changedByAdmin?: bigint;
   ipAddress?: string;
   userAgent?: string;
 }
@@ -115,6 +119,7 @@ export interface CreateAuditLogDto {
 export interface LoginAttemptDto {
   username: string;
   userId?: string;
+  adminId?: bigint;
   ipAddress: string;
   success: boolean;
   failureReason?: string;
