@@ -570,10 +570,8 @@ class SalesOrderService {
         if (data.salesPersonId !== undefined) updateData.salesPersonId = data.salesPersonId ? Number(data.salesPersonId) : null;
         if (data.expectedCompletionDate) updateData.expectedCompletionDate = new Date(data.expectedCompletionDate);
         if (data.paymentTermId !== undefined) updateData.paymentTermId = data.paymentTermId;
-        if (data.billingAddress) updateData.billingAddress = data.billingAddress as unknown as Prisma.InputJsonValue;
         if (data.dispatchType !== undefined) updateData.dispatchType = data.dispatchType;
         if (data.orderType !== undefined) updateData.orderType = data.orderType;
-        if (data.shippingAddress) updateData.shippingAddress = data.shippingAddress as unknown as Prisma.InputJsonValue;
         if (data.sameAsBilling !== undefined) updateData.sameAsBilling = data.sameAsBilling;
         if (data.remarks !== undefined) updateData.remarks = data.remarks;
         if (data.internalNotes !== undefined) updateData.internalNotes = data.internalNotes;
