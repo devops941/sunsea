@@ -1,4 +1,5 @@
 {
+  "main": "dist/server.js",
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
     "build": "tsc",
@@ -11,6 +12,7 @@
     "convert-units": "^2.3.4",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
+    "decimal.js": "^10.6.0",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "helmet": "^8.2.0",
