@@ -129,7 +129,7 @@ const PurchaseOrderEditPage: React.FC = () => {
 
   const dispatch = useAppDispatch();
   const { data: company } = useSelector((state: any) => state.company);
-  const { data: locations } = useAppSelector(state => state.locations);
+
   const companyState = company?.state;
   const gstTaxes = useAppSelector(selectActiveGstTaxes);
   const gstLoading = useAppSelector((state) => state.gst.loading);

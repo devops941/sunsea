@@ -61,7 +61,7 @@ const quotationSchema = z.object({
     shippingState: z.string().optional(),
     shippingPincode: z.string().optional(),
     items: z.array(orderItemSchema).min(1, "At least one item is required"),
-    isInterState: z.boolean().default(false),
+    isInterState: z.boolean(),
     remarks: z.string().optional(),
     internalNotes: z.string().optional(),
     // ── Order-level discount (the ONLY discount input in this form) ──

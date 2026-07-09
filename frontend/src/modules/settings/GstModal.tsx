@@ -12,7 +12,7 @@ import CustomButton from "../../components/ui/custombutton/CustomButton";
 export const gstTaxSchema = z.object({
     id: z.string().optional(),
     taxName: z.string().min(1, "Tax name is required").max(50, "Max 50 characters"),
-    taxType: z.enum(["INTRA_STATE", "INTER_STATE"]).default("INTRA_STATE"),
+    taxType: z.enum(["INTRA_STATE", "INTER_STATE"]),
     taxRate: z
         .string()
         .min(1, "Tax rate is required")
