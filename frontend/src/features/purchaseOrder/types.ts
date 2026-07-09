@@ -107,6 +107,8 @@ export interface PurchaseOrderFormData {
     billingState: string;
     billingPincode: string;
 
+    sameAsBilling?: boolean;
+
     shippingAddressLine1: string;
     shippingCity: string;
     shippingState: string;
@@ -117,6 +119,9 @@ export interface PurchaseOrderFormData {
     subtotal: number;
     totalDiscount: number;
     totalTax: number;
+    totalCgst?: number;
+    totalSgst?: number;
+    totalIgst?: number;
     netAmount: number;
 }
 
@@ -132,7 +137,7 @@ export interface CreatePurchaseOrderDto {
     shippingCity: string;
     shippingState: string;
     shippingPincode: string;
-    sameAsBilling: boolean;
+    sameAsBilling?: boolean;
     remarks?: string;
     status?: PurchaseOrderStatus;
     items: Array<{
@@ -153,6 +158,13 @@ export interface CreatePurchaseOrderDto {
         igstRate?: number;
         igstAmount?: number;
     }>;
+    subtotal?: number;
+    totalDiscount?: number;
+    totalTax?: number;
+    totalCgst?: number;
+    totalSgst?: number;
+    totalIgst?: number;
+    netAmount?: number;
 }
 
 export type UpdatePurchaseOrderDto = Partial<CreatePurchaseOrderDto> & {

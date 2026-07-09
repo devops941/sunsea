@@ -76,8 +76,7 @@ const mapPOToFormData = (po: any): PurchaseOrderFormData => {
     billingCity: po.billingCity ?? "",
     billingState: po.billingState ?? "",
     billingPincode: po.billingPincode ?? "",
-
-
+    sameAsBilling: po.sameAsBilling ?? false,
 
     shippingAddressLine1: po.shippingAddressLine1 ?? "",
     shippingCity: po.shippingCity ?? "",
