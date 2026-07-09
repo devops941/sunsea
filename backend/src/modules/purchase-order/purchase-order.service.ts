@@ -151,7 +151,7 @@ class PurchaseOrderService {
                 supplierId: Number(data.supplierId),
                 status: data.status || "DRAFT",
                 remarks: data.remarks || null,
-
+                sameAsBilling: data.sameAsBilling ?? false,
 
                 billingAddressLine1: data.billingAddressLine1,
                 billingCity: data.billingCity,
