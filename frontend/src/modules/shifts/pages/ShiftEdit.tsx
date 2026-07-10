@@ -6,6 +6,7 @@ import { toast } from "react-toastify";
 import { useDispatch, useSelector } from "react-redux";
 
 import TextInput from "../../../components/form/TextInput/TextInput";
+import TimePickerInput from "../../../components/form/TimePickerInput/TimePickerInput";
 import CustomButton from "../../../components/ui/Button/Button";
 import { updateShift } from "../../../features/shifts/shiftSlice";
 import type { RootState, AppDispatch } from "../../../app/store";
@@ -104,8 +105,8 @@ const ShiftEdit: React.FC = () => {
             shiftName: formData.shiftName,
             startTime: formData.startTime,
             endTime: formData.endTime,
-            breakDuration: Number(formData.breakDuration),
-            gracePeriod: Number(formData.gracePeriod),
+            breakDuration: formData.breakDuration ? Number(formData.breakDuration) : null,
+            gracePeriod: formData.gracePeriod ? Number(formData.gracePeriod) : null,
         };
         try {
             await dispatch(updateShift({ id: formData.id, data: payload })).unwrap();
@@ -164,24 +165,32 @@ const ShiftEdit: React.FC = () => {
                             />
                         </Col>
                         <Col md={6}>
-                            <TextInput
+                            <TimePickerInput
                                 label="Start Time"
                                 name="startTime"
                                 value={formData.startTime}
-                                type="time"
                                 required
-                                onChange={handleChange}
+                                onChange={(val) => {
+                                    setFormData(prev => ({ ...prev, startTime: val }));
+                                    if (errors.startTime) {
+                                        setErrors(prev => ({ ...prev, startTime: undefined }));
+                                    }
+                                }}
                                 error={errors.startTime}
                             />
                         </Col>
                         <Col md={6}>
-                            <TextInput
+                            <TimePickerInput
                                 label="End Time"
                                 name="endTime"
                                 value={formData.endTime}
-                                type="time"
                                 required
-                                onChange={handleChange}
+                                onChange={(val) => {
+                                    setFormData(prev => ({ ...prev, endTime: val }));
+                                    if (errors.endTime) {
+                                        setErrors(prev => ({ ...prev, endTime: undefined }));
+                                    }
+                                }}
                                 error={errors.endTime}
                             />
                         </Col>
