@@ -15,6 +15,93 @@ import { validateCustomer } from "../validations/customerValidation";
 import MultiSelect from "../../../components/form/multiSelect/MultiSelect";
 import IndiaPhoneInput from "../../../components/ui/PhoneInput/PhoneInput";
 
+const getGstStateCode = (stateNameOrCode: string): string => {
+  const normalized = stateNameOrCode.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const mapping: Record<string, string> = {
+    // ISO codes
+    jk: "01",
+    hp: "02",
+    pb: "03",
+    ch: "04",
+    ut: "05",
+    hr: "06",
+    dl: "07",
+    rj: "08",
+    up: "09",
+    br: "10",
+    sk: "11",
+    ar: "12",
+    nl: "13",
+    mn: "14",
+    mz: "15",
+    tr: "16",
+    ml: "17",
+    as: "18",
+    wb: "19",
+    jh: "20",
+    or: "21",
+    od: "21",
+    ct: "22",
+    cg: "22",
+    mp: "23",
+    gj: "24",
+    dd: "26",
+    dn: "26",
+    mh: "27",
+    ap: "37",
+    ka: "29",
+    ga: "30",
+    ld: "31",
+    kl: "32",
+    tn: "33",
+    py: "34",
+    an: "35",
+    tg: "36",
+    ts: "36",
+    la: "38",
+
+    // State Names
+    jammuandkashmir: "01",
+    himachalpradesh: "02",
+    punjab: "03",
+    chandigarh: "04",
+    uttarakhand: "05",
+    haryana: "06",
+    delhi: "07",
+    rajasthan: "08",
+    uttarpradesh: "09",
+    bihar: "10",
+    sikkim: "11",
+    arunachalpradesh: "12",
+    nagaland: "13",
+    manipur: "14",
+    mizoram: "15",
+    tripura: "16",
+    meghalaya: "17",
+    assam: "18",
+    westbengal: "19",
+    jharkhand: "20",
+    odisha: "21",
+    chhattisgarh: "22",
+    madhyapradesh: "23",
+    gujarat: "24",
+    damananddiu: "26",
+    dadraandnagarhaveli: "26",
+    maharashtra: "27",
+    andhrapradesh: "37",
+    karnataka: "29",
+    goa: "30",
+    lakshadweep: "31",
+    kerala: "32",
+    tamilnadu: "33",
+    puducherry: "34",
+    andamanandnicobarislands: "35",
+    telangana: "36",
+    ladakh: "38",
+  };
+  return mapping[normalized] || "";
+};
+
 const CustomerCreatePage: React.FC = () => {
   const navigate = useNavigate();
   const { addCustomer } = useCustomers();
@@ -39,13 +126,13 @@ const CustomerCreatePage: React.FC = () => {
     email: "",
 
     gstin: "",
-    pan: "",
-    gstRegType: "Regular",
+    // pan: "",
+    // gstRegType: "Regular",
 
     stateCode: "",
 
-    tdsSection: "",
-    tcsRate: "0",
+    // tdsSection: "",
+    // tcsRate: "0",
 
     billingAddressLine1: "",
     billingCity: "",
@@ -204,16 +291,18 @@ const CustomerCreatePage: React.FC = () => {
 
   // Billing State/City handlers (passed to CityStateSelect)
   const handleBillingStateChange = (stateData: StateCityOption) => {
+    const gstCode = getGstStateCode(stateData.state_code || stateData.name);
     setFormData((prev) => ({
       ...prev,
       billingState: stateData.name,
       billingCity: "",
-      stateCode: stateData.state_code || prev.stateCode,
+      stateCode: gstCode || prev.stateCode,
     }));
     setErrors((prev) => ({
       ...prev,
       billingState: "",
       billingCity: "",
+      stateCode: "",
     }));
   };
 
@@ -308,11 +397,11 @@ const CustomerCreatePage: React.FC = () => {
         whatsapp: formData.whatsapp,
         email: formData.email,
         gstin: formData.gstin,
-        pan: formData.pan,
-        gstRegType: formData.gstRegType,
+        //pan: formData.pan,
+        //gstRegType: formData.gstRegType,
         stateCode: formData.stateCode,
-        tdsSection: formData.tdsSection,
-        tcsRate: Number(formData.tcsRate),
+        //tdsSection: formData.tdsSection,
+        //tcsRate: Number(formData.tcsRate),
         billingAddressLine1: formData.billingAddressLine1,
         billingCity: formData.billingCity,
         billingState: formData.billingState,
@@ -516,7 +605,7 @@ const CustomerCreatePage: React.FC = () => {
               {errors.gstin && <div className="text-danger mt-1">{errors.gstin}</div>}
             </Col>
 
-            <Col lg={4} md={6}>
+            {/* <Col lg={4} md={6}>
               <TextInput
                 label="PAN (AUTO FROM GSTIN)"
                 name="pan"
@@ -525,9 +614,9 @@ const CustomerCreatePage: React.FC = () => {
                 onChange={handleChange}
               />
               {errors.pan && <div className="text-danger mt-1">{errors.pan}</div>}
-            </Col>
+            </Col> */}
 
-            <Col lg={4} md={6}>
+            {/* <Col lg={4} md={6}>
               <SelectInput
                 label="GST Registration Type"
                 name="gstRegType"
@@ -542,7 +631,7 @@ const CustomerCreatePage: React.FC = () => {
                 onChange={handleChange}
               />
               {errors.gstRegType && <div className="text-danger mt-1">{errors.gstRegType}</div>}
-            </Col>
+            </Col> */}
 
             {/* <Col lg={4} md={6}>
               <TextInput
@@ -555,7 +644,7 @@ const CustomerCreatePage: React.FC = () => {
               {errors.stateCode && <div className="text-danger mt-1">{errors.stateCode}</div>}
             </Col> */}
 
-            <Col lg={4} md={6}>
+            {/* <Col lg={4} md={6}>
               <SelectInput
                 label="TDS Section (If Applicable)"
                 name="tdsSection"
@@ -581,7 +670,7 @@ const CustomerCreatePage: React.FC = () => {
                 onChange={handleChange}
               />
               {errors.tcsRate && <div className="text-danger mt-1">{errors.tcsRate}</div>}
-            </Col>
+            </Col> */}
           </Row>
 
           <Row className="mb-4">

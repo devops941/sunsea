@@ -18,7 +18,7 @@ const ITEMS_PER_PAGE = 10;
 const CustomerListPage: React.FC = () => {
   const navigate = useNavigate();
   const { customers, loading, error, loadCustomers, removeCustomer } = useCustomers();
-  const canCreateCustomer = hasPermission("customers.create");
+  //const canCreateCustomer = hasPermission("customers.create");
   const canEditCustomer = hasPermission("customers.edit");
   const canDeleteCustomer = hasPermission("customers.delete");
 
@@ -114,13 +114,13 @@ const CustomerListPage: React.FC = () => {
                     onChange={handleSearch}
                   />
                 </div>
-                {canCreateCustomer &&
-                  <CustomButton
-                    text="Add Customer"
-                    icon={FaPlus}
-                    onClick={() => navigate("/customers/create")}
-                  />
-                }
+                {/* {canCreateCustomer && */}
+                <CustomButton
+                  text="Add Customer"
+                  icon={FaPlus}
+                  onClick={() => navigate("/customers/create")}
+                />
+                {/* } */}
               </div>
             </Col>
           </Row>

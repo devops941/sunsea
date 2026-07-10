@@ -14,7 +14,49 @@ import MultiSelect from "../../../components/form/multiSelect/MultiSelect";
 import IndiaPhoneInput from "../../../components/ui/PhoneInput/PhoneInput";
 import CityStateSelect from "../../../components/ui/CityStateSelect/CityStateSelect";
 import type { StateCityOption } from "../../../components/ui/CityStateSelect/CityStateSelect";
-
+const getGstStateCode = (stateName: string): string => {
+  const normalized = stateName.toLowerCase().replace(/[^a-z]/g, "");
+  const mapping: Record<string, string> = {
+    jammuandkashmir: "01",
+    himachalpradesh: "02",
+    punjab: "03",
+    chandigarh: "04",
+    uttarakhand: "05",
+    haryana: "06",
+    delhi: "07",
+    rajasthan: "08",
+    uttarpradesh: "09",
+    bihar: "10",
+    sikkim: "11",
+    arunachalpradesh: "12",
+    nagaland: "13",
+    manipur: "14",
+    mizoram: "15",
+    tripura: "16",
+    meghalaya: "17",
+    assam: "18",
+    westbengal: "19",
+    jharkhand: "20",
+    odisha: "21",
+    chhattisgarh: "22",
+    madhyapradesh: "23",
+    gujarat: "24",
+    damananddiu: "26",
+    dadraandnagarhaveli: "26",
+    maharashtra: "27",
+    andhrapradesh: "37",
+    karnataka: "29",
+    goa: "30",
+    lakshadweep: "31",
+    kerala: "32",
+    tamilnadu: "33",
+    puducherry: "34",
+    andamanandnicobarislands: "35",
+    telangana: "36",
+    ladakh: "38",
+  };
+  return mapping[normalized] || "";
+};
 
 const initialFormData = {
   // Customer Info
@@ -283,16 +325,18 @@ const CustomerEditPage: React.FC = () => {
 
   // Billing State/City handlers (passed to CityStateSelect)
   const handleBillingStateChange = (stateData: StateCityOption) => {
+    const gstCode = getGstStateCode(stateData.state_code || stateData.name);
     setFormData((prev) => ({
       ...prev,
       billingState: stateData.name,
       billingCity: "",
-      stateCode: stateData.state_code || prev.stateCode,
+      stateCode: gstCode || prev.stateCode,
     }));
     setErrors((prev) => ({
       ...prev,
       billingState: "",
       billingCity: "",
+      stateCode: "",
     }));
   };
 
@@ -418,13 +462,13 @@ const CustomerEditPage: React.FC = () => {
         email: formData.email || undefined,
 
         gstin: formData.gstin || undefined,
-        pan: formData.pan || undefined,
-        gstRegType: formData.gstRegType || undefined,
+        // pan: formData.pan || undefined,
+        // gstRegType: formData.gstRegType || undefined,
 
-        stateCode: formData.stateCode,
+        // stateCode: formData.stateCode,
 
-        tdsSection: formData.tdsSection || undefined,
-        tcsRate: Number(formData.tcsRate || 0),
+        // tdsSection: formData.tdsSection || undefined,
+        // tcsRate: Number(formData.tcsRate || 0),
 
         billingAddressLine1: formData.billingAddressLine1,
         billingCity: formData.billingCity,
@@ -639,7 +683,7 @@ const CustomerEditPage: React.FC = () => {
               />
             </Col>
 
-            <Col lg={4} md={6}>
+            {/* <Col lg={4} md={6}>
               <TextInput
                 label="PAN (AUTO FROM GSTIN)"
                 name="pan"
@@ -666,7 +710,7 @@ const CustomerEditPage: React.FC = () => {
                 onChange={handleChange}
                 error={errors.gstRegType}
               />
-            </Col>
+            </Col> */}
 
             {/* <Col lg={4} md={6}>
               <TextInput
@@ -679,7 +723,7 @@ const CustomerEditPage: React.FC = () => {
               />
             </Col> */}
 
-            <Col lg={4} md={6}>
+            {/* <Col lg={4} md={6}>
               <SelectInput
                 label="TDS Section (If Applicable)"
                 name="tdsSection"
@@ -705,7 +749,7 @@ const CustomerEditPage: React.FC = () => {
                 onChange={handleChange}
                 error={errors.tcsRate}
               />
-            </Col>
+            </Col> */}
           </Row>
 
           <Row className="mb-4">

@@ -9,6 +9,8 @@ import CustomButton from "../../../components/ui/Button/Button";
 import Button from "../../../components/ui/custombutton/CustomButton";
 import { useAppDispatch } from "../../../hooks/reduxHooks";
 import { updateLocation } from "../../../features/locations/locationSlice";
+import CityStateSelect from "../../../components/ui/CityStateSelect/CityStateSelect";
+import type { StateCityOption } from "../../../components/ui/CityStateSelect/CityStateSelect";
 
 const LOCATION_TYPE_OPTIONS = [
     { label: "Warehouse", value: "Warehouse" },
@@ -24,7 +26,7 @@ const initialFormState = {
     address: "",
     city: "",
     state: "",
-    country: "",
+    // country: "",
     isActive: true,
 };
 
@@ -66,31 +68,23 @@ const locationSchema = z.object({
         .string()
         .trim()
         .min(1, "City is required")
-        .max(50, "Maximum 50 characters allowed")
-        .regex(
-            /^[A-Za-z\s]+$/,
-            "City cannot contain numbers or special characters"
-        ),
+        .max(100, "Maximum 100 characters allowed"),
 
     state: z
         .string()
         .trim()
         .min(1, "State is required")
-        .max(50, "Maximum 50 characters allowed")
-        .regex(
-            /^[A-Za-z\s]+$/,
-            "State cannot contain numbers or special characters"
-        ),
+        .max(100, "Maximum 100 characters allowed"),
 
-    country: z
-        .string()
-        .trim()
-        .min(1, "Country is required")
-        .max(50, "Maximum 50 characters allowed")
-        .regex(
-            /^[A-Za-z\s]+$/,
-            "Country cannot contain numbers or special characters"
-        ),
+    // country: z
+    //     .string()
+    //     .trim()
+    //     .min(1, "Country is required")
+    //     .max(50, "Maximum 50 characters allowed")
+    //     .regex(
+    //         /^[A-Za-z\s]+$/,
+    //         "Country cannot contain numbers or special characters"
+    //     ),
 });
 
 const LocationEdit: React.FC = () => {
@@ -111,7 +105,7 @@ const LocationEdit: React.FC = () => {
                 address: locationState.state.address || "",
                 city: locationState.state.city || "",
                 state: locationState.state.state || "",
-                country: locationState.state.country || "",
+                // country: locationState.state.country || "",
                 isActive: locationState.state.isActive,
             });
         } else {
@@ -128,6 +122,24 @@ const LocationEdit: React.FC = () => {
         if (errors[name]) {
             setErrors(prev => ({ ...prev, [name]: "" }));
         }
+    };
+
+    const handleStateChange = (stateData: StateCityOption) => {
+        setFormData((prev) => ({
+            ...prev,
+            state: stateData.name,
+            city: "",
+        }));
+        setErrors((prev) => ({
+            ...prev,
+            state: "",
+            city: "",
+        }));
+    };
+
+    const handleCityChange = (cityData: StateCityOption) => {
+        setFormData((prev) => ({ ...prev, city: cityData.name }));
+        setErrors((prev) => ({ ...prev, city: "" }));
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -164,7 +176,7 @@ const LocationEdit: React.FC = () => {
                     address: formData.address,
                     city: formData.city,
                     state: formData.state,
-                    country: formData.country,
+                    // country: formData.country,
                     isActive: formData.isActive
                 }
             })).unwrap();
@@ -250,30 +262,16 @@ const LocationEdit: React.FC = () => {
 
                             />
                         </Col>
-                        <Col md={4}>
-                            <TextInput
-                                label="City"
-                                name="city"
-                                value={formData.city}
-                                placeholder="e.g. New York"
-                                error={errors.city}
-                                onChange={handleChange}
-                                required
-
-                            />
-                        </Col>
-                        <Col md={4}>
-                            <TextInput
-                                label="State"
-                                name="state"
-                                value={formData.state}
-                                placeholder="e.g. NY"
-                                error={errors.state}
-                                required
-                                onChange={handleChange}
-                            />
-                        </Col>
-                        <Col md={4}>
+                        <CityStateSelect
+                            stateValue={formData.state}
+                            cityValue={formData.city}
+                            onStateChange={handleStateChange}
+                            onCityChange={handleCityChange}
+                            stateError={errors.state}
+                            cityError={errors.city}
+                            required
+                        />
+                        {/* <Col md={4}>
                             <TextInput
                                 label="Country"
                                 name="country"
@@ -284,7 +282,7 @@ const LocationEdit: React.FC = () => {
                                 required
 
                             />
-                        </Col>
+                        </Col> */}
                         <Col md={4}>
                              <SelectInput
                                 label="Status"
