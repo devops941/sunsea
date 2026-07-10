@@ -12,6 +12,7 @@ import TextInput from "../../../components/form/TextInput/TextInput";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import { useCategories } from "../../../hooks/useCategories";
 import { categoryService } from "../../../services/categoryService";
+import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -247,9 +248,7 @@ const CategoryList: React.FC = () => {
                                                 <td className="master-data-cell">{category.code}</td>
                                                 <td className="master-data-cell">{category.name}</td>
                                                 <td className="master-data-cell">
-                                                    <span className={`status-pill status-pill--${category.status === "ACTIVE" ? "active" : "inactive"}`}>
-                                                        {category.status}
-                                                    </span>
+                                                    <StatusBadge status={category.status} />
                                                 </td>
                                                 <td className="master-data-cell">{new Date(category.createdAt).toLocaleDateString()}</td>
                                                 <td className="master-data-cell">

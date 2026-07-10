@@ -20,17 +20,16 @@ class RawMaterialService {
         data: {
           rawMaterialId: data.rawMaterialId,
           materialName: data.materialName,
-          categoryId: data.categoryId || null,
+          ...(data.categoryId ? { category: { connect: { id: data.categoryId } } } : {}),
           hsnCode: data.hsnCode || null,
           minimumStock: data.minimumStock,
           leadTimeDays: data.leadTimeDays,
           baseUom: data.baseUom,
           reorderLevel: data.reorderLevel,
           unitPrice: data.unitPrice,
-          storeId: data.storeId,
+          ...(data.storeId ? { store: { connect: { storeId: data.storeId } } } : {}),
           isActive: data.isActive ?? true,
           createdBy: userId,
-          gstTaxRateId: data.gstTaxRateId || null,
           // locationId: data.locationId ?? null,
           batchNo: data.batchNo ?? null,
           onHandQty: data.onHandQty ?? 0,
@@ -94,12 +93,32 @@ class RawMaterialService {
     await this.findById(rawMaterialId);
 
 
+    const { categoryId, gstTaxRateId, storeId, ...restData } = data;
+
+    const updateData: any = {
+      ...restData,
+      updatedBy: userId,
+    };
+
+    if (categoryId !== undefined) {
+      if (categoryId === null) {
+        updateData.category = { disconnect: true };
+      } else {
+        updateData.category = { connect: { id: categoryId } };
+      }
+    }
+
+    if (storeId !== undefined) {
+      if (storeId === null) {
+        updateData.store = { disconnect: true };
+      } else {
+        updateData.store = { connect: { storeId: storeId } };
+      }
+    }
+
     return prisma.rawMaterial.update({
       where: { rawMaterialId },
-      data: {
-        ...data,
-        updatedBy: userId,
-      },
+      data: updateData,
     });
   }
 

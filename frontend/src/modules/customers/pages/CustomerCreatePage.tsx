@@ -633,7 +633,7 @@ const CustomerCreatePage: React.FC = () => {
               {errors.gstRegType && <div className="text-danger mt-1">{errors.gstRegType}</div>}
             </Col> */}
 
-            {/* <Col lg={4} md={6}>
+            <Col lg={4} md={6}>
               <TextInput
                 label="Place Of Supply (State Code)"
                 name="stateCode"
@@ -642,7 +642,7 @@ const CustomerCreatePage: React.FC = () => {
                 onChange={handleChange}
               />
               {errors.stateCode && <div className="text-danger mt-1">{errors.stateCode}</div>}
-            </Col> */}
+            </Col>
 
             {/* <Col lg={4} md={6}>
               <SelectInput

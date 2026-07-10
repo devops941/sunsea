@@ -8,7 +8,7 @@ import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import CustomButton from "../../../components/ui/custombutton/CustomButton";
 import { useEmployees } from "../../../hooks/useEmployees";
 import { useDepartments } from "../../../hooks/useDepartments";
-import { useDesignations } from "../../../hooks/useDesignations";
+// import { useDesignations } from "../../../hooks/useDesignations";
 import { useRoles } from "../../../hooks/useRoles";
 import { employeeService } from "../../../services/employeeService";
 import { useSelector } from "react-redux";
@@ -19,7 +19,7 @@ const EmployeeCreatePage: React.FC = () => {
   const navigate = useNavigate();
   const { addEmployee, employees, loadEmployees } = useEmployees();
   const { departments, loadDepartments } = useDepartments();
-  const { designations, loadDesignations } = useDesignations();
+  // const { designations, loadDesignations } = useDesignations();
   const { roles, loadRoles } = useRoles();
   const user = useSelector((state: any) => state.auth.user);
 
@@ -31,7 +31,6 @@ const EmployeeCreatePage: React.FC = () => {
     mobile: "",
     email: "",
     departmentId: "",
-    designationId: "",
     status: "active",
     createLoginAccount: false,
     username: "",
@@ -79,11 +78,11 @@ const EmployeeCreatePage: React.FC = () => {
   //     loadDesignations(Number(firstDeptId));
   //   }
   // }, [departments]);
-  useEffect(() => {
-    if (!formData.departmentId) return;
+  // useEffect(() => {
+  //   if (!formData.departmentId) return;
 
-    loadDesignations(Number(formData.departmentId));
-  }, [formData.departmentId, loadDesignations]);
+  //   loadDesignations(Number(formData.departmentId));
+  // }, [formData.departmentId, loadDesignations]);
 
 
   const handleChange = (
@@ -120,7 +119,6 @@ const EmployeeCreatePage: React.FC = () => {
       mobile: "",
       email: "",
       departmentId: "",
-      designationId: "",
       status: "active",
       createLoginAccount: false,
       username: "",
@@ -144,7 +142,6 @@ const EmployeeCreatePage: React.FC = () => {
         mobile: formData.mobile || undefined,
         email: formData.email || undefined,
         departmentId: formData.departmentId ? Number(formData.departmentId) : undefined,
-        designationId: formData.designationId ? Number(formData.designationId) : undefined,
         status: formData.status as any,
         createLoginAccount: formData.createLoginAccount,
         createdBy: user ? user?.userId : undefined,
@@ -173,12 +170,7 @@ const EmployeeCreatePage: React.FC = () => {
     }));
   }, [departments]);
 
-  const designationOptions = useMemo(() => {
-    return designations.map((d) => ({
-      value: String(d.id),
-      label: d.name,
-    }));
-  }, [designations]);
+
 
   const roleOptions = useMemo(() => {
     return roles.map(r => ({ value: String(r.id), label: r.name }));
@@ -192,6 +184,7 @@ const EmployeeCreatePage: React.FC = () => {
     username?: string;
     password?: string;
     roleId?: string;
+    departmentId?: string;
   }
 
   const [errors, setErrors] = useState<FormErrors>({});
@@ -210,12 +203,16 @@ const EmployeeCreatePage: React.FC = () => {
     // if (! /^\d{10}$/.test(formData.mobile.trim())) {
     //   newErrors.mobile = "Enter a valid 10-digit mobile number";
     // }
-    const mobileError = validatePhoneNumber(formData.mobile, true);
+    const mobileError = validatePhoneNumber(formData.mobile, false); // Make mobile optional
     if (mobileError) {
       newErrors.mobile = mobileError;
     }
 
-    if (!formData.email) {
+    if (!formData.departmentId) {
+      newErrors.departmentId = "Department is required";
+    }
+
+    if (formData.email) {
       const emailFormatValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim());
       if (!emailFormatValid) {
         newErrors.email = "Enter a valid email address";
@@ -244,7 +241,13 @@ const EmployeeCreatePage: React.FC = () => {
     }
 
     setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    
+    if (Object.keys(newErrors).length > 0) {
+      toast.error(`Validation failed: ${Object.values(newErrors)[0]}`);
+      return false;
+    }
+    
+    return true;
   };
 
   return (
@@ -296,6 +299,7 @@ const EmployeeCreatePage: React.FC = () => {
                 name="mobile"
                 value={formData.mobile}
                 placeholder="Enter Mobile Number"
+                required={false}
                 onChange={handleChange}
                 error={errors.mobile}
               />
@@ -322,21 +326,11 @@ const EmployeeCreatePage: React.FC = () => {
                 defaultOptionLabel="Select Department"
                 required
                 onChange={handleChange}
+                error={errors.departmentId}
               />
             </Col>
 
-            <Col lg={4} md={6}>
-              <SelectInput
-                label="Designation"
-                name="designationId"
-                value={formData.designationId}
-                options={designationOptions}
-                defaultOptionLabel="Select Designation"
-                required
-                disabled={!formData.departmentId}
-                onChange={handleChange}
-              />
-            </Col>
+
 
             <Col lg={4} md={6}>
               <SelectInput
@@ -417,8 +411,10 @@ const EmployeeCreatePage: React.FC = () => {
                     name="roleId"
                     value={formData.roleId}
                     options={roleOptions}
+                    defaultOptionLabel="Select Role"
                     required
                     onChange={handleChange}
+                    error={errors.roleId}
                   />
                 </Col>
 

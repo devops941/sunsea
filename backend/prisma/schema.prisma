@@ -186,6 +186,7 @@ model Permission {
 
 model Role {
   id              Int              @id @default(autoincrement())
+  code            String           @unique @default("ADMIN")
   name            String
   description     String?
   isSystem        Boolean          @default(true)

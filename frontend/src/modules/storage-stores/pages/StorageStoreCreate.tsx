@@ -15,10 +15,10 @@ import { storeService } from "../../../services/storeService";
 import { z } from "zod";
 // Dynamic Store Types are now fetched from DB
 
-const COST_METHOD_OPTIONS = [
-    { label: "Weighted Average (WAVG)", value: "WAVG" },
-    { label: "First In First Out (FIFO)", value: "FIFO" },
-];
+// const COST_METHOD_OPTIONS = [
+//     { label: "Weighted Average (WAVG)", value: "WAVG" },
+//     { label: "First In First Out (FIFO)", value: "FIFO" },
+// ];
 
 const STATUS_OPTIONS = [
     { label: "Active", value: "Active" },
@@ -31,9 +31,9 @@ const initialFormState = {
     storeName: "",
     storeTypeId: "",
     locationId: "",
-    locationDesc: "",
+    // locationDesc: "",
     inchargeId: "",
-    costMethod: "WAVG",
+    // costMethod: "WAVG",
     gstPlace: "",
     status: "Active",
     allowNegative: false,
@@ -49,8 +49,8 @@ const storeSchema = z.object({
         .min(1, "Store Name is required")
         .max(100, "Maximum 100 characters allowed")
         .regex(
-            /^[A-Za-z\s&()-]+$/,
-            "Store Name cannot contain numbers or special characters"
+            /^[A-Za-z0-9\s&()-]+$/,
+            "Store Name can only contain letters, numbers, spaces, &, (, ), and -"
         ),
 
     storeTypeId: z
@@ -68,15 +68,15 @@ const storeSchema = z.object({
         .trim()
         .min(1, "Location is required"),
 
-    locationDesc: z
-        .string()
-        .trim()
-        .min(1, "Location Description is required")
-        .max(255, "Maximum 255 characters allowed")
-        .regex(
-            /^[A-Za-z0-9\s,./()-]+$/,
-            "Invalid characters in Location Description"
-        ),
+    // locationDesc: z
+    //     .string()
+    //     .trim()
+    //     .min(1, "Location Description is required")
+    //     .max(255, "Maximum 255 characters allowed")
+    //     .regex(
+    //         /^[A-Za-z0-9\s,./()-]+$/,
+    //         "Invalid characters in Location Description"
+    //     ),
 
     gstPlace: z
         .string()
@@ -192,9 +192,9 @@ const StorageStoreCreate: React.FC = () => {
                 storeName: formData.storeName,
                 storeTypeId: formData.storeTypeId ? Number(formData.storeTypeId) : undefined,
                 locationId: formData.locationId || undefined,
-                locationDesc: formData.locationDesc || undefined,
+                // locationDesc: formData.locationDesc || undefined,
                 inchargeId: formData.inchargeId || undefined,
-                costMethod: formData.costMethod,
+                // costMethod: formData.costMethod,
                 gstPlace: formData.gstPlace || undefined,
                 status: formData.status,
                 allowNegative: formData.allowNegative,
@@ -295,7 +295,7 @@ const StorageStoreCreate: React.FC = () => {
                                 onChange={handleChange}
                             />
                         </Col>
-                        <Col md={4}>
+                        {/* <Col md={4}>
                             <TextInput
                                 label="Location Description"
                                 name="locationDesc"
@@ -304,7 +304,7 @@ const StorageStoreCreate: React.FC = () => {
                                 error={errors.locationDesc}
                                 onChange={handleChange}
                             />
-                        </Col>
+                        </Col> */}
                         <Col md={4}>
                             <SelectInput
                                 label="Store Incharge"
@@ -322,7 +322,7 @@ const StorageStoreCreate: React.FC = () => {
                                 onChange={handleChange}
                             />
                         </Col>
-                        <Col md={4}>
+                        {/* <Col md={4}>
                             <SelectInput
                                 label="Costing Method"
                                 name="costMethod"
@@ -332,7 +332,7 @@ const StorageStoreCreate: React.FC = () => {
                                 required
 
                             />
-                        </Col>
+                        </Col> */}
                         <Col md={4}>
                             <SelectInput
                                 label="Status"
@@ -354,7 +354,7 @@ const StorageStoreCreate: React.FC = () => {
                                 onChange={handleChange}
                             />
                         </Col>
-                        <Col md={4}>
+                        {/* <Col md={4}>
                             <div className="form-group mb-3 d-flex align-items-center gap-2">
                                 <input
                                     type="checkbox"
@@ -366,7 +366,7 @@ const StorageStoreCreate: React.FC = () => {
                                 />
                                 <label htmlFor="allowNegative" className="form-label mb-0" style={{ marginTop: '2rem' }}>Allow Negative Stock</label>
                             </div>
-                        </Col>
+                        </Col> */}
                        
                     </Row>
 

@@ -13,6 +13,7 @@ import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import { useSubCategories } from "../../../hooks/useSubCategories";
 import { useCategories } from "../../../hooks/useCategories";
 import { subCategoryService } from "../../../services/subCategoryService";
+import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -272,9 +273,7 @@ const SubCategoryList: React.FC = () => {
                                                 <td className="master-data-cell">{sc.name}</td>
                                                 <td className="master-data-cell">{sc.category?.name || sc.parentCategoryId}</td>
                                                 <td className="master-data-cell">
-                                                    <span className={`status-pill status-pill--${sc.status === "ACTIVE" ? "active" : "inactive"}`}>
-                                                        {sc.status}
-                                                    </span>
+                                                    <StatusBadge status={sc.status} />
                                                 </td>
                                                 <td className="master-data-cell">{new Date(sc.createdAt).toLocaleDateString()}</td>
                                                 <td className="master-data-cell">

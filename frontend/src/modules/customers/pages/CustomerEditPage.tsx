@@ -712,7 +712,7 @@ const CustomerEditPage: React.FC = () => {
               />
             </Col> */}
 
-            {/* <Col lg={4} md={6}>
+            <Col lg={4} md={6}>
               <TextInput
                 label="Place Of Supply (State Code)"
                 name="stateCode"
@@ -721,7 +721,7 @@ const CustomerEditPage: React.FC = () => {
                 onChange={handleChange}
                 error={errors.stateCode}
               />
-            </Col> */}
+            </Col>
 
             {/* <Col lg={4} md={6}>
               <SelectInput

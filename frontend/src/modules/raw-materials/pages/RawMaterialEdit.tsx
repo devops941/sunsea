@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Container, Row, Col } from "react-bootstrap";
 import { FaSave, FaEraser, FaArrowLeft } from "react-icons/fa";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import TextInput from "../../../components/form/TextInput/TextInput";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
@@ -13,6 +13,7 @@ import { useRawMaterialCategories } from "../../../hooks/useRawMaterialCategorie
 import UOMSelect from "../../../components/form/SelectInput/UOMSelect";
 import QuantityInput from "../../../components/form/QuantityInput/QuantityInput";
 import { z } from "zod";
+import { rawMaterialService } from "../../../services/rawMaterialService";
 
 // const CATEGORY_OPTIONS = [
 //     { label: "Yarn", value: "Yarn" },
@@ -211,6 +212,7 @@ const rawMaterialSchema = z
 const RawMaterialEdit: React.FC = () => {
     const navigate = useNavigate();
     const locationState = useLocation();
+    const { id } = useParams<{ id: string }>();
     const dispatch = useAppDispatch();
 
     const [formData, setFormData] = useState(initialFormState);
@@ -271,11 +273,37 @@ const RawMaterialEdit: React.FC = () => {
                 status: locationState.state.status || "Active",
 
             });
+        } else if (id) {
+            // Fetch by ID if state is not provided
+            rawMaterialService.fetchById(id).then((data) => {
+                setFormData({
+                    rawMaterialId: data.rawMaterialId,
+                    materialName: data.materialName,
+                    categoryId: data.categoryId ? String(data.categoryId) : "",
+                    hsnCode: data.hsnCode || "",
+                    minimumStock: data.minimumStock !== null && data.minimumStock !== undefined ? String(data.minimumStock) : "",
+                    leadTimeDays: data.leadTimeDays !== null && data.leadTimeDays !== undefined ? String(data.leadTimeDays) : "",
+                    storeId: data.storeId || "",
+                    baseUom: data.baseUom || "",
+                    reorderLevel: data.reorderLevel != null ? String(data.reorderLevel) : "",
+                    unitPrice: data.unitPrice != null ? String(data.unitPrice) : "",
+                    batchNo: data.batchNo ?? "",
+                    onHandQty: data.onHandQty != null ? String(data.onHandQty) : "",
+                    reservedQty: data.reservedQty != null ? String(data.reservedQty) : "",
+                    avgCost: data.avgCost != null ? String(data.avgCost) : "",
+                    remarks: data.remarks || "",
+                    lastMovementAt: data.lastMovementAt ? data.lastMovementAt.substring(0, 16) : "",
+                    status: data.status || "Active",
+                });
+            }).catch(() => {
+                toast.error("Failed to load raw material data.");
+                navigate("/raw-materials");
+            });
         } else {
             toast.error("No raw material data provided.");
             navigate("/raw-materials");
         }
-    }, [locationState.state, navigate, dispatch, loadCategories]);
+    }, [locationState.state, id, navigate, dispatch, loadCategories]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value, type } = e.target as any;

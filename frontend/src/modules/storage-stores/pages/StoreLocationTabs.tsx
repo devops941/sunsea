@@ -29,8 +29,8 @@ const StoreLocationTabs: React.FC = () => {
     const activeTab = pathToKey[location.pathname] || "types";
 
     const tabs: TabItem[] = [
-        { key: "types", label: "Store Types", icon: <FaCogs />, content: <StoreTypeList /> },
         { key: "stores", label: "Storage Stores", icon: <FaWarehouse />, content: <StorageStoreList /> },
+        { key: "types", label: "Store Types", icon: <FaCogs />, content: <StoreTypeList /> },
         { key: "locations", label: "Locations", icon: <FaMapMarkerAlt />, content: <LocationList /> }
     ];
 
