@@ -112,7 +112,7 @@ const ProductEdit: React.FC = () => {
     // Load dropdowns
     useEffect(() => {
         loadCategories({ isActive: true });
-        loadActiveUOMs();
+        // loadActiveUOMs();
         dispatch(fetchGstTaxes({ status: "ACTIVE" }));
         loadColors({ isActive: true });
         loadSizes({ isActive: true });

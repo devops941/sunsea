@@ -1,9 +1,12 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Container, Row, Col, Table, Spinner } from "react-bootstrap";
 import { FaSave, FaPlus, FaTrash, FaInfoCircle, FaUser, FaMapMarkerAlt, FaBoxOpen, FaPaperPlane } from "react-icons/fa";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
-//import { useSelector } from "react-redux";
+import { useSelector } from "react-redux";
+import { useAppDispatch, useAppSelector } from "../../../../hooks/reduxHooks";
+import { fetchLocations } from "../../../../features/locations/locationSlice";
+import { selectActiveGstTaxes, fetchGstTaxes } from "../../../../features/gst/gstSlice";
 
 import TextInput from "../../../../components/form/TextInput/TextInput";
 import SelectInput from "../../../../components/form/SelectInput/SelectInput";
@@ -49,6 +52,9 @@ const initialFormData: PurchaseOrderFormData = {
   subtotal: 0,
   totalDiscount: 0,
   totalTax: 0,
+  totalCgst: 0,
+  totalSgst: 0,
+  totalIgst: 0,
   netAmount: 0,
 };
 
@@ -70,7 +76,6 @@ const mapPOToFormData = (po: any): PurchaseOrderFormData => {
     billingCity: po.billingCity ?? "",
     billingState: po.billingState ?? "",
     billingPincode: po.billingPincode ?? "",
-
     sameAsBilling: po.sameAsBilling ?? false,
 
     shippingAddressLine1: po.shippingAddressLine1 ?? "",
@@ -88,13 +93,26 @@ const mapPOToFormData = (po: any): PurchaseOrderFormData => {
       unitPrice: i.unitPrice ?? 0,
       discount: i.discount ?? 0,
       tax: i.tax ?? 0,
+      discountType: i.discountType ?? "PERCENT",
+      discountValue: i.discountValue ?? i.discount ?? 0,
+      discountAmount: i.discountAmount ?? 0,
+      taxableAmount: i.taxableAmount ?? 0,
+      cgstRate: i.cgstRate ?? 0,
+      cgstAmount: i.cgstAmount ?? 0,
+      sgstRate: i.sgstRate ?? 0,
+      sgstAmount: i.sgstAmount ?? 0,
+      igstRate: i.igstRate ?? 0,
+      igstAmount: i.igstAmount ?? 0,
       lineTotal: i.lineTotal ?? 0,
     })) ?? [],
 
-    subtotal: po.subtotal ?? 0,
-    totalDiscount: po.totalDiscount ?? 0,
-    totalTax: po.totalTax ?? 0,
-    netAmount: po.netAmount ?? 0,
+    subtotal: Number(po.subtotal ?? 0),
+    totalDiscount: Number(po.totalDiscount ?? 0),
+    totalTax: Number(po.totalTax ?? 0),
+    totalCgst: Number(po.totalCgst ?? 0),
+    totalSgst: Number(po.totalSgst ?? 0),
+    totalIgst: Number(po.totalIgst ?? 0),
+    netAmount: Number(po.netAmount ?? 0),
   };
 };
 
@@ -109,12 +127,35 @@ const PurchaseOrderEditPage: React.FC = () => {
   const { suppliers, loadSuppliers } = useSuppliers();
   const [rawMaterials, setRawMaterials] = useState<RawMaterial[]>([]);
 
+  const dispatch = useAppDispatch();
+  const { data: company } = useSelector((state: any) => state.company);
+
+  const companyState = company?.state;
+  const gstTaxes = useAppSelector(selectActiveGstTaxes);
+  const gstLoading = useAppSelector((state) => state.gst.loading);
 
   const [formData, setFormData] = useState<PurchaseOrderFormData>(initialFormData);
+
+  const selectedSupplier = useMemo(() => (suppliers || []).find(
+    (s) => String(s?.id) === String(formData.supplierId)
+  ), [suppliers, formData.supplierId]);
+
+  const isInterState = useMemo(() => {
+    if (!companyState || !selectedSupplier?.billingState) return false;
+    return companyState.toLowerCase().trim() !== selectedSupplier.billingState.toLowerCase().trim();
+  }, [companyState, selectedSupplier]);
+
+  const gstOptions = useMemo(() => [
+    { value: "", label: gstLoading ? "Loading GST rates..." : "-- Select GST Rate --" },
+    ...(gstTaxes || []).map((t: any) => ({
+      value: String(t.taxRate),
+      label: `${t.taxName} (${t.taxRate}%)`,
+    })),
+  ], [gstTaxes, gstLoading]);
   const { users, loadUsers } = useUsers();
   const createdOn = users.find(
     (u: any) => u.userId === formData?.createdByOn
-  )?.username; ``
+  )?.username;
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -127,7 +168,9 @@ const PurchaseOrderEditPage: React.FC = () => {
   useEffect(() => {
     loadSuppliers();
     loadUsers();
-  }, [loadSuppliers, loadUsers]);
+    dispatch(fetchLocations(undefined));
+    dispatch(fetchGstTaxes(undefined));
+  }, [loadSuppliers, loadUsers, dispatch]);
 
   useEffect(() => {
     let mounted = true;
@@ -159,6 +202,68 @@ const PurchaseOrderEditPage: React.FC = () => {
       mounted = false;
     };
   }, [id, location.state]);
+
+  // ============================================================
+  // CALCULATE TOTALS
+  // ============================================================
+  const recalculateTotals = (items: PurchaseOrderItem[]) => {
+    let subtotal = 0;
+    let totalDiscount = 0;
+    let totalTax = 0;
+    let totalCgst = 0;
+    let totalSgst = 0;
+    let totalIgst = 0;
+
+    items.forEach((item) => {
+      const qty = Number(item.quantity) || 0;
+      const price = Number(item.unitPrice) || 0;
+      const lineSubtotal = qty * price;
+
+      const discountType = item.discountType || "PERCENT";
+      const discountValue = Number(item.discountValue ?? item.discount) || 0;
+      let discountAmount = 0;
+      if (discountType === "PERCENT") {
+        discountAmount = (lineSubtotal * discountValue) / 100;
+      } else {
+        discountAmount = discountValue;
+      }
+      if (discountAmount > lineSubtotal) {
+        discountAmount = lineSubtotal;
+      }
+
+      const taxableAmount = lineSubtotal - discountAmount;
+      const totalGstRate = Number(item.tax) || 0;
+      const totalGstAmount = (taxableAmount * totalGstRate) / 100;
+
+      let cgstAmount = 0;
+      let sgstAmount = 0;
+      let igstAmount = 0;
+
+      if (isInterState) {
+        igstAmount = totalGstAmount;
+      } else {
+        cgstAmount = totalGstAmount / 2;
+        sgstAmount = totalGstAmount / 2;
+      }
+
+      subtotal += lineSubtotal;
+      totalDiscount += discountAmount;
+      totalTax += totalGstAmount;
+      totalCgst += cgstAmount;
+      totalSgst += sgstAmount;
+      totalIgst += igstAmount;
+    });
+
+    return {
+      subtotal,
+      totalDiscount,
+      totalTax,
+      totalCgst,
+      totalSgst,
+      totalIgst,
+      netAmount: subtotal - totalDiscount + totalTax,
+    };
+  };
 
   // ============================================================
   // HANDLE CHANGE
@@ -205,14 +310,54 @@ const PurchaseOrderEditPage: React.FC = () => {
               : 0);
 
           const qty = Number(item.quantity) || 0;
-          const base = qty * parsedUnitPrice;
-          const discountAmt = (base * (Number(item.discount) || 0)) / 100;
-          const taxAmt = ((base - discountAmt) * (Number(item.tax) || 0)) / 100;
+          const lineSubtotal = qty * parsedUnitPrice;
+
+          const discountType = item.discountType || "PERCENT";
+          const discountValue = Number(item.discountValue ?? item.discount) || 0;
+          let discountAmount = 0;
+          if (discountType === "PERCENT") {
+            discountAmount = (lineSubtotal * discountValue) / 100;
+          } else {
+            discountAmount = discountValue;
+          }
+          if (discountAmount > lineSubtotal) {
+            discountAmount = lineSubtotal;
+          }
+
+          const taxableAmount = lineSubtotal - discountAmount;
+          const totalGstRate = Number(item.tax) || 0;
+          const totalGstAmount = (taxableAmount * totalGstRate) / 100;
+
+          let cgstRate = 0;
+          let cgstAmount = 0;
+          let sgstRate = 0;
+          let sgstAmount = 0;
+          let igstRate = 0;
+          let igstAmount = 0;
+
+          if (isInterState) {
+            igstRate = totalGstRate;
+            igstAmount = totalGstAmount;
+          } else {
+            cgstRate = totalGstRate / 2;
+            sgstRate = totalGstRate / 2;
+            cgstAmount = totalGstAmount / 2;
+            sgstAmount = totalGstAmount / 2;
+          }
 
           return {
             ...item,
             unitPrice: parsedUnitPrice,
-            lineTotal: base - discountAmt + taxAmt,
+            discount: discountType === "PERCENT" ? discountValue : 0,
+            discountAmount,
+            taxableAmount,
+            cgstRate,
+            cgstAmount,
+            sgstRate,
+            sgstAmount,
+            igstRate,
+            igstAmount,
+            lineTotal: taxableAmount + totalGstAmount,
             product: item.product
               ? {
                 ...item.product,
@@ -222,28 +367,11 @@ const PurchaseOrderEditPage: React.FC = () => {
           };
         });
 
-        let subtotal = 0;
-        let totalDiscount = 0;
-        let totalTax = 0;
-
-        updatedItems.forEach((item) => {
-          const line = item.quantity * item.unitPrice;
-          const discount = (line * (item.discount || 0)) / 100;
-          const tax = ((line - discount) * (item.tax || 0)) / 100;
-
-          subtotal += line;
-          totalDiscount += discount;
-          totalTax += tax;
-        });
-
         return {
           ...prev,
           poDate: value,
           items: updatedItems,
-          subtotal,
-          totalDiscount,
-          totalTax,
-          netAmount: subtotal - totalDiscount + totalTax,
+          ...recalculateTotals(updatedItems),
         };
       });
       if (errors.poDate) {
@@ -319,49 +447,76 @@ const PurchaseOrderEditPage: React.FC = () => {
     formData.billingPincode,
   ]);
 
-  // ============================================================
-  // TOTALS
-  // ============================================================
-  const calculateTotals = useCallback(() => {
-    setFormData((prev) => {
-      let subtotal = 0;
-      let totalDiscount = 0;
-      let totalTax = 0;
-
-      prev.items.forEach((item) => {
-        const line = item.quantity * item.unitPrice;
-        const discount = (line * (item.discount || 0)) / 100;
-        const tax = ((line - discount) * (item.tax || 0)) / 100;
-
-        subtotal += line;
-        totalDiscount += discount;
-        totalTax += tax;
-      });
-
-      return {
-        ...prev,
-        subtotal,
-        totalDiscount,
-        totalTax,
-        netAmount: subtotal - totalDiscount + totalTax,
-      };
-    });
-  }, []);
-
-  // ============================================================
-  // ITEM HANDLERS
-  // ============================================================
   const handleItemChange = (index: number, field: keyof PurchaseOrderItem, value: any) => {
     setFormData((prev) => {
       const items = [...prev.items];
       items[index] = { ...items[index], [field]: value };
-      return { ...prev, items };
+
+      const item = items[index];
+      const qty = Number(item.quantity) || 0;
+      const price = Number(item.unitPrice) || 0;
+      const lineSubtotal = qty * price;
+
+      const discountType = item.discountType || "PERCENT";
+      const discountValue = Number(item.discountValue ?? item.discount) || 0;
+      let discountAmount = 0;
+      if (discountType === "PERCENT") {
+        discountAmount = (lineSubtotal * discountValue) / 100;
+      } else {
+        discountAmount = discountValue;
+      }
+      if (discountAmount > lineSubtotal) {
+        discountAmount = lineSubtotal;
+      }
+
+      const taxableAmount = lineSubtotal - discountAmount;
+      const totalGstRate = Number(item.tax) || 0;
+      const totalGstAmount = (taxableAmount * totalGstRate) / 100;
+
+      let cgstRate = 0;
+      let cgstAmount = 0;
+      let sgstRate = 0;
+      let sgstAmount = 0;
+      let igstRate = 0;
+      let igstAmount = 0;
+
+      if (isInterState) {
+        igstRate = totalGstRate;
+        igstAmount = totalGstAmount;
+      } else {
+        cgstRate = totalGstRate / 2;
+        sgstRate = totalGstRate / 2;
+        cgstAmount = totalGstAmount / 2;
+        sgstAmount = totalGstAmount / 2;
+      }
+
+      items[index] = {
+        ...item,
+        discount: discountType === "PERCENT" ? discountValue : 0,
+        discountAmount,
+        taxableAmount,
+        cgstRate,
+        cgstAmount,
+        sgstRate,
+        sgstAmount,
+        igstRate,
+        igstAmount,
+        lineTotal: taxableAmount + totalGstAmount,
+      };
+
+      return {
+        ...prev,
+        items,
+        ...recalculateTotals(items),
+      };
     });
-    calculateTotals();
   };
 
   const handleItemProductChange = (index: number, productId: string) => {
-    const rawMaterial = rawMaterials.find((rm) => rm.rawMaterialId === productId);
+    const rawMaterial = rawMaterials.find(
+      (rm) => String(rm.rawMaterialId) === String(productId)
+    );
+
     setFormData((prev) => {
       const selectedSupObj = suppliers.find((s) => String(s.id) === String(prev.supplierId));
       const supplierPrices = selectedSupObj?.materialPrices || [];
@@ -380,9 +535,49 @@ const PurchaseOrderEditPage: React.FC = () => {
           ? (typeof rawMaterial.unitPrice === "string" ? parseFloat(rawMaterial.unitPrice) : Number(rawMaterial.unitPrice))
           : 0);
 
+      const defaultTaxRateObj = gstTaxes?.find((t: any) => String(t.id) === String(rawMaterial?.gstTaxRateId));
+      const defaultTaxRate = defaultTaxRateObj ? Number(defaultTaxRateObj.taxRate) : 0;
+
       const items = [...prev.items];
+      const item = items[index];
+      const qty = Number(item.quantity) || 0;
+      const lineSubtotal = qty * parsedUnitPrice;
+
+      const discountType = item.discountType || "PERCENT";
+      const discountValue = Number(item.discountValue ?? item.discount) || 0;
+      let discountAmount = 0;
+      if (discountType === "PERCENT") {
+        discountAmount = (lineSubtotal * discountValue) / 100;
+      } else {
+        discountAmount = discountValue;
+      }
+      if (discountAmount > lineSubtotal) {
+        discountAmount = lineSubtotal;
+      }
+
+      const taxableAmount = lineSubtotal - discountAmount;
+      const totalGstRate = defaultTaxRate;
+      const totalGstAmount = (taxableAmount * totalGstRate) / 100;
+
+      let cgstRate = 0;
+      let cgstAmount = 0;
+      let sgstRate = 0;
+      let sgstAmount = 0;
+      let igstRate = 0;
+      let igstAmount = 0;
+
+      if (isInterState) {
+        igstRate = totalGstRate;
+        igstAmount = totalGstAmount;
+      } else {
+        cgstRate = totalGstRate / 2;
+        sgstRate = totalGstRate / 2;
+        cgstAmount = totalGstAmount / 2;
+        sgstAmount = totalGstAmount / 2;
+      }
+
       items[index] = {
-        ...items[index],
+        ...item,
         productId,
         product: rawMaterial
           ? {
@@ -394,28 +589,69 @@ const PurchaseOrderEditPage: React.FC = () => {
           }
           : undefined,
         unitPrice: parsedUnitPrice,
+        uom: rawMaterial?.baseUom || "",
+        tax: totalGstRate,
+        discount: discountType === "PERCENT" ? discountValue : 0,
+        discountAmount,
+        taxableAmount,
+        cgstRate,
+        cgstAmount,
+        sgstRate,
+        sgstAmount,
+        igstRate,
+        igstAmount,
+        lineTotal: taxableAmount + totalGstAmount,
       };
-      return { ...prev, items };
+
+      return {
+        ...prev,
+        items,
+        ...recalculateTotals(items),
+      };
     });
-    calculateTotals();
   };
 
   const addItem = () => {
-    setFormData((prev) => ({
-      ...prev,
-      items: [
+    setFormData((prev) => {
+      const items = [
         ...prev.items,
-        { productId: "", quantity: 1, unitPrice: 0, discount: 0, tax: 0, lineTotal: 0, uom: "" },
-      ],
-    }));
+        {
+          productId: "",
+          uom: "",
+          quantity: 1,
+          unitPrice: 0,
+          discount: 0,
+          tax: 0,
+          discountType: "PERCENT" as const,
+          discountValue: 0,
+          discountAmount: 0,
+          taxableAmount: 0,
+          cgstRate: 0,
+          cgstAmount: 0,
+          sgstRate: 0,
+          sgstAmount: 0,
+          igstRate: 0,
+          igstAmount: 0,
+          lineTotal: 0,
+        },
+      ];
+      return {
+        ...prev,
+        items,
+        ...recalculateTotals(items),
+      };
+    });
   };
 
   const removeItem = (index: number) => {
-    setFormData((prev) => ({
-      ...prev,
-      items: prev.items.filter((_, i) => i !== index),
-    }));
-    calculateTotals();
+    setFormData((prev) => {
+      const items = prev.items.filter((_, i) => i !== index);
+      return {
+        ...prev,
+        items,
+        ...recalculateTotals(items),
+      };
+    });
   };
 
   // ============================================================
@@ -452,19 +688,31 @@ const PurchaseOrderEditPage: React.FC = () => {
         shippingPincode: formData.shippingPincode,
         sameAsBilling: formData.sameAsBilling,
         remarks: formData.remarks,
-        items: formData.items.map((i) => ({
-          productId: i.productId,
-          uom: i.uom,
-          quantity: Number(i.quantity),
-          unitPrice: Number(i.unitPrice),
-          discount: Number(i.discount || 0),
-          tax: Number(i.tax || 0),
-          subtotal: Number(i.lineTotal),
-          discountAmount: Number(i.discount),
-          taxAmount: Number(i.tax),
-          netAmount: Number(i.lineTotal)
+        items: formData.items.map((item) => ({
+          productId: item.productId,
+          uom: item.uom,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          discount: item.discount || 0,
+          tax: item.tax || 0,
+          discountType: item.discountType || "PERCENT",
+          discountValue: Number(item.discountValue ?? item.discount) || 0,
+          discountAmount: item.discountAmount || 0,
+          taxableAmount: item.taxableAmount || 0,
+          cgstRate: item.cgstRate || 0,
+          cgstAmount: item.cgstAmount || 0,
+          sgstRate: item.sgstRate || 0,
+          sgstAmount: item.sgstAmount || 0,
+          igstRate: item.igstRate || 0,
+          igstAmount: item.igstAmount || 0,
         })),
-        status: formData.status,
+        totalDiscount: formData.totalDiscount,
+        totalTax: formData.totalTax,
+        totalCgst: formData.totalCgst,
+        totalSgst: formData.totalSgst,
+        totalIgst: formData.totalIgst,
+        netAmount: formData.netAmount,
+        status: submitStatus,
       });
 
       toast.success("Purchase Order updated successfully!");
@@ -496,7 +744,7 @@ const PurchaseOrderEditPage: React.FC = () => {
     label: `${s.supplierCode} - ${s.legalName || s.displayName || ""}`,
   }));
 
-  const selectedSupplier = (suppliers || []).find((s) => s?.id === formData.supplierId);
+
   const supplierMaterials = selectedSupplier?.category
     ? selectedSupplier.category.split(",").map((c: string) => c.trim().toLowerCase())
     : [];
@@ -520,6 +768,8 @@ const PurchaseOrderEditPage: React.FC = () => {
     { value: "COMPLETED", label: "Completed" },
     { value: "CANCELLED", label: "Cancelled" },
   ];
+
+
 
   const isLocked = formData.status !== "DRAFT" && formData.status !== "PENDING";
 
@@ -720,96 +970,120 @@ const PurchaseOrderEditPage: React.FC = () => {
               />
             </div>
 
-            <div className="table-responsive">
-              <Table bordered hover>
+            <div className="table-wrap" style={{ overflowX: "auto" }}>
+              <Table bordered hover style={{ minWidth: "1200px" }}>
                 <thead>
                   <tr>
-                    <th>S.No</th>
-                    <th>Product</th>
-                    <th>Quantity</th>
-                    <th>Unit Price</th>
-                    <th>Discount %</th>
-                    <th>Tax %</th>
-                    <th>Line Total</th>
+                    <th style={{ width: "50px" }}>#</th>
+                    <th style={{ minWidth: "220px" }}>RAW MATERIAL</th>
+                    <th style={{ minWidth: "100px" }}>UOM</th>
+                    <th style={{ minWidth: "100px" }}>QTY</th>
+                    <th style={{ minWidth: "120px" }}>UNIT PRICE (₹)</th>
+                    <th style={{ minWidth: "115px" }}>TAX %</th>
+                    <th style={{ minWidth: "120px" }}>TAXABLE (₹)</th>
                     <th>Action</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {formData.items.map((item, index) => (
-                    <tr key={index}>
-                      <td>{index + 1}</td>
-                      <td>
-                        <SelectInput
-                          label=""
-                          name={`items[${index}].productId`}
-                          value={item.productId || ""}
-                          options={[{ value: "", label: "-- Select --" }, ...productOptions]}
-                          onChange={(e) => handleItemProductChange(index, e.target.value)}
-                          error={errors[`items.${index}.productId`]}
-                          disabled={isLocked}
-                        />
-                      </td>
-                      <td>
-                        <TextInput
-                          name={`items[${index}].quantity`}
-                          type="number"
-                          value={String(item.quantity)}
-                          onChange={(e) => handleItemChange(index, "quantity", Number(e.target.value))}
-                          error={errors[`items.${index}.quantity`]}
-                          min={1}
-                          disabled={isLocked}
-                        />
-                      </td>
-                      <td>
-                        <TextInput
-                          name={`items[${index}].unitPrice`}
-                          type="number"
-                          value={String(item.unitPrice)}
-                          onChange={(e) => handleItemChange(index, "unitPrice", Number(e.target.value))}
-                          error={errors[`items.${index}.unitPrice`]}
-                          min={0}
-                          step={0.01}
-                          disabled
-                        />
-                      </td>
-                      <td>
-                        <TextInput
-                          name={`items[${index}].discount`}
-                          type="number"
-                          value={String(item.discount)}
-                          onChange={(e) => handleItemChange(index, "discount", Number(e.target.value))}
-                          min={0}
-                          max={100}
-                          disabled={isLocked}
-                        />
-                      </td>
-                      <td>
-                        <TextInput
-                          name={`items[${index}].tax`}
-                          type="number"
-                          value={String(item.tax)}
-                          onChange={(e) => handleItemChange(index, "tax", Number(e.target.value))}
-                          min={0}
-                          max={100}
-                          disabled={isLocked}
-                        />
-                      </td>
-                      <td>
-                        ₹{(item.quantity * item.unitPrice - (item.quantity * item.unitPrice * (item.discount || 0)) / 100 + ((item.quantity * item.unitPrice - (item.quantity * item.unitPrice * (item.discount || 0)) / 100) * (item.tax || 0)) / 100).toFixed(2)}
-                      </td>
-                      <td>
-                        <CustomButton
-                          text=""
-                          icon={FaTrash}
-                          onClick={() => removeItem(index)}
-                          type="button"
-                          variant="danger"
-                          size="sm"
-                          disabled={isLocked}
-                        />
-                      </td>
-                    </tr>
-                  ))}
+                  {formData.items.map((item, index) => {
+                    const qty = Number(item.quantity) || 0;
+                    const price = Number(item.unitPrice) || 0;
+                    const lineSubtotal = qty * price;
+
+                    const discountType = item.discountType || "PERCENT";
+                    const discountValue = Number(item.discountValue ?? item.discount) || 0;
+                    let discountAmount = 0;
+                    if (discountType === "PERCENT") {
+                      discountAmount = (lineSubtotal * discountValue) / 100;
+                    } else {
+                      discountAmount = discountValue;
+                    }
+                    if (discountAmount > lineSubtotal) {
+                      discountAmount = lineSubtotal;
+                    }
+
+                    const taxableAmount = lineSubtotal - discountAmount;
+
+                    return (
+                      <tr key={index}>
+                        <td>{index + 1}</td>
+                        <td>
+                          <SelectInput
+                            label=""
+                            name={`items[${index}].productId`}
+                            value={item.productId || ""}
+                            options={[{ value: "", label: "-- Select Material --" }, ...productOptions]}
+                            onChange={(e) => handleItemProductChange(index, e.target.value)}
+                            error={errors[`items.${index}.productId`]}
+                            disabled={isLocked}
+                          />
+                        </td>
+                        <td>
+                          <TextInput
+                            label=""
+                            name={`items[${index}].uom`}
+                            value={item.uom || ""}
+                            onChange={() => { }}
+                            disabled
+                            placeholder="—"
+                          />
+                        </td>
+                        <td>
+                          <TextInput
+                            label=""
+                            name={`items[${index}].quantity`}
+                            type="number"
+                            value={String(item.quantity)}
+                            onChange={(e) => handleItemChange(index, "quantity", Number(e.target.value))}
+                            error={errors[`items.${index}.quantity`]}
+                            min={0.01}
+                            step={0.01}
+                            placeholder="0.00"
+                            disabled={isLocked}
+                          />
+                        </td>
+                        <td>
+                          <TextInput
+                            label=""
+                            name={`items[${index}].unitPrice`}
+                            type="number"
+                            value={String(item.unitPrice)}
+                            onChange={(e) => handleItemChange(index, "unitPrice", Number(e.target.value))}
+                            error={errors[`items.${index}.unitPrice`]}
+                            min={0}
+                            step={0.01}
+                            disabled
+                            placeholder="0.00"
+                          />
+                        </td>
+
+                        <td>
+                          <SelectInput
+                            label=""
+                            name={`items[${index}].tax`}
+                            options={gstOptions}
+                            value={String(item.tax || 0)}
+                            onChange={(e) => handleItemChange(index, "tax", Number(e.target.value))}
+                            disabled={isLocked}
+                          />
+                        </td>
+                        <td className="text-end">
+                          ₹{taxableAmount.toFixed(2)}
+                        </td>
+                        <td>
+                          <CustomButton
+                            text=""
+                            icon={FaTrash}
+                            onClick={() => removeItem(index)}
+                            type="button"
+                            variant="danger"
+                            size="sm"
+                            disabled={isLocked}
+                          />
+                        </td>
+                      </tr>
+                    );
+                  })}
                   {formData.items.length === 0 && (
                     <tr>
                       <td colSpan={8} className="text-center">No items added</td>
@@ -845,20 +1119,34 @@ const PurchaseOrderEditPage: React.FC = () => {
                   <h6 className="mb-3 fw-bold" style={{ color: "var(--color-primary)" }}>Order Summary</h6>
                   <div className="d-flex justify-content-between mb-2">
                     <span>Subtotal:</span>
-                    <span>₹{formData.subtotal}</span>
+                    <span>₹{formData.subtotal.toFixed(2)}</span>
                   </div>
-                  <div className="d-flex justify-content-between mb-2 text-danger">
-                    <span>Total Discount:</span>
-                    <span>-₹{formData.totalDiscount}</span>
-                  </div>
-                  <div className="d-flex justify-content-between mb-2 text-success">
+
+                  {isInterState ? (
+                    <div className="d-flex justify-content-between mb-2 text-success small">
+                      <span>Total IGST:</span>
+                      <span>+₹{(formData.totalIgst ?? 0).toFixed(2)}</span>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="d-flex justify-content-between mb-2 text-success small">
+                        <span>Total CGST:</span>
+                        <span>+₹{(formData.totalCgst ?? 0).toFixed(2)}</span>
+                      </div>
+                      <div className="d-flex justify-content-between mb-2 text-success small">
+                        <span>Total SGST:</span>
+                        <span>+₹{(formData.totalSgst ?? 0).toFixed(2)}</span>
+                      </div>
+                    </>
+                  )}
+                  <div className="d-flex justify-content-between mb-2 text-success fw-bold">
                     <span>Total Tax:</span>
-                    <span>+₹{formData.totalTax}</span>
+                    <span>+₹{formData.totalTax.toFixed(2)}</span>
                   </div>
                   <hr />
                   <div className="d-flex justify-content-between fw-bold">
                     <span>Net Amount:</span>
-                    <span>₹{formData.netAmount}</span>
+                    <span>₹{formData.netAmount.toFixed(2)}</span>
                   </div>
                 </div>
               </Col>

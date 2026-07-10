@@ -20,6 +20,7 @@ const ITEMS_PER_PAGE = 10;
 
 const POMDApproval: React.FC = () => {
     const user = useSelector((state: any) => state?.auth?.user);
+    const navigate = useNavigate();
     const [data, setData] = useState<PurchaseOrder[]>([]);
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");

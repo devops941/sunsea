@@ -26,22 +26,82 @@ class PurchaseOrderService {
     }
 
     // ── Calculate totals from items ───────────────────────────────────────────
-    private calculateTotals(items: CreatePurchaseOrderInput["items"]) {
+    private calculateTotals(items: CreatePurchaseOrderInput["items"], isInterState: boolean) {
         let subtotal = 0;
         let totalDiscount = 0;
         let totalTax = 0;
+        let totalCgst = 0;
+        let totalSgst = 0;
+        let totalIgst = 0;
 
         const itemsWithTotals = items.map((item) => {
-            const base = item.quantity * item.unitPrice;
-            const discAmount = (base * (item.discount || 0)) / 100;
-            const taxAmount = ((base - discAmount) * (item.tax || 0)) / 100;
-            const lineTotal = base - discAmount + taxAmount;
+            const qty = Number(item.quantity) || 0;
+            const unitPrice = Number(item.unitPrice) || 0;
+            const lineSubtotal = qty * unitPrice;
 
-            subtotal += base;
-            totalDiscount += discAmount;
-            totalTax += taxAmount;
+            // Discount calculation
+            const discountType = item.discountType || "PERCENT";
+            const discountValue = Number(item.discountValue ?? item.discount) || 0;
+            let discountAmount = 0;
+            if (discountType === "PERCENT") {
+                discountAmount = (lineSubtotal * discountValue) / 100;
+            } else {
+                discountAmount = discountValue;
+            }
+            if (discountAmount > lineSubtotal) {
+                discountAmount = lineSubtotal;
+            }
 
-            return { ...item, lineTotal };
+            const taxableAmount = lineSubtotal - discountAmount;
+
+            // GST Tax Rate (percentage rate, e.g. 18)
+            const totalGstRate = Number(item.tax) || 0;
+            const totalGstAmount = (taxableAmount * totalGstRate) / 100;
+
+            let cgstRate = 0;
+            let cgstAmount = 0;
+            let sgstRate = 0;
+            let sgstAmount = 0;
+            let igstRate = 0;
+            let igstAmount = 0;
+
+            if (isInterState) {
+                igstRate = totalGstRate;
+                igstAmount = totalGstAmount;
+            } else {
+                cgstRate = totalGstRate / 2;
+                sgstRate = totalGstRate / 2;
+                cgstAmount = totalGstAmount / 2;
+                sgstAmount = totalGstAmount / 2;
+            }
+
+            const lineTotal = taxableAmount + totalGstAmount;
+
+            subtotal += lineSubtotal;
+            totalDiscount += discountAmount;
+            totalTax += totalGstAmount;
+            totalCgst += cgstAmount;
+            totalSgst += sgstAmount;
+            totalIgst += igstAmount;
+
+            return {
+                ...item,
+                quantity: qty,
+                unitPrice: unitPrice,
+                discount: discountType === "PERCENT" ? discountValue : 0,
+                tax: totalGstRate,
+                discountType,
+                discountValue,
+                discountAmount,
+                taxableAmount,
+                cgstRate,
+                cgstAmount,
+                sgstRate,
+                sgstAmount,
+                igstRate,
+                igstAmount,
+                lineTotal,
+            };
         });
 
         return {
@@ -49,6 +109,9 @@ class PurchaseOrderService {
             subtotal,
             totalDiscount,
             totalTax,
+            totalCgst,
+            totalSgst,
+            totalIgst,
             netAmount: subtotal - totalDiscount + totalTax,
         };
     }
@@ -71,9 +134,14 @@ class PurchaseOrderService {
             throw new ApiError(400, "At least one item is required");
         }
 
+        const company = await prisma.company.findUnique({
+            where: { id: currentUser.companyId },
+        });
+        const isInterState = company?.state?.toLowerCase().trim() !== supplier.billingState?.toLowerCase().trim();
+
         const poNumber = await this.getNextPONumber();
-        const { itemsWithTotals, subtotal, totalDiscount, totalTax, netAmount } =
-            this.calculateTotals(data.items);
+        const { itemsWithTotals, subtotal, totalDiscount, totalTax, totalCgst, totalSgst, totalIgst, netAmount } =
+            this.calculateTotals(data.items, isInterState);
 
         return prisma.purchaseOrder.create({
             data: {
@@ -83,7 +151,7 @@ class PurchaseOrderService {
                 supplierId: Number(data.supplierId),
                 status: data.status || "DRAFT",
                 remarks: data.remarks || null,
-                sameAsBilling: data.sameAsBilling || false,
+                sameAsBilling: data.sameAsBilling ?? false,
 
                 billingAddressLine1: data.billingAddressLine1,
                 billingCity: data.billingCity,
@@ -98,6 +166,9 @@ class PurchaseOrderService {
                 subtotal,
                 totalDiscount,
                 totalTax,
+                totalCgst,
+                totalSgst,
+                totalIgst,
                 netAmount,
 
                 companyId: currentUser.companyId,
@@ -111,6 +182,16 @@ class PurchaseOrderService {
                         unitPrice: item.unitPrice,
                         discount: item.discount || 0,
                         tax: item.tax || 0,
+                        discountType: item.discountType,
+                        discountValue: item.discountValue,
+                        discountAmount: item.discountAmount,
+                        taxableAmount: item.taxableAmount,
+                        cgstRate: item.cgstRate,
+                        cgstAmount: item.cgstAmount,
+                        sgstRate: item.sgstRate,
+                        sgstAmount: item.sgstAmount,
+                        igstRate: item.igstRate,
+                        igstAmount: item.igstAmount,
                         lineTotal: item.lineTotal,
                     })),
                 },
@@ -230,7 +311,12 @@ class PurchaseOrderService {
 
     // ── Update ────────────────────────────────────────────────────────────────
     async updatePurchaseOrder(id: string, data: UpdatePurchaseOrderInput) {
-        await this.getPurchaseOrderById(id);
+        const po = await prisma.purchaseOrder.findUnique({
+            where: { id },
+        });
+        if (!po) {
+            throw new ApiError(404, "Purchase Order not found");
+        }
 
         // Recalculate totals if items are being updated
         const updateData: any = {
@@ -255,12 +341,28 @@ class PurchaseOrderService {
 
         // If items are updated — delete old and recreate
         if (data.items && data.items.length > 0) {
-            const { itemsWithTotals, subtotal, totalDiscount, totalTax, netAmount } =
-                this.calculateTotals(data.items);
+            const supplierId = data.supplierId ? Number(data.supplierId) : Number(po.supplierId);
+            const supplier = await prisma.supplier.findUnique({
+                where: { id: supplierId },
+            });
+            if (!supplier) {
+                throw new ApiError(404, `Supplier not found`);
+            }
+
+            const company = await prisma.company.findUnique({
+                where: { id: po.companyId },
+            });
+            const isInterState = company?.state?.toLowerCase().trim() !== supplier.billingState?.toLowerCase().trim();
+
+            const { itemsWithTotals, subtotal, totalDiscount, totalTax, totalCgst, totalSgst, totalIgst, netAmount } =
+                this.calculateTotals(data.items, isInterState);
 
             updateData.subtotal = subtotal;
             updateData.totalDiscount = totalDiscount;
             updateData.totalTax = totalTax;
+            updateData.totalCgst = totalCgst;
+            updateData.totalSgst = totalSgst;
+            updateData.totalIgst = totalIgst;
             updateData.netAmount = netAmount;
 
             updateData.items = {
@@ -272,6 +374,16 @@ class PurchaseOrderService {
                     unitPrice: item.unitPrice,
                     discount: item.discount || 0,
                     tax: item.tax || 0,
+                    discountType: item.discountType,
+                    discountValue: item.discountValue,
+                    discountAmount: item.discountAmount,
+                    taxableAmount: item.taxableAmount,
+                    cgstRate: item.cgstRate,
+                    cgstAmount: item.cgstAmount,
+                    sgstRate: item.sgstRate,
+                    sgstAmount: item.sgstAmount,
+                    igstRate: item.igstRate,
+                    igstAmount: item.igstAmount,
                     lineTotal: item.lineTotal,
                 })),
             };
