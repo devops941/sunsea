@@ -38,15 +38,6 @@ export const loginSchema = z.object({
 });
 
 /**
- * Refresh token validation schema.
- */
-export const refreshTokenSchema = z.object({
-  body: z.object({
-    refreshToken: z.string().optional()
-  }).optional().default({})
-});
-
-/**
  * Password reset request validation schema.
  */
 export const passwordResetRequestSchema = z.object({

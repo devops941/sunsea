@@ -172,27 +172,42 @@ export class AuthRepository {
   // SESSION MANAGEMENT
   // ============================================================
 
+  /**
+   * Creates a new user session with automatic device limit management.
+   * Maximum 4 active sessions per user/admin.
+   * Oldest session is automatically removed when limit is exceeded.
+   */
   async createUserSession(payload: {
     userId?: string;
     adminId?: bigint;
-    refreshTokenHash: string;
+    sessionToken: string;
     ipAddress?: string;
     userAgent?: string;
     deviceLabel?: string;
-    rememberMe?: boolean;
   }): Promise<any> {
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+    const MAX_SESSIONS = 4;
 
     return prisma.$transaction(async (tx) => {
-      // Remove any existing sessions for this user to prevent constraint violations
-      // and ensure a single active session per user.
-      if (payload.userId) {
+      // Get all active sessions for this user/admin
+      const existingSessions = await tx.userSession.findMany({
+        where: {
+          ...(payload.userId ? { userId: payload.userId } : {}),
+          ...(payload.adminId ? { adminId: payload.adminId } : {}),
+          isActive: true
+        },
+        orderBy: { loginAt: 'asc' } // Oldest first
+      });
+
+      // If at limit, remove the oldest session
+      if (existingSessions.length >= MAX_SESSIONS) {
+        const sessionsToRemove = existingSessions.slice(0, existingSessions.length - MAX_SESSIONS + 1);
         await tx.userSession.deleteMany({
-          where: { userId: payload.userId }
-        });
-      } else if (payload.adminId) {
-        await tx.userSession.deleteMany({
-          where: { adminId: payload.adminId }
+          where: {
+            id: {
+              in: sessionsToRemove.map(s => s.id)
+            }
+          }
         });
       }
 
@@ -201,12 +216,13 @@ export class AuthRepository {
         data: {
           userId: payload.userId,
           adminId: payload.adminId,
-          refreshTokenHash: payload.refreshTokenHash,
+          sessionToken: payload.sessionToken,
           ipAddress: payload.ipAddress,
           userAgent: payload.userAgent,
           deviceLabel: payload.deviceLabel,
-          rememberMe: payload.rememberMe || false,
-          expiresAt
+          loginAt: new Date(),
+          expiresAt,
+          isActive: true
         }
       });
     });
@@ -214,31 +230,69 @@ export class AuthRepository {
 
   async findUserSession(sessionId: string): Promise<any | null> {
     return prisma.userSession.findUnique({
-      where: { id: sessionId }
+      where: { id: sessionId, isActive: true }
     });
   }
 
-  async findUserSessionByRefreshTokenHash(refreshTokenHash: string): Promise<any | null> {
+  async findUserSessionByToken(sessionToken: string): Promise<any | null> {
     return prisma.userSession.findUnique({
-      where: { refreshTokenHash }
+      where: { sessionToken, isActive: true }
     });
   }
 
-  async revokeUserSession(sessionId: string): Promise<any> {
+  async updateSessionLastActivity(sessionId: string): Promise<any> {
     return prisma.userSession.update({
       where: { id: sessionId },
-      data: { revokedAt: new Date() }
+      data: { updatedAt: new Date() }
     });
   }
 
-  async revokeAllUserSessions(userId?: string, adminId?: bigint): Promise<number> {
+  async logoutSession(sessionId: string): Promise<any> {
+    return prisma.userSession.update({
+      where: { id: sessionId },
+      data: { 
+        logoutAt: new Date(),
+        isActive: false
+      }
+    });
+  }
+
+  async logoutAllUserSessions(userId?: string, adminId?: bigint): Promise<number> {
     const result = await prisma.userSession.updateMany({
       where: {
         ...(userId ? { userId } : {}),
         ...(adminId ? { adminId } : {}),
-        revokedAt: null
+        isActive: true
       },
-      data: { revokedAt: new Date() }
+      data: { 
+        logoutAt: new Date(),
+        isActive: false
+      }
+    });
+    return result.count;
+  }
+
+  async getActiveSessions(userId?: string, adminId?: bigint): Promise<any[]> {
+    return prisma.userSession.findMany({
+      where: {
+        ...(userId ? { userId } : {}),
+        ...(adminId ? { adminId } : {}),
+        isActive: true
+      },
+      orderBy: { loginAt: 'desc' }
+    });
+  }
+
+  async cleanupExpiredSessions(): Promise<number> {
+    const result = await prisma.userSession.updateMany({
+      where: {
+        expiresAt: { lt: new Date() },
+        isActive: true
+      },
+      data: {
+        isActive: false,
+        logoutAt: new Date()
+      }
     });
     return result.count;
   }

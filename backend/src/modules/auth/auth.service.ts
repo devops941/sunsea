@@ -5,7 +5,6 @@ import { ApiError } from "../../utils/ApiError";
 import { authRepository } from "./auth.repository";
 import { hashPassword, comparePassword } from "../../utils/hashPassword";
 import { generateAccessToken } from "../../utils/generateAccessToken";
-import { generateRefreshToken } from "../../utils/generateRefreshToken";
 import {
   AccessTokenPayload,
   AuthResult,
@@ -17,10 +16,9 @@ import {
   UserStatus
 } from "../../types/auth.types";
 
-const REFRESH_TOKEN_EXPIRY_DAYS = 7;
-const ACCESS_TOKEN_EXPIRY_MINUTES = 30;
-const ACCOUNT_LOCK_THRESHOLD = 10;
-const ACCOUNT_LOCK_DURATION_MINUTES = 0.1;
+const ACCESS_TOKEN_EXPIRY_DAYS = 7;
+const ACCOUNT_LOCK_THRESHOLD = 5;
+const ACCOUNT_LOCK_DURATION_MINUTES = 30;
 const RATE_LIMIT_THRESHOLD = 10;
 const RATE_LIMIT_WINDOW_MINUTES = 15;
 
@@ -107,9 +105,6 @@ export class AuthService {
       }
     }
 
-    // Record attempt regardless of result
-    const failureReason = this.getLoginFailureReason(user, payload.password ? undefined : "missing_password");
-
     // Rate limiting check
     if (ipAddress) {
       const recentFailedAttempts = await authRepository.getRecentFailedAttempts(
@@ -133,7 +128,6 @@ export class AuthService {
     if (!user || user.status !== UserStatus.ACTIVE) {
       if (user && user.status === UserStatus.LOCKED) {
         if (user.lockedUntil && user.lockedUntil > new Date()) {
-
           const unlockTime = user.lockedUntil.toLocaleString();
 
           await authRepository.recordLoginAttempt({
@@ -175,7 +169,6 @@ export class AuthService {
 
     if (!passwordMatches) {
       if (!isAdminLogin) {
-        // Increment failed attempts
         await authRepository.incrementFailedAttempts(user.userId);
 
         await authRepository.recordLoginAttempt({
@@ -206,23 +199,26 @@ export class AuthService {
     const permissions = await authRepository.findPermissionsByRole(user.roleId);
     const roleCode = user.role?.name ?? (user.roleId !== null ? user.roleId.toString() : "");
 
+    // Generate unique session token
+    const sessionToken = crypto.randomBytes(32).toString("hex");
+    const sessionId = crypto.randomUUID();
+
     const accessPayload: AccessTokenPayload = {
       userId: user.userId,
       email: user.email!,
       roleId: roleCode,
       permissions,
-      isSuperAdmin: isAdminLogin
+      isSuperAdmin: isAdminLogin,
+      sessionId
     };
 
     const accessToken = generateAccessToken(accessPayload);
-    const refreshToken = generateRefreshToken({ userId: user.userId, sessionId: crypto.randomUUID() });
-    const refreshTokenHash = this.hashToken(refreshToken);
 
-    // Create session
-    await authRepository.createUserSession({
+    // Create session (automatically manages 4-device limit)
+    const session = await authRepository.createUserSession({
       userId: isAdminLogin ? undefined : user.userId,
       adminId: isAdminLogin ? admin!.id : undefined,
-      refreshTokenHash,
+      sessionToken,
       ipAddress,
       userAgent,
       deviceLabel: this.extractDeviceLabel(userAgent)
@@ -258,23 +254,26 @@ export class AuthService {
       user: this.formatUserResponse(user, isAdminLogin),
       tokens: {
         accessToken,
-        refreshToken,
-        accessTokenExpiresAt: new Date(Date.now() + ACCESS_TOKEN_EXPIRY_MINUTES * 60 * 1000)
+        accessTokenExpiresAt: new Date(Date.now() + ACCESS_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000)
+      },
+      sessionInfo: {
+        deviceLabel: session.deviceLabel || "Unknown Device",
+        loginAt: session.loginAt,
+        expiresAt: session.expiresAt
       }
     };
   }
 
   async logout(
     userId: string,
-    refreshToken?: string,
+    sessionId?: string,
     ipAddress?: string,
     userAgent?: string
   ): Promise<void> {
-    if (refreshToken) {
-      const tokenHash = this.hashToken(refreshToken);
-      const session = await authRepository.findUserSessionByRefreshTokenHash(tokenHash);
+    if (sessionId) {
+      const session = await authRepository.findUserSession(sessionId);
       if (session) {
-        await authRepository.revokeUserSession(session.id);
+        await authRepository.logoutSession(session.id);
       }
     }
 
@@ -293,7 +292,14 @@ export class AuthService {
     ipAddress?: string,
     userAgent?: string
   ): Promise<void> {
-    await authRepository.revokeAllUserSessions(userId);
+    const isAdmin = userId.startsWith("admin_");
+    
+    if (isAdmin) {
+      const adminId = BigInt(userId.replace("admin_", ""));
+      await authRepository.logoutAllUserSessions(undefined, adminId);
+    } else {
+      await authRepository.logoutAllUserSessions(userId);
+    }
 
     await authRepository.createAuditLog({
       entityName: "User",
@@ -306,102 +312,18 @@ export class AuthService {
   }
 
   // ============================================================
-  // TOKEN MANAGEMENT
+  // SESSION MANAGEMENT
   // ============================================================
 
-  async refreshAccessToken(
-    refreshToken: string | undefined,
-    ipAddress?: string,
-    userAgent?: string
-  ): Promise<AuthTokens> {
-    if (!refreshToken) {
-      throw new ApiError(401, "Refresh token is required");
-    }
-
-    const tokenHash = this.hashToken(refreshToken);
-    const session = await authRepository.findUserSessionByRefreshTokenHash(tokenHash);
-
-    if (!session || session.revokedAt) {
-      throw new ApiError(401, "Invalid or revoked refresh token");
-    }
-
-    if (new Date(session.expiresAt) < new Date()) {
-      throw new ApiError(401, "Refresh token has expired");
-    }
-
-    let user;
-    let isAdminLogin = false;
-
-    if (session.adminId) {
-      isAdminLogin = true;
-      const admin = await prisma.admin.findUnique({
-        where: { id: session.adminId }
-      });
-      if (!admin) {
-        throw new ApiError(401, "Admin account not found");
-      }
-      user = {
-        userId: "admin_" + admin.id.toString(),
-        email: admin.email,
-        username: admin.username,
-        passwordHash: admin.passwordHash,
-        fullName: admin.fullName,
-        status: admin.status || "active",
-        roleId: null,
-        role: null,
-        failedAttempts: 0,
-        lockedUntil: null
-      };
+  async getActiveSessions(userId: string): Promise<any[]> {
+    const isAdmin = userId.startsWith("admin_");
+    
+    if (isAdmin) {
+      const adminId = BigInt(userId.replace("admin_", ""));
+      return authRepository.getActiveSessions(undefined, adminId);
     } else {
-      user = await authRepository.findUserById(session.userId!);
+      return authRepository.getActiveSessions(userId);
     }
-
-    if (!user || user.status !== UserStatus.ACTIVE) {
-      await authRepository.revokeUserSession(session.id);
-      throw new ApiError(401, "User account is not active");
-    }
-
-    const permissions = isAdminLogin ? [] : await authRepository.findPermissionsByRole(user.roleId);
-    const roleCode = isAdminLogin ? "" : (user.role?.name ?? (user.roleId !== null ? user.roleId.toString() : ""));
-
-    const accessPayload: AccessTokenPayload = {
-      userId: user.userId,
-      email: user.email!,
-      roleId: roleCode,
-      permissions,
-      isSuperAdmin: isAdminLogin
-    };
-
-    const accessToken = generateAccessToken(accessPayload);
-    const newSessionId = crypto.randomUUID();
-    const newRefreshToken = generateRefreshToken({ userId: user.userId, sessionId: newSessionId });
-    const newRefreshTokenHash = this.hashToken(newRefreshToken);
-
-    // Create new session (this automatically removes previous sessions)
-    await authRepository.createUserSession({
-      userId: isAdminLogin ? undefined : user.userId,
-      adminId: isAdminLogin ? session.adminId : undefined,
-      refreshTokenHash: newRefreshTokenHash,
-      ipAddress,
-      userAgent,
-      deviceLabel: this.extractDeviceLabel(userAgent)
-    });
-
-    await authRepository.createAuditLog({
-      entityName: isAdminLogin ? "Admin" : "User",
-      entityId: isAdminLogin ? session.adminId.toString() : user.userId,
-      action: "TOKEN_REFRESHED",
-      changedBy: isAdminLogin ? undefined : user.userId,
-      changedByAdmin: isAdminLogin ? session.adminId : undefined,
-      ipAddress,
-      userAgent
-    });
-
-    return {
-      accessToken,
-      refreshToken: newRefreshToken,
-      accessTokenExpiresAt: new Date(Date.now() + ACCESS_TOKEN_EXPIRY_MINUTES * 60 * 1000)
-    };
   }
 
   // ============================================================
@@ -489,16 +411,21 @@ export class AuthService {
     }
 
     const passwordHash = await hashPassword(newPassword);
-    await authRepository.updatePassword(resetToken.userId, passwordHash);
+    
+    if (resetToken.userId) {
+      await authRepository.updatePassword(resetToken.userId, passwordHash);
+      await authRepository.logoutAllUserSessions(resetToken.userId);
+    } else if (resetToken.adminId) {
+      await authRepository.updateAdminPassword(resetToken.adminId, passwordHash);
+      await authRepository.logoutAllUserSessions(undefined, resetToken.adminId);
+    }
+    
     await authRepository.markPasswordResetTokenAsUsed(resetToken.id);
 
-    // Invalidate all sessions for security
-    await authRepository.revokeAllUserSessions(resetToken.userId);
-
     await authRepository.createAuditLog({
-      entityName: "User",
-      entityId: resetToken.userId,
-      action: "PASSWORD_RESET",
+      entityName: resetToken.userId ? "User" : "Admin",
+      entityId: resetToken.userId || resetToken.adminId?.toString() || "",
+      action: "PASSWORD_RESET_COMPLETED",
       ipAddress
     });
   }
