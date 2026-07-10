@@ -73,6 +73,10 @@ export interface SalesOrder {
     totalGst: number;
     totalCess: number;
     netAmount: number;
+    isInterState?: boolean;
+    totalIgst?: number;
+    totalCgst?: number;
+    totalSgst?: number;
 
     mdApprovalStatus: ApprovalStatus;
     customerApprovalStatus: ApprovalStatus;

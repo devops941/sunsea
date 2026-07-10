@@ -137,7 +137,6 @@ const GstTaxList: React.FC = () => {
                                 <tr>
                                     <th style={{ width: "60px" }}>#</th>
                                     <th>TAX NAME</th>
-                                    <th>TAX TYPE</th>
                                     <th>RATE (%)</th>
                                     <th>STATUS</th>
                                     <th>ACTIONS</th>
@@ -146,7 +145,7 @@ const GstTaxList: React.FC = () => {
                             <tbody>
                                 {loading ? (
                                     <tr>
-                                        <td colSpan={6} className="text-center p-4">
+                                        <td colSpan={5} className="text-center p-4">
                                             <Spinner animation="border" size="sm" className="me-2" />
                                             Loading GST tax rates...
                                         </td>
@@ -158,9 +157,6 @@ const GstTaxList: React.FC = () => {
                                                 {(currentPage - 1) * ITEMS_PER_PAGE + index + 1}
                                             </td>
                                             <td className="master-data-cell">{item.taxName}</td>
-                                            <td className="master-data-cell">
-                                                {item.taxType === "INTRA_STATE" ? "Intra-State (CGST+SGST)" : "Inter-State (IGST)"}
-                                            </td>
                                             <td className="master-data-cell">{item.taxRate}</td>
                                             <td className="master-data-cell">
                                                 <StatusBadge status={item.status} />
@@ -174,7 +170,7 @@ const GstTaxList: React.FC = () => {
                                     ))
                                 ) : (
                                     <tr>
-                                        <td colSpan={6} className="text-center p-4">
+                                        <td colSpan={5} className="text-center p-4">
                                             No GST tax rates found.
                                         </td>
                                     </tr>

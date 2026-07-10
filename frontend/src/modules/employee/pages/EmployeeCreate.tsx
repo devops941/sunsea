@@ -8,15 +8,18 @@ import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import CustomButton from "../../../components/ui/custombutton/CustomButton";
 import { useEmployees } from "../../../hooks/useEmployees";
 import { useDepartments } from "../../../hooks/useDepartments";
-
+import { useDesignations } from "../../../hooks/useDesignations";
 import { useRoles } from "../../../hooks/useRoles";
 import { employeeService } from "../../../services/employeeService";
 import { useSelector } from "react-redux";
+import IndiaPhoneInput from "../../../components/ui/PhoneInput/PhoneInput";
+import { validatePhoneNumber } from "../../../components/ui/PhoneInput/PhoneInput";
 
 const EmployeeCreatePage: React.FC = () => {
   const navigate = useNavigate();
   const { addEmployee, employees, loadEmployees } = useEmployees();
   const { departments, loadDepartments } = useDepartments();
+  const { designations, loadDesignations } = useDesignations();
   const { roles, loadRoles } = useRoles();
   const user = useSelector((state: any) => state.auth.user);
 
@@ -28,6 +31,7 @@ const EmployeeCreatePage: React.FC = () => {
     mobile: "",
     email: "",
     departmentId: "",
+    designationId: "",
     status: "active",
     createLoginAccount: false,
     username: "",
@@ -75,6 +79,12 @@ const EmployeeCreatePage: React.FC = () => {
   //     loadDesignations(Number(firstDeptId));
   //   }
   // }, [departments]);
+  useEffect(() => {
+    if (!formData.departmentId) return;
+
+    loadDesignations(Number(formData.departmentId));
+  }, [formData.departmentId, loadDesignations]);
+
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -92,7 +102,7 @@ const EmployeeCreatePage: React.FC = () => {
 
       // RESET DESIGNATION WHEN DEPARTMENT CHANGES
       if (name === "departmentId") {
-        // Nothing to reset
+        updated.designationId = "";
       }
 
       return updated;
@@ -110,6 +120,7 @@ const EmployeeCreatePage: React.FC = () => {
       mobile: "",
       email: "",
       departmentId: "",
+      designationId: "",
       status: "active",
       createLoginAccount: false,
       username: "",
@@ -133,6 +144,7 @@ const EmployeeCreatePage: React.FC = () => {
         mobile: formData.mobile || undefined,
         email: formData.email || undefined,
         departmentId: formData.departmentId ? Number(formData.departmentId) : undefined,
+        designationId: formData.designationId ? Number(formData.designationId) : undefined,
         status: formData.status as any,
         createLoginAccount: formData.createLoginAccount,
         createdBy: user ? user?.userId : undefined,
@@ -161,7 +173,12 @@ const EmployeeCreatePage: React.FC = () => {
     }));
   }, [departments]);
 
-
+  const designationOptions = useMemo(() => {
+    return designations.map((d) => ({
+      value: String(d.id),
+      label: d.name,
+    }));
+  }, [designations]);
 
   const roleOptions = useMemo(() => {
     return roles.map(r => ({ value: String(r.id), label: r.name }));
@@ -190,11 +207,15 @@ const EmployeeCreatePage: React.FC = () => {
       newErrors.fullName = "Employee name is required";
     }
 
-    if (formData.mobile.trim() && !/^\d{10}$/.test(formData.mobile.trim())) {
-      newErrors.mobile = "Enter a valid 10-digit mobile number";
+    // if (! /^\d{10}$/.test(formData.mobile.trim())) {
+    //   newErrors.mobile = "Enter a valid 10-digit mobile number";
+    // }
+    const mobileError = validatePhoneNumber(formData.mobile, true);
+    if (mobileError) {
+      newErrors.mobile = mobileError;
     }
 
-    if (formData.email.trim()) {
+    if (!formData.email) {
       const emailFormatValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim());
       if (!emailFormatValid) {
         newErrors.email = "Enter a valid email address";
@@ -270,7 +291,7 @@ const EmployeeCreatePage: React.FC = () => {
             </Col>
 
             <Col lg={4} md={6}>
-              <TextInput
+              <IndiaPhoneInput
                 label="Phone Number"
                 name="mobile"
                 value={formData.mobile}
@@ -304,7 +325,18 @@ const EmployeeCreatePage: React.FC = () => {
               />
             </Col>
 
-
+            <Col lg={4} md={6}>
+              <SelectInput
+                label="Designation"
+                name="designationId"
+                value={formData.designationId}
+                options={designationOptions}
+                defaultOptionLabel="Select Designation"
+                required
+                disabled={!formData.departmentId}
+                onChange={handleChange}
+              />
+            </Col>
 
             <Col lg={4} md={6}>
               <SelectInput
@@ -385,10 +417,8 @@ const EmployeeCreatePage: React.FC = () => {
                     name="roleId"
                     value={formData.roleId}
                     options={roleOptions}
-                    defaultOptionLabel="Select Role"
                     required
                     onChange={handleChange}
-                    error={errors.roleId}
                   />
                 </Col>
 

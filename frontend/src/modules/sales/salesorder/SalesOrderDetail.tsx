@@ -266,7 +266,14 @@ const SalesOrderDetail: React.FC = () => {
                                             <th className="text-end">Unit Price</th>
                                             <th className="text-end">Discount</th>
                                             <th className="text-end">Taxable Value</th>
-                                            <th className="text-end">GST</th>
+                                            {order.isInterState ? (
+                                                <th className="text-end">IGST</th>
+                                            ) : (
+                                                <>
+                                                    <th className="text-end">CGST</th>
+                                                    <th className="text-end">SGST</th>
+                                                </>
+                                            )}
                                             <th className="text-end">Cess</th>
                                             <th className="text-end">Line Total</th>
                                         </tr>
@@ -288,11 +295,24 @@ const SalesOrderDetail: React.FC = () => {
                                                         ({item.discountType === "PERCENT" ? `${item.discountValue}%` : "flat"})
                                                     </div>
                                                 </td>
-                                                <td className="master-data-cell text-end">{formatMoney(item.taxableValue)}</td>
-                                                <td className="master-data-cell text-end">
-                                                    {formatMoney(item.gstAmount)}
-                                                    <div className="text-muted small">({item.gstRate}%)</div>
-                                                </td>
+                                                <td className="master-data-cell text-end">{formatMoney(item.taxableAmount || item.taxableValue)}</td>
+                                                {order.isInterState ? (
+                                                    <td className="master-data-cell text-end">
+                                                        {formatMoney(item.igstAmount || item.gstAmount || 0)}
+                                                        <div className="text-muted small">({item.igstRate || item.gstRate || 0}%)</div>
+                                                    </td>
+                                                ) : (
+                                                    <>
+                                                        <td className="master-data-cell text-end">
+                                                            {formatMoney(item.cgstAmount || (Number(item.gstAmount || 0) / 2))}
+                                                            <div className="text-muted small">({item.cgstRate || (Number(item.gstRate || 0) / 2)}%)</div>
+                                                        </td>
+                                                        <td className="master-data-cell text-end">
+                                                            {formatMoney(item.sgstAmount || (Number(item.gstAmount || 0) / 2))}
+                                                            <div className="text-muted small">({item.sgstRate || (Number(item.gstRate || 0) / 2)}%)</div>
+                                                        </td>
+                                                    </>
+                                                )}
                                                 <td className="master-data-cell text-end">
                                                     {formatMoney(item.cessAmount)}
                                                     <div className="text-muted small">({item.cessRate}%)</div>
@@ -351,8 +371,25 @@ const SalesOrderDetail: React.FC = () => {
                                 <span className="text-muted">Subtotal</span>
                                 <span>{formatMoney(order.subtotal)}</span>
                             </div>
+                            {order.isInterState ? (
+                                <div className="d-flex justify-content-between py-1 small text-success">
+                                    <span>IGST</span>
+                                    <span>+ {formatMoney(order.totalIgst || order.totalGst || 0)}</span>
+                                </div>
+                            ) : (
+                                <>
+                                    <div className="d-flex justify-content-between py-1 small text-success">
+                                        <span>CGST</span>
+                                        <span>+ {formatMoney(order.totalCgst || (Number(order.totalGst || 0) / 2))}</span>
+                                    </div>
+                                    <div className="d-flex justify-content-between py-1 small text-success">
+                                        <span>SGST</span>
+                                        <span>+ {formatMoney(order.totalSgst || (Number(order.totalGst || 0) / 2))}</span>
+                                    </div>
+                                </>
+                            )}
                             <div className="d-flex justify-content-between py-1">
-                                <span className="text-muted">GST</span>
+                                <span className="text-muted">Total GST</span>
                                 <span>{formatMoney(order.totalGst)}</span>
                             </div>
                             <div className="d-flex justify-content-between py-1">

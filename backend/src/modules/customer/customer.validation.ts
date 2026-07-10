@@ -29,7 +29,7 @@ export const createCustomerSchema = z.object({
   ),
 
   gstin: z.string().optional(),
-  pan: z.string().optional(),
+  //pan: z.string().optional(),
 
   gstRegType: z.string().optional(),
 

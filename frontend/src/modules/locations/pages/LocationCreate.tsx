@@ -10,6 +10,9 @@ import Button from "../../../components/ui/custombutton/CustomButton";
 import { useAppDispatch } from "../../../hooks/reduxHooks";
 import { createLocation } from "../../../features/locations/locationSlice";
 import { locationService } from "../../../services/locationService";
+import CityStateSelect from "../../../components/ui/CityStateSelect/CityStateSelect";
+import type { StateCityOption } from "../../../components/ui/CityStateSelect/CityStateSelect";
+
 import { z } from "zod";
 
 const LOCATION_TYPE_OPTIONS = [
@@ -27,7 +30,7 @@ const initialFormState = {
     address: "",
     city: "",
     state: "",
-    country: "",
+    // country: "",
     isActive: true,
 };
 
@@ -67,31 +70,23 @@ const locationSchema = z.object({
         .string()
         .trim()
         .min(1, "City is required")
-        .max(50, "Maximum 50 characters allowed")
-        .regex(
-            /^[A-Za-z\s]+$/,
-            "City cannot contain numbers or special characters"
-        ),
+        .max(100, "Maximum 100 characters allowed"),
 
     state: z
         .string()
         .trim()
         .min(1, "State is required")
-        .max(50, "Maximum 50 characters allowed")
-        .regex(
-            /^[A-Za-z\s]+$/,
-            "State cannot contain numbers or special characters"
-        ),
+        .max(100, "Maximum 100 characters allowed"),
 
-    country: z
-        .string()
-        .trim()
-        .min(1, "Country is required")
-        .max(50, "Maximum 50 characters allowed")
-        .regex(
-            /^[A-Za-z\s]+$/,
-            "Country cannot contain numbers or special characters"
-        ),
+    // country: z
+    //     .string()
+    //     .trim()
+    //     .min(1, "Country is required")
+    //     .max(50, "Maximum 50 characters allowed")
+    //     .regex(
+    //         /^[A-Za-z\s]+$/,
+    //         "Country cannot contain numbers or special characters"
+    //     ),
 });
 
 const LocationCreate: React.FC = () => {
@@ -122,6 +117,24 @@ const LocationCreate: React.FC = () => {
         if (errors[name]) {
             setErrors(prev => ({ ...prev, [name]: "" }));
         }
+    };
+
+    const handleStateChange = (stateData: StateCityOption) => {
+        setFormData((prev) => ({
+            ...prev,
+            state: stateData.name,
+            city: "",
+        }));
+        setErrors((prev) => ({
+            ...prev,
+            state: "",
+            city: "",
+        }));
+    };
+
+    const handleCityChange = (cityData: StateCityOption) => {
+        setFormData((prev) => ({ ...prev, city: cityData.name }));
+        setErrors((prev) => ({ ...prev, city: "" }));
     };
 
     const handleClear = () => {
@@ -207,9 +220,16 @@ const LocationCreate: React.FC = () => {
                         <Col md={6}> <TextInput label="Location Name" name="locationName" value={formData.locationName} placeholder="e.g. Main Warehouse" required error={errors.locationName} onChange={handleChange} /> </Col>
                         <Col md={12}> <SelectInput label="Location Type" name="locationType" value={formData.locationType} options={LOCATION_TYPE_OPTIONS} required defaultOptionLabel="Select Location Type" error={errors.locationType} onChange={handleChange} /> </Col>
                         <Col md={12}> <TextInput label="Address" name="address" required value={formData.address} placeholder="e.g. 123 Main St" error={errors.address} onChange={handleChange} /> </Col>
-                        <Col md={4}> <TextInput label="City" name="city" value={formData.city} required placeholder="e.g. New York" error={errors.city} onChange={handleChange} /> </Col>
-                        <Col md={4}> <TextInput label="State" name="state" value={formData.state} required placeholder="e.g. TN" error={errors.state} onChange={handleChange} /> </Col>
-                        <Col md={4}> <TextInput label="Country" name="country" value={formData.country} required placeholder="e.g. India" error={errors.country} onChange={handleChange} /> </Col>
+                        <CityStateSelect
+                            stateValue={formData.state}
+                            cityValue={formData.city}
+                            onStateChange={handleStateChange}
+                            onCityChange={handleCityChange}
+                            stateError={errors.state}
+                            cityError={errors.city}
+                            required
+                        />
+                        {/* <Col md={4}> <TextInput label="Country" name="country" value={formData.country} required placeholder="e.g. India" error={errors.country} onChange={handleChange} /> </Col> */}
                         <Col md={4}>
                             <SelectInput
                                 label="Status"

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Container, Row, Col } from "react-bootstrap";
 import { FaSave, FaPaperPlane, FaPlus, FaTrash, FaUser, FaMapMarkerAlt, FaBoxOpen, FaInfoCircle } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
@@ -19,6 +19,9 @@ import type { RawMaterial } from "../../../../features/raw-materials/types";
 import { usePurchaseOrders } from "../../../../hooks/usePurchaseOrder";
 import { purchaseOrderService } from "../../../../services/purchaseOrderService";
 import Section from "../../../../components/ui/Section/Section";
+import { useAppDispatch, useAppSelector } from "../../../../hooks/reduxHooks";
+import { fetchLocations } from "../../../../features/locations/locationSlice";
+import { selectActiveGstTaxes, fetchGstTaxes } from "../../../../features/gst/gstSlice";
 
 // ─── Report-style Section wrapper (matches QuotationForm) ──────────────────
 
@@ -28,6 +31,7 @@ const initialFormData = {
   poDate: new Date().toISOString().split("T")[0],
   expectedDeliveryDate: "",
   supplierId: "",
+  locationId: "",
   status: "DRAFT" as const,
   createdByOn: "",
 
@@ -35,9 +39,6 @@ const initialFormData = {
   billingCity: "",
   billingState: "",
   billingPincode: "",
-
-  sameAsBilling: false,
-
   shippingAddressLine1: "",
   shippingCity: "",
   shippingState: "",
@@ -50,12 +51,16 @@ const initialFormData = {
   subtotal: 0,
   totalDiscount: 0,
   totalTax: 0,
+  totalCgst: 0,
+  totalSgst: 0,
+  totalIgst: 0,
   netAmount: 0,
 };
 
 type PurchaseOrderFormData = typeof initialFormData;
 
 const PurchaseOrderCreatePage: React.FC = () => {
+  const dispatch = useAppDispatch();
   const navigate = useNavigate();
   const { addPurchaseOrder } = usePurchaseOrders();
   const user = useSelector((state: any) => state?.auth?.user);
@@ -63,7 +68,32 @@ const PurchaseOrderCreatePage: React.FC = () => {
   const [formData, setFormData] = useState<PurchaseOrderFormData>(initialFormData);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const { suppliers, loadSuppliers } = useSuppliers();
+
+
   const [rawMaterials, setRawMaterials] = useState<RawMaterial[]>([]);
+  const { data: company } = useSelector((state: any) => state.company);
+  const { data: locations } = useAppSelector(state => state.locations);
+  const companyState = company?.state
+  const gstTaxes = useAppSelector(selectActiveGstTaxes);
+  const gstLoading = useAppSelector((state) => state.gst.loading);
+
+  const selectedSupplier = useMemo(() => (suppliers || []).find(
+    (s) => String(s?.id) === String(formData.supplierId)
+  ), [suppliers, formData.supplierId]);
+
+  // ============================================================
+  // INTER-STATE CHECK
+  // Rule requested: compare COMPANY state vs SHIPPING address state.
+  // Same state  -> CGST + SGST
+  // Diff state  -> IGST
+  // ============================================================
+  const isInterState = useMemo(() => {
+    if (!companyState || !formData.shippingState) return false;
+    return (
+      companyState.toLowerCase().trim() !==
+      formData.shippingState.toLowerCase().trim()
+    );
+  }, [companyState, formData.shippingState]);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmittingForApproval, setIsSubmittingForApproval] = useState(false);
@@ -73,7 +103,9 @@ const PurchaseOrderCreatePage: React.FC = () => {
   // ============================================================
   useEffect(() => {
     loadSuppliers();
-  }, [loadSuppliers]);
+    dispatch(fetchLocations(undefined));
+    dispatch(fetchGstTaxes(undefined));
+  }, [loadSuppliers, dispatch]);
 
   useEffect(() => {
     const fetchRawMaterials = async () => {
@@ -111,30 +143,133 @@ const PurchaseOrderCreatePage: React.FC = () => {
   // ============================================================
   // CALCULATE TOTALS
   // ============================================================
-  const recalculateTotals = (items: PurchaseOrderItem[]) => {
+  const recalculateTotals = (items: PurchaseOrderItem[], interState: boolean = isInterState) => {
     let subtotal = 0;
     let totalDiscount = 0;
     let totalTax = 0;
+    let totalCgst = 0;
+    let totalSgst = 0;
+    let totalIgst = 0;
 
     items.forEach((item) => {
       const qty = Number(item.quantity) || 0;
       const price = Number(item.unitPrice) || 0;
-      const lineTotal = qty * price;
-      const discountAmount = (lineTotal * (Number(item.discount) || 0)) / 100;
-      const taxAmount = ((lineTotal - discountAmount) * (Number(item.tax) || 0)) / 100;
+      const lineSubtotal = qty * price;
 
-      subtotal += lineTotal;
+      const discountType = item.discountType || "PERCENT";
+      const discountValue = Number(item.discountValue ?? item.discount) || 0;
+      let discountAmount = 0;
+      if (discountType === "PERCENT") {
+        discountAmount = (lineSubtotal * discountValue) / 100;
+      } else {
+        discountAmount = discountValue;
+      }
+      if (discountAmount > lineSubtotal) {
+        discountAmount = lineSubtotal;
+      }
+
+      const taxableAmount = lineSubtotal - discountAmount;
+      const totalGstRate = Number(item.tax) || 0;
+      const totalGstAmount = (taxableAmount * totalGstRate) / 100;
+
+      let cgstAmount = 0;
+      let sgstAmount = 0;
+      let igstAmount = 0;
+
+      if (interState) {
+        igstAmount = totalGstAmount;
+      } else {
+        cgstAmount = totalGstAmount / 2;
+        sgstAmount = totalGstAmount / 2;
+      }
+
+      subtotal += lineSubtotal;
       totalDiscount += discountAmount;
-      totalTax += taxAmount;
+      totalTax += totalGstAmount;
+      totalCgst += cgstAmount;
+      totalSgst += sgstAmount;
+      totalIgst += igstAmount;
     });
 
     return {
       subtotal,
       totalDiscount,
       totalTax,
+      totalCgst,
+      totalSgst,
+      totalIgst,
       netAmount: subtotal - totalDiscount + totalTax,
     };
   };
+
+  // ============================================================
+  // RECOMPUTE ITEM-LEVEL TAX SPLIT WHENEVER isInterState CHANGES
+  // (e.g. shipping state edited after items were already added)
+  // ============================================================
+  useEffect(() => {
+    setFormData((prev) => {
+      if (prev.items.length === 0) return prev;
+
+      const updatedItems = prev.items.map((item) => {
+        const qty = Number(item.quantity) || 0;
+        const price = Number(item.unitPrice) || 0;
+        const lineSubtotal = qty * price;
+
+        const discountType = item.discountType || "PERCENT";
+        const discountValue = Number(item.discountValue ?? item.discount) || 0;
+        let discountAmount = 0;
+        if (discountType === "PERCENT") {
+          discountAmount = (lineSubtotal * discountValue) / 100;
+        } else {
+          discountAmount = discountValue;
+        }
+        if (discountAmount > lineSubtotal) {
+          discountAmount = lineSubtotal;
+        }
+
+        const taxableAmount = lineSubtotal - discountAmount;
+        const totalGstRate = Number(item.tax) || 0;
+        const totalGstAmount = (taxableAmount * totalGstRate) / 100;
+
+        let cgstRate = 0;
+        let cgstAmount = 0;
+        let sgstRate = 0;
+        let sgstAmount = 0;
+        let igstRate = 0;
+        let igstAmount = 0;
+
+        if (isInterState) {
+          igstRate = totalGstRate;
+          igstAmount = totalGstAmount;
+        } else {
+          cgstRate = totalGstRate / 2;
+          sgstRate = totalGstRate / 2;
+          cgstAmount = totalGstAmount / 2;
+          sgstAmount = totalGstAmount / 2;
+        }
+
+        return {
+          ...item,
+          discountAmount,
+          taxableAmount,
+          cgstRate,
+          cgstAmount,
+          sgstRate,
+          sgstAmount,
+          igstRate,
+          igstAmount,
+          lineTotal: taxableAmount + totalGstAmount,
+        };
+      });
+
+      return {
+        ...prev,
+        items: updatedItems,
+        ...recalculateTotals(updatedItems, isInterState),
+      };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isInterState]);
 
   // ============================================================
   // HANDLE CHANGE
@@ -149,14 +284,17 @@ const PurchaseOrderCreatePage: React.FC = () => {
       setFormData((prev) => ({
         ...prev,
         supplierId: value,
-        billingAddressLine1: selectedSup?.billingAddressLine1 || "",
-        billingCity: selectedSup?.billingCity || "",
-        billingState: selectedSup?.billingState || "",
-        billingPincode: selectedSup?.billingPincode || "",
+        shippingAddressLine1: selectedSup?.billingAddressLine1 || "",
+        shippingCity: selectedSup?.billingCity || "",
+        shippingState: selectedSup?.billingState || "",
+        shippingPincode: selectedSup?.billingPincode || "",
         items: [],
         subtotal: 0,
         totalDiscount: 0,
         totalTax: 0,
+        totalCgst: 0,
+        totalSgst: 0,
+        totalIgst: 0,
         netAmount: 0,
       }));
       if (errors.supplierId) {
@@ -165,26 +303,19 @@ const PurchaseOrderCreatePage: React.FC = () => {
       return;
     }
 
-    if (name === "sameAsBilling") {
-      const checked = (e.target as HTMLInputElement).checked;
-
+    if (name === "locationId") {
+      const selectedSup = locations.find((s) => String(s.locationId) === String(value));
       setFormData((prev) => ({
         ...prev,
-        sameAsBilling: checked,
-        ...(checked
-          ? {
-            shippingAddressLine1: prev.billingAddressLine1,
-            shippingCity: prev.billingCity,
-            shippingState: prev.billingState,
-            shippingPincode: prev.billingPincode,
-          }
-          : {
-            shippingAddressLine1: "",
-            shippingCity: "",
-            shippingState: "",
-            shippingPincode: "",
-          }),
+        locationId: value,
+        billingAddressLine1: selectedSup?.address || "",
+        billingCity: selectedSup?.city || "",
+        billingState: selectedSup?.state || "",
+        billingPincode: "625017",
       }));
+      if (errors.locationId) {
+        setErrors((prev) => ({ ...prev, locationId: "" }));
+      }
       return;
     }
 
@@ -214,14 +345,54 @@ const PurchaseOrderCreatePage: React.FC = () => {
               : 0);
 
           const qty = Number(item.quantity) || 0;
-          const base = qty * parsedUnitPrice;
-          const discountAmt = (base * (Number(item.discount) || 0)) / 100;
-          const taxAmt = ((base - discountAmt) * (Number(item.tax) || 0)) / 100;
+          const lineSubtotal = qty * parsedUnitPrice;
+
+          const discountType = item.discountType || "PERCENT";
+          const discountValue = Number(item.discountValue ?? item.discount) || 0;
+          let discountAmount = 0;
+          if (discountType === "PERCENT") {
+            discountAmount = (lineSubtotal * discountValue) / 100;
+          } else {
+            discountAmount = discountValue;
+          }
+          if (discountAmount > lineSubtotal) {
+            discountAmount = lineSubtotal;
+          }
+
+          const taxableAmount = lineSubtotal - discountAmount;
+          const totalGstRate = Number(item.tax) || 0;
+          const totalGstAmount = (taxableAmount * totalGstRate) / 100;
+
+          let cgstRate = 0;
+          let cgstAmount = 0;
+          let sgstRate = 0;
+          let sgstAmount = 0;
+          let igstRate = 0;
+          let igstAmount = 0;
+
+          if (isInterState) {
+            igstRate = totalGstRate;
+            igstAmount = totalGstAmount;
+          } else {
+            cgstRate = totalGstRate / 2;
+            sgstRate = totalGstRate / 2;
+            cgstAmount = totalGstAmount / 2;
+            sgstAmount = totalGstAmount / 2;
+          }
 
           return {
             ...item,
             unitPrice: parsedUnitPrice,
-            lineTotal: base - discountAmt + taxAmt,
+            discount: discountType === "PERCENT" ? discountValue : 0,
+            discountAmount,
+            taxableAmount,
+            cgstRate,
+            cgstAmount,
+            sgstRate,
+            sgstAmount,
+            igstRate,
+            igstAmount,
+            lineTotal: taxableAmount + totalGstAmount,
             product: item.product
               ? {
                 ...item.product,
@@ -290,24 +461,6 @@ const PurchaseOrderCreatePage: React.FC = () => {
     setErrors((prev) => ({ ...prev, shippingCity: "" }));
   };
 
-  useEffect(() => {
-    if (formData.sameAsBilling) {
-      setFormData((prev) => ({
-        ...prev,
-        shippingAddressLine1: prev.billingAddressLine1,
-        shippingCity: prev.billingCity,
-        shippingState: prev.billingState,
-        shippingPincode: prev.billingPincode,
-      }));
-    }
-  }, [
-    formData.sameAsBilling,
-    formData.billingAddressLine1,
-    formData.billingCity,
-    formData.billingState,
-    formData.billingPincode,
-  ]);
-
   // ============================================================
   // ITEM HANDLERS
   // ============================================================
@@ -319,10 +472,54 @@ const PurchaseOrderCreatePage: React.FC = () => {
       const item = items[index];
       const qty = Number(item.quantity) || 0;
       const price = Number(item.unitPrice) || 0;
-      const base = qty * price;
-      const discountAmt = (base * (Number(item.discount) || 0)) / 100;
-      const taxAmt = ((base - discountAmt) * (Number(item.tax) || 0)) / 100;
-      items[index].lineTotal = base - discountAmt + taxAmt;
+      const lineSubtotal = qty * price;
+
+      const discountType = item.discountType || "PERCENT";
+      const discountValue = Number(item.discountValue ?? item.discount) || 0;
+      let discountAmount = 0;
+      if (discountType === "PERCENT") {
+        discountAmount = (lineSubtotal * discountValue) / 100;
+      } else {
+        discountAmount = discountValue;
+      }
+      if (discountAmount > lineSubtotal) {
+        discountAmount = lineSubtotal;
+      }
+
+      const taxableAmount = lineSubtotal - discountAmount;
+      const totalGstRate = Number(item.tax) || 0;
+      const totalGstAmount = (taxableAmount * totalGstRate) / 100;
+
+      let cgstRate = 0;
+      let cgstAmount = 0;
+      let sgstRate = 0;
+      let sgstAmount = 0;
+      let igstRate = 0;
+      let igstAmount = 0;
+
+      if (isInterState) {
+        igstRate = totalGstRate;
+        igstAmount = totalGstAmount;
+      } else {
+        cgstRate = totalGstRate / 2;
+        sgstRate = totalGstRate / 2;
+        cgstAmount = totalGstAmount / 2;
+        sgstAmount = totalGstAmount / 2;
+      }
+
+      items[index] = {
+        ...item,
+        discount: discountType === "PERCENT" ? discountValue : 0,
+        discountAmount,
+        taxableAmount,
+        cgstRate,
+        cgstAmount,
+        sgstRate,
+        sgstAmount,
+        igstRate,
+        igstAmount,
+        lineTotal: taxableAmount + totalGstAmount,
+      };
 
       return {
         ...prev,
@@ -355,9 +552,49 @@ const PurchaseOrderCreatePage: React.FC = () => {
           ? (typeof rawMaterial.unitPrice === "string" ? parseFloat(rawMaterial.unitPrice) : Number(rawMaterial.unitPrice))
           : 0);
 
+      const defaultTaxRateObj = gstTaxes?.find((t: any) => String(t.id) === String(rawMaterial?.gstTaxRateId));
+      const defaultTaxRate = defaultTaxRateObj ? Number(defaultTaxRateObj.taxRate) : 0;
+
       const items = [...prev.items];
+      const item = items[index];
+      const qty = Number(item.quantity) || 0;
+      const lineSubtotal = qty * parsedUnitPrice;
+
+      const discountType = item.discountType || "PERCENT";
+      const discountValue = Number(item.discountValue ?? item.discount) || 0;
+      let discountAmount = 0;
+      if (discountType === "PERCENT") {
+        discountAmount = (lineSubtotal * discountValue) / 100;
+      } else {
+        discountAmount = discountValue;
+      }
+      if (discountAmount > lineSubtotal) {
+        discountAmount = lineSubtotal;
+      }
+
+      const taxableAmount = lineSubtotal - discountAmount;
+      const totalGstRate = defaultTaxRate;
+      const totalGstAmount = (taxableAmount * totalGstRate) / 100;
+
+      let cgstRate = 0;
+      let cgstAmount = 0;
+      let sgstRate = 0;
+      let sgstAmount = 0;
+      let igstRate = 0;
+      let igstAmount = 0;
+
+      if (isInterState) {
+        igstRate = totalGstRate;
+        igstAmount = totalGstAmount;
+      } else {
+        cgstRate = totalGstRate / 2;
+        sgstRate = totalGstRate / 2;
+        cgstAmount = totalGstAmount / 2;
+        sgstAmount = totalGstAmount / 2;
+      }
+
       items[index] = {
-        ...items[index],
+        ...item,
         productId,
         product: rawMaterial
           ? ({
@@ -370,13 +607,18 @@ const PurchaseOrderCreatePage: React.FC = () => {
           : undefined,
         unitPrice: parsedUnitPrice,
         uom: rawMaterial?.baseUom || "",
+        tax: totalGstRate,
+        discount: discountType === "PERCENT" ? discountValue : 0,
+        discountAmount,
+        taxableAmount,
+        cgstRate,
+        cgstAmount,
+        sgstRate,
+        sgstAmount,
+        igstRate,
+        igstAmount,
+        lineTotal: taxableAmount + totalGstAmount,
       };
-
-      const qty = Number(items[index].quantity) || 0;
-      const base = qty * parsedUnitPrice;
-      const discountAmt = (base * (Number(items[index].discount) || 0)) / 100;
-      const taxAmt = ((base - discountAmt) * (Number(items[index].tax) || 0)) / 100;
-      items[index].lineTotal = base - discountAmt + taxAmt;
 
       return {
         ...prev,
@@ -397,6 +639,16 @@ const PurchaseOrderCreatePage: React.FC = () => {
           unitPrice: 0,
           discount: 0,
           tax: 0,
+          discountType: "PERCENT" as const,
+          discountValue: 0,
+          discountAmount: 0,
+          taxableAmount: 0,
+          cgstRate: 0,
+          cgstAmount: 0,
+          sgstRate: 0,
+          sgstAmount: 0,
+          igstRate: 0,
+          igstAmount: 0,
           lineTotal: 0,
         },
       ];
@@ -430,6 +682,7 @@ const PurchaseOrderCreatePage: React.FC = () => {
     e.preventDefault();
 
     const validationErrors = validatePurchaseOrder(formData);
+    console.log(validationErrors, "kjklj")
     if (Object.keys(validationErrors).length > 0) {
       setErrors(validationErrors);
       toast.error("Please fill all required fields correctly.");
@@ -453,8 +706,6 @@ const PurchaseOrderCreatePage: React.FC = () => {
         shippingCity: formData.shippingCity,
         shippingState: formData.shippingState,
         shippingPincode: formData.shippingPincode,
-
-        sameAsBilling: formData.sameAsBilling,
         remarks: formData.remarks,
 
         items: formData.items.map((item) => ({
@@ -462,14 +713,25 @@ const PurchaseOrderCreatePage: React.FC = () => {
           uom: item.uom,
           quantity: item.quantity,
           unitPrice: item.unitPrice,
-          subtotal: item.quantity * item.unitPrice,
           discount: item.discount || 0,
           tax: item.tax || 0,
+          discountType: item.discountType || "PERCENT",
+          discountValue: Number(item.discountValue ?? item.discount) || 0,
+          discountAmount: item.discountAmount || 0,
+          taxableAmount: item.taxableAmount || 0,
+          cgstRate: item.cgstRate || 0,
+          cgstAmount: item.cgstAmount || 0,
+          sgstRate: item.sgstRate || 0,
+          sgstAmount: item.sgstAmount || 0,
+          igstRate: item.igstRate || 0,
+          igstAmount: item.igstAmount || 0,
         })),
 
-        subtotal: formData.subtotal,
         totalDiscount: formData.totalDiscount,
         totalTax: formData.totalTax,
+        totalCgst: formData.totalCgst,
+        totalSgst: formData.totalSgst,
+        totalIgst: formData.totalIgst,
         netAmount: formData.netAmount,
 
         status: submitStatus,
@@ -497,9 +759,14 @@ const PurchaseOrderCreatePage: React.FC = () => {
     label: `${s?.supplierCode || ""} - ${s?.legalName || ""}`,
   }));
 
-  const selectedSupplier = (suppliers || []).find(
-    (s) => String(s?.id) === String(formData.supplierId)
-  );
+  const gstOptions = useMemo(() => [
+    { value: "", label: gstLoading ? "Loading GST rates..." : "-- Select GST Rate --" },
+    ...(gstTaxes || []).map((t: any) => ({
+      value: String(t.taxRate),
+      label: `${t.taxName} (${t.taxRate}%)`,
+    })),
+  ], [gstTaxes, gstLoading]);
+
   const supplierMaterials = selectedSupplier?.category
     ? selectedSupplier.category.split(",").map((c: string) => c.trim().toLowerCase())
     : [];
@@ -570,22 +837,28 @@ const PurchaseOrderCreatePage: React.FC = () => {
                   <div className="text-danger mt-1">{errors.expectedDeliveryDate}</div>
                 )}
               </Col>
-
-              <Col lg={4} md={6}>
-                <TextInput
-                  label="Created by"
-                  name="createdByOn"
-                  value={formData.createdByOn}
-                  onChange={handleChange}
-                  disabled
-                />
-              </Col>
             </Row>
           </Section>
 
           {/* ── Supplier ── */}
           <Section title="Supplier" icon={<FaUser />}>
             <Row>
+              <Col lg={6} md={12}>
+                <SelectInput
+                  label="Location"
+                  name="locationId"
+                  value={formData.locationId} options={[
+                    { label: "Select a location", value: "" },
+                    ...locations.filter(loc => loc.isActive).map(loc => ({
+                      label: `${loc.locationName} (${loc.locationCode})`,
+                      value: loc.locationId
+                    }))
+                  ]}
+                  required
+                  error={errors.locationId}
+                  onChange={handleChange}
+                />
+              </Col>
               <Col lg={6} md={12}>
                 <SelectInput
                   label="Supplier"
@@ -601,10 +874,10 @@ const PurchaseOrderCreatePage: React.FC = () => {
           </Section>
 
           {/* ── Addresses ── */}
-          <Section title="Billing & Shipping Address" icon={<FaMapMarkerAlt />}>
+          <Section title="Delivery & Shipping Address" icon={<FaMapMarkerAlt />}>
             <Row>
               <Col lg={6}>
-                <h6 className="mb-3">Billing Address</h6>
+                <h6 className="mb-3">Delivery Address</h6>
                 <TextInput
                   label="Address Line"
                   name="billingAddressLine1"
@@ -645,23 +918,12 @@ const PurchaseOrderCreatePage: React.FC = () => {
               <Col lg={6}>
                 <div className="d-flex align-items-center justify-content-between mb-3">
                   <h6 className="mb-0">Shipping Address</h6>
-                  <div>
-                    <input
-                      type="checkbox"
-                      name="sameAsBilling"
-                      checked={formData.sameAsBilling}
-                      onChange={handleChange}
-                    />{" "}
-                    Same as billing
-                  </div>
                 </div>
                 <TextInput
                   label="Address Line"
                   name="shippingAddressLine1"
                   value={formData.shippingAddressLine1}
                   onChange={handleChange}
-                  disabled={formData.sameAsBilling}
-                  required={!formData.sameAsBilling}
                 />
                 {errors.shippingAddressLine1 && (
                   <div className="text-danger mt-1">{errors.shippingAddressLine1}</div>
@@ -676,8 +938,6 @@ const PurchaseOrderCreatePage: React.FC = () => {
                     onCityChange={handleShippingCityChange}
                     stateError={errors.shippingState}
                     cityError={errors.shippingCity}
-                    required={!formData.sameAsBilling}
-                    disabled={formData.sameAsBilling}
                   />
                   <Col md={4}>
                     <TextInput
@@ -685,8 +945,6 @@ const PurchaseOrderCreatePage: React.FC = () => {
                       name="shippingPincode"
                       value={formData.shippingPincode}
                       onChange={handleChange}
-                      disabled={formData.sameAsBilling}
-                      required={!formData.sameAsBilling}
                     />
                     {errors.shippingPincode && (
                       <div className="text-danger mt-1">{errors.shippingPincode}</div>
@@ -703,29 +961,57 @@ const PurchaseOrderCreatePage: React.FC = () => {
               <CustomButton text="Add Item" icon={FaPlus} onClick={addItem} type="button" size="sm" />
             </div>
 
-            <div className="table-wrap" style={{ overflowX: "auto" }}>
-              <table className="master-data-table" style={{ minWidth: "1100px" }}>
+            {/*
+              No horizontal scroll: table-layout fixed + percentage-based
+              column widths that always add up to 100% of the container,
+              and no forced min-widths on inner inputs.
+            */}
+            <div className="table-wrap" style={{ width: "100%", overflowX: "hidden" }}>
+              <table
+                className="master-data-table"
+                style={{ width: "100%", tableLayout: "fixed" }}
+              >
+                <colgroup>
+                  <col style={{ width: "4%" }} />
+                  <col style={{ width: "26%" }} />
+                  <col style={{ width: "10%" }} />
+                  <col style={{ width: "10%" }} />
+                  <col style={{ width: "14%" }} />
+                  <col style={{ width: "14%" }} />
+                  <col style={{ width: "14%" }} />
+                  <col style={{ width: "8%" }} />
+                </colgroup>
                 <thead>
                   <tr>
-                    <th style={{ width: "50px" }}>#</th>
-                    <th style={{ minWidth: "220px" }}>RAW MATERIAL</th>
-                    <th style={{ minWidth: "140px" }}>UOM</th>
-                    <th style={{ minWidth: "130px" }}>QTY</th>
-                    <th style={{ minWidth: "150px" }}>UNIT PRICE (₹)</th>
-                    <th style={{ minWidth: "120px" }}>DISC %</th>
-                    <th style={{ minWidth: "120px" }}>TAX %</th>
-                    <th style={{ minWidth: "150px" }}>LINE TOTAL (₹)</th>
-                    <th style={{ minWidth: "80px" }}>ACTION</th>
+                    <th>#</th>
+                    <th>RAW MATERIAL</th>
+                    <th>UOM</th>
+                    <th>QTY</th>
+                    <th>UNIT PRICE (₹)</th>
+                    <th>TAX %</th>
+                    <th>TAXABLE (₹)</th>
+                    <th>ACTION</th>
                   </tr>
                 </thead>
                 <tbody>
                   {formData.items.map((item, index) => {
                     const qty = Number(item.quantity) || 0;
                     const price = Number(item.unitPrice) || 0;
-                    const base = qty * price;
-                    const discAmount = (base * (Number(item.discount) || 0)) / 100;
-                    const taxAmount = ((base - discAmount) * (Number(item.tax) || 0)) / 100;
-                    const lineTotal = base - discAmount + taxAmount;
+                    const lineSubtotal = qty * price;
+
+                    const discountType = item.discountType || "PERCENT";
+                    const discountValue = Number(item.discountValue ?? item.discount) || 0;
+                    let discountAmount = 0;
+                    if (discountType === "PERCENT") {
+                      discountAmount = (lineSubtotal * discountValue) / 100;
+                    } else {
+                      discountAmount = discountValue;
+                    }
+                    if (discountAmount > lineSubtotal) {
+                      discountAmount = lineSubtotal;
+                    }
+
+                    const taxableAmount = lineSubtotal - discountAmount;
 
                     return (
                       <tr key={index} className="master-data-row">
@@ -734,16 +1020,14 @@ const PurchaseOrderCreatePage: React.FC = () => {
                         </td>
 
                         <td className="master-data-cell">
-                          <div style={{ minWidth: "200px" }}>
-                            <SelectInput
-                              label=""
-                              name={`items[${index}].productId`}
-                              value={item.productId ? String(item.productId) : ""}
-                              options={[{ value: "", label: "-- Select Material --" }, ...productOptions]}
-                              onChange={(e) => handleItemProductChange(index, e.target.value)}
-                              error={errors[`items.${index}.productId`]}
-                            />
-                          </div>
+                          <SelectInput
+                            label=""
+                            name={`items[${index}].productId`}
+                            value={item.productId ? String(item.productId) : ""}
+                            options={[{ value: "", label: "-- Select Material --" }, ...productOptions]}
+                            onChange={(e) => handleItemProductChange(index, e.target.value)}
+                            error={errors[`items.${index}.productId`]}
+                          />
                         </td>
 
                         <td className="master-data-cell">
@@ -754,7 +1038,6 @@ const PurchaseOrderCreatePage: React.FC = () => {
                             onChange={() => { }}
                             disabled
                             placeholder="—"
-                            style={{ minWidth: "120px" }}
                           />
                         </td>
 
@@ -769,7 +1052,6 @@ const PurchaseOrderCreatePage: React.FC = () => {
                             min={0.01}
                             step={0.01}
                             placeholder="0.00"
-                            style={{ minWidth: "110px" }}
                           />
                         </td>
 
@@ -784,43 +1066,22 @@ const PurchaseOrderCreatePage: React.FC = () => {
                             min={0}
                             step={0.01}
                             placeholder="0.00"
-                            style={{ minWidth: "130px" }}
                             disabled
                           />
                         </td>
 
                         <td className="master-data-cell">
-                          <TextInput
-                            label=""
-                            name={`items[${index}].discount`}
-                            type="number"
-                            value={String(item.discount || 0)}
-                            onChange={(e) => handleItemChange(index, "discount", Number(e.target.value))}
-                            min={0}
-                            max={100}
-                            step={0.01}
-                            placeholder="0"
-                            style={{ minWidth: "100px" }}
-                          />
-                        </td>
-
-                        <td className="master-data-cell">
-                          <TextInput
+                          <SelectInput
                             label=""
                             name={`items[${index}].tax`}
-                            type="number"
+                            options={gstOptions}
                             value={String(item.tax || 0)}
                             onChange={(e) => handleItemChange(index, "tax", Number(e.target.value))}
-                            min={0}
-                            max={100}
-                            step={0.01}
-                            placeholder="0"
-                            style={{ minWidth: "100px" }}
                           />
                         </td>
 
-                        <td className="master-data-cell text-end fw-semibold">
-                          ₹{lineTotal.toFixed(2)}
+                        <td className="master-data-cell text-end">
+                          ₹{taxableAmount.toFixed(2)}
                         </td>
 
                         <td className="master-data-cell text-center">
@@ -839,7 +1100,7 @@ const PurchaseOrderCreatePage: React.FC = () => {
 
                   {formData.items.length === 0 && (
                     <tr>
-                      <td colSpan={9} className="text-center text-muted py-4">
+                      <td colSpan={8} className="text-center text-muted py-4">
                         No items added — click "Add Item" to begin
                       </td>
                     </tr>
@@ -876,11 +1137,25 @@ const PurchaseOrderCreatePage: React.FC = () => {
                     <span>Subtotal:</span>
                     <span>₹{formData.subtotal.toFixed(2)}</span>
                   </div>
-                  <div className="d-flex justify-content-between mb-2 text-danger">
-                    <span>Total Discount:</span>
-                    <span>-₹{formData.totalDiscount.toFixed(2)}</span>
-                  </div>
-                  <div className="d-flex justify-content-between mb-2 text-success">
+
+                  {isInterState ? (
+                    <div className="d-flex justify-content-between mb-2 text-success small">
+                      <span>Total IGST:</span>
+                      <span>+₹{formData.totalIgst.toFixed(2)}</span>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="d-flex justify-content-between mb-2 text-success small">
+                        <span>Total CGST:</span>
+                        <span>+₹{formData.totalCgst.toFixed(2)}</span>
+                      </div>
+                      <div className="d-flex justify-content-between mb-2 text-success small">
+                        <span>Total SGST:</span>
+                        <span>+₹{formData.totalSgst.toFixed(2)}</span>
+                      </div>
+                    </>
+                  )}
+                  <div className="d-flex justify-content-between mb-2 text-success fw-bold">
                     <span>Total Tax:</span>
                     <span>+₹{formData.totalTax.toFixed(2)}</span>
                   </div>
@@ -917,7 +1192,7 @@ const PurchaseOrderCreatePage: React.FC = () => {
           </div>
         </form>
       </Container>
-    </div>
+    </div >
   );
 };
 
