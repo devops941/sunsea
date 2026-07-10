@@ -39,44 +39,25 @@ apiClient.interceptors.request.use(
     (error) => Promise.reject(error)
 );
 
-// Response Interceptor: Silent refresh on 401 error
+// Response Interceptor: Handle 401 errors by clearing session
 apiClient.interceptors.response.use(
     (response) => response,
     async (error) => {
-        const originalRequest = error.config;
-
-        if (
-            error.response?.status === 401 &&
-            !originalRequest._retry &&
-            !originalRequest.url?.includes("/auth/login") &&
-            !originalRequest.url?.includes("/auth/refresh-token")
-        ) {
-            originalRequest._retry = true;
-            try {
-                // Call public axios since we don't want to use apiClient interceptor recursive loops
-                const response = await axios.post(
-                    apiUrl + "/auth/refresh-token",
-                    {},
-                    { withCredentials: true }
-                );
-
-                const { accessToken } = response.data?.data || {};
-
-                if (accessToken && storeRef) {
-                    const { setAccessToken } = await import("../features/auth/authSlice");
-                    storeRef.dispatch(setAccessToken(accessToken));
-
-                    // Update authorization header and retry original request
-                    originalRequest.headers.Authorization = `Bearer ${accessToken}`;
-                    return apiClient(originalRequest);
-                }
-            } catch (refreshError) {
-                // Silent refresh failed -> cookie expired or invalid. Force logout.
-                if (storeRef) {
-                    const { clearUser } = await import("../features/auth/authSlice");
-                    storeRef.dispatch(clearUser());
-                }
-                return Promise.reject(new Error("Session expired. Please log in again."));
+        // If 401 Unauthorized, it means the token is expired or invalid
+        if (error.response?.status === 401 && !error.config.url?.includes("/auth/login")) {
+            // Clear the invalid token and redirect to login
+            if (storeRef) {
+                const { clearUser } = await import("../features/auth/authSlice");
+                storeRef.dispatch(clearUser());
+            }
+            
+            // Clear stored tokens
+            localStorage.removeItem('accessToken');
+            sessionStorage.removeItem('accessToken');
+            
+            // Optionally redirect to login page
+            if (window.location.pathname !== '/login') {
+                window.location.href = '/login';
             }
         }
         return Promise.reject(error);
