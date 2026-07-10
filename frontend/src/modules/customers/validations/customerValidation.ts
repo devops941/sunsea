@@ -51,7 +51,7 @@ export const validateCustomer = (
         newErrors.mobile = mobileError;
     }
 
-    const altPhoneError = validatePhoneNumber(formData.altPhone, true);
+    const altPhoneError = validatePhoneNumber(formData.altPhone, false);
     if (altPhoneError) {
         newErrors.altPhone = altPhoneError;
     }
@@ -79,37 +79,37 @@ export const validateCustomer = (
         newErrors.gstin = "Invalid GSTIN format";
     }
 
-    if (
-        formData.pan &&
-        !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(formData.pan)
-    ) {
-        newErrors.pan = "Invalid PAN (auto-derived from GSTIN)";
-    }
-
-    if (!formData.gstRegType) {
-        newErrors.gstRegType = "GST Registration Type is required";
-    }
-
-    // GSTIN is mandatory if registration type is Regular/Composition/SEZ
-    if (
-        ["Regular", "Composition", "SEZ"].includes(formData.gstRegType) &&
-        !formData.gstin.trim()
-    ) {
-        newErrors.gstin = "GSTIN is required for this registration type";
-    }
-
-    // if (!formData.stateCode.trim()) {
-    //     newErrors.stateCode = "State Code is required";
-    // } else if (!/^[0-9]{2}$/.test(formData.stateCode)) {
-    //     newErrors.stateCode = "State Code must be a 2-digit number";
+    // if (
+    //     formData.pan &&
+    //     !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(formData.pan)
+    // ) {
+    //     newErrors.pan = "Invalid PAN (auto-derived from GSTIN)";
     // }
 
-    if (formData.tcsRate !== "" && formData.tcsRate !== null) {
-        const tcs = Number(formData.tcsRate);
-        if (isNaN(tcs) || tcs < 0 || tcs > 100) {
-            newErrors.tcsRate = "TCS Rate must be between 0 and 100";
-        }
+    // if (!formData.gstRegType) {
+    //     newErrors.gstRegType = "GST Registration Type is required";
+    // }
+
+    // GSTIN is mandatory if registration type is Regular/Composition/SEZ
+    // if (
+    //     ["Regular", "Composition", "SEZ"].includes(formData.gstRegType) &&
+    //     !formData.gstin.trim()
+    // ) {
+    //     newErrors.gstin = "GSTIN is required for this registration type";
+    // }
+
+    if (!formData.stateCode.trim()) {
+        newErrors.stateCode = "State Code is required";
+    } else if (!/^[0-9]{2}$/.test(formData.stateCode)) {
+        newErrors.stateCode = "State Code must be a 2-digit number";
     }
+
+    // if (formData.tcsRate !== "" && formData.tcsRate !== null) {
+    //     const tcs = Number(formData.tcsRate);
+    //     if (isNaN(tcs) || tcs < 0 || tcs > 100) {
+    //         newErrors.tcsRate = "TCS Rate must be between 0 and 100";
+    //     }
+    // }
 
     // ---- Billing Address ----
     if (!formData.billingAddressLine1.trim()) {
@@ -169,28 +169,39 @@ export const validateCustomer = (
     // ---- Bank Accounts ----
     if (formData.bankAccounts && Array.isArray(formData.bankAccounts)) {
         formData.bankAccounts.forEach((bank: any, index: number) => {
-            if (!bank.bankHolderName?.trim()) {
-                newErrors[`bankAccounts.${index}.bankHolderName`] = "Account Holder Name is required";
-            }
-            if (!bank.bankName?.trim()) {
-                newErrors[`bankAccounts.${index}.bankName`] = "Bank Name is required";
-            }
-            if (!bank.ifscCode?.trim()) {
-                newErrors[`bankAccounts.${index}.ifscCode`] = "IFSC Code is required";
-            } else if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(bank.ifscCode)) {
-                newErrors[`bankAccounts.${index}.ifscCode`] = "Invalid IFSC code";
-            }
-            if (!bank.accountNumber?.trim()) {
-                newErrors[`bankAccounts.${index}.accountNumber`] = "Account Number is required";
-            } else if (!/^[0-9]{9,18}$/.test(bank.accountNumber)) {
-                newErrors[`bankAccounts.${index}.accountNumber`] = "Account Number must be 9-18 digits";
-            }
-            if (!bank.branchName?.trim()) {
-                newErrors[`bankAccounts.${index}.branchName`] = "Branch is required";
-            }
-            const upiMobileNumberError = validatePhoneNumber(bank.upiMobileNumber, false);
-            if (upiMobileNumberError) {
-                newErrors[`bankAccounts.${index}.upiMobileNumber`] = upiMobileNumberError;
+            const hasAnyField = !!(
+                bank.bankHolderName?.trim() ||
+                bank.bankName?.trim() ||
+                bank.ifscCode?.trim() ||
+                bank.accountNumber?.trim() ||
+                bank.branchName?.trim() ||
+                bank.upiMobileNumber?.trim()
+            );
+
+            if (hasAnyField) {
+                if (!bank.bankHolderName?.trim()) {
+                    newErrors[`bankAccounts.${index}.bankHolderName`] = "Account Holder Name is required";
+                }
+                if (!bank.bankName?.trim()) {
+                    newErrors[`bankAccounts.${index}.bankName`] = "Bank Name is required";
+                }
+                if (!bank.ifscCode?.trim()) {
+                    newErrors[`bankAccounts.${index}.ifscCode`] = "IFSC Code is required";
+                } else if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(bank.ifscCode)) {
+                    newErrors[`bankAccounts.${index}.ifscCode`] = "Invalid IFSC code";
+                }
+                if (!bank.accountNumber?.trim()) {
+                    newErrors[`bankAccounts.${index}.accountNumber`] = "Account Number is required";
+                } else if (!/^[0-9]{9,18}$/.test(bank.accountNumber)) {
+                    newErrors[`bankAccounts.${index}.accountNumber`] = "Account Number must be 9-18 digits";
+                }
+                if (!bank.branchName?.trim()) {
+                    newErrors[`bankAccounts.${index}.branchName`] = "Branch is required";
+                }
+                const upiMobileNumberError = validatePhoneNumber(bank.upiMobileNumber, false);
+                if (upiMobileNumberError) {
+                    newErrors[`bankAccounts.${index}.upiMobileNumber`] = upiMobileNumberError;
+                }
             }
         });
     }

@@ -12,6 +12,8 @@ import { useDesignations } from "../../../hooks/useDesignations";
 import { useRoles } from "../../../hooks/useRoles";
 import { employeeService } from "../../../services/employeeService";
 import { useSelector } from "react-redux";
+import IndiaPhoneInput from "../../../components/ui/PhoneInput/PhoneInput";
+import { validatePhoneNumber } from "../../../components/ui/PhoneInput/PhoneInput";
 
 const EmployeeCreatePage: React.FC = () => {
   const navigate = useNavigate();
@@ -77,11 +79,11 @@ const EmployeeCreatePage: React.FC = () => {
   //     loadDesignations(Number(firstDeptId));
   //   }
   // }, [departments]);
-useEffect(() => {
-  if (!formData.departmentId) return;
+  useEffect(() => {
+    if (!formData.departmentId) return;
 
-  loadDesignations(Number(formData.departmentId));
-}, [formData.departmentId, loadDesignations]);
+    loadDesignations(Number(formData.departmentId));
+  }, [formData.departmentId, loadDesignations]);
   useEffect(() => {
     if (formData.departmentId) {
       loadDesignations(Number(formData.departmentId));
@@ -210,8 +212,12 @@ useEffect(() => {
       newErrors.fullName = "Employee name is required";
     }
 
-    if (! /^\d{10}$/.test(formData.mobile.trim())) {
-      newErrors.mobile = "Enter a valid 10-digit mobile number";
+    // if (! /^\d{10}$/.test(formData.mobile.trim())) {
+    //   newErrors.mobile = "Enter a valid 10-digit mobile number";
+    // }
+    const mobileError = validatePhoneNumber(formData.mobile, true);
+    if (mobileError) {
+      newErrors.mobile = mobileError;
     }
 
     if (!formData.email) {
@@ -290,7 +296,7 @@ useEffect(() => {
             </Col>
 
             <Col lg={4} md={6}>
-              <TextInput
+              <IndiaPhoneInput
                 label="Phone Number"
                 name="mobile"
                 value={formData.mobile}
