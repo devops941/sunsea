@@ -21,13 +21,6 @@ const envSchema = z.object({
       "JWT Access Secret must be at least 32 characters"
     ),
 
-  JWT_REFRESH_SECRET: z
-    .string()
-    .min(
-      32,
-      "JWT Refresh Secret must be at least 32 characters"
-    ),
-
   NODE_ENV: z
     .enum([
       "development",

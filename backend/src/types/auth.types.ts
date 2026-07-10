@@ -31,7 +31,7 @@ export interface LoginDto {
 }
 
 export interface RefreshTokenDto {
-  refreshToken?: string;
+  // Remove - not needed anymore
 }
 
 export interface PasswordResetRequestDto {
@@ -58,14 +58,10 @@ export interface AccessTokenPayload {
   roleId: string | null;
   permissions: string[];
   isSuperAdmin?: boolean;
+  sessionId: string; // Add session ID to token
 }
 
 export type JwtPayload = AccessTokenPayload;
-
-export interface RefreshTokenPayload {
-  userId: string;
-  sessionId: string;
-}
 
 // ============================================================
 // RESPONSE DTOs
@@ -91,13 +87,17 @@ export interface ProfileResponseDto {
 
 export interface AuthTokens {
   accessToken: string;
-  refreshToken?: string;
   accessTokenExpiresAt?: Date;
 }
 
 export interface AuthResult {
   user: UserResponseDto;
   tokens: AuthTokens;
+  sessionInfo?: {
+    deviceLabel: string;
+    loginAt: Date;
+    expiresAt: Date;
+  };
 }
 
 // ============================================================

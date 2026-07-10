@@ -93,23 +93,25 @@ model User {
 }
 
 model UserSession {
-  id               String    @id @default(uuid())
-  userId           String?
-  refreshTokenHash String    @unique
-  ipAddress        String?
-  userAgent        String?
-  deviceLabel      String?
-  rememberMe       Boolean   @default(false)
-  expiresAt        DateTime  @db.Timestamptz(6)
-  revokedAt        DateTime? @db.Timestamptz(6)
-  isRevoked        Boolean   @default(false)
-  createdAt        DateTime  @default(now()) @db.Timestamptz(6)
-  adminId          BigInt?
-  admin            Admin?    @relation(fields: [adminId], references: [id], onDelete: Cascade)
-  user             User?     @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  id          String    @id @default(uuid())
+  userId      String?
+  adminId     BigInt?
+  sessionToken String   @unique @default(uuid())
+  ipAddress   String?
+  userAgent   String?
+  deviceLabel String?
+  loginAt     DateTime  @default(now()) @db.Timestamptz(6)
+  logoutAt    DateTime? @db.Timestamptz(6)
+  expiresAt   DateTime  @db.Timestamptz(6)
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime  @default(now()) @updatedAt @db.Timestamptz(6)
+  admin       Admin?    @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  user        User?     @relation(fields: [userId], references: [userId], onDelete: Cascade)
 
-  @@index([userId])
-  @@index([revokedAt])
+  @@index([userId, isActive])
+  @@index([adminId, isActive])
+  @@index([sessionToken])
   @@map("user_sessions")
 }
 

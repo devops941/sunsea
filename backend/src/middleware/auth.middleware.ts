@@ -47,13 +47,28 @@ export const authMiddleware = async (
 
     if (
       !decoded?.userId ||
-      !Array.isArray(decoded?.permissions)
+      !Array.isArray(decoded?.permissions) ||
+      !decoded?.sessionId
     ) {
       return next(
         new ApiError(
           401,
           "Invalid token payload"
         )
+      );
+    }
+
+    // Verify session is still active
+    const session = await prisma.userSession.findFirst({
+      where: {
+        isActive: true,
+        expiresAt: { gt: new Date() }
+      }
+    });
+
+    if (!session) {
+      return next(
+        new ApiError(401, "Session expired or invalid")
       );
     }
 

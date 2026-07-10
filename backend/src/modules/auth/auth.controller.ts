@@ -13,14 +13,6 @@ import {
   PasswordResetDto
 } from "../../types/auth.types";
 
-const refreshTokenCookieOptions = {
-  httpOnly: true,
-  secure: isProduction,
-  sameSite: "strict" as const,
-  path: "/api/auth",
-  maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
-};
-
 // ============================================================
 // AUTHENTICATION
 // ============================================================
@@ -49,37 +41,27 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
     req.get("user-agent") ?? undefined
   );
 
-  res.cookie(
-    "refreshToken",
-    authResult.tokens.refreshToken,
-    refreshTokenCookieOptions
-  );
-
   res.status(200).json(
     new ApiResponse("Login successful", {
       accessToken: authResult.tokens.accessToken,
       accessTokenExpiresAt: authResult.tokens.accessTokenExpiresAt,
-      user: authResult.user
+      user: authResult.user,
+      session: authResult.sessionInfo
     })
   );
   return;
 });
 
 export const logout = asyncHandler(async (req: Request, res: Response) => {
-  const refreshToken = req.cookies?.refreshToken as string | undefined;
   const userId = req.user?.userId as string;
+  const sessionId = req.user?.sessionId as string;
 
   await authService.logout(
     userId,
-    refreshToken,
+    sessionId,
     req.ip,
     req.get("user-agent") ?? undefined
   );
-
-  res.cookie("refreshToken", "", {
-    ...refreshTokenCookieOptions,
-    maxAge: 0
-  });
 
   res.status(200).json(new ApiResponse("Logout successful"));
   return;
@@ -95,53 +77,25 @@ export const logoutAllSessions = asyncHandler(
       req.get("user-agent") ?? undefined
     );
 
-    res.cookie("refreshToken", "", {
-      ...refreshTokenCookieOptions,
-      maxAge: 0
-    });
-
     res.status(200).json(new ApiResponse("All sessions logged out successfully"));
     return;
   }
 );
 
 // ============================================================
-// TOKEN MANAGEMENT
+// SESSION MANAGEMENT
 // ============================================================
 
-export const refreshToken = asyncHandler(
-  async (req: Request, res: Response, next: NextFunction) => {
-    const bodyToken = req.body?.refreshToken as string | undefined;
-    const cookieToken = req.cookies?.refreshToken as string | undefined;
-    const token = bodyToken || cookieToken;
+export const getActiveSessions = asyncHandler(
+  async (req: Request, res: Response) => {
+    const userId = req.user?.userId as string;
 
-    try {
-      const tokens = await authService.refreshAccessToken(
-        token,
-        req.ip,
-        req.get("user-agent") ?? undefined
-      );
+    const sessions = await authService.getActiveSessions(userId);
 
-      res.cookie(
-        "refreshToken",
-        tokens.refreshToken,
-        refreshTokenCookieOptions
-      );
-
-      res.status(200).json(
-        new ApiResponse("Token refreshed successfully", {
-          accessToken: tokens.accessToken,
-          accessTokenExpiresAt: tokens.accessTokenExpiresAt
-        })
-      );
-      return;
-    } catch (error) {
-      res.cookie("refreshToken", "", {
-        ...refreshTokenCookieOptions,
-        maxAge: 0
-      });
-      next(error);
-    }
+    res.status(200).json(
+      new ApiResponse("Active sessions retrieved successfully", sessions)
+    );
+    return;
   }
 );
 
