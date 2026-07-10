@@ -14,6 +14,16 @@ const ItemSchema = z.object({
     unitPrice: z.coerce.number().min(0, "Price must be ≥ 0"),
     discount: z.coerce.number().min(0).max(100).optional(),
     tax: z.coerce.number().min(0).max(100).optional(),
+    discountType: z.enum(["PERCENT", "FLAT"]).optional(),
+    discountValue: z.coerce.number().min(0).optional(),
+    discountAmount: z.coerce.number().min(0).optional(),
+    taxableAmount: z.coerce.number().min(0).optional(),
+    cgstRate: z.coerce.number().min(0).optional(),
+    cgstAmount: z.coerce.number().min(0).optional(),
+    sgstRate: z.coerce.number().min(0).optional(),
+    sgstAmount: z.coerce.number().min(0).optional(),
+    igstRate: z.coerce.number().min(0).optional(),
+    igstAmount: z.coerce.number().min(0).optional(),
 });
 
 export const CreatePurchaseOrderSchema = z.object({

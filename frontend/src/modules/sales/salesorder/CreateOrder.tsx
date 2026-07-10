@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useSelector } from "react-redux";
 import { Container, Row, Col } from "react-bootstrap";
 import { FaSave, FaEraser, FaArrowLeft, FaPlus, FaTrash, FaCalendarAlt, FaPaperPlane } from "react-icons/fa";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -194,6 +195,8 @@ const SalesOrderForm: React.FC = () => {
     const [orderId, setOrderId] = useState<number | null>(null);
     const isEditMode = useMemo(() => Boolean((location.state as any)?.id), [location.state]);
     const [shippingResetKey, setShippingResetKey] = useState(0);
+    const { data: company } = useSelector((state: any) => state.company);
+    const companyState = company?.state;
 
     const handleBillingStateChange = (stateData: StateCityOption) => {
         setValue("billingState", stateData.name, { shouldValidate: true });
@@ -403,6 +406,15 @@ const SalesOrderForm: React.FC = () => {
             setValue("salesPersonId", "", { shouldValidate: true });
         }
     }, [orderType, setValue]);
+
+    const computedIsInterState = useMemo(() => {
+        if (!companyState || !billingState) return false;
+        return companyState.toLowerCase().trim() !== billingState.toLowerCase().trim();
+    }, [companyState, billingState]);
+
+    useEffect(() => {
+        setValue("isInterState", computedIsInterState, { shouldValidate: true });
+    }, [computedIsInterState, setValue]);
 
     // ─── Submit handler ──────────────────────────────────────────────
     const onSubmit = async (data: SalesOrderFormValues, action: "draft" | "quotation") => {
@@ -622,7 +634,7 @@ const SalesOrderForm: React.FC = () => {
                                             type="checkbox"
                                             id="isInterState"
                                             checked={field.value || false}
-                                            onChange={(e) => field.onChange(e.target.checked)}
+                                            disabled
                                         />
                                         <label htmlFor="isInterState" className="mb-0">
                                             Inter‑State GST (IGST)

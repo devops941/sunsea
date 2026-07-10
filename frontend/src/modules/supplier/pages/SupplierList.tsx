@@ -120,11 +120,11 @@ const SupplierList: React.FC = () => {
                                         onChange={handleSearch}
                                     />
                                 </div>
-                                {canCreateSupplier && <CustomButton
+                                <CustomButton
                                     text="Add supplier"
                                     icon={FaPlus}
                                     onClick={() => navigate("/suppliers/create")}
-                                />}
+                                />
                             </div>
                         </Col>
                     </Row>

@@ -13,7 +13,7 @@ import { rawMaterialService } from "../../../../services/rawMaterialService";
 import type { RawMaterial } from "../../../../features/raw-materials/types";
 import Section from "../../../../components/ui/Section/Section";
 import SelectInput from "../../../../components/form/SelectInput/SelectInput";
-import { useAppSelector } from "../../../../hooks/reduxHooks";
+
 
 // ─── Report-style read-only Field (matches QuotationForm / SalesOrderDetail) ──
 const Field: React.FC<{ label: string; value: React.ReactNode }> = ({ label, value }) => (
@@ -178,18 +178,14 @@ const UpComingOrderDetailPage: React.FC = () => {
                 poDate: formData.poDate,
                 expectedDeliveryDate: formData.expectedDeliveryDate,
                 supplierId: formData.supplierId,
-                billingAddress: {
-                    addressLine1: formData.billingAddressLine1,
-                    city: formData.billingCity,
-                    state: formData.billingState,
-                    pincode: formData.billingPincode,
-                },
-                shippingAddress: {
-                    addressLine1: formData.shippingAddressLine1,
-                    city: formData.shippingCity,
-                    state: formData.shippingState,
-                    pincode: formData.shippingPincode,
-                },
+                billingAddressLine1: formData.billingAddressLine1,
+                billingCity: formData.billingCity,
+                billingState: formData.billingState,
+                billingPincode: formData.billingPincode,
+                shippingAddressLine1: formData.shippingAddressLine1,
+                shippingCity: formData.shippingCity,
+                shippingState: formData.shippingState,
+                shippingPincode: formData.shippingPincode,
                 sameAsBilling: formData.sameAsBilling,
                 remarks: formData.remarks,
                 items: formData.items.map((i) => ({

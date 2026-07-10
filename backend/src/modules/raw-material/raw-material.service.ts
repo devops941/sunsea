@@ -30,6 +30,7 @@ class RawMaterialService {
           storeId: data.storeId,
           isActive: data.isActive ?? true,
           createdBy: userId,
+          gstTaxRateId: data.gstTaxRateId || null,
           // locationId: data.locationId ?? null,
           batchNo: data.batchNo ?? null,
           onHandQty: data.onHandQty ?? 0,

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useSelector } from "react-redux";
 import { Container, Row, Col, Table, Spinner, Modal } from "react-bootstrap";
 import { FaInfoCircle, FaUser, FaMapMarkerAlt, FaBoxOpen, FaCheck, FaTimes, FaArrowLeft } from "react-icons/fa";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
@@ -37,6 +38,8 @@ const PurchaseOrderViewPage: React.FC = () => {
     const location = useLocation();
     const { suppliers, loadSuppliers } = useSuppliers();
     const { users, loadUsers } = useUsers();
+    const { data: company } = useSelector((state: any) => state.company);
+    const companyState = company?.state;
 
     const [po, setPo] = useState<any>(null);
     const [loading, setLoading] = useState(true);
@@ -97,6 +100,9 @@ const PurchaseOrderViewPage: React.FC = () => {
 
     const supplier = suppliers.find((s) => String(s.id) === String(po.supplierId));
     const createdByUser = users.find((u: any) => u.userId === po.createdBy);
+    const isInterState = companyState && supplier?.billingState
+        ? companyState.toLowerCase().trim() !== supplier.billingState.toLowerCase().trim()
+        : false;
 
     // ============================================================
     // APPROVE / REJECT (unified handler)
@@ -216,8 +222,16 @@ const PurchaseOrderViewPage: React.FC = () => {
                                     <th>UOM</th>
                                     <th>Quantity</th>
                                     <th>Unit Price</th>
-                                    <th>Discount %</th>
                                     <th>Tax %</th>
+                                    <th>Taxable (₹)</th>
+                                    {isInterState ? (
+                                        <th>IGST (₹)</th>
+                                    ) : (
+                                        <>
+                                            <th>CGST (₹)</th>
+                                            <th>SGST (₹)</th>
+                                        </>
+                                    )}
                                     <th>Line Total</th>
                                 </tr>
                             </thead>
@@ -229,14 +243,22 @@ const PurchaseOrderViewPage: React.FC = () => {
                                         <td>{item.uom}</td>
                                         <td>{item.quantity}</td>
                                         <td>₹{Number(item.unitPrice).toFixed(2)}</td>
-                                        <td>{item.discount || 0}%</td>
                                         <td>{item.tax || 0}%</td>
+                                        <td>₹{Number(item.taxableAmount || 0).toFixed(2)}</td>
+                                        {isInterState ? (
+                                            <td>₹{Number(item.igstAmount || 0).toFixed(2)}</td>
+                                        ) : (
+                                            <>
+                                                <td>₹{Number(item.cgstAmount || 0).toFixed(2)}</td>
+                                                <td>₹{Number(item.sgstAmount || 0).toFixed(2)}</td>
+                                            </>
+                                        )}
                                         <td>₹{Number(item.lineTotal).toFixed(2)}</td>
                                     </tr>
                                 ))}
                                 {(!po.items || po.items.length === 0) && (
                                     <tr>
-                                        <td colSpan={8} className="text-center">No items</td>
+                                        <td colSpan={isInterState ? 9 : 10} className="text-center">No items</td>
                                     </tr>
                                 )}
                             </tbody>
@@ -264,11 +286,24 @@ const PurchaseOrderViewPage: React.FC = () => {
                                     <span>Subtotal:</span>
                                     <span>₹{Number(po.subtotal).toFixed(2)}</span>
                                 </div>
-                                <div className="d-flex justify-content-between mb-2 text-danger">
-                                    <span>Total Discount:</span>
-                                    <span>-₹{Number(po.totalDiscount).toFixed(2)}</span>
-                                </div>
-                                <div className="d-flex justify-content-between mb-2 text-success">
+                                {isInterState ? (
+                                    <div className="d-flex justify-content-between mb-2 text-success small">
+                                        <span>Total IGST:</span>
+                                        <span>+₹{Number(po.totalIgst || 0).toFixed(2)}</span>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <div className="d-flex justify-content-between mb-2 text-success small">
+                                            <span>Total CGST:</span>
+                                            <span>+₹{Number(po.totalCgst || 0).toFixed(2)}</span>
+                                        </div>
+                                        <div className="d-flex justify-content-between mb-2 text-success small">
+                                            <span>Total SGST:</span>
+                                            <span>+₹{Number(po.totalSgst || 0).toFixed(2)}</span>
+                                        </div>
+                                    </>
+                                )}
+                                <div className="d-flex justify-content-between mb-2 text-success fw-bold">
                                     <span>Total Tax:</span>
                                     <span>+₹{Number(po.totalTax).toFixed(2)}</span>
                                 </div>
