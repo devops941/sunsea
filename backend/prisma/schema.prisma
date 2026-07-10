@@ -96,7 +96,7 @@ model UserSession {
   id          String    @id @default(uuid())
   userId      String?
   adminId     BigInt?
-  sessionToken String   @unique @default(uuid())
+  sessionToken String   @unique
   ipAddress   String?
   userAgent   String?
   deviceLabel String?

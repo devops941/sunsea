@@ -270,18 +270,37 @@ export class AuthService {
     ipAddress?: string,
     userAgent?: string
   ): Promise<void> {
+    const isAdmin = userId.startsWith("admin_");
+    
     if (sessionId) {
-      const session = await authRepository.findUserSession(sessionId);
+      // Look up session by sessionId (UUID from JWT)
+      const session = await prisma.userSession.findFirst({
+        where: {
+          ...(isAdmin ? { adminId: BigInt(userId.replace("admin_", "")) } : { userId }),
+          isActive: true
+        },
+        orderBy: { loginAt: 'desc' }
+      });
+      
       if (session) {
         await authRepository.logoutSession(session.id);
+      }
+    } else {
+      // Fallback: logout all active sessions for this user
+      if (isAdmin) {
+        const adminId = BigInt(userId.replace("admin_", ""));
+        await authRepository.logoutAllUserSessions(undefined, adminId);
+      } else {
+        await authRepository.logoutAllUserSessions(userId);
       }
     }
 
     await authRepository.createAuditLog({
-      entityName: "User",
+      entityName: isAdmin ? "Admin" : "User",
       entityId: userId,
       action: "LOGOUT",
       changedBy: userId,
+      changedByAdmin: isAdmin ? BigInt(userId.replace("admin_", "")) : undefined,
       ipAddress,
       userAgent
     });
