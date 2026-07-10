@@ -166,7 +166,7 @@ const ProductList: React.FC = () => {
                                                     {product.size?.sizeCode ? product.size?.sizeCode : "-"}
                                                 </td>
                                                 <td className="master-data-cell">
-                                                    {product.weightPerPiece != null ? `${product.weightPerPiece} kg` : "-"}
+                                                    {product.weightPerPiece != null ? (Number(product.weightPerPiece) < 1 ? `${Number(product.weightPerPiece) * 1000} g` : `${product.weightPerPiece} kg`) : "-"}
                                                 </td>
                                                 <td className="master-data-cell">
                                                     <StatusBadge status={product.isActive ? "ACTIVE" : "INACTIVE"} />
@@ -232,7 +232,7 @@ const ProductList: React.FC = () => {
                                 { label: "MRP", value: selectedProduct.pricing?.length > 0 && selectedProduct.pricing[0].mrp != null ? `₹${selectedProduct.pricing[0].mrp}` : "N/A" },
                                 { label: "Min Sale", value: selectedProduct.pricing?.length > 0 && selectedProduct.pricing[0].minSalePrice != null ? `₹${selectedProduct.pricing[0].minSalePrice}` : "N/A" },
                                 { label: "Colour", value: selectedProduct.colors?.length > 0 ? selectedProduct.colors.map((c: any) => c.color?.colorName).join(", ") : "N/A" },
-                                { label: "Weight", value: selectedProduct.weightPerPiece != null ? `${selectedProduct.weightPerPiece} grams` : "N/A" },
+                                { label: "Weight", value: selectedProduct.weightPerPiece != null ? (Number(selectedProduct.weightPerPiece) < 1 ? `${Number(selectedProduct.weightPerPiece) * 1000} g` : `${selectedProduct.weightPerPiece} kg`) : "N/A" },
                                 { label: "Status", value: selectedProduct.isActive ? "Active" : "Inactive" },
                             ]
                         }

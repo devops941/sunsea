@@ -1,6 +1,7 @@
 import React from "react";
 import type { Employee } from "../../../features/employee/types";
 import CommonViewModal from "../../../components/ui/CommonViewModal/CommonViewModal";
+import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 
 interface EmployeeViewModalProps {
     show: boolean;
@@ -32,11 +33,7 @@ const EmployeeViewModal: React.FC<EmployeeViewModalProps> = ({
                         { label: "Date of Joining", value: employee.dateOfJoining ? new Date(employee.dateOfJoining).toLocaleDateString() : "N/A" },
                         {
                             label: "Status",
-                            value: (
-                                <span className={`badge bg-${employee.status === "active" ? "success" : "secondary"} text-capitalize`}>
-                                    {employee.status}
-                                </span>
-                            )
+                            value: <StatusBadge status={employee.status === "active" ? "ACTIVE" : "INACTIVE"} />
                         }
                     ]
                 },

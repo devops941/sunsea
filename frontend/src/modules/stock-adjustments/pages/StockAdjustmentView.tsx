@@ -6,7 +6,7 @@ import { toast } from "react-toastify";
 
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
 import { fetchStockAdjustmentById, approveStockAdjustment, clearCurrent } from "../../../features/stock-adjustments/stockAdjustmentSlice";
-import CustomButton from "../../../components/ui/Button/Button";
+import CustomButton from "../../../components/ui/custombutton/CustomButton";
 import { formatDate } from "../../../utils/dateUtils";
 
 const StockAdjustmentView: React.FC = () => {

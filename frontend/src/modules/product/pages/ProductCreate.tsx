@@ -7,12 +7,14 @@ import TextInput from "../../../components/form/TextInput/TextInput";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import UOMSelect from "../../../components/form/SelectInput/UOMSelect";
 import MultiSelect from "../../../components/form/multiSelect/MultiSelect";
+import QuantityInput from "../../../components/form/QuantityInput/QuantityInput";
 import CustomButton from "../../../components/ui/custombutton/CustomButton";
 import { useProducts } from "../../../hooks/useProducts";
 import { useCategories } from "../../../hooks/useCategories";
 import { productService } from "../../../services/productService";
 import { useColors } from "../../../hooks/useColors";
 import { useSizes } from "../../../hooks/useSizes";
+import { useUOMs } from "../../../hooks/useUOMs";
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
 import { fetchGstTaxes, selectActiveGstTaxes } from "../../../features/gst/gstSlice";
 
@@ -41,6 +43,7 @@ const ProductCreatePage: React.FC = () => {
     const { categories, loadCategories } = useCategories();
     const { colors, loadColors } = useColors();
     const { sizes, loadSizes } = useSizes();
+    const { loadActiveUOMs } = useUOMs();
     const dispatch = useAppDispatch();
 
     // ── GST taxes from Redux store ──────────────────────────────────────
@@ -656,13 +659,11 @@ const ProductCreatePage: React.FC = () => {
                         </Col>
 
                         <Col lg={4} md={6}>
-                            <TextInput
+                            <QuantityInput
                                 label="Weight Per Piece"
                                 name="weightPerPiece"
-                                type="number"
-                                step="0.01"
                                 value={formData.weightPerPiece}
-                                placeholder="e.g. 1.25"
+                                baseUoms="kg,g"
                                 onChange={handleChange}
                                 error={errors.weightPerPiece}
                             />

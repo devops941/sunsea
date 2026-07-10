@@ -1277,10 +1277,10 @@ ul {
     min-width: 0;
     padding: 24px;
     background: #ffffff;
-    border: 1px solid #e8edf2;
+    /* border: 1px solid #e8edf2; */
     border-radius: 16px;
-    box-shadow:
-        0 2px 8px rgba(15, 23, 42, 0.04);
+    /* box-shadow:
+        0 2px 8px rgba(15, 23, 42, 0.04); */
     min-height: calc(100vh - 120px);
 }
 

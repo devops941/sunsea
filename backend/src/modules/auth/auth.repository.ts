@@ -19,7 +19,7 @@ interface PrismaUser {
   mfaSecret: string | null;
   roleId: number | null;
   role?: {
-    code: string;
+    name: string;
   } | null;
   createdBy: string | null;
   createdOn: Date;

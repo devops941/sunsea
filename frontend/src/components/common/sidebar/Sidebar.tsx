@@ -34,6 +34,7 @@ const Sidebar = () => {
   };
 
   const { permissions, user } = useAppSelector((state) => state.auth);
+  const { data: company } = useAppSelector((state) => state.company);
 
   const handleLogout = () => {
     dispatch(logoutUser());
@@ -91,16 +92,14 @@ const Sidebar = () => {
           }`}
       >
         <div className="sidebar-brand">
-          <div className="sidebar-logo">
-            <img src={Logo} alt="Sunsea" className="sidebar-logo-image" />
+          <div className="sidebar-logo" style={{ background: 'transparent', width: '48px', height: '48px', padding: '0px' }}>
+            <img 
+              src={company?.logoUrl || Logo} 
+              alt="Company Logo" 
+              className="sidebar-logo-image" 
+              style={{ objectFit: 'contain' }} 
+            />
           </div>
-
-          {!activeCollapsed && (
-            <div>
-              <h2 className="sidebar-title">SUNSEA</h2>
-              <p className="sidebar-subtitle">ERP - MADURAI</p>
-            </div>
-          )}
         </div>
 
         {!isCollapsed && (

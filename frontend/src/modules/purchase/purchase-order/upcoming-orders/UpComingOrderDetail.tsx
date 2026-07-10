@@ -367,7 +367,7 @@ const UpComingOrderDetailPage: React.FC = () => {
             </Container>
             <Modal show={showFormModal} onHide={() => {
                 setShowFormModal(false);
-            }} centered size="md">
+            }} centered>
                 <Modal.Header closeButton>
                     <Modal.Title>{"Select Store"}</Modal.Title>
                 </Modal.Header>

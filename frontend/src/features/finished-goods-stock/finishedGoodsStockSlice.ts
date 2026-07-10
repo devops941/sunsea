@@ -12,7 +12,7 @@ const initialState: FinishedGoodsStockState = {
 // Fetch all stocks
 export const fetchFinishedGoodsStocks = createAsyncThunk(
     "finishedGoodsStock/fetchAll",
-    async (params: any | undefined, { rejectWithValue }) => {
+    async (params: any = {}, { rejectWithValue }) => {
         try {
             return await finishedGoodsStockService.fetchAll(params);
         } catch (error: any) {

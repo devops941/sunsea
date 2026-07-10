@@ -12,6 +12,7 @@ import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/Common
 import { useEmployees } from "../../../hooks/useEmployees";
 import Select from "react-select";
 import { hasPermission } from "../../../utils/permission";
+import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -163,9 +164,7 @@ const Employeelist: React.FC = () => {
                         <td className="master-data-cell">{employee.department?.name || "N/A"}</td>
                         {/* <td className="master-data-cell">{employee.designation?.name || "N/A"}</td> */}
                         <td className="master-data-cell">
-                          <span className={`status-pill status-pill--${employee.status === "active" ? "active" : "inactive"}`}>
-                            {employee.status}
-                          </span>
+                          <StatusBadge status={employee.status === "active" ? "ACTIVE" : "INACTIVE"} />
                         </td>
                         <td className="master-data-cell">
                           <div className="table-action-group">

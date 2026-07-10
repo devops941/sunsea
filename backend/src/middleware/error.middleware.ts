@@ -10,9 +10,12 @@ export const errorMiddleware = (
   res: Response,
   _next: NextFunction
 ) => {
-  console.error("API ERROR DETECTED:", err);
-
   if (err instanceof ApiError) {
+    if (err.statusCode >= 500) {
+      console.error("API ERROR DETECTED:", err);
+    } else {
+      console.warn(`[API Warning] ${err.statusCode} - ${err.message}`);
+    }
     res.status(err.statusCode).json({
       success: false,
       message: err.message,
@@ -22,6 +25,7 @@ export const errorMiddleware = (
   }
 
   if (err instanceof ZodError) {
+    console.warn(`[API Warning] 400 - Validation failed`);
     const issues: ZodIssue[] = err.issues;
 
     const errors = issues.map((issue) => ({

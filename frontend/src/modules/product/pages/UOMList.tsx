@@ -15,28 +15,12 @@ const UOMList: React.FC = () => {
         setCurrentPage(1); // Reset to first page on search
     };
 
-    const allowedCategories = ["mass", "volume", "length", "area", "time"];
-    const allowedCodes = [
-        "kg", "g", "ton", "t",
-        "l", "ml", "ltr",
-        "m", "cm", "mm", "in", "ft",
-        "sq_m", "sq_ft", "ac", "ha",
-        "s", "min", "h", "d"
-    ];
-
-    // Filter units based on our allowed list AND the search term
+    // Filter units based on the search term
     const filteredUnits = units.filter(u => {
-        const isAllowedCategory = allowedCategories.includes(u.category.toLowerCase());
-        const isAllowedCode = allowedCodes.includes(u.code.toLowerCase());
-        
-        if (!isAllowedCategory || !isAllowedCode) {
-            return false;
-        }
-
         const searchLower = searchTerm.toLowerCase();
-        return u.code.toLowerCase().includes(searchLower) || 
-               u.label.toLowerCase().includes(searchLower) ||
-               u.category.toLowerCase().includes(searchLower);
+        return (u.code || '').toLowerCase().includes(searchLower) || 
+               (u.label || '').toLowerCase().includes(searchLower) ||
+               (u.category || '').toLowerCase().includes(searchLower);
     });
 
     const totalPages = Math.ceil(filteredUnits.length / ITEMS_PER_PAGE);

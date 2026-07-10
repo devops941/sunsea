@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Container, Row, Col, Spinner } from "react-bootstrap";
-import { FaSearch, FaChevronLeft, FaChevronRight } from "react-icons/fa";
+import { FaSearch, FaChevronLeft, FaChevronRight, FaPlus } from "react-icons/fa";
+import { useNavigate } from "react-router-dom";
 
 import { toast } from "react-toastify";
 
@@ -12,11 +13,13 @@ import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import { storeService } from "../../../services/storeService";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import CommonViewModal from "../../../components/ui/CommonViewModal/CommonViewModal";
+import CustomButton from "../../../components/ui/custombutton/CustomButton";
 
 const ITEMS_PER_PAGE = 10;
 
 const StockList: React.FC = () => {
     const dispatch = useAppDispatch();
+    const navigate = useNavigate();
 
     const { data, loading, error } = useAppSelector((state) => state.rawMaterialStocks);
 
@@ -109,8 +112,13 @@ const StockList: React.FC = () => {
                         </Col>
                         <Col lg={8} md={12}>
                             <div className="page-header-actions">
-
-
+                                <div className="me-2">
+                                    <CustomButton
+                                        text="Add Raw Material"
+                                        icon={FaPlus}
+                                        onClick={() => navigate("/raw-materials/create")}
+                                    />
+                                </div>
                                 <div className="page-search-wrap me-2" style={{ minWidth: "200px" }}>
                                     <SelectInput
                                         label="Select Store"
