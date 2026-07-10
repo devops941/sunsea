@@ -19,7 +19,7 @@ interface PrismaUser {
   mfaSecret: string | null;
   roleId: number | null;
   role?: {
-    code: string;
+    name: string;
   } | null;
   createdBy: string | null;
   createdOn: Date;
@@ -34,22 +34,45 @@ export class AuthRepository {
   async findUserByEmail(email: string): Promise<PrismaUser | null> {
     return prisma.user.findUnique({
       where: { email },
-      include: { role: { select: { code: true } } }
+      include: { role: { select: { name: true } } }
     }) as Promise<PrismaUser | null>;
   }
 
   async findUserByUsername(username: string): Promise<PrismaUser | null> {
     return prisma.user.findUnique({
       where: { username },
-      include: { role: { select: { code: true } } }
+      include: { role: { select: { name: true } } }
     }) as Promise<PrismaUser | null>;
   }
 
   async findUserById(userId: string): Promise<PrismaUser | null> {
     return prisma.user.findUnique({
       where: { userId },
-      include: { role: { select: { code: true } } }
+      include: { role: { select: { name: true } } }
     }) as Promise<PrismaUser | null>;
+  }
+
+  // ============================================================
+  // ADMIN OPERATIONS
+  // ============================================================
+
+  async findAdminByEmail(email: string) {
+    return prisma.admin.findUnique({ where: { email } });
+  }
+
+  async findAdminByUsername(username: string) {
+    return prisma.admin.findUnique({ where: { username } });
+  }
+
+  async findAdminById(id: bigint) {
+    return prisma.admin.findUnique({ where: { id } });
+  }
+
+  async updateAdminLastLogin(id: bigint) {
+    return prisma.admin.update({
+      where: { id },
+      data: { lastLoginAt: new Date() }
+    });
   }
 
   async createUser(payload: {
@@ -70,7 +93,7 @@ export class AuthRepository {
         roleId: payload.roleId !== undefined ? Number(payload.roleId) : undefined,
         createdBy: payload.createdBy
       },
-      include: { role: { select: { code: true } } }
+      include: { role: { select: { name: true } } }
     }) as Promise<PrismaUser>;
   }
 
@@ -136,12 +159,22 @@ export class AuthRepository {
     }) as Promise<PrismaUser>;
   }
 
+  async updateAdminPassword(adminId: bigint, passwordHash: string): Promise<any> {
+    return prisma.admin.update({
+      where: { id: adminId },
+      data: {
+        passwordHash
+      }
+    });
+  }
+
   // ============================================================
   // SESSION MANAGEMENT
   // ============================================================
 
   async createUserSession(payload: {
-    userId: string;
+    userId?: string;
+    adminId?: bigint;
     refreshTokenHash: string;
     ipAddress?: string;
     userAgent?: string;
@@ -153,14 +186,21 @@ export class AuthRepository {
     return prisma.$transaction(async (tx) => {
       // Remove any existing sessions for this user to prevent constraint violations
       // and ensure a single active session per user.
-      await tx.userSession.deleteMany({
-        where: { userId: payload.userId }
-      });
+      if (payload.userId) {
+        await tx.userSession.deleteMany({
+          where: { userId: payload.userId }
+        });
+      } else if (payload.adminId) {
+        await tx.userSession.deleteMany({
+          where: { adminId: payload.adminId }
+        });
+      }
 
       // Create the new session
       return tx.userSession.create({
         data: {
           userId: payload.userId,
+          adminId: payload.adminId,
           refreshTokenHash: payload.refreshTokenHash,
           ipAddress: payload.ipAddress,
           userAgent: payload.userAgent,
@@ -191,10 +231,11 @@ export class AuthRepository {
     });
   }
 
-  async revokeAllUserSessions(userId: string): Promise<number> {
+  async revokeAllUserSessions(userId?: string, adminId?: bigint): Promise<number> {
     const result = await prisma.userSession.updateMany({
       where: {
-        userId,
+        ...(userId ? { userId } : {}),
+        ...(adminId ? { adminId } : {}),
         revokedAt: null
       },
       data: { revokedAt: new Date() }
@@ -207,7 +248,8 @@ export class AuthRepository {
   // ============================================================
 
   async createPasswordResetToken(payload: {
-    userId: string;
+    userId?: string;
+    adminId?: bigint;
     tokenHash: string;
     requestedIp?: string;
   }): Promise<any> {
@@ -216,6 +258,7 @@ export class AuthRepository {
     return prisma.passwordResetToken.create({
       data: {
         userId: payload.userId,
+        adminId: payload.adminId,
         tokenHash: payload.tokenHash,
         expiresAt,
         requestedIp: payload.requestedIp
@@ -236,10 +279,11 @@ export class AuthRepository {
     });
   }
 
-  async invalidatePasswordResetTokens(userId: string): Promise<number> {
+  async invalidatePasswordResetTokens(userId?: string, adminId?: bigint): Promise<number> {
     const result = await prisma.passwordResetToken.updateMany({
       where: {
-        userId,
+        ...(userId ? { userId } : {}),
+        ...(adminId ? { adminId } : {}),
         usedAt: null,
         expiresAt: {
           gt: new Date()
@@ -259,6 +303,7 @@ export class AuthRepository {
       data: {
         username: attempt.username,
         userId: attempt.userId,
+        adminId: attempt.adminId,
         ipAddress: attempt.ipAddress,
         success: attempt.success,
         failureReason: attempt.failureReason,
@@ -313,6 +358,7 @@ export class AuthRepository {
         oldValues: entry.oldValues ? serializeBigInt(entry.oldValues) : undefined,
         newValues: entry.newValues ? serializeBigInt(entry.newValues) : undefined,
         changedBy: entry.changedBy,
+        changedByAdmin: entry.changedByAdmin,
         ipAddress: entry.ipAddress,
         userAgent: entry.userAgent
       }

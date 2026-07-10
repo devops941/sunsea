@@ -674,7 +674,7 @@ const PurchaseOrderEditPage: React.FC = () => {
     else setIsSubmittingForApproval(true);
 
     try {
-      await editPurchaseOrder(id, {
+      await editPurchaseOrder(id!, {
         poDate: formData.poDate,
         expectedDeliveryDate: formData.expectedDeliveryDate,
         supplierId: formData.supplierId,

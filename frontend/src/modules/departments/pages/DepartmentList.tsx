@@ -31,26 +31,11 @@ const DepartmentList: React.FC = () => {
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [deptToDelete, setDeptToDelete] = useState<number | null>(null);
 
-    const [formErrors, setFormErrors] = useState<{ code?: string; name?: string }>({});
+    const [formErrors, setFormErrors] = useState<{  name?: string }>({});
 
     const validateForm = () => {
-        const errors: { code?: string; name?: string } = {};
-        const code = formData.code.trim();
+        const errors: { name?: string } = {};
         const name = formData.name.trim();
-
-        if (!code) {
-            errors.code = "Department code is required.";
-        } else if (!/^[A-Za-z0-9_-]{2,10}$/.test(code)) {
-            errors.code = "Code must be 2-10 characters (letters, numbers, - or _ only).";
-        } else if (
-            departments.some(
-                d =>
-                    d.code.toLowerCase() === code.toLowerCase() &&
-                    String(d.id) !== formData.id
-            )
-        ) {
-            errors.code = "This department code already exists.";
-        }
 
         if (!name) {
             errors.name = "Department name is required.";
@@ -74,8 +59,8 @@ const DepartmentList: React.FC = () => {
 
     const [formData, setFormData] = useState({
         id: "",
-        code: "",
         name: "",
+        description: "",
     });
 
     useEffect(() => {
@@ -95,7 +80,6 @@ const DepartmentList: React.FC = () => {
 
     const filteredDepts = useMemo(() => {
         return departments.filter(d =>
-            d.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
             d.name.toLowerCase().includes(searchTerm.toLowerCase())
         );
     }, [departments, searchTerm]);
@@ -106,7 +90,7 @@ const DepartmentList: React.FC = () => {
 
     const handleOpenAdd = () => {
         setEditMode(false);
-        setFormData({ id: "", code: "", name: "" });
+        setFormData({ id: "", name: "", description: "" });
         setFormErrors({});
         setShowFormModal(true);
     };
@@ -115,12 +99,12 @@ const DepartmentList: React.FC = () => {
         setEditMode(true);
         setFormData({
             id: String(dept.id),
-            code: dept.code,
             name: dept.name,
+            description: dept.description || "",
         });
         setFormErrors({});
         setShowFormModal(true);
-    }, []);
+    }, [setFormData, setFormErrors]);
 
     const handleOpenView = useCallback((dept: any) => {
         setSelectedDept(dept);
@@ -167,10 +151,10 @@ const DepartmentList: React.FC = () => {
 
         try {
             if (editMode) {
-                await editDepartment(Number(formData.id), { code: formData.code.trim(), name: formData.name.trim() });
+                await editDepartment(Number(formData.id), { name: formData.name.trim(), description: formData.description.trim() || null });
                 toast.success("Department updated successfully!");
             } else {
-                await addDepartment({ code: formData.code.trim(), name: formData.name.trim() });
+                await addDepartment({ name: formData.name.trim(), description: formData.description.trim() || null });
                 toast.success("Department created successfully!");
             }
             setShowFormModal(false);
@@ -229,8 +213,8 @@ const DepartmentList: React.FC = () => {
                                 <thead>
                                     <tr>
                                         <th style={{ width: "60px" }}>#</th>
-                                        <th>Department Code</th>
                                         <th>Department Name</th>
+                                        <th>Description</th>
                                         <th>Actions</th>
                                     </tr>
                                 </thead>
@@ -239,8 +223,9 @@ const DepartmentList: React.FC = () => {
                                         paginatedDepts.map((dept, index) => (
                                             <tr key={dept.id} className="master-data-row">
                                                 <td className="master-data-cell">{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</td>
-                                                <td className="master-data-cell">{dept.code}</td>
+                                                
                                                 <td className="master-data-cell">{dept.name}</td>
+                                                <td className="master-data-cell">{dept.description || "N/A"}</td>
                                                 <td className="master-data-cell">
                                                     <div className="table-action-group">
                                                         <ViewButton onClick={() => handleOpenView(dept)} />
@@ -292,17 +277,7 @@ const DepartmentList: React.FC = () => {
                     <form onSubmit={handleSubmit}>
                         <Modal.Body>
                             <Row className="g-3">
-                                <Col md={12}>
-                                    <TextInput
-                                        label="Department Code"
-                                        name="code"
-                                        value={formData.code}
-                                        placeholder="e.g. IT"
-                                        required
-                                        onChange={handleChange}
-                                        error={formErrors.code}
-                                    />
-                                </Col>
+                                
                                 <Col md={12}>
                                     <TextInput
                                         label="Department Name"
@@ -314,6 +289,15 @@ const DepartmentList: React.FC = () => {
                                         error={formErrors.name}
                                     />
                                 </Col>
+                                <Col md={12}>
+                                    <TextInput
+                                        label="Description"
+                                        name="description"
+                                        value={formData.description}
+                                        placeholder="Enter department description"
+                                        onChange={handleChange}
+                                    />
+                                </Col>
                             </Row>
                         </Modal.Body>
                         <Modal.Footer>
@@ -322,8 +306,8 @@ const DepartmentList: React.FC = () => {
                                 icon={FaEraser}
                                 onClick={() => setFormData({
                                     id: formData.id,
-                                    code: "",
                                     name: "",
+                                    description: "",
                                 })}
                             />
                             <div className="ms-2">
@@ -345,12 +329,13 @@ const DepartmentList: React.FC = () => {
                     modalTitle="Department Details"
                     avatarText={selectedDept ? selectedDept.name.charAt(0).toUpperCase() : ""}
                     headerTitle={selectedDept ? selectedDept.name : ""}
-                    headerSubtitle={selectedDept ? `Code: ${selectedDept.code}` : ""}
+                    headerSubtitle={selectedDept ? `ID: ${selectedDept.id}` : ""}
                     sections={selectedDept ? [
                         {
                             fields: [
-                                { label: "Department Code", value: selectedDept.code },
+                                
                                 { label: "Department Name", value: selectedDept.name },
+                                { label: "Description", value: selectedDept.description || "N/A" },
                                 { label: "Department ID", value: <span className="text-muted font-monospace small">{String(selectedDept.id)}</span>, xs: 12 }
                             ]
                         }

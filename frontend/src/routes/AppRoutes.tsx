@@ -8,92 +8,97 @@ import PublicRoute from "./PublicRoute";
 
 const Dashboard = lazy(() => import("../modules/dashboard/pages/DashboardPage"));
 const CompanySettings = lazy(() => import("../modules/company/pages/CompanySettings"));
-const CompanyProfile = lazy(() => import("../modules/company/pages/CompanyProfile"));
+
+const OrganizationTabs = lazy(() => import("../modules/company/pages/OrganizationTabs"));
+const InventoryTabs = lazy(() => import("../modules/stock/pages/InventoryTabs"));
 const Sample = lazy(() => import("../modules/sample"));
 const NotFoundPage = lazy(() => import("../modules/not-found/pages/NotFoundPage"));
 const LoginPage = lazy(() => import("../modules/login/pages/LoginPage"));
 const ResetPassword = lazy(() => import("../modules/passwordreset/pages/ResetPassword"));
 
 // Customers
-const CustomerListPage = lazy(() => import("../modules/customers/pages/CustomerListPage"));
+
 const CustomerCreatePage = lazy(() => import("../modules/customers/pages/CustomerCreatePage"));
 const CustomerEditPage = lazy(() => import("../modules/customers/pages/CustomerEditPage"));
 
 // Employees
-const Employeelist = lazy(() => import("../modules/employee/pages/EmployeeList"));
+
 const EmployeeCreatePage = lazy(() => import("../modules/employee/pages/EmployeeCreate"));
 const EmployeeEdit = lazy(() => import("../modules/employee/pages/EmployeeEdit"));
 
 // Suppliers
-const SupplierListPage = lazy(() => import("../modules/supplier/pages/SupplierList"));
+
 const SupplierCreatePage = lazy(() => import("../modules/supplier/pages/SupplierCreate"));
 const SupplierEditPage = lazy(() => import("../modules/supplier/pages/SupplierEdit"));
 const SupplierMaterialPricingList = lazy(() => import("../modules/supplier/pages/Suppliermaterialpricinglist"));
 
 // Products
-const ProductList = lazy(() => import("../modules/product/pages/ProductList"));
+
 const ProductEdit = lazy(() => import("../modules/product/pages/ProductEdit"));
 const ProductCreatePage = lazy(() => import("../modules/product/pages/ProductCreate"));
+const ProductMasterTabs = lazy(() => import("../modules/product/pages/ProductMasterTabs"));
 
 // Categories & Sub Categories (Product Master)
-const CategoryList = lazy(() => import("../modules/product/pages/CategoryList"));
+
 const SubcategoryList = lazy(() => import("../modules/product/pages/SubCategoryList"));
+
+const StoreLocationTabs = lazy(() => import("../modules/storage-stores/pages/StoreLocationTabs"));
+const HROrganizationTabs = lazy(() => import("../modules/employee/pages/HROrganizationTabs"));
 
 // Administration
 const UserList = lazy(() => import("../modules/users/pages/UserList"));
-const RoleList = lazy(() => import("../modules/roles/pages/RoleList"));
+
 const PermissionList = lazy(() => import("../modules/permissions/pages/PermissionList"));
-const RolePermissionMapping = lazy(() => import("../modules/role-permissions/pages/RolePermissionMapping"));
+
 
 // HR
-const DepartmentList = lazy(() => import("../modules/departments/pages/DepartmentList"));
-const DesignationList = lazy(() => import("../modules/designations/pages/DesignationList"));
 
 // Product Master Attributes
-const ColourList = lazy(() => import("../modules/product/pages/ColorList"));
-const SizeList = lazy(() => import("../modules/product/pages/SizeList"));
-const UomList = lazy(() => import("../modules/product/pages/UOMList"));
+
+
+
 
 // Product Management
 const ProductPricing = lazy(() => import("../modules/product-pricing/pages/ProductPricing"));
 const ProductImageUpload = lazy(() => import("../modules/product-images/pages/ProductImageUpload"));
 
 // New modules
-const StorageStoreList = lazy(() => import("../modules/storage-stores/pages/StorageStoreList"));
+
 const StorageStoreCreate = lazy(() => import("../modules/storage-stores/pages/StorageStoreCreate"));
 const StorageStoreEdit = lazy(() => import("../modules/storage-stores/pages/StorageStoreEdit"));
 
-const StoreTypeList = lazy(() => import("../modules/store-types/pages/StoreTypeList"));
+
 const StoreTypeCreate = lazy(() => import("../modules/store-types/pages/StoreTypeCreate"));
 const StoreTypeEdit = lazy(() => import("../modules/store-types/pages/StoreTypeEdit"));
 
-const LocationList = lazy(() => import("../modules/locations/pages/LocationList"));
+
 const LocationCreate = lazy(() => import("../modules/locations/pages/LocationCreate"));
 const LocationEdit = lazy(() => import("../modules/locations/pages/LocationEdit"));
 
-const MachineList = lazy(() => import("../modules/machines/pages/MachineList"));
+
 const MachineCreate = lazy(() => import("../modules/machines/pages/MachineCreate"));
 const MachineEdit = lazy(() => import("../modules/machines/pages/MachineEdit"));
 
+
 // shift
-const ShiftList = lazy(() => import("../modules/shifts/pages/ShiftList"));
+
 const ShiftCreate = lazy(() => import("../modules/shifts/pages/ShiftCreate"));
 const ShiftEdit = lazy(() => import("../modules/shifts/pages/ShiftEdit"));
 
-const RawMaterialList = lazy(() => import("../modules/raw-materials/pages/RawMaterialList"));
+
 const RawMaterialCreate = lazy(() => import("../modules/raw-materials/pages/RawMaterialCreate"));
 const RawMaterialEdit = lazy(() => import("../modules/raw-materials/pages/RawMaterialEdit"));
-const RawMaterialCategoryList = lazy(() => import("../modules/raw-material-categories/pages/RawMaterialCategoryList"));
+
 const RawMaterialCategoryCreate = lazy(() => import("../modules/raw-material-categories/pages/RawMaterialCategoryCreate"));
 const RawMaterialCategoryEdit = lazy(() => import("../modules/raw-material-categories/pages/RawMaterialCategoryEdit"));
 
-const StockList = lazy(() => import("../modules/stock/pages/StockList"));
 
-const StockAdjustmentList = lazy(() => import("../modules/stock-adjustments/pages/StockAdjustmentList"));
+
+
 const StockAdjustmentForm = lazy(() => import("../modules/stock-adjustments/pages/StockAdjustmentForm"));
 const StockAdjustmentView = lazy(() => import("../modules/stock-adjustments/pages/StockAdjustmentView"));
 
-const FinishedStockList = lazy(() => import("../modules/finished-stock/pages/FinishedStockList"));
+
 const FinishedStockCreate = lazy(() => import("../modules/finished-stock/pages/FinishedStockCreate"));
 const FinishedStockEdit = lazy(() => import("../modules/finished-stock/pages/FinishedStockEdit"));
 
@@ -101,49 +106,52 @@ const WastageStockList = lazy(() => import("../modules/wastage-stock/pages/Wasta
 const WastageStockCreate = lazy(() => import("../modules/wastage-stock/pages/WastageStockCreate"));
 const WastageStockEdit = lazy(() => import("../modules/wastage-stock/pages/WastageStockEdit"));
 
-const WeeklyMachineScheduleList = lazy(() => import("../modules/weekly-machine-schedules/pages/WeeklyMachineScheduleList"));
+
 
 const WeeklyMachineScheduleCreate = lazy(() => import("../modules/weekly-machine-schedules/pages/WeeklyMachineScheduleCreate"));
 const WeeklyMachineScheduleEdit = lazy(() => import("../modules/weekly-machine-schedules/pages/WeeklyMachineScheduleEdit"));
 
-const DailyMachinePlanning = lazy(() => import("../modules/daily-machine-planning/pages/DailyMachinePlanning"));
+
 const ShiftExecutionBoard = lazy(() => import("../modules/shift-execution/pages/ShiftExecutionBoard"));
 const ProductionDashboard = lazy(() => import("../modules/dashboard/pages/ProductionDashboard"));
-const ProductionReportsCenter = lazy(() => import("../modules/reports/pages/ProductionReportsCenter"));
+const ReportsTabs = lazy(() => import("../modules/reports/pages/ReportsTabs"));
 
-const HourlyWorkReportList = lazy(() => import("../modules/hourly-work-reports/pages/HourlyWorkReportList"));
+
 const HourlyWorkReportCreate = lazy(() => import("../modules/hourly-work-reports/pages/HourlyWorkReportCreate"));
 const HourlyWorkReportEdit = lazy(() => import("../modules/hourly-work-reports/pages/HourlyWorkReportEdit"));
 
-const WastageList = lazy(() => import("../modules/production-wastage/pages/WastageList"));
+
 const WastageForm = lazy(() => import("../modules/production-wastage/pages/WastageCreate"));
 
-const ProductionOrderList = lazy(() => import("../modules/production-orders/pages/ProductionOrderList"));
-const AllProductionOrderList = lazy(() => import("../modules/production-orders/pages/AllProductionOrderList"));
-const ApprovedSalesOrderList = lazy(() => import("../modules/production-orders/pages/ApprovedSalesOrderList"));
+
+
+const ProductionOrderTabs = lazy(() => import("../modules/production-orders/pages/ProductionOrderTabs"));
+
 const ProductionOrderCreate = lazy(() => import("../modules/production-orders/pages/ProductionOrderCreate"));
 
 
 const BillOfMaterialList = lazy(() => import("../modules/bill-of-material/pages/BillOfMaterialList"));
 const BillOfMaterialCreate = lazy(() => import("../modules/bill-of-material/pages/BillOfMaterialCreate"));
 const BillOfMaterialEdit = lazy(() => import("../modules/bill-of-material/pages/BillOfMaterialEdit"));
-const SalesOrderList = lazy(() => import("../modules/sales/salesorder/SalesOrderList"));
+
 const SalesOrderCreate = lazy(() => import("../modules/sales/salesorder/CreateOrder"));
-const AllSalesOrderList = lazy(() => import("../modules/sales/salesorder/AllSalesOrderList"))
+
 const OrderDetails = lazy(() => import("../modules/sales/salesorder/SalesOrderDetail"))
-const QuotationList = lazy(() => import("../modules/sales/quatation/QuatationList"));
+
 const QuotationCreate = lazy(() => import("../modules/sales/quatation/CreateQuatation"));
-const PendingQuatationList = lazy(() => import("../modules/sales/quatation/PendingQuatation"));
+
 const UpdateQuatation = lazy(() => import("../modules/sales/quatation/UpdateQuatation"));
+const SalesTabs = lazy(() => import("../modules/sales/pages/SalesTabs"));
+const PurchaseTabs = lazy(() => import("../modules/purchase/pages/PurchaseTabs"));
 
 
 // Purchase Order Module
-const PurchaseOrderListPage = lazy(() => import("../modules/purchase/purchase-order/pages/PurchaseOrderListPage"));
+
 const PurchaseOrderCreatePage = lazy(() => import("../modules/purchase/purchase-order/pages/PurchaseOrderCreatePage"));
 const PurchaseOrderEditPage = lazy(() => import("../modules/purchase/purchase-order/pages/PurchaseOrderEditPage"));
-const POMDApproval = lazy(() => import("../modules/purchase/purchase-order/purchaseordeappovals/PurchaseOrderapprovalList"));
+
 const PurchaseOrderViewPage = lazy(() => import("../modules/purchase/purchase-order/purchaseordeappovals/PurchaseOrderapprovalEdit"));
-const UpComingOrderList = lazy(() => import("../modules/purchase/purchase-order/upcoming-orders/UpComingOrderList"));
+
 const UpComingOrderDetail = lazy(() => import("../modules/purchase/purchase-order/upcoming-orders/UpComingOrderDetail"));
 // profile
 const ProfilePage = lazy(() => import("../modules/profile/ProfilePage"));
@@ -174,7 +182,9 @@ const AppRoutes = () => {
             {/* Dashboard Route */}
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/company/edit" element={<CompanySettings />} />
-            <Route path="/company/view" element={<CompanyProfile />} />
+            <Route path="/company/view" element={<OrganizationTabs />} />
+            <Route path="/settings/company" element={<OrganizationTabs />} />
+            <Route path="/settings/gst-taxes" element={<OrganizationTabs />} />
             {/* Sample Route */}
             <Route path="/sample" element={<Sample />} />
 
@@ -184,7 +194,7 @@ const AppRoutes = () => {
 
             {/* Customers */}
             <Route element={<ProtectedRoute permission="customers.view" />}>
-              <Route path="/customers" element={<CustomerListPage />} />
+              <Route path="/customers" element={<HROrganizationTabs />} />
             </Route>
             {/* Customers Create Route */}
             <Route element={<ProtectedRoute permission="customers.create" />}>
@@ -197,7 +207,7 @@ const AppRoutes = () => {
 
             {/* Suppliers */}
             <Route element={<ProtectedRoute permission="suppliers.view" />}>
-              <Route path="/suppliers" element={<SupplierListPage />} />
+              <Route path="/suppliers" element={<HROrganizationTabs />} />
             </Route>
             {/* Suppliers Create Route */}
             <Route element={<ProtectedRoute permission="suppliers.create" />}>
@@ -218,7 +228,7 @@ const AppRoutes = () => {
 
             {/* Employees Management (RBAC guarded) */}
             <Route element={<ProtectedRoute permission="employees.view" />}>
-              <Route path="/employees" element={<Employeelist />} />
+              <Route path="/employees" element={<HROrganizationTabs />} />
             </Route>
             {/* Employees Create Route */}
             <Route element={<ProtectedRoute permission="employees.create" />}>
@@ -231,7 +241,7 @@ const AppRoutes = () => {
 
             {/* Products Management (RBAC guarded) */}
             <Route element={<ProtectedRoute permission="products.view" />}>
-              <Route path="/products" element={<ProductList />} />
+              <Route path="/products" element={<ProductMasterTabs />} />
             </Route>
             {/* Products Create Route */}
             <Route element={<ProtectedRoute permission="products.create" />}>
@@ -244,7 +254,7 @@ const AppRoutes = () => {
 
             {/* Categories & Subcategories */}
             <Route element={<ProtectedRoute permission="categories.view" />}>
-              <Route path="/categories" element={<CategoryList />} />
+              <Route path="/categories" element={<ProductMasterTabs />} />
             </Route>
             {/* Sub Categories Route */}
             <Route element={<ProtectedRoute permission="sub-categories.view" />}>
@@ -257,7 +267,7 @@ const AppRoutes = () => {
             </Route>
             {/* Roles Route */}
             <Route element={<ProtectedRoute permission="roles.view" />}>
-              <Route path="/roles" element={<RoleList />} />
+              <Route path="/roles" element={<OrganizationTabs />} />
             </Route>
             {/* Permissions Route */}
             <Route element={<ProtectedRoute permission="permissions.view" />}>
@@ -265,29 +275,24 @@ const AppRoutes = () => {
             </Route>
             {/* Role Permissions Route */}
             <Route element={<ProtectedRoute permission="role-permissions.view" />}>
-              <Route path="/role-permissions" element={<RolePermissionMapping />} />
+              <Route path="/role-permissions" element={<OrganizationTabs />} />
             </Route>
 
             {/* Department / Designation */}
             <Route element={<ProtectedRoute permission="departments.view" />}>
-              <Route path="/departments" element={<DepartmentList />} />
+              <Route path="/departments" element={<HROrganizationTabs />} />
             </Route>
-            {/* Designations Route */}
-            <Route element={<ProtectedRoute permission="designations.view" />}>
-              <Route path="/designations" element={<DesignationList />} />
-            </Route>
-
             {/* Product Master Attributes */}
             <Route element={<ProtectedRoute permission="colors.view" />}>
-              <Route path="/colours" element={<ColourList />} />
+              <Route path="/colours" element={<ProductMasterTabs />} />
             </Route>
             {/* Sizes Route */}
             <Route element={<ProtectedRoute permission="sizes.view" />}>
-              <Route path="/sizes" element={<SizeList />} />
+              <Route path="/sizes" element={<ProductMasterTabs />} />
             </Route>
             {/* Uoms Route */}
             <Route element={<ProtectedRoute permission="uoms.view" />}>
-              <Route path="/uoms" element={<UomList />} />
+              <Route path="/uoms" element={<ProductMasterTabs />} />
             </Route>
 
             {/* Product Management Extras */}
@@ -305,7 +310,7 @@ const AppRoutes = () => {
 
             {/* Storage Stores */}
             <Route element={<ProtectedRoute permission="stores.view" />}>
-              <Route path="/storage-stores" element={<StorageStoreList />} />
+              <Route path="/storage-stores" element={<StoreLocationTabs />} />
             </Route>
             {/* Storage Stores Create Route */}
             <Route element={<ProtectedRoute permission="stores.create" />}>
@@ -318,7 +323,7 @@ const AppRoutes = () => {
 
             {/* Store Types */}
             <Route element={<ProtectedRoute permission="store-types.view" />}>
-              <Route path="/store-types" element={<StoreTypeList />} />
+              <Route path="/store-types" element={<StoreLocationTabs />} />
             </Route>
             {/* Store Types Create Route */}
             <Route element={<ProtectedRoute permission="store-types.create" />}>
@@ -331,7 +336,7 @@ const AppRoutes = () => {
 
             {/* Locations */}
             <Route element={<ProtectedRoute permission="locations.view" />}>
-              <Route path="/locations" element={<LocationList />} />
+              <Route path="/locations" element={<StoreLocationTabs />} />
             </Route>
             {/* Locations Create Route */}
             <Route element={<ProtectedRoute permission="locations.create" />}>
@@ -344,7 +349,7 @@ const AppRoutes = () => {
 
             {/* Machines */}
             <Route element={<ProtectedRoute permission="machines.view" />}>
-              <Route path="/machines" element={<MachineList />} />
+              <Route path="/machines" element={<HROrganizationTabs />} />
             </Route>
             {/* Machines Create Route */}
             <Route element={<ProtectedRoute permission="machines.create" />}>
@@ -357,7 +362,7 @@ const AppRoutes = () => {
 
             {/* Shifts */}
             <Route element={<ProtectedRoute permission="shift.view" />}>
-              <Route path="/shifts" element={<ShiftList />} />
+              <Route path="/shifts" element={<HROrganizationTabs />} />
             </Route>
             {/* Shifts Create Route */}
             <Route element={<ProtectedRoute permission="shift.create" />}>
@@ -370,11 +375,11 @@ const AppRoutes = () => {
 
             {/* Raw Materials */}
             <Route element={<ProtectedRoute permission="raw_materials.view" />}>
-              <Route path="/raw-materials" element={<RawMaterialList />} />
+              <Route path="/raw-materials" element={<InventoryTabs />} />
             </Route>
             {/* Raw Material Categories Route */}
             <Route element={<ProtectedRoute permission="raw_materials.view" />}>
-              <Route path="/raw-material-categories" element={<RawMaterialCategoryList />} />
+              <Route path="/raw-material-categories" element={<InventoryTabs />} />
             </Route>
             {/* Raw Materials Create Route */}
             <Route element={<ProtectedRoute permission="raw_materials.create" />}>
@@ -391,12 +396,12 @@ const AppRoutes = () => {
 
             {/* Stock */}
             <Route element={<ProtectedRoute permission="raw_material_stocks.view" />}>
-              <Route path="/stock" element={<StockList />} />
+              <Route path="/stock" element={<InventoryTabs />} />
             </Route>
 
             {/* Stock Adjustments */}
             <Route element={<ProtectedRoute permission="raw_material_stocks.view" />}>
-              <Route path="/inventory/stock-adjustments" element={<StockAdjustmentList />} />
+              <Route path="/inventory/stock-adjustments" element={<InventoryTabs />} />
             </Route>
             {/* Stock Adjustments Create Route */}
             <Route element={<ProtectedRoute permission="raw_material_stocks.create" />}>
@@ -426,7 +431,7 @@ const AppRoutes = () => {
 
             {/* Finished Stock */}
             <Route element={<ProtectedRoute permission="finished_goods_stocks.view" />}>
-              <Route path="/finished-stock" element={<FinishedStockList />} />
+              <Route path="/finished-stock" element={<InventoryTabs />} />
             </Route>
             {/* Finished Stock Create Route */}
             <Route element={<ProtectedRoute permission="finished_goods_stocks.create" />}>
@@ -443,7 +448,7 @@ const AppRoutes = () => {
 
             {/* Weekly Machine Schedules */}
             <Route element={<ProtectedRoute permission="weekly_programs.view" />}>
-              <Route path="/weekly-machine-schedules" element={<WeeklyMachineScheduleList />} />
+              <Route path="/weekly-machine-schedules" element={<ProductionOrderTabs />} />
             </Route>
 
 
@@ -463,7 +468,7 @@ const AppRoutes = () => {
 
             {/* Daily Machine Planning */}
             <Route element={<ProtectedRoute permission="weekly_programs.view" />}>
-              <Route path="/daily-machine-planning" element={<DailyMachinePlanning />} />
+              <Route path="/daily-machine-planning" element={<ProductionOrderTabs />} />
             </Route>
 
             {/* Shift Execution Board */}
@@ -478,7 +483,7 @@ const AppRoutes = () => {
 
             {/* Hourly Machine Work Reports */}
             <Route element={<ProtectedRoute permission="hourly_productions.view" />}>
-              <Route path="/hourly-work-reports" element={<HourlyWorkReportList />} />
+              <Route path="/hourly-work-reports" element={<ProductionOrderTabs />} />
             </Route>
             {/* Hourly Work Reports Create Route */}
             <Route element={<ProtectedRoute permission="hourly_productions.create" />}>
@@ -491,17 +496,17 @@ const AppRoutes = () => {
 
             {/* Production Wastage Audits */}
             <Route element={<ProtectedRoute permission="machines.view" />}>
-              <Route path="/production-wastages" element={<WastageList />} />
+              <Route path="/production-wastages" element={<ProductionOrderTabs />} />
               <Route path="/production-wastages/create" element={<WastageForm />} />
               <Route path="/production-wastages/edit/:id" element={<WastageForm />} />
             </Route>
 
             {/* Production Orders */}
             <Route element={<ProtectedRoute permission="production_orders.view" />}>
-              <Route path="/production-orders" element={<ProductionOrderList />} />
-              <Route path="allproduction-orders" element={<AllProductionOrderList />} />
+              <Route path="/production-orders" element={<ProductionOrderTabs />} />
+              <Route path="/allproduction-orders" element={<ProductionOrderTabs />} />
               {/* Approved Sales Orders Route */}
-              <Route path="/approved-sales-orders" element={<ApprovedSalesOrderList />} />
+              <Route path="/approved-sales-orders" element={<ProductionOrderTabs />} />
             </Route>
             {/* Production Orders Create Route */}
             <Route element={<ProtectedRoute permission="production_orders.create" />}>
@@ -531,7 +536,11 @@ const AppRoutes = () => {
 
             {/* Reports */}
             <Route element={<ProtectedRoute permission="reports.view" />}>
-              <Route path="/reports/production" element={<ProductionReportsCenter />} />
+              <Route path="/reports/sales" element={<ReportsTabs />} />
+              <Route path="/reports/purchase" element={<ReportsTabs />} />
+              <Route path="/reports/inventory" element={<ReportsTabs />} />
+              <Route path="/reports/production" element={<ReportsTabs />} />
+              <Route path="/reports/audit" element={<ReportsTabs />} />
             </Route>
 
             {/* ========================================================================= */}
@@ -540,11 +549,11 @@ const AppRoutes = () => {
 
             {/* Sales */}
             <Route element={<ProtectedRoute permission="reports.view" />}>
-              <Route path="/draft-order" element={<SalesOrderList />} />
+              <Route path="/draft-order" element={<SalesTabs />} />
             </Route>
             {/* All Order Route */}
             <Route element={<ProtectedRoute permission="reports.view" />}>
-              <Route path="/sales-order" element={<AllSalesOrderList />} />
+              <Route path="/sales-order" element={<SalesTabs />} />
             </Route>
             {/* All Order Details :Id Route */}
             <Route element={<ProtectedRoute permission="reports.view" />}>
@@ -561,7 +570,7 @@ const AppRoutes = () => {
 
             {/* Quatation Order Route */}
             <Route element={<ProtectedRoute permission="reports.view" />}>
-              <Route path="/quatation-order" element={<QuotationList />} />
+              <Route path="/quatation-order" element={<SalesTabs />} />
             </Route>
 
             {/* Quatation Order Edit :Id Route */}
@@ -571,7 +580,7 @@ const AppRoutes = () => {
 
             {/* Pending Quotations Route */}
             <Route element={<ProtectedRoute permission="reports.view" />}>
-              <Route path="/pending-quotations" element={<PendingQuatationList />} />
+              <Route path="/pending-quotations" element={<SalesTabs />} />
             </Route>
 
             {/* Pending Quotations Edit :Id Route */}
@@ -585,7 +594,7 @@ const AppRoutes = () => {
 
             {/* Purchase Orders - List */}
             <Route element={<ProtectedRoute permission="purchase_orders.view" />}>
-              <Route path="/purchase-orders" element={<PurchaseOrderListPage />} />
+              <Route path="/purchase-orders" element={<PurchaseTabs />} />
             </Route>
 
             {/* Purchase Orders - Create */}
@@ -603,12 +612,12 @@ const AppRoutes = () => {
             {/* ============================================ */}
 
             <Route element={<ProtectedRoute permission="purchase_orders.view" />}>
-              <Route path="/purchase-order-approvals" element={<POMDApproval />} />
+              <Route path="/purchase-order-approvals" element={<PurchaseTabs />} />
             </Route>
 
             <Route element={<ProtectedRoute permission="purchase_orders.view" />}>
               <Route path="/purchase-orders/view/:id" element={<PurchaseOrderViewPage />} />
-              <Route path="/upcoming-orders" element={<UpComingOrderList />} />
+              <Route path="/upcoming-orders" element={<PurchaseTabs />} />
             </Route>
             <Route element={<ProtectedRoute permission="purchase_orders.view" />}>
               <Route path="/upcoming-orders/detail/:id" element={<UpComingOrderDetail />} />

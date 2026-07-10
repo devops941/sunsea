@@ -10,8 +10,9 @@ export interface UserResponseDto {
     fullName: string;
     email: string | null;
     username: string;
-    roleId: string; // ROLE_ADMIN, etc.
+    roleId: string | null; // ROLE_ADMIN, etc.
     status: UserStatus;
+    isSuperAdmin?: boolean;
     lastLoginAt: string | null;
     mfaEnabled: boolean;
 }
@@ -19,6 +20,7 @@ export interface UserResponseDto {
 export interface ProfileResponseDto {
     user: UserResponseDto;
     permissions: string[];
+    isSuperAdmin?: boolean;
 }
 
 export interface AuthState {

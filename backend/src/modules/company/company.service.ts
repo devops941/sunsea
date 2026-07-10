@@ -64,7 +64,7 @@ class CompanyService {
           ...(companyData as any),
           companyName: actualCompanyName,
           isOnboarded: true,
-          updatedBy: userId,
+          updatedBy: userId.startsWith("admin_") ? null : userId,
         },
       });
 

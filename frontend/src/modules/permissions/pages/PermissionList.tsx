@@ -32,7 +32,7 @@ const PermissionList: React.FC = () => {
     const [formData, setFormData] = useState({
         id: "",
         key: "",
-        module: "Administration",
+        module: "users",
         action: "",
         scope: "",
         description: "",
@@ -71,7 +71,7 @@ const PermissionList: React.FC = () => {
         setFormData({
             id: "",
             key: "",
-            module: "Administration",
+            module: "users",
             action: "",
             scope: "",
             description: "",
@@ -291,13 +291,34 @@ const PermissionList: React.FC = () => {
                                         name="module"
                                         value={formData.module}
                                         options={[
-                                            { value: "Administration", label: "Administration" },
-                                            { value: "HR Management", label: "HR Management" },
-                                            { value: "Business Partners", label: "Business Partners" },
-                                            { value: "Product Catalog", label: "Product Catalog" },
-                                            { value: "Inventory & Warehouse", label: "Inventory & Warehouse" },
-                                            { value: "Production & Machinery", label: "Production & Machinery" },
-                                            { value: "Reports", label: "Reports" },
+                                            { value: "customers", label: "Customers" },
+                                            { value: "suppliers", label: "Suppliers" },
+                                            { value: "supplierpricelist", label: "Supplier Pricing" },
+                                            { value: "products", label: "Product Master" },
+                                            { value: "categories", label: "Categories" },
+                                            { value: "sub-categories", label: "Sub-Categories" },
+                                            { value: "colors", label: "Colors" },
+                                            { value: "sizes", label: "Sizes" },
+                                            { value: "uoms", label: "Units of Measure (UOM)" },
+                                            { value: "product-pricing", label: "Product Pricing" },
+                                            { value: "product-images", label: "Product Gallery" },
+                                            { value: "raw_materials", label: "Raw Materials" },
+                                            { value: "raw_material_stocks", label: "Raw Material Stocks" },
+                                            { value: "finished_goods_stocks", label: "Finished Goods Stocks" },
+                                            { value: "stores", label: "Stores Config" },
+                                            { value: "storage-stores", label: "Warehouses" },
+                                            { value: "store-types", label: "Store Types" },
+                                            { value: "locations", label: "Store Locations" },
+                                            { value: "machines", label: "Machines List" },
+                                            { value: "shifts", label: "Shift Schedules" },
+                                            { value: "users", label: "System Users" },
+                                            { value: "roles", label: "User Roles" },
+                                            { value: "permissions", label: "Permissions Registry" },
+                                            { value: "role-permissions", label: "Role Mappings" },
+                                            { value: "employees", label: "Employee Directory" },
+                                            { value: "departments", label: "Departments" },
+                                            { value: "profile", label: "User Profile" },
+                                            { value: "reports", label: "System Reports" }
                                         ]}
                                         onChange={handleChange}
                                     />
@@ -330,7 +351,7 @@ const PermissionList: React.FC = () => {
                                     onClick={() => setFormData({
                                         id: "",
                                         key: "",
-                                        module: "Administration",
+                                        module: "users",
                                         action: "",
                                         scope: "",
                                         description: "",

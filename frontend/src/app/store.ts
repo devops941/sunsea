@@ -3,7 +3,6 @@ import authReducer from "../features/auth/authSlice";
 import { baseApi } from "../services/baseApi";
 import roleReducer from "../features/roles/roleSlice";
 import departmentReducer from "../features/departments/departmentSlice";
-import designationReducer from "../features/designations/designationSlice";
 import categoryReducer from "../features/categories/categorySlice";
 import subCategoryReducer from "../features/subCategories/subCategorySlice";
 import colorReducer from "../features/colors/colorSlice";
@@ -40,7 +39,6 @@ export const store = configureStore({
         auth: authReducer,
         roles: roleReducer,
         departments: departmentReducer,
-        designations: designationReducer,
         categories: categoryReducer,
         subCategories: subCategoryReducer,
         colors: colorReducer,

@@ -1,40 +1,24 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   Navbar,
   Container,
-  Form,
-  InputGroup,
-  Badge,
 } from 'react-bootstrap';
 import {
-  FaSearch,
-  FaBell,
   FaBars,
 } from 'react-icons/fa';
 
 export interface UserProfile {
   fullName: string;
-  roleId?: string;
+  roleId?: string | null;
   avatarUrl?: string;
+  isSuperAdmin?: boolean;
 }
 
-export interface SearchCategory {
-  value: string;
-  label: string;
-}
+
 
 export interface NavbarProps {
   onMenuClick?: () => void;
-  // Search
-  searchPlaceholder?: string;
-  searchCategories?: SearchCategory[];
-  onSearch?: (query: string, category: string) => void;
-  // Live Status
-  showLiveStatus?: boolean;
-  liveStatusText?: string;
-  // Notifications
-  notificationsCount?: number;
-  onNotificationClick?: () => void;
+
   // User Profile
   user?: UserProfile | null;
   onProfileClick?: () => void;
@@ -42,25 +26,11 @@ export interface NavbarProps {
 
 const TopNavbar: React.FC<NavbarProps> = ({
   onMenuClick,
-  searchPlaceholder = "Search...",
-  searchCategories = [],
-  onSearch,
-  showLiveStatus = true,
-  liveStatusText = "Live",
-  notificationsCount = 0,
-  onNotificationClick,
+
   user,
   onProfileClick,
 }) => {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchCategory, setSearchCategory] = useState(searchCategories.length > 0 ? searchCategories[0].value : "all");
 
-  const handleSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (onSearch) {
-      onSearch(searchQuery, searchCategory);
-    }
-  };
 
   // Helper to get initials
   const getInitials = (name?: string) => {
@@ -74,9 +44,10 @@ const TopNavbar: React.FC<NavbarProps> = ({
   };
 
   // Helper to format role
-  const formatRole = (role?: string) => {
-    if (!role) return "User";
-    return role.replace("ROLE_", "").replace("_", " ");
+  const formatRole = (userObj?: UserProfile | null) => {
+    if (userObj?.isSuperAdmin) return "Super Admin";
+    if (!userObj?.roleId) return "User";
+    return userObj.roleId.replace("ROLE_", "").replace("_", " ");
   };
 
   return (
@@ -84,73 +55,20 @@ const TopNavbar: React.FC<NavbarProps> = ({
       <Container fluid>
         {/* Left Section */}
         <div className="main-header-left">
-          <Form onSubmit={handleSearchSubmit} className="d-flex w-100">
-            <InputGroup className="header-search">
-              {searchCategories.length > 0 && (
-                <Form.Select 
-                  className="header-search-filter"
-                  value={searchCategory}
-                  onChange={(e) => setSearchCategory(e.target.value)}
-                >
-                  {searchCategories.map(cat => (
-                    <option key={cat.value} value={cat.value}>{cat.label}</option>
-                  ))}
-                </Form.Select>
-              )}
-              
-              {!searchCategories.length && (
-                <InputGroup.Text className="header-search-icon">
-                  <FaSearch />
-                </InputGroup.Text>
-              )}
-              
-              <Form.Control
-                className="header-search-input"
-                placeholder={searchPlaceholder}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-
-              {searchCategories.length > 0 && (
-                <InputGroup.Text 
-                  className="header-search-icon clickable" 
-                  onClick={handleSearchSubmit} 
-                >
-                  <FaSearch />
-                </InputGroup.Text>
-              )}
-            </InputGroup>
-          </Form>
         </div>
 
         {/* Right Section */}
         <div className="main-header-right">
           {/* Live Status */}
-          {showLiveStatus && (
+          {/* {showLiveStatus && (
             <div className="header-live-status">
               <Badge className="header-live-badge">
                 ● {liveStatusText}
               </Badge>
             </div>
-          )}
+          )} */}
 
-          {/* Notification */}
-          <div 
-            className="header-notification" 
-            role="button" 
-            tabIndex={0} 
-            onClick={onNotificationClick}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") onNotificationClick?.();
-            }}
-          >
-            <FaBell />
-            {notificationsCount > 0 && (
-              <span className="header-notification-badge">
-                {notificationsCount > 99 ? '99+' : notificationsCount}
-              </span>
-            )}
-          </div>
+
 
           {/* Profile */}
           <div
@@ -174,7 +92,7 @@ const TopNavbar: React.FC<NavbarProps> = ({
                 {user ? user.fullName : "Guest"}
               </div>
               <div className="header-user-role">
-                {user ? formatRole(user.roleId) : "Visitor"}
+                {user ? formatRole(user) : "Visitor"}
               </div>
             </div>
           </div>

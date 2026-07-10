@@ -291,7 +291,7 @@ const SalesOrderForm: React.FC = () => {
     useEffect(() => {
         loadCustomers();
         loadProducts();
-        loadEmployees({ designationId: 6 });
+        loadEmployees({});
     }, [loadCustomers, loadProducts, loadEmployees]);
 
     // ─── Memoized options ────────────────────────────────────────────

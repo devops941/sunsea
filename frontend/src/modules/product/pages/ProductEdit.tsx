@@ -12,6 +12,8 @@ import { useProducts } from "../../../hooks/useProducts";
 import { useCategories } from "../../../hooks/useCategories";
 import { useColors } from "../../../hooks/useColors";
 import { useSizes } from "../../../hooks/useSizes";
+import QuantityInput from "../../../components/form/QuantityInput/QuantityInput";
+import { useUOMs } from "../../../hooks/useUOMs";
 import { productService } from "../../../services/productService";
 import { getImageUrl } from "../../../utils/ImageUrls";
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
@@ -69,6 +71,7 @@ const ProductEdit: React.FC = () => {
     const { categories, loadCategories } = useCategories();
     const { colors, loadColors } = useColors();
     const { sizes, loadSizes } = useSizes();
+    const { loadActiveUOMs } = useUOMs();
 
     // ── GST taxes from Redux store ──────────────────────────────────────
     const gstTaxes = useAppSelector(selectActiveGstTaxes);
@@ -771,13 +774,11 @@ const ProductEdit: React.FC = () => {
                             />
                         </Col>
                         <Col lg={4} md={6}>
-                            <TextInput
+                            <QuantityInput
                                 label="Weight Per Piece"
                                 name="weightPerPiece"
-                                type="number"
-                                step="0.01"
                                 value={formData.weightPerPiece}
-                                placeholder="e.g. 1.25"
+                                baseUoms="kg,g"
                                 onChange={handleChange}
                                 error={errors.weightPerPiece}
                             />

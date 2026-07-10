@@ -10,6 +10,7 @@ import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import { useUsers } from "../../../hooks/useUsers";
 import CommonViewModal from "../../../components/ui/CommonViewModal/CommonViewModal";
 import { hasPermission } from "../../../utils/permission";
+import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -164,9 +165,7 @@ const UserList: React.FC = () => {
                                                 <td className="master-data-cell">{user.email || "N/A"}</td>
                                                 <td className="master-data-cell">{user.roleId}</td>
                                                 <td className="master-data-cell">
-                                                    <span className={`status-pill status-pill--${user.status === "active" ? "active" : "inactive"}`}>
-                                                        {user.status}
-                                                    </span>
+                                                    <StatusBadge status={user.status} />
                                                 </td>
                                                 <td className="master-data-cell">
                                                     <div className="table-action-group">
@@ -275,11 +274,7 @@ const UserList: React.FC = () => {
                                 { label: "Role", value: selectedUser.roleId || "N/A" },
                                 {
                                     label: "Status",
-                                    value: (
-                                        <span className={`badge bg-${selectedUser.status === "active" ? "success" : "danger"} text-capitalize`}>
-                                            {selectedUser.status}
-                                        </span>
-                                    )
+                                    value: <StatusBadge status={selectedUser.status} />
                                 },
                                 { label: "Email", value: selectedUser.email || "N/A", xs: 12 },
                                 { label: "User ID", value: <span className="font-monospace small text-muted">{selectedUser.userId}</span>, xs: 12 }

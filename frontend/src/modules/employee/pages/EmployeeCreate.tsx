@@ -84,11 +84,6 @@ const EmployeeCreatePage: React.FC = () => {
 
     loadDesignations(Number(formData.departmentId));
   }, [formData.departmentId, loadDesignations]);
-  useEffect(() => {
-    if (formData.departmentId) {
-      loadDesignations(Number(formData.departmentId));
-    }
-  }, [formData.departmentId, loadDesignations]);
 
 
   const handleChange = (

@@ -4,18 +4,15 @@ import { ApiError } from "../../utils/ApiError";
 export const createDepartmentService =
   async (
     payload: {
-      code: string;
       name: string;
+      description?: string | null;
     }
   ) => {
 
     const exists =
       await prisma.department.findFirst({
         where: {
-          OR: [
-            { code: payload.code },
-            { name: payload.name },
-          ],
+          name: payload.name
         },
       });
 
@@ -64,8 +61,8 @@ export const updateDepartmentService =
   async (
     id: number,
     payload: {
-      code?: string;
       name?: string;
+      description?: string | null;
     }
   ) => {
 
@@ -80,16 +77,7 @@ export const updateDepartmentService =
                 not: id,
               },
             },
-            {
-              OR: [
-                payload.code
-                  ? { code: payload.code }
-                  : {},
-                payload.name
-                  ? { name: payload.name }
-                  : {},
-              ],
-            },
+            payload.name ? { name: payload.name } : {}
           ],
         },
       });

@@ -54,6 +54,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 
     // Role-based Access Control (RBAC) / Permissions check
     const isAdmin = 
+        user?.isSuperAdmin ||
         user?.roleId === "ROLE_ADMIN" || 
         user?.roleId === "SUPER_ADMIN" || 
         user?.roleId === "ADMIN" ||

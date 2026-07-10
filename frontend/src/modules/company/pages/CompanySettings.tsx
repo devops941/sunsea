@@ -113,7 +113,7 @@ const CompanySettings: React.FC = () => {
       await dispatch(updateCompany({ id: company.id, data: formData })).unwrap();
       toast.success(company.isOnboarded ? "Company updated successfully!" : "Onboarding completed successfully!");
       if (!company.isOnboarded) {
-        window.location.href = "/dashboard";
+        navigate('/dashboard');
       } else {
         navigate('/company/view');
       }

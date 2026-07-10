@@ -7,7 +7,6 @@ import TextInput from "../../../components/form/TextInput/TextInput";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import CustomButton from "../../../components/ui/Button/Button";
 import UOMSelect from "../../../components/form/SelectInput/UOMSelect";
-import { wastageStockService } from "../../../services/wastageStockService";
 
 const CATEGORY_OPTIONS = [
     { label: "Fabric Scraps", value: "Fabric Scraps" },

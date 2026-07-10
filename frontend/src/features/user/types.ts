@@ -5,8 +5,9 @@ export interface User {
     username: string;
     fullName: string;
     email: string | null;
-    roleId: string;
+    roleId: string | null;
     status: UserStatus;
+    isSuperAdmin?: boolean;
     lastLoginAt: string | null;
     createdOn: string;
 }

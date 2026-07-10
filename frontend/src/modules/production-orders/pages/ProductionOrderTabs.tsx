@@ -1,0 +1,69 @@
+import React from "react";
+import { Container } from "react-bootstrap";
+import { useLocation, useNavigate } from "react-router-dom";
+import { FaPlay, FaHistory, FaClipboardCheck, FaTrashAlt, FaCalendarWeek, FaCalendarDay, FaClock } from "react-icons/fa";
+import Tabs from "../../../components/ui/tab/Tabs";
+import type { TabItem } from "../../../components/ui/tab/Tabs";
+
+import ProductionOrderList from "./ProductionOrderList";
+import AllProductionOrderList from "./AllProductionOrderList";
+import ApprovedSalesOrderList from "./ApprovedSalesOrderList";
+import WastageList from "../../production-wastage/pages/WastageList";
+import WeeklyMachineScheduleList from "../../weekly-machine-schedules/pages/WeeklyMachineScheduleList";
+import DailyMachinePlanning from "../../daily-machine-planning/pages/DailyMachinePlanning";
+import HourlyWorkReportList from "../../hourly-work-reports/pages/HourlyWorkReportList";
+
+const ProductionOrderTabs: React.FC = () => {
+    const location = useLocation();
+    const navigate = useNavigate();
+
+    // Map pathnames to tab keys
+    const pathToKey: Record<string, string> = {
+        "/approved-sales-orders": "approved",
+        "/production-orders": "active",
+        "/allproduction-orders": "history",
+        "/weekly-machine-schedules": "weekly",
+        "/daily-machine-planning": "daily",
+        "/hourly-work-reports": "hourly",
+        "/production-wastages": "wastage"
+    };
+
+    const keyToPath: Record<string, string> = {
+        "approved": "/approved-sales-orders",
+        "active": "/production-orders",
+        "history": "/allproduction-orders",
+        "weekly": "/weekly-machine-schedules",
+        "daily": "/daily-machine-planning",
+        "hourly": "/hourly-work-reports",
+        "wastage": "/production-wastages"
+    };
+
+    const activeTab = pathToKey[location.pathname] || "approved";
+
+    const tabs: TabItem[] = [
+        { key: "approved", label: "Approved Sales Orders", icon: <FaClipboardCheck />, content: <ApprovedSalesOrderList /> },
+        { key: "active", label: "Active Production Orders", icon: <FaPlay />, content: <ProductionOrderList /> },
+        { key: "history", label: "Order History", icon: <FaHistory />, content: <AllProductionOrderList /> },
+        { key: "weekly", label: "Weekly Schedules", icon: <FaCalendarWeek />, content: <WeeklyMachineScheduleList /> },
+        { key: "daily", label: "Daily Planning", icon: <FaCalendarDay />, content: <DailyMachinePlanning /> },
+        { key: "hourly", label: "Hourly Production", icon: <FaClock />, content: <HourlyWorkReportList /> },
+        { key: "wastage", label: "Production Wastage", icon: <FaTrashAlt />, content: <WastageList /> }
+    ];
+
+    const handleTabChange = (key: string) => {
+        const targetPath = keyToPath[key];
+        if (targetPath) {
+            navigate(targetPath);
+        }
+    };
+
+    return (
+        <div className="inner-container">
+            <Container fluid>
+                <Tabs tabs={tabs} activeKey={activeTab} onChange={handleTabChange} />
+            </Container>
+        </div>
+    );
+};
+
+export default ProductionOrderTabs;

@@ -408,7 +408,7 @@ const QuotationForm: React.FC = () => {
     useEffect(() => {
         loadCustomers();
         loadProducts();
-        loadEmployees({ designationId: 6 });
+        loadEmployees({});
     }, [loadCustomers, loadProducts, loadEmployees]);
 
     // ─── Get Next Quotation Number (Create Mode) ──────────────

@@ -8,6 +8,10 @@ class EmployeeService {
   async create(data: any) {
     const { createLoginAccount, loginAccount, ...employeeData } = data;
 
+    if (employeeData.createdBy && employeeData.createdBy.startsWith("admin_")) {
+      employeeData.createdBy = null;
+    }
+
     return prisma.$transaction(async (tx) => {
 
       // Check if email already exists
@@ -66,7 +70,7 @@ class EmployeeService {
       // Return employee with user included
       return tx.employee.findUnique({
         where: { id: employee.id },
-        include: { user: true, department: true, designation: true },
+        include: { user: true, department: true },
       });
     });
   }
@@ -76,7 +80,6 @@ class EmployeeService {
   //     include: {
   //       user: true,
   //       department: true,
-  //       designation: true,
   //     },
   //     orderBy: {
   //       createdAt: "desc",
@@ -86,16 +89,16 @@ class EmployeeService {
 
   async findAll(params: {
     search?: string;
-    designationId?: number;   // was bigint, now number
+    departmentId?: number;
     page?: number;
     limit?: number;
   }) {
-    const { search, designationId, page = 1, limit = 10 } = params;
+    const { search, departmentId, page = 1, limit = 10 } = params;
 
     const where: any = {};
 
-    if (designationId) {
-      where.designationId = designationId;
+    if (departmentId) {
+      where.departmentId = departmentId;
     }
 
     if (search) {
@@ -105,14 +108,13 @@ class EmployeeService {
         { email: { contains: search, mode: "insensitive" } },
         { mobile: { contains: search } },
         { department: { name: { contains: search, mode: "insensitive" } } },
-        { designation: { name: { contains: search, mode: "insensitive" } } },
       ];
     }
 
     const [employees, total] = await Promise.all([
       prisma.employee.findMany({
         where,
-        include: { user: true, department: true, designation: true },
+        include: { user: true, department: true },
         orderBy: { createdAt: "desc" },
         skip: (page - 1) * limit,
         take: limit,
@@ -134,7 +136,6 @@ class EmployeeService {
       include: {
         user: true,
         department: true,
-        designation: true,
       },
     });
 
@@ -150,6 +151,10 @@ class EmployeeService {
     const employeeExists = await this.findById(id);
 
     const { createLoginAccount, loginAccount, ...employeeData } = data;
+
+    if (employeeData.updatedBy && employeeData.updatedBy.startsWith("admin_")) {
+      employeeData.updatedBy = null;
+    }
 
     return prisma.$transaction(async (tx) => {
       // Update employee
@@ -224,7 +229,7 @@ class EmployeeService {
       // Return employee with user included
       return tx.employee.findUnique({
         where: { id },
-        include: { user: true, department: true, designation: true },
+        include: { user: true, department: true },
       });
     });
   }

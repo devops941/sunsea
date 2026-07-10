@@ -115,7 +115,7 @@ const ProductViewModal: React.FC<ProductViewModalProps> = ({
                         <Col md={4}>
                             <div className="info-item">
                                 <label>Weight Per Piece</label>
-                                <p>{product.weightPerPiece !== null ? `${product.weightPerPiece} kg` : "N/A"}</p>
+                                <p>{product.weightPerPiece !== null ? (Number(product.weightPerPiece) < 1 ? `${Number(product.weightPerPiece) * 1000} g` : `${product.weightPerPiece} kg`) : "N/A"}</p>
                             </div>
                         </Col>
 

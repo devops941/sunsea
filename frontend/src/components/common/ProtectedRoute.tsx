@@ -10,40 +10,30 @@ interface ProtectedRouteProps {
   redirectPath?: string;
 }
 
-const getUserPermissions = (): string[] => {
-  try {
-    const permissions =
-      localStorage.getItem("user_permissions");
-
-    return permissions
-      ? JSON.parse(permissions)
-      : [];
-  } catch {
-    return [];
-  }
-};
+import { useAppSelector } from "../../hooks/reduxHooks";
 
 const useAuth = () => {
-  const accessToken =
-    localStorage.getItem("access_token");
+  const { accessToken, permissions, user } = useAppSelector((state) => state.auth);
 
-  const userPermissions =
-    getUserPermissions();
-
-  const isAuthenticated =
-    Boolean(accessToken);
+  const isAuthenticated = Boolean(accessToken);
 
   const hasPermission = (
     permission: string
   ): boolean => {
-    return userPermissions.includes(
-      permission
-    );
+    if (
+      user?.isSuperAdmin ||
+      user?.roleId === "ROLE_ADMIN" ||
+      user?.roleId === "SUPER_ADMIN" ||
+      user?.roleId === "ADMIN"
+    ) {
+      return true;
+    }
+    return permissions.includes(permission);
   };
 
   return {
     isAuthenticated,
-    userPermissions,
+    userPermissions: permissions,
     hasPermission,
   };
 };

@@ -47,7 +47,6 @@ export const authMiddleware = async (
 
     if (
       !decoded?.userId ||
-      !decoded?.roleId ||
       !Array.isArray(decoded?.permissions)
     ) {
       return next(
@@ -58,13 +57,26 @@ export const authMiddleware = async (
       );
     }
 
-    const user = await prisma.user.findUnique({
-      where: { userId: decoded.userId },
-      select: { status: true }
-    });
+    const isAdmin = decoded.userId.startsWith("admin_");
+    
+    if (isAdmin) {
+      const adminId = BigInt(decoded.userId.replace("admin_", ""));
+      const admin = await prisma.admin.findUnique({
+        where: { id: adminId },
+        select: { status: true }
+      });
+      if (!admin || admin.status !== "active") {
+        return next(new ApiError(401, "Admin account is suspended or inactive"));
+      }
+    } else {
+      const user = await prisma.user.findUnique({
+        where: { userId: decoded.userId },
+        select: { status: true }
+      });
 
-    if (!user || user.status !== "active") {
-      return next(new ApiError(401, "Account is suspended or inactive"));
+      if (!user || user.status !== "active") {
+        return next(new ApiError(401, "Account is suspended or inactive"));
+      }
     }
 
     req.user = decoded;

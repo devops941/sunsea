@@ -18,7 +18,6 @@ import productPricingRoutes from "../modules/product-pricing/product-pricing.rou
 import productImageRoutes from "../modules/product-image/product-image.routes";
 import productRoutes from "../modules/product/product.routes";
 import companyRoutes from "../modules/company/company.routes";
-import designationRoutes from "../modules/designation/designation.routes";
 import shiftRoutes from "../modules/shift/shift.routes";
 import storeRoutes from "../modules/store/store.routes";
 import storeTypeRoutes from "../modules/store-type/store-type.routes";
@@ -52,7 +51,6 @@ router.use("/roles", roleRoutes);
 router.use("/permissions", permissionRoutes);
 router.use("/role-permissions", rolePermissionRoutes);
 router.use("/departments", departmentRoutes);
-router.use("/designations", designationRoutes);
 router.use("/shifts", shiftRoutes);
 
 router.use("/employees", employeeRoutes);

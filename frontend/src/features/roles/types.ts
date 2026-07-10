@@ -1,6 +1,6 @@
 export interface Role {
   id: number;
-  code: string;
+  code?: string;
   name: string;
   description?: string;
   isSystem: boolean;
@@ -9,7 +9,7 @@ export interface Role {
 }
 
 export interface CreateRoleDto {
-  code: string;
+  code?: string;
   name: string;
   description?: string;
   status: string;

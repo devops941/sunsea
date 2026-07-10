@@ -16,6 +16,8 @@ interface TabsProps {
     activeKey?: string;
     onChange?: (key: string) => void;
     className?: string;
+    align?: 'left' | 'center' | 'right';
+    variant?: 'primary' | 'secondary';
 }
 
 const Tabs: React.FC<TabsProps> = ({
@@ -24,6 +26,8 @@ const Tabs: React.FC<TabsProps> = ({
     activeKey: controlledKey,
     onChange,
     className = "",
+    align = "left",
+    variant = "primary",
 }) => {
     const [internalKey, setInternalKey] = useState(
         defaultActiveKey || tabs[0]?.key
@@ -56,8 +60,8 @@ const Tabs: React.FC<TabsProps> = ({
 
     return (
         <div className={`app-tabs ${className}`}>
-            <div className="app-tabs-list-wrap">
-                <div className="app-tabs-list" ref={listRef} role="tablist">
+            <div className={`app-tabs-list-wrap app-tabs-align-${align}`}>
+                <div className={`app-tabs-list app-tabs-variant-${variant}`} ref={listRef} role="tablist">
                     {tabs.map((tab) => (
                         <button
                             key={tab.key}
