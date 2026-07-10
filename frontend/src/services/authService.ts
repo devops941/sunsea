@@ -18,8 +18,13 @@ export const authService = {
         return response.data;
     },
 
-    refreshSession: async () => {
-        const response = await apiClient.post(`${config?.auth?.refreshSession}`);
+    getSessions: async () => {
+        const response = await apiClient.get(`${config?.auth?.sessions}`);
+        return response.data;
+    },
+
+    logoutAllSessions: async () => {
+        const response = await apiClient.post(`${config?.auth?.logoutAllSessions}`);
         return response.data;
     },
 };

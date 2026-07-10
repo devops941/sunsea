@@ -3,7 +3,8 @@ const config = {
         login: "/auth/login",
         getCurrentUser: "/auth/me",
         logout: "/auth/logout",
-        refreshSession: "/auth/refresh-token",
+        sessions: "/auth/sessions",
+        logoutAllSessions: "/auth/logout-all-sessions",
     },
     department: {
         base: "/departments",

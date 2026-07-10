@@ -77,15 +77,25 @@ export const initializeAuth = createAsyncThunk(
     "auth/initialize",
     async (_, thunkAPI) => {
         try {
-            // Attempt silent refresh session to retrieve in-memory access token
-            const response = await authService.refreshSession();
-            const { accessToken } = response.data || {};
-
-            if (accessToken) {
-                thunkAPI.dispatch(setAccessToken(accessToken));
-                const userResponse = await authService.getCurrentUser();
-                return userResponse.data as ProfileResponseDto;
+            // Check if access token exists in localStorage or sessionStorage
+            const storedToken = localStorage.getItem('accessToken') || sessionStorage.getItem('accessToken');
+            
+            if (storedToken) {
+                // Set the token first
+                thunkAPI.dispatch(setAccessToken(storedToken));
+                
+                // Verify the token by fetching current user
+                try {
+                    const userResponse = await authService.getCurrentUser();
+                    return userResponse.data as ProfileResponseDto;
+                } catch (error) {
+                    // Token is invalid or expired, clear it
+                    localStorage.removeItem('accessToken');
+                    sessionStorage.removeItem('accessToken');
+                    return null;
+                }
             }
+            
             return null;
         } catch {
             return null;
@@ -100,12 +110,23 @@ const authSlice = createSlice({
         setAccessToken: (state, action: PayloadAction<string>) => {
             state.accessToken = action.payload;
             state.permissions = action.payload ? decodePermissions(action.payload) : [];
+            
+            // Store token in localStorage for persistence across page refreshes
+            if (action.payload) {
+                localStorage.setItem('accessToken', action.payload);
+            } else {
+                localStorage.removeItem('accessToken');
+            }
         },
         clearUser: (state) => {
             state.user = null;
             state.accessToken = null;
             state.permissions = [];
             state.isAuthenticated = false;
+            
+            // Clear stored token
+            localStorage.removeItem('accessToken');
+            sessionStorage.removeItem('accessToken');
         },
     },
     extraReducers: (builder) => {
