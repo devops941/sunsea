@@ -16,7 +16,7 @@ const router = Router();
 router.post(
   "/",
   authMiddleware,
-  requirePermission("customers.create"),
+  //requirePermission("customers.create"),
   validateMiddleware(createCustomerRequestSchema),
   customerController.create
 );
@@ -24,21 +24,21 @@ router.post(
 router.get(
   "/",
   authMiddleware,
-  requirePermission("customers.view"),
+  //requirePermission("customers.view"),
   customerController.findAll
 );
 
 router.get(
   "/next-code",
   authMiddleware,
-  requirePermission("customers.view"),
+  //requirePermission("customers.view"),
   customerController.getNextCode
 );
 
 router.get(
   "/:id",
   authMiddleware,
-  requirePermission("customers.view"),
+  //requirePermission("customers.view"),
   validateMiddleware(customerIdRequestSchema),
   customerController.findOne
 );
