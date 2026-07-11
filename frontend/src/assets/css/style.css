@@ -1275,7 +1275,7 @@ ul {
 .inner-container {
     width: 100%;
     min-width: 0;
-    padding: 24px;
+    padding: 8px;
     background: #ffffff;
     /* border: 1px solid #e8edf2; */
     border-radius: 16px;

@@ -88,7 +88,7 @@ const HourlyWorkReportList: React.FC = () => {
                     productionOrderId: item.productionOrderId,
                     productName: item.productionOrder?.productItem?.productName || "Unknown Product",
                     productCode: item.productionOrder?.productItem?.productCode || "",
-                    uom: item.productionOrder?.uom || "",
+                    uom: (item.productionOrder?.uom?.toLowerCase() === "ea" ? "pcs" : item.productionOrder?.uom) || "pcs",
                     plannedQty: item.shiftPlannedQty || 0,
                     totalQtyProduced: 0,
                     totalRejectQty: 0,

@@ -993,11 +993,22 @@ class SalesOrderService {
         if (data.decision === "REJECTED" && !data.rejectionReason) {
             throw new ApiError(400, "Rejection reason is required when rejecting");
         }
+
+        let approverId = data.approverId;
+        if (approverId && approverId.startsWith("admin_")) {
+            const firstUser = await prisma.user.findFirst();
+            if (firstUser) {
+                approverId = firstUser.userId;
+            } else {
+                approverId = null as any;
+            }
+        }
+
         return prisma.salesOrder.update({
             where: { id },
             data: {
                 mdApprovalStatus: data.decision,
-                mdApprovedBy: data.approverId,
+                mdApprovedBy: approverId,
                 mdApprovedAt: new Date(),
                 mdRejectionReason: data.decision === "REJECTED" ? data.rejectionReason : null,
                 status: data.decision === "APPROVED" ? "IN_PRODUCTION" : "MD_REJECTED",

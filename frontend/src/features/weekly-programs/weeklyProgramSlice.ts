@@ -21,7 +21,11 @@ export const createWeeklyProgram = createAsyncThunk(
       const response = await weeklyProgramService.create(data);
       return response.data;
     } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || "Failed to create weekly program");
+      return rejectWithValue(
+        error.response?.data?.errors
+          ? error.response.data.errors.map((e: any) => e.message).join(", ")
+          : error.response?.data?.message || "Failed to create weekly program"
+      );
     }
   }
 );

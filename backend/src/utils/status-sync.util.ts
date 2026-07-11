@@ -32,14 +32,14 @@ export class StatusSyncService {
     let newStatus = productionOrder.status;
 
     if (totalPlannedQty === 0) {
-      if (productionOrder.status === "PLANNED" || productionOrder.status === "PARTIALLY_PLANNED") {
-        newStatus = "SCHEDULE_DELETED";
+      if (productionOrder.status === "PLANNED" || productionOrder.status === "PARTIALLY_PLANNED" || productionOrder.status === "SCHEDULED" || productionOrder.status === "SCHEDULE_DELETED") {
+        newStatus = "READY_FOR_PLANNING";
       }
       // Otherwise keep its existing status (e.g., RM_AVAILABLE)
     } else if (totalPlannedQty > 0 && totalPlannedQty < targetQty) {
       newStatus = "PARTIALLY_PLANNED";
     } else if (totalPlannedQty >= targetQty) {
-      newStatus = "PLANNED";
+      newStatus = "SCHEDULED";
     }
 
     // Keep existing statuses if they are further along the workflow

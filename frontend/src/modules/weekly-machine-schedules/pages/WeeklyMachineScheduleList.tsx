@@ -1,11 +1,12 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
-import { Container, Row, Col, Spinner} from "react-bootstrap";
-import {FaChevronLeft, FaChevronRight, FaChevronDown, FaChevronRight as FaCaretRight } from "react-icons/fa";
+import { Container, Row, Col, Spinner } from "react-bootstrap";
+import { FaChevronLeft, FaChevronRight, FaChevronDown, FaChevronRight as FaCaretRight, FaPlus } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
 import { fetchWeeklyPrograms, deleteWeeklyProgram } from "../../../features/weekly-programs/weeklyProgramSlice";
+import CustomButton from "../../../components/ui/Button/Button";
 
 import EditButton from "../../../components/ui/EditButton/EditButton";
 import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
@@ -21,30 +22,16 @@ const WeeklyMachineScheduleList: React.FC = () => {
     const navigate = useNavigate();
     const dispatch = useAppDispatch();
 
-    const getScheduleDateParts = (weekStartDateStr: string, dayOfWeek: number) => {
-        const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-        const dayName = days[dayOfWeek - 1] || `Day ${dayOfWeek}`;
-        if (!weekStartDateStr) return { dayName, dateStr: "" };
-        
+    const getFormattedWeekLabel = (startDateStr: string, endDateStr: string) => {
         try {
-            const cleanDateStr = weekStartDateStr.split('T')[0];
-            const [yyyy, mm, dd] = cleanDateStr.split('-').map(Number);
-            const date = new Date(Date.UTC(yyyy, mm - 1, dd + (dayOfWeek - 1)));
-            const formattedDate = date.toLocaleDateString('en-US', { 
-                month: 'short', 
-                day: 'numeric',
-                year: 'numeric'
-            });
-            return { dayName, dateStr: formattedDate };
+            const start = new Date(startDateStr);
+            const end = new Date(endDateStr);
+            const opt: Intl.DateTimeFormatOptions = { month: "short", day: "numeric", year: "numeric" };
+            return `${start.toLocaleDateString("en-US", opt)} - ${end.toLocaleDateString("en-US", opt)}`;
         } catch {
-            return { dayName, dateStr: "" };
+            return `${startDateStr} - ${endDateStr}`;
         }
     };
-    
-    // const getScheduleDayAndDate = (weekStartDateStr: string, dayOfWeek: number) => {
-    //     const parts = getScheduleDateParts(weekStartDateStr, dayOfWeek);
-    //     return parts.dateStr ? `${parts.dayName} (${parts.dateStr})` : parts.dayName;
-    // };
     
     const { data, loading, error } = useAppSelector((state) => state.weeklyPrograms);
     const { user } = useAppSelector((state) => state.auth);
@@ -62,13 +49,13 @@ const WeeklyMachineScheduleList: React.FC = () => {
     const { data: machines } = useAppSelector((state) => state.machines);
     const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
 
-    // Accordion state: keep track of which Production Orders are expanded
+    // Keep track of which weeks are expanded
     const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
 
-    const toggleGroup = (prodOrderId: string) => {
+    const toggleGroup = (weekKey: string) => {
         setExpandedGroups(prev => ({
             ...prev,
-            [prodOrderId]: !prev[prodOrderId]
+            [weekKey]: !prev[weekKey]
         }));
     };
 
@@ -123,46 +110,65 @@ const WeeklyMachineScheduleList: React.FC = () => {
         setCurrentPage(1);
     };
 
-    // Group data by productionOrderId
+    // Group weekly programs by week period
     const groupedData = useMemo(() => {
         const safeData = Array.isArray(data) ? data : [];
         const groups: Record<string, any> = {};
+
         safeData.forEach((item: any) => {
+            if (item.machineId === "MAC-001") return; // Exclude MAC-001
+
+            const startStr = item.weekStartDate.split('T')[0];
+            const endStr = item.weekEndDate.split('T')[0];
+            const weekKey = `${startStr}_${endStr}`;
+
+            if (!groups[weekKey]) {
+                groups[weekKey] = {
+                    weekKey,
+                    weekStartDate: startStr,
+                    weekEndDate: endStr,
+                    orders: {}
+                };
+            }
+
             const poId = item.productionOrderId || "Unassigned";
-            if (!groups[poId]) {
-                groups[poId] = {
+            if (!groups[weekKey].orders[poId]) {
+                groups[weekKey].orders[poId] = {
                     productionOrderId: poId,
                     productName: item.productionOrder?.productItem?.productName || "Unknown Product",
                     priority: item.priority || "MEDIUM",
-                    totalPlannedQty: 0,
+                    machineName: item.machine?.machineName || item.machineId || "Unknown Machine",
+                    plannedQty: 0,
                     uom: item.productionOrder?.uom || item.uom || "",
-                    schedules: [],
-                    minDate: item.weekStartDate,
-                    maxDate: item.weekEndDate,
-                    status: item.productionOrder?.status || item.status || "UNKNOWN"
+                    status: item.productionOrder?.status || item.status || "PLANNED",
+                    schedules: []
                 };
             }
-            groups[poId].schedules.push(item);
-            groups[poId].totalPlannedQty += (Number(item.plannedQty) || 0);
 
-            if (new Date(item.weekStartDate) < new Date(groups[poId].minDate)) {
-                groups[poId].minDate = item.weekStartDate;
-            }
-            if (new Date(item.weekEndDate) > new Date(groups[poId].maxDate)) {
-                groups[poId].maxDate = item.weekEndDate;
-            }
+            groups[weekKey].orders[poId].plannedQty += (Number(item.plannedQty) || 0);
+            groups[weekKey].orders[poId].schedules.push(item);
         });
-        return Object.values(groups);
+
+        // Convert to array of week objects
+        return Object.values(groups).map((group: any) => {
+            const ordersList = Object.values(group.orders);
+            return {
+                ...group,
+                ordersList,
+                totalOrders: ordersList.length,
+                totalPlannedQty: ordersList.reduce((sum: number, o: any) => sum + o.plannedQty, 0),
+                uom: ordersList[0]?.uom || ""
+            };
+        });
     }, [data]);
 
     const totalPages = Math.ceil(groupedData.length / ITEMS_PER_PAGE);
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
     const paginatedGroups = groupedData.slice(startIndex, startIndex + ITEMS_PER_PAGE);
-console.log("fd",paginatedGroups)
 
-    // const handleOpenAdd = () => {
-    //     navigate("/weekly-machine-schedules/create");
-    // };
+    const handleOpenAdd = () => {
+        navigate("/weekly-machine-schedules/create");
+    };
 
     const handleOpenEdit = useCallback((item: any) => {
         navigate(`/weekly-machine-schedules/edit/${item.weeklyProgramId}?po=${item.productionOrderId}`, { state: item });
@@ -186,6 +192,7 @@ console.log("fd",paginatedGroups)
                     await dispatch(deleteWeeklyProgram(itemToDelete)).unwrap();
                     toast.success("Schedule deleted successfully!");
                 }
+                navigate("/production-orders");
             } catch (err: any) {
                 toast.error(err || "Failed to delete schedule");
             } finally {
@@ -208,16 +215,6 @@ console.log("fd",paginatedGroups)
                         </Col>
                         <Col lg={8} md={12}>
                             <div className="page-header-actions weekely-list d-flex gap-2 align-items-center flex-wrap">
-                                <div style={{ width: '250px' }}>
-                                    <SelectInput
-                                        label="Filter Machine"
-                                        hideLabel
-                                        name="filterMachine"
-                                        options={[{ value: '', label: 'All Machines' }, ...(machines?.map((m: any) => ({ value: m.machineId, label: m.machineName })) || [])]}
-                                        value={filterMachineId}
-                                        onChange={(e) => { setFilterMachineId(e.target.value); setCurrentPage(1); }}
-                                    />
-                                </div>
                                 <div style={{ width: '150px' }}>
                                     <TextInput
                                         label=""
@@ -237,11 +234,11 @@ console.log("fd",paginatedGroups)
                                         onChange={handleSearch}
                                     />
                                 </div>
-                                {/* <CustomButton
+                                <CustomButton
                                     text="Add Schedule"
                                     icon={FaPlus}
                                     onClick={handleOpenAdd}
-                                /> */}
+                                />
                             </div>
                         </Col>
                     </Row>
@@ -253,113 +250,92 @@ console.log("fd",paginatedGroups)
                             <thead>
                                 <tr>
                                     <th style={{ width: "40px" }}></th>
-                                    <th>PRODUCTION ORDER</th>
-                                    <th>PRODUCT</th>
-                                    <th>PRIORITY</th>
-                                    <th>MACHINE / SHIFT</th>
-                                    <th>WEEK DATES</th>
-                                    <th>PLANNED QTY</th>
-                                    <th>STATUS</th>
-                                    <th style={{ width: "100px", textAlign: "right" }}>ACTIONS</th>
+                                    <th>WEEK PERIOD</th>
+                                    <th>TOTAL PRODUCTION ORDERS</th>
+                                    <th>TOTAL WEEKLY QUANTITY</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {loading ? (
                                     <tr>
-                                        <td colSpan={9} className="text-center p-4">
+                                        <td colSpan={4} className="text-center p-4">
                                             <Spinner animation="border" variant="primary" />
                                         </td>
                                     </tr>
                                 ) : paginatedGroups.length > 0 ? (
                                     paginatedGroups.map((group: any) => (
-                                        <React.Fragment key={group.productionOrderId}>
-                                            {/* Parent Row */}
+                                        <React.Fragment key={group.weekKey}>
+                                            {/* Parent Row (Week) */}
                                             <tr 
-                                                className={`master-data-row cursor-pointer ${expandedGroups[group.productionOrderId] ? 'bg-light' : ''}`}
-                                                onClick={() => toggleGroup(group.productionOrderId)}
+                                                className={`master-data-row cursor-pointer ${expandedGroups[group.weekKey] ? 'bg-light' : ''}`}
+                                                onClick={() => toggleGroup(group.weekKey)}
                                                 style={{ transition: "background-color 0.2s" }}
                                             >
                                                 <td className="master-data-cell text-center text-secondary" style={{ width: "40px" }}>
-                                                    {expandedGroups[group.productionOrderId] ? <FaChevronDown /> : <FaCaretRight />}
+                                                    {expandedGroups[group.weekKey] ? <FaChevronDown /> : <FaCaretRight />}
                                                 </td>
                                                 <td className="master-data-cell fw-bold text-dark">
-                                                    {group.productionOrderId}
-                                                </td>
-                                                <td className="master-data-cell fw-bold">
-                                                    {group.productName}
-                                                </td>
-                                                <td className="master-data-cell">
-                                                    <StatusBadge status={group.priority} />
+                                                    {getFormattedWeekLabel(group.weekStartDate, group.weekEndDate)}
                                                 </td>
                                                 <td className="master-data-cell">
                                                     <StatusBadge 
                                                         status="UNKNOWN" 
-                                                        customText={`${group.schedules.length} Schedule(s)`} 
-                                                        customColor={{ bg: '#e9ecef', text: '#495057' }}
+                                                        customText={`${group.totalOrders} Production Order(s)`} 
+                                                        customColor={{ bg: '#e9ecef', text: '#0f766e' }}
                                                     />
                                                 </td>
-                                                <td className="master-data-cell text-muted small">
-                                                    {group.minDate && new Date(group.minDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} 
-                                                    {group.minDate !== group.maxDate && ` - ${new Date(group.maxDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`}
-                                                </td>
                                                 <td className="master-data-cell fw-bold text-success">
-                                                    {group.totalPlannedQty} <span className="fw-normal text-muted small">{group.uom}</span>
-                                                </td>
-                                                <td className="master-data-cell">
-                                                    <StatusBadge status={group.status} />
-                                                </td>
-                                                <td className="master-data-cell text-end">
-                                                    {["IN_PROGRESS", "IN_PRODUCTION", "COMPLETED", "ON_HOLD", "FG_RECEIVED", "READY_FOR_DISPATCH", "DISPATCHED"].includes(group.status) ? (
-                                                        <span className="text-secondary small fw-medium fst-italic">Production Started</span>
-                                                    ) : (
-                                                        <div className="table-action-group justify-content-end" style={{ gap: '0.5rem' }}>
-                                                            <EditButton onClick={(e) => { e.stopPropagation(); handleOpenEdit(group.schedules[0]); }} />
-                                                            {user?.roleId === "ROLE_ADMIN" && (
-                                                                <DeleteButton onClick={(e) => { e.stopPropagation(); triggerGroupDelete(group); }} />
-                                                            )}
-                                                        </div>
-                                                    )}
+                                                    {group.totalPlannedQty} <span className="fw-normal text-muted small">{group.uom?.toLowerCase() === 'ea' ? 'pcs' : group.uom}</span>
                                                 </td>
                                             </tr>
 
-                                            {/* Child Rows (Schedules) */}
-                                            {expandedGroups[group.productionOrderId] && group.schedules.map((item: any) => (
-                                                <tr key={item.weeklyProgramId} className="master-data-row" style={{ backgroundColor: "#fdfdfd" }}>
-                                                    <td className="master-data-cell"></td>
-                                                    <td className="master-data-cell" colSpan={3}>
-                                                        <div className="d-flex align-items-center gap-2 ps-3 border-start border-3 border-secondary" style={{ height: "100%", opacity: 0.8 }}>
-                                                            <span className="text-secondary fw-semibold small">↳ Schedule</span>
+                                            {/* Expanded Sub-table Details */}
+                                            {expandedGroups[group.weekKey] && (
+                                                <tr>
+                                                    <td></td>
+                                                    <td colSpan={3} className="p-3 bg-light rounded" style={{ borderLeft: "3px solid var(--color-primary, #0f766e)" }}>
+                                                        <div className="table-responsive">
+                                                            <table className="master-data-table mb-0 shadow-sm" style={{ width: "100%", background: "#fff", borderRadius: "8px", overflow: "hidden" }}>
+                                                                 <thead>
+                                                                    <tr style={{ background: "#f1f5f9" }}>
+                                                                        <th className="master-data-cell fw-bold text-uppercase text-secondary" style={{ fontSize: "11px" }}>Production Order</th>
+                                                                        <th className="master-data-cell fw-bold text-uppercase text-secondary" style={{ fontSize: "11px" }}>Product Name</th>
+                                                                        <th className="master-data-cell fw-bold text-uppercase text-secondary" style={{ fontSize: "11px" }}>Planned Qty</th>
+                                                                        <th className="master-data-cell fw-bold text-uppercase text-secondary" style={{ fontSize: "11px" }}>Status</th>
+                                                                        <th className="master-data-cell fw-bold text-uppercase text-secondary text-end" style={{ fontSize: "11px", width: "120px" }}>Actions</th>
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody>
+                                                                    {group.ordersList.map((order: any) => (
+                                                                        <tr key={order.productionOrderId} className="master-data-row">
+                                                                            <td className="master-data-cell fw-bold text-dark">{order.productionOrderId}</td>
+                                                                            <td className="master-data-cell fw-semibold">{order.productName}</td>
+                                                                            <td className="master-data-cell fw-bold text-success">{order.plannedQty} {order.uom?.toLowerCase() === 'ea' ? 'pcs' : order.uom}</td>
+                                                                            <td className="master-data-cell">
+                                                                                <StatusBadge status={order.status} />
+                                                                            </td>
+                                                                            <td className="master-data-cell text-end">
+                                                                                {["IN_PROGRESS", "IN_PRODUCTION", "COMPLETED", "ON_HOLD", "FG_RECEIVED", "READY_FOR_DISPATCH", "DISPATCHED"].includes(order.status) ? (
+                                                                                    <span className="text-secondary small fw-medium fst-italic">Started</span>
+                                                                                ) : (
+                                                                                    <div className="d-flex justify-content-end gap-2">
+                                                                                        <DeleteButton onClick={(e) => { e.stopPropagation(); triggerGroupDelete(order); }} />
+                                                                                    </div>
+                                                                                )}
+                                                                            </td>
+                                                                        </tr>
+                                                                    ))}
+                                                                </tbody>
+                                                            </table>
                                                         </div>
                                                     </td>
-                                                    <td className="master-data-cell">
-                                                        <div className="fw-bold text-dark">{item.machine?.machineName || item.machineId}</div>
-                                                        <StatusBadge 
-                                                            status="UNKNOWN"
-                                                            customText={item.shift?.shiftName || item.shiftId} 
-                                                            className="border mt-1 shadow-sm"
-                                                            customColor={{ bg: '#f8f9fa', text: '#212529' }}
-                                                        />
-                                                    </td>
-                                                    <td className="master-data-cell">
-                                                        <div className="fw-bold text-dark">{getScheduleDateParts(item.weekStartDate, item.dayOfWeek).dayName}</div>
-                                                        <div className="text-muted small">{getScheduleDateParts(item.weekStartDate, item.dayOfWeek).dateStr}</div>
-                                                    </td>
-                                                    <td className="master-data-cell fw-bold">
-                                                        {item.plannedQty} <span className="fw-normal text-muted small">{item.productionOrder?.uom || group.uom}</span>
-                                                    </td>
-                                                    <td className="master-data-cell">
-                                                        <StatusBadge status={item.status} />
-                                                    </td>
-                                                    <td className="master-data-cell text-end text-muted">
-                                                        -
-                                                    </td>
                                                 </tr>
-                                            ))}
+                                            )}
                                         </React.Fragment>
                                     ))
                                 ) : (
                                     <tr>
-                                        <td colSpan={9} className="text-center p-4">No schedules found.</td>
+                                        <td colSpan={4} className="text-center p-4">No schedules found.</td>
                                     </tr>
                                 )}
                             </tbody>
@@ -374,9 +350,7 @@ console.log("fd",paginatedGroups)
                                 >
                                     <FaChevronLeft />
                                 </button>
-                                <div className="pagination-info">
-                                    Page {currentPage} of {totalPages}
-                                </div>
+                                <div className="pagination-info">Page {currentPage} of {totalPages}</div>
                                 <button
                                     className="pagination-btn"
                                     disabled={currentPage === totalPages}
@@ -393,9 +367,14 @@ console.log("fd",paginatedGroups)
                     show={showDeleteModal}
                     onHide={() => setShowDeleteModal(false)}
                     onConfirm={handleDeleteConfirm}
-                    title={isGroupDelete ? "Confirm Group Delete" : "Confirm Delete"}
-                    message={isGroupDelete && itemToDelete ? `Are you sure you want to delete ALL scheduled shifts for Production Order ${itemToDelete.productionOrderId}?` : "Are you sure you want to delete this specific schedule?"}
-                    confirmText={isGroupDelete ? "Delete Group" : "Delete"}
+                    title="Delete Weekly Schedule Allocation"
+                    message={
+                        <>
+                            Are you sure you want to delete this weekly schedule allocation?<br/>
+                            This will clear all shift run slots allocated to this order for the week.
+                        </>
+                    }
+                    confirmText="Delete"
                     confirmVariant="danger"
                 />
             </Container>

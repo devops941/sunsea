@@ -67,7 +67,13 @@ export const ProductionOrderViewModal: React.FC<ProductionOrderViewModalProps> =
         p.rawMaterials?.some((rm: any) => {
             const stockRm = rawMaterialsMap.get(rm.rawMaterialId?.toString());
             const required = Number(rm.requiredQty || 0);
-            const available = stockRm ? Number(stockRm.onHandQty || 0) : Number(rm.availableStock || 0);
+            let available = stockRm 
+                ? Number(stockRm.onHandQty || 0) - Number(stockRm.reservedQty || 0) 
+                : Number(rm.availableStock || 0);
+            const isReservedStatus = ["RM_AVAILABLE", "READY_FOR_PLANNING", "SCHEDULED", "IN_PROGRESS", "IN PROGRESS"].includes(fullOrder?.status);
+            if (isReservedStatus && stockRm) {
+                available += required;
+            }
             return rm.status ? rm.status === "INSUFFICIENT" : available < required;
         })
     );
@@ -192,7 +198,13 @@ export const ProductionOrderViewModal: React.FC<ProductionOrderViewModalProps> =
                                                 {prod.rawMaterials?.map((rm: any) => {
                                                     const stockRm = rawMaterialsMap.get(rm.rawMaterialId?.toString());
                                                     const required = Number(rm.requiredQty || 0);
-                                                    const available = stockRm ? Number(stockRm.onHandQty || 0) : Number(rm.availableStock || 0);
+                                                    let available = stockRm 
+                                                        ? Number(stockRm.onHandQty || 0) - Number(stockRm.reservedQty || 0) 
+                                                        : Number(rm.availableStock || 0);
+                                                    const isReservedStatus = ["RM_AVAILABLE", "READY_FOR_PLANNING", "SCHEDULED", "IN_PROGRESS", "IN PROGRESS"].includes(fullOrder?.status);
+                                                    if (isReservedStatus && stockRm) {
+                                                        available += required;
+                                                    }
                                                     const materialName = rm.materialName || stockRm?.materialName || rm.rawMaterialId;
                                                     const isAvailable = rm.status ? rm.status === "AVAILABLE" : available >= required;
                                                     
