@@ -83,6 +83,7 @@ model User {
   createdSuppliers      Supplier[]           @relation("SupplierCreatedBy")
   updatedSuppliers      Supplier[]           @relation("SupplierUpdatedBy")
   sessions              UserSession[]
+  expensesCreated       Expense[]            @relation("ExpenseCreatedBy")
   employee              Employee?            @relation(fields: [employeeId], references: [id])
   role                  Role?                @relation(fields: [roleId], references: [id])
 
@@ -302,8 +303,24 @@ model Company {
   updatedAt      DateTime        @updatedAt @db.Timestamptz(6)
   businessPlaces BusinessPlace[]
   customers      Customer[]
+  whatsappConfig WhatsappConfig?
+  expenses       Expense[]
 
   @@map("companies")
+}
+
+model WhatsappConfig {
+  id            String   @id @default(uuid()) @db.Uuid
+  companyId     String   @unique @db.Uuid
+  phoneNumberId String   @db.VarChar(50)
+  wabaId        String   @db.VarChar(50)
+  businessPhone String   @db.VarChar(20)
+  accessToken   String   @db.Text
+  createdAt     DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt     DateTime @updatedAt @db.Timestamptz(6)
+  company       Company  @relation(fields: [companyId], references: [id])
+
+  @@map("whatsapp_configs")
 }
 
 model BusinessPlace {
@@ -396,6 +413,7 @@ model Supplier {
   materialPrices        SupplierMaterialPrice[]
   purchaseOrders        PurchaseOrder[]
   addresses             SupplierAddress[]
+  expenses              Expense[]
   createdByUser         User                    @relation("SupplierCreatedBy", fields: [createdBy], references: [userId])
   updatedByUser         User?                   @relation("SupplierUpdatedBy", fields: [updatedBy], references: [userId])
 
@@ -769,6 +787,7 @@ model RawMaterial {
   onHandQty               Decimal                  @default(0) @map("on_hand_qty") @db.Decimal(14, 3)
   reservedQty             Decimal                  @default(0) @map("qty_reserved") @db.Decimal(14, 3)
   remarks                 String?                  @db.VarChar(255)
+  gstTaxRateId            String?                  @map("gst_tax_rate_id")
   billOfMaterials         BillOfMaterial[]
   productionWastages      ProductionWastage[]
   rawMaterialTransactions RawMaterialTransaction[]
@@ -776,11 +795,13 @@ model RawMaterial {
   storeLocation           StoreLocation?           @relation(fields: [locationId], references: [id])
   store                   Store?                   @relation("StoreToRawMaterial", fields: [storeId], references: [storeId])
   StockAdjustmentItem     StockAdjustmentItem[]
+  gstTaxRate              GstTaxRate?              @relation(fields: [gstTaxRateId], references: [id], onDelete: SetNull)
 
   @@index([categoryId])
   @@index([storeId])
   @@index([locationId])
   @@index([isActive])
+  @@index([gstTaxRateId])
   @@map("raw_materials")
 }
 
@@ -1078,6 +1099,9 @@ model PurchaseOrder {
   totalDiscount        Decimal             @default(0) @db.Decimal(12, 2)
   totalTax             Decimal             @default(0) @db.Decimal(12, 2)
   netAmount            Decimal             @default(0) @db.Decimal(12, 2)
+  totalCgst            Decimal             @default(0) @db.Decimal(14, 2)
+  totalSgst            Decimal             @default(0) @db.Decimal(14, 2)
+  totalIgst            Decimal             @default(0) @db.Decimal(14, 2)
   companyId            String              @db.Uuid
   createdBy            String?
   createdAt            DateTime            @default(now())
@@ -1099,6 +1123,16 @@ model PurchaseOrderItem {
   unitPrice       Decimal       @db.Decimal(12, 2)
   discount        Decimal       @default(0) @db.Decimal(5, 2)
   tax             Decimal       @default(0) @db.Decimal(5, 2)
+  discountType    DiscountType  @default(PERCENT)
+  discountValue   Decimal       @default(0) @db.Decimal(12, 2)
+  discountAmount  Decimal       @default(0) @db.Decimal(14, 2)
+  taxableAmount   Decimal       @default(0) @db.Decimal(14, 2)
+  cgstRate        Decimal       @default(0) @db.Decimal(5, 2)
+  cgstAmount      Decimal       @default(0) @db.Decimal(14, 2)
+  sgstRate        Decimal       @default(0) @db.Decimal(5, 2)
+  sgstAmount      Decimal       @default(0) @db.Decimal(14, 2)
+  igstRate        Decimal       @default(0) @db.Decimal(5, 2)
+  igstAmount      Decimal       @default(0) @db.Decimal(14, 2)
   lineTotal       Decimal       @db.Decimal(12, 2)
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
@@ -1119,6 +1153,7 @@ model GstTaxRate {
   updatedAt       DateTime         @updatedAt
   products        Product[]
   salesOrderItems SalesOrderItem[]
+  rawMaterials    RawMaterial[]
 
   @@map("gst_tax_rates")
 }
@@ -1352,4 +1387,30 @@ enum ItemCategoryType {
   RAW_MATERIAL
   FINISHED_GOODS
   SEMI_FINISHED
+}
+
+model Expense {
+  id              String   @id @default(uuid()) @db.Uuid
+  expenseNumber   String   @db.VarChar(30)
+  expenseCategory String   @db.VarChar(60)
+  date            DateTime @db.Date
+  expense         String   @db.VarChar(120)
+  amount          Decimal  @db.Decimal(12, 2)
+  description     String?  @db.Text
+  paymentMethod   String   @db.VarChar(50)
+  status          String   @default("Draft") @db.VarChar(30)
+  notes           String?  @db.Text
+  receiptInvoice  String?  @db.VarChar(255)
+  companyId       String   @db.Uuid
+  supplierId      Int?
+  createdBy       String?
+  createdAt       DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt       DateTime @updatedAt @db.Timestamptz(6)
+
+  company   Company   @relation(fields: [companyId], references: [id])
+  supplier  Supplier? @relation(fields: [supplierId], references: [id])
+  user      User?     @relation("ExpenseCreatedBy", fields: [createdBy], references: [userId])
+
+  @@unique([companyId, expenseNumber])
+  @@map("expenses")
 }
