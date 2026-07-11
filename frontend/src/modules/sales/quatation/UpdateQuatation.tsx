@@ -278,7 +278,7 @@ const QuotationReport: React.FC = () => {
                                                 <th className="text-end">SGST</th>
                                             </>
                                         )}
-                                        <th className="text-end">Cess</th>
+
                                         <th className="text-end">Line Total</th>
                                     </tr>
                                 </thead>
@@ -317,10 +317,7 @@ const QuotationReport: React.FC = () => {
                                                     </td>
                                                 </>
                                             )}
-                                            <td className="master-data-cell text-end">
-                                                {formatMoney(item.cessAmount)}
-                                                <div className="text-muted small">({item.cessRate}%)</div>
-                                            </td>
+
                                             <td className="master-data-cell text-end fw-bold">{formatMoney(item.lineTotal)}</td>
                                         </tr>
                                     ))}
@@ -353,14 +350,6 @@ const QuotationReport: React.FC = () => {
                                         </div>
                                     </>
                                 )}
-                                <div className="d-flex justify-content-between py-1">
-                                    <span className="text-muted">Total GST</span>
-                                    <span>{formatMoney(order.totalGst)}</span>
-                                </div>
-                                <div className="d-flex justify-content-between py-1">
-                                    <span className="text-muted">CESS</span>
-                                    <span>{formatMoney(order.totalCess)}</span>
-                                </div>
                                 <div className="d-flex justify-content-between py-1">
                                     <span className="text-muted">Discount</span>
                                     <span className="text-danger">− {formatMoney(order.totalDiscount)}</span>

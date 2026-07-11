@@ -1,6 +1,7 @@
 import { Router } from "express";
 import companyController from "./company.controller";
 import { authMiddleware } from "../../middleware/auth.middleware";
+import { uploadProductImage } from "../../middleware/upload.middleware";
 
 const router = Router();
 
@@ -11,6 +12,6 @@ router.use(authMiddleware);
 router.get("/", companyController.getCompany);
 
 // Update company details
-router.put("/:id", companyController.updateCompany);
+router.put("/:id", uploadProductImage.single("logo"), companyController.updateCompany);
 
 export default router;

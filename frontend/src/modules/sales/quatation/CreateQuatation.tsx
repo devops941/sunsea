@@ -620,6 +620,8 @@ const QuotationForm: React.FC = () => {
                 remarks: data.remarks,
                 internalNotes: data.internalNotes,
                 items: transformedItems,
+                orderDiscountType: data.orderDiscountType,
+                orderDiscountValue: data.orderDiscountValue,
             };
 
             let response;

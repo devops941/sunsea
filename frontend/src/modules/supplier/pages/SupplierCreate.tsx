@@ -771,16 +771,7 @@ const SupplierCreate: React.FC = () => {
                                 onChange={handleChange}
                             />
                         </Col>
-                        <Col lg={4} md={6} className="mt-3">
-                            <TextInput
-                                label="Website"
-                                name="website"
-                                value={formData.website}
-                                placeholder="https://"
-                                error={errors.website}
-                                onChange={handleChange}
-                            />
-                        </Col>
+
                     </Row>
 
                     {/* BILLING ADDRESS */}
@@ -866,51 +857,7 @@ const SupplierCreate: React.FC = () => {
                                 onChange={handleChange}
                             />
                         </Col>
-                        <Col lg={4} md={6}>
-                            <TextInput
-                                label="GST Registration Type"
-                                name="gstRegType"
-                                value={formData.gstRegType}
-                                placeholder="Registered / Composition"
-                                error={errors.gstRegType}
-                                onChange={handleChange}
-                            />
-                        </Col>
-                        <Col lg={4} md={6} className="mt-3">
-                            <SelectInput
-                                label="MSME Status"
-                                name="msmeStatus"
-                                value={formData.msmeStatus}
-                                options={[
-                                    { value: "Micro", label: "Micro" },
-                                    { value: "Small", label: "Small" },
-                                    { value: "Medium", label: "Medium" },
-                                    { value: "None", label: "None" },
-                                ]}
-                                error={errors.msmeStatus}
-                                onChange={handleChange}
-                            />
-                        </Col>
-                        <Col lg={4} md={6} className="mt-3">
-                            <TextInput
-                                label="Udyam Registration No."
-                                name="udyamNo"
-                                value={formData.udyamNo}
-                                placeholder="UDYAM-TN-00-12345"
-                                error={errors.udyamNo}
-                                onChange={handleChange}
-                            />
-                        </Col>
-                        <Col lg={4} md={6} className="mt-3">
-                            <TextInput
-                                label="TDS Section"
-                                name="tdsSection"
-                                value={formData.tdsSection}
-                                placeholder="194Q"
-                                error={errors.tdsSection}
-                                onChange={handleChange}
-                            />
-                        </Col>
+
                     </Row>
 
                     {/* BANK DETAILS */}

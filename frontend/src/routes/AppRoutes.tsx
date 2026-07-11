@@ -155,7 +155,7 @@ const PurchaseOrderEditPage = lazy(() => import("../modules/purchase/purchase-or
 
 const PurchaseOrderViewPage = lazy(() => import("../modules/purchase/purchase-order/purchaseordeappovals/PurchaseOrderapprovalEdit"));
 
-const UpComingOrderDetail = lazy(() => import("../modules/purchase/purchase-order/upcoming-orders/UpComingOrderDetail"));
+const InvoiceDetail = lazy(() => import("../modules/purchase/purchase-order/upcoming-orders/InvoiceDetailPage"));
 // profile
 const ProfilePage = lazy(() => import("../modules/profile/ProfilePage"));
 const Settings = lazy(() => import("../modules/settings/Setting"))
@@ -597,17 +597,17 @@ const AppRoutes = () => {
             {/* ========================================================================= */}
 
             {/* Purchase Orders - List */}
-            <Route element={<ProtectedRoute permission="purchase_orders.view" />}>
+            <Route element={<ProtectedRoute permission="reports.view" />}>
               <Route path="/purchase-orders" element={<PurchaseTabs />} />
             </Route>
 
             {/* Purchase Orders - Create */}
-            <Route element={<ProtectedRoute permission="purchase_orders.create" />}>
+            <Route element={<ProtectedRoute permission="reports.view" />}>
               <Route path="/purchase-orders/create" element={<PurchaseOrderCreatePage />} />
             </Route>
 
             {/* Purchase Orders - Edit */}
-            <Route element={<ProtectedRoute permission="purchase_orders.edit" />}>
+            <Route element={<ProtectedRoute permission="reports.view" />}>
               <Route path="/purchase-orders/edit/:id" element={<PurchaseOrderEditPage />} />
             </Route>
 
@@ -615,19 +615,20 @@ const AppRoutes = () => {
             {/* END PURCHASE ORDER MODULE */}
             {/* ============================================ */}
 
-            <Route element={<ProtectedRoute permission="purchase_orders.view" />}>
+            <Route element={<ProtectedRoute permission="reports.view" />}>
               <Route path="/purchase-order-approvals" element={<PurchaseTabs />} />
             </Route>
 
-            <Route element={<ProtectedRoute permission="purchase_orders.view" />}>
+            <Route element={<ProtectedRoute permission="reports.view" />}>
               <Route path="/purchase-orders/view/:id" element={<PurchaseOrderViewPage />} />
               <Route path="/upcoming-orders" element={<PurchaseTabs />} />
               <Route path="/expenses" element={<PurchaseTabs />} /> 
+              <Route path="/invoice" element={<PurchaseTabs />} />
             </Route>
-            <Route element={<ProtectedRoute permission="purchase_orders.view" />}>
-              <Route path="/upcoming-orders/detail/:id" element={<UpComingOrderDetail />} />
+            <Route element={<ProtectedRoute permission="reports.view" />}>
+              <Route path="/invoice/create" element={<InvoiceDetail />} />
             </Route>
-            <Route element={<ProtectedRoute permission="purchase_orders.view" />}>
+            <Route element={<ProtectedRoute permission="reports.view" />}>
               <Route path="/settings" element={<Settings />} />
             </Route>
             <Route element={<ProtectedRoute permission="purchase_orders.view" />}>

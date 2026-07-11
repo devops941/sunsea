@@ -22,6 +22,7 @@ import Section from "../../../../components/ui/Section/Section";
 import { useAppDispatch, useAppSelector } from "../../../../hooks/reduxHooks";
 import { fetchLocations } from "../../../../features/locations/locationSlice";
 import { selectActiveGstTaxes, fetchGstTaxes } from "../../../../features/gst/gstSlice";
+import { fetchStores } from "../../../../features/stores/storeSlice";
 
 // ─── Report-style Section wrapper (matches QuotationForm) ──────────────────
 
@@ -73,6 +74,7 @@ const PurchaseOrderCreatePage: React.FC = () => {
   const [rawMaterials, setRawMaterials] = useState<RawMaterial[]>([]);
   const { data: company } = useSelector((state: any) => state.company);
   const { data: locations } = useAppSelector(state => state.locations);
+  const { data: stores } = useAppSelector(state => state.stores);
   const companyState = company?.state
   const gstTaxes = useAppSelector(selectActiveGstTaxes);
   const gstLoading = useAppSelector((state) => state.gst.loading);
@@ -105,6 +107,7 @@ const PurchaseOrderCreatePage: React.FC = () => {
     loadSuppliers();
     dispatch(fetchLocations(undefined));
     dispatch(fetchGstTaxes(undefined));
+    dispatch(fetchStores(undefined));
   }, [loadSuppliers, dispatch]);
 
   useEffect(() => {
@@ -304,13 +307,13 @@ const PurchaseOrderCreatePage: React.FC = () => {
     }
 
     if (name === "locationId") {
-      const selectedSup = locations.find((s) => String(s.locationId) === String(value));
+      const selectedStore = (stores || []).find((s) => String(s.storeId) === String(value));
       setFormData((prev) => ({
         ...prev,
         locationId: value,
-        billingAddressLine1: selectedSup?.address || "",
-        billingCity: selectedSup?.city || "",
-        billingState: selectedSup?.state || "",
+        billingAddressLine1: selectedStore?.location?.address || "",
+        billingCity: selectedStore?.location?.city || "",
+        billingState: selectedStore?.location?.state || "",
         billingPincode: "625017",
       }));
       if (errors.locationId) {
@@ -767,6 +770,23 @@ const PurchaseOrderCreatePage: React.FC = () => {
     })),
   ], [gstTaxes, gstLoading]);
 
+  const uomOptions = useMemo(() => {
+    const allUoms = (rawMaterials || [])
+      .map((rm) => rm.baseUom)
+      .filter(Boolean)
+      .flatMap((uom) => uom!.split(",").map((s) => s.trim()));
+
+    const uniqueUoms = Array.from(new Set(allUoms));
+
+    return [
+      { value: "", label: "-- Select UOM --" },
+      ...uniqueUoms.map((uom) => ({
+        value: uom as string,
+        label: uom as string,
+      }))
+    ];
+  }, [rawMaterials]);
+
   const supplierMaterials = selectedSupplier?.category
     ? selectedSupplier.category.split(",").map((c: string) => c.trim().toLowerCase())
     : [];
@@ -842,16 +862,18 @@ const PurchaseOrderCreatePage: React.FC = () => {
 
           {/* ── Supplier ── */}
           <Section title="Supplier" icon={<FaUser />}>
-            <Row>
+            <Row className="g-3">
+              {/* Store */}
               <Col lg={6} md={12}>
                 <SelectInput
-                  label="Location"
+                  label="Store"
                   name="locationId"
-                  value={formData.locationId} options={[
-                    { label: "Select a location", value: "" },
-                    ...locations.filter(loc => loc.isActive).map(loc => ({
-                      label: `${loc.locationName} (${loc.locationCode})`,
-                      value: loc.locationId
+                  value={formData.locationId}
+                  options={[
+                    { label: "-- Select Store --", value: "" },
+                    ...(stores || []).filter((s) => s.isActive).map((s) => ({
+                      label: s.storeName,
+                      value: s.storeId
                     }))
                   ]}
                   required
@@ -859,6 +881,8 @@ const PurchaseOrderCreatePage: React.FC = () => {
                   onChange={handleChange}
                 />
               </Col>
+
+              {/* Supplier */}
               <Col lg={6} md={12}>
                 <SelectInput
                   label="Supplier"
@@ -876,6 +900,7 @@ const PurchaseOrderCreatePage: React.FC = () => {
           {/* ── Addresses ── */}
           <Section title="Delivery & Shipping Address" icon={<FaMapMarkerAlt />}>
             <Row>
+              {/* Delivery Address — auto-populated from warehouse */}
               <Col lg={6}>
                 <h6 className="mb-3">Delivery Address</h6>
                 <TextInput
@@ -1031,13 +1056,13 @@ const PurchaseOrderCreatePage: React.FC = () => {
                         </td>
 
                         <td className="master-data-cell">
-                          <TextInput
+                          <SelectInput
                             label=""
                             name={`items[${index}].uom`}
+                            options={uomOptions}
                             value={item.uom || ""}
-                            onChange={() => { }}
-                            disabled
-                            placeholder="—"
+                            onChange={(e) => handleItemChange(index, "uom", e.target.value)}
+                            error={errors[`items.${index}.uom`]}
                           />
                         </td>
 

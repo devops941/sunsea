@@ -9,6 +9,7 @@ import {
 
 class CustomerService {
   async createCustomer(data: CreateCustomerInput, currentUser: { userId: string; companyId: string }) {
+    console.log(currentUser, 'lkjlk')
     const existingCustomer = await prisma.customer.findFirst({
       where: {
         companyId: currentUser.companyId,
@@ -33,13 +34,13 @@ class CustomerService {
   async getAllCustomers(search?: string) {
     const whereClause = search
       ? {
-          OR: [
-            { customerCode: { contains: search, mode: "insensitive" as const } },
-            { firmName: { contains: search, mode: "insensitive" as const } },
-            { email: { contains: search, mode: "insensitive" as const } },
-            { mobile: { contains: search, mode: "insensitive" as const } },
-          ],
-        }
+        OR: [
+          { customerCode: { contains: search, mode: "insensitive" as const } },
+          { firmName: { contains: search, mode: "insensitive" as const } },
+          { email: { contains: search, mode: "insensitive" as const } },
+          { mobile: { contains: search, mode: "insensitive" as const } },
+        ],
+      }
       : {};
 
     return prisma.customer.findMany({
