@@ -14,6 +14,10 @@ import { storeService } from "../../../services/storeService";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import CommonViewModal from "../../../components/ui/CommonViewModal/CommonViewModal";
 import CustomButton from "../../../components/ui/custombutton/CustomButton";
+import EditButton from "../../../components/ui/EditButton/EditButton";
+import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
+import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
+import { rawMaterialService } from "../../../services/rawMaterialService";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -30,6 +34,27 @@ const StockList: React.FC = () => {
     const [currentPage, setCurrentPage] = useState(1);
     const [showView, setShowView] = useState(false);
     const [selectedItem, setSelectedItem] = useState<any>(null);
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [itemToDelete, setItemToDelete] = useState<string | null>(null);
+
+    const handleDeleteClick = (rawMaterialId: string) => {
+        setItemToDelete(rawMaterialId);
+        setShowDeleteModal(true);
+    };
+
+    const confirmDelete = async () => {
+        if (!itemToDelete) return;
+        try {
+            await rawMaterialService.delete(itemToDelete);
+            toast.success("Raw material deleted successfully.");
+            dispatch(fetchRawMaterialStocks({ search: debouncedSearch, storeId }));
+        } catch (err: any) {
+            toast.error(err?.response?.data?.message || err?.message || "Cannot delete raw material. It might be in use.");
+        } finally {
+            setShowDeleteModal(false);
+            setItemToDelete(null);
+        }
+    };
 
     // Fetch stores for dropdown
     useEffect(() => {
@@ -112,14 +137,8 @@ const StockList: React.FC = () => {
                         </Col>
                         <Col lg={8} md={12}>
                             <div className="page-header-actions">
-                                <div className="me-2">
-                                    <CustomButton
-                                        text="Add Raw Material"
-                                        icon={FaPlus}
-                                        onClick={() => navigate("/raw-materials/create")}
-                                    />
-                                </div>
-                                <div className="page-search-wrap me-2" style={{ minWidth: "200px" }}>
+                               
+                                {/* <div className="page-search-wrap me-2" style={{ minWidth: "200px" }}>
                                     <SelectInput
                                         label="Select Store"
                                         hideLabel
@@ -137,7 +156,7 @@ const StockList: React.FC = () => {
                                             setCurrentPage(1);
                                         }}
                                     />
-                                </div>
+                                </div> */}
                                 <div className="page-search-wrap">
                                     <FaSearch className="page-search-icon" />
                                     <input
@@ -148,6 +167,7 @@ const StockList: React.FC = () => {
                                         onChange={handleSearch}
                                     />
                                 </div>
+                                
                                 <div className="me-2">
                                     <ExportCSVButton
                                         data={data || []}
@@ -155,6 +175,14 @@ const StockList: React.FC = () => {
                                         filename="stock_ledger_balances.csv"
                                     />
                                 </div>
+                                 <div className="me-2">
+                                    <CustomButton
+                                        text="Add Raw Material"
+                                        icon={FaPlus}
+                                        onClick={() => navigate("/raw-materials/create")}
+                                    />
+                                </div>
+                                
                             </div>
                         </Col>
                     </Row>
@@ -243,6 +271,8 @@ const StockList: React.FC = () => {
                                                                 setShowView(true);
                                                             }}
                                                         />
+                                                        <EditButton onClick={() => navigate(`/raw-materials/edit/${item.rawMaterialId}`)} />
+                                                        <DeleteButton onClick={() => handleDeleteClick(item.rawMaterialId)} />
                                                     </div>
                                                 </td>
                                             </tr>
@@ -309,6 +339,19 @@ const StockList: React.FC = () => {
                         ]
                     }
                 ] : []}
+            />
+
+            <CommonConfirmModal
+                show={showDeleteModal}
+                onHide={() => {
+                    setShowDeleteModal(false);
+                    setItemToDelete(null);
+                }}
+                onConfirm={confirmDelete}
+                title="Delete Raw Material"
+                bodyText="Are you sure you want to delete this Raw Material? This action cannot be undone."
+                confirmText="Delete"
+                confirmVariant="danger"
             />
         </div>
     );

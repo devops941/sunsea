@@ -90,9 +90,11 @@ class DailyScheduleService {
 
       const dayObj = scheduleMap.get(dayNum)!;
       const shiftCode = prog.shiftId;
-      const shiftName = prog.shift.shiftName;
-      const startTime = prog.shift.startTime;
-      const endTime = prog.shift.endTime;
+      if (!shiftCode) continue;
+
+      const shiftName = prog.shift?.shiftName || "Unknown Shift";
+      const startTime = prog.shift?.startTime || "00:00:00";
+      const endTime = prog.shift?.endTime || "00:00:00";
 
       if (!dayObj.shiftsMap.has(shiftCode)) {
         dayObj.shiftsMap.set(shiftCode, {

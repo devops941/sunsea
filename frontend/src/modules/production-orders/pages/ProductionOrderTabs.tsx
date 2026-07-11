@@ -19,7 +19,7 @@ const ProductionOrderTabs: React.FC = () => {
 
     // Map pathnames to tab keys
     const pathToKey: Record<string, string> = {
-        "/approved-sales-orders": "approved",
+        "/approved-sales-orders": "active",
         "/production-orders": "active",
         "/allproduction-orders": "history",
         "/weekly-machine-schedules": "weekly",
@@ -29,7 +29,6 @@ const ProductionOrderTabs: React.FC = () => {
     };
 
     const keyToPath: Record<string, string> = {
-        "approved": "/approved-sales-orders",
         "active": "/production-orders",
         "history": "/allproduction-orders",
         "weekly": "/weekly-machine-schedules",
@@ -38,12 +37,11 @@ const ProductionOrderTabs: React.FC = () => {
         "wastage": "/production-wastages"
     };
 
-    const activeTab = pathToKey[location.pathname] || "approved";
+    const activeTab = pathToKey[location.pathname] || "active";
 
     const tabs: TabItem[] = [
-        { key: "approved", label: "Approved Sales Orders", icon: <FaClipboardCheck />, content: <ApprovedSalesOrderList /> },
-        { key: "active", label: "Active Production Orders", icon: <FaPlay />, content: <ProductionOrderList /> },
         { key: "history", label: "Order History", icon: <FaHistory />, content: <AllProductionOrderList /> },
+        { key: "active", label: "Production Orders", icon: <FaPlay />, content: <ProductionOrderList /> },
         { key: "weekly", label: "Weekly Schedules", icon: <FaCalendarWeek />, content: <WeeklyMachineScheduleList /> },
         { key: "daily", label: "Daily Planning", icon: <FaCalendarDay />, content: <DailyMachinePlanning /> },
         { key: "hourly", label: "Hourly Production", icon: <FaClock />, content: <HourlyWorkReportList /> },

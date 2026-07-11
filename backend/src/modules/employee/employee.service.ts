@@ -237,7 +237,7 @@ class EmployeeService {
   async getNextEmployeeCode() {
     const lastEmployee = await prisma.employee.findFirst({
       orderBy: {
-        id: "desc",
+        empCode: "desc",
       },
     });
 

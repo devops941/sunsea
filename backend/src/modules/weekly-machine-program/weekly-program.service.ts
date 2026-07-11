@@ -31,8 +31,22 @@ class WeeklyProgramService {
 
     // We allow multiple schedules for the same PO (auto-splitting across shifts)
     // so we skip the strict "already planned" validation here. We rely on total quantity validation instead.
-
-
+    
+    if (data.machineId && data.shiftId && data.weekStartDate && data.dayOfWeek !== undefined) {
+      const conflictingProgram = await prisma.weeklyMachineProgram.findFirst({
+        where: {
+          machineId: data.machineId,
+          shiftId: data.shiftId,
+          weekStartDate: new Date(data.weekStartDate),
+          dayOfWeek: data.dayOfWeek,
+          status: { in: ["PLANNED", "IN_PROGRESS", "APPROVED", "RELEASED"] }
+        }
+      });
+      
+      if (conflictingProgram) {
+         throw new ApiError(409, "This Machine is already scheduled or running on the selected shift for today. Please select a different Machine or Shift.");
+      }
+    }
     const productionOrder = await prisma.productionOrder.findUnique({
       where: {
         productionOrderId: data.productionOrderId,
@@ -43,22 +57,52 @@ class WeeklyProgramService {
       throw new ApiError(404, "Production Order not found");
     }
 
-    const machine = await prisma.machine.findUnique({
+    if (productionOrder.status === "COMPLETED" || productionOrder.status === "CANCELLED") {
+      throw new ApiError(400, `Cannot schedule a Weekly Program for a Production Order that is already ${productionOrder.status.toLowerCase()}`);
+    }
+
+    // Validate that the total planned quantity across all weekly schedules (including this one)
+    // does not exceed the target quantity of the Production Order.
+    const aggregatedSchedules = await prisma.weeklyMachineProgram.aggregate({
       where: {
-        machineId: data.machineId,
+        productionOrderId: data.productionOrderId,
+        status: { in: ["PLANNED", "IN_PROGRESS", "APPROVED", "RELEASED", "COMPLETED"] }
       },
+      _sum: {
+        plannedQty: true
+      }
     });
 
-    if (!machine) {
-      throw new ApiError(404, "Machine not found");
-    } const shift = await prisma.shift.findUnique({
-      where: {
-        shiftCode: data.shiftId,
-      },
-    });
+    const alreadyPlannedQty = Number(aggregatedSchedules._sum.plannedQty || 0);
+    const orderTargetQty = Number(productionOrder.targetQty);
+    const newPlannedQty = Number(data.plannedQty);
 
-    if (!shift) {
-      throw new ApiError(404, "Shift not found");
+    if (alreadyPlannedQty + newPlannedQty > orderTargetQty) {
+      throw new ApiError(400, `Cannot schedule Weekly Program: The total planned quantity across all weekly schedules (${alreadyPlannedQty + newPlannedQty} pcs) cannot exceed the Production Order target quantity (${orderTargetQty} pcs). Remaining schedule capacity: ${orderTargetQty - alreadyPlannedQty} pcs.`);
+    }
+
+    if (data.machineId) {
+      const machine = await prisma.machine.findUnique({
+        where: {
+          machineId: data.machineId,
+        },
+      });
+
+      if (!machine) {
+        throw new ApiError(404, "Machine not found");
+      }
+    }
+    
+    if (data.shiftId) {
+      const shift = await prisma.shift.findUnique({
+        where: {
+          shiftCode: data.shiftId,
+        },
+      });
+
+      if (!shift) {
+        throw new ApiError(404, "Shift not found");
+      }
     }
 
     const program = await prisma.$transaction(async (tx) => {
@@ -173,9 +217,54 @@ class WeeklyProgramService {
     const checkDayOfWeek = data.dayOfWeek !== undefined ? data.dayOfWeek : existingProgram.dayOfWeek;
     const checkStatus = data.status || existingProgram.status;
     const checkProductionOrderId = data.productionOrderId || existingProgram.productionOrderId;
+    const checkPlannedQty = data.plannedQty !== undefined ? Number(data.plannedQty) : Number(existingProgram.plannedQty);
+
+    const productionOrder = await prisma.productionOrder.findUnique({
+      where: { productionOrderId: checkProductionOrderId }
+    });
+
+    if (!productionOrder) {
+      throw new ApiError(404, "Production Order not found");
+    }
+
+    // Validate that the updated total planned quantity does not exceed the PO target quantity.
+    const aggregatedSchedules = await prisma.weeklyMachineProgram.aggregate({
+      where: {
+        productionOrderId: checkProductionOrderId,
+        weeklyProgramId: { not: weeklyProgramId },
+        status: { in: ["PLANNED", "IN_PROGRESS", "APPROVED", "RELEASED", "COMPLETED"] }
+      },
+      _sum: {
+        plannedQty: true
+      }
+    });
+
+    const alreadyPlannedQty = Number(aggregatedSchedules._sum.plannedQty || 0);
+    const orderTargetQty = Number(productionOrder.targetQty);
+
+    if (alreadyPlannedQty + checkPlannedQty > orderTargetQty) {
+      throw new ApiError(400, `Cannot update Weekly Program: The total planned quantity across all weekly schedules (${alreadyPlannedQty + checkPlannedQty} pcs) cannot exceed the Production Order target quantity (${orderTargetQty} pcs). Remaining schedule capacity: ${orderTargetQty - alreadyPlannedQty} pcs.`);
+    }
 
     // We skip strict validation checks for conflicting schedule and already planned orders
     // to allow splitting POs across multiple schedules. We rely on total quantity validation instead.
+    
+    if (checkMachineId && checkShiftId && checkWeekStartDate && checkDayOfWeek !== null) {
+      const conflictingProgram = await prisma.weeklyMachineProgram.findFirst({
+        where: {
+          machineId: checkMachineId,
+          shiftId: checkShiftId,
+          weekStartDate: checkWeekStartDate,
+          dayOfWeek: checkDayOfWeek,
+          weeklyProgramId: { not: weeklyProgramId },
+          status: { in: ["PLANNED", "IN_PROGRESS", "APPROVED", "RELEASED"] }
+        }
+      });
+      
+      if (conflictingProgram) {
+         throw new ApiError(409, "This Machine is already scheduled or running on the selected shift for today. Please select a different Machine or Shift.");
+      }
+    }
 
     const updatedProgram = await prisma.$transaction(async (tx) => {
       const res = await tx.weeklyMachineProgram.update({
@@ -196,6 +285,13 @@ class WeeklyProgramService {
 
   async delete(weeklyProgramId: string) {
     const existingProgram = await this.findById(weeklyProgramId);
+
+    if (existingProgram.productionOrder) {
+      const startedStatuses = ["IN_PROGRESS", "IN_PRODUCTION", "COMPLETED", "ON_HOLD", "FG_RECEIVED", "READY_FOR_DISPATCH", "DISPATCHED"];
+      if (startedStatuses.includes(existingProgram.productionOrder.status)) {
+        throw new ApiError(400, "Cannot delete schedule because the Production Order has already started production.");
+      }
+    }
 
     return prisma.$transaction(async (tx) => {
       const deleted = await tx.weeklyMachineProgram.delete({
@@ -291,15 +387,15 @@ class WeeklyProgramService {
                   where: {
                     productionOrderId: p.productionOrderId,
                     productionDate: dateForDay,
-                    machineId: p.machineId,
-                    shiftId: p.shiftId,
+                    machineId: p.machineId || undefined,
+                    shiftId: p.shiftId || undefined,
                   },
                   _sum: {
                     qtyProduced: true,
                   },
                 });
 
-                const producedQty = Number(aggregate._sum.qtyProduced || 0);
+                const producedQty = Number(aggregate?._sum?.qtyProduced || 0);
                 const plannedQty = Number(p.plannedQty);
                 const remainingQty = Math.max(0, plannedQty - producedQty);
 

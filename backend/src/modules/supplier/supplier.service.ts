@@ -55,7 +55,7 @@ class SupplierService {
   async getNextSupplierCode() {
     const lastSupplier = await prisma.supplier.findFirst({
       orderBy: {
-        createdAt: "desc",
+        supplierCode: "desc",
       },
     });
 

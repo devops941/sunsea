@@ -887,9 +887,7 @@ const ProductionOrderCreate: React.FC = () => {
                 .then((orderNo) => setValue("productionOrderId", orderNo))
                 .catch(() => { });
 
-            const suffix = Math.floor(Math.random() * 10000).toString().padStart(4, "0");
-            const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-            setValue("batchNo", `BAT-${dateStr}-${suffix}`);
+
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [id, reset, setValue]);
@@ -1195,6 +1193,7 @@ const ProductionOrderCreate: React.FC = () => {
                                                                     disabled: isSelected
                                                                 };
                                                             })}
+                                                            defaultOptionLabel="Select Finished Product"
                                                             onChange={(e) => {
                                                                 field.onChange(e);
                                                                 const p = products.find((x) => x.id?.toString() === e.target.value);
@@ -1397,41 +1396,6 @@ const ProductionOrderCreate: React.FC = () => {
                             />
                         </Col>
 
-                        {/* ── 3. Tracking ─────────────────────────────────── */}
-                        <Col lg={12} className="mt-4">
-                            <h6 className="section-title border-bottom-0 ">
-                                3. Tracking & Assignments
-                            </h6>
-                            <Row className="g-3">
-                                <Col md={6}>
-                                    <Controller
-                                        name="batchNo"
-                                        control={control}
-                                        render={({ field }) => (
-                                            <CtrlText
-                                                field={field}
-                                                label="Batch No"
-                                                placeholder="Auto Generated"
-                                                disabled
-                                            />
-                                        )}
-                                    />
-                                </Col>
-                                <Col md={6}>
-                                    <Controller
-                                        name="lotNo"
-                                        control={control}
-                                        render={({ field }) => (
-                                            <CtrlText
-                                                field={field}
-                                                label="Lot No"
-                                                placeholder="Enter Lot No"
-                                            />
-                                        )}
-                                    />
-                                </Col>
-                            </Row>
-                        </Col>
 
 
 

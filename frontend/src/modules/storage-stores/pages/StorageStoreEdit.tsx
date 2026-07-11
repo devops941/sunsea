@@ -14,10 +14,7 @@ import { fetchStoreTypes } from "../../../features/store-types/storeTypeSlice";
 import { z } from "zod";
 // Dynamic Store Types are now fetched from DB
 
-const COST_METHOD_OPTIONS = [
-    { label: "Weighted Average (WAVG)", value: "WAVG" },
-    { label: "First In First Out (FIFO)", value: "FIFO" },
-];
+
 
 const STATUS_OPTIONS = [
     { label: "Active", value: "Active" },
@@ -34,32 +31,30 @@ const storeSchema = z.object({
         .min(1, "Store Name is required")
         .max(100, "Maximum 100 characters allowed")
         .regex(
-            /^[A-Za-z][A-Za-z0-9\s&()-]*$/,
-            "Store Name must start with a letter and may contain letters, numbers, spaces, &, (, ), and -"
+            /^[A-Za-z0-9\s&()-]+$/,
+            "Store Name can only contain letters, numbers, spaces, &, (, ), and -"
         ),
 
     storeTypeId: z
         .string()
+        .trim()
         .min(1, "Store Type is required"),
-
-    locationId: z
-        .string()
-        .min(1, "Location is required"),
 
     inchargeId: z
         .string()
+        .trim()
         .min(1, "Store Incharge is required"),
 
-    locationDesc: z
+    locationId: z
         .string()
         .trim()
-        .min(1, "Location Description is required")
-        .max(255, "Maximum 255 characters allowed"),
+        .min(1, "Location is required"),
 
     gstPlace: z
         .string()
-        .max(10, "Maximum 10 characters allowed")
+        .trim()
         .optional()
+        .or(z.literal(""))
 });
 
 const initialFormState = {
@@ -67,9 +62,7 @@ const initialFormState = {
     storeName: "",
     storeTypeId: "",
     locationId: "",
-    locationDesc: "",
     inchargeId: "",
-    costMethod: "WAVG",
     gstPlace: "",
     status: "Active",
     allowNegative: false,
@@ -102,9 +95,7 @@ const StorageStoreEdit: React.FC = () => {
                 storeName: location.state.storeName || "",
                 storeTypeId: location.state.storeTypeId ? location.state.storeTypeId.toString() : "",
                 locationId: location.state.locationId || "",
-                locationDesc: location.state.locationDesc || "",
                 inchargeId: location.state.inchargeId ? location.state.inchargeId.toString() : "",
-                costMethod: location.state.costMethod || "WAVG",
                 gstPlace: location.state.gstPlace || "",
                 status: location.state.status || "Active",
                 allowNegative: location.state.allowNegative || false,
@@ -176,9 +167,7 @@ const StorageStoreEdit: React.FC = () => {
                             ? Number(formData.storeTypeId)
                             : undefined,
                         locationId: formData.locationId || undefined,
-                        locationDesc: formData.locationDesc || undefined,
                         inchargeId: formData.inchargeId || undefined,
-                        costMethod: formData.costMethod,
                         gstPlace: formData.gstPlace || undefined,
                         status: formData.status,
                         allowNegative: formData.allowNegative,
@@ -297,15 +286,7 @@ const StorageStoreEdit: React.FC = () => {
                             />
                         </Col>
 
-                        <Col md={4}>
-                            <SelectInput
-                                label="Costing Method"
-                                name="costMethod"
-                                value={formData.costMethod}
-                                options={COST_METHOD_OPTIONS}
-                                onChange={handleChange}
-                            />
-                        </Col>
+
                         <Col md={4}>
                             <SelectInput
                                 label="Status"
@@ -326,19 +307,7 @@ const StorageStoreEdit: React.FC = () => {
                                 onChange={handleChange}
                             />
                         </Col>
-                        <Col md={4}>
-                            <div className="form-group mb-3 d-flex align-items-center gap-2">
-                                <input
-                                    type="checkbox"
-                                    id="allowNegative"
-                                    name="allowNegative"
-                                    checked={formData.allowNegative}
-                                    onChange={handleChange}
-                                    style={{ width: 'auto', marginTop: '2rem' }}
-                                />
-                                <label htmlFor="allowNegative" className="form-label mb-0" style={{ marginTop: '2rem' }}>Allow Negative Stock</label>
-                            </div>
-                        </Col>
+
 
                     </Row>
 

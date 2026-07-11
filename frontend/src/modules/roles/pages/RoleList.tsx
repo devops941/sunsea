@@ -27,7 +27,7 @@ const RoleList: React.FC = () => {
     const [editMode, setEditMode] = useState(false);
     const [selectedRole, setSelectedRole] = useState<any>(null);
     const [formErrors, setFormErrors] = useState<{
-        
+        code?: string;
         name?: string;
     }>({});
 
@@ -37,7 +37,7 @@ const RoleList: React.FC = () => {
 
     const [formData, setFormData] = useState({
         id: "",
-        
+        code: "",
         name: "",
         description: "",
         status: "active",
@@ -60,7 +60,7 @@ const RoleList: React.FC = () => {
 
     const filteredRoles = useMemo(() => {
         return roles.filter(role =>
-            
+            (role.code && role.code.toLowerCase().includes(searchTerm.toLowerCase())) ||
             role.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
             (role.description && role.description.toLowerCase().includes(searchTerm.toLowerCase()))
         );
@@ -74,7 +74,7 @@ const RoleList: React.FC = () => {
         setEditMode(false);
         setFormData({
             id: "",
-            
+            code: "",
             name: "",
             description: "",
             status: "active",
@@ -86,7 +86,7 @@ const RoleList: React.FC = () => {
         setEditMode(true);
         setFormData({
             id: String(role.id),
-            
+            code: role.code || "",
             name: role.name,
             description: role.description || "",
             status: role.status,
@@ -129,7 +129,9 @@ const RoleList: React.FC = () => {
     const validateRoleForm = () => {
         const errors: any = {};
 
-        
+        if (!formData.code.trim()) {
+            errors.code = "Role code is required";
+        }
 
         if (!formData.name.trim()) {
             errors.name = "Role name is required";
@@ -144,7 +146,7 @@ const RoleList: React.FC = () => {
         if (!validateRoleForm()) return;
         try {
             const payload = {
-                
+                code: formData.code,
                 name: formData.name,
                 description: formData.description,
                 status: formData.status
@@ -209,6 +211,7 @@ const RoleList: React.FC = () => {
                                 <thead>
                                     <tr>
                                         <th style={{ width: "60px" }}>#</th>
+                                        <th>Role Code</th>
                                         <th>Role Name</th>
                                         <th>Description</th>
                                         <th>Status</th>
@@ -220,7 +223,7 @@ const RoleList: React.FC = () => {
                                         paginatedRoles.map((role, index) => (
                                             <tr key={role.id} className="master-data-row">
                                                 <td className="master-data-cell">{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</td>
-                                                
+                                                <td className="master-data-cell">{role.code}</td>
                                                 <td className="master-data-cell">{role.name}</td>
                                                 <td className="master-data-cell">{role.description}</td>
                                                 <td className="master-data-cell">
@@ -237,7 +240,7 @@ const RoleList: React.FC = () => {
                                         ))
                                     ) : (
                                         <tr>
-                                            <td colSpan={5} className="text-center p-4">No roles found.</td>
+                                            <td colSpan={6} className="text-center p-4">No roles found.</td>
                                         </tr>
                                     )}
                                 </tbody>
@@ -277,7 +280,18 @@ const RoleList: React.FC = () => {
                     <form onSubmit={handleSubmit}>
                         <Modal.Body>
                             <Row className="g-3">
-                                
+                                <Col md={12}>
+                                    <TextInput
+                                        label="Role Code"
+                                        name="code"
+                                        value={formData.code}
+                                        placeholder="e.g. ROLE_ADMIN"
+                                        required
+                                        error={formErrors.code}
+                                        onChange={handleChange}
+                                        disabled={editMode && formData.code === "ROLE_ADMIN"}
+                                    />
+                                </Col>
                                 <Col md={12}>
                                     <TextInput
                                         label="Role Name"
@@ -286,7 +300,6 @@ const RoleList: React.FC = () => {
                                         placeholder="e.g. Super Admin"
                                         required
                                         error={formErrors.name}
-
                                         onChange={handleChange}
                                     />
                                 </Col>
@@ -319,7 +332,7 @@ const RoleList: React.FC = () => {
                                 icon={FaEraser}
                                 onClick={() => setFormData({
                                     id: formData.id,
-                                    
+                                    code: "",
                                     name: "",
                                     description: "",
                                     status: "active",
@@ -348,7 +361,7 @@ const RoleList: React.FC = () => {
                     sections={selectedRole ? [
                         {
                             fields: [
-                                
+                                { label: "Role Code", value: selectedRole.code },
                                 { label: "Role Name", value: selectedRole.name },
                                 { label: "Description", value: selectedRole.description || "N/A" },
                                 {

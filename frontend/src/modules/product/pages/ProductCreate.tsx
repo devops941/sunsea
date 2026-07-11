@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Container, Row, Col } from "react-bootstrap";
-import { FaIdCard, FaUser, FaSave, FaEraser, FaTimes } from "react-icons/fa";
+import { FaSave, FaEraser, FaTimes } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import TextInput from "../../../components/form/TextInput/TextInput";
@@ -43,7 +43,6 @@ const ProductCreatePage: React.FC = () => {
     const { categories, loadCategories } = useCategories();
     const { colors, loadColors } = useColors();
     const { sizes, loadSizes } = useSizes();
-    const { loadActiveUOMs } = useUOMs();
     const dispatch = useAppDispatch();
 
     // ── GST taxes from Redux store ──────────────────────────────────────
@@ -165,13 +164,7 @@ const ProductCreatePage: React.FC = () => {
             newErrors.minimumQty = "Minimum Stock Qty must be 0 or greater.";
         }
 
-        if (!formData.maximumQty.toString().trim()) {
-            newErrors.maximumQty = "Maximum Stock Qty is required.";
-        } else if (isNaN(maxQty) || maxQty < 0) {
-            newErrors.maximumQty = "Maximum Stock Qty must be 0 or greater.";
-        } else if (!isNaN(minQty) && maxQty < minQty) {
-            newErrors.maximumQty = "Maximum Qty cannot be less than Minimum Qty.";
-        }
+
 
         // ── UOM ─────────────────────────────────────────────────────────
         if (!formData.uomId) {
@@ -460,7 +453,6 @@ const ProductCreatePage: React.FC = () => {
                                 name="productCode"
                                 value={formData.productCode}
                                 placeholder="e.g. PRD-001"
-                                icon={<FaIdCard />}
                                 required
                                 onChange={handleChange}
                                 disabled
@@ -473,22 +465,13 @@ const ProductCreatePage: React.FC = () => {
                                 name="productName"
                                 value={formData.productName}
                                 placeholder="e.g. Plastic Bucket 20L"
-                                icon={<FaUser />}
                                 required
                                 onChange={handleChange}
                                 error={errors.productName}
                             />
                         </Col>
 
-                        <Col lg={4} md={6}>
-                            <TextInput
-                                label="Display Name"
-                                name="displayName"
-                                value={formData.displayName}
-                                placeholder="e.g. Bucket 20L"
-                                onChange={handleChange}
-                            />
-                        </Col>
+
 
                         <Col lg={4} md={6}>
                             <SelectInput
@@ -502,23 +485,18 @@ const ProductCreatePage: React.FC = () => {
                             />
                         </Col>
 
+
+
                         <Col lg={4} md={6}>
                             <TextInput
-                                label="Tags"
-                                name="tags"
-                                value={formData.tags}
-                                placeholder="e.g. plastic, large, paint-industry"
+                                label="Minimum Stock Qty"
+                                name="minimumQty"
+                                type="number"
+                                placeholder="0"
+                                value={String(formData.minimumQty)}
                                 onChange={handleChange}
-                            />
-                        </Col>
-
-                        <Col lg={8}>
-                            <TextInput
-                                label="Description"
-                                name="description"
-                                value={formData.description}
-                                placeholder="Enter catalogue description..."
-                                onChange={handleChange}
+                                required
+                                error={errors.minimumQty}
                             />
                         </Col>
 
@@ -534,30 +512,17 @@ const ProductCreatePage: React.FC = () => {
                                 onChange={handleChange}
                             />
                         </Col>
-                        <Col lg={4} md={6}>
+
+                        <Col lg={12}>
                             <TextInput
-                                label="Minimum Stock Qty"
-                                name="minimumQty"
-                                type="number"
-                                placeholder="0"
-                                value={String(formData.minimumQty)}
+                                label="Description"
+                                name="description"
+                                value={formData.description}
+                                placeholder="Enter catalogue description..."
                                 onChange={handleChange}
-                                required
-                                error={errors.minimumQty}
                             />
                         </Col>
-                        <Col lg={4} md={6}>
-                            <TextInput
-                                label="Maximum Stock Qty"
-                                name="maximumQty"
-                                type="number"
-                                placeholder="0"
-                                value={String(formData.maximumQty)}
-                                onChange={handleChange}
-                                required
-                                error={errors.maximumQty}
-                            />
-                        </Col>
+
                     </Row>
 
                     {/* Product Images */}
@@ -648,15 +613,7 @@ const ProductCreatePage: React.FC = () => {
                             />
                         </Col>
 
-                        <Col lg={4} md={6}>
-                            <TextInput
-                                label="Capacity (Litres)"
-                                name="capacityLitres"
-                                value={formData.capacityLitres}
-                                placeholder="e.g. 10"
-                                onChange={handleChange}
-                            />
-                        </Col>
+
 
                         <Col lg={4} md={6}>
                             <QuantityInput

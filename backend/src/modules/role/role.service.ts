@@ -2,6 +2,7 @@ import { prisma } from "../../config/prisma";
 
 export const createRole = async (
   data: {
+    code: string;
     name: string;
     description?: string;
   }
@@ -32,6 +33,7 @@ export const getRoleById = async (
 export const updateRole = async (
   id: number,
   data: {
+    code?: string;
     name?: string;
     description?: string;
     status?: "active" | "inactive";
