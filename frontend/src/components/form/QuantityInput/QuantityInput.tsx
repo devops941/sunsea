@@ -54,9 +54,15 @@ const QuantityInput: React.FC<QuantityInputProps> = ({
   const [displayValue, setDisplayValue] = useState<string>(String(value || ""));
   const [selectedUom, setSelectedUom] = useState<string>(primaryUom);
 
-  // If primaryUom changes, reset selectedUom if current isn't valid
+  const prevPrimaryUomRef = React.useRef(primaryUom);
+
+  // If primaryUom changes, reset selectedUom if current isn't valid,
+  // or if the primaryUom itself has changed to a new value.
   useEffect(() => {
-    if (primaryUom && !uomList.includes(selectedUom)) {
+    if (primaryUom !== prevPrimaryUomRef.current) {
+      setSelectedUom(primaryUom);
+      prevPrimaryUomRef.current = primaryUom;
+    } else if (primaryUom && !uomList.includes(selectedUom)) {
       setSelectedUom(primaryUom);
     }
   }, [primaryUom, uomList, selectedUom]);

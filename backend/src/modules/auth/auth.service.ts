@@ -125,30 +125,12 @@ export class AuthService {
       }
     }
 
+    if (user && user.status === UserStatus.LOCKED) {
+      await authRepository.unlockUser(user.userId);
+      user.status = UserStatus.ACTIVE;
+    }
+
     if (!user || user.status !== UserStatus.ACTIVE) {
-      if (user && user.status === UserStatus.LOCKED) {
-        if (user.lockedUntil && user.lockedUntil > new Date()) {
-          const unlockTime = user.lockedUntil.toLocaleString();
-
-          await authRepository.recordLoginAttempt({
-            username: payload.email,
-            userId: user.userId,
-            ipAddress: ipAddress ?? "unknown",
-            success: false,
-            failureReason: "account_locked",
-            userAgent
-          });
-
-          throw new ApiError(
-            403,
-            `Account is locked due to multiple failed login attempts. Please try again after ${unlockTime} or contact the system administrator.`
-          );
-        }
-
-        if (user.lockedUntil && user.lockedUntil <= new Date()) {
-          await authRepository.unlockUser(user.userId);
-        }
-      }
 
       await authRepository.recordLoginAttempt({
         username: payload.email,
@@ -197,7 +179,7 @@ export class AuthService {
 
     // Successful login
     const permissions = await authRepository.findPermissionsByRole(user.roleId);
-    const roleCode = user.role?.name ?? (user.roleId !== null ? user.roleId.toString() : "");
+    const roleCode = user.role?.code ?? (user.roleId !== null ? user.roleId.toString() : "");
 
     // Generate unique session token
     const sessionToken = crypto.randomBytes(32).toString("hex");

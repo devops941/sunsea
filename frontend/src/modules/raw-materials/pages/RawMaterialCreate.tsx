@@ -439,7 +439,7 @@ const RawMaterialCreate: React.FC = () => {
                                 value={formData.baseUom}
                                 required
                                 isMulti
-                                category={["length", "mass", "each"]}
+                                category={["length", "mass", "each","volume"]}
                                 allowedCodes={[
                                     "kg", "g", "t", "ton",
                                     "l", "ml", "ltr",
@@ -580,30 +580,6 @@ const RawMaterialCreate: React.FC = () => {
                     {/* Other Details */}
                     <Row className="mb-4">
                         <h2 className="form-title">Other Details</h2>
-
-                        <Col lg={4} md={6}>
-                            <TextInput
-                                label="Batch No"
-                                name="batchNo"
-                                value={formData.batchNo}
-                                required
-                                error={errors.batchNo}
-                                onChange={handleChange}
-                            />
-                        </Col>
-
-                        <Col lg={4} md={6}>
-                            <TextInput
-                                type="datetime-local"
-                                label="Last Movement"
-                                name="lastMovementAt"
-                                value={formData.lastMovementAt}
-                                required
-                                min={new Date().toISOString().split('T')[0] + 'T00:00'}
-                                error={errors.lastMovementAt}
-                                onChange={handleChange}
-                            />
-                        </Col>
 
                         <Col lg={4} md={6}>
                             <TextInput

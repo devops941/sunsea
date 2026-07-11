@@ -47,7 +47,7 @@ export const requirePermission = (permission: string) => {
     }
 
     // Bypass for Super Admin and Admin role
-    if (user.isSuperAdmin || user.roleId === "ROLE_ADMIN") {
+    if (user.isSuperAdmin || user.roleId === "ROLE_ADMIN" || user.roleId === "ADMIN") {
       return next();
     }
 

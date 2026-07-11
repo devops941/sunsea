@@ -28,13 +28,15 @@ export const createWeeklyProgramSchema = z.object({
 
     machineId: z
       .string()
-      .min(1, "Machine is required")
-      .max(50),
+      .max(50)
+      .optional()
+      .nullable(),
 
     shiftId: z
       .string()
-      .min(1, "Shift is required")
-      .max(50),
+      .max(50)
+      .optional()
+      .nullable(),
 
     dayOfWeek: z
       .number()
@@ -113,12 +115,14 @@ export const updateWeeklyProgramSchema = z.object({
     machineId: z
       .string()
       .max(50)
-      .optional(),
+      .optional()
+      .nullable(),
 
     shiftId: z
       .string()
       .max(50)
-      .optional(),
+      .optional()
+      .nullable(),
 
     dayOfWeek: z
       .number()

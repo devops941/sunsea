@@ -143,7 +143,7 @@ export const productionOrderQuerySchema = z.object({
       .optional()
       .default("20")
       .transform(Number)
-      .refine((val) => val > 0 && val <= 100, "Page size must be between 1 and 100"),
+      .refine((val) => val > 0 && val <= 1000, "Page size must be between 1 and 1000"),
 
     productItemId: z
       .string()

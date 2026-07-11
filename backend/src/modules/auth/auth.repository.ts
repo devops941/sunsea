@@ -19,6 +19,7 @@ interface PrismaUser {
   mfaSecret: string | null;
   roleId: number | null;
   role?: {
+    code: string;
     name: string;
   } | null;
   createdBy: string | null;
@@ -34,21 +35,21 @@ export class AuthRepository {
   async findUserByEmail(email: string): Promise<PrismaUser | null> {
     return prisma.user.findUnique({
       where: { email },
-      include: { role: { select: { name: true } } }
+      include: { role: { select: { code: true, name: true } } }
     }) as Promise<PrismaUser | null>;
   }
 
   async findUserByUsername(username: string): Promise<PrismaUser | null> {
     return prisma.user.findUnique({
       where: { username },
-      include: { role: { select: { name: true } } }
+      include: { role: { select: { code: true, name: true } } }
     }) as Promise<PrismaUser | null>;
   }
 
   async findUserById(userId: string): Promise<PrismaUser | null> {
     return prisma.user.findUnique({
       where: { userId },
-      include: { role: { select: { name: true } } }
+      include: { role: { select: { code: true, name: true } } }
     }) as Promise<PrismaUser | null>;
   }
 
@@ -93,7 +94,7 @@ export class AuthRepository {
         roleId: payload.roleId !== undefined ? Number(payload.roleId) : undefined,
         createdBy: payload.createdBy
       },
-      include: { role: { select: { name: true } } }
+      include: { role: { select: { code: true, name: true } } }
     }) as Promise<PrismaUser>;
   }
 
@@ -122,11 +123,7 @@ export class AuthRepository {
     return prisma.user.update({
       where: { userId },
       data: {
-        failedAttempts: newFailedAttempts,
-        ...(shouldLock && {
-          status: UserStatus.LOCKED,
-          lockedUntil: new Date(Date.now() + 30 * 60 * 1000) // 30 minutes
-        })
+        failedAttempts: newFailedAttempts
       }
     }) as Promise<PrismaUser>;
   }

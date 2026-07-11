@@ -187,6 +187,7 @@ model Permission {
 
 model Role {
   id              Int              @id @default(autoincrement())
+  code            String           @unique @default("ADMIN")
   name            String
   description     String?
   isSystem        Boolean          @default(true)
@@ -912,9 +913,9 @@ model WeeklyMachineProgram {
   weeklyProgramId   String          @id @map("weekly_program_id") @db.VarChar(20)
   weekStartDate     DateTime        @map("week_start_date") @db.Date
   weekEndDate       DateTime        @map("week_end_date") @db.Date
-  machineId         String          @map("machine_id") @db.VarChar(20)
+  machineId         String?         @map("machine_id") @db.VarChar(20)
   dayOfWeek         Int             @map("day_of_week")
-  shiftId           String          @map("shift_id") @db.VarChar(20)
+  shiftId           String?         @map("shift_id") @db.VarChar(20)
   plannedQty        Decimal         @map("planned_qty") @db.Decimal(12, 3)
   status            String          @default("DRAFT") @db.VarChar(20)
   remarks           String?         @db.VarChar(255)
@@ -930,10 +931,10 @@ model WeeklyMachineProgram {
   productionOrderId String          @map("production_order_id") @db.VarChar(20)
   sequenceNo        Int             @default(1) @map("sequence_no")
   setupHours        Decimal?        @map("setup_hours") @db.Decimal(10, 2)
-  machine           Machine         @relation(fields: [machineId], references: [machineId])
+  machine           Machine?        @relation(fields: [machineId], references: [machineId])
   Product           Product?        @relation("ProductWeeklyPrograms", fields: [productId], references: [id])
   productionOrder   ProductionOrder @relation(fields: [productionOrderId], references: [productionOrderId])
-  shift             Shift           @relation(fields: [shiftId], references: [shiftCode], onDelete: Cascade)
+  shift             Shift?          @relation(fields: [shiftId], references: [shiftCode], onDelete: Cascade)
 
   @@unique([machineId, shiftId, weekStartDate, dayOfWeek, sequenceNo])
   @@index([productionOrderId])

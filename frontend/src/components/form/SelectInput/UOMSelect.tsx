@@ -2,8 +2,47 @@ import React from "react";
 import { Form, Spinner, Button } from "react-bootstrap";
 import { Controller } from "react-hook-form";
 import type { Control } from "react-hook-form";
-import Select from "react-select";
+import Select, { components } from "react-select";
+import type { MultiValueProps } from "react-select";
 import { useUOM } from "../../../hooks/useUOM";
+
+const SortableMultiValue = (props: MultiValueProps<any>) => {
+  const onDragStart = (e: React.DragEvent<HTMLDivElement>) => {
+    e.dataTransfer.setData("text/plain", props.index.toString());
+  };
+
+  const onDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+  };
+
+  const onDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const draggedIndexStr = e.dataTransfer.getData("text/plain");
+    if (!draggedIndexStr) return;
+    const draggedIndex = parseInt(draggedIndexStr, 10);
+    const targetIndex = props.index;
+
+    if (draggedIndex !== targetIndex) {
+      const onReorder = (props.selectProps as any).onReorder;
+      if (onReorder) {
+        onReorder(draggedIndex, targetIndex);
+      }
+    }
+  };
+
+  return (
+    <div
+      draggable
+      onDragStart={onDragStart}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+      style={{ cursor: "grab", display: "inline-flex" }}
+    >
+      <components.MultiValue {...props} />
+    </div>
+  );
+};
+
 import "./SelectInput.css";
 
 interface UOMSelectProps {
@@ -111,7 +150,9 @@ export const UOMSelect: React.FC<UOMSelectProps> = ({
                   label: `${u.label} (${u.code})`,
                   value: u.code,
                 }));
-              const selectedOptions = options.filter((o) => currentValueArray.includes(o.value));
+              const selectedOptions = currentValueArray
+                .map((val: string) => options.find((o) => o.value === val))
+                .filter(Boolean);
 
               return (
                 <>
@@ -122,6 +163,17 @@ export const UOMSelect: React.FC<UOMSelectProps> = ({
                     options={options}
                     value={selectedOptions}
                     placeholder={placeholder}
+                    components={{ MultiValue: SortableMultiValue }}
+                    {...({
+                      onReorder: (dragIndex: number, hoverIndex: number) => {
+                        const newValues = [...currentValueArray];
+                        const [dragged] = newValues.splice(dragIndex, 1);
+                        newValues.splice(hoverIndex, 0, dragged);
+                        const newValueStr = newValues.join(",");
+                        field.onChange(newValueStr);
+                        if (customOnChange) customOnChange(newValueStr);
+                      }
+                    } as any)}
                     className={fieldState.error ? 'is-invalid' : ''}
                     styles={{
                       control: (base) => ({
@@ -190,7 +242,9 @@ export const UOMSelect: React.FC<UOMSelectProps> = ({
                   label: `${u.label} (${u.code})`,
                   value: u.code,
                 }));
-              const selectedOptions = options.filter((o) => currentValueArray.includes(o.value));
+              const selectedOptions = currentValueArray
+                .map((val) => options.find((o) => o.value === val))
+                .filter(Boolean);
 
               return (
                 <Select
@@ -200,6 +254,16 @@ export const UOMSelect: React.FC<UOMSelectProps> = ({
                   options={options}
                   value={selectedOptions}
                   placeholder={placeholder}
+                  components={{ MultiValue: SortableMultiValue }}
+                  {...({
+                    onReorder: (dragIndex: number, hoverIndex: number) => {
+                      const newValues = [...currentValueArray];
+                      const [dragged] = newValues.splice(dragIndex, 1);
+                      newValues.splice(hoverIndex, 0, dragged);
+                      const newValueStr = newValues.join(",");
+                      if (customOnChange) customOnChange(newValueStr);
+                    }
+                  } as any)}
                   className={error ? 'is-invalid' : ''}
                   styles={{
                     control: (base) => ({

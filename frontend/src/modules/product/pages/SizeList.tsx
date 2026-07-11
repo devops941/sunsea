@@ -12,6 +12,7 @@ import TextInput from "../../../components/form/TextInput/TextInput";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import { useSizes } from "../../../hooks/useSizes";
 import { sizeService } from "../../../services/sizeService";
+import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -245,9 +246,7 @@ const SizeList: React.FC = () => {
                                                 <td className="master-data-cell">{size.code}</td>
                                                 <td className="master-data-cell">{size.name}</td>
                                                 <td className="master-data-cell">
-                                                    <span className={`status-pill status-pill--${size.status === "ACTIVE" ? "active" : "inactive"}`}>
-                                                        {size.status}
-                                                    </span>
+                                                    <StatusBadge status={size.status} />
                                                 </td>
                                                 <td className="master-data-cell">{new Date(size.createdAt).toLocaleDateString()}</td>
                                                 <td className="master-data-cell">

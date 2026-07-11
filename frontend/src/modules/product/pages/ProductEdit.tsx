@@ -238,13 +238,7 @@ const ProductEdit: React.FC = () => {
             newErrors.minimumQty = "Minimum Stock Qty must be 0 or greater.";
         }
 
-        if (!formData.maximumQty.toString().trim()) {
-            newErrors.maximumQty = "Maximum Stock Qty is required.";
-        } else if (isNaN(maxQty) || maxQty < 0) {
-            newErrors.maximumQty = "Maximum Stock Qty must be 0 or greater.";
-        } else if (!isNaN(minQty) && maxQty < minQty) {
-            newErrors.maximumQty = "Maximum Qty cannot be less than Minimum Qty.";
-        }
+
 
         // --- UOM, Size ---
         if (!formData.uomId) {
@@ -559,15 +553,7 @@ const ProductEdit: React.FC = () => {
                                 error={errors.productName}
                             />
                         </Col>
-                        <Col lg={4} md={6}>
-                            <TextInput
-                                label="Display Name"
-                                name="displayName"
-                                value={formData.displayName}
-                                placeholder="e.g. Bucket 20L"
-                                onChange={handleChange}
-                            />
-                        </Col>
+
                         <Col lg={4} md={6}>
                             <SelectInput
                                 label="Category"
@@ -579,21 +565,15 @@ const ProductEdit: React.FC = () => {
                                 error={errors.categoryId}
                             />
                         </Col>
+
                         <Col lg={4} md={6}>
                             <TextInput
-                                label="Tags"
-                                name="tags"
-                                value={formData.tags}
-                                placeholder="e.g. plastic, large, paint-industry"
-                                onChange={handleChange}
-                            />
-                        </Col>
-                        <Col lg={8}>
-                            <TextInput
-                                label="Description"
-                                name="description"
-                                value={formData.description}
-                                placeholder="Enter catalogue description..."
+                                label="Minimum Stock Qty"
+                                name="minimumQty"
+                                type="number"
+                                value={String(formData.minimumQty)}
+                                required
+                                error={errors.minimumQty}
                                 onChange={handleChange}
                             />
                         </Col>
@@ -609,28 +589,16 @@ const ProductEdit: React.FC = () => {
                                 onChange={handleChange}
                             />
                         </Col>
-                        <Col lg={4} md={6}>
+                        <Col lg={12}>
                             <TextInput
-                                label="Minimum Stock Qty"
-                                name="minimumQty"
-                                type="number"
-                                value={String(formData.minimumQty)}
-                                required
-                                error={errors.minimumQty}
+                                label="Description"
+                                name="description"
+                                value={formData.description}
+                                placeholder="Enter catalogue description..."
                                 onChange={handleChange}
                             />
                         </Col>
-                        <Col lg={4} md={6}>
-                            <TextInput
-                                label="Maximum Stock Qty"
-                                name="maximumQty"
-                                type="number"
-                                value={String(formData.maximumQty)}
-                                required
-                                error={errors.maximumQty}
-                                onChange={handleChange}
-                            />
-                        </Col>
+
                     </Row>
 
                     {/* Product Images */}
@@ -764,15 +732,7 @@ const ProductEdit: React.FC = () => {
                                 error={errors.bundleQty}
                             />
                         </Col>
-                        <Col lg={4} md={6}>
-                            <TextInput
-                                label="Capacity (Litres)"
-                                name="capacityLitres"
-                                value={formData.capacityLitres}
-                                placeholder="e.g. 10"
-                                onChange={handleChange}
-                            />
-                        </Col>
+
                         <Col lg={4} md={6}>
                             <QuantityInput
                                 label="Weight Per Piece"

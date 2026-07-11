@@ -12,6 +12,7 @@ import TextInput from "../../../components/form/TextInput/TextInput";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import { useColors } from "../../../hooks/useColors";
 import { colorService } from "../../../services/colorService";
+import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -320,9 +321,7 @@ const ColorList: React.FC = () => {
                                                     </div>
                                                 </td>
                                                 <td className="master-data-cell">
-                                                    <span className={`status-pill status-pill--${color.status === "ACTIVE" ? "active" : "inactive"}`}>
-                                                        {color.status}
-                                                    </span>
+                                                    <StatusBadge status={color.status} />
                                                 </td>
                                                 <td className="master-data-cell">
                                                     <div className="table-action-group">

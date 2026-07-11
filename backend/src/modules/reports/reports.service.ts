@@ -156,7 +156,7 @@ class ReportsService {
         weekStartDate: wp.weekStartDate,
         weekEndDate: wp.weekEndDate,
         machineId: wp.machineId,
-        machineName: wp.machine.machineName,
+        machineName: wp.machine?.machineName || "Unassigned",
         plannedProductItemId: wp.productId ? wp.productId.toString() : null,
         productCode: wp.Product?.productCode || null,
         productName: wp.Product?.productName || null,

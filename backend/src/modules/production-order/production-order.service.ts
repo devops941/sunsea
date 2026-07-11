@@ -710,6 +710,36 @@ class ProductionOrderService {
       }
     }
 
+    // RM_PENDING or DRAFT -> PLANNED (recheck raw material availability)
+    if ((existing.status === "RM_PENDING" || existing.status === "DRAFT") && data.status === "PLANNED") {
+      const rawMaterialsToUse = data.rawMaterials ?? (existing.draftRawMaterials as any[]) ?? [];
+      if (rawMaterialsToUse.length > 0) {
+        let allAvailable = true;
+        const aggregatedRms: Record<string, number> = {};
+        for (const rm of rawMaterialsToUse) {
+          aggregatedRms[rm.rawMaterialId] = (aggregatedRms[rm.rawMaterialId] || 0) + Number(rm.requiredQty);
+        }
+
+        for (const [rawMaterialId, totalRequired] of Object.entries(aggregatedRms)) {
+          const stock = await prisma.rawMaterial.findUnique({ where: { rawMaterialId } });
+          const availableStock = stock ? Number(stock.onHandQty) - Number(stock.reservedQty) : 0;
+          if (!stock || availableStock < totalRequired) {
+            allAvailable = false;
+            break;
+          }
+        }
+        calculatedStatus = allAvailable ? "RM_AVAILABLE" : "RM_PENDING";
+
+        if (allAvailable) {
+          for (const [rawMaterialId, totalRequired] of Object.entries(aggregatedRms)) {
+            rmMoves.push({ type: "RESERVE", rawMaterialId, qty: totalRequired });
+          }
+        }
+      } else {
+        calculatedStatus = "PLANNED";
+      }
+    }
+
     // Confirmed / IN_PROGRESS -> CANCELLED (Release stock)
     if ((existing.status === "RM_AVAILABLE" || existing.status === "IN_PROGRESS" || existing.status === "IN PROGRESS") && calculatedStatus === "CANCELLED") {
       const rawMaterialsToUse = (existing.draftRawMaterials as any[]) || [];
@@ -934,8 +964,12 @@ class ProductionOrderService {
   async delete(productionOrderId: string) {
     const existing = await this.findById(productionOrderId);
 
-    if (existing.status !== "DRAFT") {
-      throw new ApiError(400, "Production Order has already been created and cannot be deleted.");
+    if (["SCHEDULED", "IN_PROGRESS", "COMPLETED"].includes(existing.status)) {
+      throw new ApiError(400, `Production Order is already ${existing.status.toLowerCase()} and cannot be deleted.`);
+    }
+
+    if (existing.sourceSalesOrderId) {
+      throw new ApiError(400, "Production Orders generated from Sales Orders cannot be deleted directly.");
     }
     
     await prisma.productionOrder.update({

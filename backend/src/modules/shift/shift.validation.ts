@@ -25,9 +25,9 @@ export const createShiftSchema = z.object({
       .string()
       .regex(/^([01]\d|2[0-3]):([0-5]\d)$/, "Invalid time format"),
 
-    breakDuration: numericStringOrNumber.optional(),
+    breakDuration: numericStringOrNumber.optional().nullable(),
 
-    gracePeriod: numericStringOrNumber.optional(),
+    gracePeriod: numericStringOrNumber.optional().nullable(),
 
     isActive: z.boolean().optional(),
   }),
@@ -49,9 +49,9 @@ export const updateShiftSchema = z.object({
       .regex(/^([01]\d|2[0-3]):([0-5]\d)$/)
       .optional(),
 
-    breakDuration: numericStringOrNumber.optional(),
+    breakDuration: numericStringOrNumber.optional().nullable(),
 
-    gracePeriod: numericStringOrNumber.optional(),
+    gracePeriod: numericStringOrNumber.optional().nullable(),
 
     isActive: z.boolean().optional(),
   }),

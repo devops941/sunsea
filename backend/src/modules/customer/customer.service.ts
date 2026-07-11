@@ -53,7 +53,7 @@ class CustomerService {
   async getNextCustomerCode() {
     const lastCustomer = await prisma.customer.findFirst({
       orderBy: {
-        createdAt: "desc",
+        customerCode: "desc",
       },
     });
 

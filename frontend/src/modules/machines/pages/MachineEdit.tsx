@@ -22,7 +22,7 @@ const machineSchema = z.object({
     manufacturer: z.string().trim().min(1, "Manufacturer is required").max(100, "Maximum 100 characters allowed"),
     modelNumber: z.string().trim().min(1, "Model Number is required").max(50, "Maximum 50 characters allowed"),
     cycleTime: z.coerce.number().min(1, "Cycle Time is required"),
-    operatorId: z.string().trim().min(1, "Operator is required").max(20, "Maximum 20 characters allowed"),
+    operatorId: z.string().trim().max(20, "Maximum 20 characters allowed").optional().nullable(),
     machineStatus: z.string().min(1, "Machine Status is required"),
     description: z.string().trim().max(255, "Maximum 255 characters allowed").optional().nullable(),
     isActive: z.boolean().optional(),
@@ -110,6 +110,7 @@ const MachineEdit: React.FC = () => {
             targetTemperature: formData.targetTemperature ? Number(formData.targetTemperature) : null,
             targetLoadPercent: formData.targetLoadPercent ? Number(formData.targetLoadPercent) : null,
             cycleTime: formData.cycleTime ? Number(formData.cycleTime) : null,
+            operatorId: formData.operatorId || null,
         };
 
         try {
@@ -142,7 +143,7 @@ const MachineEdit: React.FC = () => {
                     manufacturer: payload.manufacturer,
                     modelNumber: payload.modelNumber,
                     cycleTime: payload.cycleTime,
-                    operatorId: payload.operatorId,
+                    operatorId: payload.operatorId || null,
                     machineStatus: payload.machineStatus,
                     description: payload.description,
                     isActive: payload.isActive
@@ -249,14 +250,13 @@ const MachineEdit: React.FC = () => {
                                 label="Operator"
                                 name="operatorId"
                                 value={formData.operatorId}
-                                defaultOptionLabel="-- Select Operator -- "
+                                defaultOptionLabel="-- Select Operator (Optional) -- "
                                 options={employees.map(emp => ({
                                     label: `${emp.fullName} (${emp.empCode})`,
                                     value: emp.id
                                 }))}
                                 error={errors.operatorId}
                                 onChange={handleChange}
-                                required
                             />
                         </Col>
                         

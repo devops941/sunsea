@@ -122,6 +122,10 @@ class HourlyProductionService {
       throw new ApiError(400, "Quantities and downtime cannot be negative");
     }
 
+    if (data.downtime && Number(data.downtime) > 60) {
+      throw new ApiError(400, "Downtime cannot exceed 60 minutes for a single hour slot");
+    }
+
     // 7. Hourly Quantity greater than Remaining Quantity
     const aggregates = await prisma.hourlyProduction.aggregate({
       where: {
