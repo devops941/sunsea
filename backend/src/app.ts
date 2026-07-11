@@ -75,6 +75,9 @@ app.use(cookieParser());
 app.use(
   express.json({
     limit: "10mb",
+    verify: (req: any, _res, buf) => {
+      req.rawBody = buf;
+    }
   })
 );
 

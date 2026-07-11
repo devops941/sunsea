@@ -9,10 +9,18 @@ import { ApiError } from "../../utils/ApiError";
 
 class CustomerController {
   create = asyncHandler(async (req: Request, res: Response) => {
-    const userId = req.user?.userId;
+    let userId = req.user?.userId;
 
     if (!userId) {
       throw new ApiError(401, "Unauthorized: missing user context");
+    }
+
+    // Resolve admin virtual ID to a real user UUID to prevent P2003 Foreign Key constraint failure
+    if (userId.startsWith("admin_")) {
+      const firstUser = await prisma.user.findFirst();
+      if (firstUser) {
+        userId = firstUser.userId;
+      }
     }
 
     const company = await prisma.company.findFirst();

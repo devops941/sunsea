@@ -135,16 +135,16 @@ const CustomerCreatePage: React.FC = () => {
     // tcsRate: "0",
 
     billingAddressLine1: "",
-    billingCity: "",
-    billingState: "",
-    billingPincode: "",
+    billingAddressCity: "",
+    billingAddressState: "",
+    billingAddressPincode: "",
 
     sameAsBilling: false,
 
     shippingAddressLine1: "",
-    shippingCity: "",
-    shippingState: "",
-    shippingPincode: "",
+    shippingAddressCity: "",
+    shippingAddressState: "",
+    shippingAddressPincode: "",
 
     creditLimit: "",
     creditDays: "0",
@@ -175,6 +175,13 @@ const CustomerCreatePage: React.FC = () => {
   const [shippingResetKey, setShippingResetKey] = useState(0);
 
   useEffect(() => {
+    if (formData.gstin && formData.gstin.length >= 2) {
+      const extractedStateCode = formData.gstin.substring(0, 2);
+      if (/^[0-9]{2}$/.test(extractedStateCode)) {
+        setFormData(prev => ({ ...prev, stateCode: extractedStateCode }));
+        setErrors(prev => ({ ...prev, stateCode: "" }));
+      }
+    }
     if (formData.gstin && formData.gstin.length >= 12) {
       const extractedPan = formData.gstin.substring(2, 12).toUpperCase();
       setFormData(prev => ({ ...prev, pan: extractedPan }));
@@ -250,15 +257,15 @@ const CustomerCreatePage: React.FC = () => {
         ...(checked
           ? {
             shippingAddressLine1: prev.billingAddressLine1,
-            shippingCity: prev.billingCity,
-            shippingState: prev.billingState,
-            shippingPincode: prev.billingPincode,
+            shippingAddressCity: prev.billingAddressCity,
+            shippingAddressState: prev.billingAddressState,
+            shippingAddressPincode: prev.billingAddressPincode,
           }
           : {
             shippingAddressLine1: "",
-            shippingCity: "",
-            shippingState: "",
-            shippingPincode: "",
+            shippingAddressCity: "",
+            shippingAddressState: "",
+            shippingAddressPincode: "",
           }),
       }));
 
@@ -267,67 +274,94 @@ const CustomerCreatePage: React.FC = () => {
       setErrors((prev) => ({
         ...prev,
         shippingAddressLine1: "",
-        shippingCity: "",
-        shippingState: "",
-        shippingPincode: "",
+        shippingAddressCity: "",
+        shippingAddressState: "",
+        shippingAddressPincode: "",
         sameAsBilling: "",
       }));
 
       return;
     }
 
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+    setFormData((prev) => {
+      const updated = {
+        ...prev,
+        [name]: value,
+      };
+      if (prev.sameAsBilling) {
+        if (name === "billingAddressLine1") {
+          updated.shippingAddressLine1 = value;
+        } else if (name === "billingAddressPincode") {
+          updated.shippingAddressPincode = value;
+        }
+      }
+      return updated;
+    });
 
     if (errors[name]) {
-      setErrors((prev) => ({
-        ...prev,
-        [name]: "",
-      }));
+      setErrors((prev) => {
+        const updatedErrors = { ...prev, [name]: "" };
+        if (prev.sameAsBilling) {
+          if (name === "billingAddressLine1") {
+            updatedErrors.shippingAddressLine1 = "";
+          } else if (name === "billingAddressPincode") {
+            updatedErrors.shippingAddressPincode = "";
+          }
+        }
+        return updatedErrors;
+      });
     }
   };
 
   // Billing State/City handlers (passed to CityStateSelect)
-  const handleBillingStateChange = (stateData: StateCityOption) => {
+  const handleStateChange = (stateData: StateCityOption) => {
     const gstCode = getGstStateCode(stateData.state_code || stateData.name);
     setFormData((prev) => ({
       ...prev,
-      billingState: stateData.name,
-      billingCity: "",
+      billingAddressState: stateData.name,
+      billingAddressCity: "",
       stateCode: gstCode || prev.stateCode,
+      ...(prev.sameAsBilling && {
+        shippingAddressState: stateData.name,
+        shippingAddressCity: "",
+      }),
     }));
     setErrors((prev) => ({
       ...prev,
-      billingState: "",
-      billingCity: "",
+      billingAddressState: "",
+      billingAddressCity: "",
       stateCode: "",
     }));
   };
 
-  const handleBillingCityChange = (cityData: StateCityOption) => {
-    setFormData((prev) => ({ ...prev, billingCity: cityData.name }));
-    setErrors((prev) => ({ ...prev, billingCity: "" }));
+  const handleCityChange = (cityData: StateCityOption) => {
+    setFormData((prev) => ({
+      ...prev,
+      billingAddressCity: cityData.name,
+      ...(prev.sameAsBilling && {
+        shippingAddressCity: cityData.name,
+      }),
+    }));
+    setErrors((prev) => ({ ...prev, billingAddressCity: "" }));
   };
 
   // Shipping State/City handlers (passed to CityStateSelect)
   const handleShippingStateChange = (stateData: StateCityOption) => {
     setFormData((prev) => ({
       ...prev,
-      shippingState: stateData.name,
-      shippingCity: "",
+      shippingAddressState: stateData.name,
+      shippingAddressCity: "",
     }));
     setErrors((prev) => ({
       ...prev,
-      shippingState: "",
-      shippingCity: "",
+      shippingAddressState: "",
+      shippingAddressCity: "",
     }));
   };
 
   const handleShippingCityChange = (cityData: StateCityOption) => {
-    setFormData((prev) => ({ ...prev, shippingCity: cityData.name }));
-    setErrors((prev) => ({ ...prev, shippingCity: "" }));
+    setFormData((prev) => ({ ...prev, shippingAddressCity: cityData.name }));
+    setErrors((prev) => ({ ...prev, shippingAddressCity: "" }));
   };
 
   useEffect(() => {
@@ -351,16 +385,16 @@ const CustomerCreatePage: React.FC = () => {
       setFormData((prev) => ({
         ...prev,
         shippingAddressLine1: prev.billingAddressLine1,
-        shippingCity: prev.billingCity,
-        shippingState: prev.billingState,
-        shippingPincode: prev.billingPincode,
+        shippingAddressCity: prev.billingAddressCity,
+        shippingAddressState: prev.billingAddressState,
+        shippingAddressPincode: prev.billingAddressPincode,
       }));
     }
   }, [
     formData.billingAddressLine1,
-    formData.billingCity,
-    formData.billingState,
-    formData.billingPincode,
+    formData.billingAddressCity,
+    formData.billingAddressState,
+    formData.billingAddressPincode,
     formData.sameAsBilling,
   ]);
 
@@ -373,18 +407,45 @@ const CustomerCreatePage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const validationErrors = validateCustomer(formData);
+    const validationData = {
+      ...formData,
+      billingState: formData.billingAddressState,
+      billingCity: formData.billingAddressCity,
+      billingPincode: formData.billingAddressPincode,
+      shippingState: formData.shippingAddressState,
+      shippingCity: formData.shippingAddressCity,
+      shippingPincode: formData.shippingAddressPincode,
+    };
 
-    //console.log("Email:", formData.email);
-    //console.log("Validation Errors:", validationErrors);
+    const validationErrors = validateCustomer(validationData);
 
     if (Object.keys(validationErrors).length > 0) {
-      setErrors(validationErrors);
+      const mappedErrors: Record<string, string> = {};
+      Object.keys(validationErrors).forEach((key) => {
+        if (key === "billingState") mappedErrors.billingAddressState = validationErrors.billingState;
+        else if (key === "billingCity") mappedErrors.billingAddressCity = validationErrors.billingCity;
+        else if (key === "billingPincode") mappedErrors.billingAddressPincode = validationErrors.billingPincode;
+        else if (key === "shippingState") mappedErrors.shippingAddressState = validationErrors.shippingState;
+        else if (key === "shippingCity") mappedErrors.shippingAddressCity = validationErrors.shippingCity;
+        else if (key === "shippingPincode") mappedErrors.shippingAddressPincode = validationErrors.shippingPincode;
+        else mappedErrors[key] = validationErrors[key];
+      });
+      setErrors(mappedErrors);
       toast.error("Please fix the highlighted errors");
       return;
     }
 
     try {
+      const activeBankAccounts = formData.bankAccounts.filter(
+        (bank) =>
+          bank.bankHolderName?.trim() ||
+          bank.bankName?.trim() ||
+          bank.accountNumber?.trim() ||
+          bank.ifscCode?.trim() ||
+          bank.branchName?.trim() ||
+          bank.upiMobileNumber?.trim()
+      );
+
       await addCustomer({
         customerCode: formData.customerId,
         firmName: formData.firmName,
@@ -403,16 +464,16 @@ const CustomerCreatePage: React.FC = () => {
         //tdsSection: formData.tdsSection,
         //tcsRate: Number(formData.tcsRate),
         billingAddressLine1: formData.billingAddressLine1,
-        billingCity: formData.billingCity,
-        billingState: formData.billingState,
-        billingPincode: formData.billingPincode,
+        billingCity: formData.billingAddressCity,
+        billingState: formData.billingAddressState,
+        billingPincode: formData.billingAddressPincode,
         shippingAddressLine1: formData.shippingAddressLine1,
-        shippingCity: formData.shippingCity,
-        shippingState: formData.shippingState,
-        shippingPincode: formData.shippingPincode,
+        shippingCity: formData.shippingAddressCity,
+        shippingState: formData.shippingAddressState,
+        shippingPincode: formData.shippingAddressPincode,
         creditLimit: Number(formData.creditLimit),
         creditDays: Number(formData.creditDays),
-        bankAccount: formData.bankAccounts,
+        bankAccount: activeBankAccounts.length > 0 ? activeBankAccounts : undefined,
         status: formData.isActive === "true" ? "Active" : "Inactive",
       });
 
@@ -694,23 +755,23 @@ const CustomerCreatePage: React.FC = () => {
 
               <Row>
                 <CityStateSelect
-                  stateValue={formData.billingState}
-                  cityValue={formData.billingCity}
-                  onStateChange={handleBillingStateChange}
-                  onCityChange={handleBillingCityChange}
-                  stateError={errors.billingState}
-                  cityError={errors.billingCity}
+                  stateValue={formData.billingAddressState}
+                  cityValue={formData.billingAddressCity}
+                  onStateChange={handleStateChange}
+                  onCityChange={handleCityChange}
+                  stateError={errors.billingAddressState}
+                  cityError={errors.billingAddressCity}
                   required
                 />
 
                 <Col md={4}>
                   <TextInput
                     label="Pincode"
-                    name="billingPincode"
-                    value={formData.billingPincode}
+                    name="billingAddressPincode"
+                    value={formData.billingAddressPincode}
                     onChange={handleChange}
                   />
-                  {errors.billingPincode && <div className="text-danger mt-1">{errors.billingPincode}</div>}
+                  {errors.billingAddressPincode && <div className="text-danger mt-1">{errors.billingAddressPincode}</div>}
                 </Col>
               </Row>
             </Col>
@@ -743,12 +804,12 @@ const CustomerCreatePage: React.FC = () => {
 
               <Row>
                 <CityStateSelect
-                  stateValue={formData.shippingState}
-                  cityValue={formData.shippingCity}
+                  stateValue={formData.shippingAddressState}
+                  cityValue={formData.shippingAddressCity}
                   onStateChange={handleShippingStateChange}
                   onCityChange={handleShippingCityChange}
-                  stateError={errors.shippingState}
-                  cityError={errors.shippingCity}
+                  stateError={errors.shippingAddressState}
+                  cityError={errors.shippingAddressCity}
                   disabled={formData.sameAsBilling}
                   resetKey={shippingResetKey}
                 />
@@ -756,12 +817,12 @@ const CustomerCreatePage: React.FC = () => {
                 <Col md={4}>
                   <TextInput
                     label="Pincode"
-                    name="shippingPincode"
-                    value={formData.shippingPincode}
+                    name="shippingAddressPincode"
+                    value={formData.shippingAddressPincode}
                     onChange={handleChange}
                     disabled={formData.sameAsBilling}
                   />
-                  {errors.shippingPincode && <div className="text-danger mt-1">{errors.shippingPincode}</div>}
+                  {errors.shippingAddressPincode && <div className="text-danger mt-1">{errors.shippingAddressPincode}</div>}
                 </Col>
               </Row>
             </Col>

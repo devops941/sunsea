@@ -1,7 +1,7 @@
 import React from "react";
 import { Container } from "react-bootstrap";
 import { useLocation, useNavigate } from "react-router-dom";
-import { FaBuilding, FaUserTag, FaUserShield, FaCogs, FaPercent } from "react-icons/fa";
+import { FaBuilding, FaUserTag, FaUserShield, FaCogs, FaPercent, FaWhatsapp } from "react-icons/fa";
 import Tabs from "../../../components/ui/tab/Tabs";
 import type { TabItem } from "../../../components/ui/tab/Tabs";
 
@@ -10,6 +10,7 @@ import RoleList from "../../roles/pages/RoleList";
 import RolePermissionMapping from "../../role-permissions/pages/RolePermissionMapping";
 import CompanySettings from "../../company/pages/CompanySettings";
 import GstTaxList from "../../settings/GstTaxListPage";
+import WhatsappSettings from "../../whatsapp/WhatsappCreate";
 
 const OrganizationTabs: React.FC = () => {
     const location = useLocation();
@@ -21,7 +22,8 @@ const OrganizationTabs: React.FC = () => {
         "/roles": "roles",
         "/role-permissions": "permissions",
         "/settings/company": "settings",
-        "/settings/gst-taxes": "gst"
+        "/settings/gst-taxes": "gst",
+        "/whatsapp": "whatsapp"
     };
 
     const keyToPath: Record<string, string> = {
@@ -29,7 +31,8 @@ const OrganizationTabs: React.FC = () => {
         "roles": "/roles",
         "permissions": "/role-permissions",
         "settings": "/settings/company",
-        "gst": "/settings/gst-taxes"
+        "gst": "/settings/gst-taxes",
+        "whatsapp": "/whatsapp"
     };
 
     const activeTab = pathToKey[location.pathname] || "profile";
@@ -39,7 +42,8 @@ const OrganizationTabs: React.FC = () => {
         { key: "roles", label: "Roles", icon: <FaUserTag />, content: <RoleList /> },
         { key: "permissions", label: "Permissions", icon: <FaUserShield />, content: <RolePermissionMapping /> },
         { key: "settings", label: "Company Settings", icon: <FaCogs />, content: <CompanySettings /> },
-        { key: "gst", label: "GST Tax Rates", icon: <FaPercent />, content: <GstTaxList /> }
+        { key: "gst", label: "GST Tax Rates", icon: <FaPercent />, content: <GstTaxList /> },
+        { key: "whatsapp", label: "Whatsapp", icon: <FaWhatsapp />, content: <WhatsappSettings /> }
     ];
 
     const handleTabChange = (key: string) => {

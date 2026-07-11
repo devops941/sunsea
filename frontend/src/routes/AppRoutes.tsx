@@ -6,6 +6,7 @@ import BaseLayout from "../components/layout/BaseLayout";
 import ProtectedRoute from "./ProtectedRoute";
 import PublicRoute from "./PublicRoute";
 
+
 const Dashboard = lazy(() => import("../modules/dashboard/pages/DashboardPage"));
 const CompanySettings = lazy(() => import("../modules/company/pages/CompanySettings"));
 
@@ -144,6 +145,8 @@ const UpdateQuatation = lazy(() => import("../modules/sales/quatation/UpdateQuat
 const SalesTabs = lazy(() => import("../modules/sales/pages/SalesTabs"));
 const PurchaseTabs = lazy(() => import("../modules/purchase/pages/PurchaseTabs"));
 
+const ExpensesList = lazy(() => import("../modules/expenses/ExpensesList"));
+
 
 // Purchase Order Module
 
@@ -185,6 +188,7 @@ const AppRoutes = () => {
             <Route path="/company/view" element={<OrganizationTabs />} />
             <Route path="/settings/company" element={<OrganizationTabs />} />
             <Route path="/settings/gst-taxes" element={<OrganizationTabs />} />
+            <Route path="/whatsapp" element={<OrganizationTabs />} />
             {/* Sample Route */}
             <Route path="/sample" element={<Sample />} />
 
@@ -618,12 +622,16 @@ const AppRoutes = () => {
             <Route element={<ProtectedRoute permission="purchase_orders.view" />}>
               <Route path="/purchase-orders/view/:id" element={<PurchaseOrderViewPage />} />
               <Route path="/upcoming-orders" element={<PurchaseTabs />} />
+              <Route path="/expenses" element={<PurchaseTabs />} /> 
             </Route>
             <Route element={<ProtectedRoute permission="purchase_orders.view" />}>
               <Route path="/upcoming-orders/detail/:id" element={<UpComingOrderDetail />} />
             </Route>
             <Route element={<ProtectedRoute permission="purchase_orders.view" />}>
               <Route path="/settings" element={<Settings />} />
+            </Route>
+            <Route element={<ProtectedRoute permission="purchase_orders.view" />}>
+
             </Route>
 
           </Route>
