@@ -26,9 +26,13 @@ class PurchaseOrderService {
     }
 
     // ── Calculate totals from items ───────────────────────────────────────────
-    private calculateTotals(items: CreatePurchaseOrderInput["items"], isInterState: boolean) {
+    private calculateTotals(
+        items: CreatePurchaseOrderInput["items"],
+        isInterState: boolean,
+        poDiscountType: "PERCENT" | "FLAT" = "PERCENT",
+        poDiscountValue: number = 0
+    ) {
         let subtotal = 0;
-        let totalDiscount = 0;
         let totalTax = 0;
         let totalCgst = 0;
         let totalSgst = 0;
@@ -39,20 +43,8 @@ class PurchaseOrderService {
             const unitPrice = Number(item.unitPrice) || 0;
             const lineSubtotal = qty * unitPrice;
 
-            // Discount calculation
-            const discountType = item.discountType || "PERCENT";
-            const discountValue = Number(item.discountValue ?? item.discount) || 0;
-            let discountAmount = 0;
-            if (discountType === "PERCENT") {
-                discountAmount = (lineSubtotal * discountValue) / 100;
-            } else {
-                discountAmount = discountValue;
-            }
-            if (discountAmount > lineSubtotal) {
-                discountAmount = lineSubtotal;
-            }
-
-            const taxableAmount = lineSubtotal - discountAmount;
+            // Taxable amount is the line subtotal (no item-level discount)
+            const taxableAmount = lineSubtotal;
 
             // GST Tax Rate (percentage rate, e.g. 18)
             const totalGstRate = Number(item.tax) || 0;
@@ -78,7 +70,6 @@ class PurchaseOrderService {
             const lineTotal = taxableAmount + totalGstAmount;
 
             subtotal += lineSubtotal;
-            totalDiscount += discountAmount;
             totalTax += totalGstAmount;
             totalCgst += cgstAmount;
             totalSgst += sgstAmount;
@@ -88,11 +79,7 @@ class PurchaseOrderService {
                 ...item,
                 quantity: qty,
                 unitPrice: unitPrice,
-                discount: discountType === "PERCENT" ? discountValue : 0,
                 tax: totalGstRate,
-                discountType,
-                discountValue,
-                discountAmount,
                 taxableAmount,
                 cgstRate,
                 cgstAmount,
@@ -101,8 +88,23 @@ class PurchaseOrderService {
                 igstRate,
                 igstAmount,
                 lineTotal,
+                // Zero out legacy item-level discount fields
+                discount: 0,
+                discountType: "PERCENT" as const,
+                discountValue: 0,
+                discountAmount: 0,
             };
         });
+
+        let totalDiscount = 0;
+        if (poDiscountType === "PERCENT") {
+            totalDiscount = (subtotal * poDiscountValue) / 100;
+        } else {
+            totalDiscount = poDiscountValue;
+        }
+        if (totalDiscount > subtotal) {
+            totalDiscount = subtotal;
+        }
 
         return {
             itemsWithTotals,
@@ -140,8 +142,11 @@ class PurchaseOrderService {
         const isInterState = company?.state?.toLowerCase().trim() !== supplier.billingState?.toLowerCase().trim();
 
         const poNumber = await this.getNextPONumber();
+        const poDiscountType = data.discountType || "PERCENT";
+        const poDiscountValue = Number(data.discountValue) || 0;
+
         const { itemsWithTotals, subtotal, totalDiscount, totalTax, totalCgst, totalSgst, totalIgst, netAmount } =
-            this.calculateTotals(data.items, isInterState);
+            this.calculateTotals(data.items, isInterState, poDiscountType, poDiscountValue);
 
         return prisma.purchaseOrder.create({
             data: {
@@ -149,6 +154,7 @@ class PurchaseOrderService {
                 poDate: new Date(data.poDate),
                 expectedDeliveryDate: new Date(data.expectedDeliveryDate),
                 supplierId: Number(data.supplierId),
+                storeId: data.storeId || null,
                 status: data.status || "DRAFT",
                 remarks: data.remarks || null,
                 sameAsBilling: data.sameAsBilling ?? false,
@@ -164,6 +170,8 @@ class PurchaseOrderService {
                 shippingPincode: data.shippingPincode,
 
                 subtotal,
+                discountType: poDiscountType,
+                discountValue: poDiscountValue,
                 totalDiscount,
                 totalTax,
                 netAmount,
@@ -334,6 +342,10 @@ class PurchaseOrderService {
             ...(data.shippingCity !== undefined && { shippingCity: data.shippingCity }),
             ...(data.shippingState !== undefined && { shippingState: data.shippingState }),
             ...(data.shippingPincode !== undefined && { shippingPincode: data.shippingPincode }),
+
+            ...(data.storeId !== undefined && { storeId: data.storeId }),
+            ...(data.discountType !== undefined && { discountType: data.discountType }),
+            ...(data.discountValue !== undefined && { discountValue: data.discountValue }),
         };
 
         // If items are updated — delete old and recreate
@@ -351,10 +363,15 @@ class PurchaseOrderService {
             });
             const isInterState = company?.state?.toLowerCase().trim() !== supplier.billingState?.toLowerCase().trim();
 
+            const poDiscountType = data.discountType !== undefined ? data.discountType : po.discountType;
+            const poDiscountValue = data.discountValue !== undefined ? Number(data.discountValue) : Number(po.discountValue || 0);
+
             const { itemsWithTotals, subtotal, totalDiscount, totalTax, totalCgst, totalSgst, totalIgst, netAmount } =
-                this.calculateTotals(data.items, isInterState);
+                this.calculateTotals(data.items, isInterState, poDiscountType as any, poDiscountValue);
 
             updateData.subtotal = subtotal;
+            updateData.discountType = poDiscountType;
+            updateData.discountValue = poDiscountValue;
             updateData.totalDiscount = totalDiscount;
             updateData.totalTax = totalTax;
             updateData.netAmount = netAmount;

@@ -57,9 +57,6 @@ export const validatePurchaseOrder = (data: PurchaseOrderFormData): Record<strin
     if (item.unitPrice < 0) {
       errors[`items.${index}.unitPrice`] = "Unit price cannot be negative";
     }
-    if (item.discount < 0 || item.discount > 100) {
-      errors[`items.${index}.discount`] = "Discount must be between 0 and 100";
-    }
     if (item.tax < 0 || item.tax > 100) {
       errors[`items.${index}.tax`] = "Tax must be between 0 and 100";
     }

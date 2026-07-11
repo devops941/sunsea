@@ -66,6 +66,7 @@ const mapPOToFormData = (po: any): PurchaseOrderFormData => {
         poDate: po.poDate ? po.poDate.split("T")[0] : "",
         expectedDeliveryDate: po.expectedDeliveryDate ? po.expectedDeliveryDate.split("T")[0] : "",
         supplierId: po.supplierId ?? "",
+        storeId: po.storeId ?? "",
         status: po.status ?? "DRAFT",
         createdByOn: po.createdBy ? String(po.createdBy) : "",
         billingAddressLine1: po.billingAddressLine1 ?? "",
@@ -193,12 +194,14 @@ const UpComingOrderDetailPage: React.FC = () => {
                     uom: i.uom,
                     quantity: Number(i.quantity),
                     unitPrice: Number(i.unitPrice),
-                    discount: Number(i.discount || 0),
                     tax: Number(i.tax || 0),
-                    subtotal: Number(i.lineTotal),
-                    discountAmount: Number(i.discount),
-                    taxAmount: Number(i.tax),
-                    netAmount: Number(i.lineTotal)
+                    taxableAmount: Number(i.taxableAmount || 0),
+                    cgstRate: Number(i.cgstRate || 0),
+                    cgstAmount: Number(i.cgstAmount || 0),
+                    sgstRate: Number(i.sgstRate || 0),
+                    sgstAmount: Number(i.sgstAmount || 0),
+                    igstRate: Number(i.igstRate || 0),
+                    igstAmount: Number(i.igstAmount || 0),
                 })),
                 status: formData.status,
             });
@@ -266,13 +269,19 @@ const UpComingOrderDetailPage: React.FC = () => {
                         </Row>
                     </Section>
 
-                    {/* ── Supplier ── */}
-                    <Section title="Supplier" icon={<FaUser />}>
+                    {/* ── Supplier & Store ── */}
+                    <Section title="Supplier & Store" icon={<FaUser />}>
                         <Row>
                             <Col lg={6} md={12}>
                                 <Field
                                     label="Supplier"
                                     value={selectedSupplier?.legalName || selectedSupplier?.displayName}
+                                />
+                            </Col>
+                            <Col lg={6} md={12}>
+                                <Field
+                                    label="Store"
+                                    value={(location.state?.store?.storeName) || formData.storeId || "—"}
                                 />
                             </Col>
                         </Row>

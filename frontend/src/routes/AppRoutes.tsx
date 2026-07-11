@@ -621,8 +621,8 @@ const AppRoutes = () => {
 
             <Route element={<ProtectedRoute permission="reports.view" />}>
               <Route path="/purchase-orders/view/:id" element={<PurchaseOrderViewPage />} />
-              <Route path="/upcoming-orders" element={<PurchaseTabs />} />
-              <Route path="/expenses" element={<PurchaseTabs />} /> 
+
+              <Route path="/expenses" element={<PurchaseTabs />} />
               <Route path="/invoice" element={<PurchaseTabs />} />
             </Route>
             <Route element={<ProtectedRoute permission="reports.view" />}>

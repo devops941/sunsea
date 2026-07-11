@@ -7,6 +7,7 @@ import { useSelector } from "react-redux";
 import { useAppDispatch, useAppSelector } from "../../../../hooks/reduxHooks";
 import { fetchLocations } from "../../../../features/locations/locationSlice";
 import { selectActiveGstTaxes, fetchGstTaxes } from "../../../../features/gst/gstSlice";
+import { fetchStores } from "../../../../features/stores/storeSlice";
 
 import TextInput from "../../../../components/form/TextInput/TextInput";
 import SelectInput from "../../../../components/form/SelectInput/SelectInput";
@@ -18,6 +19,7 @@ import { purchaseOrderService } from "../../../../services/purchaseOrderService"
 import { validatePurchaseOrder } from "../validations/purchaseOrderValidation";
 import type { PurchaseOrderFormData, PurchaseOrderItem } from "../../../../features/purchaseOrder/types";
 import { useSuppliers } from "../../../../hooks/useSuppliers";
+import { useUOMs } from "../../../../hooks/useUOMs";
 import { rawMaterialService } from "../../../../services/rawMaterialService";
 import type { RawMaterial } from "../../../../features/raw-materials/types";
 import Section from "../../../../components/ui/Section/Section";
@@ -77,6 +79,7 @@ const mapPOToFormData = (po: any): PurchaseOrderFormData => {
     billingState: po.billingState ?? "",
     billingPincode: po.billingPincode ?? "",
     sameAsBilling: po.sameAsBilling ?? false,
+    storeId: po.storeId ?? "",
 
     shippingAddressLine1: po.shippingAddressLine1 ?? "",
     shippingCity: po.shippingCity ?? "",
@@ -91,11 +94,7 @@ const mapPOToFormData = (po: any): PurchaseOrderFormData => {
       uom: i.uom ?? "",
       quantity: i.quantity ?? 0,
       unitPrice: i.unitPrice ?? 0,
-      discount: i.discount ?? 0,
       tax: i.tax ?? 0,
-      discountType: i.discountType ?? "PERCENT",
-      discountValue: i.discountValue ?? i.discount ?? 0,
-      discountAmount: i.discountAmount ?? 0,
       taxableAmount: i.taxableAmount ?? 0,
       cgstRate: i.cgstRate ?? 0,
       cgstAmount: i.cgstAmount ?? 0,
@@ -107,6 +106,8 @@ const mapPOToFormData = (po: any): PurchaseOrderFormData => {
     })) ?? [],
 
     subtotal: Number(po.subtotal ?? 0),
+    discountType: po.discountType ?? "PERCENT",
+    discountValue: Number(po.discountValue ?? 0),
     totalDiscount: Number(po.totalDiscount ?? 0),
     totalTax: Number(po.totalTax ?? 0),
     totalCgst: Number(po.totalCgst ?? 0),
@@ -133,6 +134,9 @@ const PurchaseOrderEditPage: React.FC = () => {
   const companyState = company?.state;
   const gstTaxes = useAppSelector(selectActiveGstTaxes);
   const gstLoading = useAppSelector((state) => state.gst.loading);
+  const { data: stores } = useAppSelector((state) => state.stores);
+  const { data: locations } = useAppSelector((state) => state.locations);
+  const { activeUOMs, loadActiveUOMs } = useUOMs();
 
   const [formData, setFormData] = useState<PurchaseOrderFormData>(initialFormData);
 
@@ -160,8 +164,8 @@ const PurchaseOrderEditPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmittingForApproval, setIsSubmittingForApproval] = useState(false);
-
-
+  const [roundingSign, setRoundingSign] = useState<"+" | "-">("+");
+  const [roundingValue, setRoundingValue] = useState<number>(0);
   // ============================================================
   // LOAD DATA
   // ============================================================
@@ -170,7 +174,9 @@ const PurchaseOrderEditPage: React.FC = () => {
     loadUsers();
     dispatch(fetchLocations(undefined));
     dispatch(fetchGstTaxes(undefined));
-  }, [loadSuppliers, loadUsers, dispatch]);
+    dispatch(fetchStores(undefined));
+    loadActiveUOMs();
+  }, [loadSuppliers, loadUsers, dispatch, loadActiveUOMs]);
 
   useEffect(() => {
     let mounted = true;
@@ -184,10 +190,30 @@ const PurchaseOrderEditPage: React.FC = () => {
         setRawMaterials(materials ?? []);
 
         if (location.state) {
-          setFormData(mapPOToFormData(location.state));
+          const poData = mapPOToFormData(location.state);
+          setFormData(poData);
+          const initialRounding = Number(poData.netAmount) - (Number(poData.subtotal) - Number(poData.totalDiscount) + Number(poData.totalTax));
+          if (initialRounding < 0) {
+            setRoundingSign("-");
+            setRoundingValue(Math.abs(initialRounding));
+          } else {
+            setRoundingSign("+");
+            setRoundingValue(initialRounding);
+          }
         } else if (id) {
           const po = await purchaseOrderService.fetchById(id);
-          if (mounted) setFormData(mapPOToFormData(po));
+          if (mounted) {
+            const poData = mapPOToFormData(po);
+            setFormData(poData);
+            const initialRounding = Number(poData.netAmount) - (Number(poData.subtotal) - Number(poData.totalDiscount) + Number(poData.totalTax));
+            if (initialRounding < 0) {
+              setRoundingSign("-");
+              setRoundingValue(Math.abs(initialRounding));
+            } else {
+              setRoundingSign("+");
+              setRoundingValue(initialRounding);
+            }
+          }
         }
       } catch {
         toast.error("Failed to load purchase order");
@@ -206,9 +232,8 @@ const PurchaseOrderEditPage: React.FC = () => {
   // ============================================================
   // CALCULATE TOTALS
   // ============================================================
-  const recalculateTotals = (items: PurchaseOrderItem[]) => {
+  const recalculateTotals = (items: PurchaseOrderItem[], poDiscountType: "PERCENT" | "FLAT" = formData.discountType || "PERCENT", poDiscountValue: number = formData.discountValue || 0, rSign: "+" | "-" = roundingSign, rValue: number = roundingValue) => {
     let subtotal = 0;
-    let totalDiscount = 0;
     let totalTax = 0;
     let totalCgst = 0;
     let totalSgst = 0;
@@ -219,19 +244,7 @@ const PurchaseOrderEditPage: React.FC = () => {
       const price = Number(item.unitPrice) || 0;
       const lineSubtotal = qty * price;
 
-      const discountType = item.discountType || "PERCENT";
-      const discountValue = Number(item.discountValue ?? item.discount) || 0;
-      let discountAmount = 0;
-      if (discountType === "PERCENT") {
-        discountAmount = (lineSubtotal * discountValue) / 100;
-      } else {
-        discountAmount = discountValue;
-      }
-      if (discountAmount > lineSubtotal) {
-        discountAmount = lineSubtotal;
-      }
-
-      const taxableAmount = lineSubtotal - discountAmount;
+      const taxableAmount = lineSubtotal;
       const totalGstRate = Number(item.tax) || 0;
       const totalGstAmount = (taxableAmount * totalGstRate) / 100;
 
@@ -247,12 +260,23 @@ const PurchaseOrderEditPage: React.FC = () => {
       }
 
       subtotal += lineSubtotal;
-      totalDiscount += discountAmount;
       totalTax += totalGstAmount;
       totalCgst += cgstAmount;
       totalSgst += sgstAmount;
       totalIgst += igstAmount;
     });
+
+    let totalDiscount = 0;
+    if (poDiscountType === "PERCENT") {
+      totalDiscount = (subtotal * poDiscountValue) / 100;
+    } else {
+      totalDiscount = poDiscountValue;
+    }
+    if (totalDiscount > subtotal) {
+      totalDiscount = subtotal;
+    }
+
+    const roundingAdjust = rSign === "+" ? rValue : -rValue;
 
     return {
       subtotal,
@@ -261,7 +285,7 @@ const PurchaseOrderEditPage: React.FC = () => {
       totalCgst,
       totalSgst,
       totalIgst,
-      netAmount: subtotal - totalDiscount + totalTax,
+      netAmount: subtotal - totalDiscount + totalTax + roundingAdjust,
     };
   };
 
@@ -312,19 +336,7 @@ const PurchaseOrderEditPage: React.FC = () => {
           const qty = Number(item.quantity) || 0;
           const lineSubtotal = qty * parsedUnitPrice;
 
-          const discountType = item.discountType || "PERCENT";
-          const discountValue = Number(item.discountValue ?? item.discount) || 0;
-          let discountAmount = 0;
-          if (discountType === "PERCENT") {
-            discountAmount = (lineSubtotal * discountValue) / 100;
-          } else {
-            discountAmount = discountValue;
-          }
-          if (discountAmount > lineSubtotal) {
-            discountAmount = lineSubtotal;
-          }
-
-          const taxableAmount = lineSubtotal - discountAmount;
+          const taxableAmount = lineSubtotal;
           const totalGstRate = Number(item.tax) || 0;
           const totalGstAmount = (taxableAmount * totalGstRate) / 100;
 
@@ -348,8 +360,6 @@ const PurchaseOrderEditPage: React.FC = () => {
           return {
             ...item,
             unitPrice: parsedUnitPrice,
-            discount: discountType === "PERCENT" ? discountValue : 0,
-            discountAmount,
             taxableAmount,
             cgstRate,
             cgstAmount,
@@ -376,6 +386,23 @@ const PurchaseOrderEditPage: React.FC = () => {
       });
       if (errors.poDate) {
         setErrors((prev) => ({ ...prev, poDate: "" }));
+      }
+      return;
+    }
+
+    if (name === "storeId") {
+      const selectedStore = (stores || []).find((s: any) => String(s.storeId) === String(value));
+      const selectedLoc = (locations || []).find((l: any) => String(l.locationId || l.id) === String(selectedStore?.locationId));
+      setFormData((prev) => ({
+        ...prev,
+        storeId: value,
+        billingAddressLine1: selectedLoc?.address || "",
+        billingCity: selectedLoc?.city || "",
+        billingState: selectedLoc?.state || "",
+        billingPincode: "625017",
+      }));
+      if (errors.storeId) {
+        setErrors((prev) => ({ ...prev, storeId: "" }));
       }
       return;
     }
@@ -457,19 +484,7 @@ const PurchaseOrderEditPage: React.FC = () => {
       const price = Number(item.unitPrice) || 0;
       const lineSubtotal = qty * price;
 
-      const discountType = item.discountType || "PERCENT";
-      const discountValue = Number(item.discountValue ?? item.discount) || 0;
-      let discountAmount = 0;
-      if (discountType === "PERCENT") {
-        discountAmount = (lineSubtotal * discountValue) / 100;
-      } else {
-        discountAmount = discountValue;
-      }
-      if (discountAmount > lineSubtotal) {
-        discountAmount = lineSubtotal;
-      }
-
-      const taxableAmount = lineSubtotal - discountAmount;
+      const taxableAmount = lineSubtotal;
       const totalGstRate = Number(item.tax) || 0;
       const totalGstAmount = (taxableAmount * totalGstRate) / 100;
 
@@ -492,8 +507,6 @@ const PurchaseOrderEditPage: React.FC = () => {
 
       items[index] = {
         ...item,
-        discount: discountType === "PERCENT" ? discountValue : 0,
-        discountAmount,
         taxableAmount,
         cgstRate,
         cgstAmount,
@@ -543,19 +556,7 @@ const PurchaseOrderEditPage: React.FC = () => {
       const qty = Number(item.quantity) || 0;
       const lineSubtotal = qty * parsedUnitPrice;
 
-      const discountType = item.discountType || "PERCENT";
-      const discountValue = Number(item.discountValue ?? item.discount) || 0;
-      let discountAmount = 0;
-      if (discountType === "PERCENT") {
-        discountAmount = (lineSubtotal * discountValue) / 100;
-      } else {
-        discountAmount = discountValue;
-      }
-      if (discountAmount > lineSubtotal) {
-        discountAmount = lineSubtotal;
-      }
-
-      const taxableAmount = lineSubtotal - discountAmount;
+      const taxableAmount = lineSubtotal;
       const totalGstRate = defaultTaxRate;
       const totalGstAmount = (taxableAmount * totalGstRate) / 100;
 
@@ -591,8 +592,6 @@ const PurchaseOrderEditPage: React.FC = () => {
         unitPrice: parsedUnitPrice,
         uom: rawMaterial?.baseUom || "",
         tax: totalGstRate,
-        discount: discountType === "PERCENT" ? discountValue : 0,
-        discountAmount,
         taxableAmount,
         cgstRate,
         cgstAmount,
@@ -620,11 +619,7 @@ const PurchaseOrderEditPage: React.FC = () => {
           uom: "",
           quantity: 1,
           unitPrice: 0,
-          discount: 0,
           tax: 0,
-          discountType: "PERCENT" as const,
-          discountValue: 0,
-          discountAmount: 0,
           taxableAmount: 0,
           cgstRate: 0,
           cgstAmount: 0,
@@ -692,12 +687,8 @@ const PurchaseOrderEditPage: React.FC = () => {
           productId: item.productId,
           uom: item.uom,
           quantity: item.quantity,
-          unitPrice: item.unitPrice,
-          discount: item.discount || 0,
-          tax: item.tax || 0,
-          discountType: item.discountType || "PERCENT",
-          discountValue: Number(item.discountValue ?? item.discount) || 0,
-          discountAmount: item.discountAmount || 0,
+          unitPrice: Number(item.unitPrice) || 0,
+          tax: Number(item.tax) || 0,
           taxableAmount: item.taxableAmount || 0,
           cgstRate: item.cgstRate || 0,
           cgstAmount: item.cgstAmount || 0,
@@ -770,6 +761,16 @@ const PurchaseOrderEditPage: React.FC = () => {
   ];
 
 
+
+  const uomOptions = useMemo(() => {
+    return [
+      { value: "", label: "-- Select UOM --" },
+      ...(activeUOMs || []).map((u: any) => ({
+        value: u.uomName as string,
+        label: u.uomName as string,
+      }))
+    ];
+  }, [activeUOMs]);
 
   const isLocked = formData.status !== "DRAFT" && formData.status !== "PENDING";
 
@@ -848,7 +849,28 @@ const PurchaseOrderEditPage: React.FC = () => {
 
           {/* ── Supplier ── */}
           <Section title="Supplier" icon={<FaUser />}>
-            <Row>
+            <Row className="g-3">
+              {/* Store */}
+              <Col lg={6} md={12}>
+                <SelectInput
+                  label="Store"
+                  name="storeId"
+                  value={formData.storeId || ""}
+                  options={[
+                    { label: "-- Select Store --", value: "" },
+                    ...(stores || []).filter((s: any) => s.isActive).map((s: any) => ({
+                      label: s.storeName,
+                      value: s.storeId
+                    }))
+                  ]}
+                  required
+                  error={errors.storeId}
+                  onChange={handleChange}
+                  disabled={formData.status !== "DRAFT"}
+                />
+              </Col>
+
+              {/* Supplier */}
               <Col lg={6} md={12}>
                 <SelectInput
                   label="Supplier"
@@ -990,19 +1012,7 @@ const PurchaseOrderEditPage: React.FC = () => {
                     const price = Number(item.unitPrice) || 0;
                     const lineSubtotal = qty * price;
 
-                    const discountType = item.discountType || "PERCENT";
-                    const discountValue = Number(item.discountValue ?? item.discount) || 0;
-                    let discountAmount = 0;
-                    if (discountType === "PERCENT") {
-                      discountAmount = (lineSubtotal * discountValue) / 100;
-                    } else {
-                      discountAmount = discountValue;
-                    }
-                    if (discountAmount > lineSubtotal) {
-                      discountAmount = lineSubtotal;
-                    }
-
-                    const taxableAmount = lineSubtotal - discountAmount;
+                    const taxableAmount = lineSubtotal;
 
                     return (
                       <tr key={index}>
@@ -1019,13 +1029,14 @@ const PurchaseOrderEditPage: React.FC = () => {
                           />
                         </td>
                         <td>
-                          <TextInput
+                          <SelectInput
                             label=""
                             name={`items[${index}].uom`}
+                            options={uomOptions}
                             value={item.uom || ""}
-                            onChange={() => { }}
-                            disabled
-                            placeholder="—"
+                            onChange={(e) => handleItemChange(index, "uom", e.target.value)}
+                            error={errors[`items.${index}.uom`]}
+                            disabled={isLocked}
                           />
                         </td>
                         <td>
@@ -1121,6 +1132,127 @@ const PurchaseOrderEditPage: React.FC = () => {
                     <span>Subtotal:</span>
                     <span>₹{formData.subtotal.toFixed(2)}</span>
                   </div>
+                  <div className="d-flex justify-content-between align-items-center mb-2 text-danger small">
+                    <span className="d-flex align-items-center gap-2">
+                      Discount:
+                      <SelectInput
+                        label=""
+                        name="discountType"
+                        options={[
+                          { value: "PERCENT", label: "%" },
+                          { value: "FLAT", label: "Flat" },
+                        ]}
+                        value={formData.discountType || "PERCENT"}
+                        onChange={(e) => {
+                          setFormData((prev) => {
+                            const newDiscountType = e.target.value as "PERCENT" | "FLAT";
+                            const newTotals = recalculateTotals(
+                              prev.items,
+                              newDiscountType,
+                              prev.discountValue
+                            );
+                            return { ...prev, discountType: newDiscountType, ...newTotals };
+                          });
+                        }}
+                        disabled={formData.status !== "DRAFT"}
+                      />
+                      <TextInput
+                        name="discountValue"
+                        type="number"
+                        min={0}
+                        step={0.01}
+                        placeholder="0"
+                        value={String(formData.discountValue || 0)}
+                        onChange={(e) => {
+                          setFormData((prev) => {
+                            const newDiscountValue = Number(e.target.value) || 0;
+                            const newTotals = recalculateTotals(
+                              prev.items,
+                              prev.discountType,
+                              newDiscountValue
+                            );
+                            return { ...prev, discountValue: newDiscountValue, ...newTotals };
+                          });
+                        }}
+                        style={{ width: "80px", padding: "0.25rem 0.5rem", textAlign: "right" }}
+                        disabled={formData.status !== "DRAFT"}
+                      />
+                    </span>
+                    <span>-₹{(formData.totalDiscount || 0).toFixed(2)}</span>
+                  </div>
+
+                  <div className="d-flex justify-content-between align-items-center mb-2 text-success small">
+                    <span>Total Tax:</span>
+                    <span>₹{formData.totalTax.toFixed(2)}</span>
+                  </div>
+
+                  <div className="d-flex justify-content-between align-items-center mb-2 text-secondary small">
+                    <span className="d-flex align-items-center gap-2">
+                      Round Off:
+                      <div className="d-flex align-items-center bg-white rounded border overflow-hidden">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (isLocked) return;
+                            setRoundingSign("+");
+                            setFormData(prev => ({
+                              ...prev,
+                              ...recalculateTotals(prev.items, prev.discountType, prev.discountValue, "+", roundingValue)
+                            }));
+                          }}
+                          style={{
+                            border: "none",
+                            background: roundingSign === "+" ? "var(--color-primary, #047857)" : "var(--color-bg, #f9fafb)",
+                            color: roundingSign === "+" ? "#fff" : "var(--color-text-secondary)",
+                            padding: "0.25rem 0.5rem",
+                            cursor: isLocked ? "not-allowed" : "pointer"
+                          }}
+                          disabled={isLocked}
+                        >
+                          +
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (isLocked) return;
+                            setRoundingSign("-");
+                            setFormData(prev => ({
+                              ...prev,
+                              ...recalculateTotals(prev.items, prev.discountType, prev.discountValue, "-", roundingValue)
+                            }));
+                          }}
+                          style={{
+                            border: "none",
+                            background: roundingSign === "-" ? "var(--color-danger, #ef4444)" : "var(--color-bg, #f9fafb)",
+                            color: roundingSign === "-" ? "#fff" : "var(--color-text-secondary)",
+                            padding: "0.25rem 0.5rem",
+                            cursor: isLocked ? "not-allowed" : "pointer"
+                          }}
+                          disabled={isLocked}
+                        >
+                          -
+                        </button>
+                      </div>
+                      <TextInput
+                        name="roundingValue"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={String(roundingValue || 0)}
+                        onChange={(e) => {
+                          const val = Number(e.target.value) || 0;
+                          setRoundingValue(val);
+                          setFormData(prev => ({
+                            ...prev,
+                            ...recalculateTotals(prev.items, prev.discountType, prev.discountValue, roundingSign, val)
+                          }));
+                        }}
+                        style={{ width: "80px", padding: "0.25rem 0.5rem", textAlign: "right" }}
+                        disabled={isLocked}
+                      />
+                    </span>
+                    <span>{roundingSign === "+" ? "+" : "-"}₹{(roundingValue || 0).toFixed(2)}</span>
+                  </div>
 
                   {isInterState ? (
                     <div className="d-flex justify-content-between mb-2 text-success small">
@@ -1139,10 +1271,6 @@ const PurchaseOrderEditPage: React.FC = () => {
                       </div>
                     </>
                   )}
-                  <div className="d-flex justify-content-between mb-2 text-success fw-bold">
-                    <span>Total Tax:</span>
-                    <span>+₹{formData.totalTax.toFixed(2)}</span>
-                  </div>
                   <hr />
                   <div className="d-flex justify-content-between fw-bold">
                     <span>Net Amount:</span>

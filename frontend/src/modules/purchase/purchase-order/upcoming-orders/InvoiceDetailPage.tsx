@@ -15,6 +15,7 @@ import type { PurchaseOrder } from "../../../../features/purchaseOrder/types";
 import { useAppDispatch, useAppSelector } from "../../../../hooks/reduxHooks";
 import { fetchLocations } from "../../../../features/locations/locationSlice";
 import { useSuppliers } from "../../../../hooks/useSuppliers";
+import { useUOMs } from "../../../../hooks/useUOMs";
 import { rawMaterialService } from "../../../../services/rawMaterialService";
 import { selectActiveGstTaxes, fetchGstTaxes } from "../../../../features/gst/gstSlice";
 import { fetchStores } from "../../../../features/stores/storeSlice";
@@ -51,6 +52,7 @@ const InvoiceDetailPage: React.FC = () => {
     const { data: stores } = useAppSelector((state: any) => state.stores);
     const gstTaxes = useAppSelector(selectActiveGstTaxes);
     const gstLoading = useAppSelector((state: any) => state.gst.loading);
+    const { activeUOMs, loadActiveUOMs } = useUOMs();
 
     const [saving, setSaving] = useState(false);
     const [loadingPOs, setLoadingPOs] = useState(true);
@@ -66,7 +68,7 @@ const InvoiceDetailPage: React.FC = () => {
         invoiceNo: "",
         grnDate: new Date().toISOString().split("T")[0],
         supplierId: "",
-        locationId: "",
+        storeId: "",
         billingAddressLine1: "",
         billingCity: "",
         billingState: "",
@@ -106,9 +108,9 @@ const InvoiceDetailPage: React.FC = () => {
     // ── Fetch on mount ────────────────────────────────────────────────────────────
     useEffect(() => {
         dispatch(fetchLocations(undefined));
-        loadSuppliers();
         dispatch(fetchGstTaxes(undefined));
         dispatch(fetchStores(undefined));
+        loadActiveUOMs();
         purchaseOrderService
             .fetchAll({ status: "APPROVED" })
             .then((res) => {
@@ -117,7 +119,7 @@ const InvoiceDetailPage: React.FC = () => {
             })
             .catch(() => toast.error("Failed to load approved orders"))
             .finally(() => setLoadingPOs(false));
-    }, [dispatch, loadSuppliers]);
+    }, [dispatch, loadSuppliers, loadActiveUOMs]);
 
     useEffect(() => {
         const fetchRawMaterials = async () => {
@@ -139,7 +141,7 @@ const InvoiceDetailPage: React.FC = () => {
             setForm((prev) => ({
                 ...prev,
                 supplierId: "",
-                locationId: "",
+                storeId: "",
                 billingAddressLine1: "",
                 billingCity: "",
                 billingState: "",
@@ -162,14 +164,12 @@ const InvoiceDetailPage: React.FC = () => {
             .fetchById(form.poId)
             .then((po: any) => {
                 setSelectedPO(po);
-                const matchedStore = (stores || []).find(
-                    (s: any) => s.location?.city?.toLowerCase() === po.billingCity?.toLowerCase()
-                );
                 const sup = po.supplier;
+                const matchedStore = (stores || []).find((s: any) => s.location?.city?.toLowerCase() === po.billingCity?.toLowerCase());
                 setForm((prev) => ({
                     ...prev,
                     supplierId: String(po.supplierId || sup?.id || ""),
-                    locationId: matchedStore ? String(matchedStore.storeId) : "",
+                    storeId: String(po.storeId || matchedStore?.storeId || ""),
                     billingAddressLine1: po.billingAddressLine1 || "",
                     billingCity: po.billingCity || "",
                     billingState: po.billingState || "",
@@ -226,17 +226,18 @@ const InvoiceDetailPage: React.FC = () => {
     // ── When store selected manually → auto-fill billing ──────────────────────
     useEffect(() => {
         if (form.poId) return;
-        const storeObj = (stores || []).find((s: any) => String(s.storeId) === String(form.locationId));
-        if (storeObj) {
+        const storeObj = (stores || []).find((s: any) => String(s.storeId) === String(form.storeId));
+        const locObj = (locations || []).find((l: any) => String(l.locationId || l.id) === String(storeObj?.locationId));
+        if (locObj) {
             setForm((prev) => ({
                 ...prev,
-                billingAddressLine1: storeObj.location?.address || "",
-                billingCity: storeObj.location?.city || "",
-                billingState: storeObj.location?.state || "",
+                billingAddressLine1: locObj.address || "",
+                billingCity: locObj.city || "",
+                billingState: locObj.state || "",
                 billingPincode: "625017",
             }));
         }
-    }, [form.locationId, form.poId, stores]);
+    }, [form.storeId, form.poId, stores, locations]);
 
     // ── Same as billing sync effect ──────────────────────────────────────────────
     useEffect(() => {
@@ -321,6 +322,16 @@ const InvoiceDetailPage: React.FC = () => {
         })),
     ], [suppliers]);
 
+    const uomOptions = useMemo(() => {
+        return [
+            { value: "", label: "-- Select UOM --" },
+            ...(activeUOMs || []).map((u: any) => ({
+                value: u.uomName,
+                label: u.uomName,
+            }))
+        ];
+    }, [activeUOMs]);
+
     const storeOptions = useMemo(() => [
         { value: "", label: "Select" },
         ...(stores || []).filter((s: any) => s.isActive).map((s: any) => ({
@@ -337,22 +348,6 @@ const InvoiceDetailPage: React.FC = () => {
         })),
     ], [gstTaxes, gstLoading]);
 
-    const uomOptions = useMemo(() => {
-        const allUoms = (rawMaterials || [])
-            .map((rm: any) => rm.baseUom)
-            .filter(Boolean)
-            .flatMap((uom: string) => uom.split(",").map((s) => s.trim()));
-
-        const uniqueUoms = Array.from(new Set(allUoms));
-
-        return [
-            { value: "", label: "-- Select UOM --" },
-            ...uniqueUoms.map((uom) => ({
-                value: uom,
-                label: uom,
-            })),
-        ];
-    }, [rawMaterials]);
 
     // ── Item handlers ─────────────────────────────────────────────────────────────
     const addItem = () => setItems((prev) => [...prev, emptyItem()]);
@@ -391,7 +386,7 @@ const InvoiceDetailPage: React.FC = () => {
         if (!form.invoiceNo) errs.invoiceNo = "Required";
         if (!form.grnDate) errs.grnDate = "Required";
         if (!form.supplierId) errs.supplierId = "Required";
-        if (!form.locationId) errs.locationId = "Required";
+        if (!form.storeId) errs.storeId = "Required";
 
         if (!form.billingAddressLine1) errs.billingAddressLine1 = "Required";
         if (!form.billingCity) errs.billingCity = "Required";
@@ -476,9 +471,9 @@ const InvoiceDetailPage: React.FC = () => {
                                 <Col xl={2} lg={2} md={4} sm={6}>
                                     <SelectInput label="Supplier" name="supplierId" value={form.supplierId} options={supplierOptions} onChange={handleChange} required error={errors.supplierId} disabled={isPOSelected} />
                                 </Col>
-                                 <Col xl={2} lg={2} md={4} sm={6}>
-                                     <SelectInput label="Store" name="locationId" value={form.locationId} options={storeOptions} onChange={handleChange} required error={errors.locationId} disabled={isPOSelected} />
-                                 </Col>
+                                <Col xl={2} lg={2} md={4} sm={6}>
+                                    <SelectInput label="Store" name="storeId" value={form.storeId} options={storeOptions} onChange={handleChange} required error={errors.storeId} disabled={isPOSelected} />
+                                </Col>
                             </Row>
                         </div>
                     </div>
