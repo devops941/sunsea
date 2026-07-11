@@ -624,25 +624,7 @@ const SalesOrderForm: React.FC = () => {
                         )}
 
                         {/* ── NEW: Inter‑State GST toggle ── */}
-                        <Col md={6}>
-                            <Controller
-                                name="isInterState"
-                                control={control}
-                                render={({ field }) => (
-                                    <div className="d-flex align-items-center gap-2" style={{ paddingTop: "10px" }}>
-                                        <input
-                                            type="checkbox"
-                                            id="isInterState"
-                                            checked={field.value || false}
-                                            disabled
-                                        />
-                                        <label htmlFor="isInterState" className="mb-0">
-                                            Inter‑State GST (IGST)
-                                        </label>
-                                    </div>
-                                )}
-                            />
-                        </Col>
+
                     </Row>
 
                     {/* ── Billing & Shipping ── */}

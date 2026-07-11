@@ -44,38 +44,38 @@ export const ProtectedRoute: React.FC<
   permission,
   redirectPath = "/dashboard",
 }) => {
-  const {
-    isAuthenticated,
-    hasPermission,
-  } = useAuth();
+    const {
+      isAuthenticated,
+      hasPermission,
+    } = useAuth();
 
-  const location = useLocation();
+    const location = useLocation();
 
-  // Not Logged In
-  if (!isAuthenticated) {
-    return (
-      <Navigate
-        to="/login"
-        state={{ from: location }}
-        replace
-      />
-    );
-  }
+    // Not Logged In
+    if (!isAuthenticated) {
+      return (
+        <Navigate
+          to="/login"
+          state={{ from: location }}
+          replace
+        />
+      );
+    }
 
-  // Permission Check
-  if (
-    permission &&
-    !hasPermission(permission)
-  ) {
-    return (
-      <Navigate
-        to={redirectPath}
-        replace
-      />
-    );
-  }
+    // Permission Check
+    if (
+      permission &&
+      !hasPermission(permission)
+    ) {
+      return (
+        <Navigate
+          to={redirectPath}
+          replace
+        />
+      );
+    }
 
-  return <Outlet />;
-};
+    return <Outlet />;
+  };
 
 export default ProtectedRoute;

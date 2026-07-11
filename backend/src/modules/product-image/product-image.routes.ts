@@ -25,7 +25,7 @@ router.post(
   "/",
   authMiddleware,
   requirePermission("product-images.view"),
-  uploadProductImage.array("images", 3),
+  uploadProductImage.single("image"),
   normalizeImageBody,
   validateMiddleware(createProductImageSchema),
   productImageController.create
@@ -62,7 +62,7 @@ router.put(
   "/:id",
   authMiddleware,
   requirePermission("product-images.edit"),
-  uploadProductImage.array("images", 3),
+  uploadProductImage.single("image"),
   normalizeImageBodyOptional,
   validateMiddleware(updateProductImageSchema),
   productImageController.update

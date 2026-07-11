@@ -2,6 +2,9 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../../config/prisma";
 import { ApiError } from "../../utils/ApiError";
 import { standardConverter } from "../../utils/convert.util";
+import { uploadToImageKit } from "../../utils/Imagekit";
+import fs from "fs";
+import path from "path";
 
 function toNumberOrNull(value: any): number | null {
   if (value === undefined || value === null || value === "") return null;
@@ -20,9 +23,10 @@ function toIdArray(value: any): number[] {
 }
 
 class ProductService {
-  private async resolveUomId(uomInput: any): Promise<number | null> { console.log('=== RESOLVE UOM ===', uomInput);
+  private async resolveUomId(uomInput: any): Promise<number | null> {
+    console.log('=== RESOLVE UOM ===', uomInput);
     if (!uomInput) return null;
-    
+
     // If it's already a valid number ID
     const numId = Number(uomInput);
     if (!isNaN(numId) && numId > 0) {
@@ -32,7 +36,7 @@ class ProductService {
     // Otherwise, it's a string code (e.g., "kg")
     const uomCode = String(uomInput).trim();
     let existingUom = await prisma.unitOfMeasure.findUnique({ where: { uomCode } });
-    
+
     if (!existingUom) {
       // Auto-create it if missing using convert-units for the name
       let uomName = uomCode.toUpperCase();
@@ -52,12 +56,37 @@ class ProductService {
         },
       });
     }
-    
+
     return existingUom.id;
   }
 
   async create(data: any, files?: Express.Multer.File[]) {
     const colorIds = toIdArray(data.colorIds);
+
+    const uploadedImages: any[] = [];
+    if (files && files.length > 0) {
+      for (let index = 0; index < files.length; index++) {
+        const file = files[index];
+        const uniqueName = `product_${Date.now()}_${index}${path.extname(file.originalname)}`;
+        try {
+          const imageUrl = await uploadToImageKit(file.path, uniqueName, "/products");
+          uploadedImages.push({
+            imageUrl,
+            isPrimary: index === 0,
+          });
+
+          // Clean up the local temp file after upload
+          try {
+            fs.unlinkSync(file.path);
+          } catch (err) {
+            console.error("Failed to delete temp file:", file.path, err);
+          }
+        } catch (err) {
+          console.error("Failed to upload product image to ImageKit:", err);
+          throw err;
+        }
+      }
+    }
 
     const payload: Prisma.ProductUncheckedCreateInput = {
       productCode: data.productCode,
@@ -112,13 +141,10 @@ class ProductService {
         }
         : {}),
 
-      ...(files?.length
+      ...(uploadedImages.length
         ? {
           images: {
-            create: files.map((file, index) => ({
-              imageUrl: `/uploads/products/${file.filename}`,
-              isPrimary: index === 0,
-            })),
+            create: uploadedImages,
           },
         }
         : {}),
@@ -239,6 +265,32 @@ class ProductService {
       }
     }
 
+    const uploadedImages: any[] = [];
+    if (files && files.length > 0) {
+      for (let index = 0; index < files.length; index++) {
+        const file = files[index];
+        const uniqueName = `product_${Date.now()}_${index}${path.extname(file.originalname)}`;
+        try {
+          const imageUrl = await uploadToImageKit(file.path, uniqueName, "/products");
+          uploadedImages.push({
+            productId: id,
+            imageUrl,
+            isPrimary: false,
+          });
+
+          // Clean up the local temp file after upload
+          try {
+            fs.unlinkSync(file.path);
+          } catch (err) {
+            console.error("Failed to delete temp file:", file.path, err);
+          }
+        } catch (err) {
+          console.error("Failed to upload product image to ImageKit:", err);
+          throw err;
+        }
+      }
+    }
+
     await prisma.$transaction(async (tx) => {
       // --- Image handling (unchanged) ---
       if (removedImageIds.length) {
@@ -247,17 +299,13 @@ class ProductService {
         });
       }
 
-      if (files?.length) {
+      if (uploadedImages.length) {
         await tx.productImage.createMany({
-          data: files.map((file) => ({
-            productId: id,
-            imageUrl: `/uploads/products/${file.filename}`,
-            isPrimary: false,
-          })),
+          data: uploadedImages,
         });
       }
 
-      if (removedImageIds.length || files?.length) {
+      if (removedImageIds.length || uploadedImages.length) {
         await tx.productImage.updateMany({
           where: { productId: id },
           data: { isPrimary: false },
@@ -275,8 +323,8 @@ class ProductService {
 
           const newPrimary = requestedStillExists
             ? remaining.find((img) => img.id === BigInt(primaryImageId))!
-            : files?.length
-              ? remaining[remaining.length - files.length]
+            : uploadedImages.length
+              ? remaining[remaining.length - uploadedImages.length]
               : remaining[0];
 
           await tx.productImage.update({

@@ -175,13 +175,19 @@ const PurchaseOrderViewPage: React.FC = () => {
                     )}
                 </Section>
 
-                {/* ── Supplier ── */}
-                <Section title="Supplier" icon={<FaUser />}>
+                {/* ── Supplier & Store ── */}
+                <Section title="Supplier & Store" icon={<FaUser />}>
                     <Row>
                         <Col lg={6} md={12}>
                             <ViewField
                                 label="Supplier"
                                 value={supplier ? `${supplier.supplierCode} - ${supplier.legalName || supplier.displayName || ""}` : po.supplierId}
+                            />
+                        </Col>
+                        <Col lg={6} md={12}>
+                            <ViewField
+                                label="Store"
+                                value={po.store?.storeName || po.storeId || "—"}
                             />
                         </Col>
                     </Row>
@@ -285,6 +291,10 @@ const PurchaseOrderViewPage: React.FC = () => {
                                 <div className="d-flex justify-content-between mb-2">
                                     <span>Subtotal:</span>
                                     <span>₹{Number(po.subtotal).toFixed(2)}</span>
+                                </div>
+                                <div className="d-flex justify-content-between mb-2 text-danger small">
+                                    <span>Discount:</span>
+                                    <span>-₹{Number(po.totalDiscount || 0).toFixed(2)}</span>
                                 </div>
                                 {isInterState ? (
                                     <div className="d-flex justify-content-between mb-2 text-success small">

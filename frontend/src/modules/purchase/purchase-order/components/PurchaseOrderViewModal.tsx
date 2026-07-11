@@ -138,7 +138,6 @@ const PurchaseOrderViewModal: React.FC<PurchaseOrderViewModalProps> = ({
                   <th>Product</th>
                   <th>Qty</th>
                   <th>Unit Price</th>
-                  <th>Discount %</th>
                   <th>Tax %</th>
                   <th>Total</th>
                 </tr>
@@ -149,13 +148,11 @@ const PurchaseOrderViewModal: React.FC<PurchaseOrderViewModalProps> = ({
                   purchaseOrder.items.map((item, index) => {
                     const qty = safeNumber(item.quantity);
                     const price = safeNumber(item.unitPrice);
-                    const discount = safeNumber(item.discount);
                     const tax = safeNumber(item.tax);
 
                     const base = qty * price;
-                    const discountAmt = (base * discount) / 100;
-                    const taxAmt = ((base - discountAmt) * tax) / 100;
-                    const total = base - discountAmt + taxAmt;
+                    const taxAmt = (base * tax) / 100;
+                    const total = item.lineTotal ? safeNumber(item.lineTotal) : base + taxAmt;
 
                     const matchedMaterial = rawMaterials.find(
                       (rm: any) => String(rm.rawMaterialId) === String(item.productId)
@@ -168,7 +165,6 @@ const PurchaseOrderViewModal: React.FC<PurchaseOrderViewModalProps> = ({
                         <td>{productName}</td>
                         <td>{qty}</td>
                         <td>₹{price.toFixed(2)}</td>
-                        <td>{discount}%</td>
                         <td>{tax}%</td>
                         <td>₹{total.toFixed(2)}</td>
                       </tr>

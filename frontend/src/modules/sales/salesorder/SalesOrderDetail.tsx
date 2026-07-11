@@ -264,8 +264,8 @@ const SalesOrderDetail: React.FC = () => {
                                             <th>Color</th>
                                             <th className="text-end">Qty</th>
                                             <th className="text-end">Unit Price</th>
-                                            <th className="text-end">Discount</th>
-                                            <th className="text-end">Taxable Value</th>
+
+
                                             {order.isInterState ? (
                                                 <th className="text-end">IGST</th>
                                             ) : (
@@ -274,7 +274,7 @@ const SalesOrderDetail: React.FC = () => {
                                                     <th className="text-end">SGST</th>
                                                 </>
                                             )}
-                                            <th className="text-end">Cess</th>
+
                                             <th className="text-end">Line Total</th>
                                         </tr>
                                     </thead>
@@ -289,13 +289,8 @@ const SalesOrderDetail: React.FC = () => {
                                                 <td className="master-data-cell">{COLOR_TYPE_LABELS[item.colorType] || item.colorType || "—"}</td>
                                                 <td className="master-data-cell text-end">{item.quantity}</td>
                                                 <td className="master-data-cell text-end">{formatMoney(getUnitPrice(item, order.customerType))}</td>
-                                                <td className="master-data-cell text-end">
-                                                    {formatMoney(item.discountAmount)}
-                                                    <div className="text-muted small">
-                                                        ({item.discountType === "PERCENT" ? `${item.discountValue}%` : "flat"})
-                                                    </div>
-                                                </td>
-                                                <td className="master-data-cell text-end">{formatMoney(item.taxableAmount || item.taxableValue)}</td>
+
+
                                                 {order.isInterState ? (
                                                     <td className="master-data-cell text-end">
                                                         {formatMoney(item.igstAmount || item.gstAmount || 0)}
@@ -313,10 +308,7 @@ const SalesOrderDetail: React.FC = () => {
                                                         </td>
                                                     </>
                                                 )}
-                                                <td className="master-data-cell text-end">
-                                                    {formatMoney(item.cessAmount)}
-                                                    <div className="text-muted small">({item.cessRate}%)</div>
-                                                </td>
+
                                                 <td className="master-data-cell text-end fw-bold">{formatMoney(item.lineTotal)}</td>
                                             </tr>
                                         ))}
@@ -388,18 +380,13 @@ const SalesOrderDetail: React.FC = () => {
                                     </div>
                                 </>
                             )}
-                            <div className="d-flex justify-content-between py-1">
-                                <span className="text-muted">Total GST</span>
-                                <span>{formatMoney(order.totalGst)}</span>
-                            </div>
-                            <div className="d-flex justify-content-between py-1">
-                                <span className="text-muted">CESS</span>
-                                <span>{formatMoney(order.totalCess)}</span>
-                            </div>
-                            <div className="d-flex justify-content-between py-1">
-                                <span className="text-muted">Discount</span>
-                                <span className="text-danger">− {formatMoney(order.totalDiscount)}</span>
-                            </div>
+
+                            {Number(order.totalDiscount) !== 0 && (
+                                <div className="d-flex justify-content-between py-1">
+                                    <span className="text-muted">Discount</span>
+                                    <span className="text-danger">− {formatMoney(order.totalDiscount)}</span>
+                                </div>
+                            )}
                             {/* <div className="d-flex justify-content-between py-1">
                                 <span className="text-muted">GST</span>
                                 <span>+ {formatMoney(order.totalGst)}</span>

@@ -290,6 +290,62 @@ class SalesOrderService {
         };
     }
 
+    private calculateLinesWithOrderDiscount(
+        items: Array<{
+            productId: bigint;
+            colorType: string;
+            quantity: Prisma.Decimal;
+            pricing: ProductPricingRow;
+            gstTaxRateId?: string | null;
+            customGstRate?: Prisma.Decimal | null;
+        }>,
+        customerType: string | null | undefined,
+        isInterState: boolean,
+        orderDiscountType: "PERCENT" | "FLAT",
+        orderDiscountValue: Prisma.Decimal
+    ): LineCalculation[] {
+        const baseLines = items.map((item) => {
+            return this.calculateLine({
+                productId: item.productId,
+                colorType: item.colorType,
+                quantity: item.quantity,
+                pricing: item.pricing,
+                customerType,
+                customGstTaxRateId: item.gstTaxRateId,
+                customGstRate: item.customGstRate,
+                isInterState,
+                discountType: "PERCENT",
+                discountValue: new Prisma.Decimal(0),
+            });
+        });
+
+        const subtotal = baseLines.reduce((sum, line) => sum.add(line.lineSubtotal), new Prisma.Decimal(0));
+
+        const rawDiscount = orderDiscountType === "PERCENT"
+            ? subtotal.mul(orderDiscountValue).div(100)
+            : orderDiscountValue;
+        const totalDiscount = rawDiscount.gt(subtotal) ? subtotal : rawDiscount;
+
+        return baseLines.map((baseLine, index) => {
+            const share = subtotal.gt(0) ? baseLine.lineSubtotal.div(subtotal) : new Prisma.Decimal(0);
+            const itemDiscount = totalDiscount.mul(share);
+            const item = items[index];
+
+            return this.calculateLine({
+                productId: baseLine.productId,
+                colorType: baseLine.colorType,
+                quantity: baseLine.quantity,
+                pricing: item.pricing,
+                customerType,
+                customGstTaxRateId: item.gstTaxRateId,
+                customGstRate: item.customGstRate,
+                isInterState,
+                discountType: "FLAT",
+                discountValue: itemDiscount,
+            });
+        });
+    }
+
     // ─── Create Sales Order ─────────────────────────────────────────────
 
     async create(data: CreateSalesOrderInput) {
@@ -333,33 +389,40 @@ class SalesOrderService {
         });
         const customGstTaxRateMap = new Map(customGstTaxRates.map((r) => [r.id, r.taxRate]));
 
-        const lineCalcs = data.items.map((item) => {
-            const productId = BigInt(item.productId);
-            const pricing = this.resolvePricing(pricingMap, productId, item.colorTypeId);
-            if (!pricing) {
-                throw new ApiError(404, `Product with ID ${item.productId} not found`);
-            }
+        const orderDiscountType = data.orderDiscountType ?? "PERCENT";
+        const orderDiscountValue = data.orderDiscountValue !== undefined ? new Prisma.Decimal(data.orderDiscountValue) : new Prisma.Decimal(0);
 
-            let customGstRate: Prisma.Decimal | null = null;
-            if (item.gstTaxRateId) {
-                const rate = customGstTaxRateMap.get(item.gstTaxRateId);
-                if (rate === undefined) {
-                    throw new ApiError(400, `GST Tax Rate with ID ${item.gstTaxRateId} not found`);
+        const lineCalcs = this.calculateLinesWithOrderDiscount(
+            data.items.map((item) => {
+                const productId = BigInt(item.productId);
+                const pricing = this.resolvePricing(pricingMap, productId, item.colorTypeId);
+                if (!pricing) {
+                    throw new ApiError(404, `Product with ID ${item.productId} not found`);
                 }
-                customGstRate = rate;
-            }
 
-            return this.calculateLine({
-                productId,
-                colorType: item.colorTypeId,
-                quantity: new Prisma.Decimal(item.quantity),
-                pricing,
-                customerType: data.customerType,
-                customGstTaxRateId: item.gstTaxRateId,
-                customGstRate,
-                isInterState,
-            });
-        });
+                let customGstRate: Prisma.Decimal | null = null;
+                if (item.gstTaxRateId) {
+                    const rate = customGstTaxRateMap.get(item.gstTaxRateId);
+                    if (rate === undefined) {
+                        throw new ApiError(400, `GST Tax Rate with ID ${item.gstTaxRateId} not found`);
+                    }
+                    customGstRate = rate;
+                }
+
+                return {
+                    productId,
+                    colorType: item.colorTypeId,
+                    quantity: new Prisma.Decimal(item.quantity),
+                    pricing,
+                    gstTaxRateId: item.gstTaxRateId,
+                    customGstRate,
+                };
+            }),
+            data.customerType,
+            isInterState,
+            orderDiscountType,
+            orderDiscountValue
+        );
 
         const orderTotals = lineCalcs.reduce(
             (acc, line) => ({
@@ -405,6 +468,8 @@ class SalesOrderService {
                 internalNotes: data.internalNotes,
                 createdBy: data.createdBy,
                 status: data.status,
+                orderDiscountType,
+                orderDiscountValue,
                 subtotal: orderTotals.subtotal,
                 totalDiscount: orderTotals.totalDiscount,
                 totalCgst: orderTotals.totalCgst,
@@ -578,6 +643,16 @@ class SalesOrderService {
         if (data.status !== undefined) updateData.status = data.status;
         if (data.isInterState !== undefined) updateData.isInterState = data.isInterState;
 
+        if (data.orderDiscountType !== undefined) {
+            updateData.orderDiscountType = data.orderDiscountType;
+        }
+        if (data.orderDiscountValue !== undefined) {
+            updateData.orderDiscountValue = new Prisma.Decimal(data.orderDiscountValue);
+        }
+
+        const orderDiscountType = data.orderDiscountType !== undefined ? data.orderDiscountType : (existing.orderDiscountType ?? "PERCENT");
+        const orderDiscountValue = data.orderDiscountValue !== undefined ? new Prisma.Decimal(data.orderDiscountValue) : new Prisma.Decimal(existing.orderDiscountValue ?? 0);
+
         const isInterState = data.isInterState ?? existing.isInterState;
 
         if (data.billingAddressLine1 !== undefined) {
@@ -651,33 +726,37 @@ class SalesOrderService {
             });
             const customGstTaxRateMap = new Map(customGstTaxRates.map((r) => [r.id, r.taxRate]));
 
-            const lineCalcs = data.items.map((item) => {
-                const productId = BigInt(item.productId);
-                const pricing = this.resolvePricing(pricingMap, productId, item.colorTypeId);
-                if (!pricing) {
-                    throw new ApiError(404, `Product with ID ${item.productId} not found`);
-                }
-
-                let customGstRate: Prisma.Decimal | null = null;
-                if (item.gstTaxRateId) {
-                    const rate = customGstTaxRateMap.get(item.gstTaxRateId);
-                    if (rate === undefined) {
-                        throw new ApiError(400, `GST Tax Rate with ID ${item.gstTaxRateId} not found`);
+            const lineCalcs = this.calculateLinesWithOrderDiscount(
+                data.items.map((item) => {
+                    const productId = BigInt(item.productId);
+                    const pricing = this.resolvePricing(pricingMap, productId, item.colorTypeId);
+                    if (!pricing) {
+                        throw new ApiError(404, `Product with ID ${item.productId} not found`);
                     }
-                    customGstRate = rate;
-                }
 
-                return this.calculateLine({
-                    productId,
-                    colorType: item.colorTypeId,
-                    quantity: new Prisma.Decimal(item.quantity),
-                    pricing,
-                    customerType: data.customerType ?? existing.customerType,
-                    customGstTaxRateId: item.gstTaxRateId,
-                    customGstRate,
-                    isInterState,
-                });
-            });
+                    let customGstRate: Prisma.Decimal | null = null;
+                    if (item.gstTaxRateId) {
+                        const rate = customGstTaxRateMap.get(item.gstTaxRateId);
+                        if (rate === undefined) {
+                            throw new ApiError(400, `GST Tax Rate with ID ${item.gstTaxRateId} not found`);
+                        }
+                        customGstRate = rate;
+                    }
+
+                    return {
+                        productId,
+                        colorType: item.colorTypeId,
+                        quantity: new Prisma.Decimal(item.quantity),
+                        pricing,
+                        gstTaxRateId: item.gstTaxRateId,
+                        customGstRate,
+                    };
+                }),
+                data.customerType ?? existing.customerType,
+                isInterState,
+                orderDiscountType,
+                orderDiscountValue
+            );
 
             // Replace items
             await prisma.salesOrderItem.deleteMany({
@@ -708,6 +787,75 @@ class SalesOrderService {
                     gstTaxRateId: line.gstTaxRateId,
                 })),
             };
+
+            const orderTotals = lineCalcs.reduce(
+                (acc, line) => ({
+                    subtotal: acc.subtotal.add(line.lineSubtotal),
+                    totalDiscount: acc.totalDiscount.add(line.discountAmount),
+                    totalCgst: acc.totalCgst.add(line.cgstAmount),
+                    totalSgst: acc.totalSgst.add(line.sgstAmount),
+                    totalIgst: acc.totalIgst.add(line.igstAmount),
+                    netAmount: acc.netAmount.add(line.lineTotal),
+                }),
+                {
+                    subtotal: new Prisma.Decimal(0),
+                    totalDiscount: new Prisma.Decimal(0),
+                    totalCgst: new Prisma.Decimal(0),
+                    totalSgst: new Prisma.Decimal(0),
+                    totalIgst: new Prisma.Decimal(0),
+                    netAmount: new Prisma.Decimal(0),
+                }
+            );
+
+            updateData.subtotal = orderTotals.subtotal;
+            updateData.totalDiscount = orderTotals.totalDiscount;
+            updateData.totalCgst = orderTotals.totalCgst;
+            updateData.totalSgst = orderTotals.totalSgst;
+            updateData.totalIgst = orderTotals.totalIgst;
+            updateData.netAmount = orderTotals.netAmount;
+        } else if (data.orderDiscountType !== undefined || data.orderDiscountValue !== undefined) {
+            const lineCalcs = this.calculateLinesWithOrderDiscount(
+                existing.items.map((item) => ({
+                    productId: item.productId,
+                    colorType: item.colorType,
+                    quantity: item.quantity,
+                    pricing: {
+                        id: item.productId,
+                        b2b: item.b2b,
+                        mrp: item.mrp,
+                        b2c: item.b2c,
+                        exportPrice: item.exportPrice,
+                        gstTaxRateId: item.gstTaxRateId,
+                        gstRate: item.igstRate.gt(0) ? item.igstRate : item.cgstRate.add(item.sgstRate),
+                    },
+                    gstTaxRateId: item.gstTaxRateId,
+                    customGstRate: item.igstRate.gt(0) ? item.igstRate : item.cgstRate.add(item.sgstRate),
+                })),
+                data.customerType ?? existing.customerType,
+                isInterState,
+                orderDiscountType,
+                orderDiscountValue
+            );
+
+            await prisma.$transaction(async (tx) => {
+                for (let i = 0; i < existing.items.length; i++) {
+                    const line = lineCalcs[i];
+                    const item = existing.items[i];
+                    await tx.salesOrderItem.update({
+                        where: { id: item.id },
+                        data: {
+                            discountType: line.discountType,
+                            discountValue: line.discountValue,
+                            discountAmount: line.discountAmount,
+                            taxableAmount: line.taxableValue,
+                            cgstAmount: line.cgstAmount,
+                            sgstAmount: line.sgstAmount,
+                            igstAmount: line.igstAmount,
+                            lineTotal: line.lineTotal,
+                        }
+                    });
+                }
+            });
 
             const orderTotals = lineCalcs.reduce(
                 (acc, line) => ({

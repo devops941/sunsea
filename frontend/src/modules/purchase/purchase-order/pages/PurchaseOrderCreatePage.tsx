@@ -14,6 +14,7 @@ import type { StateCityOption } from "../../../../components/ui/CityStateSelect/
 import { validatePurchaseOrder } from "../validations/purchaseOrderValidation";
 import type { PurchaseOrderItem } from "../../../../features/purchaseOrder/types";
 import { useSuppliers } from "../../../../hooks/useSuppliers";
+import { useUOMs } from "../../../../hooks/useUOMs";
 import { rawMaterialService } from "../../../../services/rawMaterialService";
 import type { RawMaterial } from "../../../../features/raw-materials/types";
 import { usePurchaseOrders } from "../../../../hooks/usePurchaseOrder";
@@ -22,6 +23,7 @@ import Section from "../../../../components/ui/Section/Section";
 import { useAppDispatch, useAppSelector } from "../../../../hooks/reduxHooks";
 import { fetchLocations } from "../../../../features/locations/locationSlice";
 import { selectActiveGstTaxes, fetchGstTaxes } from "../../../../features/gst/gstSlice";
+import { fetchStores } from "../../../../features/stores/storeSlice";
 
 // ─── Report-style Section wrapper (matches QuotationForm) ──────────────────
 
@@ -31,7 +33,7 @@ const initialFormData = {
   poDate: new Date().toISOString().split("T")[0],
   expectedDeliveryDate: "",
   supplierId: "",
-  locationId: "",
+  storeId: "",
   status: "DRAFT" as const,
   createdByOn: "",
 
@@ -49,6 +51,8 @@ const initialFormData = {
   items: [] as PurchaseOrderItem[],
 
   subtotal: 0,
+  discountType: "PERCENT" as "PERCENT" | "FLAT",
+  discountValue: 0,
   totalDiscount: 0,
   totalTax: 0,
   totalCgst: 0,
@@ -73,6 +77,8 @@ const PurchaseOrderCreatePage: React.FC = () => {
   const [rawMaterials, setRawMaterials] = useState<RawMaterial[]>([]);
   const { data: company } = useSelector((state: any) => state.company);
   const { data: locations } = useAppSelector(state => state.locations);
+  const { data: stores } = useAppSelector(state => state.stores);
+  const { activeUOMs, loadActiveUOMs } = useUOMs();
   const companyState = company?.state
   const gstTaxes = useAppSelector(selectActiveGstTaxes);
   const gstLoading = useAppSelector((state) => state.gst.loading);
@@ -105,7 +111,9 @@ const PurchaseOrderCreatePage: React.FC = () => {
     loadSuppliers();
     dispatch(fetchLocations(undefined));
     dispatch(fetchGstTaxes(undefined));
-  }, [loadSuppliers, dispatch]);
+    dispatch(fetchStores(undefined));
+    loadActiveUOMs();
+  }, [loadSuppliers, dispatch, loadActiveUOMs]);
 
   useEffect(() => {
     const fetchRawMaterials = async () => {
@@ -140,12 +148,14 @@ const PurchaseOrderCreatePage: React.FC = () => {
     }));
   }, [user]);
 
+  const [roundingSign, setRoundingSign] = useState<"+" | "-">("+");
+  const [roundingValue, setRoundingValue] = useState<number>(0);
+
   // ============================================================
-  // CALCULATE TOTALS
+  // TOTALS RECALCULATION
   // ============================================================
-  const recalculateTotals = (items: PurchaseOrderItem[], interState: boolean = isInterState) => {
+  const recalculateTotals = (items: PurchaseOrderItem[], interState: boolean = isInterState, poDiscountType: "PERCENT" | "FLAT" = formData.discountType, poDiscountValue: number = formData.discountValue, rSign: "+" | "-" = roundingSign, rValue: number = roundingValue) => {
     let subtotal = 0;
-    let totalDiscount = 0;
     let totalTax = 0;
     let totalCgst = 0;
     let totalSgst = 0;
@@ -156,19 +166,8 @@ const PurchaseOrderCreatePage: React.FC = () => {
       const price = Number(item.unitPrice) || 0;
       const lineSubtotal = qty * price;
 
-      const discountType = item.discountType || "PERCENT";
-      const discountValue = Number(item.discountValue ?? item.discount) || 0;
-      let discountAmount = 0;
-      if (discountType === "PERCENT") {
-        discountAmount = (lineSubtotal * discountValue) / 100;
-      } else {
-        discountAmount = discountValue;
-      }
-      if (discountAmount > lineSubtotal) {
-        discountAmount = lineSubtotal;
-      }
-
-      const taxableAmount = lineSubtotal - discountAmount;
+      // Taxable amount is exactly line subtotal
+      const taxableAmount = lineSubtotal;
       const totalGstRate = Number(item.tax) || 0;
       const totalGstAmount = (taxableAmount * totalGstRate) / 100;
 
@@ -184,12 +183,23 @@ const PurchaseOrderCreatePage: React.FC = () => {
       }
 
       subtotal += lineSubtotal;
-      totalDiscount += discountAmount;
       totalTax += totalGstAmount;
       totalCgst += cgstAmount;
       totalSgst += sgstAmount;
       totalIgst += igstAmount;
     });
+
+    let totalDiscount = 0;
+    if (poDiscountType === "PERCENT") {
+      totalDiscount = (subtotal * poDiscountValue) / 100;
+    } else {
+      totalDiscount = poDiscountValue;
+    }
+    if (totalDiscount > subtotal) {
+      totalDiscount = subtotal;
+    }
+
+    const roundingAdjust = rSign === "+" ? rValue : -rValue;
 
     return {
       subtotal,
@@ -198,7 +208,7 @@ const PurchaseOrderCreatePage: React.FC = () => {
       totalCgst,
       totalSgst,
       totalIgst,
-      netAmount: subtotal - totalDiscount + totalTax,
+      netAmount: subtotal - totalDiscount + totalTax + roundingAdjust,
     };
   };
 
@@ -215,19 +225,7 @@ const PurchaseOrderCreatePage: React.FC = () => {
         const price = Number(item.unitPrice) || 0;
         const lineSubtotal = qty * price;
 
-        const discountType = item.discountType || "PERCENT";
-        const discountValue = Number(item.discountValue ?? item.discount) || 0;
-        let discountAmount = 0;
-        if (discountType === "PERCENT") {
-          discountAmount = (lineSubtotal * discountValue) / 100;
-        } else {
-          discountAmount = discountValue;
-        }
-        if (discountAmount > lineSubtotal) {
-          discountAmount = lineSubtotal;
-        }
-
-        const taxableAmount = lineSubtotal - discountAmount;
+        const taxableAmount = lineSubtotal;
         const totalGstRate = Number(item.tax) || 0;
         const totalGstAmount = (taxableAmount * totalGstRate) / 100;
 
@@ -250,7 +248,6 @@ const PurchaseOrderCreatePage: React.FC = () => {
 
         return {
           ...item,
-          discountAmount,
           taxableAmount,
           cgstRate,
           cgstAmount,
@@ -259,6 +256,7 @@ const PurchaseOrderCreatePage: React.FC = () => {
           igstRate,
           igstAmount,
           lineTotal: taxableAmount + totalGstAmount,
+          discount: 0,
         };
       });
 
@@ -303,18 +301,19 @@ const PurchaseOrderCreatePage: React.FC = () => {
       return;
     }
 
-    if (name === "locationId") {
-      const selectedSup = locations.find((s) => String(s.locationId) === String(value));
+    if (name === "storeId") {
+      const selectedStore = (stores || []).find((s: any) => String(s.storeId) === String(value));
+      const selectedLoc = (locations || []).find((l: any) => String(l.locationId || l.id) === String(selectedStore?.locationId));
       setFormData((prev) => ({
         ...prev,
-        locationId: value,
-        billingAddressLine1: selectedSup?.address || "",
-        billingCity: selectedSup?.city || "",
-        billingState: selectedSup?.state || "",
+        storeId: value,
+        billingAddressLine1: selectedLoc?.address || "",
+        billingCity: selectedLoc?.city || "",
+        billingState: selectedLoc?.state || "",
         billingPincode: "625017",
       }));
-      if (errors.locationId) {
-        setErrors((prev) => ({ ...prev, locationId: "" }));
+      if (errors.storeId) {
+        setErrors((prev) => ({ ...prev, storeId: "" }));
       }
       return;
     }
@@ -347,19 +346,7 @@ const PurchaseOrderCreatePage: React.FC = () => {
           const qty = Number(item.quantity) || 0;
           const lineSubtotal = qty * parsedUnitPrice;
 
-          const discountType = item.discountType || "PERCENT";
-          const discountValue = Number(item.discountValue ?? item.discount) || 0;
-          let discountAmount = 0;
-          if (discountType === "PERCENT") {
-            discountAmount = (lineSubtotal * discountValue) / 100;
-          } else {
-            discountAmount = discountValue;
-          }
-          if (discountAmount > lineSubtotal) {
-            discountAmount = lineSubtotal;
-          }
-
-          const taxableAmount = lineSubtotal - discountAmount;
+          const taxableAmount = lineSubtotal;
           const totalGstRate = Number(item.tax) || 0;
           const totalGstAmount = (taxableAmount * totalGstRate) / 100;
 
@@ -383,8 +370,6 @@ const PurchaseOrderCreatePage: React.FC = () => {
           return {
             ...item,
             unitPrice: parsedUnitPrice,
-            discount: discountType === "PERCENT" ? discountValue : 0,
-            discountAmount,
             taxableAmount,
             cgstRate,
             cgstAmount,
@@ -474,19 +459,7 @@ const PurchaseOrderCreatePage: React.FC = () => {
       const price = Number(item.unitPrice) || 0;
       const lineSubtotal = qty * price;
 
-      const discountType = item.discountType || "PERCENT";
-      const discountValue = Number(item.discountValue ?? item.discount) || 0;
-      let discountAmount = 0;
-      if (discountType === "PERCENT") {
-        discountAmount = (lineSubtotal * discountValue) / 100;
-      } else {
-        discountAmount = discountValue;
-      }
-      if (discountAmount > lineSubtotal) {
-        discountAmount = lineSubtotal;
-      }
-
-      const taxableAmount = lineSubtotal - discountAmount;
+      const taxableAmount = lineSubtotal;
       const totalGstRate = Number(item.tax) || 0;
       const totalGstAmount = (taxableAmount * totalGstRate) / 100;
 
@@ -509,8 +482,6 @@ const PurchaseOrderCreatePage: React.FC = () => {
 
       items[index] = {
         ...item,
-        discount: discountType === "PERCENT" ? discountValue : 0,
-        discountAmount,
         taxableAmount,
         cgstRate,
         cgstAmount,
@@ -560,19 +531,7 @@ const PurchaseOrderCreatePage: React.FC = () => {
       const qty = Number(item.quantity) || 0;
       const lineSubtotal = qty * parsedUnitPrice;
 
-      const discountType = item.discountType || "PERCENT";
-      const discountValue = Number(item.discountValue ?? item.discount) || 0;
-      let discountAmount = 0;
-      if (discountType === "PERCENT") {
-        discountAmount = (lineSubtotal * discountValue) / 100;
-      } else {
-        discountAmount = discountValue;
-      }
-      if (discountAmount > lineSubtotal) {
-        discountAmount = lineSubtotal;
-      }
-
-      const taxableAmount = lineSubtotal - discountAmount;
+      const taxableAmount = lineSubtotal;
       const totalGstRate = defaultTaxRate;
       const totalGstAmount = (taxableAmount * totalGstRate) / 100;
 
@@ -608,8 +567,6 @@ const PurchaseOrderCreatePage: React.FC = () => {
         unitPrice: parsedUnitPrice,
         uom: rawMaterial?.baseUom || "",
         tax: totalGstRate,
-        discount: discountType === "PERCENT" ? discountValue : 0,
-        discountAmount,
         taxableAmount,
         cgstRate,
         cgstAmount,
@@ -637,11 +594,7 @@ const PurchaseOrderCreatePage: React.FC = () => {
           uom: "",
           quantity: 1,
           unitPrice: 0,
-          discount: 0,
           tax: 0,
-          discountType: "PERCENT" as const,
-          discountValue: 0,
-          discountAmount: 0,
           taxableAmount: 0,
           cgstRate: 0,
           cgstAmount: 0,
@@ -713,11 +666,7 @@ const PurchaseOrderCreatePage: React.FC = () => {
           uom: item.uom,
           quantity: item.quantity,
           unitPrice: item.unitPrice,
-          discount: item.discount || 0,
           tax: item.tax || 0,
-          discountType: item.discountType || "PERCENT",
-          discountValue: Number(item.discountValue ?? item.discount) || 0,
-          discountAmount: item.discountAmount || 0,
           taxableAmount: item.taxableAmount || 0,
           cgstRate: item.cgstRate || 0,
           cgstAmount: item.cgstAmount || 0,
@@ -766,6 +715,16 @@ const PurchaseOrderCreatePage: React.FC = () => {
       label: `${t.taxName} (${t.taxRate}%)`,
     })),
   ], [gstTaxes, gstLoading]);
+
+  const uomOptions = useMemo(() => {
+    return [
+      { value: "", label: "-- Select UOM --" },
+      ...(activeUOMs || []).map((u: any) => ({
+        value: u.uomName as string,
+        label: u.uomName as string,
+      }))
+    ];
+  }, [activeUOMs]);
 
   const supplierMaterials = selectedSupplier?.category
     ? selectedSupplier.category.split(",").map((c: string) => c.trim().toLowerCase())
@@ -842,23 +801,27 @@ const PurchaseOrderCreatePage: React.FC = () => {
 
           {/* ── Supplier ── */}
           <Section title="Supplier" icon={<FaUser />}>
-            <Row>
+            <Row className="g-3">
+              {/* Store */}
               <Col lg={6} md={12}>
                 <SelectInput
-                  label="Location"
-                  name="locationId"
-                  value={formData.locationId} options={[
-                    { label: "Select a location", value: "" },
-                    ...locations.filter(loc => loc.isActive).map(loc => ({
-                      label: `${loc.locationName} (${loc.locationCode})`,
-                      value: loc.locationId
+                  label="Store"
+                  name="storeId"
+                  value={formData.storeId}
+                  options={[
+                    { label: "-- Select Store --", value: "" },
+                    ...(stores || []).filter((s) => s.isActive).map((s) => ({
+                      label: s.storeName,
+                      value: s.storeId
                     }))
                   ]}
                   required
-                  error={errors.locationId}
+                  error={errors.storeId}
                   onChange={handleChange}
                 />
               </Col>
+
+              {/* Supplier */}
               <Col lg={6} md={12}>
                 <SelectInput
                   label="Supplier"
@@ -876,6 +839,7 @@ const PurchaseOrderCreatePage: React.FC = () => {
           {/* ── Addresses ── */}
           <Section title="Delivery & Shipping Address" icon={<FaMapMarkerAlt />}>
             <Row>
+              {/* Delivery Address — auto-populated from warehouse */}
               <Col lg={6}>
                 <h6 className="mb-3">Delivery Address</h6>
                 <TextInput
@@ -999,19 +963,7 @@ const PurchaseOrderCreatePage: React.FC = () => {
                     const price = Number(item.unitPrice) || 0;
                     const lineSubtotal = qty * price;
 
-                    const discountType = item.discountType || "PERCENT";
-                    const discountValue = Number(item.discountValue ?? item.discount) || 0;
-                    let discountAmount = 0;
-                    if (discountType === "PERCENT") {
-                      discountAmount = (lineSubtotal * discountValue) / 100;
-                    } else {
-                      discountAmount = discountValue;
-                    }
-                    if (discountAmount > lineSubtotal) {
-                      discountAmount = lineSubtotal;
-                    }
-
-                    const taxableAmount = lineSubtotal - discountAmount;
+                    const taxableAmount = lineSubtotal;
 
                     return (
                       <tr key={index} className="master-data-row">
@@ -1031,13 +983,13 @@ const PurchaseOrderCreatePage: React.FC = () => {
                         </td>
 
                         <td className="master-data-cell">
-                          <TextInput
+                          <SelectInput
                             label=""
                             name={`items[${index}].uom`}
+                            options={uomOptions}
                             value={item.uom || ""}
-                            onChange={() => { }}
-                            disabled
-                            placeholder="—"
+                            onChange={(e) => handleItemChange(index, "uom", e.target.value)}
+                            error={errors[`items.${index}.uom`]}
                           />
                         </td>
 
@@ -1137,6 +1089,117 @@ const PurchaseOrderCreatePage: React.FC = () => {
                     <span>Subtotal:</span>
                     <span>₹{formData.subtotal.toFixed(2)}</span>
                   </div>
+                  <div className="d-flex justify-content-between align-items-center mb-2 text-danger small">
+                    <span className="d-flex align-items-center gap-2">
+                      Discount:
+                      <SelectInput
+                        label=""
+                        name="discountType"
+                        options={[
+                          { value: "PERCENT", label: "%" },
+                          { value: "FLAT", label: "Flat" },
+                        ]}
+                        value={formData.discountType || "PERCENT"}
+                        onChange={(e) => {
+                          setFormData((prev) => {
+                            const newDiscountType = e.target.value as "PERCENT" | "FLAT";
+                            const newTotals = recalculateTotals(
+                              prev.items,
+                              isInterState,
+                              newDiscountType,
+                              prev.discountValue
+                            );
+                            return { ...prev, discountType: newDiscountType, ...newTotals };
+                          });
+                        }}
+                      />
+                      <TextInput
+                        name="discountValue"
+                        type="number"
+                        min={0}
+                        step={0.01}
+                        placeholder="0"
+                        value={String(formData.discountValue || 0)}
+                        onChange={(e) => {
+                          setFormData((prev) => {
+                            const newDiscountValue = Number(e.target.value) || 0;
+                            const newTotals = recalculateTotals(
+                              prev.items,
+                              isInterState,
+                              prev.discountType,
+                              newDiscountValue
+                            );
+                            return { ...prev, discountValue: newDiscountValue, ...newTotals };
+                          });
+                        }}
+                        style={{ width: "80px", padding: "0.25rem 0.5rem", textAlign: "right" }}
+                      />
+                    </span>
+                    <span>-₹{formData.totalDiscount.toFixed(2)}</span>
+                  </div>
+
+                  <div className="d-flex justify-content-between align-items-center mb-2 text-secondary small">
+                    <span className="d-flex align-items-center gap-2">
+                      Round Off:
+                      <div className="d-flex align-items-center bg-white rounded border overflow-hidden">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setRoundingSign("+");
+                            setFormData(prev => ({
+                              ...prev,
+                              ...recalculateTotals(prev.items, isInterState, prev.discountType, prev.discountValue, "+", roundingValue)
+                            }));
+                          }}
+                          style={{
+                            border: "none",
+                            background: roundingSign === "+" ? "var(--color-primary, #047857)" : "var(--color-bg, #f9fafb)",
+                            color: roundingSign === "+" ? "#fff" : "var(--color-text-secondary)",
+                            padding: "0.25rem 0.5rem",
+                            cursor: "pointer"
+                          }}
+                        >
+                          +
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setRoundingSign("-");
+                            setFormData(prev => ({
+                              ...prev,
+                              ...recalculateTotals(prev.items, isInterState, prev.discountType, prev.discountValue, "-", roundingValue)
+                            }));
+                          }}
+                          style={{
+                            border: "none",
+                            background: roundingSign === "-" ? "var(--color-danger, #ef4444)" : "var(--color-bg, #f9fafb)",
+                            color: roundingSign === "-" ? "#fff" : "var(--color-text-secondary)",
+                            padding: "0.25rem 0.5rem",
+                            cursor: "pointer"
+                          }}
+                        >
+                          -
+                        </button>
+                      </div>
+                      <TextInput
+                        name="roundingValue"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={String(roundingValue || 0)}
+                        onChange={(e) => {
+                          const val = Number(e.target.value) || 0;
+                          setRoundingValue(val);
+                          setFormData(prev => ({
+                            ...prev,
+                            ...recalculateTotals(prev.items, isInterState, prev.discountType, prev.discountValue, roundingSign, val)
+                          }));
+                        }}
+                        style={{ width: "80px", padding: "0.25rem 0.5rem", textAlign: "right" }}
+                      />
+                    </span>
+                    <span>{roundingSign === "+" ? "+" : "-"}₹{(roundingValue || 0).toFixed(2)}</span>
+                  </div>
 
                   {isInterState ? (
                     <div className="d-flex justify-content-between mb-2 text-success small">
@@ -1155,10 +1218,6 @@ const PurchaseOrderCreatePage: React.FC = () => {
                       </div>
                     </>
                   )}
-                  <div className="d-flex justify-content-between mb-2 text-success fw-bold">
-                    <span>Total Tax:</span>
-                    <span>+₹{formData.totalTax.toFixed(2)}</span>
-                  </div>
                   <hr />
                   <div className="d-flex justify-content-between fw-bold">
                     <span>Net Amount:</span>

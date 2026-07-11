@@ -132,6 +132,11 @@ const salesOrderBodyShape = z.object({
     customerApprovedAt: z.string().datetime({ message: "Invalid customer approval date format" }).optional().nullable(),
     customerRejectionReason: z.string().max(500).optional().nullable(),
     createdBy: z.string().min(1).max(36).optional().nullable(),
+    orderDiscountType: DiscountTypeEnum.optional(),
+    orderDiscountValue: z.union([z.string(), z.number()])
+        .optional()
+        .refine((val) => val === undefined || val === null || val === "" || !isNaN(Number(val)), "Discount value must be a valid number")
+        .transform((val) => val !== undefined && val !== null && val !== "" ? Number(val) : undefined),
     items: z.array(salesOrderItemInputSchema).min(1, "At least one item is required"),
 });
 

@@ -61,14 +61,10 @@ const CompanySettings: React.FC = () => {
     } else if (type === "file") {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (file) {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          setFormData((prev) => ({ ...prev, [name]: reader.result as string }));
-          if (errors[name]) {
-            setErrors((prev: any) => ({ ...prev, [name]: undefined }));
-          }
-        };
-        reader.readAsDataURL(file);
+        setFormData((prev) => ({ ...prev, logoFile: file }));
+        if (errors[name]) {
+          setErrors((prev: any) => ({ ...prev, [name]: undefined }));
+        }
       }
       return;
     }
@@ -110,7 +106,20 @@ const CompanySettings: React.FC = () => {
     if (!validate() || !company) return;
 
     try {
-      await dispatch(updateCompany({ id: company.id, data: formData })).unwrap();
+      const submitData = new FormData();
+      Object.entries(formData).forEach(([key, value]) => {
+        if (key === "logoFile") {
+          if (value) {
+            submitData.append("logo", value);
+          }
+        } else if (key === "businessPlaces") {
+          submitData.append(key, JSON.stringify(value));
+        } else if (value !== undefined && value !== null) {
+          submitData.append(key, String(value));
+        }
+      });
+
+      await dispatch(updateCompany({ id: company.id, data: submitData as any })).unwrap();
       toast.success(company.isOnboarded ? "Company updated successfully!" : "Onboarding completed successfully!");
       if (!company.isOnboarded) {
         navigate('/dashboard');
@@ -198,14 +207,14 @@ const CompanySettings: React.FC = () => {
                   <Col md={6}>
                     <div className="mb-3">
                       <label className="form-label">Phone Number <span className="text-danger">*</span></label>
-                      <IndiaPhoneInput 
+                      <IndiaPhoneInput
                         name="phone"
-                        value={formData.phone || ""} 
+                        value={formData.phone || ""}
                         onChange={(e) => {
-                          setFormData(prev => ({...prev, phone: e.target.value}));
-                          if (errors.phone) setErrors((prev: any) => ({...prev, phone: undefined}));
-                        }} 
-                        required={true} 
+                          setFormData(prev => ({ ...prev, phone: e.target.value }));
+                          if (errors.phone) setErrors((prev: any) => ({ ...prev, phone: undefined }));
+                        }}
+                        required={true}
                       />
                       {errors.phone && <div className="text-danger small mt-1">{errors.phone}</div>}
                     </div>
@@ -302,14 +311,14 @@ const CompanySettings: React.FC = () => {
               <Col lg={4} md={6}>
                 <div className="mb-3">
                   <label className="form-label">Phone Number <span className="text-danger">*</span></label>
-                  <IndiaPhoneInput 
+                  <IndiaPhoneInput
                     name="phone"
-                    value={formData.phone || ""} 
+                    value={formData.phone || ""}
                     onChange={(e) => {
-                      setFormData(prev => ({...prev, phone: e.target.value}));
-                      if (errors.phone) setErrors((prev: any) => ({...prev, phone: undefined}));
-                    }} 
-                    required={true} 
+                      setFormData(prev => ({ ...prev, phone: e.target.value }));
+                      if (errors.phone) setErrors((prev: any) => ({ ...prev, phone: undefined }));
+                    }}
+                    required={true}
                   />
                   {errors.phone && <div className="text-danger small mt-1">{errors.phone}</div>}
                 </div>

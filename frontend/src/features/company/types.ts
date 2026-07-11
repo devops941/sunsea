@@ -65,6 +65,7 @@ export interface UpdateCompanyDto {
   isOnboarded?: boolean | null;
   isActive?: boolean | null;
   businessPlaces?: Partial<BusinessPlace>[];
+  logoFile?: File | null;
 }
 export interface CompanyState {
   data: Company | null;

@@ -41,11 +41,7 @@ export interface PurchaseOrderItem {
     uom: string;
     quantity: number;
     unitPrice: number;
-    discount: number;
     tax: number;
-    discountType?: "PERCENT" | "FLAT";
-    discountValue?: number;
-    discountAmount?: number;
     taxableAmount?: number;
     cgstRate?: number;
     cgstAmount?: number;
@@ -63,6 +59,7 @@ export interface PurchaseOrder {
     expectedDeliveryDate: string;
     supplierId: string;
     supplier?: Supplier;
+    storeId?: string;
 
     billingAddressLine1: string;
     billingCity: string;
@@ -80,6 +77,8 @@ export interface PurchaseOrder {
     status: PurchaseOrderStatus;
 
     subtotal: number;
+    discountType?: "PERCENT" | "FLAT";
+    discountValue?: number;
     totalDiscount: number;
     totalTax: number;
     totalCgst?: number;
@@ -99,6 +98,7 @@ export interface PurchaseOrderFormData {
     poDate: string;
     expectedDeliveryDate: string;
     supplierId: string;
+    storeId?: string;
     status: PurchaseOrderStatus;
     createdByOn: string;
 
@@ -117,6 +117,8 @@ export interface PurchaseOrderFormData {
     remarks: string;
     items: PurchaseOrderItem[];
     subtotal: number;
+    discountType?: "PERCENT" | "FLAT";
+    discountValue?: number;
     totalDiscount: number;
     totalTax: number;
     totalCgst?: number;
@@ -145,11 +147,7 @@ export interface CreatePurchaseOrderDto {
         uom: string;
         quantity: number;
         unitPrice: number;
-        discount: number;
         tax: number;
-        discountType?: "PERCENT" | "FLAT";
-        discountValue?: number;
-        discountAmount?: number;
         taxableAmount?: number;
         cgstRate?: number;
         cgstAmount?: number;

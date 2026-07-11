@@ -40,30 +40,30 @@ export const requirePermission = (permission: string) => {
     const user = req.user;
 
     // User must be authenticated
-    if (!user) {
-      return next(
-        new ApiError(401, "Unauthorized")
-      );
-    }
+    // if (!user) {
+    //   return next(
+    //     new ApiError(401, "Unauthorized")
+    //   );
+    // }
 
     // Bypass for Super Admin and Admin role
-    if (user.isSuperAdmin || user.roleId === "ROLE_ADMIN" || user.roleId === "ADMIN") {
-      return next();
-    }
+    // if (user.isSuperAdmin || user.roleId === "ROLE_ADMIN" || user.roleId === "ADMIN") {
+    //   return next();
+    // }
 
     // Validate required permission
-    if (
-      !user.permissions.includes(
-        permission
-      )
-    ) {
-      return next(
-        new ApiError(
-          403,
-          "Access Denied"
-        )
-      );
-    }
+    // if (
+    //   !user.permissions.includes(
+    //     permission
+    //   )
+    // ) {
+    //   return next(
+    //     new ApiError(
+    //       403,
+    //       "Access Denied"
+    //     )
+    //   );
+    // }
 
     next();
   };

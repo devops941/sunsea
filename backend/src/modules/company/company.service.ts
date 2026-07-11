@@ -1,6 +1,9 @@
 import { prisma } from "../../config/prisma";
 import { ApiError } from "../../utils/ApiError";
+import { uploadToImageKit } from "../../utils/Imagekit";
 import { UpdateCompanyInput } from "./company.validation";
+import fs from "fs";
+import path from "path";
 
 class CompanyService {
   /**
@@ -42,7 +45,7 @@ class CompanyService {
   /**
    * Update the company and its business places
    */
-  async updateCompany(id: string, data: UpdateCompanyInput, userId: string) {
+  async updateCompany(id: string, data: UpdateCompanyInput, userId: string, logoFile?: Express.Multer.File) {
     const existingCompany = await prisma.company.findUnique({
       where: { id },
     });
@@ -52,7 +55,20 @@ class CompanyService {
     }
 
     const { businessPlaces, companyName, ...companyData } = data;
-    
+
+    // Check if a new logo file was uploaded
+    if (logoFile) {
+      const fileName = `logo_${Date.now()}${path.extname(logoFile.originalname)}`;
+      companyData.logoUrl = await uploadToImageKit(logoFile.path, fileName, "/company-logos")
+
+      // Clean up the local temp file after upload
+      try {
+        fs.unlinkSync(logoFile.path);
+      } catch (err) {
+        console.error("Failed to delete temp file:", logoFile.path, err);
+      }
+    }
+
     // Ensure companyName is populated for backwards compatibility if needed
     const actualCompanyName = companyData.legalName || companyName || existingCompany.companyName;
 

@@ -31,12 +31,11 @@ export const bootstrapAdmin = async (prisma: PrismaClient) => {
 
   // --- Seed Permissions ---
   const systemModules = [
-    "customers", "supplier", "suppliers", "supplierpricelist", "profile", "employees", "products", 
-    "categories", "sub-categories", "users", "roles", "permissions", "role-permissions", 
+    "customers", "supplier", "suppliers", "supplierpricelist", "profile", "employees", "products",
+    "categories", "sub-categories", "users", "roles", "permissions", "role-permissions",
     "departments", "colors", "sizes", "uoms", "product-pricing",
-    "product-images", "stores", "storage-stores", "store-types", "locations", "machines", "shifts", 
-    "raw_materials", "raw_material_stocks", "sales-orders", "reports", "purchase-order-approvals", 
-    "finished_goods_stocks"
+    "product-images", "stores", "storage-stores", "store-types", "locations", "machines", "shifts",
+    "raw_materials", "raw_material_stocks", "sales-orders", "reports", "purchase-order-approvals", "invoice", "finished_goods_stocks"
   ];
   const actions = ["view", "create", "edit", "delete"];
 
