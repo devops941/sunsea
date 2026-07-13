@@ -290,9 +290,8 @@ const AppRoutes = () => {
               <Route path="/role-permissions" element={<OrganizationTabs />} />
             </Route>
 
-            {/* Department / Designation */}
             <Route element={<ProtectedRoute permission="departments.view" />}>
-              <Route path="/departments" element={<HROrganizationTabs />} />
+              <Route path="/departments" element={<OrganizationTabs />} />
             </Route>
             {/* Product Master Attributes */}
             <Route element={<ProtectedRoute permission="colors.view" />}>
