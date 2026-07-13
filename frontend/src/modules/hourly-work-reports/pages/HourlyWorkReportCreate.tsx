@@ -496,7 +496,7 @@ const HourlyWorkReportCreate: React.FC = () => {
                         <Col lg={6} md={12}>
                             <div className="page-header-info">
                                 <h2 className="page-title mb-1">Hourly Production Entry</h2>
-                                <div className="page-breadcrumb text-muted small">Home / Production / Hourly Entry / Create</div>
+                                
                             </div>
                         </Col>
                         <Col lg={6} md={12}>

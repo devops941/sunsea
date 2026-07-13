@@ -1,6 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
-import { Container, Row, Col, Spinner } from "react-bootstrap";
-import { FaSearch, FaPlus, FaChevronLeft, FaChevronRight } from "react-icons/fa";
+import { FaSearch, FaPlus } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 
@@ -14,9 +13,8 @@ import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
 import CustomButton from "../../../components/ui/Button/Button";
 import CommonViewModal from "../../../components/ui/CommonViewModal/CommonViewModal";
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
-import StatusBadge from "../../../components/ui/StatusBadge/Badge";
-
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
+import DataTable from "../../../components/ui/table/DataTable";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -57,6 +55,7 @@ const StorageStoreList: React.FC = () => {
 
         return () => clearTimeout(timer);
     }, [dispatch, searchTerm, storeType, currentPage]);
+    
     const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
         setSearchTerm(e.target.value);
         setCurrentPage(1);
@@ -76,6 +75,7 @@ const StorageStoreList: React.FC = () => {
     const totalPages = Math.ceil(filteredData.length / ITEMS_PER_PAGE);
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
     const paginatedData = filteredData.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+    
     const handleOpenView = useCallback((item: Store) => {
         setSelectedItem(item);
         setShowViewModal(true);
@@ -113,22 +113,19 @@ const StorageStoreList: React.FC = () => {
     }
 
     return (
-        <div className="inner-container">
-            <Container fluid>
-                {/* Page Header */}
-                <div className="page-header">
-                    <Row className="align-items-center g-3">
-                        <Col lg={6} md={12}>
-                            <div className="page-header-info">
-                                <h2 className="page-title">Storage Store Management</h2>
-                                <div className="page-breadcrumb">Home / Inventory & Warehouse / Storage Stores</div>
-                            </div>
-                        </Col>
-                        <Col lg={6} md={12}>
-                            <div className="page-header-actions">
+        <div className="p-4 md:p-6 min-h-screen bg-slate-50">
+            <div className="max-w-7xl mx-auto">
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                    {/* Page Header */}
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-6 border-b border-slate-200">
+                        <div>
+                            <h2 className="text-2xl font-bold text-slate-800">Storage Store Management</h2>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+                            <div className="w-48">
                                 <SelectInput
-                                    label=""
-                                    hideLabel
+                                    label="Store Type"
+                                    hideLabel={true}
                                     name="storeType"
                                     value={storeType}
                                     options={storeTypeOptions}
@@ -137,106 +134,77 @@ const StorageStoreList: React.FC = () => {
                                         setCurrentPage(1);
                                     }}
                                 />
-
-                                <div className="page-search-wrap">
-                                    <FaSearch className="page-search-icon" />
-                                    <input
-                                        type="text"
-                                        className="page-search-input"
-                                        placeholder="Search stores..."
-                                        value={searchTerm}
-                                        onChange={handleSearch}
-                                    />
-                                </div>
-                                <CustomButton
-                                    text="Add Store"
-                                    icon={FaPlus}
-                                    onClick={handleOpenAdd}
+                            </div>
+                            <div className="relative w-full md:w-64">
+                                <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                <input
+                                    type="text"
+                                    className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                                    placeholder="Search stores..."
+                                    value={searchTerm}
+                                    onChange={handleSearch}
                                 />
                             </div>
-                        </Col>
-                    </Row>
-                </div>
-
-                {/* Table */}
-                <div className="master-table-body table-wrap">
-                    <div className="master-table-body">
-                        <table className="master-data-table">
-                            <thead>
-                                <tr>
-                                    <th style={{ width: "60px" }}>#</th>
-                                    <th>CODE</th>
-                                    <th>STORE NAME</th>
-                                    <th>LOCATION</th>
-                                    <th>STORE TYPE</th>
-                                    <th>INCHARGE</th>
-                                    <th>COST METHOD</th>
-                                    <th>GST PLACE</th>
-                                    <th>STATUS</th>
-                                    <th>ACTIONS</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {loading ? (
-                                    <tr>
-                                        <td colSpan={10} className="text-center p-4">
-                                            <Spinner animation="border" variant="primary" />
-                                        </td>
-                                    </tr>
-                                ) : paginatedData.length > 0 ? (
-                                    paginatedData.map((item, index) => (
-                                        <tr key={item.id || item.storeId} className="master-data-row">
-                                            <td className="master-data-cell">{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</td>
-                                            <td className="master-data-cell">{item.storeId}</td>
-                                            <td className="master-data-cell">{item.storeName}</td>
-                                            <td className="master-data-cell">{(item as any).location?.locationName ?? "N/A"}</td>
-                                            <td className="master-data-cell">{item.storeTypeRef?.name || "N/A"}</td>
-                                            <td className="master-data-cell">{item.incharge?.fullName || "N/A"}</td>
-                                            <td className="master-data-cell">{item.costMethod || "N/A"}</td>
-                                            <td className="master-data-cell">{item.gstPlace || "N/A"}</td>
-                                            <td className="master-data-cell">
-                                                <StatusBadge status={item.isActive ? "ACTIVE" : "INACTIVE"} />
-                                            </td>
-                                            <td className="master-data-cell">
-                                                <div className="table-action-group">
-                                                    <ViewButton onClick={() => handleOpenView(item)} />
-                                                    <EditButton onClick={() => handleOpenEdit(item)} />
-                                                    <DeleteButton onClick={() => triggerDelete(item.storeId)} />
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))
-                                ) : (
-                                    <tr>
-                                        <td colSpan={10} className="text-center p-4">No stores found.</td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
-
-                        {/* Pagination */}
-                        {totalPages > 1 && (
-                            <div className="pagination-wrap">
-                                <button
-                                    className="pagination-btn"
-                                    disabled={currentPage === 1}
-                                    onClick={() => setCurrentPage(prev => prev - 1)}
-                                >
-                                    <FaChevronLeft />
-                                </button>
-                                <div className="pagination-info">
-                                    Page {currentPage} of {totalPages}
-                                </div>
-                                <button
-                                    className="pagination-btn"
-                                    disabled={currentPage === totalPages}
-                                    onClick={() => setCurrentPage(prev => prev + 1)}
-                                >
-                                    <FaChevronRight />
-                                </button>
-                            </div>
-                        )}
+                            <CustomButton
+                                text="Add Store"
+                                icon={FaPlus}
+                                onClick={handleOpenAdd}
+                            />
+                        </div>
                     </div>
+
+                    {/* Table */}
+                    {loading && data.length === 0 ? (
+                        <div className="flex justify-center items-center h-64">
+                            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"></div>
+                        </div>
+                    ) : (
+                        <DataTable
+                            data={paginatedData}
+                            rowKey={(item) => item.storeId}
+                            emptyMessage="No stores found."
+                            pagination={
+                                totalPages > 1
+                                    ? {
+                                        currentPage,
+                                        totalPages,
+                                        onPageChange: setCurrentPage,
+                                    }
+                                    : undefined
+                            }
+                            columns={[
+                                { header: "#", width: "60px", render: (_item, index) => startIndex + index + 1, align: "center" },
+                                { header: "CODE", accessor: "storeId" },
+                                { header: "STORE NAME", accessor: "storeName" },
+                                { header: "LOCATION", render: (item) => (item as any).location?.locationName ?? "N/A" },
+                                { header: "STORE TYPE", render: (item) => item.storeTypeRef?.name || "N/A" },
+                                { header: "INCHARGE", render: (item) => item.incharge?.fullName || "N/A" },
+                                { header: "COST METHOD", render: (item) => item.costMethod || "N/A" },
+                                { header: "GST PLACE", render: (item) => item.gstPlace || "N/A" },
+                                {
+                                    header: "STATUS", render: (item) => (
+                                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${item.isActive
+                                                ? "bg-green-100 text-green-700 border border-green-200"
+                                                : "bg-red-100 text-red-700 border border-red-200"
+                                            }`}>
+                                            {item.isActive ? "ACTIVE" : "INACTIVE"}
+                                        </span>
+                                    )
+                                },
+                                {
+                                    header: "ACTIONS",
+                                    render: (item) => (
+                                        <div className="flex items-center gap-2">
+                                            <ViewButton onClick={() => handleOpenView(item)} />
+                                            <EditButton onClick={() => handleOpenEdit(item)} />
+                                            <DeleteButton onClick={() => triggerDelete(item.storeId)} />
+                                        </div>
+                                    ),
+                                    align: "right"
+                                },
+                            ]}
+                        />
+                    )}
                 </div>
 
                 {/* View Modal */}
@@ -284,7 +252,7 @@ const StorageStoreList: React.FC = () => {
                     confirmText="Delete"
                     confirmVariant="danger"
                 />
-            </Container>
+            </div>
         </div>
     );
 };

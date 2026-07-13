@@ -23,7 +23,8 @@ import { useSuppliers } from "../../../../hooks/useSuppliers";
 import { useUOMs } from "../../../../hooks/useUOMs";
 import { rawMaterialService } from "../../../../services/rawMaterialService";
 import type { RawMaterial } from "../../../../features/raw-materials/types";
-import Section from "../../../../components/ui/Section/Section";
+import BackButton from "../../../../components/ui/BackButton/BackButton";
+import AddressForm from "../../../../components/form/AddressFrom/AddressFrom";
 import { useUsers } from "../../../../hooks/useUsers";
 
 
@@ -132,6 +133,14 @@ const PurchaseOrderEditPage: React.FC = () => {
 
   const dispatch = useAppDispatch();
   const { data: company } = useSelector((state: any) => state.company);
+  const { user } = useAppSelector((state: any) => state.auth);
+
+  const isAdmin =
+    user?.isSuperAdmin ||
+    user?.roleId === "ROLE_ADMIN" ||
+    user?.roleId === "SUPER_ADMIN" ||
+    user?.roleId === "ADMIN" ||
+    user?.roleId === "1";
 
   const companyState = company?.state;
   const gstTaxes = useAppSelector(selectActiveGstTaxes);
@@ -294,7 +303,7 @@ const PurchaseOrderEditPage: React.FC = () => {
   // ============================================================
   // HANDLE CHANGE
   // ============================================================
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
 
     if (name === "sameAsBilling") {
@@ -415,10 +424,10 @@ const PurchaseOrderEditPage: React.FC = () => {
     }
   };
 
-  const handleBillingStateChange = (stateData: StateCityOption) => {
+  const handleBillingStateChange = (stateName: string) => {
     setFormData((prev) => ({
       ...prev,
-      billingState: stateData.name,
+      billingState: stateName,
       billingCity: "",
     }));
     setErrors((prev) => ({
@@ -428,15 +437,15 @@ const PurchaseOrderEditPage: React.FC = () => {
     }));
   };
 
-  const handleBillingCityChange = (cityData: StateCityOption) => {
-    setFormData((prev) => ({ ...prev, billingCity: cityData.name }));
+  const handleBillingCityChange = (cityName: string) => {
+    setFormData((prev) => ({ ...prev, billingCity: cityName }));
     setErrors((prev) => ({ ...prev, billingCity: "" }));
   };
 
-  const handleShippingStateChange = (stateData: StateCityOption) => {
+  const handleShippingStateChange = (stateName: string) => {
     setFormData((prev) => ({
       ...prev,
-      shippingState: stateData.name,
+      shippingState: stateName,
       shippingCity: "",
     }));
     setErrors((prev) => ({
@@ -446,8 +455,8 @@ const PurchaseOrderEditPage: React.FC = () => {
     }));
   };
 
-  const handleShippingCityChange = (cityData: StateCityOption) => {
-    setFormData((prev) => ({ ...prev, shippingCity: cityData.name }));
+  const handleShippingCityChange = (cityName: string) => {
+    setFormData((prev) => ({ ...prev, shippingCity: cityName }));
     setErrors((prev) => ({ ...prev, shippingCity: "" }));
   };
 
@@ -741,15 +750,13 @@ const PurchaseOrderEditPage: React.FC = () => {
   }));
 
 
-  const supplierMaterials = selectedSupplier?.category
-    ? selectedSupplier.category.split(",").map((c: string) => c.trim().toLowerCase())
+  const supplierMaterialIds = selectedSupplier?.materialPrices
+    ? selectedSupplier.materialPrices.map((mp: any) => String(mp.rawMaterialId))
     : [];
 
-  const filteredRawMaterials = rawMaterials.filter((rm) => {
-    const isSupplierMaterial = rm?.materialName && supplierMaterials.includes(rm.materialName.toLowerCase());
-    const isAlreadyInItems = formData.items.some((item) => item.productId === rm.rawMaterialId);
-    return isSupplierMaterial || isAlreadyInItems;
-  });
+  const filteredRawMaterials = supplierMaterialIds.length > 0
+    ? rawMaterials.filter((rm) => supplierMaterialIds.includes(String(rm.rawMaterialId)) || formData.items.some((item) => item.productId === rm.rawMaterialId))
+    : rawMaterials;
 
   const productOptions = filteredRawMaterials.map((rm) => ({
     value: rm.rawMaterialId || "",
@@ -771,523 +778,194 @@ const PurchaseOrderEditPage: React.FC = () => {
   // UI
   // ============================================================
   return (
-    <div className="inner-container">
-      <Container fluid>
-        <div className="page-header">
-          <Row className="align-items-center g-3">
-            <Col lg={6} md={12}>
-              <div className="page-header-info">
-                <h2 className="page-title">Edit Purchase Order</h2>
-                <div className="page-breadcrumb">Home / Purchase / Purchase Orders / Edit</div>
-              </div>
-            </Col>
-          </Row>
+    <div className="w-full mx-auto">
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+        <div className="px-6 py-4 ">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div><h2 className="text-xl font-bold text-gray-800">Edit Purchase Order</h2></div>
+            <div><BackButton text="Back to List" /></div>
+          </div>
         </div>
+        <form className="px-6 py-3 space-y-4" noValidate>
+          {/* Main Fields */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+            <div>
+              <TextInput label="PO Number" name="poNumber" value={formData.poNumber} onChange={() => { }} disabled />
+            </div>
+            <div>
+              <TextInput label="PO Date" name="poDate" type="date" value={formData.poDate} onChange={handleChange} required disabled={isLocked} />
+              {errors.poDate && <div className="text-red-500 mt-1 text-sm">{errors.poDate}</div>}
+            </div>
+            <div>
+              <TextInput label="Expected Delivery Date" name="expectedDeliveryDate" type="date" value={formData.expectedDeliveryDate} onChange={handleChange} required disabled={isLocked} />
+              {errors.expectedDeliveryDate && <div className="text-red-500 mt-1 text-sm">{errors.expectedDeliveryDate}</div>}
+            </div>
+            <div>
+              <SelectInput label="Status" name="status" value={formData.status} options={statusOptions} onChange={handleChange} disabled={!isAdmin && formData.status !== "DRAFT" && formData.status !== "PENDING"} />
+            </div>
+            <div>
+              <TextInput label="Created by-on" name="createdByOn" value={createdOn || ""} onChange={() => { }} disabled />
+            </div>
+            <div>
+              <SelectInput label="Store" name="storeId" value={formData.storeId || ""} options={[{ label: "-- Select Store --", value: "" }, ...(stores || []).filter((s: any) => s.isActive).map((s: any) => ({ label: s.storeName, value: s.storeId }))]} required error={errors.storeId} onChange={handleChange} disabled={formData.status !== "DRAFT"} />
+            </div>
+            <div>
+              <SelectInput label="Supplier" name="supplierId" value={formData.supplierId} options={[{ value: "", label: "-- Select Supplier --" }, ...supplierOptions]} onChange={handleChange} required disabled={formData.status !== "DRAFT"} />
+              {errors.supplierId && <div className="text-red-500 mt-1 text-sm">{errors.supplierId}</div>}
+            </div>
+          </div>
 
-        <form>
-          {/* ── Order Information ── */}
-          <Section title="Order Information" icon={<FaInfoCircle />}>
-            <Row>
-              <Col lg={4} md={6}>
-                <TextInput label="PO Number" name="poNumber" value={formData.poNumber} onChange={() => { }} disabled />
-              </Col>
-
-              <Col lg={4} md={6}>
-                <TextInput
-                  label="PO Date"
-                  name="poDate"
-                  type="date"
-                  value={formData.poDate}
-                  onChange={handleChange}
-                  required
-                />
-                {errors.poDate && <div className="text-danger mt-1">{errors.poDate}</div>}
-              </Col>
-
-              <Col lg={4} md={6}>
-                <TextInput
-                  label="Expected Delivery Date"
-                  name="expectedDeliveryDate"
-                  type="date"
-                  value={formData.expectedDeliveryDate}
-                  onChange={handleChange}
-                  required
-                />
-                {errors.expectedDeliveryDate && (
-                  <div className="text-danger mt-1">{errors.expectedDeliveryDate}</div>
-                )}
-              </Col>
-
-              <Col lg={4} md={6}>
-                <SelectInput
-                  label="Status"
-                  name="status"
-                  value={formData.status}
-                  options={statusOptions}
-                  onChange={handleChange}
-                />
-              </Col>
-
-              <Col lg={4} md={6}>
-                <TextInput
-                  label="Created by-on"
-                  name="createdByOn"
-                  value={createdOn || ""}
-                  onChange={() => { }}
-                  disabled
-                />
-              </Col>
-            </Row>
-          </Section>
-
-          {/* ── Supplier ── */}
-          <Section title="Supplier" icon={<FaUser />}>
-            <Row className="g-3">
-              {/* Store */}
-              <Col lg={6} md={12}>
-                <SelectInput
-                  label="Store"
-                  name="storeId"
-                  value={formData.storeId || ""}
-                  options={[
-                    { label: "-- Select Store --", value: "" },
-                    ...(stores || []).filter((s: any) => s.isActive).map((s: any) => ({
-                      label: s.storeName,
-                      value: s.storeId
-                    }))
-                  ]}
-                  required
-                  error={errors.storeId}
-                  onChange={handleChange}
-                  disabled={formData.status !== "DRAFT"}
-                />
-              </Col>
-
-              {/* Supplier */}
-              <Col lg={6} md={12}>
-                <SelectInput
-                  label="Supplier"
-                  name="supplierId"
-                  value={String(formData.supplierId ?? "")}
-                  options={[{ value: "", label: "-- Select Supplier --" }, ...supplierOptions]}
-                  onChange={handleChange}
-                  required
-                  disabled={formData.status !== "DRAFT"}
-                />
-                {errors.supplierId && <div className="text-danger mt-1">{errors.supplierId}</div>}
-              </Col>
-            </Row>
-          </Section>
-
-          {/* ── Addresses ── */}
-          <Section title="Billing & Shipping Address" icon={<FaMapMarkerAlt />}>
-            <Row>
-              <Col lg={6}>
-                <h6 className="mb-3">Billing Address</h6>
-                <TextInput
-                  label="Address Line"
-                  name="billingAddressLine1"
-                  value={formData.billingAddressLine1}
-                  onChange={handleChange}
-                  required
-                />
-                {errors.billingAddressLine1 && (
-                  <div className="text-danger mt-1">{errors.billingAddressLine1}</div>
-                )}
-                <Row>
-                  <CityStateSelect
-                    stateLabel="State"
-                    cityLabel="City"
-                    stateValue={formData.billingState}
-                    cityValue={formData.billingCity}
-                    onStateChange={handleBillingStateChange}
-                    onCityChange={handleBillingCityChange}
-                    stateError={errors.billingState}
-                    cityError={errors.billingCity}
-                    required
-                  />
-                  <Col md={4}>
-                    <TextInput
-                      label="Pincode"
-                      name="billingPincode"
-                      value={formData.billingPincode}
-                      onChange={handleChange}
-                      required
-                    />
-                    {errors.billingPincode && <div className="text-danger mt-1">{errors.billingPincode}</div>}
-                  </Col>
-                </Row>
-              </Col>
-
-              <Col lg={6}>
-                <div className="d-flex align-items-center justify-content-between mb-3">
-                  <h6 className="mb-0">Shipping Address</h6>
-                  <div>
-                    <input
-                      type="checkbox"
-                      name="sameAsBilling"
-                      checked={formData.sameAsBilling}
-                      onChange={handleChange}
-                    />{" "}
-                    Same as billing
-                  </div>
-                </div>
-                <TextInput
-                  label="Address Line"
-                  name="shippingAddressLine1"
-                  value={formData.shippingAddressLine1}
-                  onChange={handleChange}
-                  disabled={formData.sameAsBilling}
-                  required={!formData.sameAsBilling}
-                />
-                {errors.shippingAddressLine1 && (
-                  <div className="text-danger mt-1">{errors.shippingAddressLine1}</div>
-                )}
-                <Row>
-                  <CityStateSelect
-                    stateLabel="State"
-                    cityLabel="City"
-                    stateValue={formData.shippingState}
-                    cityValue={formData.shippingCity}
-                    onStateChange={handleShippingStateChange}
-                    onCityChange={handleShippingCityChange}
-                    stateError={errors.shippingState}
-                    cityError={errors.shippingCity}
-                    required={!formData.sameAsBilling}
-                    disabled={formData.sameAsBilling}
-                  />
-                  <Col md={4}>
-                    <TextInput
-                      label="Pincode"
-                      name="shippingPincode"
-                      value={formData.shippingPincode}
-                      onChange={handleChange}
-                      disabled={formData.sameAsBilling}
-                      required={!formData.sameAsBilling}
-                    />
-                    {errors.shippingPincode && <div className="text-danger mt-1">{errors.shippingPincode}</div>}
-                  </Col>
-                </Row>
-              </Col>
-            </Row>
-          </Section>
-
-          {/* ── Items ── */}
-          <Section title="Items" icon={<FaBoxOpen />}>
-            <div className="d-flex justify-content-end mb-3">
-              <CustomButton
-                text="Add Item"
-                icon={FaPlus}
-                onClick={addItem}
-                type="button"
-                size="sm"
+          <div className="grid grid-cols-1 gap-4">
+            <div>
+              <h6 className="text-lg font-semibold text-gray-800 mb-4">Billing</h6>
+              <AddressForm
+                addressValue={formData.billingAddressLine1 || ""}
+                onAddressChange={(val) => setFormData(prev => ({ ...prev, billingAddressLine1: val }))}
+                addressError={errors.billingAddressLine1}
+                stateValue={formData.billingState || ""}
+                onStateChange={handleBillingStateChange}
+                stateError={errors.billingState}
+                cityValue={formData.billingCity || ""}
+                onCityChange={handleBillingCityChange}
+                cityError={errors.billingCity}
+                pincodeValue={formData.billingPincode || ""}
+                onPincodeChange={(val) => setFormData(prev => ({ ...prev, billingPincode: val }))}
+                pincodeError={errors.billingPincode}
+                required
                 disabled={isLocked}
               />
             </div>
-
-            <div className="table-wrap" style={{ overflowX: "auto" }}>
-              <Table bordered hover style={{ minWidth: "1200px" }}>
-                <thead>
-                  <tr>
-                    <th style={{ width: "50px" }}>#</th>
-                    <th style={{ minWidth: "220px" }}>RAW MATERIAL</th>
-                    <th style={{ minWidth: "200px" }}>QUANTITY / UOM</th>
-                    <th style={{ minWidth: "120px" }}>UNIT PRICE (₹)</th>
-                    <th style={{ minWidth: "115px" }}>TAX %</th>
-                    <th style={{ minWidth: "120px" }}>TAXABLE (₹)</th>
-                    <th>Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {formData.items.map((item, index) => {
-                    const qty = Number(item.quantity) || 0;
-                    const price = Number(item.unitPrice) || 0;
-                    const lineSubtotal = qty * price;
-
-                    const taxableAmount = lineSubtotal;
-
-                    const itemRawMaterial = rawMaterials.find(
-                      (rm) => String(rm.rawMaterialId) === String(item.productId)
-                    );
-                    const baseUoms = itemRawMaterial?.baseUom || "";
-
-                    return (
-                      <tr key={index}>
-                        <td>{index + 1}</td>
-                        <td>
-                          <SelectInput
-                            label=""
-                            name={`items[${index}].productId`}
-                            value={item.productId || ""}
-                            options={[{ value: "", label: "-- Select Material --" }, ...productOptions]}
-                            onChange={(e) => handleItemProductChange(index, e.target.value)}
-                            error={errors[`items.${index}.productId`]}
-                            disabled={isLocked}
-                          />
-                        </td>
-                        <td>
-                          <QuantityInput
-                            label=""
-                            name={`items[${index}].quantity`}
-                            value={item.quantity}
-                            baseUoms={baseUoms}
-                            required
-                            error={errors[`items.${index}.quantity`]}
-                            onChange={(e) => handleItemChange(index, "quantity", Number(e.target.value))}
-                            disabled={isLocked}
-                          />
-                        </td>
-                        <td>
-                          <TextInput
-                            label=""
-                            name={`items[${index}].unitPrice`}
-                            type="number"
-                            value={String(item.unitPrice)}
-                            onChange={(e) => handleItemChange(index, "unitPrice", Number(e.target.value))}
-                            error={errors[`items.${index}.unitPrice`]}
-                            min={0}
-                            step={0.01}
-                            disabled
-                            placeholder="0.00"
-                          />
-                        </td>
-
-                        <td>
-                          <SelectInput
-                            label=""
-                            name={`items[${index}].tax`}
-                            options={gstOptions}
-                            value={String(item.tax || 0)}
-                            onChange={(e) => handleItemChange(index, "tax", Number(e.target.value))}
-                            disabled={isLocked}
-                          />
-                        </td>
-                        <td className="text-end">
-                          ₹{taxableAmount.toFixed(2)}
-                        </td>
-                        <td>
-                          <CustomButton
-                            text=""
-                            icon={FaTrash}
-                            onClick={() => removeItem(index)}
-                            type="button"
-                            variant="danger"
-                            size="sm"
-                            disabled={isLocked}
-                          />
-                        </td>
-                      </tr>
-                    );
-                  })}
-                  {formData.items.length === 0 && (
-                    <tr>
-                      <td colSpan={8} className="text-center">No items added</td>
-                    </tr>
-                  )}
-                </tbody>
-              </Table>
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h6 className="text-lg font-semibold text-gray-800 mb-0">Shipping</h6>
+              </div>
+              <AddressForm
+                addressValue={formData.shippingAddressLine1 || ""}
+                onAddressChange={(val) => setFormData(prev => ({ ...prev, shippingAddressLine1: val }))}
+                addressError={errors.shippingAddressLine1}
+                stateValue={formData.shippingState || ""}
+                onStateChange={handleShippingStateChange}
+                stateError={errors.shippingState}
+                cityValue={formData.shippingCity || ""}
+                onCityChange={handleShippingCityChange}
+                cityError={errors.shippingCity}
+                pincodeValue={formData.shippingPincode || ""}
+                onPincodeChange={(val) => setFormData(prev => ({ ...prev, shippingPincode: val }))}
+                pincodeError={errors.shippingPincode}
+                disabled={isLocked}
+              />
             </div>
-          </Section>
+          </div>
 
-          {/* ── Notes & Summary ── */}
-          <Section title="Notes & Summary">
-            <Row>
-              <Col lg={6}>
-                <TextInput
-                  label="Remarks"
-                  name="remarks"
-                  as="textarea"
-                  rows={3}
-                  value={formData.remarks}
-                  onChange={handleChange}
-                />
-              </Col>
-              <Col lg={{ span: 5, offset: 1 }}>
-                <div
-                  className="p-3"
-                  style={{
-                    background: "var(--color-bg, #f8f9fa)",
-                    borderRadius: "var(--radius-md, 8px)",
-                    border: "1px solid var(--color-border)",
-                  }}
-                >
-                  <h6 className="mb-3 fw-bold" style={{ color: "var(--color-primary)" }}>Order Summary</h6>
-                  <div className="d-flex justify-content-between mb-2">
-                    <span>Subtotal:</span>
-                    <span>₹{formData.subtotal.toFixed(2)}</span>
-                  </div>
-                  <div className="d-flex justify-content-between align-items-center mb-2 text-danger small">
-                    <span className="d-flex align-items-center gap-2">
-                      Discount:
-                      <SelectInput
-                        label=""
-                        name="discountType"
-                        options={[
-                          { value: "PERCENT", label: "%" },
-                          { value: "FLAT", label: "Flat" },
-                        ]}
-                        value={formData.discountType || "PERCENT"}
-                        onChange={(e) => {
-                          setFormData((prev) => {
-                            const newDiscountType = e.target.value as "PERCENT" | "FLAT";
-                            const newTotals = recalculateTotals(
-                              prev.items,
-                              newDiscountType,
-                              prev.discountValue
-                            );
-                            return { ...prev, discountType: newDiscountType, ...newTotals };
-                          });
-                        }}
-                        disabled={formData.status !== "DRAFT"}
-                      />
-                      <TextInput
-                        name="discountValue"
-                        type="number"
-                        min={0}
-                        step={0.01}
-                        placeholder="0"
-                        value={String(formData.discountValue || 0)}
-                        onChange={(e) => {
-                          setFormData((prev) => {
-                            const newDiscountValue = Number(e.target.value) || 0;
-                            const newTotals = recalculateTotals(
-                              prev.items,
-                              prev.discountType,
-                              newDiscountValue
-                            );
-                            return { ...prev, discountValue: newDiscountValue, ...newTotals };
-                          });
-                        }}
-                        style={{ width: "80px", padding: "0.25rem 0.5rem", textAlign: "right" }}
-                        disabled={formData.status !== "DRAFT"}
-                      />
-                    </span>
-                    <span>-₹{(formData.totalDiscount || 0).toFixed(2)}</span>
-                  </div>
+          <div className="flex justify-between items-center mb-4 mt-6">
+            <span className="text-lg font-semibold text-gray-800">Order Items</span>
+            <CustomButton text="Add Item" icon={FaPlus} onClick={addItem} type="button" disabled={isLocked} />
+          </div>
 
-                  <div className="d-flex justify-content-between align-items-center mb-2 text-success small">
-                    <span>Total Tax:</span>
-                    <span>₹{formData.totalTax.toFixed(2)}</span>
-                  </div>
-
-                  <div className="d-flex justify-content-between align-items-center mb-2 text-secondary small">
-                    <span className="d-flex align-items-center gap-2">
-                      Round Off:
-                      <div className="d-flex align-items-center bg-white rounded border overflow-hidden">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (isLocked) return;
-                            setRoundingSign("+");
-                            setFormData(prev => ({
-                              ...prev,
-                              ...recalculateTotals(prev.items, prev.discountType, prev.discountValue, "+", roundingValue)
-                            }));
-                          }}
-                          style={{
-                            border: "none",
-                            background: roundingSign === "+" ? "var(--color-primary, #047857)" : "var(--color-bg, #f9fafb)",
-                            color: roundingSign === "+" ? "#fff" : "var(--color-text-secondary)",
-                            padding: "0.25rem 0.5rem",
-                            cursor: isLocked ? "not-allowed" : "pointer"
-                          }}
-                          disabled={isLocked}
-                        >
-                          +
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (isLocked) return;
-                            setRoundingSign("-");
-                            setFormData(prev => ({
-                              ...prev,
-                              ...recalculateTotals(prev.items, prev.discountType, prev.discountValue, "-", roundingValue)
-                            }));
-                          }}
-                          style={{
-                            border: "none",
-                            background: roundingSign === "-" ? "var(--color-danger, #ef4444)" : "var(--color-bg, #f9fafb)",
-                            color: roundingSign === "-" ? "#fff" : "var(--color-text-secondary)",
-                            padding: "0.25rem 0.5rem",
-                            cursor: isLocked ? "not-allowed" : "pointer"
-                          }}
-                          disabled={isLocked}
-                        >
-                          -
-                        </button>
-                      </div>
-                      <TextInput
-                        name="roundingValue"
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={String(roundingValue || 0)}
-                        onChange={(e) => {
-                          const val = Number(e.target.value) || 0;
-                          setRoundingValue(val);
-                          setFormData(prev => ({
-                            ...prev,
-                            ...recalculateTotals(prev.items, prev.discountType, prev.discountValue, roundingSign, val)
-                          }));
-                        }}
-                        style={{ width: "80px", padding: "0.25rem 0.5rem", textAlign: "right" }}
-                        disabled={isLocked}
-                      />
-                    </span>
-                    <span>{roundingSign === "+" ? "+" : "-"}₹{(roundingValue || 0).toFixed(2)}</span>
-                  </div>
-
-                  {isInterState ? (
-                    <div className="d-flex justify-content-between mb-2 text-success small">
-                      <span>Total IGST:</span>
-                      <span>+₹{(formData.totalIgst ?? 0).toFixed(2)}</span>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="d-flex justify-content-between mb-2 text-success small">
-                        <span>Total CGST:</span>
-                        <span>+₹{(formData.totalCgst ?? 0).toFixed(2)}</span>
-                      </div>
-                      <div className="d-flex justify-content-between mb-2 text-success small">
-                        <span>Total SGST:</span>
-                        <span>+₹{(formData.totalSgst ?? 0).toFixed(2)}</span>
-                      </div>
-                    </>
+          <div className="rounded-xl border border-slate-200 bg-white [&_.mb-\[18px\]]:!mb-0 [&_.select-input-group]:!mb-0 overflow-x-auto">
+            <table className="min-w-full divide-y divide-slate-200">
+              <thead className="bg-slate-50/80">
+                <tr>
+                  <th className="px-3 py-3 text-center text-[11px] font-bold text-slate-500 uppercase tracking-widest w-12 border-b border-slate-200">#</th>
+                  <th className="px-3 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200">RAW MATERIAL</th>
+                  <th className="px-3 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200">UOM</th>
+                  <th className="px-3 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200">QTY</th>
+                  <th className="px-3 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200">UNIT PRICE (₹)</th>
+                  <th className="px-3 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200">TAX %</th>
+                  <th className="px-3 py-3 text-right text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200">TAXABLE (₹)</th>
+                  {!isLocked && (
+                    <th className="px-3 py-3 text-center text-[11px] font-bold text-slate-500 uppercase tracking-widest w-16 border-b border-slate-200"></th>
                   )}
-                  <hr />
-                  <div className="d-flex justify-content-between fw-bold">
-                    <span>Net Amount:</span>
-                    <span>₹{formData.netAmount.toFixed(2)}</span>
-                  </div>
-                </div>
-              </Col>
-            </Row>
-          </Section>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {formData.items.map((item, index) => {
+                  const qty = Number(item.quantity) || 0;
+                  const price = Number(item.unitPrice) || 0;
+                  const taxableAmount = qty * price;
+                  return (
+                    <tr key={index} className="hover:bg-slate-50/50 transition-colors duration-200">
+                      <td className="px-3 py-2 whitespace-nowrap text-sm font-medium text-slate-400 text-center">{index + 1}</td>
+                      <td className="px-3 py-2 whitespace-nowrap"><SelectInput label="" name={`items[${index}].productId`} value={item.productId ? String(item.productId) : ""} options={[{ value: "", label: "-- Select Material --" }, ...productOptions]} onChange={(e) => handleItemProductChange(index, e.target.value)} error={errors[`items.${index}.productId`]} hideLabel disabled={isLocked} /></td>
+                      <td className="px-3 py-2 whitespace-nowrap"><SelectInput label="" name={`items[${index}].uom`} options={uomOptions} value={item.uom || ""} onChange={(e) => handleItemChange(index, "uom", e.target.value)} error={errors[`items.${index}.uom`]} hideLabel disabled={isLocked} /></td>
+                      <td className="px-3 py-2 whitespace-nowrap"><TextInput label="" name={`items[${index}].quantity`} type="number" value={String(item.quantity)} onChange={(e) => handleItemChange(index, "quantity", Number(e.target.value))} error={errors[`items.${index}.quantity`]} min={0.01} step={0.01} placeholder="0.00" disabled={isLocked} /></td>
+                      <td className="px-3 py-2 whitespace-nowrap"><TextInput label="" name={`items[${index}].unitPrice`} type="number" value={String(item.unitPrice)} onChange={(e) => handleItemChange(index, "unitPrice", Number(e.target.value))} error={errors[`items.${index}.unitPrice`]} min={0} step={0.01} placeholder="0.00" disabled /></td>
+                      <td className="px-3 py-2 whitespace-nowrap"><SelectInput label="" name={`items[${index}].tax`} options={gstOptions} value={String(item.tax || 0)} onChange={(e) => handleItemChange(index, "tax", Number(e.target.value))} hideLabel disabled={isLocked} /></td>
+                      <td className="px-3 py-2 whitespace-nowrap text-right font-medium text-slate-700">₹{taxableAmount.toFixed(2)}</td>
+                      {!isLocked && (
+                        <td className="px-3 py-2 whitespace-nowrap text-center">
+                          <button
+                            type="button"
+                            className="text-rose-400 hover:text-rose-600 hover:bg-rose-100 p-2 rounded-md disabled:opacity-40 disabled:hover:bg-transparent disabled:cursor-not-allowed transition-all duration-200 inline-flex items-center justify-center"
+                            onClick={() => removeItem(index)}
+                            title="Remove item"
+                          >
+                            <FaTrash size={14} />
+                          </button>
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
+                {formData.items.length === 0 && <tr><td colSpan={isLocked ? 7 : 8} className="px-3 py-4 text-center text-slate-400 font-medium">No items added</td></tr>}
+              </tbody>
+            </table>
+          </div>
 
-          {/* ── Form Actions ── */}
-          <div
-            className="form-actions d-flex justify-content-end gap-3 mt-4"
-            style={{ borderTop: "1px solid var(--color-border)", paddingTop: "1.5rem" }}
-          >
-            <CustomButton
-              text={isSubmitting ? "Saving..." : "Save as Draft"}
-              icon={isSubmitting ? undefined : FaSave}
-              onClick={(e: React.FormEvent) => handleSubmit(e, "DRAFT")}
-              type="button"
-              disabled={isSubmitting || isSubmittingForApproval}
-            />
-            <CustomButton
-              text={isSubmittingForApproval ? "Submitting..." : "Submit for Approval"}
-              icon={isSubmittingForApproval ? undefined : FaPaperPlane}
-              onClick={(e: React.FormEvent) => handleSubmit(e, "PENDING")}
-              type="button"
-              disabled={isSubmitting || isSubmittingForApproval}
-              className="btn-success"
-            />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
+            <div className="col-span-2">
+              <TextInput label="Remarks" name="remarks" value={formData.remarks} onChange={handleChange} disabled={isLocked} />
+            </div>
+            <div>
+              <div className="bg-gray-50 rounded-lg border border-gray-200 p-4">
+                <h6 className="mb-3 font-bold text-blue-600">Order Summary</h6>
+                <div className="flex justify-between mb-2"><span>Subtotal:</span><span>₹{formData.subtotal.toFixed(2)}</span></div>
+                <div className="flex justify-between items-center mb-2 text-red-500 text-sm">
+                  <span className="flex items-center gap-2">Discount:
+                    <div className="w-24 [&_.mb-\[18px\]]:!mb-0 [&_.select-input-group]:!mb-0">
+                      <SelectInput label="" name="discountType" options={[{ value: "PERCENT", label: "%" }, { value: "FLAT", label: "Flat" }]} value={formData.discountType || "PERCENT"} onChange={(e) => { setFormData(prev => { const newTotals = recalculateTotals(prev.items, e.target.value as any, prev.discountValue); return { ...prev, discountType: e.target.value as any, ...newTotals }; }); }} disabled={formData.status !== "DRAFT"} hideLabel />
+                    </div>
+                    <div className="w-24 [&_.mb-\[18px\]]:!mb-0">
+                      <TextInput label="" name="discountValue" type="number" min={0} step={0.01} value={String(formData.discountValue || 0)} onChange={(e) => { setFormData(prev => { const newTotals = recalculateTotals(prev.items, prev.discountType, Number(e.target.value) || 0); return { ...prev, discountValue: Number(e.target.value) || 0, ...newTotals }; }); }} disabled={formData.status !== "DRAFT"} />
+                    </div>
+                  </span>
+                  <span>-₹{(formData.totalDiscount || 0).toFixed(2)}</span>
+                </div>
+
+                <div className="flex justify-between items-center mb-2 text-green-600 text-sm"><span>Total Tax:</span><span>₹{formData.totalTax.toFixed(2)}</span></div>
+
+                <div className="flex justify-between items-center mb-2 text-gray-600 text-sm">
+                  <span className="flex items-center gap-2">Round Off:
+                    <div className="flex items-center bg-white rounded border overflow-hidden h-[35px]">
+                      <button type="button" onClick={() => { if (isLocked) return; setRoundingSign("+"); setFormData(prev => ({ ...prev, ...recalculateTotals(prev.items, prev.discountType, prev.discountValue, "+", roundingValue) })); }} className={`px-2 py-1 h-full font-bold ${roundingSign === "+" ? "bg-green-600 text-white" : "bg-gray-100 text-gray-600"}`} disabled={isLocked}>+</button>
+                      <button type="button" onClick={() => { if (isLocked) return; setRoundingSign("-"); setFormData(prev => ({ ...prev, ...recalculateTotals(prev.items, prev.discountType, prev.discountValue, "-", roundingValue) })); }} className={`px-2 py-1 h-full font-bold ${roundingSign === "-" ? "bg-red-500 text-white" : "bg-gray-100 text-gray-600"}`} disabled={isLocked}>-</button>
+                    </div>
+                    <div className="w-24 [&_.mb-\[18px\]]:!mb-0">
+                      <TextInput label="" name="roundingValue" type="number" min={0} step={0.01} value={String(roundingValue || 0)} onChange={(e) => { const val = Number(e.target.value) || 0; setRoundingValue(val); setFormData(prev => ({ ...prev, ...recalculateTotals(prev.items, prev.discountType, prev.discountValue, roundingSign, val) })); }} disabled={isLocked} />
+                    </div>
+                  </span>
+                  <span>{roundingSign === "+" ? "+" : "-"}₹{(roundingValue || 0).toFixed(2)}</span>
+                </div>
+                {isInterState ? (
+                  <div className="flex justify-between mb-2 text-green-600 text-sm"><span>Total IGST:</span><span>+₹{(formData.totalIgst ?? 0).toFixed(2)}</span></div>
+                ) : (
+                  <>
+                    <div className="flex justify-between mb-2 text-green-600 text-sm"><span>Total CGST:</span><span>+₹{(formData.totalCgst ?? 0).toFixed(2)}</span></div>
+                    <div className="flex justify-between mb-2 text-green-600 text-sm"><span>Total SGST:</span><span>+₹{(formData.totalSgst ?? 0).toFixed(2)}</span></div>
+                  </>
+                )}
+                <hr className="my-2 border-gray-300" />
+                <div className="flex justify-between font-bold"><span>Net Amount:</span><span>₹{formData.netAmount.toFixed(2)}</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap justify-end gap-3 mt-8 pt-4 border-t border-gray-200">
+            <CustomButton text={isSubmitting ? "Saving..." : "Save as Draft"} icon={isSubmitting ? undefined : FaSave} onClick={(e: any) => handleSubmit(e, "DRAFT")} type="button" disabled={isSubmitting || isSubmittingForApproval} />
+            <CustomButton text={isSubmittingForApproval ? "Submitting..." : "Submit for Approval"} icon={isSubmittingForApproval ? undefined : FaPaperPlane} onClick={(e: any) => handleSubmit(e, "PENDING")} type="button" disabled={isSubmitting || isSubmittingForApproval} className="btn-success" />
           </div>
         </form>
-      </Container>
+      </div>
     </div>
   );
 };

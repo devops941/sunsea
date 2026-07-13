@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import "./MultiSelect.css";
+import { FaChevronDown, FaChevronUp, FaTimes } from "react-icons/fa";
 
 interface Option {
     value: string;
@@ -54,64 +54,72 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
         .map((o) => o.label);
 
     return (
-        <div className="multi-select-wrapper" ref={ref}>
-            <label className="multi-select-label">
+        <div className="relative w-full" ref={ref}>
+            <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">
                 {label}
-                {required && <span className="required-star text-danger ms-1">*</span>}
+                {required && <span className="text-red-500 ml-1">*</span>}
             </label>
 
             <div
-                className={`multi-select-control ${open ? "open" : ""} ${error ? "invalid" : ""}`}
+                className={`flex items-center justify-between w-full min-h-[38px] py-1 px-3 bg-white border rounded-sm ${error ? 'border-red-500' : 'border-slate-300'} rounded cursor-pointer ${open ? 'ring-1 ring-primary border-primary' : 'hover:border-slate-400'}`}
                 onClick={() => setOpen((prev) => !prev)}
             >
-                <div className="multi-select-tags">
+                <div className="flex flex-wrap gap-1 flex-1">
                     {selectedLabels.length === 0 ? (
-                        <span className="multi-select-placeholder">{placeholder}</span>
+                        <span className="text-xs font-semibold text-slate-400 py-1">{placeholder}</span>
                     ) : (
                         selectedLabels.map((label, i) => (
-                            <span key={i} className="multi-select-tag">
+                            <span key={i} className="flex items-center gap-1 bg-primary/10 text-primary px-2 py-0.5 rounded text-[11px] font-bold">
                                 {label}
                                 <button
                                     type="button"
-                                    className="multi-select-tag-remove"
+                                    className="text-primary hover:text-primary-dark hover:bg-primary/20 rounded-full p-0.5 transition-colors focus:outline-none"
                                     onClick={(e) => {
                                         e.stopPropagation();
                                         handleToggle(options.find((o) => o.label === label)!.value);
                                     }}
                                 >
-                                    ×
+                                    <FaTimes size={10} />
                                 </button>
                             </span>
                         ))
                     )}
                 </div>
-                <span className="multi-select-arrow">{open ? "▲" : "▼"}</span>
+                <div className="text-slate-400 pl-2">
+                    {open ? <FaChevronUp size={12} /> : <FaChevronDown size={12} />}
+                </div>
             </div>
 
             {open && (
-                <div className="multi-select-dropdown">
+                <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg max-h-60 overflow-y-auto">
                     {options.length === 0 ? (
-                        <div className="multi-select-empty">No options available</div>
+                        <div className="p-3 text-xs text-slate-500 text-center">No options available</div>
                     ) : (
-                        options.map((option) => (
-                            <div
-                                key={option.value}
-                                className={`multi-select-option ${value.includes(option.value) ? "selected" : ""
-                                    }`}
-                                onClick={() => handleToggle(option.value)}
-                            >
-                                <span className="multi-select-checkbox">
-                                    {value.includes(option.value) ? "☑" : "☐"}
-                                </span>
-                                {option.label}
-                            </div>
-                        ))
+                        <div className="py-1">
+                            {options.map((option) => (
+                                <div
+                                    key={option.value}
+                                    className={`flex items-center px-3 py-2 text-xs font-semibold cursor-pointer hover:bg-slate-50 transition-colors  ${value.includes(option.value) ? "bg-primary/5 text-primary" : "text-slate-700"}`}
+                                    onClick={() => handleToggle(option.value)}
+                                >
+                                    <div className="flex-shrink-0 mr-2 flex items-center justify-center">
+                                        <input
+                                            type="checkbox"
+                                            className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary focus:ring-offset-0 pointer-events-none"
+                                            checked={value.includes(option.value)}
+                                            readOnly
+                                        />
+                                    </div>
+                                    <span className="truncate">{option.label}</span>
+                                </div>
+                            ))}
+                        </div>
                     )}
                 </div>
             )}
 
             {error && (
-                <div className="multi-select-error">
+                <div className="text-red-500 text-xs mt-1">
                     {error}
                 </div>
             )}

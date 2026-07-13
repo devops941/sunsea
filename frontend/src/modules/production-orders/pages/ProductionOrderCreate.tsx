@@ -1006,15 +1006,7 @@ const ProductionOrderCreate: React.FC = () => {
                                         ? "Edit Production Order"
                                         : "Create Production Order"}
                                 </h2>
-                                <div className="page-breadcrumb">
-                                    Home / Production / Orders /{" "}
-                                    {isEditMode ? "Edit" : "Create"}
-                                    {isEditMode && orderId && (
-                                        <span className="ms-2 text-muted">
-                                            (ID: {orderId})
-                                        </span>
-                                    )}
-                                </div>
+                                
                             </div>
                         </Col>
                         <Col lg={6} md={12}>

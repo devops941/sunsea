@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import { Container, Row, Col } from "react-bootstrap";
 import { FaSave, FaEraser, FaArrowLeft } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -13,12 +12,6 @@ import { fetchEmployees } from "../../../features/employee/employeeSlice";
 import { fetchStoreTypes } from "../../../features/store-types/storeTypeSlice";
 import { storeService } from "../../../services/storeService";
 import { z } from "zod";
-// Dynamic Store Types are now fetched from DB
-
-// const COST_METHOD_OPTIONS = [
-//     { label: "Weighted Average (WAVG)", value: "WAVG" },
-//     { label: "First In First Out (FIFO)", value: "FIFO" },
-// ];
 
 const STATUS_OPTIONS = [
     { label: "Active", value: "Active" },
@@ -31,9 +24,7 @@ const initialFormState = {
     storeName: "",
     storeTypeId: "",
     locationId: "",
-    // locationDesc: "",
     inchargeId: "",
-    // costMethod: "WAVG",
     gstPlace: "",
     status: "Active",
     allowNegative: false,
@@ -41,8 +32,6 @@ const initialFormState = {
 };
 
 const storeSchema = z.object({
-   
-
     storeName: z
         .string()
         .trim()
@@ -68,20 +57,9 @@ const storeSchema = z.object({
         .trim()
         .min(1, "Location is required"),
 
-    // locationDesc: z
-    //     .string()
-    //     .trim()
-    //     .min(1, "Location Description is required")
-    //     .max(255, "Maximum 255 characters allowed")
-    //     .regex(
-    //         /^[A-Za-z0-9\s,./()-]+$/,
-    //         "Invalid characters in Location Description"
-    //     ),
-
     gstPlace: z
         .string()
         .trim()
-       
         .optional()
         .or(z.literal(""))
 });
@@ -96,8 +74,6 @@ const StorageStoreCreate: React.FC = () => {
     const { data: locations } = useAppSelector(state => state.locations);
     const { employees } = useAppSelector((state: any) => state.employees || { employees: [] });
     const { data: storeTypes } = useAppSelector(state => state.storeTypes);
-
-
 
     useEffect(() => {
         dispatch(fetchLocations(undefined));
@@ -131,7 +107,8 @@ const StorageStoreCreate: React.FC = () => {
         e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
     ) => {
         const target = e.target;
-        const { name, value, type } = target;
+        const { name, value } = target;
+        const type = (target as any).type;
 
         const checked =
             type === "checkbox"
@@ -150,6 +127,7 @@ const StorageStoreCreate: React.FC = () => {
             }));
         }
     };
+    
     const handleClear = () => {
         setFormData(prev => ({
             ...initialFormState,
@@ -192,9 +170,7 @@ const StorageStoreCreate: React.FC = () => {
                 storeName: formData.storeName,
                 storeTypeId: formData.storeTypeId ? Number(formData.storeTypeId) : undefined,
                 locationId: formData.locationId || undefined,
-                // locationDesc: formData.locationDesc || undefined,
                 inchargeId: formData.inchargeId || undefined,
-                // costMethod: formData.costMethod,
                 gstPlace: formData.gstPlace || undefined,
                 status: formData.status,
                 allowNegative: formData.allowNegative,
@@ -214,31 +190,20 @@ const StorageStoreCreate: React.FC = () => {
     };
 
     return (
-        <div className="inner-container">
-            <Container fluid>
-                <div className="page-header">
-                    <Row className="align-items-center g-3">
-                        <Col lg={6} md={12}>
-                            <div className="page-header-info">
-                                <h2 className="page-title">Create Storage Store</h2>
-                                <div className="page-breadcrumb">Home / Inventory & Warehouse / Storage Stores / Create</div>
-                            </div>
-                        </Col>
-                        <Col lg={6} md={12}>
-                            <div className="page-header-actions">
-                                <CustomButton
-                                    text="Back to List"
-                                    icon={FaArrowLeft}
-                                    onClick={() => navigate("/storage-stores")}
-                                />
-                            </div>
-                        </Col>
-                    </Row>
-                </div>
+        <div className="p-4 md:p-6 min-h-screen bg-slate-50">
+            <div className="max-w-7xl mx-auto space-y-3">
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200">
+                    <div className="p-6 border-b border-slate-200 flex items-center justify-between">
+                        <h2 className="text-2xl font-bold text-slate-800">Create Storage Store</h2>
+                        <CustomButton
+                            text="Back to List"
+                            icon={FaArrowLeft}
+                            onClick={() => navigate("/storage-stores")}
+                        />
+                    </div>
 
-                <form onSubmit={handleSubmit} className="form-inner" noValidate>
-                    <Row className="g-3">
-                        <Col md={4}>
+                    <form onSubmit={handleSubmit} className="p-6" noValidate>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             <TextInput
                                 label="Store ID"
                                 name="storeId"
@@ -248,9 +213,7 @@ const StorageStoreCreate: React.FC = () => {
                                 disabled={true}
                                 onChange={handleChange}
                             />
-                        </Col>
-                        
-                        <Col md={4}>
+                            
                             <TextInput
                                 label="Store Name"
                                 name="storeName"
@@ -260,8 +223,6 @@ const StorageStoreCreate: React.FC = () => {
                                 error={errors.storeName}
                                 onChange={handleChange}
                             />
-                        </Col>
-                        <Col md={4}>
                             <SelectInput
                                 label="Store Type"
                                 name="storeTypeId"
@@ -277,8 +238,6 @@ const StorageStoreCreate: React.FC = () => {
                                 error={errors.storeTypeId}
                                 onChange={handleChange}
                             />
-                        </Col>
-                        <Col md={4}>
                             <SelectInput
                                 label="Location"
                                 name="locationId"
@@ -294,18 +253,7 @@ const StorageStoreCreate: React.FC = () => {
                                 error={errors.locationId}
                                 onChange={handleChange}
                             />
-                        </Col>
-                        {/* <Col md={4}>
-                            <TextInput
-                                label="Location Description"
-                                name="locationDesc"
-                                value={formData.locationDesc}
-                                placeholder="e.g. Building A, Floor 1"
-                                error={errors.locationDesc}
-                                onChange={handleChange}
-                            />
-                        </Col> */}
-                        <Col md={4}>
+
                             <SelectInput
                                 label="Store Incharge"
                                 name="inchargeId"
@@ -314,70 +262,67 @@ const StorageStoreCreate: React.FC = () => {
                                     { label: "Select an incharge", value: "" },
                                     ...(employees || []).map((emp: any) => ({
                                         label: `${emp.fullName} (${emp.empCode})`,
-                                        value: emp.id.toString()
+                                        value: emp.id?.toString() || ""
                                     }))
                                 ]}
                                 required
                                 error={errors.inchargeId}
                                 onChange={handleChange}
                             />
-                        </Col>
-                        {/* <Col md={4}>
-                            <SelectInput
-                                label="Costing Method"
-                                name="costMethod"
-                                value={formData.costMethod}
-                                options={COST_METHOD_OPTIONS}
-                                onChange={handleChange}
-                                required
 
-                            />
-                        </Col> */}
-                        <Col md={4}>
                             <SelectInput
                                 label="Status"
                                 name="status"
                                 value={formData.status}
                                 options={STATUS_OPTIONS}
                                 onChange={handleChange}
-                                required
-
                             />
-                        </Col>
-                        <Col md={4}>
+
                             <TextInput
-                                label="GST Place (State Code)"
+                                label="GST Place"
                                 name="gstPlace"
                                 value={formData.gstPlace}
-                                placeholder="e.g. 33"
+                                placeholder="e.g. Maharashtra"
                                 error={errors.gstPlace}
                                 onChange={handleChange}
                             />
-                        </Col>
-                        {/* <Col md={4}>
-                            <div className="form-group mb-3 d-flex align-items-center gap-2">
+                            
+                            <div className="flex items-center gap-2 mt-8 h-[42px]">
                                 <input
                                     type="checkbox"
                                     id="allowNegative"
                                     name="allowNegative"
                                     checked={formData.allowNegative}
                                     onChange={handleChange}
-                                    style={{ width: 'auto', marginTop: '2rem' }}
+                                    className="w-4 h-4 text-indigo-600 bg-white border-slate-300 rounded focus:ring-indigo-500 cursor-pointer"
                                 />
-                                <label htmlFor="allowNegative" className="form-label mb-0" style={{ marginTop: '2rem' }}>Allow Negative Stock</label>
+                                <label htmlFor="allowNegative" className="text-sm font-medium text-slate-700 cursor-pointer">
+                                    Allow Negative Stock
+                                </label>
                             </div>
-                        </Col> */}
-                       
-                    </Row>
+                            <div className="flex items-center gap-2 mt-8 h-[42px]">
+                                <input
+                                    type="checkbox"
+                                    id="isActive"
+                                    name="isActive"
+                                    checked={formData.isActive}
+                                    onChange={handleChange}
+                                    className="w-4 h-4 text-indigo-600 bg-white border-slate-300 rounded focus:ring-indigo-500 cursor-pointer"
+                                />
+                                <label htmlFor="isActive" className="text-sm font-medium text-slate-700 cursor-pointer">
+                                    Is Active
+                                </label>
+                            </div>
+                        </div>
 
-                    <div className="form-actions d-flex justify-content-end gap-3 mt-4">
-                        <CustomButton
-                            text="Clear"
-                            icon={FaEraser}
-                            onClick={handleClear}
-                            disabled={isSubmitting}
-                        />
-                        <div className="ms-2">
+                        <div className="flex justify-end gap-3 pt-6 mt-6 border-t border-slate-200">
+                            <CustomButton
+                                text="Clear"
+                                icon={FaEraser}
+                                onClick={handleClear}
+                                disabled={isSubmitting}
+                                type="button"
+                            />
                             <CustomButton
                                 text={isSubmitting ? "Saving..." : "Save Store"}
                                 icon={FaSave}
@@ -385,11 +330,11 @@ const StorageStoreCreate: React.FC = () => {
                                 disabled={isSubmitting}
                             />
                         </div>
-                    </div>
-                </form>
-            </Container>
+                    </form>
+                </div>
+            </div>
         </div>
     );
-}
+};
 
 export default StorageStoreCreate;

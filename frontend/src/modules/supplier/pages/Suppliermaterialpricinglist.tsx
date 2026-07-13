@@ -179,7 +179,7 @@ const SupplierMaterialPricingList: React.FC = () => {
                     <Row className="align-items-center g-3">
                         <Col lg={8} md={12}>
                             <div className="page-header-info">
-                                <div className="page-breadcrumb">Settings / Supplier Master / Pricing</div>
+                                
                                 <h2 className="page-title">
                                     Raw Material Pricing {supplierName ? `— ${supplierName}` : ""}
                                 </h2>

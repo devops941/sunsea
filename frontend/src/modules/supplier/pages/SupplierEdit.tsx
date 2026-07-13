@@ -598,7 +598,7 @@ const SupplierEdit: React.FC = () => {
                     <Row className="align-items-center g-3">
                         <Col lg={6} md={12}>
                             <div className="page-header-info">
-                                <div className="page-breadcrumb">Settings / Supplier Master / Edit</div>
+                                
                                 <h2 className="page-title">Edit Supplier</h2>
                             </div>
                         </Col>

@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Container, Row, Col, Spinner } from "react-bootstrap";
-import { FaSearch, FaPlus, FaChevronLeft, FaChevronRight } from "react-icons/fa";
+import { FaSearch, FaPlus } from "react-icons/fa";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 
@@ -12,13 +11,13 @@ import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/Common
 import { useCustomers } from "../../../hooks/useCustomers";
 import { hasPermission } from "../../../utils/permission";
 import CustomerViewModal from "../components/CustomerViewModal";
+import DataTable from "../../../components/ui/table/DataTable";
 
 const ITEMS_PER_PAGE = 10;
 
 const CustomerListPage: React.FC = () => {
   const navigate = useNavigate();
   const { customers, loading, error, loadCustomers, removeCustomer } = useCustomers();
-  //const canCreateCustomer = hasPermission("customers.create");
   const canEditCustomer = hasPermission("customers.edit");
   const canDeleteCustomer = hasPermission("customers.delete");
 
@@ -41,8 +40,6 @@ const CustomerListPage: React.FC = () => {
   // Custom confirm delete state
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [customerToDelete, setCustomerToDelete] = useState<string | null>(null);
-
-  // Initial load is now handled by the search effect above
 
   useEffect(() => {
     if (error) {
@@ -84,165 +81,89 @@ const CustomerListPage: React.FC = () => {
       }
     }
   };
+  
   const filteredCustomers = customers ?? [];
-
   const totalPages = Math.ceil(filteredCustomers.length / ITEMS_PER_PAGE);
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
   const paginatedCustomers = filteredCustomers.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
   return (
-    <div className="inner-container">
-      <Container fluid>
-        {/* Page Header */}
-        <div className="page-header">
-          <Row className="align-items-center g-3">
-            <Col lg={6} md={12}>
-              <div className="page-header-info">
-                <h2 className="page-title">Customer Management</h2>
-                <div className="page-breadcrumb">Home / Customers</div>
-              </div>
-            </Col>
-            <Col lg={6} md={12}>
-              <div className="page-header-actions">
-                <div className="page-search-wrap">
-                  <FaSearch className="page-search-icon" />
-                  <input
-                    type="text"
-                    className="page-search-input"
-                    placeholder="Search customer..."
-                    value={searchTerm}
-                    onChange={handleSearch}
-                  />
-                </div>
-                {/* {canCreateCustomer && */}
-                <CustomButton
-                  text="Add Customer"
-                  icon={FaPlus}
-                  onClick={() => navigate("/customers/create")}
+    <div className="p-4 md:p-6 min-h-screen bg-slate-50">
+      <div className="max-w-7xl mx-auto">
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+          {/* Page Header */}
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-6 border-b border-slate-200">
+            <div>
+              <h2 className="text-2xl font-bold text-slate-800">Customer Management</h2>
+            </div>
+            <div className="flex items-center gap-3 w-full md:w-auto">
+              <div className="relative w-full md:w-64">
+                <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                  placeholder="Search customer..."
+                  value={searchTerm}
+                  onChange={handleSearch}
                 />
-                {/* } */}
               </div>
-            </Col>
-          </Row>
-        </div>
-
-        {/* View Table */}
-        <div className="master-table-body table-wrap">
-          <div className="master-table-body">
-            {loading && (customers ?? []).length === 0 ? (
-              <div className="text-center p-5">
-                <Spinner animation="border" variant="primary" />
-              </div>
-            ) : (
-              <table className="master-data-table">
-                <thead>
-                  <tr>
-                    <th style={{ width: "60px" }}>#</th>
-                    <th>CUSTOMER CODE</th>
-                    <th>FIRM NAME</th>
-                    <th>MOBILE</th>
-                    <th>GMAIL</th>
-                    <th>GST TYPE</th>
-                    <th>STATUS</th>
-                    <th>ACTIONS</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {paginatedCustomers.length > 0 ? (
-                    paginatedCustomers.map((customer: any, index: number) => (
-                      <tr key={customer.id} className="master-data-row">
-                        <td className="master-data-cell">
-                          {(currentPage - 1) * ITEMS_PER_PAGE + index + 1}
-                        </td>
-
-                        <td className="master-data-cell">
-                          {customer.customerCode}
-                        </td>
-
-                        <td className="master-data-cell">
-                          {customer.firmName}
-                        </td>
-
-                        <td className="master-data-cell">
-                          {customer.mobile || "N/A"}
-                        </td>
-
-                        <td className="master-data-cell">
-                          {customer.email || "N/A"}
-                        </td>
-
-                        <td className="master-data-cell">
-                          {customer.gstRegType || "N/A"}
-                        </td>
-
-                        <td className="master-data-cell">
-                          <span
-                            className={`status-pill status-pill--${customer.status === "Active"
-                              ? "active"
-                              : "inactive"
-                              }`}
-                          >
-                            {customer.status}
-                          </span>
-                        </td>
-
-                        <td className="master-data-cell">
-                          <div className="table-action-group">
-                            <ViewButton
-                              onClick={() => handleView(customer)}
-                            />
-
-                            {canEditCustomer && (
-                              <EditButton
-                                onClick={() => handleEdit(customer)}
-                              />
-                            )}
-
-                            {canDeleteCustomer && (
-                              <DeleteButton
-                                onClick={() =>
-                                  triggerDelete(customer.id)
-                                }
-                              />
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={8} className="text-center p-4">
-                        No customers found.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            )}
-
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="pagination-wrap">
-                <button
-                  className="pagination-btn"
-                  disabled={currentPage === 1}
-                  onClick={() => setCurrentPage(currentPage - 1)}
-                >
-                  <FaChevronLeft />
-                </button>
-                <div className="pagination-info">
-                  Page {currentPage} of {totalPages}
-                </div>
-                <button
-                  className="pagination-btn"
-                  disabled={currentPage === totalPages}
-                  onClick={() => setCurrentPage(currentPage + 1)}
-                >
-                  <FaChevronRight />
-                </button>
-              </div>
-            )}
+              <CustomButton
+                text="Add Customer"
+                icon={FaPlus}
+                onClick={() => navigate("/customers/create")}
+              />
+            </div>
           </div>
+
+          {/* View Table */}
+          {loading && (customers ?? []).length === 0 ? (
+            <div className="flex justify-center items-center h-64">
+                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"></div>
+            </div>
+          ) : (
+            <DataTable
+              data={paginatedCustomers}
+              rowKey={(customer) => customer.id}
+              emptyMessage="No customers found."
+              pagination={
+                  totalPages > 1
+                      ? {
+                            currentPage,
+                            totalPages,
+                            onPageChange: setCurrentPage,
+                        }
+                      : undefined
+              }
+              columns={[
+                  { header: "#", width: "60px", render: (_item, index) => startIndex + index + 1, align: "center" },
+                  { header: "CUSTOMER CODE", accessor: "customerCode" },
+                  { header: "FIRM NAME", accessor: "firmName" },
+                  { header: "MOBILE", render: (customer) => customer.mobile || "N/A" },
+                  { header: "GMAIL", render: (customer) => customer.email || "N/A" },
+                  { header: "GST TYPE", render: (customer) => customer.gstRegType || "N/A" },
+                  { header: "STATUS", render: (customer) => (
+                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                        customer.status === "Active" 
+                            ? "bg-green-100 text-green-700 border border-green-200" 
+                            : "bg-red-100 text-red-700 border border-red-200"
+                    }`}>
+                      {customer.status}
+                    </span>
+                  ) },
+                  {
+                      header: "ACTIONS",
+                      render: (customer) => (
+                          <div className="flex items-center gap-2">
+                              <ViewButton onClick={() => handleView(customer)} />
+                              {canEditCustomer && <EditButton onClick={() => handleEdit(customer)} />}
+                              {canDeleteCustomer && <DeleteButton onClick={() => triggerDelete(customer.id)} />}
+                          </div>
+                      ),
+                      align: "right"
+                  },
+              ]}
+            />
+          )}
         </div>
 
         <CustomerViewModal
@@ -261,7 +182,7 @@ const CustomerListPage: React.FC = () => {
           confirmText="Delete"
           confirmVariant="danger"
         />
-      </Container>
+      </div>
     </div>
   );
 };

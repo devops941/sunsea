@@ -111,10 +111,7 @@ const StockAdjustmentView: React.FC = () => {
           <Row className="align-items-center">
             <Col>
               <h2 className="page-title">Stock Adjustment Details</h2>
-              <div className="page-breadcrumb">
-                Inventory / Stock Adjustments /{" "}
-                {currentAdjustment.adjustmentNumber}
-              </div>
+
             </Col>
             <Col className="text-end">
               <CustomButton
@@ -387,8 +384,8 @@ const StockAdjustmentView: React.FC = () => {
                             Number(item.difference) > 0
                               ? "text-success fw-bold"
                               : Number(item.difference) < 0
-                              ? "text-danger fw-bold"
-                              : ""
+                                ? "text-danger fw-bold"
+                                : ""
                           }
                         >
                           {Number(item.difference) > 0

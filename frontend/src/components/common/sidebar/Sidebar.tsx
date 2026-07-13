@@ -6,7 +6,6 @@ import React from "react";
 import {
   FaChevronDown,
   FaChevronRight,
-  FaColumns,
   FaSignOutAlt,
 } from "react-icons/fa";
 import { FaCircle } from "react-icons/fa";
@@ -78,59 +77,55 @@ const Sidebar = () => {
 
   return (
     <aside
-      className={`sidebar ${activeCollapsed ? "sidebar-collapsed" : ""}`}
-      onMouseEnter={() => {
-        setIsHovered(true);
-        if (isCollapsed) {
-          setIsCollapsed(false);
-        }
-      }}
+      className={`h-screen bg-[#F8F8F8] shadow-md text-gray-700 relative overflow-visible flex flex-col transition-[width] duration-300 ease-in-out z-50  ${activeCollapsed ? "w-[80px]" : "w-[240px]"}`}
+      onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
       <div
-        className={`sidebar-header ${activeCollapsed ? "sidebar-header-expanded" : ""
-          }`}
+        className={`px-4 flex  shrink-0 h-[72px] ${activeCollapsed ? "flex-col items-center justify-center gap-1" : "items-center justify-between"}`}
       >
-        <div className="sidebar-brand">
-          <div className="sidebar-logo" style={{ background: 'transparent', width: '48px', height: '48px', padding: '0px' }}>
-            <img 
-              src={company?.logoUrl || Logo} 
-              alt="Company Logo" 
-              className="sidebar-logo-image" 
-              style={{ objectFit: 'contain' }} 
-            />
-          </div>
+        <div className="w-10 h-10 rounded-xl overflow-hidden bg-transparent flex items-center justify-center shrink-0">
+          <img
+            src={company?.logoUrl || Logo}
+            alt="Company Logo"
+            className="w-full h-full object-contain"
+          />
         </div>
 
-        {!isCollapsed && (
-          <div className="inner-side-tonggle">
-            <FaColumns
-              className={`sidebar-toggle ${isCollapsed ? "sidebar-toggle-collapsed" : ""
-                }`}
-              onClick={() => setIsCollapsed(!isCollapsed)}
-            />
+        {!activeCollapsed && (
+          <div
+            className="flex items-center justify-center w-[22px] h-[22px] rounded-full border-2 border-gray-400 cursor-pointer transition-all duration-200 hover:bg-red-50 hover:shadow-sm"
+            title="Toggle Sidebar"
+            onClick={(e) => {
+              e.preventDefault();
+              setIsCollapsed(!isCollapsed);
+            }}
+          >
+            <div className={`w-[10px] h-[10px] rounded-full bg-primary transition-transform duration-200 ${!isCollapsed ? 'scale-100' : 'scale-0'}`}></div>
           </div>
         )}
       </div>
 
-      <div className="sidebar-menu-wrapper">
+      <div className="flex-1 px-3 py-4 overflow-y-auto overflow-x-hidden [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:bg-black/20 [&::-webkit-scrollbar-thumb]:rounded-full">
         {filteredSidebarItems.map((menu) => {
           const Icon = menu.icon;
 
           // ── Flat top-level item (no children) → render as a direct link ──
           if (!menu.children && menu.path) {
             return (
-              <div key={menu.title} className="sidebar-menu">
+              <div key={menu.title} className="relative mb-2">
                 <NavLink
                   to={menu.path}
                   className={({ isActive }) =>
-                    isActive ? "sidebar-menu-btn active" : "sidebar-menu-btn"
+                    `w-full border-none outline-none cursor-pointer p-[10px_6px] rounded-sm flex items-center justify-between transition-all duration-300 hover:bg-gray-100 ${isActive ? "!bg-primary !text-white font-semibold" : "bg-transparent text-gray-700"} ${activeCollapsed ? "justify-center p-[14px]" : ""}`
                   }
                 >
-                  <div className="sidebar-menu-left">
-                    <Icon />
-                    {!activeCollapsed && <span>{menu.title}</span>}
-                  </div>
+                  {({ isActive }) => (
+                    <div className={`flex items-center text-[clamp(13px,0.9vw,14px)] font-medium ${activeCollapsed ? "justify-center gap-0" : "gap-3"} ${isActive ? "!text-white" : ""}`}>
+                      <Icon className={`min-w-[18px] text-[18px] ${isActive ? "!text-white" : ""}`} />
+                      {!activeCollapsed && <span className={isActive ? "!text-white" : ""}>{menu.title}</span>}
+                    </div>
+                  )}
                 </NavLink>
               </div>
             );
@@ -142,37 +137,31 @@ const Sidebar = () => {
           return (
             <div
               key={menu.title}
-              className="sidebar-menu"
+              className="relative mb-2"
               onMouseEnter={() => setHoveredMenu(menu.title)}
               onMouseLeave={() => setHoveredMenu(null)}
             >
               <button
-                className="sidebar-menu-btn"
+                className={`w-full border-none outline-none cursor-pointer bg-transparent text-gray-700 p-[14px_6px] rounded-xl flex items-center justify-between transition-all duration-300 hover:bg-gray-100 ${activeCollapsed ? "justify-center p-[14px]" : ""}`}
                 onClick={() => toggleMenu(menu.title)}
               >
-                <div className="sidebar-menu-left">
-                  <Icon />
+                <div className={`flex items-center text-[clamp(13px,0.9vw,14px)] font-medium ${activeCollapsed ? "justify-center gap-0" : "gap-3"}`}>
+                  <Icon className="min-w-[18px] text-[18px]" />
                   {!activeCollapsed && <span>{menu.title}</span>}
                 </div>
 
                 {!activeCollapsed &&
-                  (isOpen ? <FaChevronDown /> : <FaChevronRight />)}
+                  (isOpen ? <FaChevronDown className="min-w-[14px] text-[14px]" /> : <FaChevronRight className="min-w-[14px] text-[14px]" />)}
               </button>
 
               {!activeCollapsed && isOpen && (
-                <div className="sidebar-submenu-wrapper">
+                <div className="mt-2 ml-3 pl-2 border-l-2 border-black/10 flex flex-col gap-1">
                   {menu.children?.map((subMenu) => (
                     <React.Fragment key={subMenu.title}>
                       {subMenu.children ? (
                         <>
                           {/* Parent Child */}
-                          <div
-                            className="sidebar-submenu-item"
-                            style={{
-                              cursor: "default",
-                              fontWeight: 600,
-                            }}
-                          >
+                          <div className="no-underline text-gray-700 px-3 py-2.5 rounded-lg text-sm font-semibold cursor-default">
                             {subMenu.title}
                           </div>
 
@@ -183,16 +172,8 @@ const Sidebar = () => {
                                 key={child.path}
                                 to={child.path}
                                 className={({ isActive }) =>
-                                  isActive
-                                    ? "sidebar-submenu-item active"
-                                    : "sidebar-submenu-item"
+                                  `no-underline px-3 py-2.5 rounded-lg text-sm transition-all duration-300 hover:bg-gray-100 flex items-center gap-2 pl-5 ${isActive ? "!bg-primary !text-white font-semibold" : "text-gray-700"}`
                                 }
-                                style={{
-                                  paddingLeft: "20px",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: "8px",
-                                }}
                               >
                                 <FaCircle size={6} />
                                 {child.title}
@@ -206,9 +187,7 @@ const Sidebar = () => {
                             key={subMenu.path}
                             to={subMenu.path}
                             className={({ isActive }) =>
-                              isActive
-                                ? "sidebar-submenu-item active"
-                                : "sidebar-submenu-item"
+                              `no-underline px-3 py-2.5 rounded-lg text-sm transition-all duration-300 hover:bg-gray-100 ${isActive ? "!bg-primary !text-white font-semibold" : "text-gray-700"}`
                             }
                           >
                             {subMenu.title}
@@ -221,13 +200,13 @@ const Sidebar = () => {
               )}
 
               {activeCollapsed && hoveredMenu === menu.title && (
-                <div className="sidebar-hover-menu">
-                  <div className="sidebar-hover-title">{menu.title}</div>
+                <div className="absolute top-0 left-[72px] w-[240px] bg-white rounded-xl overflow-hidden ">
+                  <div className="px-4 py-3.5 bg-white text-gray-700 font-semibold border-b border-black/10">{menu.title}</div>
                   {menu.children?.map((subMenu) => (
                     <React.Fragment key={subMenu.title}>
                       {subMenu.children ? (
                         <>
-                          <div className="sidebar-hover-item">
+                          <div className="block px-4 py-3 no-underline text-gray-700 font-semibold mt-1">
                             {subMenu.title}
                           </div>
 
@@ -236,8 +215,9 @@ const Sidebar = () => {
                               <NavLink
                                 key={child.path}
                                 to={child.path}
-                                className="sidebar-hover-item"
-                                style={{ paddingLeft: "20px" }}
+                                className={({ isActive }) =>
+                                  `block px-4 py-3 no-underline transition-all duration-300 hover:bg-gray-100 pl-8 ${isActive ? "!bg-primary !text-white font-semibold" : "text-gray-700"}`
+                                }
                               >
                                 {child.title}
                               </NavLink>
@@ -249,7 +229,9 @@ const Sidebar = () => {
                           <NavLink
                             key={subMenu.path}
                             to={subMenu.path}
-                            className="sidebar-hover-item"
+                            className={({ isActive }) =>
+                              `block px-4 py-3 no-underline transition-all duration-300 hover:bg-gray-100 ${isActive ? "!bg-primary !text-white font-semibold" : "text-gray-700"}`
+                            }
                           >
                             {subMenu.title}
                           </NavLink>
@@ -264,9 +246,12 @@ const Sidebar = () => {
         })}
       </div>
 
-      <div className="sidebar-footer">
-        <button className="sidebar-logout-btn" onClick={handleLogout}>
-          <FaSignOutAlt />
+      <div className="p-4 border-t border-black/10 mt-auto shrink-0">
+        <button
+          className={`h-12 border-none outline-none cursor-pointer !rounded-xl bg-gradient-to-br from-red-600 to-red-700 text-white flex items-center justify-center gap-2.5 text-sm font-semibold transition-all duration-300 shadow-[0_4px_12px_rgba(220,38,38,0.25)] hover:-translate-y-[2px] hover:from-red-500 hover:to-red-600 hover:shadow-[0_8px_20px_rgba(220,38,38,0.35)] active:scale-95 ${activeCollapsed ? "w-12 mx-auto px-0" : "w-full"}`}
+          onClick={handleLogout}
+        >
+          <FaSignOutAlt className="text-[16px]" />
           {!activeCollapsed && <span>Logout</span>}
         </button>
       </div>

@@ -1,70 +1,41 @@
 import React, { useState, useEffect } from "react";
-import { Container, Row, Col, Spinner } from "react-bootstrap";
-import { FaIdCard, FaSave } from "react-icons/fa";
+import { FaSave, FaIdCard, FaArrowLeft, FaUser, FaMapMarkerAlt, FaFileInvoiceDollar, FaBuilding } from "react-icons/fa";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
+import CityStateSelect from "../../../components/ui/CityStateSelect/CityStateSelect";
+import type { StateCityOption } from "../../../components/ui/CityStateSelect/CityStateSelect";
 import TextInput from "../../../components/form/TextInput/TextInput";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
-import CustomButton from "../../../components/ui/custombutton/CustomButton";
+import CustomButton from "../../../components/ui/Button/Button";
+import AddressForm from "../../../components/form/AddressFrom/AddressFrom";
 import { useCustomers } from "../../../hooks/useCustomers";
 import { customerService } from "../../../services/customerService";
 import { useSelector } from "react-redux";
 import { validateCustomer } from "../validations/customerValidation";
 import MultiSelect from "../../../components/form/multiSelect/MultiSelect";
 import IndiaPhoneInput from "../../../components/ui/PhoneInput/PhoneInput";
-import CityStateSelect from "../../../components/ui/CityStateSelect/CityStateSelect";
-import type { StateCityOption } from "../../../components/ui/CityStateSelect/CityStateSelect";
+
 const getGstStateCode = (stateName: string): string => {
   const normalized = stateName.toLowerCase().replace(/[^a-z]/g, "");
   const mapping: Record<string, string> = {
-    jammuandkashmir: "01",
-    himachalpradesh: "02",
-    punjab: "03",
-    chandigarh: "04",
-    uttarakhand: "05",
-    haryana: "06",
-    delhi: "07",
-    rajasthan: "08",
-    uttarpradesh: "09",
-    bihar: "10",
-    sikkim: "11",
-    arunachalpradesh: "12",
-    nagaland: "13",
-    manipur: "14",
-    mizoram: "15",
-    tripura: "16",
-    meghalaya: "17",
-    assam: "18",
-    westbengal: "19",
-    jharkhand: "20",
-    odisha: "21",
-    chhattisgarh: "22",
-    madhyapradesh: "23",
-    gujarat: "24",
-    damananddiu: "26",
-    dadraandnagarhaveli: "26",
-    maharashtra: "27",
-    andhrapradesh: "37",
-    karnataka: "29",
-    goa: "30",
-    lakshadweep: "31",
-    kerala: "32",
-    tamilnadu: "33",
-    puducherry: "34",
-    andamanandnicobarislands: "35",
-    telangana: "36",
-    ladakh: "38",
+    jammuandkashmir: "01", himachalpradesh: "02", punjab: "03", chandigarh: "04",
+    uttarakhand: "05", haryana: "06", delhi: "07", rajasthan: "08",
+    uttarpradesh: "09", bihar: "10", sikkim: "11", arunachalpradesh: "12",
+    nagaland: "13", manipur: "14", mizoram: "15", tripura: "16", meghalaya: "17",
+    assam: "18", westbengal: "19", jharkhand: "20", odisha: "21", chhattisgarh: "22",
+    madhyapradesh: "23", gujarat: "24", damananddiu: "26", dadraandnagarhaveli: "26",
+    maharashtra: "27", andhrapradesh: "37", karnataka: "29", goa: "30",
+    lakshadweep: "31", kerala: "32", tamilnadu: "33", puducherry: "34",
+    andamanandnicobarislands: "35", telangana: "36", ladakh: "38",
   };
   return mapping[normalized] || "";
 };
 
 const initialFormData = {
-  // Customer Info
-  customerId: "", // display-only, holds customerCode
+  customerId: "",
   isActive: "true",
   createdByOn: "",
 
-  // Basic Information
   firmName: "",
   displayName: "",
   customerType: [] as string[],
@@ -78,23 +49,19 @@ const initialFormData = {
 
   email: "",
 
-  // GST & Statutory
   gstin: "",
   pan: "",
   gstRegType: "Regular",
-
   stateCode: "",
 
   tdsSection: "",
   tcsRate: "0",
 
-  // Billing Address
   billingAddressLine1: "",
   billingCity: "",
   billingState: "",
   billingPincode: "",
 
-  // Shipping Address
   sameAsBilling: false,
 
   shippingAddressLine1: "",
@@ -102,32 +69,20 @@ const initialFormData = {
   shippingState: "",
   shippingPincode: "",
 
-  // Commercial Settings
   creditLimit: "0",
   creditDays: "0",
-
   priceList: "Standard",
 
   routeId: "",
   collectionAgentId: "",
 
-  // Bank Accounts
   bankAccounts: [
-    {
-      bankHolderName: "",
-      bankName: "",
-      accountNumber: "",
-      ifscCode: "",
-      branchName: "",
-      upiMobileNumber: "",
-    },
+    { bankHolderName: "", bankName: "", accountNumber: "", ifscCode: "", branchName: "", upiMobileNumber: "" },
   ],
 };
 
 type CustomerFormData = typeof initialFormData;
 
-// Maps the API's customer record (nested billingAddress/shippingAddress JSON)
-// into the flat shape this form's state uses.
 const mapCustomerToFormData = (customer: any): CustomerFormData => {
   const billingMatchesShipping =
     !!customer.shippingAddressLine1 &&
@@ -139,15 +94,11 @@ const mapCustomerToFormData = (customer: any): CustomerFormData => {
   return {
     customerId: customer.customerCode || "",
     isActive: customer.status === "Active" ? "true" : "false",
-    createdByOn: customer.createdUser
-      ? `${customer.createdUser.fullName} - ${new Date(customer.createdAt).toLocaleString()}`
-      : "",
+    createdByOn: customer.createdUser ? `${customer.createdUser.fullName} - ${new Date(customer.createdAt).toLocaleString()}` : "",
 
     firmName: customer.firmName || "",
     displayName: customer.displayName || "",
-    customerType: typeof customer.customerType === "string"
-      ? customer.customerType.split(",").filter(Boolean)
-      : (Array.isArray(customer.customerType) ? customer.customerType : []),
+    customerType: typeof customer.customerType === "string" ? customer.customerType.split(",").filter(Boolean) : (Array.isArray(customer.customerType) ? customer.customerType : []),
 
     contactPerson: customer.contactPerson || "",
     designation: customer.designation || "",
@@ -161,7 +112,6 @@ const mapCustomerToFormData = (customer: any): CustomerFormData => {
     gstin: customer.gstin || "",
     pan: customer.pan || "",
     gstRegType: customer.gstRegType || "Regular",
-
     stateCode: customer.stateCode || "",
 
     tdsSection: customer.tdsSection || "",
@@ -181,7 +131,6 @@ const mapCustomerToFormData = (customer: any): CustomerFormData => {
 
     creditLimit: customer.creditLimit != null ? String(customer.creditLimit) : "0",
     creditDays: customer.creditDays != null ? String(customer.creditDays) : "0",
-
     priceList: customer.priceList || "Standard",
 
     routeId: customer.routeId || "",
@@ -197,26 +146,8 @@ const mapCustomerToFormData = (customer: any): CustomerFormData => {
         upiMobileNumber: bank.upiMobileNumber || "",
       }))
       : customer.bankAccount && typeof customer.bankAccount === "object"
-        ? [
-          {
-            bankHolderName: customer.bankAccount.bankHolderName || "",
-            bankName: customer.bankAccount.bankName || "",
-            accountNumber: customer.bankAccount.accountNumber || "",
-            ifscCode: customer.bankAccount.ifscCode || "",
-            branchName: customer.bankAccount.branchName || "",
-            upiMobileNumber: customer.bankAccount.upiMobileNumber || "",
-          },
-        ]
-        : [
-          {
-            bankHolderName: "",
-            bankName: "",
-            accountNumber: "",
-            ifscCode: "",
-            branchName: "",
-            upiMobileNumber: "",
-          },
-        ],
+        ? [{ bankHolderName: customer.bankAccount.bankHolderName || "", bankName: customer.bankAccount.bankName || "", accountNumber: customer.bankAccount.accountNumber || "", ifscCode: customer.bankAccount.ifscCode || "", branchName: customer.bankAccount.branchName || "", upiMobileNumber: customer.bankAccount.upiMobileNumber || "" }]
+        : [{ bankHolderName: "", bankName: "", accountNumber: "", ifscCode: "", branchName: "", upiMobileNumber: "" }],
   };
 };
 
@@ -233,13 +164,8 @@ const CustomerEditPage: React.FC = () => {
   const [shippingResetKey, setShippingResetKey] = useState(0);
 
   useEffect(() => {
-    // Fast-render with whatever was passed via navigation state (e.g. from a table row click)
-    if (location.state) {
-      setFormData(mapCustomerToFormData(location.state));
-    }
+    if (location.state) setFormData(mapCustomerToFormData(location.state));
 
-    // Always fetch the authoritative record from the API — handles direct URL access,
-    // page refresh, and stale navigation state.
     const fetchCustomer = async () => {
       if (!id) return;
       try {
@@ -253,25 +179,14 @@ const CustomerEditPage: React.FC = () => {
     };
 
     fetchCustomer();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   const handleMultiSelectChange = (name: string, values: string[]) => {
-    setFormData((prev) => ({
-      ...prev,
-      [name]: values,
-    }));
-    if (errors[name]) {
-      setErrors((prev) => ({
-        ...prev,
-        [name]: "",
-      }));
-    }
+    setFormData((prev) => ({ ...prev, [name]: values }));
+    if (errors[name]) setErrors((prev) => ({ ...prev, [name]: "" }));
   };
 
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement> | { target: { name: string; value: string } }
-  ) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement> | { target: { name: string; value: string } }) => {
     const { name, value } = e.target;
 
     if (name === "sameAsBilling") {
@@ -280,64 +195,23 @@ const CustomerEditPage: React.FC = () => {
       setFormData((prev) => ({
         ...prev,
         sameAsBilling: checked,
-
         ...(checked
-          ? {
-            shippingAddressLine1: prev.billingAddressLine1,
-            shippingCity: prev.billingCity,
-            shippingState: prev.billingState,
-            shippingPincode: prev.billingPincode,
-          }
-          : {
-            shippingAddressLine1: "",
-            shippingCity: "",
-            shippingState: "",
-            shippingPincode: "",
-          }),
+          ? { shippingAddressLine1: prev.billingAddressLine1, shippingCity: prev.billingCity, shippingState: prev.billingState, shippingPincode: prev.billingPincode }
+          : { shippingAddressLine1: "", shippingCity: "", shippingState: "", shippingPincode: "" }),
       }));
-
       setShippingResetKey((k) => k + 1);
-
-      // Clear shipping errors
-      setErrors((prev) => ({
-        ...prev,
-        shippingAddressLine1: "",
-        shippingCity: "",
-        shippingState: "",
-        shippingPincode: "",
-        sameAsBilling: "",
-      }));
-
+      setErrors((prev) => ({ ...prev, shippingAddressLine1: "", shippingCity: "", shippingState: "", shippingPincode: "", sameAsBilling: "" }));
       return;
     }
 
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-    if (errors[name]) {
-      setErrors((prev) => ({
-        ...prev,
-        [name]: "",
-      }));
-    }
+    setFormData((prev) => ({ ...prev, [name]: value }));
+    if (errors[name]) setErrors((prev) => ({ ...prev, [name]: "" }));
   };
 
-  // Billing State/City handlers (passed to CityStateSelect)
   const handleBillingStateChange = (stateData: StateCityOption) => {
     const gstCode = getGstStateCode(stateData.state_code || stateData.name);
-    setFormData((prev) => ({
-      ...prev,
-      billingState: stateData.name,
-      billingCity: "",
-      stateCode: gstCode || prev.stateCode,
-    }));
-    setErrors((prev) => ({
-      ...prev,
-      billingState: "",
-      billingCity: "",
-      stateCode: "",
-    }));
+    setFormData((prev) => ({ ...prev, billingState: stateData.name, billingCity: "", stateCode: gstCode || prev.stateCode }));
+    setErrors((prev) => ({ ...prev, billingState: "", billingCity: "", stateCode: "" }));
   };
 
   const handleBillingCityChange = (cityData: StateCityOption) => {
@@ -345,18 +219,9 @@ const CustomerEditPage: React.FC = () => {
     setErrors((prev) => ({ ...prev, billingCity: "" }));
   };
 
-  // Shipping State/City handlers (passed to CityStateSelect)
   const handleShippingStateChange = (stateData: StateCityOption) => {
-    setFormData((prev) => ({
-      ...prev,
-      shippingState: stateData.name,
-      shippingCity: "",
-    }));
-    setErrors((prev) => ({
-      ...prev,
-      shippingState: "",
-      shippingCity: "",
-    }));
+    setFormData((prev) => ({ ...prev, shippingState: stateData.name, shippingCity: "" }));
+    setErrors((prev) => ({ ...prev, shippingState: "", shippingCity: "" }));
   };
 
   const handleShippingCityChange = (cityData: StateCityOption) => {
@@ -364,41 +229,21 @@ const CustomerEditPage: React.FC = () => {
     setErrors((prev) => ({ ...prev, shippingCity: "" }));
   };
 
-  const handleBankChange = (
-    index: number,
-    e: React.ChangeEvent<HTMLInputElement>
-  ) => {
+  const handleBankChange = (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-
     setFormData((prev) => {
       const updatedBanks = [...prev.bankAccounts];
-      updatedBanks[index] = {
-        ...updatedBanks[index],
-        [name]: value,
-      };
+      updatedBanks[index] = { ...updatedBanks[index], [name]: value };
       return { ...prev, bankAccounts: updatedBanks };
     });
-
     const errorKey = `bankAccounts.${index}.${name}`;
-    if (errors[errorKey]) {
-      setErrors((prev) => ({ ...prev, [errorKey]: "" }));
-    }
+    if (errors[errorKey]) setErrors((prev) => ({ ...prev, [errorKey]: "" }));
   };
 
   const addBankAccount = () => {
     setFormData((prev) => ({
       ...prev,
-      bankAccounts: [
-        ...prev.bankAccounts,
-        {
-          bankHolderName: "",
-          bankName: "",
-          accountNumber: "",
-          ifscCode: "",
-          branchName: "",
-          upiMobileNumber: "",
-        },
-      ],
+      bankAccounts: [...prev.bankAccounts, { bankHolderName: "", bankName: "", accountNumber: "", ifscCode: "", branchName: "", upiMobileNumber: "" }],
     }));
   };
 
@@ -409,7 +254,6 @@ const CustomerEditPage: React.FC = () => {
     }));
   };
 
-  // Keep shipping address in sync with billing address when "Same as billing" is checked
   useEffect(() => {
     if (formData.sameAsBilling) {
       setFormData((prev) => ({
@@ -420,14 +264,7 @@ const CustomerEditPage: React.FC = () => {
         shippingPincode: prev.billingPincode,
       }));
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    formData.sameAsBilling,
-    formData.billingAddressLine1,
-    formData.billingCity,
-    formData.billingState,
-    formData.billingPincode,
-  ]);
+  }, [formData.sameAsBilling, formData.billingAddressLine1, formData.billingCity, formData.billingState, formData.billingPincode]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -441,35 +278,18 @@ const CustomerEditPage: React.FC = () => {
       return;
     }
 
-
     try {
-      // Note: customerCode, companyId, and createdBy are NOT sent — they're either
-      // immutable (customerCode/companyId) or server-derived (createdBy) and should
-      // never be edited from the client.
       await editCustomer(id, {
         firmName: formData.firmName,
         displayName: formData.displayName || undefined,
-
         customerType: formData.customerType,
-
         contactPerson: formData.contactPerson || undefined,
         designation: formData.designation || undefined,
-
         mobile: formData.mobile,
         altPhone: formData.altPhone || undefined,
         whatsapp: formData.whatsapp || undefined,
-
         email: formData.email || undefined,
-
         gstin: formData.gstin || undefined,
-        // pan: formData.pan || undefined,
-        // gstRegType: formData.gstRegType || undefined,
-
-        // stateCode: formData.stateCode,
-
-        // tdsSection: formData.tdsSection || undefined,
-        // tcsRate: Number(formData.tcsRate || 0),
-
         billingAddressLine1: formData.billingAddressLine1,
         billingCity: formData.billingCity,
         billingState: formData.billingState,
@@ -478,15 +298,11 @@ const CustomerEditPage: React.FC = () => {
         shippingCity: formData.sameAsBilling ? formData.billingCity : formData.shippingCity || undefined,
         shippingState: formData.sameAsBilling ? formData.billingState : formData.shippingState || undefined,
         shippingPincode: formData.sameAsBilling ? formData.billingPincode : formData.shippingPincode || undefined,
-
         creditLimit: Number(formData.creditLimit || 0),
         creditDays: Number(formData.creditDays || 0),
-
         priceList: formData.priceList || "Standard",
-
         routeId: formData.routeId || null,
         collectionAgentId: formData.collectionAgentId || null,
-
         bankAccount: formData.bankAccounts,
         status: formData.isActive === "true" ? "Active" : "Inactive",
       });
@@ -499,519 +315,281 @@ const CustomerEditPage: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="inner-container d-flex justify-content-center align-items-center" style={{ minHeight: "300px" }}>
-        <Spinner animation="border" />
+      <div className="min-h-screen bg-slate-50 flex justify-center items-center">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"></div>
       </div>
     );
   }
 
   return (
-    <div className="inner-container">
-      <Container fluid>
-        <div className="page-header">
-          <Row className="align-items-center g-3">
-            <Col lg={6} md={12}>
-              <div className="page-header-info">
-                <h2 className="page-title">Edit Customer</h2>
-                <div className="page-breadcrumb">Home / Customers / Edit Customer</div>
-              </div>
-            </Col>
-          </Row>
-        </div>
+    <div className="p-4 md:p-6 min-h-screen bg-slate-50">
+      <div className="max-w-7xl mx-auto space-y-3">
 
-        <form onSubmit={handleSubmit} className="form-inner">
-          {/* Customer Info */}
-          <Row className="mb-4">
-            <Col lg={4} md={6}>
-              <TextInput
-                label="Customer ID / Code"
-                name="customerId"
-                value={formData.customerId}
-                icon={<FaIdCard />}
-                onChange={handleChange}
-                disabled
-              />
-            </Col>
-            <Col lg={4} md={6}>
-              <SelectInput
-                label="Status"
-                name="isActive"
-                value={formData.isActive}
-                options={[
-                  { value: "true", label: "Active" },
-                  { value: "false", label: "Inactive" },
-                ]}
-                onChange={handleChange}
-              />
-            </Col>
-            <Col lg={4} md={6}>
-              <TextInput
-                label="Created by-on"
-                name="createdByOn"
-                value={user?.username}
-                icon={<FaIdCard />}
-                onChange={handleChange}
-                disabled
-              />
-            </Col>
-          </Row>
+        {/* Main Form Card */}
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200">
 
-          {/* Basic Info */}
-          <Row className="mb-4">
-            <h2 className="form-title">Basic Information</h2>
+          {/* Header */}
+          <div className="p-6 border-b border-slate-200 flex items-center justify-between">
+            <h2 className="text-2xl font-bold text-slate-800">Edit Customer</h2>
+            <CustomButton
+              text="Back"
+              icon={FaArrowLeft}
+              onClick={() => navigate("/customers")}
+              
+            />
+          </div>
 
-            <Col lg={8} md={12}>
-              <TextInput
-                label="Firm / Legal Name"
-                name="firmName"
-                value={formData.firmName}
-                placeholder="e.g. Murugan Plastics"
-                required
-                error={errors.firmName}
-                onChange={handleChange}
-              />
-            </Col>
+          <form onSubmit={handleSubmit} className="p-6 space-y-4">
 
-            <Col lg={4} md={12}>
-              <TextInput
-                label="Display Name"
-                name="displayName"
-                value={formData.displayName}
-                placeholder="Murugan"
-                error={errors.displayName}
-                onChange={handleChange}
-              />
-            </Col>
-
-            <Col lg={4} md={6}>
-              <MultiSelect
-                label="Customer Type"
-                name="customerType"
-                value={formData.customerType}
-                required
-                options={[
-                  { value: "B2B", label: "B2B (GST Registered)" },
-                  { value: "B2C", label: "B2C (Consumer)" },
-                  { value: "Export", label: "Export" },
-                ]}
-                onChange={handleMultiSelectChange}
-                error={errors.customerType}
-              />
-            </Col>
-
-            <Col lg={4} md={6}>
-              <TextInput
-                label="Contact Person"
-                name="contactPerson"
-                value={formData.contactPerson}
-                placeholder="Mr. S. Murugan"
-                error={errors.contactPerson}
-                onChange={handleChange}
-              />
-            </Col>
-
-            <Col lg={4} md={6}>
-              <TextInput
-                label="Designation"
-                name="designation"
-                value={formData.designation}
-                placeholder="Proprietor"
-                error={errors.designation}
-                onChange={handleChange}
-              />
-            </Col>
-
-            <Col lg={4} md={6}>
-              <IndiaPhoneInput
-                label="Mobile"
-                name="mobile"
-                value={formData.mobile}
-                placeholder="98400 XXXXX"
-                required
-                onChange={handleChange}
-                error={errors.mobile}
-              />
-            </Col>
-
-            <Col lg={4} md={6}>
-              <IndiaPhoneInput
-                label="Alt. Phone"
-                name="altPhone"
-                value={formData.altPhone}
-                placeholder="98400 XXXXX"
-                required
-                onChange={handleChange}
-                error={errors.altPhone}
-              />
-            </Col>
-
-            <Col lg={4} md={6}>
-              <IndiaPhoneInput
-                label="WhatsApp #"
-                name="whatsapp"
-                value={formData.whatsapp}
-                placeholder="98400 XXXXX"
-                onChange={handleChange}
-                error={errors.whatsapp}
-              />
-            </Col>
-
-            <Col lg={4} md={6}>
-              <TextInput
-                label="Email"
-                name="email"
-                type="email"
-                value={formData.email}
-                placeholder="x@y.com"
-                error={errors.email}
-                onChange={handleChange}
-              />
-            </Col>
-          </Row>
-
-          <Row className="mb-4">
-            <h2 className="form-title">GST & Statutory</h2>
-
-            <Col lg={4} md={6}>
-              <TextInput
-                label="GSTIN (15 CHAR)"
-                name="gstin"
-                value={formData.gstin}
-                placeholder="33AABC1234D1Z5"
-                onChange={handleChange}
-                error={errors.gstin}
-              />
-            </Col>
-
-            {/* <Col lg={4} md={6}>
-              <TextInput
-                label="PAN (AUTO FROM GSTIN)"
-                name="pan"
-                value={formData.pan}
-                placeholder="AABCM1234F"
-                onChange={handleChange}
-                error={errors.pan}
-                disabled
-              />
-            </Col>
-
-            <Col lg={4} md={6}>
-              <SelectInput
-                label="GST Registration Type"
-                name="gstRegType"
-                value={formData.gstRegType}
-                options={[
-                  { value: "Regular", label: "Regular" },
-                  { value: "Composition", label: "Composition" },
-                  { value: "Unregistered", label: "Un-registered" },
-                  { value: "SEZ", label: "SEZ" },
-                  { value: "Consumer", label: "Consumer" },
-                ]}
-                onChange={handleChange}
-                error={errors.gstRegType}
-              />
-            </Col> */}
-
-            <Col lg={4} md={6}>
-              <TextInput
-                label="Place Of Supply (State Code)"
-                name="stateCode"
-                value={formData.stateCode}
-                placeholder="33"
-                onChange={handleChange}
-                error={errors.stateCode}
-              />
-            </Col>
-
-            {/* <Col lg={4} md={6}>
-              <SelectInput
-                label="TDS Section (If Applicable)"
-                name="tdsSection"
-                value={formData.tdsSection}
-                options={[
-                  { value: "", label: "None" },
-                  { value: "194Q", label: "194Q" },
-                  { value: "194C", label: "194C" },
-                  { value: "194J", label: "194J" },
-                ]}
-                onChange={handleChange}
-                error={errors.tdsSection}
-              />
-            </Col>
-
-            <Col lg={4} md={6}>
-              <TextInput
-                label="TCS Rate %"
-                name="tcsRate"
-                type="number"
-                value={formData.tcsRate}
-                placeholder="0.10"
-                onChange={handleChange}
-                error={errors.tcsRate}
-              />
-            </Col> */}
-          </Row>
-
-          <Row className="mb-4">
-            <h2 className="form-title">Billing & Shipping Address</h2>
-
-            <p className="text-muted mb-3">
-              Two addresses. "Same as billing" checkbox copies Billing to Shipping.
-            </p>
-
-            {/* Billing */}
-            <Col lg={6}>
-              <h5 className="mb-3">Billing</h5>
-
-              <TextInput
-                label="Address Line"
-                name="billingAddressLine1"
-                value={formData.billingAddressLine1}
-                onChange={handleChange}
-                error={errors.billingAddressLine1}
-              />
-
-              <Row>
-                <CityStateSelect
-                  stateValue={formData.billingState}
-                  cityValue={formData.billingCity}
-                  onStateChange={handleBillingStateChange}
-                  onCityChange={handleBillingCityChange}
-                  stateError={errors.billingState}
-                  cityError={errors.billingCity}
-                  required
-                />
-
-                <Col md={4}>
-                  <TextInput
-                    label="Pincode"
-                    name="billingPincode"
-                    value={formData.billingPincode}
-                    onChange={handleChange}
-                    error={errors.billingPincode}
-                  />
-                </Col>
-              </Row>
-            </Col>
-
-            {/* Shipping */}
-            <Col lg={6}>
-              <div className="d-flex align-items-center justify-content-between mb-3">
-                <h5 className="mb-0">Shipping</h5>
-
+            {/* Identification & Status */}
+            <div>
+              <h3 className="text-lg font-semibold text-slate-700 mb-2">Identification & Status</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 <div>
-                  <input
-                    type="checkbox"
-                    name="sameAsBilling"
-                    checked={formData.sameAsBilling}
+                  <TextInput label="Customer ID / Code" name="customerId" value={formData.customerId} onChange={handleChange} disabled />
+                </div>
+                <div>
+                  <SelectInput
+                    label="Status"
+                    name="isActive"
+                    value={formData.isActive}
+                    options={[
+                      { value: "true", label: "Active" },
+                      { value: "false", label: "Inactive" },
+                    ]}
                     onChange={handleChange}
                   />
-                  Same as billing
+                </div>
+                <div>
+                  <TextInput label="Created by-on" name="createdByOn" value={formData.createdByOn} onChange={handleChange} disabled />
                 </div>
               </div>
-
-              <TextInput
-                label="Address Line"
-                name="shippingAddressLine1"
-                value={formData.shippingAddressLine1}
-                error={errors.shippingAddressLine1}
-                onChange={handleChange}
-                disabled={formData.sameAsBilling}
-              />
-
-              <Row>
-                <CityStateSelect
-                  stateValue={formData.shippingState}
-                  cityValue={formData.shippingCity}
-                  onStateChange={handleShippingStateChange}
-                  onCityChange={handleShippingCityChange}
-                  stateError={errors.shippingState}
-                  cityError={errors.shippingCity}
-                  disabled={formData.sameAsBilling}
-                  resetKey={shippingResetKey}
-                />
-
-                <Col md={4}>
-                  <TextInput
-                    label="Pincode"
-                    name="shippingPincode"
-                    value={formData.shippingPincode}
-                    error={errors.shippingPincode}
-                    onChange={handleChange}
-                    disabled={formData.sameAsBilling}
-                  />
-                </Col>
-              </Row>
-            </Col>
-          </Row>
-
-          <Row className="mb-4">
-            <h2 className="form-title">Commercial Settings</h2>
-
-            <Col lg={4} md={6}>
-              <TextInput
-                label="Credit Limit ₹"
-                name="creditLimit"
-                type="number"
-                value={formData.creditLimit}
-                placeholder="300000"
-                required
-                onChange={handleChange}
-                error={errors.creditLimit}
-              />
-            </Col>
-
-            <Col lg={4} md={6}>
-              <TextInput
-                label="Credit Days (Net)"
-                name="creditDays"
-                type="number"
-                value={formData.creditDays}
-                onChange={handleChange}
-                error={errors.creditDays}
-                preventNegative
-              />
-            </Col>
-
-            {/* <Col lg={4} md={6}>
-              <SelectInput
-                label="Default Price List"
-                name="priceList"
-                value={formData.priceList}
-                options={[
-                  { value: "Standard", label: "Standard" },
-                  { value: "Wholesale", label: "Wholesale" },
-                  { value: "Retail", label: "Retail" },
-                  { value: "Distributor", label: "Distributor" },
-                ]}
-                onChange={handleChange}
-                error={errors.priceList}
-              />
-            </Col> */}
-          </Row>
-
-          {/* Route and Collection Agent selects — wire up real options when those
-                hooks/endpoints (e.g. useRoutes, useEmployees) are available */}
-          {/*
-            <Col lg={4} md={6}>
-              <SelectInput
-                label="Route"
-                name="routeId"
-                value={formData.routeId}
-                options={routeOptions}
-                onChange={handleChange}
-              />
-            </Col>
-
-            <Col lg={4} md={6}>
-              <SelectInput
-                label="Collection Agent"
-                name="collectionAgentId"
-                value={formData.collectionAgentId}
-                options={employeeOptions}
-                onChange={handleChange}
-              />
-            </Col>
-            */}
-
-          {/* BANK DETAILS */}
-          <Row className="mb-4">
-            <div className="d-flex justify-content-between align-items-center mb-3">
-              <h2 className="form-title mb-0">Bank Account Details</h2>
-              <CustomButton
-                text="Add another bank"
-                onClick={addBankAccount}
-                type="button"
-              />
             </div>
 
-            {formData.bankAccounts.map((bank, index) => (
-              <div key={index} className="bank-account-block mb-4 p-3 border rounded">
-                {formData.bankAccounts.length > 1 && (
-                  <div className="d-flex justify-content-between mb-2">
-                    <h6 className="mb-0">Bank #{index + 1}</h6>
-                    <CustomButton
-                      text="Remove"
-                      onClick={() => removeBankAccount(index)}
-                      type="button"
-                    />
+
+
+            {/* Basic Info */}
+            <div>
+              <h3 className="text-lg font-semibold text-slate-700 mb-2">Basic Information</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                <TextInput label="Firm / Legal Name" name="firmName" value={formData.firmName} placeholder="e.g. Murugan Plastics" required error={errors.firmName} onChange={handleChange} />
+                <div>
+                  <TextInput label="Display Name" name="displayName" value={formData.displayName} placeholder="Murugan" error={errors.displayName} onChange={handleChange} />
+                </div>
+                <div>
+                  <MultiSelect
+                    label="Customer Type"
+                    name="customerType"
+                    value={formData.customerType}
+                    required
+                    options={[
+                      { value: "B2B", label: "B2B (GST Registered)" },
+                      { value: "B2C", label: "B2C (Consumer)" },
+                      { value: "Export", label: "Export" },
+                    ]}
+                    onChange={handleMultiSelectChange}
+                    error={errors.customerType}
+                  />
+                </div>
+                <div>
+                  <TextInput label="Contact Person" name="contactPerson" value={formData.contactPerson} placeholder="Mr. S. Murugan" error={errors.contactPerson} onChange={handleChange} />
+                </div>
+                <div>
+                  <TextInput label="Designation" name="designation" value={formData.designation} placeholder="Proprietor" error={errors.designation} onChange={handleChange} />
+                </div>
+                <div>
+                  <IndiaPhoneInput label="Mobile" name="mobile" value={formData.mobile} placeholder="98400 XXXXX" required onChange={handleChange} error={errors.mobile} />
+                </div>
+                <div>
+                  <IndiaPhoneInput label="Alt. Phone" name="altPhone" value={formData.altPhone} placeholder="98400 XXXXX" required onChange={handleChange} error={errors.altPhone} />
+                </div>
+                <div>
+                  <IndiaPhoneInput label="WhatsApp #" name="whatsapp" value={formData.whatsapp} placeholder="98400 XXXXX" onChange={handleChange} error={errors.whatsapp} />
+                </div>
+                <div>
+                  <TextInput label="Email" name="email" type="email" value={formData.email} placeholder="x@y.com" error={errors.email} onChange={handleChange} />
+                </div>
+              </div>
+            </div>
+
+
+
+            {/* GST & Statutory */}
+            <div>
+              <h3 className="text-lg font-semibold text-slate-700 mb-2">GST & Statutory</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div>
+                  <TextInput label="GSTIN (15 CHAR)" name="gstin" value={formData.gstin} placeholder="33AABC1234D1Z5" onChange={handleChange} error={errors.gstin} />
+                </div>
+                <div>
+                  <TextInput label="Place Of Supply (State Code)" name="stateCode" value={formData.stateCode} placeholder="33" onChange={handleChange} error={errors.stateCode} />
+                </div>
+              </div>
+            </div>
+
+
+
+            {/* Billing & Shipping Address */}
+            <div>
+              <h3 className="text-lg font-semibold text-slate-700 mb-2">Billing & Shipping Address</h3>
+              <div className="grid grid-cols-1 gap-10">
+                {/* Billing */}
+                <div className="space-y-2">
+                  <h5 className="font-bold text-slate-700">Billing Address</h5>
+                  <AddressForm
+                    addressValue={formData.billingAddressLine1}
+                    onAddressChange={(v) => handleChange({ target: { name: "billingAddressLine1", value: v } })}
+                    addressError={errors.billingAddressLine1}
+
+                    stateValue={formData.billingState}
+                    onStateChange={(v) => {
+                      const gstCode = getGstStateCode(v);
+                      setFormData(prev => ({
+                        ...prev, billingState: v, billingCity: "", stateCode: gstCode || prev.stateCode,
+                        ...(prev.sameAsBilling && { shippingState: v, shippingCity: "" })
+                      }));
+                      setErrors(prev => ({ ...prev, billingState: "", billingCity: "", stateCode: "" }));
+                    }}
+                    stateError={errors.billingState}
+
+                    cityValue={formData.billingCity}
+                    onCityChange={(v) => {
+                      setFormData(prev => ({ ...prev, billingCity: v, ...(prev.sameAsBilling && { shippingCity: v }) }));
+                      setErrors(prev => ({ ...prev, billingCity: "" }));
+                    }}
+                    cityError={errors.billingCity}
+
+                    pincodeValue={formData.billingPincode}
+                    onPincodeChange={(v) => handleChange({ target: { name: "billingPincode", value: v } })}
+                    pincodeError={errors.billingPincode}
+                    required
+                  />
+                </div>
+
+                {/* Shipping */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <h5 className="font-bold text-slate-700">Shipping Address</h5>
+                    <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        name="sameAsBilling"
+                        checked={formData.sameAsBilling}
+                        onChange={handleChange}
+                        className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary"
+                      />
+                      Same as billing
+                    </label>
                   </div>
-                )}
+                  {errors.sameAsBilling && <div className="text-red-500 mt-1 text-sm">{errors.sameAsBilling}</div>}
 
-                <Row>
-                  <Col lg={4} md={6}>
-                    <TextInput
-                      label="Account Holder Name"
-                      name="bankHolderName"
-                      value={bank.bankHolderName}
-                      onChange={(e) => handleBankChange(index, e)}
-                      error={errors[`bankAccounts.${index}.bankHolderName`]}
-                    />
-                  </Col>
+                  <AddressForm
+                    addressValue={formData.shippingAddressLine1}
+                    onAddressChange={(v) => handleChange({ target: { name: "shippingAddressLine1", value: v } })}
+                    addressError={errors.shippingAddressLine1}
 
-                  <Col lg={4} md={6}>
-                    <TextInput
-                      label="Bank Name"
-                      name="bankName"
-                      value={bank.bankName}
-                      onChange={(e) => handleBankChange(index, e)}
-                      error={errors[`bankAccounts.${index}.bankName`]}
-                    />
-                  </Col>
+                    stateValue={formData.shippingState}
+                    onStateChange={(v) => {
+                      setFormData(prev => ({ ...prev, shippingState: v, shippingCity: "" }));
+                      setErrors(prev => ({ ...prev, shippingState: "", shippingCity: "" }));
+                    }}
+                    stateError={errors.shippingState}
 
-                  <Col lg={4} md={6}>
-                    <TextInput
-                      label="Account Number"
-                      name="accountNumber"
-                      value={bank.accountNumber}
-                      onChange={(e) => handleBankChange(index, e)}
-                      error={errors[`bankAccounts.${index}.accountNumber`]}
-                    />
-                  </Col>
+                    cityValue={formData.shippingCity}
+                    onCityChange={(v) => {
+                      setFormData(prev => ({ ...prev, shippingCity: v }));
+                      setErrors(prev => ({ ...prev, shippingCity: "" }));
+                    }}
+                    cityError={errors.shippingCity}
 
-                  <Col lg={4} md={6}>
-                    <TextInput
-                      label="IFSC Code"
-                      name="ifscCode"
-                      value={bank.ifscCode}
-                      onChange={(e) => handleBankChange(index, e)}
-                      error={errors[`bankAccounts.${index}.ifscCode`]}
-                    />
-                  </Col>
-
-                  <Col lg={4} md={6}>
-                    <TextInput
-                      label="Branch Name"
-                      name="branchName"
-                      value={bank.branchName}
-                      onChange={(e) => handleBankChange(index, e)}
-                      error={errors[`bankAccounts.${index}.branchName`]}
-                    />
-                  </Col>
-
-                  <Col lg={4} md={6}>
-                    <IndiaPhoneInput
-                      label="GPay / PhonePe Number"
-                      name="upiMobileNumber"
-                      value={bank.upiMobileNumber}
-                      onChange={(e) => handleBankChange(index, e as React.ChangeEvent<HTMLInputElement>)}
-                      error={errors[`bankAccounts.${index}.upiMobileNumber`]}
-                    />
-                  </Col>
-                </Row>
+                    pincodeValue={formData.shippingPincode}
+                    onPincodeChange={(v) => handleChange({ target: { name: "shippingPincode", value: v } })}
+                    pincodeError={errors.shippingPincode}
+                    disabled={formData.sameAsBilling}
+                    resetKey={shippingResetKey}
+                  />
+                </div>
               </div>
-            ))}
-          </Row>
+            </div>
 
-          <Row className="mt-4">
-            <Col lg={12}>
-              <div className="form-actions d-flex justify-content-end">
-                <CustomButton text="Save Changes" icon={FaSave} type="submit" />
+
+
+            {/* Commercial Settings */}
+            <div>
+              <h3 className="text-lg font-semibold text-slate-700 mb-2">Commercial Settings</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div>
+                  <TextInput label="Credit Limit ₹" name="creditLimit" type="number" value={formData.creditLimit} placeholder="300000" onChange={handleChange} preventNegative min={250000} error={errors.creditLimit} />
+                </div>
+                <div>
+                  <TextInput label="Credit Days (Net)" name="creditDays" value={formData.creditDays} onChange={handleChange} type="number" placeholder="30 days" preventNegative error={errors.creditDays} />
+                </div>
               </div>
-            </Col>
-          </Row>
-        </form>
-      </Container>
+            </div>
+
+
+
+            {/* BANK DETAILS */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-lg font-semibold text-slate-700">Bank Account Details</h3>
+                <CustomButton text="Add Bank Account" onClick={addBankAccount} type="button" />
+              </div>
+
+              <div className="space-y-6">
+                {formData.bankAccounts.map((bank, index) => (
+                  <div key={index} className="p-4 border border-slate-200 rounded-xl bg-slate-50 relative">
+                    {formData.bankAccounts.length > 1 && (
+                      <div className="absolute top-4 right-4">
+                        <button
+                          type="button"
+                          onClick={() => removeBankAccount(index)}
+                          className="text-red-500 hover:text-red-700 text-sm font-semibold transition-colors"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    )}
+                    <h6 className="font-bold text-slate-600 mb-2">Bank #{index + 1}</h6>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      <div>
+                        <TextInput label="Account Holder Name" name="bankHolderName" value={bank.bankHolderName} onChange={(e) => handleBankChange(index, e)} error={errors[`bankAccounts.${index}.bankHolderName`]} />
+                      </div>
+                      <div>
+                        <TextInput label="Bank Name" name="bankName" value={bank.bankName} onChange={(e) => handleBankChange(index, e)} error={errors[`bankAccounts.${index}.bankName`]} />
+                      </div>
+                      <div>
+                        <TextInput label="Account Number" name="accountNumber" value={bank.accountNumber} onChange={(e) => handleBankChange(index, e)} error={errors[`bankAccounts.${index}.accountNumber`]} />
+                      </div>
+                      <div>
+                        <TextInput label="IFSC Code" name="ifscCode" value={bank.ifscCode} onChange={(e) => handleBankChange(index, e)} error={errors[`bankAccounts.${index}.ifscCode`]} />
+                      </div>
+                      <div>
+                        <TextInput label="Branch Name" name="branchName" value={bank.branchName} onChange={(e) => handleBankChange(index, e)} error={errors[`bankAccounts.${index}.branchName`]} />
+                      </div>
+                      <div>
+                        <IndiaPhoneInput label="GPay / PhonePe Number" name="upiMobileNumber" value={bank.upiMobileNumber} placeholder="9876543210" onChange={(e) => handleBankChange(index, e as React.ChangeEvent<HTMLInputElement>)} error={errors[`bankAccounts.${index}.upiMobileNumber`]} />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-6 border-t border-slate-200">
+              <CustomButton
+                text="Cancel"
+                icon={FaArrowLeft}
+                onClick={() => navigate("/customers")}
+                type="button"
+                
+              />
+              <CustomButton text="Update Customer" icon={FaSave} type="submit" />
+            </div>
+          </form>
+        </div>
+      </div>
     </div>
   );
 };

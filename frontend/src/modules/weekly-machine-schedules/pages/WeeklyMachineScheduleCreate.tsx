@@ -62,7 +62,7 @@ const WeeklyMachineScheduleCreate: React.FC = () => {
         }
     }, [location.state]);
 
-    const handleDateChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleDateChange = useCallback((e: React.ChangeEvent<any>) => {
         const val = e.target.value;
         if (val) {
             const date = new Date(val);
@@ -199,7 +199,7 @@ const WeeklyMachineScheduleCreate: React.FC = () => {
                     <Row className="align-items-center g-3">
                         <Col lg={6}>
                             <h2 className="page-title">Allocate Weekly Schedule</h2>
-                            <div className="page-breadcrumb">Weekly Schedules / Allocate</div>
+                            
                         </Col>
                         <Col lg={6} className="text-end">
                             <CustomButton text="Back to List" icon={FaArrowLeft} onClick={() => navigate("/weekly-machine-schedules")} />

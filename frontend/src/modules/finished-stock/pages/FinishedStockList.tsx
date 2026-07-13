@@ -91,7 +91,7 @@ const FinishedStockList: React.FC = () => {
                         <Col lg={6} md={12}>
                             <div className="page-header-info">
                                 <h2 className="page-title">Finished Goods Stock</h2>
-                                <div className="page-breadcrumb">Home / Inventory & Warehouse / Finished Goods Stock</div>
+                                
                             </div>
                         </Col>
                         <Col lg={6} md={12}>

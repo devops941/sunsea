@@ -200,7 +200,7 @@ const EmployeeEdit: React.FC = () => {
             <Col lg={6} md={12}>
               <div className="page-header-info">
                 <h2 className="page-title">Edit Employee</h2>
-                <div className="page-breadcrumb">Home / Employees / Edit Employee</div>
+                
               </div>
             </Col>
           </Row>

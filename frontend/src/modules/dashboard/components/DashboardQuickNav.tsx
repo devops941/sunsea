@@ -1,5 +1,4 @@
 import React from 'react';
-import { Row, Col, Card, Alert, Button } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
 import { 
     FaBoxes, FaCalendarCheck, FaCogs, FaBoxOpen, 
@@ -19,84 +18,93 @@ const DashboardQuickNav: React.FC<DashboardQuickNavProps> = ({ alerts }) => {
     const navigate = useNavigate();
 
     const quickLinks = [
-        { title: 'Production Orders', icon: FaBoxes, path: '/production-orders', color: 'primary' },
-        { title: 'Weekly Schedule', icon: FaCalendarCheck, path: '/weekly-machine-schedules', color: 'success' },
-        { title: 'Daily Plan', icon: FaCogs, path: '/daily-machine-planning', color: 'info' },
-        { title: 'Raw Materials', icon: FaLayerGroup, path: '/raw-materials', color: 'danger' },
-        { title: 'Finished Goods', icon: FaBoxOpen, path: '/stock-adjustments', color: 'warning' },
-        { title: 'Inventory', icon: FaBoxes, path: '/store-types', color: 'secondary' },
-        { title: 'Employees', icon: FaUserTie, path: '/employees', color: 'dark' },
-        { title: 'Users', icon: FaUsers, path: '/users', color: 'primary' },
+        { title: 'Production Orders', icon: FaBoxes, path: '/production-orders', colorClass: '!text-primary', bgClass: '!bg-primary' },
+        { title: 'Weekly Schedule', icon: FaCalendarCheck, path: '/weekly-machine-schedules', colorClass: 'text-green-600', bgClass: 'bg-green-100' },
+        { title: 'Daily Plan', icon: FaCogs, path: '/daily-machine-planning', colorClass: 'text-blue-600', bgClass: 'bg-blue-100' },
+        { title: 'Raw Materials', icon: FaLayerGroup, path: '/raw-materials', colorClass: 'text-red-600', bgClass: 'bg-red-100' },
+        { title: 'Finished Goods', icon: FaBoxOpen, path: '/stock-adjustments', colorClass: 'text-yellow-600', bgClass: 'bg-yellow-100' },
+        { title: 'Inventory', icon: FaBoxes, path: '/store-types', colorClass: 'text-gray-600', bgClass: 'bg-gray-100' },
+        { title: 'Employees', icon: FaUserTie, path: '/employees', colorClass: 'text-gray-900', bgClass: 'bg-gray-200' },
+        { title: 'Users', icon: FaUsers, path: '/users', colorClass: '!text-primary', bgClass: '!bg-primary' },
     ];
 
+    const getAlertClasses = (type: string) => {
+        if (type === 'danger') return 'bg-red-50 text-red-800 border-red-200';
+        if (type === 'warning') return 'bg-yellow-50 text-yellow-800 border-yellow-200';
+        return 'bg-blue-50 text-blue-800 border-blue-200';
+    };
+
+    const getAlertButtonClasses = (type: string) => {
+        if (type === 'danger') return 'text-red-800 hover:bg-red-100 border-red-200';
+        if (type === 'warning') return 'text-yellow-800 hover:bg-yellow-100 border-yellow-200';
+        return 'text-blue-800 hover:bg-blue-100 border-blue-200';
+    };
+
     return (
-        <Row className="g-4 mb-4">
-            <Col lg={6}>
-                <Card className="border-0 shadow-sm rounded-3 h-100">
-                    <Card.Body className="p-4">
-                        <div className="d-flex align-items-center mb-4">
-                            <FaBell size={20} className="me-2 text-danger" />
-                            <h5 className="fw-bold mb-0">System Alerts</h5>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            <div>
+                <div className="bg-white border-0 shadow-sm rounded-xl h-full flex flex-col">
+                    <div className="p-6">
+                        <div className="flex items-center mb-6">
+                            <FaBell size={20} className="mr-3 text-red-500" />
+                            <h5 className="font-bold mb-0 text-lg">System Alerts</h5>
                         </div>
 
-                        <div className="d-flex flex-column gap-3" style={{ maxHeight: '250px', overflowY: 'auto' }}>
+                        <div className="flex flex-col gap-4 overflow-y-auto" style={{ maxHeight: '250px' }}>
                             {alerts.length > 0 ? alerts.map((alert, idx) => (
-                                <Alert key={idx} variant={alert.type} className="mb-0 border-0 d-flex align-items-center justify-content-between p-3 rounded-3">
-                                    <div className="d-flex align-items-center">
-                                        <FaExclamationCircle className="me-3 fs-5 opacity-75" />
+                                <div key={idx} className={`flex items-center justify-between p-4 rounded-lg border ${getAlertClasses(alert.type)}`}>
+                                    <div className="flex items-center">
+                                        <FaExclamationCircle className="mr-3 text-xl opacity-75" />
                                         <span>{alert.message}</span>
                                     </div>
                                     {alert.actionLabel && alert.actionPath && (
-                                        <Button 
-                                            variant={`outline-${alert.type}`} 
-                                            size="sm" 
-                                            className="ms-3 border-0 fw-semibold bg-white bg-opacity-50"
+                                        <button 
+                                            className={`ml-4 px-3 py-1.5 text-sm font-semibold rounded bg-white bg-opacity-50 border transition-colors ${getAlertButtonClasses(alert.type)}`}
                                             onClick={() => navigate(alert.actionPath!)}
                                         >
                                             {alert.actionLabel}
-                                        </Button>
+                                        </button>
                                     )}
-                                </Alert>
+                                </div>
                             )) : (
-                                <div className="text-center py-4 text-muted">
-                                    <FaCheckCircle size={32} className="mb-2 text-success opacity-50" />
+                                <div className="text-center py-8 text-gray-500">
+                                    <FaCheckCircle size={32} className="mb-3 text-green-500 opacity-50 mx-auto" />
                                     <p className="mb-0">All systems operational. No active alerts.</p>
                                 </div>
                             )}
                         </div>
-                    </Card.Body>
-                </Card>
-            </Col>
+                    </div>
+                </div>
+            </div>
 
-            <Col lg={6}>
-                <Card className="border-0 shadow-sm rounded-3 h-100 bg-light bg-opacity-50">
-                    <Card.Body className="p-4">
-                        <h5 className="fw-bold mb-4">Quick Navigation</h5>
+            <div>
+                <div className="bg-gray-50 bg-opacity-50 border-0 shadow-sm rounded-xl h-full flex flex-col">
+                    <div className="p-6">
+                        <h5 className="font-bold mb-6 text-lg">Quick Navigation</h5>
                         
-                        <Row className="g-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             {quickLinks.map((link, idx) => {
                                 const Icon = link.icon;
                                 return (
-                                    <Col md={6} sm={6} key={idx}>
+                                    <div key={idx}>
                                         <button 
                                             onClick={() => navigate(link.path)}
-                                            className="btn btn-white w-100 text-start border-0 shadow-sm p-3 d-flex align-items-center rounded-3 bg-white hover-elevate transition-all"
-                                            style={{ cursor: 'pointer' }}
+                                            className="w-full text-left border-0 shadow-sm p-4 flex items-center rounded-xl bg-white hover:-translate-y-1 hover:shadow-md transition-all duration-200 cursor-pointer"
                                         >
-                                            <div className={`text-${link.color} bg-${link.color} bg-opacity-10 p-2 rounded-circle me-3`}>
+                                            <div className={`${link.colorClass} ${link.bgClass} bg-opacity-10 p-2.5 rounded-full mr-4`}>
                                                 <Icon size={18} />
                                             </div>
-                                            <span className="fw-semibold text-dark text-truncate flex-grow-1">{link.title}</span>
-                                            <FaArrowRight size={12} className="text-muted opacity-50" />
+                                            <span className="font-semibold text-gray-900 truncate flex-grow">{link.title}</span>
+                                            <FaArrowRight size={12} className="text-gray-400 ml-2" />
                                         </button>
-                                    </Col>
+                                    </div>
                                 );
                             })}
-                        </Row>
-                    </Card.Body>
-                </Card>
-            </Col>
-        </Row>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     );
 };
 

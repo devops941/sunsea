@@ -166,7 +166,7 @@ const ExpensesList: React.FC = () => {
             <Col lg={4} md={12}>
               <div className="page-header-info">
                 <h2 className="page-title">Expense Management</h2>
-                <div className="page-breadcrumb">Home / Purchases / Expenses</div>
+                
               </div>
             </Col>
             <Col lg={8} md={12}>

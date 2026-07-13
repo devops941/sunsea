@@ -102,6 +102,7 @@ const InvoiceList: React.FC = () => {
                             <div className="page-header-info">
                                 <h2 className="page-title">Invoice List</h2>
                                 <div className="page-breadcrumb">Home / Purchase / Invoice List</div>
+
                             </div>
                         </Col>
                         <Col lg={6} md={12}>

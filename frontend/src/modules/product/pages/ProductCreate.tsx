@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import { Container, Row, Col } from "react-bootstrap";
+
 import { FaSave, FaEraser, FaTimes } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -460,7 +460,7 @@ const ProductCreatePage: React.FC = () => {
                         <Col lg={6} md={12}>
                             <div className="page-header-info">
                                 <h2 className="page-title">Create Product</h2>
-                                <div className="page-breadcrumb">Home / Products / Create Product</div>
+
                             </div>
                         </Col>
                     </Row>

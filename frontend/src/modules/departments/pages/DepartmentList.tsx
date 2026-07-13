@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { Container, Row, Col, Modal, Spinner } from "react-bootstrap";
-import { FaSearch, FaPlus, FaChevronLeft, FaChevronRight, FaSave, FaEraser } from "react-icons/fa";
+import { FaSearch, FaPlus, FaSave, FaEraser } from "react-icons/fa";
 import { toast } from "react-toastify";
 import ViewButton from "../../../components/ui/viewbutton/ViewButton";
 import EditButton from "../../../components/ui/EditButton/EditButton";
@@ -11,6 +10,8 @@ import CommonViewModal from "../../../components/ui/CommonViewModal/CommonViewMo
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import { useDepartments } from "../../../hooks/useDepartments";
 import { hasPermission } from "../../../utils/permission";
+import DataTable, { type DataTableColumn } from "../../../components/ui/table/DataTable";
+import CommonModal from "../../../components/ui/Modal/CommonModal";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -31,7 +32,7 @@ const DepartmentList: React.FC = () => {
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [deptToDelete, setDeptToDelete] = useState<number | null>(null);
 
-    const [formErrors, setFormErrors] = useState<{  name?: string }>({});
+    const [formErrors, setFormErrors] = useState<{ name?: string }>({});
 
     const validateForm = () => {
         const errors: { name?: string } = {};
@@ -164,143 +165,81 @@ const DepartmentList: React.FC = () => {
         }
     };
 
-    return (
-        <div className="inner-container">
-            <Container fluid>
-                {/* Page Header */}
-                <div className="page-header">
-                    <Row className="align-items-center g-3">
-                        <Col lg={6} md={12}>
-                            <div className="page-header-info">
-                                <h2 className="page-title">Department Management</h2>
-                                <div className="page-breadcrumb">Home / HR Management / Departments</div>
-                            </div>
-                        </Col>
-                        <Col lg={6} md={12}>
-                            <div className="page-header-actions">
-                                <div className="page-search-wrap">
-                                    <FaSearch className="page-search-icon" />
-                                    <input
-                                        type="text"
-                                        className="page-search-input"
-                                        placeholder="Search departments..."
-                                        value={searchTerm}
-                                        onChange={handleSearch}
-                                    />
-                                </div>
-
-                                {canCreateDepartment && (
-                                    <CustomButton
-                                        text="Add Department"
-                                        icon={FaPlus}
-                                        onClick={handleOpenAdd}
-                                    />
-                                )}
-                            </div>
-                        </Col>
-                    </Row>
+    const columns: DataTableColumn<any>[] = [
+        { header: "#", render: (_, index) => startIndex + index + 1, width: "60px", align: "center" },
+        { header: "Department Name", accessor: "name" },
+        { header: "Description", render: (dept) => dept.description || "N/A" },
+        {
+            header: "Actions",
+            render: (dept) => (
+                <div className="flex items-center gap-2">
+                    <ViewButton onClick={() => handleOpenView(dept)} />
+                    {canEditDepartment && (<EditButton onClick={() => handleOpenEdit(dept)} />)}
+                    {canDeleteDepartment && (<DeleteButton onClick={() => triggerDelete(dept.id)} />)}
                 </div>
+            ),
+            align: "right"
+        }
+    ];
 
-                {/* Departments Table */}
-                <div className="master-table-body table-wrap">
-                    <div className="master-table-body">
-                        {loading && departments.length === 0 ? (
-                            <div className="text-center p-5">
-                                <Spinner animation="border" variant="primary" />
+    return (
+        <div className="p-4 md:p-6 min-h-screen bg-slate-50">
+            <div className="max-w-7xl mx-auto">
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                    {/* Page Header */}
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-6 border-b border-slate-200">
+                        <div>
+                            <h2 className="text-2xl font-bold text-slate-800">Department Management</h2>
+                        </div>
+                        <div className="flex items-center gap-3 w-full md:w-auto">
+                            <div className="relative w-full md:w-64">
+                                <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                <input
+                                    type="text"
+                                    className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                                    placeholder="Search departments..."
+                                    value={searchTerm}
+                                    onChange={handleSearch}
+                                />
                             </div>
-                        ) : (
-                            <table className="master-data-table">
-                                <thead>
-                                    <tr>
-                                        <th style={{ width: "60px" }}>#</th>
-                                        <th>Department Name</th>
-                                        <th>Description</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {paginatedDepts.length > 0 ? (
-                                        paginatedDepts.map((dept, index) => (
-                                            <tr key={dept.id} className="master-data-row">
-                                                <td className="master-data-cell">{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</td>
-                                                
-                                                <td className="master-data-cell">{dept.name}</td>
-                                                <td className="master-data-cell">{dept.description || "N/A"}</td>
-                                                <td className="master-data-cell">
-                                                    <div className="table-action-group">
-                                                        <ViewButton onClick={() => handleOpenView(dept)} />
-                                                        {canEditDepartment && (<EditButton onClick={() => handleOpenEdit(dept)} />)}
-                                                        {canDeleteDepartment && (<DeleteButton onClick={() => triggerDelete(dept.id)} />)}
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        ))
-                                    ) : (
-                                        <tr>
-                                            <td colSpan={4} className="text-center p-4">No departments found.</td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                            </table>
-                        )}
-
-                        {/* Pagination */}
-                        {totalPages > 1 && (
-                            <div className="pagination-wrap">
-                                <button
-                                    className="pagination-btn"
-                                    disabled={currentPage === 1}
-                                    onClick={() => setCurrentPage(prev => prev - 1)}
-                                >
-                                    <FaChevronLeft />
-                                </button>
-                                <div className="pagination-info">
-                                    Page {currentPage} of {totalPages}
-                                </div>
-                                <button
-                                    className="pagination-btn"
-                                    disabled={currentPage === totalPages}
-                                    onClick={() => setCurrentPage(prev => prev + 1)}
-                                >
-                                    <FaChevronRight />
-                                </button>
-                            </div>
-                        )}
+                            {canCreateDepartment && (
+                                <CustomButton
+                                    text="Add Department"
+                                    icon={FaPlus}
+                                    onClick={handleOpenAdd}
+                                />
+                            )}
+                        </div>
                     </div>
+
+                    {/* Departments Table */}
+                    {loading && departments.length === 0 ? (
+                        <div className="flex justify-center items-center h-64">
+                            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"></div>
+                        </div>
+                    ) : (
+                        <DataTable
+                            columns={columns}
+                            data={paginatedDepts}
+                            rowKey={(row) => row.id}
+                            emptyMessage="No departments found."
+                            pagination={totalPages > 1 ? {
+                                currentPage,
+                                totalPages,
+                                onPageChange: setCurrentPage
+                            } : undefined}
+                        />
+                    )}
                 </div>
 
                 {/* Add/Edit Modal */}
-                <Modal show={showFormModal} onHide={() => { setShowFormModal(false); setFormErrors({}); }} centered>
-                    <Modal.Header closeButton>
-                        <Modal.Title>{editMode ? "Edit Department" : "Add New Department"}</Modal.Title>
-                    </Modal.Header>
-                    <form onSubmit={handleSubmit}>
-                        <Modal.Body>
-                            <Row className="g-3">
-                                
-                                <Col md={12}>
-                                    <TextInput
-                                        label="Department Name"
-                                        name="name"
-                                        value={formData.name}
-                                        placeholder="e.g. Information Technology"
-                                        required
-                                        onChange={handleChange}
-                                        error={formErrors.name}
-                                    />
-                                </Col>
-                                <Col md={12}>
-                                    <TextInput
-                                        label="Description"
-                                        name="description"
-                                        value={formData.description}
-                                        placeholder="Enter department description"
-                                        onChange={handleChange}
-                                    />
-                                </Col>
-                            </Row>
-                        </Modal.Body>
-                        <Modal.Footer>
+                <CommonModal
+                    show={showFormModal}
+                    onHide={() => { setShowFormModal(false); setFormErrors({}); }}
+                    title={editMode ? "Edit Department" : "Add New Department"}
+                    overflowVisible={true}
+                    footer={
+                        <div className="flex items-center justify-end gap-2 w-full">
                             <CustomButton
                                 text="Clear"
                                 icon={FaEraser}
@@ -310,17 +249,36 @@ const DepartmentList: React.FC = () => {
                                     description: "",
                                 })}
                             />
-                            <div className="ms-2">
-                                <CustomButton
-                                    text={editMode ? "Update" : "Save"}
-                                    icon={FaSave}
-                                    type="submit"
-                                    disabled={loading}
-                                />
-                            </div>
-                        </Modal.Footer>
+                            <CustomButton
+                                text={editMode ? "Update" : "Save"}
+                                icon={FaSave}
+                                onClick={handleSubmit}
+                                disabled={loading}
+                            />
+                        </div>
+                    }
+                >
+                    <form id="departmentForm" onSubmit={handleSubmit} className="space-y-4 p-2">
+                        <div className="grid grid-cols-1 gap-4">
+                            <TextInput
+                                label="Department Name"
+                                name="name"
+                                value={formData.name}
+                                placeholder="e.g. Information Technology"
+                                required
+                                onChange={handleChange}
+                                error={formErrors.name}
+                            />
+                            <TextInput
+                                label="Description"
+                                name="description"
+                                value={formData.description}
+                                placeholder="Enter department description"
+                                onChange={handleChange}
+                            />
+                        </div>
                     </form>
-                </Modal>
+                </CommonModal>
 
                 {/* View Details Modal */}
                 <CommonViewModal
@@ -333,10 +291,9 @@ const DepartmentList: React.FC = () => {
                     sections={selectedDept ? [
                         {
                             fields: [
-                                
                                 { label: "Department Name", value: selectedDept.name },
                                 { label: "Description", value: selectedDept.description || "N/A" },
-                                { label: "Department ID", value: <span className="text-muted font-monospace small">{String(selectedDept.id)}</span>, xs: 12 }
+                                { label: "Department ID", value: <span className="text-slate-500 font-mono text-sm">{String(selectedDept.id)}</span> }
                             ]
                         }
                     ] : []}
@@ -352,7 +309,7 @@ const DepartmentList: React.FC = () => {
                     confirmText="Delete"
                     confirmVariant="danger"
                 />
-            </Container>
+            </div>
         </div>
     );
 };

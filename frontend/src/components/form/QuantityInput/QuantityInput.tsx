@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Form, InputGroup } from "react-bootstrap";
-import "../TextInput/TextInput.css";
-import "../SelectInput/SelectInput.css";
+
 
 interface QuantityInputProps {
   name: string;
@@ -77,16 +76,16 @@ const QuantityInput: React.FC<QuantityInputProps> = ({
 
   // Sync external value to displayValue if it changes from outside
   useEffect(() => {
-    const currentEmittedValue = displayValue !== "" 
-      ? String(convert(Number(displayValue), selectedUom, primaryUom)) 
+    const currentEmittedValue = displayValue !== ""
+      ? String(convert(Number(displayValue), selectedUom, primaryUom))
       : "";
 
     if (String(value || "") !== currentEmittedValue) {
       if (value !== "" && value !== null && value !== undefined && !isNaN(Number(value))) {
-         const convertedToDisplay = convert(Number(value), primaryUom, selectedUom);
-         setDisplayValue(String(convertedToDisplay));
+        const convertedToDisplay = convert(Number(value), primaryUom, selectedUom);
+        setDisplayValue(String(convertedToDisplay));
       } else {
-         setDisplayValue("");
+        setDisplayValue("");
       }
     }
   }, [value, primaryUom, selectedUom, displayValue]);
@@ -114,14 +113,12 @@ const QuantityInput: React.FC<QuantityInputProps> = ({
   };
 
   return (
-    <Form.Group className={`text-input-group ${label ? "mb-3" : "mb-0"}`}>
-      {label && (
-        <Form.Label className="text-input-label">
-          <span>{label}</span>
-          {required && <span className="required-star">*</span>}
-        </Form.Label>
-      )}
-      
+    <Form.Group className="text-input-group mb-3">
+      <Form.Label className="text-input-label">
+        <span>{label}</span>
+        {required && <span className="required-star">*</span>}
+      </Form.Label>
+
       <InputGroup hasValidation>
         <Form.Control
           type="number"

@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useSelector } from "react-redux";
-import { Container, Row, Col } from "react-bootstrap";
 import { FaSave, FaEraser, FaArrowLeft, FaPlus, FaTrash, FaCalendarAlt, FaPaperPlane } from "react-icons/fa";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -10,10 +9,13 @@ import { z } from "zod";
 import TextInput from "../../../components/form/TextInput/TextInput";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import CustomButton from "../../../components/ui/Button/Button";
+import BackButton from "../../../components/ui/BackButton/BackButton";
 import TextArea from "../../../components/form/TextArea/TextArea";
 import DateInput from "../../../components/form/DateInput/DateInput";
 import CityStateSelect from "../../../components/ui/CityStateSelect/CityStateSelect";
 import type { StateCityOption } from "../../../components/ui/CityStateSelect/CityStateSelect";
+import AddressForm from "../../../components/form/AddressFrom/AddressFrom";
+import OrderItemsTable from "../../../components/form/OrderItemsTable/OrderItemsTable";
 import { useCustomers } from "../../../hooks/useCustomers";
 import { useProducts } from "../../../hooks/useProducts";
 import { salesOrderService } from "../../../services/salesOrderService";
@@ -185,7 +187,7 @@ const CtrlText: React.FC<CtrlTextProps> = ({ field, label, placeholder, required
 );
 
 const Err: React.FC<{ message?: string }> = ({ message }) =>
-    message ? <div className="text-danger mt-1 small">{message}</div> : null;
+    message ? <div className="text-red-500 mt-1 text-sm">{message}</div> : null;
 
 // ─── Main Component ─────────────────────────────────────────────────────
 
@@ -209,17 +211,17 @@ const SalesOrderForm: React.FC = () => {
         setValue("billingCity", "", { shouldValidate: true });
     };
 
-    const handleBillingCityChange = (cityData: StateCityOption) => {
-        setValue("billingCity", cityData.name, { shouldValidate: true });
+    const handleBillingCityChange = (cityName: string) => {
+        setValue("billingCity", cityName, { shouldValidate: true });
     };
 
-    const handleShippingStateChange = (stateData: StateCityOption) => {
-        setValue("shippingState", stateData.name, { shouldValidate: true });
+    const handleShippingStateChange = (stateName: string) => {
+        setValue("shippingState", stateName, { shouldValidate: true });
         setValue("shippingCity", "", { shouldValidate: true });
     };
 
-    const handleShippingCityChange = (cityData: StateCityOption) => {
-        setValue("shippingCity", cityData.name, { shouldValidate: true });
+    const handleShippingCityChange = (cityName: string) => {
+        setValue("shippingCity", cityName, { shouldValidate: true });
     };
 
     const {
@@ -308,12 +310,16 @@ const SalesOrderForm: React.FC = () => {
         }));
     }, [customers]);
 
+
+
     const productOptions = useMemo(() => {
         return products.map((d) => ({
             value: String(d?.id),
-            label: `${d.productCode} - ${d.productName}`,
+            label: `${d.productName}`,
         }));
     }, [products]);
+
+    console.log(productOptions, "kjlk")
 
     const salesPersonOptions = useMemo(() => {
         return employees.map((d) => ({
@@ -331,8 +337,10 @@ const SalesOrderForm: React.FC = () => {
     const billingCity = watch("billingCity");
     const billingState = watch("billingState");
     const billingPincode = watch("billingPincode");
+    const shippingAddressLine1 = watch("shippingAddressLine1");
     const shippingState = watch("shippingState");
     const shippingCity = watch("shippingCity");
+    const shippingPincode = watch("shippingPincode");
     const selectedCustomerId = watch("customerId");
     const orderType = watch("orderType");
 
@@ -543,61 +551,34 @@ const SalesOrderForm: React.FC = () => {
 
     // ─── Render ──────────────────────────────────────────────────────
     return (
-        <div className="inner-container">
-            <Container fluid>
+        <div className="w-full mx-auto">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
                 {/* Page Header */}
-                <div className="page-header">
-                    <Row className="align-items-center g-3">
-                        <Col lg={6} md={12}>
-                            <div className="page-header-info">
-                                <h2 className="page-title">
-                                    {isEditMode ? "Edit Sales Order" : "Create Sales Order"}
-                                </h2>
-                                <div className="page-breadcrumb">
-                                    Home / Sales / Sales Orders / {isEditMode ? "Edit" : "Create"}
-                                </div>
-                            </div>
-                        </Col>
-                        <Col lg={6} md={12}>
-                            <div className="page-header-actions">
-                                <CustomButton
-                                    text="Back to List"
-                                    icon={FaArrowLeft}
-                                    onClick={() => navigate("/sales-order")}
-                                />
-                            </div>
-                        </Col>
-                    </Row>
+                <div className="px-6 py-4 ">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div>
+                            <h2 className="text-xl font-bold text-gray-800">
+                                {isEditMode ? "Edit Sales Order" : "Create Sales Order"}
+                            </h2>
+                        </div>
+                        <div>
+                            <BackButton text="Back to List" />
+                        </div>
+                    </div>
                 </div>
 
-                <form className="form-inner" noValidate>
+                <form className="px-6 py-3 space-y-4" noValidate>
                     {/* ── Main Fields ── */}
-                    <Row className="g-3">
-                        <Col md={6}>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                        <div>
                             <Controller name="orderNo" control={control} render={({ field }) => (
-                                <CtrlText
-                                    field={field}
-                                    label="Order No"
-                                    placeholder="e.g. SO-2024-001"
-                                    required
-                                    error={errors.orderNo?.message}
-                                    disabled
-                                />
+                                <CtrlText field={field} label="Order No" placeholder="e.g. SO-2024-001" required error={errors.orderNo?.message} disabled />
                             )} />
-                        </Col>
+                        </div>
 
-                        <Col md={6}>
+                        <div>
                             <Controller name="customerId" control={control} render={({ field }) => (
-                                <SelectInput
-                                    label="Customer"
-                                    name={field.name}
-                                    value={field.value}
-                                    options={customerOptions}
-                                    required
-                                    onChange={field.onChange}
-                                    defaultOptionLabel="Select Customer"
-                                    disabled={isEditMode}
-                                />
+                                <SelectInput label="Customer" name={field.name} value={field.value} options={customerOptions} required onChange={field.onChange} defaultOptionLabel="Select Customer" disabled={isEditMode} />
                             )} />
                             <Err message={errors.customerId?.message} />
                             {fetchingCredit && <div className="text-muted small mt-1">Fetching customer credit limit...</div>}
@@ -652,327 +633,134 @@ const SalesOrderForm: React.FC = () => {
                         </Col>
 
                         {customerTypeOptions.length >= 1 && (
-                            <Col md={6}>
+                            <div>
                                 <Controller name="customerType" control={control} render={({ field }) => (
-                                    <SelectInput
-                                        label="Customer Type"
-                                        name={field.name}
-                                        value={field.value}
-                                        options={customerTypeOptions}
-                                        required
-                                        onChange={field.onChange}
-                                        disabled={customerTypeOptions.length === 1}
-                                        defaultOptionLabel={
-                                            !selectedCustomerId
-                                                ? "Select a customer first"
-                                                : "Select Customer Type"
-                                        }
-                                    />
+                                    <SelectInput label="Customer Type" name={field.name} value={field.value} options={customerTypeOptions} required onChange={field.onChange} disabled={customerTypeOptions.length === 1} defaultOptionLabel={!selectedCustomerId ? "Select a customer first" : "Select Customer Type"} />
                                 )} />
-                            </Col>
+                            </div>
                         )}
 
-                        <Col md={6}>
+                        <div>
                             <Controller name="orderDate" control={control} render={({ field }) => (
-                                <DateInput
-                                    label="Order Date"
-                                    name={field.name}
-                                    value={field.value}
-                                    icon={<FaCalendarAlt />}
-                                    required
-                                    disabled={true}
-                                    onChange={field.onChange}
-                                />
+                                <DateInput label="Order Date" name={field.name} value={field.value} icon={<FaCalendarAlt />} required disabled={true} onChange={field.onChange} />
                             )} />
                             <Err message={errors.orderDate?.message} />
-                        </Col>
+                        </div>
 
-                        <Col md={6}>
+                        <div>
                             <Controller name="expectedCompletionDate" control={control} render={({ field }) => (
-                                <DateInput
-                                    label="Expected Completion Date"
-                                    name={field.name}
-                                    value={field.value}
-                                    min={today}
-                                    icon={<FaCalendarAlt />}
-                                    required
-                                    onChange={field.onChange}
-                                />
+                                <DateInput label="Expected Completion Date" name={field.name} value={field.value} min={today} icon={<FaCalendarAlt />} required onChange={field.onChange} />
                             )} />
                             <Err message={errors.expectedCompletionDate?.message} />
-                        </Col>
+                        </div>
 
-                        <Col md={6}>
+                        <div>
                             <Controller name="dispatchType" control={control} render={({ field }) => (
-                                <SelectInput
-                                    label="Dispatch Type"
-                                    name={field.name}
-                                    value={field.value || ''}
-                                    options={DISPATCH_TYPE_OPTIONS}
-                                    defaultOptionLabel="select dispatch type"
-                                    onChange={field.onChange}
-                                />
+                                <SelectInput label="Dispatch Type" name={field.name} value={field.value || ''} options={DISPATCH_TYPE_OPTIONS} defaultOptionLabel="select dispatch type" onChange={field.onChange} />
                             )} />
-                        </Col>
+                        </div>
 
-                        <Col md={6}>
+                        <div>
                             <Controller name="orderType" control={control} render={({ field }) => (
-                                <SelectInput
-                                    label="Order Source Platform"
-                                    name={field.name}
-                                    value={field.value ?? ""}
-                                    options={ORDER_TYPE_OPTIONS}
-                                    defaultOptionLabel="select order type"
-                                    onChange={field.onChange}
-                                />
+                                <SelectInput label="Order Source Platform" name={field.name} value={field.value ?? ""} options={ORDER_TYPE_OPTIONS} defaultOptionLabel="select order type" onChange={field.onChange} />
                             )} />
-                        </Col>
+                        </div>
 
                         {orderType === "salesperson" && (
-                            <Col md={6}>
+                            <div>
                                 <Controller name="salesPersonId" control={control} render={({ field }) => (
-                                    <SelectInput
-                                        label="Sales Person"
-                                        name={field.name}
-                                        value={field.value ?? ""}
-                                        options={salesPersonOptions}
-                                        defaultOptionLabel="select sales person"
-                                        onChange={field.onChange}
-                                    />
+                                    <SelectInput label="Sales Person" name={field.name} value={field.value ?? ""} options={salesPersonOptions} defaultOptionLabel="select sales person" onChange={field.onChange} />
                                 )} />
                                 <Err message={errors.salesPersonId?.message} />
-                            </Col>
+                            </div>
                         )}
+                    </div>
 
-                        {/* ── NEW: Inter‑State GST toggle ── */}
 
-                    </Row>
 
-                    {/* ── Billing & Shipping ── */}
-                    <div className="form-section-title mt-4"></div>
-                    <Row className="g-3">
+                    <div className="grid grid-cols-1  gap-4">
                         {/* Billing */}
-                        <Col lg={6}>
-                            <h6 className="mb-3 fw-semibold">Billing</h6>
-                            <Row className="g-3">
-                                <Col md={12}>
-                                    <Controller name="billingAddressLine1" control={control} render={({ field }) => (
-                                        <CtrlText
-                                            field={field}
-                                            label="Address Line"
-                                            placeholder="Street / Building / Area"
-                                            required
-                                            error={errors.billingAddressLine1?.message}
-                                        />
-                                    )} />
-                                </Col>
-                                <CityStateSelect
-                                    stateLabel="State"
-                                    cityLabel="City"
-                                    stateValue={billingState}
-                                    cityValue={billingCity}
-                                    onStateChange={handleBillingStateChange}
-                                    onCityChange={handleBillingCityChange}
-                                    stateError={errors.billingState?.message}
-                                    cityError={errors.billingCity?.message}
-                                    required
-                                />
-                                <Col md={4}>
-                                    <Controller name="billingPincode" control={control} render={({ field }) => (
-                                        <CtrlText
-                                            field={field}
-                                            label="Pincode"
-                                            placeholder="6-digit pincode"
-                                            required
-                                            error={errors.billingPincode?.message}
-                                        />
-                                    )} />
-                                </Col>
-                            </Row>
-                        </Col>
+                        <div>
+                            <h6 className="text-lg font-semibold text-gray-800 mb-4">Billing</h6>
+                            <AddressForm
+                                addressValue={billingAddressLine1 || ""}
+                                onAddressChange={(val) => setValue("billingAddressLine1", val, { shouldValidate: true })}
+                                addressError={errors.billingAddressLine1?.message}
+                                stateValue={billingState || ""}
+                                onStateChange={handleBillingStateChange}
+                                stateError={errors.billingState?.message}
+                                cityValue={billingCity || ""}
+                                onCityChange={handleBillingCityChange}
+                                cityError={errors.billingCity?.message}
+                                pincodeValue={billingPincode || ""}
+                                onPincodeChange={(val) => setValue("billingPincode", val, { shouldValidate: true })}
+                                pincodeError={errors.billingPincode?.message}
+                                required
+                            />
+                        </div>
 
                         {/* Shipping */}
-                        <Col lg={6}>
-                            <div className="d-flex align-items-center justify-content-between mb-3">
-                                <h6 className="mb-0 fw-semibold">Shipping</h6>
+                        <div>
+                            <div className="flex items-center justify-between mb-4">
+                                <h6 className="text-lg font-semibold text-gray-800 mb-0">Shipping</h6>
                                 <Controller name="sameAsBilling" control={control} render={({ field }) => (
-                                    <label className="d-flex align-items-center gap-2 mb-0" style={{ cursor: "pointer", fontSize: "0.875rem" }}>
-                                        <input
-                                            type="checkbox"
-                                            checked={field.value}
-                                            onChange={e => field.onChange(e.target.checked)}
-                                        />
-                                        Same as billing
+                                    <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-700 mb-0">
+                                        <input type="checkbox" className="w-4 h-4 text-blue-600 rounded border-gray-300" checked={field.value} onChange={e => field.onChange(e.target.checked)} />
+                                        <span>Same as billing</span>
                                     </label>
                                 )} />
                             </div>
-                            <Row className="g-3">
-                                <Col md={12}>
-                                    <Controller name="shippingAddressLine1" control={control} render={({ field }) => (
-                                        <CtrlText
-                                            field={field}
-                                            label="Address Line"
-                                            placeholder="Street / Building / Area"
-                                            disabled={sameAsBilling}
-                                            error={errors.shippingAddressLine1?.message}
-                                        />
-                                    )} />
-                                </Col>
-                                <CityStateSelect
-                                    stateLabel="State"
-                                    cityLabel="City"
-                                    stateValue={shippingState || ""}
-                                    cityValue={shippingCity || ""}
-                                    onStateChange={handleShippingStateChange}
-                                    onCityChange={handleShippingCityChange}
-                                    stateError={errors.shippingState?.message}
-                                    cityError={errors.shippingCity?.message}
-                                    required={!sameAsBilling}
-                                    disabled={sameAsBilling}
-                                    resetKey={shippingResetKey}
-                                />
-                                <Col md={4}>
-                                    <Controller name="shippingPincode" control={control} render={({ field }) => (
-                                        <CtrlText
-                                            field={field}
-                                            label="Pincode"
-                                            placeholder="6-digit pincode"
-                                            disabled={sameAsBilling}
-                                            error={errors.shippingPincode?.message}
-                                        />
-                                    )} />
-                                </Col>
-                            </Row>
-                        </Col>
-                    </Row>
+                            <AddressForm
+                                addressValue={shippingAddressLine1 || ""}
+                                onAddressChange={(val) => setValue("shippingAddressLine1", val, { shouldValidate: true })}
+                                addressError={errors.shippingAddressLine1?.message}
+                                stateValue={shippingState || ""}
+                                onStateChange={handleShippingStateChange}
+                                stateError={errors.shippingState?.message}
+                                cityValue={shippingCity || ""}
+                                onCityChange={handleShippingCityChange}
+                                cityError={errors.shippingCity?.message}
+                                pincodeValue={shippingPincode || ""}
+                                onPincodeChange={(val) => setValue("shippingPincode", val, { shouldValidate: true })}
+                                pincodeError={errors.shippingPincode?.message}
+                                required={!sameAsBilling}
+                                disabled={sameAsBilling}
+                                resetKey={shippingResetKey}
+                            />
+                        </div>
+                    </div>
 
                     {/* ── Order Items ── */}
-                    <div className="form-section-title mt-4 d-flex justify-content-between align-items-center">
-                        <span>Order Items</span>
-                        <CustomButton
-                            text="Add Item"
-                            icon={FaPlus}
-                            onClick={() => append({ productCode: "", quantity: "", colorType: "" })}
-                            disabled={isBlocked}
-                        />
+
+                    <div className="flex justify-between items-center mb-4">
+                        <span className="text-lg font-semibold text-gray-800">Order Items</span>
+                        <CustomButton text="Add Item" icon={FaPlus} onClick={() => append({ productCode: "", quantity: "", colorType: "" })} />
                     </div>
                     {errors.items?.root && <Err message={errors.items.root.message} />}
 
-                    <div className="master-table-body table-wrap mt-2">
-                        <table className="master-data-table">
-                            <thead>
-                                <tr>
-                                    <th style={{ width: "50px" }}>#</th>
-                                    <th>PRODUCT</th>
-                                    <th>COLOR TYPE</th>
-                                    <th style={{ width: "180px" }}>QUANTITY</th>
-                                    <th style={{ width: "60px" }}></th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {fields.map((field, index) => (
-                                    <tr key={field.id} className="master-data-row">
-                                        <td className="master-data-cell">{index + 1}</td>
-
-                                        <td className="master-data-cell">
-                                            <Controller
-                                                name={`items.${index}.productCode`}
-                                                control={control}
-                                                render={({ field: f }) => (
-                                                    <SelectInput
-                                                        label=""
-                                                        name={f.name}
-                                                        value={String(f.value || "")}
-                                                        options={productOptions}
-                                                        onChange={f.onChange}
-                                                        defaultOptionLabel="Select Product"
-                                                        error={errors.items?.[index]?.productCode?.message}
-                                                    />
-                                                )}
-                                            />
-                                        </td>
-
-                                        <td className="master-data-cell">
-                                            <Controller
-                                                name={`items.${index}.colorType`}
-                                                control={control}
-                                                render={({ field: f }) => (
-                                                    <SelectInput
-                                                        label=""
-                                                        name={f.name}
-                                                        value={f.value || ""}
-                                                        options={COLOUR_OPTIONS}
-                                                        onChange={f.onChange}
-                                                        defaultOptionLabel="Select Color"
-                                                        error={errors.items?.[index]?.colorType?.message}
-                                                    />
-                                                )}
-                                            />
-                                        </td>
-
-                                        <td className="master-data-cell">
-                                            <Controller
-                                                name={`items.${index}.quantity`}
-                                                control={control}
-                                                render={({ field: f }) => (
-                                                    <CtrlText
-                                                        field={{
-                                                            ...f,
-                                                            value: String(f.value || "")
-                                                        }}
-                                                        label=""
-                                                        type="number"
-                                                        placeholder="0"
-                                                        error={errors.items?.[index]?.quantity?.message}
-                                                    />
-                                                )}
-                                            />
-                                        </td>
-
-                                        <td className="master-data-cell">
-                                            <button
-                                                type="button"
-                                                className="btn-remove-row"
-                                                onClick={() => remove(index)}
-                                                disabled={fields.length === 1}
-                                                title="Remove item"
-                                            >
-                                                <FaTrash />
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
+                    <OrderItemsTable
+                        control={control}
+                        fields={fields}
+                        errors={errors}
+                        productOptions={productOptions}
+                        colorOptions={COLOUR_OPTIONS}
+                        remove={remove}
+                        editable={true}
+                    />
 
                     {/* ── Remarks ── */}
-                    <Row className="g-3 mt-2">
-                        <Col md={6}>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
+                        <div>
                             <Controller name="remarks" control={control} render={({ field }) => (
-                                <TextArea
-                                    label="Remarks"
-                                    name="remarks"
-                                    value={field.value ?? ""}
-                                    placeholder="Any remarks for the customer..."
-                                    rows={2}
-                                    onChange={field.onChange}
-                                />
+                                <TextArea label="Remarks" name="remarks" value={field.value ?? ""} placeholder="Any remarks for the customer..." rows={2} onChange={field.onChange} />
                             )} />
-                        </Col>
-                        <Col md={6}>
+                        </div>
+                        <div>
                             <Controller name="internalNotes" control={control} render={({ field }) => (
-                                <TextArea
-                                    label="Internal Notes"
-                                    name="internalNotes"
-                                    value={field.value ?? ""}
-                                    placeholder="Internal notes (not visible to customer)..."
-                                    rows={2}
-                                    onChange={field.onChange}
-                                />
+                                <TextArea label="Internal Notes" name="internalNotes" value={field.value ?? ""} placeholder="Internal notes (not visible to customer)..." rows={2} onChange={field.onChange} />
                             )} />
-                        </Col>
-                    </Row>
+                        </div>
+                    </div>
 
                     {/* Credit limit exceeded warning banner */}
                     {limitExceeded && (
@@ -984,7 +772,7 @@ const SalesOrderForm: React.FC = () => {
                             <span>This order will require MD's attention for credit review (Credit Limit Exceeded).</span>
                         </div>
                     )}
-                    
+
                     {/* Credit block warning banner */}
                     {isBlocked && (
                         <div
@@ -997,33 +785,14 @@ const SalesOrderForm: React.FC = () => {
                     )}
 
                     {/* ── Form Actions ── */}
-                    <div className="form-actions d-flex justify-content-end gap-3 mt-4">
-                        <CustomButton
-                            text="Clear"
-                            icon={FaEraser}
-                            onClick={() => reset(defaultValues)}
-                            disabled={isSubmitting}
-                        />
-
-                        <CustomButton
-                            text={isSubmitting ? "Saving..." : "Save Order"}
-                            icon={isSubmitting ? undefined : FaSave}
-                            type="button"
-                            onClick={handleSubmit((data) => onSubmit(data, "draft"))}
-                            disabled={isSubmitting || isBlocked}
-                        />
-
-                        <CustomButton
-                            text={isSubmitting ? "Sending..." : "Send to Quotation"}
-                            icon={isSubmitting ? undefined : FaPaperPlane}
-                            type="button"
-                            onClick={handleSubmit((data) => onSubmit(data, "quotation"))}
-                            disabled={isSubmitting || isBlocked}
-                        />
+                    <div className="flex flex-wrap justify-end gap-3 mt-8 pt-4 border-t border-gray-200">
+                        <CustomButton text="Clear" icon={FaEraser} onClick={() => reset(defaultValues)} disabled={isSubmitting} />
+                        <CustomButton text={isSubmitting ? "Saving..." : "Save Order"} icon={isSubmitting ? undefined : FaSave} type="button" onClick={handleSubmit((data) => onSubmit(data, "draft"))} disabled={isSubmitting} />
+                        <CustomButton text={isSubmitting ? "Sending..." : "Send to Quotation"} icon={isSubmitting ? undefined : FaPaperPlane} type="button" onClick={handleSubmit((data) => onSubmit(data, "quotation"))} disabled={isSubmitting} />
                     </div>
                 </form>
-            </Container>
-        </div>
+            </div >
+        </div >
     );
 };
 

@@ -167,9 +167,7 @@ const CategoryList: React.FC = () => {
                                     categorie Management
                                 </h2>
 
-                                <div className="page-breadcrumb">
-                                    Home / categorie
-                                </div>
+                                
 
                             </div>
                         </Col>

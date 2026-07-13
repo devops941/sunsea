@@ -234,7 +234,7 @@ const UpComingOrderDetailPage: React.FC = () => {
                         <Col lg={6} md={12}>
                             <div className="page-header-info">
                                 <h2 className="page-title">Edit Purchase Order</h2>
-                                <div className="page-breadcrumb">Home / Purchase / Purchase Orders / Edit</div>
+                                
                             </div>
                         </Col>
                         <Col lg={6} md={12}>

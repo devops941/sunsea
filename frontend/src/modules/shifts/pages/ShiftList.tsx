@@ -1,6 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
-import { Container, Row, Col } from "react-bootstrap";
-import { FaSearch, FaPlus, FaChevronLeft, FaChevronRight } from "react-icons/fa";
+import { FaSearch, FaPlus } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useDispatch, useSelector } from "react-redux";
@@ -12,6 +11,7 @@ import CustomButton from "../../../components/ui/Button/Button";
 import CommonViewModal from "../../../components/ui/CommonViewModal/CommonViewModal";
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
+import DataTable from "../../../components/ui/table/DataTable";
 
 import { fetchShifts, deleteShift } from "../../../features/shifts/shiftSlice";
 import type { RootState, AppDispatch } from "../../../app/store";
@@ -94,6 +94,7 @@ const ShiftList: React.FC = () => {
     const totalPages = Math.ceil(filteredData.length / ITEMS_PER_PAGE);
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
     const paginatedData = filteredData.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+    
     const handleOpenView = useCallback((item: Shift) => {
         setSelectedItem(item);
         setShowViewModal(true);
@@ -127,107 +128,80 @@ const ShiftList: React.FC = () => {
     };
 
     return (
-        <div className="inner-container">
-            <Container fluid>
-                {/* Page Header */}
-                <div className="page-header">
-                    <Row className="align-items-center g-3">
-                        <Col lg={6} md={12}>
-                            <div className="page-header-info">
-                                <h2 className="page-title">Shift Management</h2>
-                                <div className="page-breadcrumb">Home / HR & Operations / Shift Management</div>
+        <div className="p-4 md:p-6 min-h-screen bg-slate-50">
+            <div className="max-w-7xl mx-auto">
+                
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                    {/* Page Header */}
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-6 border-b border-slate-200">
+                        <div>
+                            <h2 className="text-2xl font-bold text-slate-800">Shift Management</h2>
+                        </div>
+                        <div className="flex items-center gap-3 w-full md:w-auto">
+                            <div className="relative w-full md:w-64">
+                                <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                <input
+                                    type="text"
+                                    className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                                    placeholder="Search shifts..."
+                                    value={searchTerm}
+                                    onChange={handleSearch}
+                                />
                             </div>
-                        </Col>
-                        <Col lg={6} md={12}>
-                            <div className="page-header-actions">
-                                <div className="page-search-wrap">
-                                    <FaSearch className="page-search-icon" />
-                                    <input
-                                        type="text"
-                                        className="page-search-input"
-                                        placeholder="Search shifts..."
-                                        value={searchTerm}
-                                        onChange={handleSearch}
-                                    />
-                                </div>
-                                {canCreateShift && <CustomButton
+                            {canCreateShift && (
+                                <CustomButton
                                     text="Add Shift"
                                     icon={FaPlus}
                                     onClick={handleOpenAdd}
-                                />}
-                            </div>
-                        </Col>
-                    </Row>
-                </div>
-
-                {/* Table */}
-                <div className="master-table-body table-wrap">
-                    <div className="master-table-body">
-                        {loading && data.length === 0 ? (
-                            <div className="text-center p-4">Loading shifts...</div>
-                        ) : error ? (
-                            <div className="text-center text-danger p-4">{error}</div>
-                        ) : (
-                            <table className="master-data-table">
-                                <thead>
-                                    <tr>
-                                        <th style={{ width: "60px" }}>#</th>
-                                        <th>SHIFT CODE</th>
-                                        <th>SHIFT NAME</th>
-                                        <th>START TIME</th>
-                                        <th>END TIME</th>
-                                        <th>BREAK DURATION</th>
-                                        <th>WORKING HOURS</th>
-                                        <th>STATUS</th>
-                                        <th>ACTIONS</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {paginatedData.length > 0 ? (
-                                        paginatedData.map((item, index) => (
-                                            <tr key={item.id} className="master-data-row">
-                                                <td className="master-data-cell">{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</td>
-                                                <td className="master-data-cell">{item.shiftCode}</td>
-                                                <td className="master-data-cell">{item.shiftName}</td>
-                                                <td className="master-data-cell">{formatTime12h(item.startTime)}</td>
-                                                <td className="master-data-cell">{formatTime12h(item.endTime)}</td>
-                                                <td className="master-data-cell">{item.breakDuration ? `${item.breakDuration} mins` : "N/A"}</td>
-                                                <td className="master-data-cell">
-                                                    {calculateWorkingHours(item.startTime, item.endTime, item.breakDuration)}
-                                                </td>
-                                                <td className="master-data-cell">
-                                                <StatusBadge status={item.isActive ? "ACTIVE" : "INACTIVE"} />
-                                                </td>
-                                                <td className="master-data-cell">
-                                                    <div className="table-action-group">
-                                                        <ViewButton onClick={() => handleOpenView(item)} />
-                                                        {canEditShift && <EditButton onClick={() => handleOpenEdit(item)} />}
-                                                        {canDeleteShift && !item.isAssigned && <DeleteButton onClick={() => triggerDelete(item.id)} />}
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        ))
-                                    ) : (
-                                        <tr>
-                                            <td colSpan={9} className="text-center p-4">No shifts found.</td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                            </table>
-                        )}
-
-                        {totalPages > 1 && (
-                            <div className="pagination-wrap">
-                                <button className="pagination-btn" disabled={currentPage === 1} onClick={() => setCurrentPage(prev => prev - 1)}>
-                                    <FaChevronLeft />
-                                </button>
-                                <div className="pagination-info">Page {currentPage} of {totalPages}</div>
-                                <button className="pagination-btn" disabled={currentPage === totalPages} onClick={() => setCurrentPage(prev => prev + 1)}>
-                                    <FaChevronRight />
-                                </button>
-                            </div>
-                        )}
+                                />
+                            )}
+                        </div>
                     </div>
+
+                    {/* Table */}
+                    {loading && data.length === 0 ? (
+                        <div className="flex justify-center items-center h-64">
+                            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"></div>
+                        </div>
+                    ) : error ? (
+                        <div className="text-center text-red-500 p-4">{error}</div>
+                    ) : (
+                        <DataTable
+                            data={paginatedData}
+                            rowKey={(item) => item.id}
+                            emptyMessage="No shifts found."
+                            pagination={
+                                totalPages > 1
+                                    ? {
+                                          currentPage,
+                                          totalPages,
+                                          onPageChange: (page) => setCurrentPage(page),
+                                      }
+                                    : undefined
+                            }
+                            columns={[
+                                { header: "#", width: "60px", render: (_item, index) => startIndex + index + 1, align: "center" },
+                                { header: "SHIFT CODE", accessor: "shiftCode" },
+                                { header: "SHIFT NAME", accessor: "shiftName" },
+                                { header: "START TIME", render: (item) => formatTime12h(item.startTime) },
+                                { header: "END TIME", render: (item) => formatTime12h(item.endTime) },
+                                { header: "BREAK DURATION", render: (item) => item.breakDuration ? `${item.breakDuration} mins` : "N/A" },
+                                { header: "WORKING HOURS", render: (item) => calculateWorkingHours(item.startTime, item.endTime, item.breakDuration) },
+                                { header: "STATUS", render: (item) => <StatusBadge status={item.isActive ? "ACTIVE" : "INACTIVE"} />, align: "center" },
+                                {
+                                    header: "ACTIONS",
+                                    render: (item) => (
+                                        <div className="flex items-center gap-2">
+                                            <ViewButton onClick={() => handleOpenView(item)} />
+                                            {canEditShift && <EditButton onClick={() => handleOpenEdit(item)} />}
+                                            {canDeleteShift && <DeleteButton onClick={() => triggerDelete(item.id)} />}
+                                        </div>
+                                    ),
+                                    align: "right"
+                                },
+                            ]}
+                        />
+                    )}
                 </div>
 
                 {/* View Modal */}
@@ -269,7 +243,7 @@ const ShiftList: React.FC = () => {
                     confirmText="Delete"
                     confirmVariant="danger"
                 />
-            </Container>
+            </div>
         </div>
     );
 };

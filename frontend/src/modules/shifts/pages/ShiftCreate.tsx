@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Container, Row, Col } from "react-bootstrap";
-import { FaSave, FaEraser, FaArrowLeft } from "react-icons/fa";
+import { FaSave, FaEraser, FaArrowLeft, FaClock } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useDispatch, useSelector } from "react-redux";
@@ -8,6 +7,7 @@ import { useDispatch, useSelector } from "react-redux";
 import TextInput from "../../../components/form/TextInput/TextInput";
 import TimePickerInput from "../../../components/form/TimePickerInput/TimePickerInput";
 import CustomButton from "../../../components/ui/Button/Button";
+import BackButton from "../../../components/ui/BackButton/BackButton";
 import { createShift, fetchShifts } from "../../../features/shifts/shiftSlice";
 import { shiftService } from "../../../services/shiftService";
 import type { RootState, AppDispatch } from "../../../app/store";
@@ -173,31 +173,29 @@ const ShiftCreate: React.FC = () => {
     };
 
     return (
-        <div className="inner-container">
-            <Container fluid>
-                <div className="page-header">
-                    <Row className="align-items-center g-3">
-                        <Col lg={6} md={12}>
-                            <div className="page-header-info">
-                                <h2 className="page-title">Create Shift</h2>
-                                <div className="page-breadcrumb">Home / HR & Operations / Shift Management / Create</div>
-                            </div>
-                        </Col>
-                        <Col lg={6} md={12}>
-                            <div className="page-header-actions">
-                                <CustomButton
-                                    text="Back to List"
-                                    icon={FaArrowLeft}
-                                    onClick={() => navigate("/shifts")}
-                                />
-                            </div>
-                        </Col>
-                    </Row>
+        <div className="w-full max-w-7xl mx-auto space-y-6">
+            {/* Page Header */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+                <div className="px-6 py-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                        <h2 className="text-2xl font-bold text-slate-800">
+                            Create Shift
+                        </h2>
+                    </div>
+                    <BackButton />
                 </div>
+            </div>
 
-                <form onSubmit={handleSubmit} className="form-inner">
-                    <Row className="g-3">
-                        <Col md={6}>
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+                <form onSubmit={handleSubmit} className="px-6 py-6 space-y-8" noValidate>
+                    {/* General Info */}
+                    <div>
+                        <div className="flex items-center gap-2 mb-6 pb-2 border-b border-gray-100">
+                            <FaClock className="text-primary text-xl" />
+                            <h3 className="text-lg font-semibold text-gray-700">Shift Details</h3>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             <TextInput
                                 label="Shift Code"
                                 name="shiftCode"
@@ -207,8 +205,7 @@ const ShiftCreate: React.FC = () => {
                                 onChange={handleChange}
                                 disabled
                             />
-                        </Col>
-                        <Col md={6}>
+
                             <TextInput
                                 label="Shift Name"
                                 name="shiftName"
@@ -218,8 +215,7 @@ const ShiftCreate: React.FC = () => {
                                 onChange={handleChange}
                                 error={errors.shiftName}
                             />
-                        </Col>
-                        <Col md={6}>
+
                             <TimePickerInput
                                 label="Start Time"
                                 name="startTime"
@@ -233,8 +229,7 @@ const ShiftCreate: React.FC = () => {
                                 }}
                                 error={errors.startTime}
                             />
-                        </Col>
-                        <Col md={6}>
+
                             <TimePickerInput
                                 label="End Time"
                                 name="endTime"
@@ -248,8 +243,7 @@ const ShiftCreate: React.FC = () => {
                                 }}
                                 error={errors.endTime}
                             />
-                        </Col>
-                        <Col md={6}>
+
                             <TextInput
                                 label="Break Duration (mins)"
                                 name="breakDuration"
@@ -259,8 +253,7 @@ const ShiftCreate: React.FC = () => {
                                 onChange={handleChange}
                                 error={errors.breakDuration}
                             />
-                        </Col>
-                        <Col md={6}>
+
                             <TextInput
                                 label="Grace Period (mins)"
                                 name="gracePeriod"
@@ -270,27 +263,26 @@ const ShiftCreate: React.FC = () => {
                                 onChange={handleChange}
                                 error={errors.gracePeriod}
                             />
-                        </Col>
-                    </Row>
+                        </div>
+                    </div>
 
-                    <div className="form-actions d-flex justify-content-end gap-3 mt-4">
+                    <div className="flex flex-wrap justify-end gap-3 mt-8 pt-4 border-t border-gray-200">
                         <CustomButton
                             text="Clear"
                             icon={FaEraser}
                             onClick={handleClear}
                             disabled={loading}
+
                         />
-                        <div className="ms-2">
-                            <CustomButton
-                                text={loading ? "Saving..." : "Save Shift"}
-                                icon={FaSave}
-                                type="submit"
-                                disabled={loading}
-                            />
-                        </div>
+                        <CustomButton
+                            text={loading ? "Saving..." : "Save Shift"}
+                            icon={FaSave}
+                            type="submit"
+                            disabled={loading}
+                        />
                     </div>
                 </form>
-            </Container>
+            </div>
         </div>
     );
 };

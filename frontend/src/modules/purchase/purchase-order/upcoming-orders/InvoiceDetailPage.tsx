@@ -526,7 +526,7 @@ const InvoiceDetailPage: React.FC = () => {
                         <Col lg={6} md={12}>
                             <div className="page-header-info">
                                 <h2 className="page-title">Create GRN / Invoice</h2>
-                                <div className="page-breadcrumb">Home / Purchase / Invoice / Create</div>
+                                
                             </div>
                         </Col>
                     </Row>

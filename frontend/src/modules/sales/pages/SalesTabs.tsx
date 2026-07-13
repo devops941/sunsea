@@ -1,5 +1,5 @@
 import React from "react";
-import { Container } from "react-bootstrap";
+
 import { useLocation, useNavigate } from "react-router-dom";
 import { FaFileInvoice, FaFileAlt, FaFileSignature, FaUserCheck } from "react-icons/fa";
 import Tabs from "../../../components/ui/tab/Tabs";
@@ -51,10 +51,10 @@ const SalesTabs: React.FC = () => {
     };
 
     return (
-        <div className="inner-container">
-            <Container fluid>
+        <div className="p-4 md:p-6 min-h-screen bg-slate-50">
+            <div className="max-w-7xl mx-auto space-y-6">
                 <Tabs tabs={tabs} activeKey={activeTab} onChange={handleTabChange} align="left" />
-            </Container>
+            </div>
         </div>
     );
 };

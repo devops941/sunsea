@@ -234,7 +234,7 @@ const ProductionDashboard: React.FC = () => {
             <Col md={12}>
               <div className="page-header-info">
                 <h2 className="page-title">Real-Time Production Dashboard</h2>
-                <div className="page-breadcrumb">Welcome to SUNSEA OEE & MES Command Center</div>
+                
               </div>
             </Col>
           </Row>

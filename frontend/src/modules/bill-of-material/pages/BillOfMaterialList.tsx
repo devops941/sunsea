@@ -99,9 +99,7 @@ const BillOfMaterialList: React.FC = () => {
                                 <h2 className="page-title">
                                     Bill Of Materials
                                 </h2>
-                                <div className="page-breadcrumb">
-                                    Production / Bill Of Materials
-                                </div>
+                                
                             </div>
                         </Col>
 

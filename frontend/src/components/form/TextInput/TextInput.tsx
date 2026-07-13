@@ -1,7 +1,4 @@
 import React from "react";
-import { Form } from "react-bootstrap";
-
-import "./TextInput.css"
 
 interface TextInputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "onChange" | "size"> {
   label?: string;
@@ -17,9 +14,7 @@ interface TextInputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement
   preventNegative?: boolean;
   as?: "input" | "textarea";
   rows?: number;
-  onChange: (
-    event: React.ChangeEvent<HTMLInputElement>
-  ) => void;
+  onChange?: (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
 }
 
 const TextInput: React.FC<TextInputProps> = ({
@@ -36,68 +31,130 @@ const TextInput: React.FC<TextInputProps> = ({
   onChange,
   onKeyDown,
   onPaste,
+  as = "input",
+  rows = 3,
   ...rest
 }) => {
-
   const isNumberType = type === "number";
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     if (isNumberType && (e.key === "-" || e.key === "e" || e.key === "E" || e.key === "+")) {
       e.preventDefault();
     }
-    onKeyDown?.(e);
+    onKeyDown?.(e as React.KeyboardEvent<HTMLInputElement>);
   };
 
-  const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+  const handlePaste = (e: React.ClipboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     if (isNumberType) {
       const pasted = e.clipboardData.getData("text");
       if (/^-/.test(pasted) || Number(pasted) < 0) {
         e.preventDefault();
       }
     }
-    onPaste?.(e);
+    onPaste?.(e as React.ClipboardEvent<HTMLInputElement>);
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    onChange?.(e as React.ChangeEvent<HTMLInputElement>);
   };
 
   return (
-    <Form.Group className="text-input-group">
-      <Form.Label className="text-input-label">
-        {icon && (
-          <span className="text-input-icon">
-            {icon}
-          </span>
+    <div className="mb-[18px] group">
+      {label && (
+        <label
+          htmlFor={name}
+          className={`
+            flex items-center gap-[6px] mb-2
+            text-xs font-bold uppercase
+            tracking-[0.5px]
+            transition-colors duration-250
+            ${error ? "text-red-500" : "text-slate-500"}
+            group-focus-within:text-primary
+          `}
+        >
+          {icon && (
+            <span
+              className={`
+                flex items-center text-sm
+                transition-colors duration-250
+                ${error ? "text-red-500" : "text-primary"}
+                group-focus-within:text-primary
+              `}
+            >
+              {icon}
+            </span>
+          )}
+          <span>{label}</span>
+          {required && (
+            <span className="text-[#e53935] ml-0.5">*</span>
+          )}
+        </label>
+      )}
+
+      <div className="relative">
+        {as === "textarea" ? (
+          <textarea
+            id={name}
+            name={name}
+            value={value}
+            placeholder={placeholder}
+            onChange={handleChange}
+            onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
+            disabled={disabled}
+            rows={rows}
+            className={`
+              w-full min-h-[35px] px-4 py-[5px] text-[15px] font-medium
+              border rounded-[10px] outline-none
+              transition-all duration-250
+              placeholder-[#9ca3af]
+              text-[#1f2937]
+              ${error
+                ? "border-red-500 bg-white focus:border-red-500 focus:ring-4 focus:ring-red-500/15"
+                : "border-slate-300 bg-white hover:border-slate-400 focus:border-primary focus:ring-4 focus:ring-primary/15"
+              }
+              ${disabled ? "bg-[#f5f7f8] cursor-not-allowed text-[#9ca3af]" : ""}
+              resize-y
+            `}
+            {...(rest as unknown as React.TextareaHTMLAttributes<HTMLTextAreaElement>)}
+          />
+        ) : (
+          <input
+            id={name}
+            type={type || "text"}
+            name={name}
+            value={value}
+            placeholder={placeholder}
+            onChange={handleChange}
+            onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
+            min={isNumberType ? (rest.min ?? "0") : rest.min}
+            step={step}
+            disabled={disabled}
+            className={`
+              w-full h-[35px] px-4
+              border rounded-[10px] outline-none
+              text-[15px] font-medium
+              transition-all duration-250
+              placeholder-[#9ca3af]
+              text-[#1f2937]
+              ${error
+                ? "border-red-500 bg-white focus:border-red-500 focus:ring-4 focus:ring-red-500/15"
+                : "border-slate-300 bg-white hover:border-slate-400 focus:border-primary focus:ring-4 focus:ring-primary/15"
+              }
+             ${disabled ? "bg-[#E5E7EB] cursor-not-allowed text-[#6B7280]" : ""}
+            `}
+            {...rest}
+          />
         )}
-
-        <span>{label}</span>
-
-        {required && (
-          <span className="required-star">
-            *
-          </span>
-        )}
-      </Form.Label>
-
-      <Form.Control
-        type={type || "text"}
-        name={name}
-        value={value}
-        placeholder={placeholder}
-        onChange={onChange}
-        onKeyDown={handleKeyDown}
-        onPaste={handlePaste}
-        min={isNumberType ? (rest.min ?? "0") : rest.min}
-        step={step}
-        disabled={disabled}
-        isInvalid={!!error}
-        className="text-input-control"
-        {...rest}
-      />
+      </div>
 
       {error && (
-        <div className="field-error">
+        <div className="text-[#dc3545] text-sm font-medium mt-1">
           {error}
         </div>
       )}
-    </Form.Group>
+    </div>
   );
 };
 

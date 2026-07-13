@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Row, Col } from 'react-bootstrap';
+
 import { FaSyncAlt } from 'react-icons/fa';
 import { useSelector } from 'react-redux';
 
@@ -20,20 +20,20 @@ const DashboardFooter: React.FC = () => {
     };
 
     return (
-        <Row className="mt-4 pt-3 border-top pb-5 text-muted small px-3">
-            <Col md={4} className="mb-2 mb-md-0">
+        <div className="mt-4 pt-3 border-t border-gray-200 pb-5 text-gray-500 text-sm px-3 grid grid-cols-1 md:grid-cols-3 gap-2">
+            <div className="mb-2 md:mb-0">
                 <strong>Current Date:</strong> {currentTime.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-            </Col>
-            <Col md={4} className="text-md-center mb-2 mb-md-0">
+            </div>
+            <div className="md:text-center mb-2 md:mb-0">
                 <strong>Week:</strong> {getWeekNumber(currentTime)}
                 <span className="mx-3">|</span>
                 <strong>Logged In:</strong> {user?.name || user?.username || 'Admin'}
-            </Col>
-            <Col md={4} className="text-md-end d-flex align-items-center justify-content-md-end">
-                <FaSyncAlt size={12} className="me-2 text-primary" />
+            </div>
+            <div className="flex items-center md:justify-end">
+                <FaSyncAlt size={12} className="mr-2 !text-primary" />
                 <strong>Last Refresh:</strong> {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-            </Col>
-        </Row>
+            </div>
+        </div>
     );
 };
 

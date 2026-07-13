@@ -209,9 +209,7 @@ const WastageForm: React.FC = () => {
         <div className="page-header mb-4">
           <div className="page-header-info">
             <h2 className="page-title">{isEdit ? "Edit Wastage Audit Log" : "Log Production Wastage"}</h2>
-            <div className="page-breadcrumb">
-              Home / Production / Wastage / {isEdit ? "Edit" : "Create"}
-            </div>
+            
           </div>
         </div>
 

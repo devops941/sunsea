@@ -1,16 +1,14 @@
 import React, { useState, useEffect } from "react";
-import { Container, Row, Col } from "react-bootstrap";
 import { FaSave, FaEraser, FaArrowLeft } from "react-icons/fa";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 import TextInput from "../../../components/form/TextInput/TextInput";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import CustomButton from "../../../components/ui/Button/Button";
-import Button from "../../../components/ui/custombutton/CustomButton";
 import { useAppDispatch } from "../../../hooks/reduxHooks";
 import { updateLocation } from "../../../features/locations/locationSlice";
 import CityStateSelect from "../../../components/ui/CityStateSelect/CityStateSelect";
-import type { StateCityOption } from "../../../components/ui/CityStateSelect/CityStateSelect";
+import { z } from "zod";
 
 const LOCATION_TYPE_OPTIONS = [
     { label: "Warehouse", value: "Warehouse" },
@@ -26,23 +24,10 @@ const initialFormState = {
     address: "",
     city: "",
     state: "",
-    // country: "",
     isActive: true,
 };
 
-import { z } from "zod";
-
 const locationSchema = z.object({
-    // locationCode: z
-    //     .string()
-    //     .trim()
-    //     .min(1, "Location Code is required")
-    //     .max(30, "Maximum 30 characters allowed")
-    //     .regex(
-    //         /^[A-Z0-9_-]+$/,
-    //         "Only uppercase letters, numbers, hyphen (-) and underscore (_) are allowed"
-    //     ),
-
     locationName: z
         .string()
         .trim()
@@ -75,16 +60,6 @@ const locationSchema = z.object({
         .trim()
         .min(1, "State is required")
         .max(100, "Maximum 100 characters allowed"),
-
-    // country: z
-    //     .string()
-    //     .trim()
-    //     .min(1, "Country is required")
-    //     .max(50, "Maximum 50 characters allowed")
-    //     .regex(
-    //         /^[A-Za-z\s]+$/,
-    //         "Country cannot contain numbers or special characters"
-    //     ),
 });
 
 const LocationEdit: React.FC = () => {
@@ -105,7 +80,6 @@ const LocationEdit: React.FC = () => {
                 address: locationState.state.address || "",
                 city: locationState.state.city || "",
                 state: locationState.state.state || "",
-                // country: locationState.state.country || "",
                 isActive: locationState.state.isActive,
             });
         } else {
@@ -115,31 +89,14 @@ const LocationEdit: React.FC = () => {
     }, [locationState.state, navigate]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-        const { name, value, type } = e.target as any;
+        const { name, value } = e.target;
+        const type = (e.target as any).type;
         const checked = type === "checkbox" ? (e.target as HTMLInputElement).checked : undefined;
         setFormData(prev => ({ ...prev, [name]: type === "checkbox" ? checked : value }));
 
         if (errors[name]) {
             setErrors(prev => ({ ...prev, [name]: "" }));
         }
-    };
-
-    const handleStateChange = (stateData: StateCityOption) => {
-        setFormData((prev) => ({
-            ...prev,
-            state: stateData.name,
-            city: "",
-        }));
-        setErrors((prev) => ({
-            ...prev,
-            state: "",
-            city: "",
-        }));
-    };
-
-    const handleCityChange = (cityData: StateCityOption) => {
-        setFormData((prev) => ({ ...prev, city: cityData.name }));
-        setErrors((prev) => ({ ...prev, city: "" }));
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -154,7 +111,6 @@ const LocationEdit: React.FC = () => {
 
                 error.issues.forEach((issue) => {
                     const field = issue.path[0];
-
                     if (field) {
                         newErrors[field.toString()] = issue.message;
                     }
@@ -170,13 +126,11 @@ const LocationEdit: React.FC = () => {
             await dispatch(updateLocation({
                 id: formData.locationId,
                 data: {
-                    // locationCode: formData.locationCode,
                     locationName: formData.locationName,
                     locationType: formData.locationType,
                     address: formData.address,
                     city: formData.city,
                     state: formData.state,
-                    // country: formData.country,
                     isActive: formData.isActive
                 }
             })).unwrap();
@@ -190,31 +144,20 @@ const LocationEdit: React.FC = () => {
     };
 
     return (
-        <div className="inner-container">
-            <Container fluid>
-                <div className="page-header">
-                    <Row className="align-items-center g-3">
-                        <Col lg={6} md={12}>
-                            <div className="page-header-info">
-                                <h2 className="page-title">Edit Location</h2>
-                                <div className="page-breadcrumb">Home / Settings / Locations / Edit</div>
-                            </div>
-                        </Col>
-                        <Col lg={6} md={12}>
-                            <div className="page-header-actions">
-                                <CustomButton
-                                    text="Back to List"
-                                    icon={FaArrowLeft}
-                                    onClick={() => navigate("/locations")}
-                                />
-                            </div>
-                        </Col>
-                    </Row>
-                </div>
+        <div className="p-4 md:p-6 min-h-screen bg-slate-50">
+            <div className="max-w-7xl mx-auto space-y-3">
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200">
+                    <div className="p-6 border-b border-slate-200 flex items-center justify-between">
+                        <h2 className="text-2xl font-bold text-slate-800">Edit Location</h2>
+                        <CustomButton
+                            text="Back to List"
+                            icon={FaArrowLeft}
+                            onClick={() => navigate("/locations")}
+                        />
+                    </div>
 
-                <form onSubmit={handleSubmit} className="form-inner">
-                    <Row className="g-3">
-                        <Col md={6}>
+                    <form onSubmit={handleSubmit} className="p-6" noValidate>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             <TextInput
                                 label="Location ID"
                                 name="locationId"
@@ -225,9 +168,7 @@ const LocationEdit: React.FC = () => {
                                 error={errors.locationId}
                                 onChange={handleChange}
                             />
-                        </Col>
-                        
-                        <Col md={6}>
+                            
                             <TextInput
                                 label="Location Name"
                                 name="locationName"
@@ -237,8 +178,6 @@ const LocationEdit: React.FC = () => {
                                 error={errors.locationName}
                                 onChange={handleChange}
                             />
-                        </Col>
-                        <Col md={6}>
                             <SelectInput
                                 label="Location Type"
                                 name="locationType"
@@ -249,46 +188,37 @@ const LocationEdit: React.FC = () => {
                                 error={errors.locationType}
                                 onChange={handleChange}
                             />
-                        </Col>
-                        <Col md={6}>
+                            
                             <TextInput
                                 label="Address"
                                 name="address"
                                 value={formData.address}
                                 placeholder="e.g. 123 Main St"
+                                required
                                 error={errors.address}
                                 onChange={handleChange}
-                                required
-
                             />
-                        </Col>
-                        <CityStateSelect
-                            stateValue={formData.state}
-                            cityValue={formData.city}
-                            onStateChange={handleStateChange}
-                            onCityChange={handleCityChange}
-                            stateError={errors.state}
-                            cityError={errors.city}
-                            required
-                        />
-                        {/* <Col md={4}>
-                            <TextInput
-                                label="Country"
-                                name="country"
-                                value={formData.country}
-                                placeholder="e.g. USA"
-                                error={errors.country}
-                                onChange={handleChange}
+                            
+                            <CityStateSelect
+                                stateValue={formData.state}
+                                onStateChange={(v) => {
+                                    setFormData(prev => ({ ...prev, state: v.name, city: "" }));
+                                    setErrors(prev => ({ ...prev, state: "", city: "" }));
+                                }}
+                                stateError={errors.state}
+                                cityValue={formData.city}
+                                onCityChange={(v) => {
+                                    setFormData(prev => ({ ...prev, city: v.name }));
+                                    setErrors(prev => ({ ...prev, city: "" }));
+                                }}
+                                cityError={errors.city}
                                 required
-
                             />
-                        </Col> */}
-                        <Col md={4}>
-                             <SelectInput
+                            
+                            <SelectInput
                                 label="Status"
                                 name="isActive"
                                 required
-
                                 options={[
                                     { label: "Active", value: "true" },
                                     { label: "Inactive", value: "false" },
@@ -302,28 +232,19 @@ const LocationEdit: React.FC = () => {
                                     }))
                                 }
                             />
-                        </Col>
-                    </Row>
+                        </div>
 
-                    <div className="form-actions d-flex justify-content-end gap-3 mt-4">
-                        <CustomButton
-                            text="Cancel"
-                            icon={FaEraser}
-                            onClick={() => navigate("/locations")}
-                            disabled={isSubmitting}
-                        />
-                        <div className="ms-2">
-                            <Button
+                        <div className="flex justify-end gap-3 pt-6 mt-6 border-t border-slate-200">
+                            <CustomButton
                                 text={isSubmitting ? "Updating..." : "Update Location"}
                                 icon={FaSave}
                                 type="submit"
-                                variant="primary"
                                 disabled={isSubmitting}
                             />
                         </div>
-                    </div>
-                </form>
-            </Container>
+                    </form>
+                </div>
+            </div>
         </div>
     );
 };

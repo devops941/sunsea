@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import { Container, Row, Col } from "react-bootstrap";
 import { FaSave, FaInfoCircle, FaFileAlt, FaMapMarkerAlt, FaPhoneAlt, FaCogs } from 'react-icons/fa';
 import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -8,7 +7,7 @@ import TextInput from "../../../components/form/TextInput/TextInput";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import ImageUpload from "../../../components/form/ImageUpload/ImageUpload";
 import CustomButton from "../../../components/ui/custombutton/CustomButton";
-import Section from "../../../components/ui/Section/Section";
+import BackButton from "../../../components/ui/BackButton/BackButton";
 import CityStateSelect from "../../../components/ui/CityStateSelect/CityStateSelect";
 import IndiaPhoneInput from "../../../components/ui/PhoneInput/PhoneInput";
 import type { RootState, AppDispatch } from '../../../app/store';
@@ -133,52 +132,70 @@ const CompanySettings: React.FC = () => {
 
   if (loading && !company) return <div className="text-center p-5 mt-5">Loading...</div>;
 
+  // Onboarding Screen Design
   if (company && !company.isOnboarded) {
     return (
-      <div className="onboarding-wrapper d-flex align-items-start justify-content-center bg-light py-5 px-4" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999, overflowY: 'auto', minHeight: '100vh' }}>
-        <Container style={{ maxWidth: "1000px" }}>
-          <div className="inner-container">
-            <div className="text-center mb-5">
-              <h2 className="fw-bold onboarding-title-text pb-2">Welcome to Sunsea ERP</h2>
-              <p className="text-muted">Please complete your company onboarding to get started.</p>
-            </div>
-            <form onSubmit={handleSubmit}>
-              <Section title="General Info & Logo" icon={<FaInfoCircle />}>
-                <Row className="g-3">
-                  <Col md={4}>
+      <div className="fixed inset-0 z-[9999] bg-gray-100 flex justify-center items-start overflow-y-auto min-h-screen py-10 px-4">
+        <div className="w-full max-w-5xl mx-auto">
+          <div className="text-center mb-8">
+            <h2 className="text-3xl font-bold text-gray-800 pb-2">Welcome to Sunsea ERP</h2>
+            <p className="text-gray-500">Please complete your company onboarding to get started.</p>
+          </div>
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+            <form onSubmit={handleSubmit} className="px-6 py-6 space-y-8" noValidate>
+              {/* General Info */}
+              <div>
+                <div className="flex items-center gap-2 mb-4">
+                  <FaInfoCircle className="text-primary text-xl" />
+                  <h6 className="text-lg font-semibold text-gray-800 m-0">General Info & Logo</h6>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
                     <TextInput label="Legal Company Name" name="legalName" value={formData.legalName || ""} onChange={handleChange} placeholder="Enter Legal Name" required error={errors.legalName} />
-                  </Col>
-                  <Col md={4}>
+                  </div>
+                  <div>
                     <TextInput label="Company Code (Auto Generated)" name="companyCode" value={formData.companyCode || ""} onChange={handleChange} placeholder="Auto Generated" disabled error={errors.companyCode} />
-                  </Col>
-                  <Col md={4}>
+                  </div>
+                  <div>
                     <SelectInput label="Currency Code" name="currencyCode" value={formData.currencyCode || "INR"} onChange={handleChange as any} required disabled={isEditMode} options={[
                       { value: "INR", label: "INR - Indian Rupee" }
                     ]} />
-                  </Col>
-                  <Col md={12}>
+                  </div>
+                  <div className="md:col-span-3">
                     <ImageUpload label="Company Logo" name="logoUrl" onChange={handleChange as any} />
-                  </Col>
-                </Row>
-              </Section>
+                  </div>
+                </div>
+              </div>
 
-              <Section title="Registration Details" icon={<FaFileAlt />}>
-                <Row className="g-3">
-                  <Col md={12}>
+              {/* Registration Details */}
+              <div>
+                <div className="flex items-center gap-2 mb-4">
+                  <FaFileAlt className="text-primary text-xl" />
+                  <h6 className="text-lg font-semibold text-gray-800 m-0">Registration Details</h6>
+                </div>
+                <div className="grid grid-cols-1 gap-4">
+                  <div>
                     <TextInput label="GSTIN" name="gstin" value={formData.gstin || ""} onChange={handleChange} placeholder="Enter GSTIN" />
-                  </Col>
-                </Row>
-              </Section>
+                  </div>
+                </div>
+              </div>
 
-              <Section title="Address Details" icon={<FaMapMarkerAlt />}>
-                <Row className="g-3">
-                  <Col lg={6} md={12}>
+              {/* Address Details */}
+              <div>
+                <div className="flex items-center gap-2 mb-4">
+                  <FaMapMarkerAlt className="text-primary text-xl" />
+                  <h6 className="text-lg font-semibold text-gray-800 m-0">Address Details</h6>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
                     <TextInput label="Address Line 1" name="addressLine1" value={formData.addressLine1 || ""} onChange={handleChange} placeholder="Enter Address Line 1" required error={errors.addressLine1} />
-                  </Col>
-                  <Col lg={6} md={12}>
+                  </div>
+                  <div>
                     <TextInput label="Address Line 2" name="addressLine2" value={formData.addressLine2 || ""} onChange={handleChange} placeholder="Enter Address Line 2" error={errors.addressLine2} />
-                  </Col>
-                  <Col lg={6} md={12}>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
+                  <div className="lg:col-span-2">
                     <CityStateSelect
                       stateLabel="State"
                       stateValue={formData.state || ""}
@@ -189,24 +206,29 @@ const CompanySettings: React.FC = () => {
                       onCityChange={handleCityChange}
                       cityError={errors.city}
                     />
-                  </Col>
-                  <Col lg={3} md={6}>
+                  </div>
+                  <div>
                     <TextInput label="Zipcode" name="zipcode" value={formData.zipcode || ""} onChange={handleChange} placeholder="Enter Zipcode" required error={errors.zipcode} />
-                  </Col>
-                  <Col lg={3} md={6}>
+                  </div>
+                  <div>
                     <TextInput label="Country" name="country" value={formData.country || ""} onChange={handleChange} placeholder="Enter Country" required error={errors.country} />
-                  </Col>
-                </Row>
-              </Section>
+                  </div>
+                </div>
+              </div>
 
-              <Section title="Contact Details" icon={<FaPhoneAlt />}>
-                <Row className="g-3">
-                  <Col md={6}>
+              {/* Contact Details */}
+              <div>
+                <div className="flex items-center gap-2 mb-4">
+                  <FaPhoneAlt className="text-primary text-xl" />
+                  <h6 className="text-lg font-semibold text-gray-800 m-0">Contact Details</h6>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
                     <TextInput label="Email Address" name="email" type="email" value={formData.email || ""} onChange={handleChange} placeholder="Enter Email" required error={errors.email} />
-                  </Col>
-                  <Col md={6}>
-                    <div className="mb-3">
-                      <label className="form-label">Phone Number <span className="text-danger">*</span></label>
+                  </div>
+                  <div>
+                    <div className="mb-3 flex flex-col w-full group">
+                      <label className={`flex items-center gap-[6px] mb-2 text-xs font-bold uppercase tracking-[0.5px] transition-colors duration-250 ${errors.phone ? 'text-red-500' : 'text-slate-500'} group-focus-within:text-primary`}>Phone Number <span className="text-[#e53935] ml-0.5">*</span></label>
                       <IndiaPhoneInput
                         name="phone"
                         value={formData.phone || ""}
@@ -216,73 +238,89 @@ const CompanySettings: React.FC = () => {
                         }}
                         required={true}
                       />
-                      {errors.phone && <div className="text-danger small mt-1">{errors.phone}</div>}
+                      {errors.phone && <div className="text-[#dc3545] text-sm font-medium mt-1">{errors.phone}</div>}
                     </div>
-                  </Col>
-                </Row>
-              </Section>
+                  </div>
+                </div>
+              </div>
 
-              <div className="d-flex justify-content-center mt-5">
-                <CustomButton text="Complete Onboarding" icon={FaSave} type="submit" disabled={loading} className="py-3 px-5 fs-5" />
+              <div className="flex justify-center mt-8 pt-4 border-t border-gray-200">
+                <CustomButton text="Complete Onboarding" icon={FaSave} type="submit" disabled={loading} className="py-3 px-8 text-lg" />
               </div>
             </form>
           </div>
-        </Container>
+        </div>
       </div>
     );
   }
 
+  // Normal Settings/Edit Screen Design (Matches CreateOrder.tsx)
   return (
-    <div className="inner-container">
-      <Container fluid>
-        <div className="page-header">
-          <Row className="align-items-center g-3">
-            <Col lg={6} md={12}>
-              <div className="page-header-info">
-                <h2 className="page-title">{isEditMode ? 'Edit Company' : 'Create Company'}</h2>
-                <div className="page-breadcrumb">Home / Company / {isEditMode ? 'Edit' : 'Create'} Company</div>
-              </div>
-            </Col>
-          </Row>
+    <div className="w-full mx-auto">
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+        {/* Page Header */}
+        <div className="px-6 py-4 border-b border-gray-100">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h2 className="text-xl font-bold text-gray-800">
+                {isEditMode ? 'Edit Company Settings' : 'Create Company'}
+              </h2>
+            </div>
+
+          </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="form-inner">
-          <Section title="General Information" icon={<FaInfoCircle />}>
-            <Row>
-              <Col lg={4} md={6}>
+        <form onSubmit={handleSubmit} className="px-6 py-4 space-y-6" noValidate>
+          {/* General Information */}
+          <div>
+            <h6 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+              <FaInfoCircle className="text-gray-500 text-sm" /> General Information
+            </h6>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+              <div>
                 <TextInput label="Legal Name" name="legalName" value={formData.legalName || ""} onChange={handleChange} placeholder="Enter Legal Name" required error={errors.legalName} />
-              </Col>
-              <Col lg={4} md={6}>
-                <TextInput label="Company Code (Auto Generated)" name="companyCode" value={formData.companyCode || ""} onChange={handleChange} placeholder="Auto Generated" disabled error={errors.companyCode} />
-              </Col>
-              <Col lg={4} md={6}>
+              </div>
+              <div>
+                <TextInput label="Company Code" name="companyCode" value={formData.companyCode || ""} onChange={handleChange} placeholder="Auto Generated" disabled error={errors.companyCode} />
+              </div>
+              <div>
                 <TextInput label="Short Name" name="shortName" value={formData.shortName || ""} onChange={handleChange} placeholder="Enter Short Name" />
-              </Col>
-              <Col lg={4} md={6}>
+              </div>
+              <div>
                 <SelectInput label="Currency Code" name="currencyCode" value={formData.currencyCode || "INR"} onChange={handleChange as any} required disabled={isEditMode} options={[
                   { value: "INR", label: "INR - Indian Rupee" }
                 ]} />
-              </Col>
-            </Row>
-          </Section>
+              </div>
+            </div>
+          </div>
 
-          <Section title="Registration Details" icon={<FaFileAlt />}>
-            <Row>
-              <Col lg={12} md={12}>
+          {/* Registration Details */}
+          <div>
+            <h6 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+              <FaFileAlt className="text-gray-500 text-sm" /> Registration Details
+            </h6>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+              <div className="md:col-span-2">
                 <TextInput label="GSTIN" name="gstin" value={formData.gstin || ""} onChange={handleChange} placeholder="Enter GSTIN" />
-              </Col>
-            </Row>
-          </Section>
+              </div>
+            </div>
+          </div>
 
-          <Section title="Address Information" icon={<FaMapMarkerAlt />}>
-            <Row>
-              <Col lg={6} md={12}>
+          {/* Address Information */}
+          <div>
+            <h6 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+              <FaMapMarkerAlt className="text-gray-500 text-sm" /> Address Information
+            </h6>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
                 <TextInput label="Address Line 1" name="addressLine1" value={formData.addressLine1 || ""} onChange={handleChange} placeholder="Enter Address Line 1" required error={errors.addressLine1} />
-              </Col>
-              <Col lg={6} md={12}>
+              </div>
+              <div>
                 <TextInput label="Address Line 2" name="addressLine2" value={formData.addressLine2 || ""} onChange={handleChange} placeholder="Enter Address Line 2" error={errors.addressLine2} />
-              </Col>
-              <Col lg={4} md={6}>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mt-3">
+              <div className="lg:col-span-2">
                 <CityStateSelect
                   stateLabel="State"
                   stateValue={formData.state || ""}
@@ -293,64 +331,79 @@ const CompanySettings: React.FC = () => {
                   onCityChange={handleCityChange}
                   cityError={errors.city}
                 />
-              </Col>
-              <Col lg={3} md={6}>
+              </div>
+              <div>
                 <TextInput label="Zipcode" name="zipcode" value={formData.zipcode || ""} onChange={handleChange} placeholder="Enter Zipcode" required error={errors.zipcode} />
-              </Col>
-              <Col lg={3} md={6}>
+              </div>
+              <div>
                 <TextInput label="Country" name="country" value={formData.country || ""} onChange={handleChange} placeholder="Enter Country" required error={errors.country} />
-              </Col>
-            </Row>
-          </Section>
+              </div>
+            </div>
+          </div>
 
-          <Section title="Contact Information" icon={<FaPhoneAlt />}>
-            <Row>
-              <Col lg={4} md={6}>
+          {/* Contact Information */}
+          <div>
+            <h6 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+              <FaPhoneAlt className="text-gray-500 text-sm" /> Contact Information
+            </h6>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div>
                 <TextInput label="Email Address" name="email" type="email" value={formData.email || ""} onChange={handleChange} placeholder="Enter Email" required error={errors.email} />
-              </Col>
-              <Col lg={4} md={6}>
-                <div className="mb-3">
-                  <label className="form-label">Phone Number <span className="text-danger">*</span></label>
-                  <IndiaPhoneInput
-                    name="phone"
-                    value={formData.phone || ""}
-                    onChange={(e) => {
-                      setFormData(prev => ({ ...prev, phone: e.target.value }));
-                      if (errors.phone) setErrors((prev: any) => ({ ...prev, phone: undefined }));
-                    }}
-                    required={true}
-                  />
-                  {errors.phone && <div className="text-danger small mt-1">{errors.phone}</div>}
-                </div>
-              </Col>
-              <Col lg={4} md={6}>
+              </div>
+              <div>
+                <IndiaPhoneInput
+                  label="Phone Number"
+                  name="phone"
+                  value={formData.phone || ""}
+                  onChange={(e) => {
+                    setFormData(prev => ({ ...prev, phone: e.target.value }));
+                    if (errors.phone) setErrors((prev: any) => ({ ...prev, phone: undefined }));
+                  }}
+                  required={true}
+                  error={errors.phone}
+                />
+              </div>
+              <div>
                 <TextInput label="Mobile Number" name="mobile" value={formData.mobile || ""} onChange={handleChange} placeholder="Enter Mobile" />
-              </Col>
-              <Col lg={4} md={6}>
+              </div>
+              <div className="md:col-span-3 lg:col-span-1">
                 <TextInput label="Website" name="website" value={formData.website || ""} onChange={handleChange} placeholder="Enter Website (e.g. www.example.com)" />
-              </Col>
-            </Row>
-          </Section>
+              </div>
+            </div>
+          </div>
 
-          <Section title="System Information" icon={<FaCogs />}>
-            <Row>
-              <Col lg={4} md={6}>
+          {/* System Information */}
+          <div>
+            <h6 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+              <FaCogs className="text-gray-500 text-sm" /> System Information
+            </h6>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 items-center">
+              <div>
                 <ImageUpload label="Company Logo" name="logoUrl" onChange={handleChange as any} />
-              </Col>
-              <Col lg={4} md={6} className="d-flex align-items-center mt-4">
-                <div className="form-check form-switch mt-2">
-                  <input className="form-check-input" type="checkbox" role="switch" id="isActiveSwitch" name="isActive" checked={!!formData.isActive} onChange={handleChange as any} />
-                  <label className="form-check-label ms-2 fw-bold text-primary" htmlFor="isActiveSwitch">Active Company</label>
+              </div>
+              <div>
+                <div className="flex items-center gap-3">
+                  <label className="relative inline-flex items-center cursor-pointer group/toggle">
+                    <input
+                      type="checkbox"
+                      className="sr-only peer"
+                      name="isActive"
+                      checked={!!formData.isActive}
+                      onChange={handleChange as any}
+                    />
+                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary shadow-inner"></div>
+                    <span className="ml-3 text-sm font-bold text-gray-700">Active Company</span>
+                  </label>
                 </div>
-              </Col>
-            </Row>
-          </Section>
+              </div>
+            </div>
+          </div>
 
-          <div className="form-actions d-flex justify-content-end gap-3 mt-4" style={{ borderTop: "1px solid var(--color-border)", paddingTop: "1.5rem" }}>
+          <div className="flex flex-wrap justify-end gap-3 mt-8 pt-4 border-t border-gray-200">
             <CustomButton text={isEditMode ? "Save Changes" : "Create Company"} icon={FaSave} type="submit" disabled={loading} />
           </div>
         </form>
-      </Container>
+      </div>
     </div>
   );
 };

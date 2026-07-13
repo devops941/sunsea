@@ -1,7 +1,6 @@
 // src/pages/sales/QuotationForm/QuotationForm.tsx
 import React, { useEffect, useMemo, useState } from "react";
-import { Container, Row, Col, Spinner, Alert } from "react-bootstrap";
-import { FaSave, FaArrowLeft, FaPaperPlane, FaUser, FaMapMarkerAlt, FaBoxOpen } from "react-icons/fa";
+import { FaSave, FaPaperPlane, FaCircleNotch, FaExclamationTriangle, FaUser, FaCalendarAlt, FaTruck, FaGlobe, FaMapMarkerAlt, FaFileAlt } from "react-icons/fa";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useForm, useFieldArray, Controller } from "react-hook-form";
@@ -10,6 +9,8 @@ import { z } from "zod";
 import TextInput from "../../../components/form/TextInput/TextInput";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import CustomButton from "../../../components/ui/Button/Button";
+import BackButton from "../../../components/ui/BackButton/BackButton";
+import DetailBox from "../../../components/ui/DetailBox/DetailBox";
 import { useCustomers } from "../../../hooks/useCustomers";
 import { useProducts } from "../../../hooks/useProducts";
 import { useEmployees } from "../../../hooks/useEmployees";
@@ -135,55 +136,6 @@ const CtrlText: React.FC<CtrlTextProps> = ({ field, label, placeholder, required
         disabled={disabled}
         error={error}
     />
-);
-
-// ─── Inline error ──────────────────────────────────────────────────────────
-const Err: React.FC<{ message?: string }> = ({ message }) =>
-    message ? <div className="text-danger mt-1 small">{message}</div> : null;
-
-// ─── Report-style read-only Field (matches QuotationReport / SalesOrderDetail) ──
-const Field: React.FC<{ label: string; value: React.ReactNode }> = ({ label, value }) => (
-    <div className="mb-3">
-        <div
-            className="small text-uppercase"
-            style={{ fontSize: "0.72rem", letterSpacing: "0.05em", color: "var(--color-text-muted)", fontWeight: 600 }}
-        >
-            {label}
-        </div>
-        <div className="fw-semibold" style={{ color: "var(--color-text-primary)" }}>{value ?? "—"}</div>
-    </div>
-);
-
-// ─── Report-style Section wrapper (matches QuotationReport / SalesOrderDetail) ──
-const Section: React.FC<{ title: string; icon?: React.ReactNode; children: React.ReactNode }> = ({ title, icon, children }) => (
-    <div
-        className="mb-4 p-4"
-        style={{
-            background: "var(--color-surface)",
-            borderRadius: "var(--radius-lg)",
-            border: "1px solid var(--color-border)",
-            boxShadow: "var(--shadow-sm)",
-        }}
-    >
-        <div className="d-flex align-items-center gap-2 mb-3 pb-2" style={{ borderBottom: "1px solid var(--color-border)" }}>
-            {icon && (
-                <span
-                    className="d-inline-flex align-items-center justify-content-center"
-                    style={{
-                        width: 32,
-                        height: 32,
-                        borderRadius: "var(--radius-sm)",
-                        background: "rgba(203, 122, 33, 0.1)",
-                        color: "var(--color-secondary)",
-                    }}
-                >
-                    {icon}
-                </span>
-            )}
-            <h6 className="mb-0 fw-bold" style={{ color: "var(--color-primary)", fontFamily: "var(--font-head)" }}>{title}</h6>
-        </div>
-        {children}
-    </div>
 );
 
 // ─── Component ─────────────────────────────────────────────────────────────
@@ -676,173 +628,161 @@ const QuotationForm: React.FC = () => {
         pincode: watch("shippingPincode"),
     };
 
+    
+
     return (
-        <div className="inner-container">
-            <Container fluid>
+        <div className="w-full mx-auto">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
                 {/* Page Header */}
-                <div className="page-header">
-                    <Row className="align-items-center g-3">
-                        <Col lg={6} md={12}>
-                            <div className="page-header-info">
-                                <h2 className="page-title">
-                                    {isEditMode ? "Edit Quotation" : "Create Quotation"}
-                                </h2>
-                                <div className="page-breadcrumb">Home / Sales / Quotation / {isEditMode ? "Edit" : "Create"}</div>
-                            </div>
-                        </Col>
-                        <Col lg={6} md={12}>
-                            <div className="page-header-actions">
-                                <CustomButton
-                                    text="Back to List"
-                                    icon={FaArrowLeft}
-                                    onClick={() => navigate("/quotations")}
-                                />
-                            </div>
-                        </Col>
-                    </Row>
+                <div className="px-6 py-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div>
+                            <h2 className="text-xl font-bold text-gray-800">
+                                {isEditMode ? "Edit Quotation" : "Create Quotation"}
+                            </h2>
+                        </div>
+                        <div>
+                            <BackButton text="Back to List" />
+                        </div>
+                    </div>
                 </div>
 
                 {isLoading ? (
-                    <div className="text-center py-5">
-                        <Spinner animation="border" variant="primary" />
-                        <p className="mt-3">Loading data...</p>
+                    <div className="flex flex-col items-center justify-center py-20">
+                        <FaCircleNotch className="animate-spin text-primary text-4xl mb-4" />
+                        <p className="text-gray-500">Loading data...</p>
                     </div>
                 ) : (
-                    <form onSubmit={handleSubmit((data) => onSubmit(data, false))} className="form-inner" noValidate>
+                    <form className="px-6 py-3 space-y-4" onSubmit={handleSubmit((data) => onSubmit(data, false))} noValidate>
                         {/* ── Draft Order Selector (only in create mode) ── */}
                         {!isEditMode && (
-                            <Row className="mb-3">
-                                <Col md={6}>
-                                    <label className="form-label">Select Order</label>
+                            <div className="mb-4">
+                                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wide mb-1.5">Select Order</label>
+                                <div className="relative max-w-md">
                                     <select
-                                        className="form-select"
+                                        className="w-full border border-gray-300 rounded-lg p-3 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent appearance-none bg-white"
                                         value={selectedDraftId || ""}
                                         onChange={handleDraftOrderSelect}
                                         disabled={loadingDraftOrders}
                                     >
-                                        <option value=""> Select quotation </option>
+                                        <option value=""> -- Select a Draft Order -- </option>
                                         {draftOrders.map((order) => (
                                             <option key={order.id} value={order.id}>
                                                 {order.orderNo} - {order.customer?.displayName || order.customer?.firmName || "N/A"}
                                             </option>
                                         ))}
                                     </select>
-                                    {loadingDraftOrders && <Spinner animation="border" size="sm" className="ms-2" />}
-                                </Col>
-                            </Row>
+                                    <div className="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none text-gray-500">
+                                        {loadingDraftOrders ? <FaCircleNotch className="animate-spin" /> : <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>}
+                                    </div>
+                                </div>
+                            </div>
                         )}
 
-                        {/* ── Form Fields (only when edit mode) ── */}
+                        {/* ── Report Page (only when edit mode) ── */}
                         {isEditMode && (
                             <>
-                                {/* ── Order Information — read-only ── */}
-                                <Section title="Order Information">
-                                    <Row>
-                                        <Col md={4}><Field label="Quotation No" value={quotationNo} /></Col>
-                                        <Col md={4}><Field label="Quotation Date" value={formatDate(quotationDate)} /></Col>
-                                        <Col md={4}><Field label="Valid Until" value={formatDate(validUntil)} /></Col>
-                                        <Col md={4}><Field label="Order Source Platform" value={orderTypeLabel} /></Col>
-                                        <Col md={4}><Field label="Dispatch Type" value={dispatchTypeLabel} /></Col>
-                                        {orderType === "salesperson" && (
-                                            <Col md={4}><Field label="Sales Person" value={salesPersonName} /></Col>
-                                        )}
-                                    </Row>
-                                </Section>
-
-                                {/* ── Customer — read-only ── */}
-                                <Section title="Customer" icon={<FaUser />}>
-                                    <Row>
-                                        <Col md={4}><Field label="Name" value={customerName} /> </Col >
-                                        <Col md={4}><Field label="Type" value={watchedCustomerType} /> </Col >
-                                    </Row>
-                                </Section>
-
-                                {/* ── Addresses — read-only ── */}
-                                <Section title="Addresses" icon={<FaMapMarkerAlt />}>
-                                    <Row>
-                                        <Col md={6}>
-                                            <div
-                                                className="small text-uppercase mb-2"
-                                                style={{ fontSize: "0.72rem", letterSpacing: "0.05em", color: "var(--color-text-muted)", fontWeight: 600 }}
-                                            >
-                                                Billing Address
-                                            </div>
-                                            <div>{billing.addressLine1 || "—"}</div>
-                                            <div>{billing.city}, {billing.state} — {billing.pincode}</div>
-                                        </Col>
-                                        <Col md={6}>
-                                            <div
-                                                className="small text-uppercase mb-2"
-                                                style={{ fontSize: "0.72rem", letterSpacing: "0.05em", color: "var(--color-text-muted)", fontWeight: 600 }}
-                                            >
-                                                Shipping Address
-                                            </div>
-                                            <div>{shipping.addressLine1 || "—"}</div>
-                                            <div>{shipping.city}, {shipping.state} — {shipping.pincode}</div>
-                                        </Col>
-                                    </Row>
-                                </Section>
-
                                 {rejectionReason && (
-                                    <Alert variant="danger" className="mt-3">
-                                        <strong>Rejection Reason:</strong> {rejectionReason}
-                                    </Alert>
+                                    <div className="mb-4 bg-red-50 border-l-4 border-red-500 p-3 flex items-start gap-2">
+                                        <FaExclamationTriangle className="text-red-500 mt-0.5 text-sm" />
+                                        <div>
+                                            <div className="text-red-800 font-semibold text-xs uppercase tracking-wide">Rejection Reason</div>
+                                            <p className="text-red-700 text-sm m-0">{rejectionReason}</p>
+                                        </div>
+                                    </div>
                                 )}
 
-                                {/* ── Order Items — fully read-only except GST rate; NO per-item
-                                    discount UI here anymore — discount is entered once, below,
-                                    for the whole order. ── */}
-                                <Section title="Quotation Items" icon={<FaBoxOpen />}>
-                                    {errors.items?.root && <Err message={errors.items.root.message} />}
+                                {/* ── Order Info + Customer ── */}
+                                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 mb-4">
+                                    <DetailBox label="Quotation No" value={quotationNo} icon={<FaFileAlt />} />
+                                    <DetailBox label="Customer" value={customerName} icon={<FaUser />} />
+                                    <DetailBox label="Quotation Date" value={formatDate(quotationDate)} icon={<FaCalendarAlt />} />
+                                    <DetailBox label="Valid Until" value={formatDate(validUntil)} icon={<FaCalendarAlt />} />
+                                    <DetailBox label="Dispatch Type" value={dispatchTypeLabel} icon={<FaTruck />} />
+                                    <DetailBox label="Order Source Platform" value={orderTypeLabel} icon={<FaGlobe />} />
+                                    <DetailBox label="Customer Type" value={watchedCustomerType} icon={<FaUser />} />
+                                    {orderType === "salesperson" && (
+                                        <DetailBox label="Sales Person" value={salesPersonName} icon={<FaUser />} />
+                                    )}
+                                </div>
 
-                                    <div className="table-wrap">
-                                        <table className="master-data-table">
-                                            <thead>
-                                                <tr>
-                                                    <th style={{ width: "40px" }}>#</th>
-                                                    <th style={{ width: "200px" }}>PRODUCT</th>
-                                                    <th style={{ width: "100px" }}>COLOR TYPE</th>
-                                                    <th style={{ width: "70px" }} className="text-end">QTY</th>
-                                                    <th style={{ width: "100px" }} className="text-end">UNIT PRICE</th>
-                                                    <th style={{ width: "100px" }} className="text-end">SUBTOTAL</th>
-                                                    <th style={{ width: "180px" }}>GST RATE</th>
-                                                    <th style={{ width: "100px" }} className="text-end">GST AMT</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {fields.map((field, index) => {
-                                                    const itemValue = getValues(`items.${index}`);
-                                                    const product = products.find(p => String(p.id) === String(itemValue?.productId));
-                                                    const calc = itemValue?.productId && itemValue?.quantity
-                                                        ? calculateItemDisplay(itemValue)
-                                                        : { subtotal: 0, unitPrice: 0, gstRate: 0, cessRate: 0, gstAmount: 0, cessAmount: 0 };
+                                {/* ── Billing ── */}
+                                <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2"><FaMapMarkerAlt className="text-blue-500" /> Billing</h3>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
 
-                                                    return (
-                                                        <tr key={field.id} className="master-data-row">
-                                                            <td className="master-data-cell">{index + 1}</td>
+                                    <DetailBox label="Address Line" value={billing.addressLine1} />
 
-                                                            <td className="master-data-cell">
-                                                                <div className="fw-semibold">{product?.productName || "—"}</div>
-                                                                <div className="text-muted small">{product?.productCode}</div>
-                                                            </td>
+                                    <DetailBox label="State" value={billing.state} />
+                                    <DetailBox label="City" value={billing.city} />
+                                    <DetailBox label="Pincode" value={billing.pincode} />
+                                </div>
 
-                                                            <td className="master-data-cell">
-                                                                {COLOR_TYPE_LABELS[itemValue?.colorType || ''] || itemValue?.colorType || '—'}
-                                                            </td>
+                                {/* ── Shipping ── */}
+                                <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2"><FaMapMarkerAlt className="text-blue-500" /> Shipping</h3>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
 
-                                                            <td className="master-data-cell text-end">
-                                                                {itemValue?.quantity || 0}
-                                                            </td>
+                                    <DetailBox label="Address Line" value={shipping.addressLine1} />
 
-                                                            <td className="master-data-cell text-end">
-                                                                ₹{calc.unitPrice.toFixed(2)}
-                                                            </td>
+                                    <DetailBox label="State" value={shipping.state} />
+                                    <DetailBox label="City" value={shipping.city} />
+                                    <DetailBox label="Pincode" value={shipping.pincode} />
+                                </div>
 
-                                                            <td className="master-data-cell text-end">
-                                                                ₹{calc.subtotal.toFixed(2)}
-                                                            </td>
+                                {/* ── Items ── */}
+                                <h3 className="text-lg font-semibold text-gray-800 mb-4">Quotation Items</h3>
+                                {errors.items?.root && (
+                                    <div className="text-red-500 text-sm mb-3">{errors.items.root.message}</div>
+                                )}
 
-                                                            <td className="master-data-cell">
+                                <div className="border border-gray-200 rounded-lg overflow-visible mb-4">
+                                    <table className="min-w-full text-sm">
+                                        <thead>
+                                            <tr className="bg-gray-50 border-b border-gray-200">
+                                                <th className="py-3 pl-4 pr-2 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wide w-8">#</th>
+                                                <th className="py-3 px-2 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wide">Product</th>
+                                                <th className="py-3 px-2 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wide">Color Type</th>
+                                                <th className="py-3 px-2 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wide">Qty</th>
+                                                <th className="py-3 px-2 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wide">Unit Price</th>
+                                                <th className="py-3 px-2 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wide">Subtotal</th>
+                                                <th className="py-3 px-2 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wide w-56 min-w-[14rem]">GST Rate</th>
+                                                <th className="py-3 pr-4 pl-2 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wide">GST Amt</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {fields.map((field, index) => {
+                                                const itemValue = getValues(`items.${index}`);
+                                                const product = products.find(p => String(p.id) === String(itemValue?.productId));
+                                                const calc = itemValue?.productId && itemValue?.quantity
+                                                    ? calculateItemDisplay(itemValue)
+                                                    : { subtotal: 0, unitPrice: 0, gstRate: 0, cessRate: 0, gstAmount: 0, cessAmount: 0 };
+
+                                                return (
+                                                    <tr key={field.id} className="border-b border-gray-100 last:border-b-0 bg-white">
+                                                        <td className="py-3 pl-4 pr-2 text-gray-700">{index + 1}</td>
+
+                                                        <td className="py-3 px-2">
+                                                            <div className="font-medium text-gray-900">{product?.productName || "—"}</div>
+                                                            <div className="text-gray-500 text-xs">{product?.productCode}</div>
+                                                        </td>
+
+                                                        <td className="py-3 px-2 text-gray-700">
+                                                            {COLOR_TYPE_LABELS[itemValue?.colorType || ''] || itemValue?.colorType || '—'}
+                                                        </td>
+
+                                                        <td className="py-3 px-2 text-right text-gray-900">
+                                                            {itemValue?.quantity || 0}
+                                                        </td>
+
+                                                        <td className="py-3 px-2 text-right text-gray-900">
+                                                            ₹{calc.unitPrice.toFixed(2)}
+                                                        </td>
+
+                                                        <td className="py-3 px-2 text-right font-medium text-gray-900">
+                                                            ₹{calc.subtotal.toFixed(2)}
+                                                        </td>
+
+                                                        <td className="py-2 px-2 w-56 min-w-[14rem]">
+                                                            <div className="w-full">
                                                                 <Controller
                                                                     name={`items.${index}.gstTaxRateId`}
                                                                     control={control}
@@ -856,134 +796,148 @@ const QuotationForm: React.FC = () => {
                                                                         />
                                                                     )}
                                                                 />
-                                                            </td>
+                                                            </div>
+                                                        </td>
 
-                                                            <td className="master-data-cell text-end">
-                                                                <span>₹{calc.gstAmount.toFixed(2)}</span>
-                                                                {calc.gstRate > 0 && (
-                                                                    <div className="text-muted small">({calc.gstRate}%)</div>
-                                                                )}
-                                                            </td>
-                                                        </tr>
-                                                    );
-                                                })}
-                                            </tbody>
-                                        </table>
-                                    </div>
+                                                        <td className="py-3 pr-4 pl-2 text-right text-gray-900">
+                                                            <div className="font-medium">₹{calc.gstAmount.toFixed(2)}</div>
+                                                            {calc.gstRate > 0 && (
+                                                                <div className="text-gray-500 text-xs">({calc.gstRate}%)</div>
+                                                            )}
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                            {fields.length === 0 && (
+                                                <tr>
+                                                    <td colSpan={8} className="py-8 text-center text-gray-500 text-sm">
+                                                        No items found.
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
 
-                                    {/* ── Single order-level discount input + totals ── */}
-                                    {fields.length > 0 && (
-                                        <div className="d-flex justify-content-end mt-3">
-                                            <div style={{ minWidth: "340px" }}>
-                                                <div className="d-flex align-items-end gap-2 mb-3 justify-content-end">
-                                                    <div style={{ width: "130px" }}>
-                                                        <Controller
-                                                            name="orderDiscountType"
-                                                            control={control}
-                                                            render={({ field: f }) => (
-                                                                <SelectInput
-                                                                    label="Order Discount"
-                                                                    name={f.name}
-                                                                    value={f.value}
-                                                                    options={[
-                                                                        { label: 'Percent', value: 'PERCENT' },
-                                                                        { label: 'Flat', value: 'FLAT' },
-                                                                    ]}
-                                                                    onChange={f.onChange}
-                                                                />
-                                                            )}
-                                                        />
-                                                    </div>
-                                                    <div style={{ width: "140px" }}>
-                                                        <Controller
-                                                            name="orderDiscountValue"
-                                                            control={control}
-                                                            render={({ field: f }) => (
-                                                                <CtrlText
-                                                                    field={{ ...f, value: String(f.value ?? "") }}
-                                                                    label=" "
-                                                                    type="number"
-                                                                    placeholder="0"
-                                                                    error={errors.orderDiscountValue?.message}
-                                                                />
-                                                            )}
-                                                        />
-                                                    </div>
+                                {/* ── Discount input + totals ── */}
+                                {fields.length > 0 && (
+                                    <div className="flex justify-end mb-4">
+                                        <div className="w-full max-w-sm border border-gray-200 rounded-lg p-4 bg-gray-50">
+                                            <div className="flex items-end gap-2 mb-3 justify-end">
+                                                <div className="w-28">
+                                                    <Controller
+                                                        name="orderDiscountType"
+                                                        control={control}
+                                                        render={({ field: f }) => (
+                                                            <SelectInput
+                                                                label="Discount Type"
+                                                                name={f.name}
+                                                                value={f.value}
+                                                                options={[
+                                                                    { label: 'Percent', value: 'PERCENT' },
+                                                                    { label: 'Flat', value: 'FLAT' },
+                                                                ]}
+                                                                onChange={f.onChange}
+                                                            />
+                                                        )}
+                                                    />
+                                                </div>
+                                                <div className="w-28">
+                                                    <Controller
+                                                        name="orderDiscountValue"
+                                                        control={control}
+                                                        render={({ field: f }) => (
+                                                            <CtrlText
+                                                                field={{ ...f, value: String(f.value ?? "") }}
+                                                                label="Value"
+                                                                type="number"
+                                                                placeholder="0"
+                                                                error={errors.orderDiscountValue?.message}
+                                                            />
+                                                        )}
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div className="space-y-1.5 text-sm border-t border-gray-200 pt-3">
+                                                <div className="flex justify-between">
+                                                    <span className="text-gray-500">Subtotal</span>
+                                                    <span className="text-gray-900">₹{totals.subtotal.toFixed(2)}</span>
                                                 </div>
 
-                                                <div className="d-flex justify-content-between py-1">
-                                                    <span className="text-muted">Subtotal</span>
-                                                    <span>₹{totals.subtotal.toFixed(2)}</span>
-                                                </div>
                                                 {totals.totalDiscount > 0 && (
-                                                    <div className="d-flex justify-content-between py-1">
-                                                        <span className="text-muted">Discount</span>
-                                                        <span>- ₹{totals.totalDiscount.toFixed(2)}</span>
+                                                    <div className="flex justify-between">
+                                                        <span className="text-gray-500">Discount</span>
+                                                        <span className="text-red-600">- ₹{totals.totalDiscount.toFixed(2)}</span>
                                                     </div>
                                                 )}
+
                                                 {isInterState ? (
-                                                    <div className="d-flex justify-content-between py-1 small text-success">
-                                                        <span>IGST</span>
-                                                        <span>+ ₹{totals.totalGst.toFixed(2)}</span>
+                                                    <div className="flex justify-between">
+                                                        <span className="text-gray-500">IGST</span>
+                                                        <span className="text-gray-900">+ ₹{totals.totalGst.toFixed(2)}</span>
                                                     </div>
                                                 ) : (
                                                     <>
-                                                        <div className="d-flex justify-content-between py-1 small text-success">
-                                                            <span>CGST</span>
-                                                            <span>+ ₹{(totals.totalGst / 2).toFixed(2)}</span>
+                                                        <div className="flex justify-between">
+                                                            <span className="text-gray-500">CGST</span>
+                                                            <span className="text-gray-900">+ ₹{(totals.totalGst / 2).toFixed(2)}</span>
                                                         </div>
-                                                        <div className="d-flex justify-content-between py-1 small text-success">
-                                                            <span>SGST</span>
-                                                            <span>+ ₹{(totals.totalGst / 2).toFixed(2)}</span>
+                                                        <div className="flex justify-between">
+                                                            <span className="text-gray-500">SGST</span>
+                                                            <span className="text-gray-900">+ ₹{(totals.totalGst / 2).toFixed(2)}</span>
                                                         </div>
                                                     </>
                                                 )}
-                                                <div className="d-flex justify-content-between py-1">
-                                                    <span className="text-muted">Total GST</span>
-                                                    <span>+ ₹{totals.totalGst.toFixed(2)}</span>
+
+                                                <div className="flex justify-between pb-2 border-b border-gray-300">
+                                                    <span className="text-gray-500">Total GST</span>
+                                                    <span className="text-gray-900">+ ₹{totals.totalGst.toFixed(2)}</span>
                                                 </div>
 
-                                                <hr className="my-2" />
-                                                <div className="d-flex justify-content-between py-1 fw-bold">
-                                                    <span>Net Amount</span>
-                                                    <span>₹{totals.netAmount.toFixed(2)}</span>
+                                                <div className="flex justify-between pt-2">
+                                                    <span className="text-base font-bold text-gray-900">Net Amount</span>
+                                                    <span className="text-base font-bold text-gray-900">₹{totals.netAmount.toFixed(2)}</span>
                                                 </div>
                                             </div>
                                         </div>
-                                    )}
-                                </Section>
+                                    </div>
+                                )}
 
-                                {/* ── Remarks — read-only ── */}
+                                {/* ── Notes ── */}
                                 {(remarks || internalNotes) && (
-                                    <Section title="Notes">
-                                        <Row>
-                                            {remarks && <Col md={6}><Field label="Remarks" value={remarks} /></Col>}
-                                            {internalNotes && <Col md={6}><Field label="Internal Notes" value={internalNotes} /></Col>}
-                                        </Row>
-                                    </Section>
+                                    <>
+                                        <h3 className="text-lg font-semibold text-gray-800 mb-4">Notes</h3>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+                                            {remarks && <DetailBox label="Remarks" value={remarks} />}
+                                            {internalNotes && <DetailBox label="Internal Notes" value={internalNotes} />}
+                                        </div>
+                                    </>
                                 )}
 
                                 {/* ── Form Actions ── */}
-                                <div className="form-actions d-flex justify-content-end gap-3 mt-4" style={{ borderTop: "1px solid var(--color-border)", paddingTop: "1.5rem" }}>
+                                <div className="flex flex-wrap justify-end gap-3 mt-8 pt-4 border-t border-gray-200">
                                     <CustomButton
                                         text={isSubmitting ? (isEditMode ? "Updating..." : "Creating...") : (isEditMode ? "Update Draft" : "Save as Draft")}
                                         icon={isSubmitting ? undefined : FaSave}
                                         type="submit"
                                         disabled={isSubmitting || isSubmittingForApproval}
+                                        className="!bg-white !text-blue-600 border border-blue-600 hover:!bg-blue-50"
                                     />
                                     <CustomButton
                                         text={isSubmittingForApproval ? "Submitting..." : "Submit for Approval"}
                                         icon={isSubmittingForApproval ? undefined : FaPaperPlane}
+                                        type="button"
                                         onClick={handleSubmit((data) => onSubmit(data, true))}
                                         disabled={isSubmitting || isSubmittingForApproval}
-                                        className="btn-success"
+                                        className="!bg-blue-600 !text-white hover:!bg-blue-700"
                                     />
                                 </div>
                             </>
                         )}
                     </form>
                 )}
-            </Container>
+            </div>
         </div>
     );
 };

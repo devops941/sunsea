@@ -106,37 +106,56 @@ const TimePickerInput: React.FC<TimePickerInputProps> = ({
   const displayValue = value ? `${hour}:${minute} ${period}` : "";
 
   return (
-    <Form.Group className="time-picker-input-group" ref={containerRef}>
+    <div className="mb-[18px] group" ref={containerRef}>
       {label && (
-        <Form.Label className="time-picker-input-label">
+        <label
+          className={`
+            flex items-center gap-[6px] mb-2
+            text-xs font-bold uppercase
+            tracking-[0.5px]
+            transition-colors duration-250
+            ${error ? "text-red-500" : "text-slate-500"}
+            group-focus-within:text-primary
+          `}
+        >
           <span>{label}</span>
-          {required && <span className="required-star">*</span>}
-        </Form.Label>
+          {required && <span className="text-[#e53935] ml-0.5">*</span>}
+        </label>
       )}
 
-      <div className="time-picker-relative-container">
+      <div className="relative">
         <div
-          className={`time-picker-display-input ${error ? "is-invalid" : ""} ${disabled ? "disabled" : ""}`}
+          className={`
+            w-full h-[35px] px-4 flex items-center justify-between
+            border rounded-[10px] outline-none cursor-pointer
+            text-[15px] font-medium
+            transition-all duration-250
+            ${error
+              ? "border-red-500 bg-white"
+              : "border-slate-300 bg-white hover:border-slate-400 focus-within:border-primary focus-within:ring-4 focus-within:ring-primary/15"
+            }
+            ${disabled ? "bg-[#E5E7EB] cursor-not-allowed text-[#6B7280]" : "text-[#1f2937]"}
+          `}
           onClick={() => !disabled && setIsOpen(!isOpen)}
         >
-          <span className={`time-text ${!displayValue ? "placeholder" : ""}`}>
+          <span className={`truncate ${!displayValue ? "text-[#9ca3af]" : ""}`}>
             {displayValue || "hh:mm AM/PM"}
           </span>
-          <FaRegClock className="time-picker-icon" />
+          <FaRegClock className="text-slate-400 flex-shrink-0" />
         </div>
 
         {isOpen && !disabled && (
-          <div className="time-picker-dropdown">
-            <div className="time-picker-columns">
+          <div className="absolute top-[40px] left-0 z-50 bg-white border border-slate-200 rounded-xl shadow-lg w-[320px] overflow-hidden">
+            <div className="flex bg-slate-50 border-b border-slate-200">
               {/* Hour Column */}
-              <div className="time-picker-column">
-                <div className="column-header">Hour</div>
-                <div className="column-list">
+              <div className="flex-1 border-r border-slate-200">
+                <div className="text-center py-2 text-xs font-bold text-slate-500 uppercase bg-slate-100 border-b border-slate-200">Hour</div>
+                <div className="h-[200px] overflow-y-auto overflow-x-hidden" style={{ scrollbarWidth: 'thin' }}>
                   {hours.map((h) => (
                     <button
                       key={h}
                       type="button"
-                      className={`column-item ${hour === h ? "selected" : ""}`}
+                      className={`w-full text-center py-2 text-sm transition-colors ${hour === h ? "bg-primary text-white font-bold" : "hover:bg-slate-100 text-slate-700"}`}
                       onClick={() => handleSelectHour(h)}
                     >
                       {h}
@@ -146,14 +165,14 @@ const TimePickerInput: React.FC<TimePickerInputProps> = ({
               </div>
 
               {/* Minute Column */}
-              <div className="time-picker-column">
-                <div className="column-header">Min</div>
-                <div className="column-list">
+              <div className="flex-1 border-r border-slate-200">
+                <div className="text-center py-2 text-xs font-bold text-slate-500 uppercase bg-slate-100 border-b border-slate-200">Min</div>
+                <div className="h-[200px] overflow-y-auto overflow-x-hidden" style={{ scrollbarWidth: 'thin' }}>
                   {minutes.map((m) => (
                     <button
                       key={m}
                       type="button"
-                      className={`column-item ${minute === m ? "selected" : ""}`}
+                      className={`w-full text-center py-2 text-sm transition-colors ${minute === m ? "bg-primary text-white font-bold" : "hover:bg-slate-100 text-slate-700"}`}
                       onClick={() => handleSelectMinute(m)}
                     >
                       {m}
@@ -163,14 +182,14 @@ const TimePickerInput: React.FC<TimePickerInputProps> = ({
               </div>
 
               {/* AM/PM Column */}
-              <div className="time-picker-column period-column">
-                <div className="column-header">AM/PM</div>
-                <div className="column-list">
+              <div className="flex-1">
+                <div className="text-center py-2 text-xs font-bold text-slate-500 uppercase bg-slate-100 border-b border-slate-200">AM/PM</div>
+                <div className="h-[200px] overflow-y-auto">
                   {["AM", "PM"].map((p) => (
                     <button
                       key={p}
                       type="button"
-                      className={`column-item ${period === p ? "selected" : ""}`}
+                      className={`w-full text-center py-2 text-sm transition-colors ${period === p ? "bg-primary text-white font-bold" : "hover:bg-slate-100 text-slate-700"}`}
                       onClick={() => handleTogglePeriod(p)}
                     >
                       {p}
@@ -180,10 +199,10 @@ const TimePickerInput: React.FC<TimePickerInputProps> = ({
               </div>
             </div>
 
-            <div className="time-picker-footer">
+            <div className="p-3 bg-white border-t border-slate-200">
               <button
                 type="button"
-                className="time-picker-done-btn"
+                className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold rounded-lg transition-colors text-sm"
                 onClick={() => setIsOpen(false)}
               >
                 Done
@@ -193,8 +212,12 @@ const TimePickerInput: React.FC<TimePickerInputProps> = ({
         )}
       </div>
 
-      {error && <div className="field-error">{error}</div>}
-    </Form.Group>
+      {error && (
+        <div className="text-[#dc3545] text-sm font-medium mt-1">
+          {error}
+        </div>
+      )}
+    </div>
   );
 };
 

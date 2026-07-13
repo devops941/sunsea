@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
-import { Offcanvas } from 'react-bootstrap';
 
 import { useAppSelector } from '../../hooks/reduxHooks';
 import Navbar from '../common/Navbar';
@@ -12,60 +11,38 @@ const BaseLayout = () => {
   const navigate = useNavigate();
   const { user } = useAppSelector((state) => state.auth);
 
-  const searchCategories = [
-    { value: 'all', label: 'All Modules' },
-    { value: 'sales-order', label: 'Sales Orders' },
-    { value: 'products', label: 'Products' },
-    { value: 'customers', label: 'Customers' },
-    { value: 'suppliers', label: 'Suppliers' },
-  ];
-
-  const handleGlobalSearch = (query: string, category: string) => {
-    if (!query.trim()) return;
-    
-    // Navigate to the specific module with search query
-    if (category === 'all') {
-      navigate(`/search?q=${encodeURIComponent(query)}`);
-    } else {
-      navigate(`/${category}?search=${encodeURIComponent(query)}`);
-    }
-  };
-
   return (
-    <div className="layout">
+    <div className="flex h-screen overflow-hidden">
 
       {/* Desktop Sidebar */}
-      <div className="layout-sidebar">
+      <div className="hidden lg:block">
         <Sidebar />
       </div>
 
-      {/* Mobile Sidebar */}
-      <Offcanvas
-        show={showSidebar}
-        onHide={() => setShowSidebar(false)}
-        placement="start"
-        className="mobile-sidebar"
-      >
-        <Offcanvas.Body className="p-0">
-          <Sidebar />
-        </Offcanvas.Body>
-      </Offcanvas>
+      {/* Mobile Sidebar Overlay */}
+      {showSidebar && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          onClick={() => setShowSidebar(false)}
+        ></div>
+      )}
 
-      <div className="layout-content">
+      {/* Mobile Sidebar Drawer */}
+      <div
+        className={`fixed inset-y-0 left-0 z-50 transform transition-transform duration-300 ease-in-out lg:hidden ${showSidebar ? "translate-x-0" : "-translate-x-full"}`}
+      >
+        <Sidebar />
+      </div>
+
+      <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
 
         <Navbar
           onMenuClick={() => setShowSidebar(true)}
           user={user}
           onProfileClick={() => navigate('/profile')}
-          searchPlaceholder="Enter keyword to search..."
-          searchCategories={searchCategories}
-          onSearch={handleGlobalSearch}
-          notificationsCount={3}
-          showLiveStatus={true}
-          liveStatusText="Live"
         />
 
-        <main className="main-content">
+        <main className="flex-1 p-2 min-w-0 overflow-y-auto">
           <Outlet />
         </main>
 

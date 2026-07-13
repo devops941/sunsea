@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Container, Row, Col } from "react-bootstrap";
-import { FaSave, FaEraser, FaArrowLeft } from "react-icons/fa";
+import { FaSave, FaEraser, FaClock } from "react-icons/fa";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useDispatch, useSelector } from "react-redux";
@@ -8,6 +7,7 @@ import { useDispatch, useSelector } from "react-redux";
 import TextInput from "../../../components/form/TextInput/TextInput";
 import TimePickerInput from "../../../components/form/TimePickerInput/TimePickerInput";
 import CustomButton from "../../../components/ui/Button/Button";
+import BackButton from "../../../components/ui/BackButton/BackButton";
 import { updateShift } from "../../../features/shifts/shiftSlice";
 import type { RootState, AppDispatch } from "../../../app/store";
 
@@ -123,37 +123,38 @@ const ShiftEdit: React.FC = () => {
     };
 
     return (
-        <div className="inner-container">
-            <Container fluid>
-                <div className="page-header">
-                    <Row className="align-items-center g-3">
-                        <Col lg={6} md={12}>
-                            <div className="page-header-info">
-                                <h2 className="page-title">Edit Shift</h2>
-                                <div className="page-breadcrumb">Home / HR & Operations / Shift Management / Edit</div>
-                            </div>
-                        </Col>
-                        <Col lg={6} md={12}>
-                            <div className="page-header-actions">
-                                <CustomButton
-                                    text="Back to List"
-                                    icon={FaArrowLeft}
-                                    onClick={() => navigate("/shifts")}
-                                />
-                            </div>
-                        </Col>
-                    </Row>
+        <div className="w-full max-w-7xl mx-auto space-y-6">
+            {/* Page Header */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+                <div className="px-6 py-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                        <h2 className="text-2xl font-bold text-slate-800">
+                            Edit Shift
+                        </h2>
+                    </div>
+                    <BackButton />
                 </div>
+            </div>
 
-                <form onSubmit={handleSubmit} className="form-inner">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+                <form onSubmit={handleSubmit} className="px-6 py-6 space-y-8" noValidate>
                     {isAssigned && (
-                        <div className="alert alert-warning py-2 mb-4 d-flex align-items-center small">
-                            <i className="bi bi-info-circle-fill me-2"></i>
-                            This shift is currently assigned to production plans or logs. You can only toggle its Active/Inactive status.
+                        <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-lg p-4 flex items-start gap-3 text-sm">
+                            <span className="mt-0.5 text-amber-600">⚠️</span>
+                            <div>
+                                This shift is currently assigned to production plans or logs. You can only toggle its Active/Inactive status.
+                            </div>
                         </div>
                     )}
-                    <Row className="g-3">
-                        <Col md={6}>
+
+                    {/* General Info */}
+                    <div>
+                        <div className="flex items-center gap-2 mb-6 pb-2 border-b border-gray-100">
+                            <FaClock className="text-primary text-xl" />
+                            <h3 className="text-lg font-semibold text-gray-700">Shift Details</h3>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             <TextInput
                                 label="Shift Code"
                                 name="shiftCode"
@@ -163,8 +164,7 @@ const ShiftEdit: React.FC = () => {
                                 onChange={handleChange}
                                 disabled
                             />
-                        </Col>
-                        <Col md={6}>
+
                             <TextInput
                                 label="Shift Name"
                                 name="shiftName"
@@ -175,8 +175,7 @@ const ShiftEdit: React.FC = () => {
                                 error={errors.shiftName}
                                 disabled={isAssigned}
                             />
-                        </Col>
-                        <Col md={6}>
+
                             <TimePickerInput
                                 label="Start Time"
                                 name="startTime"
@@ -191,8 +190,7 @@ const ShiftEdit: React.FC = () => {
                                 error={errors.startTime}
                                 disabled={isAssigned}
                             />
-                        </Col>
-                        <Col md={6}>
+
                             <TimePickerInput
                                 label="End Time"
                                 name="endTime"
@@ -207,8 +205,7 @@ const ShiftEdit: React.FC = () => {
                                 error={errors.endTime}
                                 disabled={isAssigned}
                             />
-                        </Col>
-                        <Col md={6}>
+
                             <TextInput
                                 label="Break Duration (mins)"
                                 name="breakDuration"
@@ -219,8 +216,7 @@ const ShiftEdit: React.FC = () => {
                                 error={errors.breakDuration}
                                 disabled={isAssigned}
                             />
-                        </Col>
-                        <Col md={6}>
+
                             <TextInput
                                 label="Grace Period (mins)"
                                 name="gracePeriod"
@@ -231,45 +227,49 @@ const ShiftEdit: React.FC = () => {
                                 error={errors.gracePeriod}
                                 disabled={isAssigned}
                             />
-                        </Col>
-                        <Col md={12}>
-                            <div className="d-flex align-items-center gap-3 mt-2 p-3 bg-light rounded border">
-                                <label className="form-label mb-0 fw-bold">Status: </label>
-                                <div className="form-check form-switch mb-0">
-                                    <input 
-                                        className="form-check-input" 
-                                        type="checkbox" 
-                                        id="isActiveSwitch"
-                                        checked={formData.isActive}
-                                        onChange={(e) => setFormData(prev => ({ ...prev, isActive: e.target.checked }))}
-                                        style={{ cursor: "pointer", width: "40px", height: "20px" }}
-                                    />
-                                    <label className="form-check-label ms-2" htmlFor="isActiveSwitch">
-                                        {formData.isActive ? "Active" : "Inactive"}
-                                    </label>
-                                </div>
-                            </div>
-                        </Col>
-                    </Row>
 
-                    <div className="form-actions d-flex justify-content-end gap-3 mt-4">
+                            <div className="flex flex-col gap-2">
+                                <label className="text-xs font-bold uppercase tracking-[0.5px] text-slate-500">Status</label>
+                                <div className="flex items-center gap-3">
+                                    <div className="relative inline-block w-12 mr-2 align-middle select-none transition duration-200 ease-in">
+                                        <input
+                                            type="checkbox"
+                                            name="isActive"
+                                            id="isActiveSwitch"
+                                            checked={formData.isActive}
+                                            onChange={(e) => setFormData(prev => ({ ...prev, isActive: e.target.checked }))}
+                                            className="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer border-slate-300 checked:border-primary checked:right-0 transition-all duration-200"
+                                            style={{ right: formData.isActive ? '0' : '1.5rem', top: 0, bottom: 0, margin: 'auto' }}
+                                        />
+                                        <label htmlFor="isActiveSwitch" className={`toggle-label block overflow-hidden h-6 rounded-full bg-slate-300 cursor-pointer ${formData.isActive ? 'bg-primary' : ''}`}></label>
+                                    </div>
+                                    <span className="text-sm font-medium text-slate-700">{formData.isActive ? "Active" : "Inactive"}</span>
+                                </div>
+                                <style dangerouslySetInnerHTML={{ __html: `
+                                    .toggle-checkbox:checked { right: 0; border-color: var(--color-primary, #6366f1); }
+                                    .toggle-checkbox:checked + .toggle-label { background-color: var(--color-primary, #6366f1); }
+                                ` }} />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="flex flex-wrap justify-end gap-3 mt-8 pt-4 border-t border-gray-200">
                         <CustomButton
                             text="Cancel"
                             icon={FaEraser}
                             onClick={() => navigate("/shifts")}
                             disabled={loading}
+
                         />
-                        <div className="ms-2">
-                            <CustomButton
-                                text={loading ? "Saving..." : "Update Shift"}
-                                icon={FaSave}
-                                type="submit"
-                                disabled={loading}
-                            />
-                        </div>
+                        <CustomButton
+                            text={loading ? "Saving..." : "Update Shift"}
+                            icon={FaSave}
+                            type="submit"
+                            disabled={loading}
+                        />
                     </div>
                 </form>
-            </Container>
+            </div>
         </div>
     );
 };

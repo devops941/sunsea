@@ -1,6 +1,4 @@
 import React, { useState, useCallback, useEffect } from "react";
-import { Container, Row, Col, Spinner } from "react-bootstrap";
-import { FaSearch, FaChevronLeft, FaChevronRight } from "react-icons/fa";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 
@@ -11,33 +9,10 @@ import CommonViewModal from "../../../components/ui/CommonViewModal/CommonViewMo
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import { salesOrderService } from "../../../services/salesOrderService";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
+import DataTable from "../../../components/ui/table/DataTable";
+import SearchInput from "../../../components/ui/SearchInput/SearchInput";
 
 const ITEMS_PER_PAGE = 10;
-
-type SalesOrderStatus = "DRAFT" | "CONFIRMED" | "PROCESSING" | "SHIPPED" | "DELIVERED" | "CANCELLED";
-
-interface SalesOrder {
-    id: number;
-    orderNo: string;
-    orderDate: string;
-    customerId: number;
-    customerName: string;
-    salesPersonId?: number;
-    salesPersonName?: string;
-    paymentTermId?: number;
-    paymentTermName?: string;
-    billingAddress?: string;
-    shippingAddress?: string;
-    status: SalesOrderStatus;
-    remarks?: string;
-    internalNotes?: string;
-    createdAt: string;
-    updatedAt: string;
-    totalItems: number;
-    totalAmount: number;
-}
-
-
 
 const SalesOrderList: React.FC = () => {
     const navigate = useNavigate();
@@ -49,7 +24,6 @@ const SalesOrderList: React.FC = () => {
     const [searchTerm, setSearchTerm] = useState(initialSearch);
     const [currentPage, setCurrentPage] = useState(1);
     const [total, setTotal] = useState(0);
-
 
     const [showViewModal, setShowViewModal] = useState(false);
     const [selectedItem, setSelectedItem] = useState<any | null>(null);
@@ -68,7 +42,7 @@ const SalesOrderList: React.FC = () => {
             });
 
             setData(response.data || []);
-            setTotal(response.total || 0);
+            setTotal((response.total ?? 0) / 10);
         } catch (error: any) {
             console.error("❌ Fetch error:", error);
             toast.error(error?.response?.data?.message || "Failed to fetch orders");
@@ -86,7 +60,6 @@ const SalesOrderList: React.FC = () => {
         return () => clearTimeout(timer);
     }, [fetchOrders]);
 
-
     const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
         setSearchTerm(e.target.value);
         setCurrentPage(1);
@@ -94,13 +67,11 @@ const SalesOrderList: React.FC = () => {
 
     const handleDeleteConfirm = async () => {
         if (itemToDelete === null) return;
-
         try {
             await salesOrderService.delete(itemToDelete);
             toast.success("Sales order deleted successfully!");
             setShowDeleteModal(false);
             setItemToDelete(null);
-            // Refresh the list
             fetchOrders();
         } catch (error: any) {
             console.error("❌ Delete error:", error);
@@ -113,15 +84,6 @@ const SalesOrderList: React.FC = () => {
         setShowDeleteModal(true);
     }, []);
 
-
-
-
-
-
-
-
-
-
     const formatDate = (dateStr: string) => {
         if (!dateStr) return "N/A";
         const d = new Date(dateStr);
@@ -131,147 +93,69 @@ const SalesOrderList: React.FC = () => {
     const formatCurrency = (amount: number) =>
         `₹${amount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`;
 
-    const totalPages = Math.ceil(total / ITEMS_PER_PAGE);
-
-
-    const handleOpenView = useCallback((item: SalesOrder) => {
+    const handleOpenView = useCallback((item: any) => {
         setSelectedItem(item);
         setShowViewModal(true);
     }, []);
 
-
-
-    const handleOpenEdit = useCallback((item: SalesOrder) => {
+    const handleOpenEdit = useCallback((item: any) => {
         navigate(`/draft-order/edit/${item.id}`, { state: item });
     }, [navigate]);
 
-
-
     return (
-        <div className="inner-container">
-            <Container fluid>
-                {/* Page Header */}
-                <div className="page-header">
-                    <Row className="align-items-center g-3">
-                        <Col lg={6} md={12}>
-                            <div className="page-header-info">
-                                <h2 className="page-title">Draft Orders List</h2>
-                                <div className="page-breadcrumb">Home / Sales / Draft Orders</div>
-                            </div>
-                        </Col>
-                        <Col lg={6} md={12}>
-                            <div className="page-header-actions">
-                                <div className="page-search-wrap">
-                                    <FaSearch className="page-search-icon" />
-                                    <input
-                                        type="text"
-                                        className="page-search-input"
-                                        placeholder="Search orders..."
-                                        value={searchTerm}
-                                        onChange={handleSearch}
-                                    />
-                                </div>
+        <div>
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            {/* Page Header */}
+            <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-slate-200">
+                <div>
+                    <h2 className="text-2xl font-bold text-slate-800">Draft Orders List</h2>
+                </div>
 
-                            </div>
-                        </Col>
-                    </Row>
+                    <div className="flex flex-wrap items-center gap-3 relative w-full lg:w-auto">
+                        <SearchInput
+                            value={searchTerm}
+                            onChange={handleSearch}
+                            placeholder="Search orders..."
+                        />
+                    </div>
                 </div>
 
                 {/* Table */}
-                <div className="master-table-body table-wrap">
-                    <div className="master-table-body">
-                        <table className="master-data-table">
-                            <thead>
-                                <tr>
-                                    <th style={{ width: "60px" }}>#</th>
-                                    <th>ORDER NO</th>
-                                    <th>ORDER DATE</th>
-                                    <th>CUSTOMER</th>
-                                    {/* <th>SALES PERSON</th>
-                                    <th>PAYMENT TERM</th> */}
-                                    {/* <th>ITEMS</th> */}
-                                    {/* <th>TOTAL QUANTITY</th> */}
-                                    <th>STATUS</th>
-                                    <th>ACTIONS</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {loading ? (
-                                    <tr>
-                                        <td colSpan={10} className="text-center p-4">
-                                            <Spinner animation="border" size="sm" className="me-2" />
-                                            Loading orders...
-                                        </td>
-                                    </tr>
-                                ) : data.length > 0 ? (
-                                    data.map((item, index) => (
-                                        <tr key={item.id} className="master-data-row">
-                                            <td className="master-data-cell">
-                                                {(currentPage - 1) * ITEMS_PER_PAGE + index + 1}
-                                            </td>
-                                            <td className="master-data-cell">{item.orderNo}</td>
-                                            <td className="master-data-cell">{formatDate(item.orderDate)}</td>
-                                            <td className="master-data-cell">
-                                                {item.customer?.displayName || item.customer?.firmName || "N/A"}
-                                            </td>
-                                            {/* <td className="master-data-cell">{"N/A"}</td>
-                                            <td className="master-data-cell">{"N/A"}</td> */}
-                                            {/* <td className="master-data-cell">{item.items?.length || 0}</td> */}
-                                            {/* <td className="master-data-cell">
-                                                {item.items?.reduce((sum, i) => sum + (i.quantity || 0), 0) || 0}
-                                            </td> */}
-                                            <td className="master-data-cell">
-                                                {/* <span className={`status-pill ${item.status as SalesOrderStatus || 'DRAFT'}`}>
-                                                    {item.status as SalesOrderStatus || 'DRAFT'}
-                                                </span> */}
-                                                <StatusBadge status={item.status} />
-                                            </td>
-                                            <td className="master-data-cell">
-                                                <div className="table-action-group">
-                                                    <ViewButton onClick={() => handleOpenView(item.id)} />
-                                                    <EditButton
-                                                        onClick={() => handleOpenEdit(item)}
-                                                    // disabled={item.mdApprovalStatus === 'APPROVED'}
-                                                    />
-                                                    <DeleteButton
-                                                        onClick={() => triggerDelete(item.id)}
-                                                    // disabled={item.mdApprovalStatus === 'APPROVED'}
-                                                    />
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))
-                                ) : (
-                                    <tr>
-                                        <td colSpan={10} className="text-center p-4">
-                                            No draft orders found.
-                                        </td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
-
-                        {totalPages > 1 && (
-                            <div className="pagination-wrap">
-                                <button
-                                    className="pagination-btn"
-                                    disabled={currentPage === 1}
-                                    onClick={() => setCurrentPage(prev => prev - 1)}
-                                >
-                                    <FaChevronLeft />
-                                </button>
-                                <div className="pagination-info">Page {currentPage} of {totalPages}</div>
-                                <button
-                                    className="pagination-btn"
-                                    disabled={currentPage === totalPages}
-                                    onClick={() => setCurrentPage(prev => prev + 1)}
-                                >
-                                    <FaChevronRight />
-                                </button>
-                            </div>
-                        )}
-                    </div>
-                </div>
+                <DataTable
+                    data={data}
+                    rowKey={(item) => item.id}
+                    loading={loading}
+                    emptyMessage="No draft orders found."
+                    pagination={{
+                        currentPage,
+                        totalPages: total,
+                        onPageChange: (page) => setCurrentPage(page),
+                    }}
+                    columns={[
+                        {
+                            header: "#",
+                            width: "60px",
+                            render: (_item, index) => (currentPage - 1) * ITEMS_PER_PAGE + index + 1,
+                        },
+                        { header: "ORDER NO", accessor: "orderNo" },
+                        { header: "ORDER DATE", render: (item) => formatDate(item.orderDate) },
+                        {
+                            header: "CUSTOMER",
+                            render: (item) => item.customer?.displayName || item.customer?.firmName || "N/A",
+                        },
+                        { header: "STATUS", render: (item) => <StatusBadge status={item.status} /> },
+                        {
+                            header: "ACTIONS",
+                            render: (item) => (
+                                <div className="flex items-center gap-2">
+                                    <ViewButton onClick={() => handleOpenView(item)} />
+                                    <EditButton onClick={() => handleOpenEdit(item)} />
+                                    <DeleteButton onClick={() => triggerDelete(item.id)} />
+                                </div>
+                            ),
+                        },
+                    ]}
+                />
 
                 {/* View Modal */}
                 <CommonViewModal
@@ -280,13 +164,13 @@ const SalesOrderList: React.FC = () => {
                     modalTitle="Sales Order Details"
                     avatarText={selectedItem ? selectedItem.orderNo.charAt(0).toUpperCase() : ""}
                     headerTitle={selectedItem ? selectedItem.orderNo : ""}
-                    headerSubtitle={selectedItem ? `Customer: ${selectedItem.customerName}` : ""}
+                    headerSubtitle={selectedItem ? `Customer: ${selectedItem.customerName || selectedItem.customer?.displayName || selectedItem.customer?.firmName}` : ""}
                     sections={selectedItem ? [
                         {
                             fields: [
                                 { label: "Order No", value: selectedItem.orderNo },
                                 { label: "Order Date", value: formatDate(selectedItem.orderDate) },
-                                { label: "Customer", value: selectedItem.customerName },
+                                { label: "Customer", value: selectedItem.customerName || selectedItem.customer?.displayName || selectedItem.customer?.firmName },
                                 { label: "Sales Person", value: selectedItem.salesPersonName || "N/A" },
                                 { label: "Payment Term", value: selectedItem.paymentTermName || "N/A" },
                             ]
@@ -301,8 +185,8 @@ const SalesOrderList: React.FC = () => {
                         {
                             title: "Order Summary",
                             fields: [
-                                { label: "Total Items", value: String(selectedItem.totalItems) },
-                                { label: "Total Amount", value: formatCurrency(selectedItem.totalAmount) },
+                                { label: "Total Items", value: String(selectedItem.totalItems || 0) },
+                                { label: "Total Amount", value: formatCurrency(selectedItem.totalAmount || 0) },
                                 { label: "Status", value: selectedItem.status },
                                 { label: "Remarks", value: selectedItem.remarks || "N/A" },
                                 { label: "Internal Notes", value: selectedItem.internalNotes || "N/A" },
@@ -328,7 +212,7 @@ const SalesOrderList: React.FC = () => {
                     confirmText="Delete"
                     confirmVariant="danger"
                 />
-            </Container>
+            </div>
         </div>
     );
 };

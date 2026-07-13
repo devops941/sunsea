@@ -58,7 +58,7 @@ const WastageStockEdit: React.FC = () => {
         }
     }, [location.state, navigate]);
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
     };
@@ -77,7 +77,7 @@ const WastageStockEdit: React.FC = () => {
                         <Col lg={6} md={12}>
                             <div className="page-header-info">
                                 <h2 className="page-title">Edit Wastage Stock Entry</h2>
-                                <div className="page-breadcrumb">Home / Inventory & Warehouse / Wastage Stock / Edit</div>
+                                
                             </div>
                         </Col>
                         <Col lg={6} md={12}>

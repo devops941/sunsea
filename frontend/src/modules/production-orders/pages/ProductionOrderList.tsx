@@ -255,7 +255,7 @@ const ProductionOrderList: React.FC = () => {
                         <Col lg={4} md={12}>
                             <div className="page-header-info">
                                 <h2 className="page-title">Production Order Management</h2>
-                                <div className="page-breadcrumb">Home / Production / Dashboard</div>
+                                
                             </div>
                         </Col>
                         <Col lg={8} md={12}>

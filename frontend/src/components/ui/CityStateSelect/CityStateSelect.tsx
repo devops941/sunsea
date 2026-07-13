@@ -88,10 +88,10 @@ const CityStateSelect: React.FC<CityStateSelectProps> = ({
     if (disabled) {
         return (
             <>
-                <div className="col-md-4">
+                <div className="w-full">
                     <TextInput label={stateLabel} name="stateDisplay" value={stateValue} onChange={() => { }} disabled />
                 </div>
-                <div className="col-md-4">
+                <div className="w-full">
                     <TextInput label={cityLabel} name="cityDisplay" value={cityValue} onChange={() => { }} disabled />
                 </div>
             </>
@@ -100,7 +100,7 @@ const CityStateSelect: React.FC<CityStateSelectProps> = ({
 
     return (
         <>
-            <div className="col-md-4">
+            <div className="w-full">
                 <SelectInput
                     label={stateLabel}
                     name="state"
@@ -110,10 +110,10 @@ const CityStateSelect: React.FC<CityStateSelectProps> = ({
                     required={required}
                     icon={<FaMapMarkerAlt />}
                 />
-                {stateError && <div className="text-danger mt-1">{stateError}</div>}
+                {stateError && <div className="text-red-500 text-sm mt-1">{stateError}</div>}
             </div>
 
-            <div className="col-md-4">
+            <div className="w-full">
                 <SelectInput
                     label={cityLabel}
                     name="city"
@@ -124,7 +124,7 @@ const CityStateSelect: React.FC<CityStateSelectProps> = ({
                     required={required}
                     icon={<FaMapMarkerAlt />}
                 />
-                {cityError && <div className="text-danger mt-1">{cityError}</div>}
+                {cityError && <div className="text-red-500 text-sm mt-1">{cityError}</div>}
             </div>
         </>
     );

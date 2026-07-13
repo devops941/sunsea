@@ -161,7 +161,7 @@ const ProductImageUpload: React.FC = () => {
                         <Col lg={6} md={12}>
                             <div className="page-header-info">
                                 <h2 className="page-title">Product Images Manager</h2>
-                                <div className="page-breadcrumb">Home / Product Management / Images</div>
+                                
                             </div>
                         </Col>
                     </Row>

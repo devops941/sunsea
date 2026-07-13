@@ -1,6 +1,5 @@
 import { Suspense, lazy } from "react";
 import { Routes, Route } from "react-router-dom";
-import { Spinner } from "react-bootstrap";
 
 import BaseLayout from "../components/layout/BaseLayout";
 import ProtectedRoute from "./ProtectedRoute";
@@ -164,8 +163,8 @@ const ProfilePage = lazy(() => import("../modules/profile/ProfilePage"));
 const Settings = lazy(() => import("../modules/settings/Setting"))
 
 const LoadingFallback = () => (
-  <div className="d-flex justify-content-center align-items-center" style={{ minHeight: "100vh" }}>
-    <Spinner animation="border" variant="primary" />
+  <div className="flex justify-center items-center min-h-screen">
+    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
   </div>
 );
 

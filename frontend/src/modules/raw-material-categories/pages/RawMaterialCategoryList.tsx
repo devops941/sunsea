@@ -103,7 +103,7 @@ const RawMaterialCategoryList: React.FC = () => {
                         <Col lg={6} md={12}>
                             <div className="page-header-info">
                                 <h2 className="page-title">Raw Material Category Management</h2>
-                                <div className="page-breadcrumb">Home / Inventory & Warehouse / Raw Material Categories</div>
+                                
                             </div>
                         </Col>
                         <Col lg={6} md={12}>

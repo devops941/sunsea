@@ -244,9 +244,7 @@ const ExpensesCreate: React.FC<ExpensesCreateProps> = ({
                 <h2 className="page-title">
                   {isEdit ? `Edit Expense: ${formData.expenseNumber}` : "Create Expense"}
                 </h2>
-                <div className="page-breadcrumb">
-                  Home / Purchases / Expenses / {isEdit ? "Edit" : "Create"}
-                </div>
+                
               </div>
             </Col>
             <Col lg={6} md={12}>

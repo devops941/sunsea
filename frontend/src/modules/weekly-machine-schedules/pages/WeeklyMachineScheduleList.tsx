@@ -91,12 +91,12 @@ const WeeklyMachineScheduleList: React.FC = () => {
         }
     }, [error]);
 
-    const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleSearch = (e: React.ChangeEvent<any>) => {
         setSearchTerm(e.target.value);
         setCurrentPage(1);
     };
 
-    const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleDateChange = (e: React.ChangeEvent<any>) => {
         const val = e.target.value;
         if (val) {
             const date = new Date(val);
@@ -215,7 +215,7 @@ const WeeklyMachineScheduleList: React.FC = () => {
                         <Col lg={4} md={12}>
                             <div className="page-header-info">
                                 <h2 className="page-title">Weekly Machine Schedules</h2>
-                                <div className="page-breadcrumb">Home / Production / Weekly Schedules</div>
+                                
                             </div>
                         </Col>
                         <Col lg={8} md={12}>

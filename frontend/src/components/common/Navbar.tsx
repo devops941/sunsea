@@ -1,11 +1,5 @@
 import React from 'react';
-import {
-  Navbar,
-  Container,
-} from 'react-bootstrap';
-import {
-  FaBars,
-} from 'react-icons/fa';
+import { FaBars } from 'react-icons/fa';
 
 export interface UserProfile {
   fullName: string;
@@ -14,24 +8,17 @@ export interface UserProfile {
   isSuperAdmin?: boolean;
 }
 
-
-
 export interface NavbarProps {
   onMenuClick?: () => void;
-
-  // User Profile
   user?: UserProfile | null;
   onProfileClick?: () => void;
 }
 
 const TopNavbar: React.FC<NavbarProps> = ({
   onMenuClick,
-
   user,
   onProfileClick,
 }) => {
-
-
   // Helper to get initials
   const getInitials = (name?: string) => {
     if (!name) return "GU";
@@ -51,63 +38,49 @@ const TopNavbar: React.FC<NavbarProps> = ({
   };
 
   return (
-    <Navbar className="inner-header">
-      <Container fluid>
-        {/* Left Section */}
-        <div className="main-header-left">
-        </div>
+    <header className="flex items-center justify-between h-[72px] bg-[#F8F8F8] border-b border-black/10 px-4 md:px-6 shadow-sm shrink-0">
+      {/* Left Section */}
+      <div className="flex items-center gap-4">
+        {/* Mobile Menu */}
+        <button
+          type="button"
+          className="p-2 text-gray-500 hover:text-primary transition-colors lg:hidden rounded-md hover:bg-gray-100"
+          onClick={onMenuClick}
+        >
+          <FaBars size={20} />
+        </button>
+      </div>
 
-        {/* Right Section */}
-        <div className="main-header-right">
-          {/* Live Status */}
-          {/* {showLiveStatus && (
-            <div className="header-live-status">
-              <Badge className="header-live-badge">
-                ● {liveStatusText}
-              </Badge>
-            </div>
-          )} */}
-
-
-
-          {/* Profile */}
-          <div
-            className="header-user-card"
-            role="button"
-            tabIndex={0}
-            onClick={onProfileClick}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") onProfileClick?.();
-            }}
-          >
-            <div className="header-user-avatar">
-              {user?.avatarUrl ? (
-                <img src={user.avatarUrl} alt="avatar" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
-              ) : (
-                getInitials(user?.fullName)
-              )}
-            </div>
-            <div className="header-user-details">
-              <div className="header-user-name">
-                {user ? user.fullName : "Guest"}
-              </div>
-              <div className="header-user-role">
-                {user ? formatRole(user) : "Visitor"}
-              </div>
-            </div>
+      {/* Right Section */}
+      <div className="flex items-center gap-4">
+        {/* Profile */}
+        <div
+          className="flex items-center gap-3 p-1.5 pr-4 rounded-full cursor-pointer transition-all "
+          role="button"
+          tabIndex={0}
+          onClick={onProfileClick}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") onProfileClick?.();
+          }}
+        >
+          <div className="w-9 h-9 rounded-full bg-primary text-white flex items-center justify-center font-bold text-sm shrink-0 overflow-hidden">
+            {user?.avatarUrl ? (
+              <img src={user.avatarUrl} alt="avatar" className="w-full h-full object-cover" />
+            ) : (
+              getInitials(user?.fullName)
+            )}
           </div>
-
-          {/* Mobile Menu */}
-          <button
-            type="button"
-            className="header-menu-toggle"
-            onClick={onMenuClick}
-          >
-            <FaBars />
-          </button>
+          <div className="flex flex-col">
+            <span className="text-sm font-semibold text-gray-800 leading-tight">
+              {user ? user.fullName : "Guest"}
+            </span>
+            <span className="text-xs text-gray-500 leading-tight">
+              {user ? formatRole(user) : "Visitor"}
+            </span>
+          </div>
         </div>
-      </Container>
-    </Navbar>
+      </div>
+    </header>
   );
 };
 

@@ -547,7 +547,7 @@ const ProductEdit: React.FC = () => {
                         <Col lg={6} md={12}>
                             <div className="page-header-info">
                                 <h2 className="page-title">Edit Product</h2>
-                                <div className="page-breadcrumb">Home / Products / Edit Product</div>
+                                
                             </div>
                         </Col>
                     </Row>

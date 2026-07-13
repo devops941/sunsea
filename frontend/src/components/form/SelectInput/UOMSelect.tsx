@@ -43,8 +43,6 @@ const SortableMultiValue = (props: MultiValueProps<any>) => {
   );
 };
 
-import "./SelectInput.css";
-
 interface UOMSelectProps {
   name: string;
   label: string;

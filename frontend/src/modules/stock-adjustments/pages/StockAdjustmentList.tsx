@@ -114,9 +114,7 @@ const StockAdjustmentList: React.FC = () => {
             <Col lg={4} md={12}>
               <div className="page-header-info">
                 <h2 className="page-title">Stock Adjustments</h2>
-                <div className="page-breadcrumb">
-                  Home / Inventory & Warehouse / Stock Adjustments
-                </div>
+
               </div>
             </Col>
             <Col lg={8} md={12}>
