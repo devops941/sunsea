@@ -233,6 +233,46 @@ const QuotationReport: React.FC = () => {
                         </Row>
                     </Section>
 
+                    {order.mdApprovalReason && (
+                        <Section title="Credit Check Snapshot" icon={<FaUser />}>
+                            <Row>
+                                <Col md={3}>
+                                    <Field
+                                        label="Reason"
+                                        value={order.mdApprovalReason
+                                            .split(",")
+                                            .map((r) =>
+                                                r === "CREDIT_LIMIT_EXCEEDED"
+                                                    ? "Credit Limit Exceeded"
+                                                    : r === "OVERDUE_INVOICE"
+                                                    ? "Overdue Invoice"
+                                                    : r
+                                            )
+                                            .join(", ")}
+                                    />
+                                </Col>
+                                <Col md={3}>
+                                    <Field
+                                        label="Credit Limit"
+                                        value={formatMoney(order.creditCheckLimit)}
+                                    />
+                                </Col>
+                                <Col md={3}>
+                                    <Field
+                                        label="Outstanding Balance"
+                                        value={formatMoney(order.creditCheckOutstanding)}
+                                    />
+                                </Col>
+                                <Col md={3}>
+                                    <Field
+                                        label="Exceeded By"
+                                        value={formatMoney(order.creditCheckExceededBy)}
+                                    />
+                                </Col>
+                            </Row>
+                        </Section>
+                    )}
+
                     <Section title="Addresses" icon={<FaMapMarkerAlt />}>
                         <Row>
                             <Col md={6}>

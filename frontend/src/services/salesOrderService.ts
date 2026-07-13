@@ -83,6 +83,10 @@ export interface SalesOrder {
     mdApprovedBy?: string | null;
     mdApprovedAt?: string | null;
     mdRejectionReason?: string | null;
+    mdApprovalReason?: string | null;
+    creditCheckOutstanding?: number | null;
+    creditCheckLimit?: number | null;
+    creditCheckExceededBy?: number | null;
     customerApprovedAt?: string | null;
     customerRejectionReason?: string | null;
     createdBy?: string | null;
@@ -310,5 +314,11 @@ export const salesOrderService = {
     },
     updateDiscount: async (orderId: number, items: { itemId: number; discountType: string; discountValue: number }[]) => {
         return apiClient.patch(`/sales-orders/${orderId}/discounts`, { items });
+    },
+    checkCreditBlock: async (customerId: string): Promise<any> => {
+        const response = await apiClient.get(`/sales-orders/credit-block-check`, {
+            params: { customerId }
+        });
+        return response.data?.data || response.data;
     }
 };

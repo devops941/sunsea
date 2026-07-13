@@ -36,6 +36,12 @@ router.get(
 );
 
 router.get(
+  "/:id/credit-status",
+  authMiddleware,
+  customerController.getCreditStatus
+);
+
+router.get(
   "/:id",
   authMiddleware,
   //requirePermission("customers.view"),

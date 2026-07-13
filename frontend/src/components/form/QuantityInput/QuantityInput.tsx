@@ -106,11 +106,13 @@ const QuantityInput: React.FC<QuantityInputProps> = ({
   };
 
   return (
-    <Form.Group className="text-input-group mb-3">
-      <Form.Label className="text-input-label">
-        <span>{label}</span>
-        {required && <span className="required-star">*</span>}
-      </Form.Label>
+    <Form.Group className={`text-input-group ${label ? "mb-3" : "mb-0"}`}>
+      {label && (
+        <Form.Label className="text-input-label">
+          <span>{label}</span>
+          {required && <span className="required-star">*</span>}
+        </Form.Label>
+      )}
       
       <InputGroup hasValidation>
         <Form.Control

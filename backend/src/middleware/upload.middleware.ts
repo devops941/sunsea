@@ -38,3 +38,20 @@ export const uploadProductImage = multer({
         fileSize: 5 * 1024 * 1024, // 5MB
     },
 });
+
+const ALLOWED_INVOICE_TYPES = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
+
+function invoiceFileFilter(_req: Request, file: Express.Multer.File, cb: multer.FileFilterCallback) {
+    if (!ALLOWED_INVOICE_TYPES.includes(file.mimetype)) {
+        return cb(new Error("Only JPG, PNG, WEBP images, or PDF files are allowed."));
+    }
+    cb(null, true);
+}
+
+export const uploadInvoiceImage = multer({
+    storage: multer.memoryStorage(),
+    fileFilter: invoiceFileFilter,
+    limits: {
+        fileSize: 5 * 1024 * 1024, // 5MB
+    },
+});

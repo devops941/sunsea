@@ -1,20 +1,19 @@
 import React, { useState, useCallback, useEffect } from "react";
 import { Container, Row, Col, Spinner } from "react-bootstrap";
-import { FaSearch, FaChevronLeft, FaChevronRight, FaPlus, FaTrash, FaEye, FaFilePdf } from "react-icons/fa";
+import { FaSearch, FaChevronLeft, FaChevronRight, FaPlus, FaTrash, FaEye } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useSelector } from "react-redux";
 
-import CommonViewModal from "../../../../components/ui/CommonViewModal/CommonViewModal";
-import CommonConfirmModal from "../../../../components/ui/CommonConfirmModal/CommonConfirmModal";
-import { grnInvoiceService } from "../../../../services/grnInvoiceService";
-import CustomButton from "../../../../components/ui/custombutton/CustomButton";
+import CommonViewModal from "../../components/ui/CommonViewModal/CommonViewModal";
+import CommonConfirmModal from "../../components/ui/CommonConfirmModal/CommonConfirmModal";
+import { salesInvoiceService } from "../../services/salesInvoiceService";
+import CustomButton from "../../components/ui/custombutton/CustomButton";
 
 const ITEMS_PER_PAGE = 10;
 
-const InvoiceList: React.FC = () => {
+const SalesInvoiceList: React.FC = () => {
     const navigate = useNavigate();
-    const user = useSelector((state: any) => state?.auth?.user);
     const [data, setData] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
@@ -30,7 +29,7 @@ const InvoiceList: React.FC = () => {
     const fetchInvoices = useCallback(async () => {
         setLoading(true);
         try {
-            const response = await grnInvoiceService.fetchAll({
+            const response = await salesInvoiceService.fetchAll({
                 page: currentPage,
                 pageSize: ITEMS_PER_PAGE,
                 search: searchTerm || undefined,
@@ -60,7 +59,7 @@ const InvoiceList: React.FC = () => {
         if (itemToDelete === null) return;
 
         try {
-            await grnInvoiceService.delete(itemToDelete);
+            await salesInvoiceService.delete(itemToDelete);
             toast.success("Invoice deleted successfully!");
             setShowDeleteModal(false);
             setItemToDelete(null);
@@ -84,7 +83,7 @@ const InvoiceList: React.FC = () => {
 
     const handleOpenView = async (item: any) => {
         try {
-            const details = await grnInvoiceService.fetchById(item.id);
+            const details = await salesInvoiceService.fetchById(item.id);
             setSelectedItem(details);
             setShowViewModal(true);
         } catch (error) {
@@ -100,8 +99,8 @@ const InvoiceList: React.FC = () => {
                     <Row className="align-items-center g-3">
                         <Col lg={6} md={12}>
                             <div className="page-header-info">
-                                <h2 className="page-title">Invoice List</h2>
-                                <div className="page-breadcrumb">Home / Purchase / Invoice List</div>
+                                <h2 className="page-title">Sales Invoice List</h2>
+                                <div className="page-breadcrumb">Home / Sales / Invoice List</div>
                             </div>
                         </Col>
                         <Col lg={6} md={12}>
@@ -119,7 +118,7 @@ const InvoiceList: React.FC = () => {
                                 <CustomButton
                                     text="Create Invoice"
                                     icon={FaPlus}
-                                    onClick={() => navigate("/invoice/create")}
+                                    onClick={() => navigate("/sales-invoices/create")}
                                 />
                             </div>
                         </Col>
@@ -133,10 +132,9 @@ const InvoiceList: React.FC = () => {
                             <thead>
                                 <tr>
                                     <th style={{ width: "60px" }}>#</th>
-                                    <th>GRN NO</th>
                                     <th>INVOICE NO</th>
-                                    <th>GRN DATE</th>
-                                    <th>SUPPLIER</th>
+                                    <th>INVOICE DATE</th>
+                                    <th>CUSTOMER</th>
                                     <th>NET AMOUNT</th>
                                     <th>ACTIONS</th>
                                 </tr>
@@ -144,7 +142,7 @@ const InvoiceList: React.FC = () => {
                             <tbody>
                                 {loading ? (
                                     <tr>
-                                        <td colSpan={7} className="text-center p-4">
+                                        <td colSpan={6} className="text-center p-4">
                                             <Spinner animation="border" size="sm" className="me-2" />
                                             Loading invoices...
                                         </td>
@@ -155,14 +153,13 @@ const InvoiceList: React.FC = () => {
                                             <td className="master-data-cell">
                                                 {(currentPage - 1) * ITEMS_PER_PAGE + index + 1}
                                             </td>
-                                            <td className="master-data-cell fw-semibold">{item.grnNumber}</td>
-                                            <td className="master-data-cell">{item.invoiceNo}</td>
-                                            <td className="master-data-cell">{formatDate(item.grnDate)}</td>
+                                            <td className="master-data-cell fw-semibold">{item.invoiceNo}</td>
+                                            <td className="master-data-cell">{formatDate(item.invoiceDate)}</td>
                                             <td className="master-data-cell">
-                                                {item.supplier?.displayName || item.supplier?.legalName || "N/A"}
+                                                {item.customer?.displayName || item.customer?.firmName || "N/A"}
                                             </td>
                                             <td className="master-data-cell fw-semibold text-success">
-                                                {formatCurrency(item.netAmount)}
+                                                {formatCurrency(item.grandTotal)}
                                             </td>
                                             <td className="master-data-cell">
                                                 <div className="table-action-group d-flex gap-2">
@@ -177,7 +174,7 @@ const InvoiceList: React.FC = () => {
                                     ))
                                 ) : (
                                     <tr>
-                                        <td colSpan={7} className="text-center p-4">
+                                        <td colSpan={6} className="text-center p-4">
                                             No invoices found.
                                         </td>
                                     </tr>
@@ -213,117 +210,57 @@ const InvoiceList: React.FC = () => {
                 <CommonViewModal
                     show={showViewModal}
                     onHide={() => setShowViewModal(false)}
-                    modalTitle="GRN Invoice details"
-                    avatarText={selectedItem ? selectedItem.grnNumber.charAt(0).toUpperCase() : ""}
-                    headerTitle={selectedItem ? selectedItem.grnNumber : ""}
+                    modalTitle="Sales Invoice details"
+                    avatarText={selectedItem ? selectedItem.invoiceNo.charAt(0).toUpperCase() : ""}
+                    headerTitle={selectedItem ? selectedItem.invoiceNo : ""}
                     headerSubtitle={
-                        selectedItem ? `Supplier: ${selectedItem.supplier?.displayName || selectedItem.supplier?.legalName || "N/A"}` : ""
+                        selectedItem ? `Customer: ${selectedItem.customer?.displayName || selectedItem.customer?.firmName || "N/A"}` : ""
                     }
                     sections={
                         selectedItem
                             ? [
                                 {
                                     fields: [
-                                        { label: "GRN No", value: selectedItem.grnNumber },
                                         { label: "Invoice No", value: selectedItem.invoiceNo },
-                                        { label: "GRN Date", value: formatDate(selectedItem.grnDate) },
-                                        { label: "Store", value: selectedItem.store?.storeName || "N/A" },
+                                        { label: "Invoice Date", value: formatDate(selectedItem.invoiceDate) },
+                                        { label: "Due Date", value: formatDate(selectedItem.dueDate) },
                                     ],
                                 },
                                 {
-                                    title: "Address details",
+                                    title: "Billing & Shipping Details",
                                     fields: [
                                         {
                                             label: "Billing address",
                                             value: [
-                                                selectedItem.billingAddressLine1,
-                                                selectedItem.billingCity,
-                                                selectedItem.billingState,
-                                                selectedItem.billingPincode,
+                                                selectedItem.customer?.billingAddressLine1,
+                                                selectedItem.customer?.billingCity,
+                                                selectedItem.customer?.billingState,
+                                                selectedItem.customer?.billingPincode,
                                             ]
                                                 .filter(Boolean)
                                                 .join(", ") || "N/A",
                                         },
                                         {
                                             label: "Shipping address",
-                                            value: selectedItem.sameAsBilling
-                                                ? "Same as billing"
-                                                : [
-                                                    selectedItem.shippingAddressLine1,
-                                                    selectedItem.shippingCity,
-                                                    selectedItem.shippingState,
-                                                    selectedItem.shippingPincode,
-                                                ]
-                                                    .filter(Boolean)
-                                                    .join(", ") || "N/A",
+                                            value: [
+                                                selectedItem.customer?.shippingAddressLine1,
+                                                selectedItem.customer?.shippingCity,
+                                                selectedItem.customer?.shippingState,
+                                                selectedItem.customer?.shippingPincode,
+                                            ]
+                                                .filter(Boolean)
+                                                .join(", ") || "N/A",
                                         },
                                     ],
                                 },
                                 {
-                                    title: "Invoice summary",
+                                    title: "Invoice Summary",
                                     fields: [
                                         { label: "Total items", value: String(selectedItem.items?.length ?? 0) },
-                                        { label: "Subtotal", value: formatCurrency(selectedItem.subtotal) },
-                                        { label: "Total discount", value: formatCurrency(selectedItem.totalDiscount) },
-                                        { label: "Total tax", value: formatCurrency(selectedItem.totalTax) },
-                                        { label: "Net amount", value: formatCurrency(selectedItem.netAmount) },
-                                        { label: "Payment Status", value: selectedItem.paymentStatus || "Unpaid" },
-                                        { label: "Remarks", value: selectedItem.remarks || "N/A" },
-                                    ],
-                                },
-                                {
-                                    title: "Attachment",
-                                    fields: [
-                                        {
-                                            label: "Invoice Copy",
-                                            value: selectedItem.invoiceImage ? (
-                                                <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "4px" }}>
-                                                    {selectedItem.invoiceImage.toLowerCase().endsWith(".pdf") ? (
-                                                        <a
-                                                            href={selectedItem.invoiceImage}
-                                                            target="_blank"
-                                                            rel="noreferrer"
-                                                            className="btn btn-outline-primary btn-sm"
-                                                            style={{ display: "inline-flex", alignItems: "center", gap: "6px", width: "fit-content" }}
-                                                        >
-                                                            <FaFilePdf /> View PDF Document
-                                                        </a>
-                                                    ) : (
-                                                        <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                                                            <img
-                                                                src={selectedItem.invoiceImage}
-                                                                alt="Invoice Copy"
-                                                                style={{
-                                                                    maxWidth: "100%",
-                                                                    maxHeight: "300px",
-                                                                    objectFit: "contain",
-                                                                    border: "1px solid var(--color-border)",
-                                                                    borderRadius: "6px"
-                                                                }}
-                                                            />
-                                                            <a
-                                                                href={selectedItem.invoiceImage}
-                                                                target="_blank"
-                                                                rel="noreferrer"
-                                                                className="btn btn-link btn-sm text-decoration-none p-0 text-start"
-                                                                style={{ width: "fit-content" }}
-                                                            >
-                                                                Open in New Tab
-                                                            </a>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            ) : (
-                                                "No file uploaded"
-                                            )
-                                        }
-                                    ]
-                                },
-                                {
-                                    title: "Timestamps",
-                                    fields: [
-                                        { label: "Created at", value: formatDate(selectedItem.createdAt) },
-                                        { label: "Last updated", value: formatDate(selectedItem.updatedAt) },
+                                        { label: "Subtotal", value: formatCurrency(selectedItem.subTotal) },
+                                        { label: "Total tax", value: formatCurrency(selectedItem.taxTotal) },
+                                        { label: "Grand Total", value: formatCurrency(selectedItem.grandTotal) },
+                                        { label: "Notes", value: selectedItem.notes || "N/A" },
                                     ],
                                 },
                             ]
@@ -331,13 +268,13 @@ const InvoiceList: React.FC = () => {
                     }
                 />
 
-                {/* Delete Modal */}
+                {/* Delete Confirmation Modal */}
                 <CommonConfirmModal
                     show={showDeleteModal}
                     onHide={() => setShowDeleteModal(false)}
                     onConfirm={handleDeleteConfirm}
-                    title="Confirm delete"
-                    message="Are you sure you want to delete this GRN Invoice?"
+                    title="Delete Invoice"
+                    message="Are you sure you want to delete this invoice? This action cannot be undone."
                     confirmText="Delete"
                     confirmVariant="danger"
                 />
@@ -346,4 +283,4 @@ const InvoiceList: React.FC = () => {
     );
 };
 
-export default InvoiceList;
+export default SalesInvoiceList;

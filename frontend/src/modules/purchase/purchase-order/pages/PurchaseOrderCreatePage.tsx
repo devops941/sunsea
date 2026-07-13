@@ -8,6 +8,7 @@ import { useSelector } from "react-redux";
 import TextInput from "../../../../components/form/TextInput/TextInput";
 import SelectInput from "../../../../components/form/SelectInput/SelectInput";
 import CustomButton from "../../../../components/ui/custombutton/CustomButton";
+import QuantityInput from "../../../../components/form/QuantityInput/QuantityInput";
 import CityStateSelect from "../../../../components/ui/CityStateSelect/CityStateSelect";
 import type { StateCityOption } from "../../../../components/ui/CityStateSelect/CityStateSelect";
 
@@ -565,7 +566,7 @@ const PurchaseOrderCreatePage: React.FC = () => {
           } as any)
           : undefined,
         unitPrice: parsedUnitPrice,
-        uom: rawMaterial?.baseUom || "",
+        uom: rawMaterial?.baseUom ? rawMaterial.baseUom.split(",")[0].trim() : "",
         tax: totalGstRate,
         taxableAmount,
         cgstRate,
@@ -660,6 +661,9 @@ const PurchaseOrderCreatePage: React.FC = () => {
         shippingState: formData.shippingState,
         shippingPincode: formData.shippingPincode,
         remarks: formData.remarks,
+        storeId: formData.storeId,
+        discountType: formData.discountType,
+        discountValue: formData.discountValue,
 
         items: formData.items.map((item) => ({
           productId: item.productId,
@@ -716,15 +720,6 @@ const PurchaseOrderCreatePage: React.FC = () => {
     })),
   ], [gstTaxes, gstLoading]);
 
-  const uomOptions = useMemo(() => {
-    return [
-      { value: "", label: "-- Select UOM --" },
-      ...(activeUOMs || []).map((u: any) => ({
-        value: u.uomName as string,
-        label: u.uomName as string,
-      }))
-    ];
-  }, [activeUOMs]);
 
   const supplierMaterials = selectedSupplier?.category
     ? selectedSupplier.category.split(",").map((c: string) => c.trim().toLowerCase())
@@ -938,8 +933,7 @@ const PurchaseOrderCreatePage: React.FC = () => {
                 <colgroup>
                   <col style={{ width: "4%" }} />
                   <col style={{ width: "26%" }} />
-                  <col style={{ width: "10%" }} />
-                  <col style={{ width: "10%" }} />
+                  <col style={{ width: "20%" }} />
                   <col style={{ width: "14%" }} />
                   <col style={{ width: "14%" }} />
                   <col style={{ width: "14%" }} />
@@ -948,13 +942,12 @@ const PurchaseOrderCreatePage: React.FC = () => {
                 <thead>
                   <tr>
                     <th>#</th>
-                    <th>RAW MATERIAL</th>
-                    <th>UOM</th>
-                    <th>QTY</th>
-                    <th>UNIT PRICE (₹)</th>
-                    <th>TAX %</th>
-                    <th>TAXABLE (₹)</th>
-                    <th>ACTION</th>
+                    <th>Material</th>
+                    <th>Quantity / UOM</th>
+                    <th>Unit Price</th>
+                    <th>GST (%)</th>
+                    <th>Total</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -964,6 +957,11 @@ const PurchaseOrderCreatePage: React.FC = () => {
                     const lineSubtotal = qty * price;
 
                     const taxableAmount = lineSubtotal;
+
+                    const itemRawMaterial = rawMaterials.find(
+                      (rm) => String(rm.rawMaterialId) === String(item.productId)
+                    );
+                    const baseUoms = itemRawMaterial?.baseUom || "";
 
                     return (
                       <tr key={index} className="master-data-row">
@@ -983,27 +981,14 @@ const PurchaseOrderCreatePage: React.FC = () => {
                         </td>
 
                         <td className="master-data-cell">
-                          <SelectInput
-                            label=""
-                            name={`items[${index}].uom`}
-                            options={uomOptions}
-                            value={item.uom || ""}
-                            onChange={(e) => handleItemChange(index, "uom", e.target.value)}
-                            error={errors[`items.${index}.uom`]}
-                          />
-                        </td>
-
-                        <td className="master-data-cell">
-                          <TextInput
+                          <QuantityInput
                             label=""
                             name={`items[${index}].quantity`}
-                            type="number"
-                            value={String(item.quantity)}
-                            onChange={(e) => handleItemChange(index, "quantity", Number(e.target.value))}
+                            value={item.quantity}
+                            baseUoms={baseUoms}
+                            required
                             error={errors[`items.${index}.quantity`]}
-                            min={0.01}
-                            step={0.01}
-                            placeholder="0.00"
+                            onChange={(e) => handleItemChange(index, "quantity", Number(e.target.value))}
                           />
                         </td>
 

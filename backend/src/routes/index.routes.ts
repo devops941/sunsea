@@ -42,7 +42,10 @@ import supplierMaterialPriceRoutes from "../modules/supplier-material-price/supp
 import productionWastageRoutes from "../modules/production-wastage/production-wastage.routes";
 import gstTaxRoutes from "../modules/gst/gstTaxRoutes";
 import whatsappRoutes from "../modules/whatsappservice/whatsapp.routes";
+import invoiceSettingsRoutes from "../modules/invoice-settings/invoice-settings.routes";
 import expenseRoutes from "../modules/expense/expense.routes";
+import grnInvoiceRoutes from "../modules/grn-invoice/grn-invoice.routes";
+import salesInvoiceRoutes from "../modules/sales-invoice/sales-invoice.routes";
 
 const router = Router();
 
@@ -95,6 +98,9 @@ router.use("/stock-adjustments", stockAdjustmentRoutes);
 router.use("/production-wastages", productionWastageRoutes);
 router.use("/gst-tax", gstTaxRoutes);
 router.use("/whatsapp", whatsappRoutes);
+router.use("/invoice-settings", invoiceSettingsRoutes);
 router.use("/expenses", expenseRoutes);
+router.use("/grn-invoices", grnInvoiceRoutes);
+router.use("/sales-invoices", salesInvoiceRoutes);
 
 export default router;

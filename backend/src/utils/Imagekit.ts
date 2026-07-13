@@ -12,7 +12,7 @@ import { ApiError } from "./ApiError";
  * @param folder    ImageKit folder path, e.g. "/company-logos" or "/products"
  */
 export async function uploadToImageKit(
-    filePath: string,
+    fileInput: string | Buffer,
     fileName: string,
     folder: string
 ): Promise<string> {
@@ -24,7 +24,7 @@ export async function uploadToImageKit(
 
     const token = Buffer.from(`${privateKey}:`).toString("base64");
 
-    const fileBuffer = fs.readFileSync(filePath);
+    const fileBuffer = Buffer.isBuffer(fileInput) ? fileInput : fs.readFileSync(fileInput);
     const blob = new Blob([fileBuffer]);
 
     const formData = new FormData();

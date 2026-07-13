@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../config/prisma";
 import { ApiError } from "../../utils/ApiError";
+import creditCheckService from "./creditCheckService";
 import {
     CreateSalesOrderInput,
     UpdateSalesOrderInput,
@@ -346,9 +347,12 @@ class SalesOrderService {
         });
     }
 
-    // ─── Create Sales Order ─────────────────────────────────────────────
-
     async create(data: CreateSalesOrderInput) {
+        const blockResult = await creditCheckService.hasBlockingPendingOrder(data.customerId);
+        if (blockResult.blocked && blockResult.blockingOrder) {
+            throw new ApiError(409, `This customer has a pending credit approval (Order #${blockResult.blockingOrder.orderNo}). New orders are blocked until MD approves or rejects it.`);
+        }
+
         if (!data.items || data.items.length === 0) {
             throw new ApiError(400, "At least one item is required");
         }
@@ -443,6 +447,31 @@ class SalesOrderService {
             }
         );
 
+        const creditResult = await creditCheckService.checkCustomerCredit(
+            data.customerId,
+            Number(orderTotals.netAmount)
+        );
+
+        const reasons: string[] = [];
+        let mdApprovalReason: string | null = null;
+        let creditCheckOutstanding: Prisma.Decimal | null = null;
+        let creditCheckLimit: Prisma.Decimal | null = null;
+        let creditCheckExceededBy: Prisma.Decimal | null = null;
+
+        if (!creditResult.withinLimit) {
+            reasons.push("CREDIT_LIMIT_EXCEEDED");
+            creditCheckExceededBy = new Prisma.Decimal(creditResult.exceededBy);
+        }
+        if (creditResult.hasOverdue) {
+            reasons.push("OVERDUE_INVOICE");
+        }
+
+        if (reasons.length > 0) {
+            mdApprovalReason = reasons.join(",");
+            creditCheckOutstanding = new Prisma.Decimal(creditResult.outstanding);
+            creditCheckLimit = new Prisma.Decimal(creditResult.creditLimit);
+        }
+
         return prisma.salesOrder.create({
             data: {
                 orderNo: data.orderNo,
@@ -476,6 +505,10 @@ class SalesOrderService {
                 totalSgst: orderTotals.totalSgst,
                 totalIgst: orderTotals.totalIgst,
                 netAmount: orderTotals.netAmount,
+                mdApprovalReason,
+                creditCheckOutstanding,
+                creditCheckLimit,
+                creditCheckExceededBy,
                 items: {
                     create: lineCalcs.map((line) => ({
                         productId: line.productId,

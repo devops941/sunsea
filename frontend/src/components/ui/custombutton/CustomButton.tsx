@@ -26,6 +26,8 @@ interface CustomButtonProps {
 
   disabled?: boolean;
 
+  loading?: boolean;
+
   className?: string;
 
   onClick?: MouseEventHandler<HTMLButtonElement>;
@@ -39,27 +41,37 @@ const CustomButton = ({
   size = "md",
   width = "fit-content",
   disabled = false,
+  loading = false,
   className = "",
   onClick,
 }: CustomButtonProps) => {
   return (
     <button
       type={type}
-      disabled={disabled}
+      disabled={disabled || loading}
       onClick={onClick}
       style={{ width }}
       className={`
         custom-btn
         custom-btn--${variant}
         custom-btn--${size}
+        ${loading ? "custom-btn--loading" : ""}
         ${className}
       `}
     >
-      {Icon && (
-        <Icon
-          className="custom-btn-icon"
-          size={18}
+      {loading ? (
+        <span
+          className="spinner-border spinner-border-sm me-2"
+          role="status"
+          aria-hidden="true"
         />
+      ) : (
+        Icon && (
+          <Icon
+            className="custom-btn-icon"
+            size={18}
+          />
+        )
       )}
 
       <span className="custom-btn-text">

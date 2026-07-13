@@ -9,6 +9,7 @@ import AllSalesOrderList from "../salesorder/AllSalesOrderList";
 import SalesOrderList from "../salesorder/SalesOrderList";
 import QuotationList from "../quatation/QuatationList";
 import PendingQuatationList from "../quatation/PendingQuatation";
+import SalesInvoiceList from "../../sales-order-invoice/SalesInvoiceList";
 
 const SalesTabs: React.FC = () => {
     const location = useLocation();
@@ -19,14 +20,17 @@ const SalesTabs: React.FC = () => {
         "/sales-order": "orders",
         "/draft-order": "drafts",
         "/quatation-order": "quotations",
-        "/pending-quotations": "approvals"
+        "/pending-quotations": "approvals",
+        "/sales-invoices": "salesorderinvoice",
+
     };
 
     const keyToPath: Record<string, string> = {
         "orders": "/sales-order",
         "drafts": "/draft-order",
         "quotations": "/quatation-order",
-        "approvals": "/pending-quotations"
+        "approvals": "/pending-quotations",
+        "salesorderinvoice": "/sales-invoices"
     };
 
     const activeTab = pathToKey[location.pathname] || "orders";
@@ -35,7 +39,8 @@ const SalesTabs: React.FC = () => {
         { key: "orders", label: "Sales Orders", icon: <FaFileInvoice />, content: <AllSalesOrderList /> },
         { key: "drafts", label: "Draft Orders", icon: <FaFileAlt />, content: <SalesOrderList /> },
         { key: "quotations", label: "Quotations", icon: <FaFileSignature />, content: <QuotationList /> },
-        { key: "approvals", label: "MD Approvals", icon: <FaUserCheck />, content: <PendingQuatationList /> }
+        { key: "approvals", label: "MD Approvals", icon: <FaUserCheck />, content: <PendingQuatationList /> },
+        { key: "salesorderinvoice", label: "Sales Invoice", icon: <FaFileInvoice />, content: <SalesInvoiceList /> },
     ];
 
     const handleTabChange = (key: string) => {

@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 
 import customerService from "./customer.service";
 import { prisma } from "../../config/prisma";
+import creditCheckService from "../sales-order/creditCheckService";
 
 import { asyncHandler } from "../../utils/asyncHandler";
 import { ApiResponse } from "../../utils/ApiResponse";
@@ -103,6 +104,14 @@ class CustomerController {
       );
     }
   );
+
+  getCreditStatus = asyncHandler(async (req: Request, res: Response) => {
+    const id = req.params.id as string;
+    const creditResult = await creditCheckService.checkCustomerCredit(id, 0);
+    return res.status(200).json(
+      new ApiResponse("Customer credit status fetched successfully", creditResult)
+    );
+  });
 
   delete = asyncHandler(
     async (req: Request, res: Response) => {

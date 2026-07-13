@@ -18,6 +18,7 @@ import { useCustomers } from "../../../hooks/useCustomers";
 import { useProducts } from "../../../hooks/useProducts";
 import { salesOrderService } from "../../../services/salesOrderService";
 import { useEmployees } from "../../../hooks/useEmployees";
+import { customerService } from "../../../services/customerService";
 import { COLOUR_OPTIONS, CUSTOMER_TYPE_OPTIONS, DISPATCH_TYPE_OPTIONS, ORDER_TYPE_OPTIONS } from "../../../constants/selectOption";
 
 const orderItemSchema = z.object({
@@ -198,6 +199,11 @@ const SalesOrderForm: React.FC = () => {
     const { data: company } = useSelector((state: any) => state.company);
     const companyState = company?.state;
 
+    const [creditStatus, setCreditStatus] = useState<any | null>(null);
+    const [fetchingCredit, setFetchingCredit] = useState(false);
+    const [blockingOrder, setBlockingOrder] = useState<{ id: number; orderNo: string } | null>(null);
+    const [isBlocked, setIsBlocked] = useState(false);
+
     const handleBillingStateChange = (stateData: StateCityOption) => {
         setValue("billingState", stateData.name, { shouldValidate: true });
         setValue("billingCity", "", { shouldValidate: true });
@@ -329,6 +335,72 @@ const SalesOrderForm: React.FC = () => {
     const shippingCity = watch("shippingCity");
     const selectedCustomerId = watch("customerId");
     const orderType = watch("orderType");
+
+    useEffect(() => {
+        if (!selectedCustomerId) {
+            setCreditStatus(null);
+            setIsBlocked(false);
+            setBlockingOrder(null);
+            return;
+        }
+        setFetchingCredit(true);
+        customerService.fetchCreditStatus(selectedCustomerId)
+            .then((res) => {
+                setCreditStatus(res);
+            })
+            .catch((err) => {
+                console.error("Failed to fetch credit status:", err);
+            })
+            .finally(() => {
+                setFetchingCredit(false);
+            });
+
+        salesOrderService.checkCreditBlock(selectedCustomerId)
+            .then((res) => {
+                setIsBlocked(res.blocked);
+                setBlockingOrder(res.blockingOrder || null);
+            })
+            .catch((err) => {
+                console.error("Failed to check credit block:", err);
+            });
+    }, [selectedCustomerId]);
+
+    const formItems = watch("items");
+    const customerType = watch("customerType");
+
+    const proposedTotal = useMemo(() => {
+        if (!formItems || !Array.isArray(formItems)) return 0;
+        let sum = 0;
+        formItems.forEach((item) => {
+            if (!item.productCode || !item.quantity) return;
+            const p = products.find((prod) => String(prod.id) === String(item.productCode));
+            if (!p) return;
+
+            let unitPrice = 0;
+            if (customerType === "MRP") {
+                unitPrice = p.mrp ?? p.b2b ?? p.b2c ?? p.exportPrice ?? 0;
+            } else if (customerType === "B2C") {
+                unitPrice = p.b2c ?? p.mrp ?? p.b2b ?? p.exportPrice ?? 0;
+            } else if (customerType === "EXPORT") {
+                unitPrice = p.exportPrice ?? p.mrp ?? p.b2b ?? p.b2c ?? 0;
+            } else {
+                unitPrice = p.b2b ?? p.mrp ?? p.b2c ?? p.exportPrice ?? 0;
+            }
+
+            const qty = Number(item.quantity) || 0;
+            const lineSubtotal = unitPrice * qty;
+            const gstRate = p.gstRate ?? 0;
+            const lineGst = (lineSubtotal * gstRate) / 100;
+            sum += lineSubtotal + lineGst;
+        });
+        return sum;
+    }, [formItems, customerType, products]);
+
+    const limitExceeded = useMemo(() => {
+        if (!creditStatus) return false;
+        const totalExposure = creditStatus.outstanding + proposedTotal;
+        return totalExposure > creditStatus.creditLimit;
+    }, [creditStatus, proposedTotal]);
 
     // ─── Auto‑generate order number ──────────────────────────────────
     useEffect(() => {
@@ -528,6 +600,55 @@ const SalesOrderForm: React.FC = () => {
                                 />
                             )} />
                             <Err message={errors.customerId?.message} />
+                            {fetchingCredit && <div className="text-muted small mt-1">Fetching customer credit limit...</div>}
+                            {creditStatus && !fetchingCredit && (
+                                <div
+                                    className="p-3 mt-2"
+                                    style={{
+                                        background: "rgba(203, 122, 33, 0.05)",
+                                        border: "1px solid var(--color-border)",
+                                        borderRadius: "var(--radius-md)",
+                                        fontSize: "0.85rem",
+                                    }}
+                                >
+                                    <div className="d-flex justify-content-between mb-1">
+                                        <span className="text-muted">Credit Limit:</span>
+                                        <span className="fw-semibold">₹{creditStatus.creditLimit.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+                                    </div>
+                                    <div className="d-flex justify-content-between mb-1">
+                                        <span className="text-muted">Outstanding Balance:</span>
+                                        <span className="fw-semibold text-danger">₹{creditStatus.outstanding.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+                                    </div>
+                                    <div className="d-flex justify-content-between mb-1">
+                                        <span className="text-muted">Available Credit:</span>
+                                        <span className={`fw-semibold ${creditStatus.creditLimit - creditStatus.outstanding < 0 ? "text-danger" : "text-success"}`}>
+                                            ₹{(creditStatus.creditLimit - creditStatus.outstanding).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                                        </span>
+                                    </div>
+                                    {creditStatus.hasOverdue && (
+                                        <div className="text-danger fw-semibold mt-2 small">
+                                            ⚠️ Has Overdue Invoices
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                            {isBlocked && blockingOrder && (
+                                <div
+                                    className="alert alert-danger mt-2 mb-0 d-flex flex-column gap-2"
+                                    style={{ borderRadius: "var(--radius-md)" }}
+                                >
+                                    <div className="fw-semibold">
+                                        ⚠️ This customer has a pending credit approval (Order #{blockingOrder.orderNo}) — new orders are blocked until it's resolved.
+                                    </div>
+                                    <div>
+                                        <CustomButton
+                                            text="View Pending Order"
+                                            className="btn-sm btn-danger text-white border-0"
+                                            onClick={() => navigate(`/pending-quotations/edit/${blockingOrder.id}`, { state: { id: blockingOrder.id } })}
+                                        />
+                                    </div>
+                                </div>
+                            )}
                         </Col>
 
                         {customerTypeOptions.length >= 1 && (
@@ -732,6 +853,7 @@ const SalesOrderForm: React.FC = () => {
                             text="Add Item"
                             icon={FaPlus}
                             onClick={() => append({ productCode: "", quantity: "", colorType: "" })}
+                            disabled={isBlocked}
                         />
                     </div>
                     {errors.items?.root && <Err message={errors.items.root.message} />}
@@ -852,6 +974,28 @@ const SalesOrderForm: React.FC = () => {
                         </Col>
                     </Row>
 
+                    {/* Credit limit exceeded warning banner */}
+                    {limitExceeded && (
+                        <div
+                            className="alert alert-warning d-flex align-items-center gap-2 mt-3"
+                            style={{ borderRadius: "var(--radius-md)" }}
+                        >
+                            <span>⚠️</span>
+                            <span>This order will require MD's attention for credit review (Credit Limit Exceeded).</span>
+                        </div>
+                    )}
+                    
+                    {/* Credit block warning banner */}
+                    {isBlocked && (
+                        <div
+                            className="alert alert-danger d-flex align-items-center gap-2 mt-3"
+                            style={{ borderRadius: "var(--radius-md)" }}
+                        >
+                            <span>🚫</span>
+                            <span>Customer is currently blocked due to overdue payments. Please contact accounts.</span>
+                        </div>
+                    )}
+
                     {/* ── Form Actions ── */}
                     <div className="form-actions d-flex justify-content-end gap-3 mt-4">
                         <CustomButton
@@ -866,7 +1010,7 @@ const SalesOrderForm: React.FC = () => {
                             icon={isSubmitting ? undefined : FaSave}
                             type="button"
                             onClick={handleSubmit((data) => onSubmit(data, "draft"))}
-                            disabled={isSubmitting}
+                            disabled={isSubmitting || isBlocked}
                         />
 
                         <CustomButton
@@ -874,7 +1018,7 @@ const SalesOrderForm: React.FC = () => {
                             icon={isSubmitting ? undefined : FaPaperPlane}
                             type="button"
                             onClick={handleSubmit((data) => onSubmit(data, "quotation"))}
-                            disabled={isSubmitting}
+                            disabled={isSubmitting || isBlocked}
                         />
                     </div>
                 </form>
