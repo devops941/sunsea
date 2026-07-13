@@ -34,10 +34,29 @@ class ShiftService {
   }
 
   async findAll() {
-    return prisma.shift.findMany({
+    const shifts = await prisma.shift.findMany({
       orderBy: {
         id: "desc",
       },
+      include: {
+        _count: {
+          select: {
+            dailyProductionPlans: true,
+            WeeklyMachineProgram: true,
+            HourlyProduction: true,
+            productionWastages: true,
+          }
+        }
+      }
+    });
+
+    return shifts.map(shift => {
+      const { _count, ...rest } = shift;
+      const isAssigned = _count.dailyProductionPlans > 0 || _count.WeeklyMachineProgram > 0 || _count.HourlyProduction > 0 || _count.productionWastages > 0;
+      return {
+        ...rest,
+        isAssigned
+      };
     });
   }
 
@@ -84,7 +103,29 @@ class ShiftService {
   }
 
   async delete(id: number) {
-    await this.findById(id);
+    const shift = await prisma.shift.findUnique({
+      where: { id },
+      include: {
+        _count: {
+          select: {
+            dailyProductionPlans: true,
+            WeeklyMachineProgram: true,
+            HourlyProduction: true,
+            productionWastages: true,
+          }
+        }
+      }
+    });
+
+    if (!shift) {
+      throw new ApiError(404, "Shift not found");
+    }
+
+    const isAssigned = shift._count.dailyProductionPlans > 0 || shift._count.WeeklyMachineProgram > 0 || shift._count.HourlyProduction > 0 || shift._count.productionWastages > 0;
+
+    if (isAssigned) {
+      throw new ApiError(400, "Shift is currently assigned and cannot be deleted");
+    }
 
     return prisma.shift.delete({
       where: { id },

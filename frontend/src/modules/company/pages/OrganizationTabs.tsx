@@ -11,6 +11,7 @@ import CompanySettings from "../../company/pages/CompanySettings";
 import GstTaxList from "../../settings/GstTaxListPage";
 import WhatsappSettings from "../../whatsapp/WhatsappCreate";
 import SalesInvoiceCreate from "../../sales-order-invoice/sales-invoiceCreate";
+import DepartmentList from "../../departments/pages/DepartmentList";
 import { FaBuilding, FaUserTag, FaUserShield, FaCogs, FaPercent, FaWhatsapp, FaFileInvoice } from "react-icons/fa";
 
 const OrganizationTabs: React.FC = () => {
@@ -24,7 +25,8 @@ const OrganizationTabs: React.FC = () => {
         "/role-permissions": "permissions",
         "/settings/gst-taxes": "gst",
         "/whatsapp": "whatsapp",
-        "/settings/invoice": "invoice"
+        "/settings/invoice": "invoice",
+        "/departments": "departments"
     };
 
     const keyToPath: Record<string, string> = {
@@ -34,7 +36,8 @@ const OrganizationTabs: React.FC = () => {
         "settings": "/settings/company",
         "gst": "/settings/gst-taxes",
         "whatsapp": "/whatsapp",
-        "invoice": "/settings/invoice"
+        "invoice": "/settings/invoice",
+        "departments": "/departments"
     };
 
     const activeTab = pathToKey[location.pathname] || "profile";
@@ -42,6 +45,7 @@ const OrganizationTabs: React.FC = () => {
     const tabs: TabItem[] = [
         { key: "profile", label: "Company Profile", icon: <FaBuilding />, content: <CompanyProfile /> },
         { key: "roles", label: "Roles", icon: <FaUserTag />, content: <RoleList /> },
+        { key: "departments", label: "Departments", icon: <FaBuilding />, content: <DepartmentList /> },
         { key: "permissions", label: "Permissions", icon: <FaUserShield />, content: <RolePermissionMapping /> },
         { key: "settings", label: "Company Settings", icon: <FaCogs />, content: <CompanySettings /> },
         { key: "gst", label: "GST Tax Rates", icon: <FaPercent />, content: <GstTaxList /> },

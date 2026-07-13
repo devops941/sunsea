@@ -38,6 +38,7 @@ export const createProductionWastageSchema = z.object({
     remarks: z.string().max(255).optional().nullable(),
     isRecyclable: z.boolean().optional().default(false),
     sentForRework: z.boolean().optional().default(false),
+    status: WastageStatusEnum.optional().default("DRAFT"),
   }),
 });
 

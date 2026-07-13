@@ -7,7 +7,8 @@ import {
   createProductionOrderSchema,
   updateProductionOrderSchema,
   productionOrderIdSchema,
-  productionOrderQuerySchema
+  productionOrderQuerySchema,
+  issueMaterialsSchema
 } from "./production-order.validation";
 
 const router = Router();
@@ -57,6 +58,14 @@ router.delete(
   requirePermission("production_orders.delete"),
   validateMiddleware(productionOrderIdSchema),
   productionOrderController.delete
+);
+
+router.post(
+  "/:productionOrderId/issue-materials",
+  authMiddleware,
+  requirePermission("production_orders.edit"),
+  validateMiddleware(issueMaterialsSchema),
+  productionOrderController.issueMaterials
 );
 
 export default router;

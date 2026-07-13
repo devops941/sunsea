@@ -190,3 +190,18 @@ export const productionOrderQuerySchema = z.object({
 export type CreateProductionOrderInput = z.infer<typeof createProductionOrderSchema>["body"];
 export type UpdateProductionOrderInput = z.infer<typeof updateProductionOrderSchema>["body"];
 export type ProductionOrderQueryInput = z.infer<typeof productionOrderQuerySchema>["query"];
+
+export const issueMaterialsSchema = z.object({
+  body: z.object({
+    items: z.array(
+      z.object({
+        rawMaterialId: z.string().min(1, "Raw Material ID is required"),
+        storeId: z.string().min(1, "Store ID is required"),
+        qty: z.number().positive("Quantity must be positive"),
+        remarks: z.string().optional(),
+      })
+    ).min(1, "At least one material item is required to issue"),
+  }),
+});
+
+export type IssueMaterialsInput = z.infer<typeof issueMaterialsSchema>["body"];

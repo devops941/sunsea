@@ -8,11 +8,9 @@ import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
 import { fetchWeeklyPrograms, deleteWeeklyProgram } from "../../../features/weekly-programs/weeklyProgramSlice";
 import CustomButton from "../../../components/ui/Button/Button";
 
-import EditButton from "../../../components/ui/EditButton/EditButton";
 import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
-import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import TextInput from "../../../components/form/TextInput/TextInput";
 import { fetchMachines } from "../../../features/machines/machineSlice";
 
@@ -34,7 +32,6 @@ const WeeklyMachineScheduleList: React.FC = () => {
     };
     
     const { data, loading, error } = useAppSelector((state) => state.weeklyPrograms);
-    const { user } = useAppSelector((state) => state.auth);
     
     const [searchTerm, setSearchTerm] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
@@ -43,10 +40,21 @@ const WeeklyMachineScheduleList: React.FC = () => {
     const [itemToDelete, setItemToDelete] = useState<any | null>(null);
     const [isGroupDelete, setIsGroupDelete] = useState<boolean>(false);
 
-    const [filterMachineId, setFilterMachineId] = useState<string>("");
-    const [filterWeekStartDate, setFilterWeekStartDate] = useState<string>("");
 
-    const { data: machines } = useAppSelector((state) => state.machines);
+    const getMondayDateStr = () => {
+        const d = new Date();
+        const day = d.getDay();
+        const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+        const monday = new Date(d.setDate(diff));
+        const year = monday.getFullYear();
+        const month = String(monday.getMonth() + 1).padStart(2, '0');
+        const date = String(monday.getDate()).padStart(2, '0');
+        return `${year}-${month}-${date}`;
+    };
+
+    const [filterWeekStartDate, setFilterWeekStartDate] = useState<string>(getMondayDateStr());
+
+
     const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
 
     // Keep track of which weeks are expanded
@@ -72,11 +80,10 @@ const WeeklyMachineScheduleList: React.FC = () => {
 
     useEffect(() => {
         dispatch(fetchWeeklyPrograms({ 
-            machineId: filterMachineId || undefined, 
             weekStartDate: filterWeekStartDate || undefined,
             search: debouncedSearchTerm || undefined
         }));
-    }, [dispatch, filterMachineId, filterWeekStartDate, debouncedSearchTerm]);
+    }, [dispatch, filterWeekStartDate, debouncedSearchTerm]);
 
     useEffect(() => {
         if (error) {
@@ -151,7 +158,7 @@ const WeeklyMachineScheduleList: React.FC = () => {
 
         // Convert to array of week objects
         return Object.values(groups).map((group: any) => {
-            const ordersList = Object.values(group.orders);
+            const ordersList: any[] = Object.values(group.orders);
             return {
                 ...group,
                 ordersList,
@@ -170,9 +177,7 @@ const WeeklyMachineScheduleList: React.FC = () => {
         navigate("/weekly-machine-schedules/create");
     };
 
-    const handleOpenEdit = useCallback((item: any) => {
-        navigate(`/weekly-machine-schedules/edit/${item.weeklyProgramId}?po=${item.productionOrderId}`, { state: item });
-    }, [navigate]);
+
 
     const triggerGroupDelete = useCallback((group: any) => {
         setItemToDelete(group);

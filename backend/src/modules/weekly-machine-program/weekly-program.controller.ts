@@ -99,6 +99,13 @@ class WeeklyProgramController {
     );
   });
 
+  findPending = asyncHandler(async (_req: Request, res: Response) => {
+    const weeklyPrograms = await weeklyProgramService.findPending();
+    return res.status(200).json(
+      new ApiResponse("Pending Weekly Programs fetched successfully", weeklyPrograms)
+    );
+  });
+
   getDailyPlanning = asyncHandler(async (req: Request, res: Response) => {
     const { machineId, weekStartDate } = req.query;
     const data = await weeklyProgramService.getDailyPlanningData(

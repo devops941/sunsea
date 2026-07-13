@@ -46,12 +46,16 @@ class ProductionWastageService {
       throw new ApiError(404, `Production Order with ID ${data.productionOrderId} not found`);
     }
 
-    // 1b. Verify no duplicate wastage for this Production Order
+    // 1b. Verify no duplicate wastage for this Production Order and Shift on this date
     const existingWastage = await prisma.productionWastage.findFirst({
-      where: { productionOrderId: data.productionOrderId }
+      where: { 
+        productionOrderId: data.productionOrderId,
+        shiftId: data.shiftId,
+        wastageDate: wDate
+      }
     });
     if (existingWastage) {
-      throw new ApiError(409, `A wastage log already exists for Production Order ${data.productionOrderId}`);
+      throw new ApiError(409, `A wastage log already exists for this shift on ${data.wastageDate}`);
     }
 
     // 2. Verify Machine
@@ -126,7 +130,7 @@ class ProductionWastageService {
         remarks: data.remarks ?? null,
         isRecyclable: data.isRecyclable ?? false,
         sentForRework: data.sentForRework ?? false,
-        status: "DRAFT",
+        status: data.status ?? "DRAFT",
         createdBy: userId,
       },
       include: {

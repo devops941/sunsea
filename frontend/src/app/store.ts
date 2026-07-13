@@ -33,6 +33,8 @@ import productionWastageReducer from "../features/production-wastage/productionW
 import companyReducer from "../features/company/companySlice";
 import finishedGoodsStockReducer from "../features/finished-goods-stock/finishedGoodsStockSlice";
 import gstReducer from "../features/gst/gstSlice";
+import dailyPlanReducer from "../features/daily-plans/dailyPlanSlice";
+
 
 export const store = configureStore({
     reducer: {
@@ -70,6 +72,7 @@ export const store = configureStore({
         productionWastages: productionWastageReducer,
         company: companyReducer,
         finishedGoodsStocks: finishedGoodsStockReducer,
+        dailyPlans: dailyPlanReducer,
     },
     middleware: (getDefaultMiddleware) =>
         getDefaultMiddleware().concat(baseApi.middleware),

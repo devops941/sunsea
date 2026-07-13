@@ -5,6 +5,12 @@ import { z } from "zod";
  */
 export const createHourlyProductionSchema = z.object({
   body: z.object({
+    dailyPlanId: z
+      .string()
+      .max(50)
+      .optional()
+      .nullable(),
+
     productionOrderId: z
       .string()
       .min(1, "Production Order ID is required")
@@ -27,7 +33,7 @@ export const createHourlyProductionSchema = z.object({
     hourIndex: z
       .number()
       .int()
-      .min(0, "Hour Index must be at least 0")
+      .min(-100000, "Hour Index must be at least -100000")
       .max(24, "Hour Index cannot exceed 24"),
 
     qtyProduced: z
@@ -60,7 +66,33 @@ export const createHourlyProductionSchema = z.object({
     operatorId: z
       .string()
       .max(20)
-      .optional(),
+      .optional()
+      .nullable(),
+
+    downtimeReason: z
+      .string()
+      .max(100)
+      .optional()
+      .nullable(),
+
+    rejectReason: z
+      .string()
+      .max(100)
+      .optional()
+      .nullable(),
+
+    scrapReason: z
+      .string()
+      .max(100)
+      .optional()
+      .nullable(),
+
+    runtimeMinutes: z
+      .number()
+      .nonnegative("Runtime cannot be negative")
+      .max(60, "Runtime cannot exceed 60 minutes per slot")
+      .optional()
+      .default(60),
   }),
 });
 

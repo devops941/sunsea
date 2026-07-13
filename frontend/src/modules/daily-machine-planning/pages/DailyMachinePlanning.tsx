@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { Container, Row, Col, Card, Spinner, Modal, Button, Form, Table, ProgressBar } from "react-bootstrap";
+import { Container, Row, Col, Card, Spinner, Modal, Button, Form } from "react-bootstrap";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
@@ -7,7 +7,7 @@ import { fetchMachines } from "../../../features/machines/machineSlice";
 import { weeklyProgramService } from "../../../services/weeklyProgramService";
 import { productionOrderService } from "../../../services/productionOrderService";
 import TextInput from "../../../components/form/TextInput/TextInput";
-import SelectInput from "../../../components/form/SelectInput/SelectInput";
+
 import apiClient from "../../../api/apiClient";
 import config from "../../../api/config";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
@@ -18,8 +18,9 @@ import ViewButton from "../../../components/ui/viewbutton/ViewButton";
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import CommonViewModal from "../../../components/ui/CommonViewModal/CommonViewModal";
 import StartProductionModal from "../../../components/ui/StartProductionModal/StartProductionModal";
+import StopProductionModal from "../../../components/ui/StopProductionModal/StopProductionModal";
 import CustomProgressBar from "../../../components/common/CustomProgressBar";
-import { FaPlay, FaStop, FaClipboardList, FaPlus, FaCalendarAlt, FaIndustry, FaSearch } from "react-icons/fa";
+import { FaPlay, FaStop, FaClipboardList, FaPlus, FaCalendarAlt, FaIndustry } from "react-icons/fa";
 
 const normalizePriority = (pri?: string): "LOW" | "MEDIUM" | "HIGH" | "URGENT" => {
   if (!pri) return "MEDIUM";
@@ -78,9 +79,6 @@ const DailyMachinePlanning: React.FC = () => {
   const [loadingPlanning, setLoadingPlanning] = useState<boolean>(false);
   const [selectedDate, setSelectedDate] = useState<string>(formatLocalDateString(new Date()));
 
-  // Search & Filter state
-  const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
 
   // Active production orders (for adding a run)
   const [activeProductionOrders, setActiveProductionOrders] = useState<any[]>([]);
@@ -96,6 +94,8 @@ const DailyMachinePlanning: React.FC = () => {
 
   const [showViewModal, setShowViewModal] = useState(false);
   const [programToView, setProgramToView] = useState<any>(null);
+  const [hourlyLogs, setHourlyLogs] = useState<any[]>([]);
+  const [loadingLogs, setLoadingLogs] = useState(false);
 
   // Confirmation Modals State
   const [showStopModal, setShowStopModal] = useState(false);
@@ -103,6 +103,33 @@ const DailyMachinePlanning: React.FC = () => {
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteProgramId, setDeleteProgramId] = useState<string | null>(null);
+
+  // Fetch hourly logs for the viewed program
+  useEffect(() => {
+    if (programToView && programToView.machineId && programToView.shiftId && showViewModal) {
+      setLoadingLogs(true);
+      apiClient.get(config.hourlyProduction.base, {
+        params: {
+          machineId: programToView.machineId,
+          shiftId: programToView.shiftId,
+          productionDate: selectedDate
+        }
+      }).then(res => {
+        if (res.data?.success) {
+          setHourlyLogs(res.data.data || []);
+        } else {
+          setHourlyLogs([]);
+        }
+      }).catch(err => {
+        console.error("Failed to load hourly logs", err);
+        setHourlyLogs([]);
+      }).finally(() => {
+        setLoadingLogs(false);
+      });
+    } else {
+      setHourlyLogs([]);
+    }
+  }, [programToView, selectedDate, showViewModal]);
 
   // Sync date input to Week Monday
   useEffect(() => {
@@ -125,11 +152,25 @@ const DailyMachinePlanning: React.FC = () => {
   const fetchWeeklyPrograms = useCallback(async () => {
     setLoadingPlanning(true);
     try {
+      // 1. Load programs for the selected week
       const res = await weeklyProgramService.getAll({
         weekStartDate: formatDateString(currentWeekMonday)
       });
-      const programList = Array.isArray(res.data) ? res.data : (Array.isArray(res) ? res : []);
-      setWeeklyPrograms(programList);
+      const weekList: any[] = Array.isArray(res.data) ? res.data : (Array.isArray(res) ? res : []);
+
+      // 2. Also load ALL pending/active programs (carry-forwards from other weeks)
+      let pendingList: any[] = [];
+      try {
+        const pendingRes = await weeklyProgramService.getPending();
+        pendingList = Array.isArray(pendingRes.data) ? pendingRes.data : (Array.isArray(pendingRes) ? pendingRes : []);
+      } catch { /* ignore pending fetch failure */ }
+
+      // 3. Merge: start with the week's programs, add pending ones not already in the week list
+      const weekIds = new Set(weekList.map((p: any) => p.weeklyProgramId));
+      const extraPending = pendingList.filter((p: any) => !weekIds.has(p.weeklyProgramId));
+      const merged = [...weekList, ...extraPending];
+
+      setWeeklyPrograms(merged);
     } catch (err: any) {
       toast.error(err?.response?.data?.message || err?.message || "Failed to load weekly program runs");
     } finally {
@@ -143,21 +184,8 @@ const DailyMachinePlanning: React.FC = () => {
 
   // Filter programs based on Search Term and Status Filter
   const filteredPrograms = useMemo(() => {
-    let list = weeklyPrograms;
-    if (statusFilter) {
-      list = list.filter(p => p.status === statusFilter);
-    }
-    if (searchTerm) {
-      const lower = searchTerm.toLowerCase();
-      list = list.filter(p => 
-        p.productionOrderId?.toLowerCase().includes(lower) ||
-        p.productionOrder?.productItem?.productName?.toLowerCase().includes(lower) ||
-        p.machine?.machineName?.toLowerCase().includes(lower) ||
-        p.machineId?.toLowerCase().includes(lower)
-      );
-    }
-    return list;
-  }, [weeklyPrograms, statusFilter, searchTerm]);
+    return weeklyPrograms;
+  }, [weeklyPrograms]);
 
   // Load active orders for selection
   const loadActiveOrders = async () => {
@@ -166,8 +194,9 @@ const DailyMachinePlanning: React.FC = () => {
       const list = res.data || res || [];
       const poList = Array.isArray(list) ? list : (list.data || []);
       
+      // Include orders that are not yet fully completed or cancelled
       const activeList = poList.filter((po: any) =>
-        ["RM_AVAILABLE", "READY_FOR_PLANNING", "SCHEDULE_DELETED", "NOT_STARTED", "PARTIALLY_PLANNED"].includes(po.status)
+        !["COMPLETED", "CANCELLED", "DISPATCHED"].includes(po.status)
       );
       setActiveProductionOrders(activeList);
     } catch (err) {
@@ -268,12 +297,13 @@ const DailyMachinePlanning: React.FC = () => {
 
       // 2. Log SYSTEM_START in hourly production to start tracking
       const todayStr = formatLocalDateString(new Date());
+      const wpNum = parseInt(programToStart.weeklyProgramId.replace(/\D/g, ""), 10) || 1;
       const payload = {
         productionOrderId: programToStart.productionOrderId,
         productionDate: todayStr,
         shiftId: selectedShiftId,
         machineId: selectedMachineId,
-        hourIndex: 0,
+        hourIndex: -wpNum,
         qtyProduced: 0,
         rejectQty: 0,
         scrapQty: 0,
@@ -293,7 +323,7 @@ const DailyMachinePlanning: React.FC = () => {
   };
 
   // Stop Run handler
-  const confirmStopRun = async () => {
+  const confirmStopRun = async (reason: string, remarks: string) => {
     if (!stopProgram) return;
     try {
       const producedQty = Number(stopProgram.productionOrder?.producedQty || 0);
@@ -304,10 +334,34 @@ const DailyMachinePlanning: React.FC = () => {
       // Otherwise, put it back to PLANNED so it can be resumed later.
       const newStatus = (producedQty >= plannedQty || producedQty >= targetQty) ? "COMPLETED" : "PLANNED";
 
+      // 1. Log SYSTEM_STOP in hourly production while machine/shift are still assigned
+      const todayStr = formatLocalDateString(new Date());
+      const wpNum = parseInt(stopProgram.weeklyProgramId.replace(/\D/g, ""), 10) || 1;
+      const payload = {
+        productionOrderId: stopProgram.productionOrderId,
+        productionDate: todayStr,
+        shiftId: stopProgram.shiftId || "UNKNOWN",
+        machineId: stopProgram.machineId || "UNKNOWN",
+        hourIndex: -(10000 + wpNum),
+        qtyProduced: 0,
+        rejectQty: 0,
+        scrapQty: 0,
+        downtime: 0,
+        downtimeReason: reason,
+        remarks: reason === "Others" ? remarks : reason,
+        operatorId: "SYSTEM"
+      };
+
+      await apiClient.post(config.hourlyProduction.base, payload);
+
+      // 2. Clear machine/shift assignment and update status
       await weeklyProgramService.update(stopProgram.weeklyProgramId, {
-        status: newStatus
+        status: newStatus,
+        machineId: null,
+        shiftId: null,
       });
-      toast.success(`Production run stopped! Status updated to ${newStatus}.`);
+
+      toast.success(`Production run stopped! Status updated to ${newStatus}. Machine freed.`);
       setShowStopModal(false);
       setStopProgram(null);
       fetchWeeklyPrograms();
@@ -453,8 +507,8 @@ const DailyMachinePlanning: React.FC = () => {
                       <th style={{ width: "60px" }}>#</th>
                       <th>PRODUCTION ORDER</th>
                       <th>PRODUCT NAME</th>
-                      <th>TARGET QTY</th>
-                      <th>PRODUCED QTY</th>
+                      <th>SHIFT TARGET</th>
+                      <th>PRODUCED / PO TARGET</th>
                       <th style={{ width: "200px" }}>PROGRESS</th>
                       <th>MACHINE</th>
                       <th>STATUS</th>
@@ -464,28 +518,86 @@ const DailyMachinePlanning: React.FC = () => {
                   <tbody>
                     {filteredPrograms.map((prog, idx) => {
                       const po = prog.productionOrder;
-                      const target = Number(prog.plannedQty || po?.targetQty || 0);
-                      const produced = Number(po?.producedQty || 0);
+                      // Show PO total target and PO total produced for overall progress
+                      const poTarget = Number(po?.targetQty || 0);
+                      const poProduced = Number(po?.producedQty || 0);
+                      // Shift planned qty — what THIS specific program slot was scheduled to produce
+                      const shiftTarget = Number(prog.plannedQty || 0);
+                      // Use PO-level for progress bar (reflects overall completion)
+                      const target = poTarget || shiftTarget;
+                      const produced = poProduced;
                       const progressPercent = Math.min(100, Math.max(0, target > 0 ? Math.round((produced / target) * 100) : 0));
                       const displayPriority = getDisplayPriority(po?.priority);
                       
-                      const isPaused = prog.status === "PLANNED" && produced > 0;
+                      const isPaused = prog.status === "PLANNED" && poProduced > 0 && po?.status !== "COMPLETED";
+                      // isCarryForward: PLANNED row where the PO already has some production — this is the carry-forward slot
+                      const isCarryForward = isPaused;
                       const displayStatus = isPaused ? "ON_HOLD" : prog.status;
 
                       return (
-                        <tr key={prog.weeklyProgramId} className="master-data-row">
+                        <tr
+                          key={prog.weeklyProgramId}
+                          className="master-data-row"
+                          style={isCarryForward ? {
+                            background: "linear-gradient(90deg, #fffbe6 0%, #fff8e1 100%)",
+                            borderLeft: "4px solid #f59e0b"
+                          } : {}}
+                        >
                           <td className="master-data-cell">{idx + 1}</td>
                           <td className="master-data-cell fw-bold">
-                            {prog.productionOrderId}
-                            {po?.priority && (
-                              <span className="ms-2">
-                                <StatusBadge status={displayPriority} />
-                              </span>
-                            )}
+                            <div className="d-flex flex-column gap-1">
+                              <div className="d-flex align-items-center gap-2 flex-wrap">
+                                <span>{prog.productionOrderId}</span>
+                                {po?.priority && (
+                                  <StatusBadge status={displayPriority} />
+                                )}
+                                {isCarryForward && (
+                                  <span
+                                    style={{
+                                      background: "#f59e0b",
+                                      color: "#fff",
+                                      fontSize: "9px",
+                                      fontWeight: 700,
+                                      padding: "2px 6px",
+                                      borderRadius: "4px",
+                                      letterSpacing: "0.5px",
+                                      textTransform: "uppercase"
+                                    }}
+                                  >
+                                    ↩ Carry Forward
+                                  </span>
+                                )}
+                              </div>
+                              {isCarryForward && (
+                                <span style={{ fontSize: "10px", color: "#92400e", fontWeight: 500 }}>
+                                  {poProduced} / {poTarget} pcs produced — Click ▶ to resume
+                                </span>
+                              )}
+                            </div>
                           </td>
                           <td className="master-data-cell">{po?.productItem?.productName || "Unknown Product"}</td>
-                          <td className="master-data-cell fw-medium">{target} pcs</td>
-                          <td className="master-data-cell fw-medium text-success">{produced} pcs</td>
+                          <td className="master-data-cell fw-medium">
+                            {shiftTarget} pcs
+                            {poTarget > shiftTarget && (
+                              <div className="text-muted" style={{ fontSize: "10px" }}>PO: {poTarget} pcs</div>
+                            )}
+                          </td>
+                          <td className="master-data-cell fw-medium">
+                            <span className={produced >= poTarget && poTarget > 0 ? "text-success fw-bold" : "text-dark"}>
+                              {produced} pcs
+                            </span>
+                            {/* Only show pending for active programs, not for completed ones */}
+                            {poTarget > 0 && produced < poTarget && prog.status !== "COMPLETED" && (
+                              <div className="text-danger" style={{ fontSize: "10px" }}>Pending: {poTarget - produced} pcs</div>
+                            )}
+                            {/* For completed programs that under-produced, show carry-forward note */}
+                            {poTarget > 0 && produced < poTarget && prog.status === "COMPLETED" && (
+                              <div className="text-warning" style={{ fontSize: "10px" }}>↳ Carried Forward</div>
+                            )}
+                            {poTarget > 0 && produced > poTarget && (
+                              <div className="text-success" style={{ fontSize: "10px" }}>+{produced - poTarget} extra</div>
+                            )}
+                          </td>
                           <td className="master-data-cell">
                             <CustomProgressBar progressPercent={progressPercent} />
                           </td>
@@ -500,7 +612,10 @@ const DailyMachinePlanning: React.FC = () => {
                             )}
                           </td>
                           <td className="master-data-cell">
-                            <StatusBadge status={displayStatus} customText={isPaused ? "Pending" : undefined} />
+                            <StatusBadge
+                              status={displayStatus}
+                              customText={isCarryForward ? "Carry Forward" : undefined}
+                            />
                           </td>
                           <td className="master-data-cell text-end">
                             <div className="table-action-group justify-content-end">
@@ -512,16 +627,16 @@ const DailyMachinePlanning: React.FC = () => {
                                 <>
                                   <IconButton
                                     variant="success"
-                                    title={isPaused ? "Resume Run" : "Start Run"}
+                                    title={isCarryForward ? "Start Carry-Forward Run" : "Start Run"}
                                     icon={FaPlay}
                                     onClick={() => handleOpenStart(prog)}
                                   />
-                                  {!isPaused && (
-                                    <DeleteButton 
+                                  {!isCarryForward && (
+                                    <DeleteButton
                                       onClick={() => {
                                         setDeleteProgramId(prog.weeklyProgramId);
                                         setShowDeleteModal(true);
-                                      }} 
+                                      }}
                                     />
                                   )}
                                 </>
@@ -649,21 +764,14 @@ const DailyMachinePlanning: React.FC = () => {
         />
 
         {/* Reusable Confirmation Modal: Stop Run */}
-        <CommonConfirmModal
+        <StopProductionModal
           show={showStopModal}
           onHide={() => {
             setShowStopModal(false);
             setStopProgram(null);
           }}
           onConfirm={confirmStopRun}
-          title="Stop Production Run"
-          message={`Are you sure you want to stop the run for PO ${stopProgram?.productionOrderId}? ${
-            Number(stopProgram?.productionOrder?.producedQty || 0) >= Number(stopProgram?.plannedQty || 0) 
-              ? "The quantity has been met, so it will be marked as Completed." 
-              : "The quantity has NOT been met, so it will be Paused (set back to Planned) so you can resume it later."
-          }`}
-          confirmText="Yes, Stop Run"
-          confirmVariant="danger"
+          program={stopProgram}
         />
 
         {/* View Modal */}
@@ -672,6 +780,7 @@ const DailyMachinePlanning: React.FC = () => {
           onHide={() => {
             setShowViewModal(false);
             setProgramToView(null);
+            setHourlyLogs([]);
           }}
           modalTitle="Production Run Details"
           headerTitle={programToView?.productionOrderId || "Unknown PO"}
@@ -696,6 +805,71 @@ const DailyMachinePlanning: React.FC = () => {
               ]
             }
           ]}
+          customContent={
+            <div className="mt-2">
+              <h6 className="fw-bold mb-3 text-uppercase" style={{ color: "var(--color-primary)", letterSpacing: "0.5px" }}>
+                Hourly Entries Details
+              </h6>
+              {loadingLogs ? (
+                <div className="text-center py-3"><Spinner animation="border" size="sm" /> Loading logs...</div>
+              ) : hourlyLogs.filter((h: any) => Number(h.hourIndex) > 0).length > 0 ? (
+                <div className="rounded-3 border bg-white shadow-sm overflow-hidden">
+                  <table className="master-data-table text-center align-middle mb-0" style={{ width: "100%" }}>
+                    <thead className="bg-light">
+                      <tr>
+                        <th>Hour Index</th>
+                        <th>Produced Qty</th>
+                        <th>Reject Qty</th>
+                        <th>Scrap Qty</th>
+                        <th>Downtime</th>
+                        <th>Operator</th>
+                        <th>Remarks</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {hourlyLogs.filter((h: any) => Number(h.hourIndex) > 0).map((h: any) => (
+                        <tr key={h.hourlyProductionId} className="master-data-row border-bottom">
+                          <td className="master-data-cell fw-bold text-dark font-monospace">Hour {h.hourIndex}</td>
+                          <td className="master-data-cell fw-bold text-success">{h.qtyProduced}</td>
+                          <td className="master-data-cell text-danger fw-semibold">{h.rejectQty || 0}</td>
+                          <td className="master-data-cell text-warning fw-semibold">{h.scrapQty || 0}</td>
+                          <td className="master-data-cell text-muted">
+                            {h.downtime > 0 ? (
+                              <div className="d-flex flex-column align-items-center">
+                                <span className="fw-semibold text-danger">{h.downtime} Mins</span>
+                                {h.downtimeReason && (
+                                  <span className="small text-muted" style={{ fontSize: "10px" }}>{h.downtimeReason}</span>
+                                )}
+                              </div>
+                            ) : "-"}
+                          </td>
+                          <td className="master-data-cell text-dark small">{h.operatorId || "-"}</td>
+                          <td className="master-data-cell text-muted small text-start">{h.remarks || "-"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot className="bg-light fw-bold" style={{ borderTop: "2px solid #dee2e6" }}>
+                      <tr>
+                        <td className="text-end pe-3">Total:</td>
+                        <td className="text-success">{hourlyLogs.filter((h: any) => Number(h.hourIndex) > 0).reduce((sum, h) => sum + (Number(h.qtyProduced) || 0), 0)}</td>
+                        <td className="text-danger">{hourlyLogs.filter((h: any) => Number(h.hourIndex) > 0).reduce((sum, h) => sum + (Number(h.rejectQty) || 0), 0)}</td>
+                        <td className="text-warning">{hourlyLogs.filter((h: any) => Number(h.hourIndex) > 0).reduce((sum, h) => sum + (Number(h.scrapQty) || 0), 0)}</td>
+                        <td className="text-danger">
+                          {(() => {
+                            const totalDowntime = hourlyLogs.filter((h: any) => Number(h.hourIndex) > 0).reduce((sum, h) => sum + (Number(h.downtime) || 0), 0);
+                            return totalDowntime > 0 ? `${totalDowntime} Mins` : "-";
+                          })()}
+                        </td>
+                        <td colSpan={2}></td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              ) : (
+                <div className="text-center text-muted p-4 border rounded-3 bg-light">No hourly reports recorded for this run.</div>
+              )}
+            </div>
+          }
         />
 
         {/* Reusable Confirmation Modal: Delete Run */}

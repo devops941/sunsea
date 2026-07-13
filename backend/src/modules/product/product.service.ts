@@ -177,6 +177,29 @@ class ProductService {
             })),
           },
         }),
+        ...(data.openingStockQty && data.openingStockStoreId
+          ? {
+              finishedGoodsStocks: {
+                create: [
+                  {
+                    storeId: String(data.openingStockStoreId),
+                    onHandQty: Number(data.openingStockQty),
+                  },
+                ],
+              },
+              finishedGoodsTransactions: {
+                create: [
+                  {
+                    txnDateTime: new Date(),
+                    storeId: String(data.openingStockStoreId),
+                    txnType: "OPENING_STOCK",
+                    qty: Number(data.openingStockQty),
+                    remarks: "Opening Stock during product creation",
+                  },
+                ],
+              },
+            }
+          : {}),
       },
 
       include: {
@@ -231,6 +254,7 @@ class ProductService {
         colors: { include: { color: true } }, // ✅ was: color: true
         size: true,
         images: true,
+        finishedGoodsStocks: true,
       },
     });
 
@@ -243,6 +267,25 @@ class ProductService {
 
   async update(id: bigint, data: any, files?: Express.Multer.File[]) {
     await this.findById(id);
+
+    let isStockChanged = false;
+    let qtyDiff = 0;
+    if (data.openingStockQty && data.openingStockStoreId) {
+      const existingStock = await prisma.finishedGoodsStock.findUnique({
+        where: {
+          storeId_productItemId: {
+            storeId: String(data.openingStockStoreId),
+            productItemId: id,
+          },
+        },
+      });
+      const newQty = Number(data.openingStockQty);
+      const oldQty = existingStock ? Number(existingStock.onHandQty) : 0;
+      if (newQty !== oldQty) {
+        isStockChanged = true;
+        qtyDiff = newQty - oldQty;
+      }
+    }
 
     const removedImageIds = toIdArray(data.removedImageIds);
     const primaryImageId =
@@ -412,6 +455,43 @@ class ProductService {
       gstTaxRateId: data.gstTaxRateId !== undefined ? data.gstTaxRateId || null : undefined,
       gstRate: data.gstRate !== undefined ? toNumberOrNull(data.gstRate) : undefined,
       cess: data.cess !== undefined ? toNumberOrNull(data.cess) : undefined,
+      
+      ...(data.openingStockQty && data.openingStockStoreId
+        ? {
+            finishedGoodsStocks: {
+              upsert: [
+                {
+                  where: {
+                    storeId_productItemId: {
+                      storeId: String(data.openingStockStoreId),
+                      productItemId: id,
+                    },
+                  },
+                  update: { onHandQty: Number(data.openingStockQty) },
+                  create: {
+                    storeId: String(data.openingStockStoreId),
+                    onHandQty: Number(data.openingStockQty),
+                  },
+                },
+              ],
+            },
+            ...(isStockChanged
+              ? {
+                  finishedGoodsTransactions: {
+                    create: [
+                      {
+                        txnDateTime: new Date(),
+                        storeId: String(data.openingStockStoreId),
+                        txnType: qtyDiff > 0 ? "STOCK_ADJUSTMENT_IN" : "STOCK_ADJUSTMENT_OUT",
+                        qty: Math.abs(qtyDiff),
+                        remarks: `Opening Stock updated (Difference: ${qtyDiff})`,
+                      },
+                    ],
+                  },
+                }
+              : {}),
+          }
+        : {}),
     };
 
     return prisma.product.update({

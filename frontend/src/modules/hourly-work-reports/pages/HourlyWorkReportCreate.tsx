@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { Container, Row, Col, Card, Alert, Spinner } from "react-bootstrap";
+import { Container, Row, Col, Card, Alert, Spinner, Form } from "react-bootstrap";
 import { FaSave, FaEraser, FaArrowLeft, FaInfoCircle, FaCheckCircle } from "react-icons/fa";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 import TextInput from "../../../components/form/TextInput/TextInput";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import CustomButton from "../../../components/ui/custombutton/CustomButton";
+import QuantityInput from "../../../components/form/QuantityInput/QuantityInput";
 
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
 import { createHourlyProduction, updateHourlyProduction } from "../../../features/hourly-productions/hourlyProductionSlice";
@@ -55,17 +56,32 @@ const HourlyWorkReportCreate: React.FC = () => {
 
     // State for hourly log fields
     const [hourIndex, setHourIndex] = useState("1");
-    const [qtyProduced, setQtyProduced] = useState("");
+    const [qtyProduced, setQtyProduced] = useState("0");
     const [rejectQty, setRejectQty] = useState("0");
     const [scrapQty, setScrapQty] = useState("0");
     const [downtime, setDowntime] = useState("0");
     const [remarks, setRemarks] = useState("");
+    const [downtimeReason, setDowntimeReason] = useState("");
+    const [rejectReason, setRejectReason] = useState("");
+    const [scrapReason, setScrapReason] = useState("");
     const [operatorId, setOperatorId] = useState("");
 
     // Auto-loaded plan details
     const [activePlan, setActivePlan] = useState<any>(null);
     const [loadingPlan, setLoadingPlan] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [dailyPlanId, setDailyPlanId] = useState<string | null>(null);
+
+    // Wastage Audit State
+    const [logWastage, setLogWastage] = useState(false);
+    const [wastageType, setWastageType] = useState("SCRAP");
+    const [wastageQuantity, setWastageQuantity] = useState("");
+    const [wastageUom, setWastageUom] = useState("");
+    const [wastageReason, setWastageReason] = useState("");
+    const [isRecyclable, setIsRecyclable] = useState(false);
+    const [stopPlanEarly, setStopPlanEarly] = useState(false);
+    const [stopPlanReason, setStopPlanReason] = useState("");
+
 
     // Is the form pre-filled from Daily Planning?
     const isPreFilled = useMemo(() => {
@@ -89,7 +105,16 @@ const HourlyWorkReportCreate: React.FC = () => {
                 productName: s.productName,
                 productCode: s.productCode,
                 plannedQty: s.plannedQty,
+                uom: s.uom || "units",
+                weeklyProgramId: s.weeklyProgramId,
+                productId: s.productId,
             });
+            if (s.uom) {
+                setWastageUom(prev => prev || s.uom);
+            }
+            if (s.dailyPlanId) {
+                setDailyPlanId(s.dailyPlanId);
+            }
             if (s.hourIndex) {
                 setHourIndex(String(s.hourIndex));
             }
@@ -99,8 +124,11 @@ const HourlyWorkReportCreate: React.FC = () => {
                 setQtyProduced(s.qtyProduced || "");
                 setRejectQty(s.rejectQty || "0");
                 setScrapQty(s.scrapQty || "0");
-                setDowntime(s.downtime || "0");
+                setDowntime(s.downtime?.toString() || "0");
                 setRemarks(s.remarks || "");
+                setDowntimeReason(s.downtimeReason || "");
+                setRejectReason(s.rejectReason || "");
+                setScrapReason(s.scrapReason || "");
                 setOperatorId(s.operatorId || "");
             }
         }
@@ -143,14 +171,16 @@ const HourlyWorkReportCreate: React.FC = () => {
             setScrapQty(String(matched.scrapQty || 0));
             setDowntime(String(matched.downtime || 0));
             setRemarks(matched.remarks || "");
+            setDowntimeReason(matched.downtimeReason || "");
             setOperatorId(matched.operatorId || "");
             setEditingLogId(matched.hourlyProductionId);
         } else {
-            setQtyProduced("");
+            setQtyProduced("0");
             setRejectQty("0");
             setScrapQty("0");
             setDowntime("0");
             setRemarks("");
+            setDowntimeReason("");
             setOperatorId("");
             setEditingLogId(null);
         }
@@ -175,42 +205,66 @@ const HourlyWorkReportCreate: React.FC = () => {
     }, [locationState.state, shifts, shiftId]);
 
     const hourOptions = useMemo(() => {
+        let baseOptions: { label: string; value: string; disabled?: boolean }[];
         if (!shiftTiming?.startTime || !shiftTiming?.endTime) {
-            return Array.from({ length: 24 }, (_, i) => ({
+            baseOptions = Array.from({ length: 24 }, (_, i) => ({
+                label: `Hour ${i + 1}`,
+                value: String(i + 1)
+            }));
+        } else {
+            const [startH, startM] = shiftTiming.startTime.split(":").map(Number);
+            const [endH, endM] = shiftTiming.endTime.split(":").map(Number);
+
+            const startMinutes = startH * 60 + startM;
+            let endMinutes = endH * 60 + endM;
+
+            if (endMinutes <= startMinutes) {
+                endMinutes += 24 * 60;
+            }
+
+            const totalMinutes = endMinutes - startMinutes;
+            const hours = Math.floor(totalMinutes / 60);
+
+            baseOptions = Array.from({ length: hours }, (_, i) => ({
                 label: `Hour ${i + 1}`,
                 value: String(i + 1)
             }));
         }
 
-        const [startH, startM] = shiftTiming.startTime.split(":").map(Number);
-        const [endH, endM] = shiftTiming.endTime.split(":").map(Number);
+        const filledIndices = existingLogs.map(log => Number(log.hourIndex));
+        const maxFilled = filledIndices.length > 0 ? Math.max(...filledIndices) : 0;
+        const nextRequiredHour = maxFilled + 1;
 
-        let startMinutes = startH * 60 + startM;
-        let endMinutes = endH * 60 + endM;
-
-        if (endMinutes <= startMinutes) {
-            endMinutes += 24 * 60;
-        }
-
-        const totalMinutes = endMinutes - startMinutes;
-        const hours = Math.floor(totalMinutes / 60);
-
-        return Array.from({ length: hours }, (_, i) => {
-            const slotStartMin = startMinutes + i * 60;
-            const slotEndMin = slotStartMin + 60;
-
-            const startHourStr = String(Math.floor((slotStartMin % (24 * 60)) / 60)).padStart(2, "0");
-            const startMinStr = String((slotStartMin % 60)).padStart(2, "0");
-
-            const endHourStr = String(Math.floor((slotEndMin % (24 * 60)) / 60)).padStart(2, "0");
-            const endMinStr = String((slotEndMin % 60)).padStart(2, "0");
-
+        return baseOptions.map(opt => {
+            const optNum = Number(opt.value);
+            const isEditingThisOne = existingLogs.some(log => String(log.hourIndex) === opt.value && String(log.hourlyProductionId) === String(editingLogId));
+            
             return {
-                label: `Hour ${i + 1} (${startHourStr}:${startMinStr} - ${endHourStr}:${endMinStr})`,
-                value: String(i + 1)
+                ...opt,
+                disabled: !isEditingThisOne && optNum !== nextRequiredHour
             };
         });
-    }, [shiftTiming]);
+    }, [shiftTiming, existingLogs, editingLogId]);
+
+    const isFinalHour = hourOptions.length > 0 && Number(hourIndex) === hourOptions.length;
+
+    useEffect(() => {
+        if (isFinalHour || stopPlanEarly) {
+            setLogWastage(true);
+        }
+    }, [isFinalHour, stopPlanEarly]);
+
+    // Auto-select the next available hour if the currently selected one is disabled
+    useEffect(() => {
+        if (!hourOptions || hourOptions.length === 0) return;
+        const selectedOption = hourOptions.find(opt => opt.value === hourIndex);
+        if (!selectedOption || selectedOption.disabled) {
+            const firstAvailable = hourOptions.find(opt => !opt.disabled);
+            if (firstAvailable && firstAvailable.value !== hourIndex) {
+                setHourIndex(firstAvailable.value);
+            }
+        }
+    }, [hourOptions, hourIndex]);
 
     // Fetch matching plan dynamically if selectors change (and not pre-filled)
     useEffect(() => {
@@ -232,7 +286,12 @@ const HourlyWorkReportCreate: React.FC = () => {
 
                 const matchedDay = response.days.find((d: any) => d.dayOfWeek === normalizedDayOfWeek);
                 const matchedShift = matchedDay?.shifts.find((s: any) => s.shiftId === shiftId);
-                const matchedProgram = matchedShift?.programs?.[0];
+                let matchedProgram = null;
+                if (matchedShift?.programs && matchedShift.programs.length > 0) {
+                    matchedProgram = matchedShift.programs.find((p: any) => p.status === "IN_PROGRESS") ||
+                                     matchedShift.programs.find((p: any) => ["PLANNED", "APPROVED", "RELEASED"].includes(p.status)) ||
+                                     matchedShift.programs[0];
+                }
 
                 if (matchedProgram) {
                     setActivePlan(matchedProgram);
@@ -308,20 +367,41 @@ const HourlyWorkReportCreate: React.FC = () => {
             return;
         }
 
+        const isLastHour = hourOptions.length > 0 && (Number(hourIndex) === hourOptions.length || stopPlanEarly);
+        
+        if (isLastHour) {
+            if (!logWastage) {
+                toast.error("Wastage collection is mandatory for the final hourly entry.");
+                return;
+            }
+            if (!wastageType || wastageQuantity === "") {
+                toast.error("Please provide a Wastage Type and Quantity (enter 0 if none) for the final entry.");
+                return;
+            }
+        }
+
         setIsSubmitting(true);
         try {
+            const numReject = Math.round(Number(rejectQty) || 0);
+            const numScrap = Math.round(Number(scrapQty) || 0);
+            const numProduced = Math.round(Number(qtyProduced) || 0);
+            
             const payload = {
                 productionOrderId: activePlan.productionOrderId,
                 productionDate,
                 shiftId,
                 machineId,
-                hourIndex: parseInt(hourIndex, 10),
-                qtyProduced: parseFloat(qtyProduced),
-                rejectQty: parseFloat(rejectQty),
-                scrapQty: parseFloat(scrapQty),
-                downtime: parseFloat(downtime),
-                remarks: remarks || undefined,
+                hourIndex: Number(hourIndex),
+                qtyProduced: numProduced,
+                rejectQty: numReject,
+                scrapQty: numScrap,
+                downtime: Number(downtime) || 0,
+                remarks: remarks.trim() || undefined,
+                downtimeReason: Number(downtime) > 0 ? downtimeReason : undefined,
+                rejectReason: numReject > 0 ? rejectReason : undefined,
+                scrapReason: numScrap > 0 ? scrapReason : undefined,
                 operatorId: operatorId || undefined,
+                dailyPlanId: dailyPlanId || undefined,
             };
 
             if (editingLogId) {
@@ -332,13 +412,81 @@ const HourlyWorkReportCreate: React.FC = () => {
                 toast.success("Hourly Production entry saved successfully!");
             }
 
-            navigate("/hourly-work-reports");
+            const newShiftProduced = shiftProducedQty + (Number(qtyProduced) || 0);
+            const pendingQtyRaw = Math.max(0, Number(activePlan?.plannedQty || 0) - newShiftProduced);
+            const pendingQty = Math.round(pendingQtyRaw * 1000) / 1000;
+            
+            const actualProductId = activePlan?.productId || activePlan?.productItemId || activePlan?.productionOrder?.productItemId || activePlan?.productionOrder?.productId;
+
+            // Handle Stop Plan Early
+            if (stopPlanEarly && dailyPlanId) {
+                try {
+                    const stopRemarks = activePlan?.remarks
+                        ? `${activePlan.remarks} | Stopped: ${stopPlanReason.trim()}`
+                        : `Stopped: ${stopPlanReason.trim()}`;
+                    
+                    await apiClient.put(`/daily-production-plans/${dailyPlanId}`, {
+                        status: "STOPPED",
+                        remarks: stopRemarks,
+                        plannedHours: Number(hourIndex)
+                    });
+                    toast.success("Production plan stopped and capacity released.");
+                } catch (err: any) {
+                    console.error("Failed to stop production plan early", err);
+                    toast.error(err?.response?.data?.message || "Failed to stop production plan early");
+                }
+            }
+
+            if (isLastHour && logWastage && Number(wastageQuantity) > 0 && actualProductId) {
+                try {
+                    await apiClient.post(config.productionWastage.base, {
+                        wastageDate: productionDate,
+                        productionOrderId: activePlan.productionOrderId,
+                        machineId: machineId,
+                        shiftId: shiftId,
+                        productId: Number(actualProductId),
+                        wastageType: wastageType,
+                        quantity: Number(wastageQuantity),
+                        uom: wastageUom || "KG",
+                        reason: wastageReason || undefined,
+                        isRecyclable: isRecyclable,
+                        status: "APPROVED"
+                    });
+                    toast.success("Shift Wastage logged successfully!");
+                } catch (err: any) {
+                    toast.error(err?.response?.data?.message || "Failed to log wastage");
+                }
+            }
+
+            if (isLastHour && pendingQty > 0 && activePlan?.weeklyProgramId) {
+                toast.info("Shift completed. Please carry forward the pending quantity.", { autoClose: 5000 });
+                navigate("/daily-production-plans/create", {
+                    state: {
+                        weeklyProgramId: activePlan.weeklyProgramId,
+                        machineId: machineId,
+                        plannedQty: pendingQty,
+                        remarks: `Carried forward from Daily Plan ${dailyPlanId}`
+                    }
+                });
+                return;
+            }
+
+            navigate("/daily-machine-planning");
         } catch (err: any) {
             toast.error(err || "Failed to log hourly production");
         } finally {
             setIsSubmitting(false);
         }
     };
+
+    const activeProductionOrderId = activePlan?.productionOrderId;
+    const shiftProducedQty = existingLogs
+        .filter(log => log.productionOrderId === activeProductionOrderId && Number(log.hourIndex) > 0)
+        .reduce((sum, log) => sum + Number(log.qtyProduced || 0), 0);
+
+    const remainingQtyForShift = activePlan
+        ? Math.max(0, Number(activePlan.plannedQty || 0) - shiftProducedQty)
+        : 0;
 
     return (
         <div className="inner-container">
@@ -436,11 +584,11 @@ const HourlyWorkReportCreate: React.FC = () => {
                                                     </Col>
                                                     <Col xs={4}>
                                                         <span className="text-muted d-block" style={{ fontSize: "10px" }}>PRODUCED</span>
-                                                        <strong className="fs-6" style={{ color: "var(--color-success)" }}>{activePlan.producedQty ?? 0}</strong>
+                                                        <strong className="fs-6" style={{ color: "var(--color-success)" }}>{shiftProducedQty}</strong>
                                                     </Col>
                                                     <Col xs={4}>
                                                         <span className="text-muted d-block" style={{ fontSize: "10px" }}>REMAINING</span>
-                                                        <strong className="fs-6" style={{ color: "var(--color-secondary)" }}>{activePlan.remainingQty ?? activePlan.plannedQty}</strong>
+                                                        <strong className="fs-6" style={{ color: "var(--color-secondary)" }}>{remainingQtyForShift}</strong>
                                                     </Col>
                                                 </Row>
                                             </div>
@@ -483,13 +631,13 @@ const HourlyWorkReportCreate: React.FC = () => {
                                                 onChange={(e) => setOperatorId(e.target.value)}
                                             />
                                         </Col>
-                                        <Col md={6}>
+                                        <Col md={12}>
                                             <TextInput
                                                 label="Produced Qty"
                                                 name="qtyProduced"
                                                 value={qtyProduced}
                                                 type="number"
-                                                step="0.001"
+                                                step="1"
                                                 required
                                                 placeholder="Enter produced amount"
                                                 onChange={(e) => setQtyProduced(e.target.value)}
@@ -501,7 +649,7 @@ const HourlyWorkReportCreate: React.FC = () => {
                                                 name="rejectQty"
                                                 value={rejectQty}
                                                 type="number"
-                                                step="0.001"
+                                                step="1"
                                                 placeholder="Enter reject amount"
                                                 onChange={(e) => setRejectQty(e.target.value)}
                                             />
@@ -512,31 +660,192 @@ const HourlyWorkReportCreate: React.FC = () => {
                                                 name="scrapQty"
                                                 value={scrapQty}
                                                 type="number"
-                                                step="0.001"
+                                                step="1"
                                                 placeholder="Enter scrap amount"
                                                 onChange={(e) => setScrapQty(e.target.value)}
                                             />
                                         </Col>
                                         <Col md={6}>
-                                            <TextInput
-                                                label="Downtime (Minutes)"
+                                            <QuantityInput
+                                                label="Downtime"
                                                 name="downtime"
                                                 value={downtime}
-                                                type="number"
-                                                placeholder="Enter downtime in minutes"
+                                                baseUoms="mins,hrs"
                                                 onChange={(e) => setDowntime(e.target.value)}
                                             />
                                         </Col>
-                                        <Col md={12}>
-                                            <TextInput
-                                                label="Remarks / Comments"
-                                                name="remarks"
-                                                value={remarks}
-                                                placeholder="Enter downtime reasons or log details"
-                                                onChange={(e) => setRemarks(e.target.value)}
-                                            />
-                                        </Col>
+                                        {Number(downtime) > 0 && (
+                                            <Col md={6}>
+                                                <SelectInput
+                                                    label="Downtime Reason"
+                                                    name="downtimeReason"
+                                                    value={downtimeReason}
+                                                    onChange={(e) => setDowntimeReason(e.target.value)}
+                                                    options={[
+                                                        { label: "Machine Breakdown", value: "Machine Breakdown" },
+                                                        { label: "Power Failure", value: "Power Failure" },
+                                                        { label: "Material Shortage", value: "Material Shortage" },
+                                                        { label: "Tool/Mould Change", value: "Tool/Mould Change" },
+                                                        { label: "Operator Unavailable", value: "Operator Unavailable" },
+                                                        { label: "Quality Issue", value: "Quality Issue" },
+                                                        { label: "Preventative Maintenance", value: "Preventative Maintenance" },
+                                                        { label: "Others", value: "Others" },
+                                                    ]}
+                                                />
+                                            </Col>
+                                        )}
+                                        {Number(rejectQty) > 0 && (
+                                            <Col md={6}>
+                                                <SelectInput
+                                                    label="Reject Reason"
+                                                    name="rejectReason"
+                                                    value={rejectReason}
+                                                    onChange={(e) => setRejectReason(e.target.value)}
+                                                    options={[
+                                                        { value: "Quality Issue", label: "Quality Issue" },
+                                                        { value: "Machine Defect", label: "Machine Defect" },
+                                                        { value: "Material Defect", label: "Material Defect" },
+                                                        { value: "Operator Error", label: "Operator Error" },
+                                                        { value: "Others", label: "Others" }
+                                                    ]}
+                                                />
+                                            </Col>
+                                        )}
+                                        {Number(scrapQty) > 0 && (
+                                            <Col md={6}>
+                                                <SelectInput
+                                                    label="Scrap Reason"
+                                                    name="scrapReason"
+                                                    value={scrapReason}
+                                                    onChange={(e) => setScrapReason(e.target.value)}
+                                                    options={[
+                                                        { value: "Startup Scrap", label: "Startup Scrap" },
+                                                        { value: "Process Setting", label: "Process Setting" },
+                                                        { value: "Material Purging", label: "Material Purging" },
+                                                        { value: "Others", label: "Others" }
+                                                    ]}
+                                                />
+                                            </Col>
+                                        )}
+                                        {(downtimeReason === "Others" || rejectReason === "Others" || scrapReason === "Others") && (
+                                            <Col md={12}>
+                                                <TextInput
+                                                    label="Remarks (Reason for Others)"
+                                                    name="remarks"
+                                                    value={remarks}
+                                                    required
+                                                    placeholder="Enter specific reason"
+                                                    onChange={(e) => setRemarks(e.target.value)}
+                                                />
+                                            </Col>
+                                        )}
                                     </Row>
+
+                                     {/* Stop Plan Early Section (only if not final hour) */}
+                                     {hourOptions.length > 0 && Number(hourIndex) < hourOptions.length && (
+                                         <div className="mt-4 pt-4 border-top">
+                                             <Form.Check 
+                                                 type="switch"
+                                                 id="stop-plan-early-switch"
+                                                 label={<span className="fw-medium text-danger ms-2">Stop Production Plan after this hour</span>}
+                                                 checked={stopPlanEarly}
+                                                 onChange={(e) => {
+                                                     setStopPlanEarly(e.target.checked);
+                                                     if (e.target.checked) setLogWastage(true);
+                                                 }}
+                                             />
+                                             {stopPlanEarly && (
+                                                 <Row className="g-3 mt-2 bg-light p-3 rounded-3 border">
+                                                     <Col md={12}>
+                                                         <TextInput
+                                                             label="Reason for Stopping *"
+                                                             name="stopPlanReason"
+                                                             value={stopPlanReason}
+                                                             required
+                                                             placeholder="e.g. Urgent plan PO2 required on this machine"
+                                                             onChange={(e) => setStopPlanReason(e.target.value)}
+                                                         />
+                                                     </Col>
+                                                 </Row>
+                                             )}
+                                         </div>
+                                     )}
+
+                                     {hourOptions.length > 0 && (Number(hourIndex) === hourOptions.length || stopPlanEarly) && (
+                                         <div className="mt-4 pt-4 border-top">
+                                             <h6 className="section-title text-warning mb-3">
+                                                 {stopPlanEarly ? "Production Stopped: Log Final Wastage" : "Shift Completed: Log Shift Wastage"}
+                                             </h6>
+                                             <Alert variant="warning" className="bg-warning bg-opacity-10 border-warning border-opacity-25 py-2 px-3 d-flex align-items-center gap-2">
+                                                 <FaInfoCircle className="text-warning" />
+                                                 <small className="text-warning-emphasis mb-0">
+                                                     {stopPlanEarly 
+                                                         ? "Since you are stopping the production plan early, please log the final wastage occurred up to this hour."
+                                                         : "Since this is the final hour of the shift, please log the total wastage occurred during this entire shift."}
+                                                 </small>
+                                             </Alert>
+
+                                            <div className="d-flex align-items-center mb-3">
+                                                <Form.Check 
+                                                    type="switch"
+                                                    id="log-wastage-switch"
+                                                    label={<span className="fw-medium ms-2">Log Wastage for this Shift</span>}
+                                                    checked={logWastage}
+                                                    disabled={isFinalHour || stopPlanEarly}
+                                                    onChange={(e) => setLogWastage(e.target.checked)}
+                                                />
+                                                {(isFinalHour || stopPlanEarly) && <span className="ms-3 text-danger small fw-bold">* Mandatory for final entry</span>}
+                                            </div>
+
+                                            {logWastage && (
+                                                <Row className="g-3 bg-light p-3 rounded-3 border">
+                                                    <Col md={6}>
+                                                        <SelectInput
+                                                            label="Wastage Type"
+                                                            name="wastageType"
+                                                            value={wastageType}
+                                                            onChange={(e) => setWastageType(e.target.value)}
+                                                            options={[
+                                                                { label: "Scrap", value: "SCRAP" },
+                                                                { label: "Raw Material Waste", value: "RAW_MATERIAL_WASTE" },
+                                                                { label: "Quality Rejection", value: "QUALITY_REJECTION" },
+                                                                { label: "Machine Setup", value: "MACHINE_SETUP" },
+                                                                { label: "Rework", value: "REWORK" },
+                                                                { label: "Other", value: "OTHER" },
+                                                            ]}
+                                                        />
+                                                    </Col>
+                                                    <Col md={6}>
+                                                        <QuantityInput
+                                                            label="Total Wastage Quantity"
+                                                            name="wastageQuantity"
+                                                            value={wastageQuantity}
+                                                            onChange={(e) => setWastageQuantity(e.target.value)}
+                                                            baseUoms="KG,G"
+                                                            required
+                                                        />
+                                                    </Col>
+                                                    <Col md={12}>
+                                                        <TextInput
+                                                            label="Reason / Remarks"
+                                                            name="wastageReason"
+                                                            value={wastageReason}
+                                                            onChange={(e) => setWastageReason(e.target.value)}
+                                                        />
+                                                    </Col>
+                                                    <Col md={12}>
+                                                        <Form.Check 
+                                                            type="checkbox"
+                                                            id="is-recyclable-check"
+                                                            label={<span className="text-muted small">This wastage is recyclable</span>}
+                                                            checked={isRecyclable}
+                                                            onChange={(e) => setIsRecyclable(e.target.checked)}
+                                                        />
+                                                    </Col>
+                                                </Row>
+                                            )}
+                                        </div>
+                                    )}
 
                                     <div className="form-actions d-flex justify-content-end gap-3 mt-4 pt-3 border-top">
                                         <CustomButton

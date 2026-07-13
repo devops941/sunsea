@@ -32,6 +32,11 @@ export const weeklyProgramService = {
     return response.data.data.nextId;
   },
 
+  getPending: async () => {
+    const response = await apiClient.get(`${config.weeklyProgram.base}/pending`);
+    return response.data;
+  },
+
   getDailyPlanningData: async (params: { machineId: string; weekStartDate: string }) => {
     const response = await apiClient.get(`${config.weeklyProgram.base}/daily-planning/data`, { params });
     return response.data.data;

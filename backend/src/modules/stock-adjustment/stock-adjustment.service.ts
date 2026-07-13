@@ -3,11 +3,31 @@ import { ApiError } from "../../utils/ApiError";
 
 export class StockAdjustmentService {
   static async createStockAdjustment(data: any, userId: string) {
-    const { items, ...adjustmentData } = data;
+    const { items, adjustmentDate, adjustmentType, productionOrderId, ...adjustmentData } = data;
+
+    // Prevent duplicate PMI for same PO
+    if (adjustmentType === "PRODUCTION_MATERIAL_ISSUE" && productionOrderId) {
+      const existing = await prisma.stockAdjustment.findFirst({
+        where: {
+          adjustmentType: "PRODUCTION_MATERIAL_ISSUE",
+          productionOrderId,
+          status: { not: "REJECTED" },
+        },
+      });
+      if (existing) {
+        throw new ApiError(
+          400,
+          `A Material Issue already exists for Production Order ${productionOrderId} (${existing.adjustmentNumber}). Duplicate issue is not allowed.`
+        );
+      }
+    }
 
     return prisma.stockAdjustment.create({
       data: {
         ...adjustmentData,
+        adjustmentDate: adjustmentDate ? new Date(adjustmentDate) : new Date(),
+        adjustmentType: adjustmentType || "STOCK_INCREASE",
+        productionOrderId: productionOrderId || null,
         createdBy: userId,
         updatedBy: userId,
         items: {
@@ -30,15 +50,23 @@ export class StockAdjustmentService {
   }
 
   static async getStockAdjustments(filters: any) {
-    const { status, search, page = 1, limit = 10 } = filters;
+    const { status, search, page = 1, limit = 10, adjustmentType, productionOrderId, dateFrom, dateTo } = filters;
     const skip = (Number(page) - 1) * Number(limit);
 
     const where: any = {};
     if (status) where.status = status;
+    if (adjustmentType) where.adjustmentType = adjustmentType;
+    if (productionOrderId) where.productionOrderId = { contains: productionOrderId, mode: "insensitive" };
+    if (dateFrom || dateTo) {
+      where.adjustmentDate = {};
+      if (dateFrom) where.adjustmentDate.gte = new Date(dateFrom);
+      if (dateTo) where.adjustmentDate.lte = new Date(dateTo);
+    }
     if (search) {
       where.OR = [
         { adjustmentNumber: { contains: search, mode: "insensitive" } },
         { reason: { contains: search, mode: "insensitive" } },
+        { productionOrderId: { contains: search, mode: "insensitive" } },
       ];
     }
 
@@ -48,6 +76,25 @@ export class StockAdjustmentService {
         skip,
         take: Number(limit),
         orderBy: { createdAt: "desc" },
+        include: {
+          productionOrder: {
+            select: {
+              productionOrderId: true,
+              productItem: { select: { productName: true, productCode: true } },
+            },
+          },
+          items: {
+            select: {
+              id: true,
+              itemType: true,
+              rawMaterialId: true,
+              difference: true,
+              storeId: true,
+              rawMaterial: { select: { materialName: true } },
+              store: { select: { storeName: true } },
+            },
+          },
+        },
       }),
       prisma.stockAdjustment.count({ where }),
     ]);
@@ -67,6 +114,20 @@ export class StockAdjustmentService {
     const adjustment = await prisma.stockAdjustment.findUnique({
       where: { id: BigInt(id) },
       include: {
+        productionOrder: {
+          select: {
+            productionOrderId: true,
+            orderDate: true,
+            dueDate: true,
+            targetQty: true,
+            uom: true,
+            status: true,
+            machineMachineId: true,
+            draftRawMaterials: true,
+            productItem: { select: { productName: true, productCode: true } },
+            Machine: { select: { machineId: true, machineName: true } },
+          },
+        },
         items: {
           include: {
             rawMaterial: true,
@@ -85,11 +146,22 @@ export class StockAdjustmentService {
   }
 
   static async updateStockAdjustment(id: bigint | number | string, data: any, userId: string) {
-    const { items, ...adjustmentData } = data;
+    const { items, adjustmentDate, ...adjustmentData } = data;
     const existing = await this.getStockAdjustmentById(id);
 
     if (existing.status !== "DRAFT") {
       throw new ApiError(400, "Only DRAFT stock adjustments can be updated");
+    }
+
+    // Prevent editing PMI after production started
+    if (existing.adjustmentType === "PRODUCTION_MATERIAL_ISSUE" && existing.productionOrderId) {
+      const po = await prisma.productionOrder.findUnique({
+        where: { productionOrderId: existing.productionOrderId },
+        select: { status: true },
+      });
+      if (po && ["IN_PROGRESS", "COMPLETED"].includes(po.status)) {
+        throw new ApiError(400, "Production Material Issue cannot be edited after Production has started.");
+      }
     }
 
     return prisma.$transaction(async (tx) => {
@@ -97,6 +169,7 @@ export class StockAdjustmentService {
         where: { id: BigInt(id) },
         data: {
           ...adjustmentData,
+          ...(adjustmentDate && { adjustmentDate: new Date(adjustmentDate) }),
           updatedBy: userId,
         },
       });
@@ -225,6 +298,14 @@ export class StockAdjustmentService {
         }
       }
 
+      // If this is a PMI approval, update the production order status
+      if (existing.adjustmentType === "PRODUCTION_MATERIAL_ISSUE" && existing.productionOrderId) {
+        await tx.productionOrder.update({
+          where: { productionOrderId: existing.productionOrderId },
+          data: { status: "MATERIAL_ISSUED", updatedBy: userId },
+        });
+      }
+
       return tx.stockAdjustment.update({
         where: { id: BigInt(id) },
         data: {
@@ -243,5 +324,96 @@ export class StockAdjustmentService {
       throw new ApiError(400, "Cannot delete an approved stock adjustment");
     }
     return prisma.stockAdjustment.delete({ where: { id: BigInt(id) } });
+  }
+
+  /**
+   * Returns Production Orders eligible for Material Issue:
+   * - status in RM_AVAILABLE | MATERIAL_RESERVED | APPROVED | SCHEDULED (not yet started)
+   * - no existing non-rejected PRODUCTION_MATERIAL_ISSUE for that PO
+   */
+  static async getProductionOrdersForIssue() {
+    const eligibleStatuses = ["RM_AVAILABLE", "MATERIAL_RESERVED", "APPROVED", "SCHEDULED", "PLANNED"];
+
+    // Get POs that already have a non-rejected PMI
+    const alreadyIssuedPos = await prisma.stockAdjustment.findMany({
+      where: {
+        adjustmentType: "PRODUCTION_MATERIAL_ISSUE",
+        status: { not: "REJECTED" },
+        productionOrderId: { not: null },
+      },
+      select: { productionOrderId: true },
+    });
+    const issuedPoIds = alreadyIssuedPos.map((a) => a.productionOrderId).filter(Boolean) as string[];
+
+    const orders = await prisma.productionOrder.findMany({
+      where: {
+        status: { in: eligibleStatuses },
+        ...(issuedPoIds.length > 0 ? { productionOrderId: { notIn: issuedPoIds } } : {}),
+      },
+      select: {
+        productionOrderId: true,
+        orderDate: true,
+        dueDate: true,
+        targetQty: true,
+        uom: true,
+        status: true,
+        machineMachineId: true,
+        draftRawMaterials: true,
+        productItem: { select: { productName: true, productCode: true } },
+        Machine: { select: { machineId: true, machineName: true } },
+        rawMaterialTransactions: {
+          where: { txnType: "MATERIAL_ISSUE" },
+          select: { rawMaterialId: true, qty: true },
+        },
+      },
+      orderBy: { orderDate: "desc" },
+    });
+
+    // Enrich with current raw material stock
+    const result = await Promise.all(
+      orders.map(async (order) => {
+        const draftRMs = (order.draftRawMaterials as any[]) || [];
+
+        // Get current stock for each RM
+        const enrichedRMs = await Promise.all(
+          draftRMs.map(async (rm: any) => {
+            const stock = await prisma.rawMaterial.findUnique({
+              where: { rawMaterialId: rm.rawMaterialId },
+              select: { materialName: true, onHandQty: true, reservedQty: true },
+            });
+
+            // Already issued qty for this RM in this PO
+            const alreadyIssued = order.rawMaterialTransactions
+              .filter((t) => t.rawMaterialId === rm.rawMaterialId)
+              .reduce((sum, t) => sum + Number(t.qty), 0);
+
+            const reservedQty = Number(rm.requiredQty || 0);
+            const remaining = Math.max(0, reservedQty - alreadyIssued);
+
+            return {
+              rawMaterialId: rm.rawMaterialId,
+              materialName: stock?.materialName || rm.rawMaterialId,
+              requiredQty: reservedQty,
+              reservedQty,
+              alreadyIssuedQty: alreadyIssued,
+              remainingQty: remaining,
+              availableStock: stock ? Number(stock.onHandQty) : 0,
+              uom: rm.uom || "KG",
+              issueQty: remaining, // default to remaining
+            };
+          })
+        );
+
+        return {
+          ...order,
+          productItemId: undefined,
+          rawMaterialTransactions: undefined,
+          draftRawMaterials: enrichedRMs,
+          targetQty: Number(order.targetQty),
+        };
+      })
+    );
+
+    return result;
   }
 }

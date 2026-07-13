@@ -71,6 +71,19 @@ class ProductionOrderController {
     );
   });
 
+  issueMaterials = asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user?.userId;
+    const order = await productionOrderService.issueMaterials(
+      String(req.params.productionOrderId),
+      req.body,
+      userId
+    );
+
+    return res.status(200).json(
+      new ApiResponse("Materials issued successfully", order)
+    );
+  });
+
   private parseSortBy(value: unknown): "orderDate" | "createdAt" | "dueDate" | "productionOrderId" | undefined {
     if (!value || typeof value !== 'string') return undefined;
 

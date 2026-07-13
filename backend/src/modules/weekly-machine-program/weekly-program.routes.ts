@@ -41,6 +41,13 @@ router.get(
 );
 
 router.get(
+  "/pending",
+  authMiddleware,
+  requirePermission("weekly_programs.view"),
+  weeklyProgramController.findPending
+);
+
+router.get(
   "/:weeklyProgramId",
   authMiddleware,
   requirePermission("weekly_programs.view"),

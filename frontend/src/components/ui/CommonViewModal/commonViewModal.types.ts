@@ -22,4 +22,5 @@ export interface CommonViewModalProps {
   sections: ViewSection[];
   size?: "sm" | "md" | "lg" | "xl";
   footer?: React.ReactNode;
+  customContent?: React.ReactNode;
 }

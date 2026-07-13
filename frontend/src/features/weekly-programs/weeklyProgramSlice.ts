@@ -22,7 +22,7 @@ export const createWeeklyProgram = createAsyncThunk(
       return response.data;
     } catch (error: any) {
       return rejectWithValue(
-        error.response?.data?.errors
+        error.response?.data?.errors?.length > 0
           ? error.response.data.errors.map((e: any) => e.message).join(", ")
           : error.response?.data?.message || "Failed to create weekly program"
       );

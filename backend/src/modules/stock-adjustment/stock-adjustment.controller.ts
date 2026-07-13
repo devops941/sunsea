@@ -71,4 +71,12 @@ export class StockAdjustmentController {
       message: "Stock Adjustment deleted successfully",
     });
   });
+
+  static getProductionOrdersForIssue = asyncHandler(async (_req: Request, res: Response) => {
+    const orders = await StockAdjustmentService.getProductionOrdersForIssue();
+    res.json({
+      success: true,
+      data: orders,
+    });
+  });
 }

@@ -13,8 +13,8 @@ import { useCategories } from "../../../hooks/useCategories";
 import { useColors } from "../../../hooks/useColors";
 import { useSizes } from "../../../hooks/useSizes";
 import QuantityInput from "../../../components/form/QuantityInput/QuantityInput";
-import { useUOMs } from "../../../hooks/useUOMs";
 import { productService } from "../../../services/productService";
+import { storeService } from "../../../services/storeService";
 import { getImageUrl } from "../../../utils/ImageUrls";
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
 import { fetchGstTaxes, selectActiveGstTaxes } from "../../../features/gst/gstSlice";
@@ -71,7 +71,6 @@ const ProductEdit: React.FC = () => {
     const { categories, loadCategories } = useCategories();
     const { colors, loadColors } = useColors();
     const { sizes, loadSizes } = useSizes();
-    const { loadActiveUOMs } = useUOMs();
 
     // ── GST taxes from Redux store ──────────────────────────────────────
     const gstTaxes = useAppSelector(selectActiveGstTaxes);
@@ -83,6 +82,7 @@ const ProductEdit: React.FC = () => {
     const [newImageFiles, setNewImageFiles] = useState<File[]>([]);
     const [newImagePreviews, setNewImagePreviews] = useState<string[]>([]);
     const [errors, setErrors] = useState<Record<string, string>>({});
+    const [stores, setStores] = useState<any[]>([]);
 
     // ─── Form state (no flat pricing fields) ────────────────────────────
     const [formData, setFormData] = useState({
@@ -108,6 +108,8 @@ const ProductEdit: React.FC = () => {
         gstTaxRateId: "",
         minimumQty: "",
         maximumQty: "",
+        openingStockQty: "",
+        openingStockStoreId: "",
     });
 
     const [colorTypePricing, setColorTypePricing] = useState<ColorTypePriceRow[]>([]);
@@ -119,6 +121,19 @@ const ProductEdit: React.FC = () => {
         dispatch(fetchGstTaxes({ status: "ACTIVE" }));
         loadColors({ isActive: true });
         loadSizes({ isActive: true });
+        
+        storeService.fetchAll({ limit: 1000 })
+            .then(res => {
+                const data = Array.isArray(res?.stores) ? res.stores : Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
+                setStores(data);
+                if (data.length > 0) {
+                    const fgStore = data.find((s: any) => s.storeName.toLowerCase().includes('finish'));
+                    setFormData(prev => ({ 
+                        ...prev, 
+                        openingStockStoreId: prev.openingStockStoreId || (fgStore ? fgStore.storeId : data[0].storeId)
+                    }));
+                }
+            }).catch(() => {});
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     // Fetch product
@@ -146,7 +161,8 @@ const ProductEdit: React.FC = () => {
             (p: any) => p.colorType
         );
 
-        setFormData({
+        setFormData((prev) => ({
+            ...prev,
             productCode: productData.productCode || "",
             productName: productData.productName || "",
             displayName: productData.displayName || "",
@@ -171,7 +187,9 @@ const ProductEdit: React.FC = () => {
             gstTaxRateId: productData.gstTaxRateId ? String(productData.gstTaxRateId) : "",
             minimumQty: productData.minimumQty != null ? String(productData.minimumQty) : "",
             maximumQty: productData.maximumQty != null ? String(productData.maximumQty) : "",
-        });
+            openingStockQty: productData.finishedGoodsStocks?.[0] ? String(productData.finishedGoodsStocks[0].onHandQty) : "",
+            openingStockStoreId: productData.finishedGoodsStocks?.[0] ? String(productData.finishedGoodsStocks[0].storeId) : (prev.openingStockStoreId || ""),
+        }));
 
         setColorTypePricing(buildInitialColorTypePricing(productData));
 
@@ -230,7 +248,6 @@ const ProductEdit: React.FC = () => {
 
         // --- Minimum / Maximum Stock Qty (same as Create) ---
         const minQty = formData.minimumQty ? Number(formData.minimumQty) : NaN;
-        const maxQty = formData.maximumQty ? Number(formData.maximumQty) : NaN;
 
         if (!formData.minimumQty.toString().trim()) {
             newErrors.minimumQty = "Minimum Stock Qty is required.";
@@ -436,6 +453,9 @@ const ProductEdit: React.FC = () => {
             payload.append("minimumQty", formData.minimumQty || "0");
             payload.append("maximumQty", formData.maximumQty || "0");
 
+            if (formData.openingStockQty) payload.append("openingStockQty", formData.openingStockQty);
+            if (formData.openingStockStoreId) payload.append("openingStockStoreId", formData.openingStockStoreId);
+
             // ── Pricing: only per‑color‑type ─────────────────────────────
             payload.append(
                 "colorTypePricing",
@@ -499,6 +519,14 @@ const ProductEdit: React.FC = () => {
             label: `${t.taxName} (${t.taxRate}%)`,
         })),
     ], [gstTaxes, gstLoading]);
+
+    const storeOptions = useMemo(
+        () => [
+            { value: "", label: "-- Select Store --" },
+            ...stores.map((s) => ({ value: String(s.storeId), label: `${s.storeName} (${s.storeCode || ""})` })),
+        ],
+        [stores]
+    );
 
     const hasAnyImage = existingImages.length > 0 || newImagePreviews.length > 0;
 
@@ -587,6 +615,27 @@ const ProductEdit: React.FC = () => {
                                     { value: "false", label: "Inactive" },
                                 ]}
                                 onChange={handleChange}
+                            />
+                        </Col>
+                        <Col lg={4} md={6}>
+                            <TextInput
+                                label="Opening Stock Qty"
+                                name="openingStockQty"
+                                type="number"
+                                placeholder="0"
+                                value={formData.openingStockQty}
+                                onChange={handleChange}
+                                error={errors.openingStockQty}
+                            />
+                        </Col>
+                        <Col lg={4} md={6}>
+                            <SelectInput
+                                label="Opening Stock Store"
+                                name="openingStockStoreId"
+                                value={formData.openingStockStoreId}
+                                options={storeOptions}
+                                onChange={handleChange}
+                                error={errors.openingStockStoreId}
                             />
                         </Col>
                         <Col lg={12}>

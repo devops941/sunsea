@@ -180,6 +180,7 @@ const WastageForm: React.FC = () => {
       reason: formData.reason || null,
       correctiveAction: formData.correctiveAction || null,
       remarks: formData.remarks || null,
+      status: "APPROVED",
     };
 
     setLoading(false);

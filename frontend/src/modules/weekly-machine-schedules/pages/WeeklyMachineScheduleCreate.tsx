@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { Container, Row, Col, Card, Spinner, Table } from "react-bootstrap";
+import { Container, Row, Col, Card, Spinner } from "react-bootstrap";
 import { FaSave, FaArrowLeft, FaCheck } from "react-icons/fa";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -8,10 +8,8 @@ import TextInput from "../../../components/form/TextInput/TextInput";
 import CustomButton from "../../../components/ui/Button/Button";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 
-import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
+import { useAppDispatch } from "../../../hooks/reduxHooks";
 import { createWeeklyProgram } from "../../../features/weekly-programs/weeklyProgramSlice";
-import { fetchMachines } from "../../../features/machines/machineSlice";
-import { fetchShifts } from "../../../features/shifts/shiftSlice";
 import { weeklyProgramService } from "../../../services/weeklyProgramService";
 import { productionOrderService } from "../../../services/productionOrderService";
 
@@ -27,17 +25,13 @@ const WeeklyMachineScheduleCreate: React.FC = () => {
     const [loadingPo, setLoadingPo] = useState(false);
 
     const [alreadyScheduled, setAlreadyScheduled] = useState<any[]>([]);
-    const [loadingScheduled, setLoadingScheduled] = useState(false);
 
     const [selectedOrders, setSelectedOrders] = useState<Record<string, boolean>>({});
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    const { data: machines } = useAppSelector((state) => state.machines);
-    const { data: shifts } = useAppSelector((state: any) => state.shifts || { data: [] });
+
 
     useEffect(() => {
-        dispatch(fetchMachines());
-        dispatch(fetchShifts());
 
         const loadProductionOrders = async () => {
             setLoadingPo(true);
@@ -104,15 +98,12 @@ const WeeklyMachineScheduleCreate: React.FC = () => {
         }
 
         const fetchScheduled = async () => {
-            setLoadingScheduled(true);
             try {
                 const res: any = await weeklyProgramService.getAll({ weekStartDate });
                 const list = res.data || res || [];
                 setAlreadyScheduled(Array.isArray(list) ? list : (list.data || []));
             } catch (err) {
                 console.error("Failed to load scheduled programs", err);
-            } finally {
-                setLoadingScheduled(false);
             }
         };
 
@@ -131,10 +122,7 @@ const WeeklyMachineScheduleCreate: React.FC = () => {
 
 
 
-    const getMachineName = (id: string) => {
-        const m = machines.find((x: any) => x.machineId === id);
-        return m ? m.machineName : id;
-    };
+
 
     const handleSubmit = async () => {
         const selectedIds = Object.keys(selectedOrders).filter(id => selectedOrders[id]);
@@ -146,7 +134,7 @@ const WeeklyMachineScheduleCreate: React.FC = () => {
 
         setIsSubmitting(true);
         try {
-            const defaultShiftId = shifts.length > 0 ? (shifts[0].shiftCode || shifts[0].id) : "SHIFT-001";
+
 
             for (let i = 0; i < selectedIds.length; i++) {
                 const poId = selectedIds[i];
@@ -170,14 +158,13 @@ const WeeklyMachineScheduleCreate: React.FC = () => {
                     weekEndDate,
                     machineId: null, // Target machine remains null until production start
                     dayOfWeek: 1, // Default to Monday
-                    shiftId: defaultShiftId, // Default shift
+                    shiftId: null, // Shift remains null until production start
                     plannedQty: qty,
                     plannedHours: 0, 
                     setupHours: 0,
                     sequenceNo: i + 1,
                     priority: mappedPriority,
-                    status: "PLANNED",
-                    productItem: po.productItem
+                    status: "PLANNED"
                 };
 
                 await dispatch(createWeeklyProgram(payload)).unwrap();
@@ -188,9 +175,13 @@ const WeeklyMachineScheduleCreate: React.FC = () => {
         } catch (err: any) {
             console.error("CREATE ERROR =>", err);
             let errMsg = "Failed to save schedule.";
-            if (err.response?.data?.message) {
+            if (typeof err === "string") {
+                errMsg = err;
+            } else if (err?.message && err.message !== "Rejected") {
+                errMsg = err.message;
+            } else if (err?.response?.data?.message) {
                 errMsg = err.response.data.message;
-            } else if (err.response?.data?.errors?.length > 0) {
+            } else if (err?.response?.data?.errors?.length > 0) {
                 errMsg = err.response.data.errors.map((e: any) => `${e.path}: ${e.message}`).join(", ");
             }
             toast.error(errMsg);
@@ -270,7 +261,7 @@ const WeeklyMachineScheduleCreate: React.FC = () => {
                                                 </th>
                                                 <th>Production Order</th>
                                                 <th>Product</th>
-                                                <th>Target Machine</th>
+
                                                 <th>Qty</th>
                                                 <th>Status / Priority</th>
                                             </tr>
@@ -294,7 +285,7 @@ const WeeklyMachineScheduleCreate: React.FC = () => {
                                                         </td>
                                                         <td className="master-data-cell fw-bold">{po.productionOrderId}</td>
                                                         <td className="master-data-cell">{po.productItem?.productName || "-"}</td>
-                                                        <td className="master-data-cell text-muted">-</td>
+
                                                         <td className="master-data-cell">{targetQty} <span className="small text-muted">PCS</span></td>
                                                         <td className="master-data-cell"><StatusBadge status={po.priority || 'MEDIUM'} /></td>
                                                     </tr>
@@ -309,7 +300,7 @@ const WeeklyMachineScheduleCreate: React.FC = () => {
                                                     </td>
                                                     <td className="master-data-cell fw-bold opacity-75">{program.productionOrderId}</td>
                                                     <td className="master-data-cell opacity-75">{program.productionOrder?.productItem?.productName || "-"}</td>
-                                                    <td className="master-data-cell opacity-75">{program.machine?.machineName || "Unassigned"}</td>
+
                                                     <td className="master-data-cell opacity-75">{Number(program.plannedQty)} <span className="small">PCS</span></td>
                                                     <td className="master-data-cell opacity-75"><StatusBadge status={program.status || 'SCHEDULED'} /></td>
                                                 </tr>

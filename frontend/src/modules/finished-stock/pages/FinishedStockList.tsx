@@ -5,12 +5,19 @@ import { toast } from "react-toastify";
 
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
 import { fetchFinishedGoodsStocks } from "../../../features/finished-goods-stock/finishedGoodsStockSlice";
-import { storeService } from "../../../services/storeService";
+
 
 import ViewButton from "../../../components/ui/viewbutton/ViewButton";
 import ExportCSVButton from "../../../components/ui/ExportCSVButton/ExportCSVButton";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import CommonViewModal from "../../../components/ui/CommonViewModal/CommonViewModal";
+
+const formatUom = (uomCode: string | undefined) => {
+    if (!uomCode) return "PCS";
+    const code = uomCode.trim().toUpperCase();
+    if (code === "EA" || code === "EACH") return "PCS";
+    return code;
+};
 
 const ITEMS_PER_PAGE = 10;
 
@@ -63,8 +70,10 @@ const FinishedStockList: React.FC = () => {
         { header: "Store / Location", accessor: (item: any) => item.store?.storeName },
         { header: "Product Code", accessor: (item: any) => item.product?.productCode },
         { header: "Product Name", accessor: (item: any) => item.product?.productName },
-        { header: "Category", accessor: (item: any) => item.product?.category?.categoryName },
-        { header: "Physical Stock", accessor: (item: any) => item.onHandQty },
+        { header: "Category", accessor: (item: any) => item.product?.category?.categoryName || "N/A" },
+        { header: "Color", accessor: (item: any) => item.product?.colors?.map((c: any) => c.color?.colorName).join(", ") || "N/A" },
+        { header: "Size", accessor: (item: any) => item.product?.size?.sizeName || "N/A" },
+        { header: "Physical Stock", accessor: (item: any) => `${item.onHandQty} ${formatUom(item.product?.uom?.uomCode)}` },
     ];
 
     const formatDate = (dateStr: string) => {
@@ -146,6 +155,7 @@ const FinishedStockList: React.FC = () => {
                                         <th>PRODUCT NAME</th>
                                         <th>CATEGORY</th>
                                         <th>COLOR</th>
+                                        <th>SIZE</th>
                                         <th>STORE / LOCATION</th>
                                         <th>PHYSICAL STOCK</th>
                                         <th>ACTIONS</th>
@@ -159,12 +169,13 @@ const FinishedStockList: React.FC = () => {
                                                 <td className="master-data-cell">{item.product?.productCode || "N/A"}</td>
                                                 <td className="master-data-cell fw-medium">{item.product?.productName || "N/A"}</td>
                                                 <td className="master-data-cell">{item.product?.category?.categoryName || "N/A"}</td>
-                                                <td className="master-data-cell">{item.product?.colorType === 'mc' ? 'Multi Color' : (item.product?.colorType === 'sc' ? 'Single Color' : 'N/A')}</td>
+                                                <td className="master-data-cell">{item.product?.colors?.map((c: any) => c.color?.colorName).join(", ") || "N/A"}</td>
+                                                <td className="master-data-cell">{item.product?.size?.sizeName ? `${item.product.size.sizeName} (${item.product.size.sizeCode})` : "N/A"}</td>
                                                 <td className="master-data-cell">{item.store?.storeName || "N/A"}</td>
                                                 <td className="master-data-cell fw-bold">
                                                     <StatusBadge 
-                                                        status={Number(item.onHandQty) > 0 ? "success" : "danger"} 
-                                                        customText={`${item.onHandQty} ${item.product?.uom?.name || "PCS"}`} 
+                                                        status={(Number(item.onHandQty) || 0) < (Number(item.product?.minimumQty) || 0) || (Number(item.onHandQty) || 0) <= 0 ? "danger" : "success"} 
+                                                        customText={`${item.onHandQty} ${formatUom(item.product?.uom?.uomCode)}`} 
                                                     />
                                                 </td>
                                                 <td className="master-data-cell">
@@ -176,7 +187,7 @@ const FinishedStockList: React.FC = () => {
                                         ))
                                     ) : (
                                         <tr>
-                                            <td colSpan={8} className="text-center p-4">No finished goods stock found.</td>
+                                            <td colSpan={9} className="text-center p-4">No finished goods stock found.</td>
                                         </tr>
                                     )}
                                 </tbody>
@@ -211,14 +222,17 @@ const FinishedStockList: React.FC = () => {
                                 { label: "Product Code", value: selectedItem.product?.productCode || "N/A" },
                                 { label: "Product Name", value: selectedItem.product?.productName || "N/A" },
                                 { label: "Category", value: selectedItem.product?.category?.categoryName || "N/A" },
-                                { label: "Color", value: selectedItem.product?.colorType === 'mc' ? 'Multi Color' : (selectedItem.product?.colorType === 'sc' ? 'Single Color' : 'N/A') },
+                                { label: "Color", value: selectedItem.product?.colors?.map((c: any) => c.color?.colorName).join(", ") || "N/A" },
+                                { label: "Size", value: selectedItem.product?.size?.sizeName ? `${selectedItem.product.size.sizeName} (${selectedItem.product.size.sizeCode})` : "N/A" },
                                 { label: "Store / Location", value: selectedItem.store?.storeName || "N/A" },
                             ]
                         },
                         {
                             title: "Stock Information",
                             fields: [
-                                { label: "Physical Stock (On Hand)", value: `${selectedItem.onHandQty} ${selectedItem.product?.uom?.name || "PCS"}` },
+                                { label: "Physical Stock (On Hand)", value: `${selectedItem.onHandQty} ${formatUom(selectedItem.product?.uom?.uomCode)}` },
+                                { label: "Weight Per Piece", value: selectedItem.product?.weightPerPiece != null ? `${selectedItem.product.weightPerPiece} kg` : "N/A" },
+                                { label: "Dimensions (L×B×H)", value: selectedItem.product?.dimensions || "N/A" },
                                 { label: "Last Updated", value: formatDate(selectedItem.updatedAt) },
                             ]
                         }

@@ -6,6 +6,7 @@ import { toast } from "react-toastify";
 import TextInput from "../../../components/form/TextInput/TextInput";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import CustomButton from "../../../components/ui/custombutton/CustomButton";
+import QuantityInput from "../../../components/form/QuantityInput/QuantityInput";
 
 import { useAppDispatch } from "../../../hooks/reduxHooks";
 import { updateHourlyProduction } from "../../../features/hourly-productions/hourlyProductionSlice";
@@ -27,12 +28,16 @@ const HourlyWorkReportEdit: React.FC = () => {
     const [scrapQty, setScrapQty] = useState("0");
     const [downtime, setDowntime] = useState("0");
     const [remarks, setRemarks] = useState("");
+    const [downtimeReason, setDowntimeReason] = useState("");
+    const [rejectReason, setRejectReason] = useState("");
+    const [scrapReason, setScrapReason] = useState("");
     const [operatorId, setOperatorId] = useState("");
 
     // Display-only fields
     const [productName, setProductName] = useState("");
     const [machineName, setMachineName] = useState("");
     const [shiftName, setShiftName] = useState("");
+    const [uom, setUom] = useState("units");
 
     const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -50,11 +55,15 @@ const HourlyWorkReportEdit: React.FC = () => {
             setScrapQty(s.scrapQty?.toString() || "0");
             setDowntime(s.downtime?.toString() || "0");
             setRemarks(s.remarks || "");
+            setDowntimeReason(s.downtimeReason || "");
+            setRejectReason(s.rejectReason || "");
+            setScrapReason(s.scrapReason || "");
             setOperatorId(s.operatorId || "");
 
             setProductName(s.productionOrder?.productItem?.productName || "Unknown Product");
             setMachineName(s.machine?.machineName || s.machineId || "Unknown Machine");
             setShiftName(s.shift?.shiftName || s.shiftId || "Unknown Shift");
+            setUom(s.productionOrder?.productItem?.uom?.uomCode || "units");
         } else {
             toast.error("No report data provided.");
             navigate("/hourly-work-reports");
@@ -65,21 +74,25 @@ const HourlyWorkReportEdit: React.FC = () => {
         e.preventDefault();
         setIsSubmitting(true);
         try {
+            const numReject = Number(rejectQty) || 0;
+            const numScrap = Number(scrapQty) || 0;
+            const numDowntime = Number(downtime) || 0;
+
+            const payload = {
+                qtyProduced: Number(qtyProduced) || 0,
+                rejectQty: numReject,
+                scrapQty: numScrap,
+                downtime: numDowntime,
+                remarks: remarks.trim() || undefined,
+                downtimeReason: numDowntime > 0 ? downtimeReason : undefined,
+                rejectReason: numReject > 0 ? rejectReason : undefined,
+                scrapReason: numScrap > 0 ? scrapReason : undefined,
+                operatorId: operatorId || undefined,
+            };
+
             await dispatch(updateHourlyProduction({
                 id: hourlyProductionId,
-                data: {
-                    productionOrderId,
-                    productionDate,
-                    shiftId,
-                    machineId,
-                    hourIndex: parseInt(hourIndex, 10),
-                    qtyProduced: parseFloat(qtyProduced),
-                    rejectQty: parseFloat(rejectQty),
-                    scrapQty: parseFloat(scrapQty),
-                    downtime: parseFloat(downtime),
-                    remarks: remarks || undefined,
-                    operatorId: operatorId || undefined,
-                }
+                data: payload
             })).unwrap();
             toast.success("Hourly Report updated successfully!");
             navigate("/hourly-work-reports");
@@ -183,58 +196,106 @@ const HourlyWorkReportEdit: React.FC = () => {
                                             />
                                         </Col>
                                         <Col md={6}>
-                                            <TextInput
+                                            <QuantityInput
                                                 label="Produced Qty"
                                                 name="qtyProduced"
                                                 value={qtyProduced}
-                                                type="number"
-                                                step="0.001"
-                                                required
-                                                placeholder="Enter produced amount"
+                                                baseUoms={uom}
                                                 onChange={(e) => setQtyProduced(e.target.value)}
                                             />
                                         </Col>
                                         <Col md={6}>
-                                            <TextInput
+                                            <QuantityInput
                                                 label="Reject Qty"
                                                 name="rejectQty"
                                                 value={rejectQty}
-                                                type="number"
-                                                step="0.001"
-                                                placeholder="Enter reject amount"
+                                                baseUoms={uom}
                                                 onChange={(e) => setRejectQty(e.target.value)}
                                             />
                                         </Col>
                                         <Col md={6}>
-                                            <TextInput
+                                            <QuantityInput
                                                 label="Scrap Qty"
                                                 name="scrapQty"
                                                 value={scrapQty}
-                                                type="number"
-                                                step="0.001"
-                                                placeholder="Enter scrap amount"
+                                                baseUoms={uom}
                                                 onChange={(e) => setScrapQty(e.target.value)}
                                             />
                                         </Col>
                                         <Col md={6}>
-                                            <TextInput
-                                                label="Downtime (Minutes)"
+                                            <QuantityInput
+                                                label="Downtime"
                                                 name="downtime"
                                                 value={downtime}
-                                                type="number"
-                                                placeholder="Enter downtime in minutes"
+                                                baseUoms="mins,hrs"
                                                 onChange={(e) => setDowntime(e.target.value)}
                                             />
                                         </Col>
-                                        <Col md={12}>
-                                            <TextInput
-                                                label="Remarks / Comments"
-                                                name="remarks"
-                                                value={remarks}
-                                                placeholder="Enter downtime reasons or log details"
-                                                onChange={(e) => setRemarks(e.target.value)}
-                                            />
-                                        </Col>
+                                        {Number(downtime) > 0 && (
+                                            <Col md={6}>
+                                                <SelectInput
+                                                    label="Downtime Reason"
+                                                    name="downtimeReason"
+                                                    value={downtimeReason}
+                                                    onChange={(e) => setDowntimeReason(e.target.value)}
+                                                    options={[
+                                                        { label: "Machine Breakdown", value: "Machine Breakdown" },
+                                                        { label: "Power Failure", value: "Power Failure" },
+                                                        { label: "Material Shortage", value: "Material Shortage" },
+                                                        { label: "Tool/Mould Change", value: "Tool/Mould Change" },
+                                                        { label: "Operator Unavailable", value: "Operator Unavailable" },
+                                                        { label: "Quality Issue", value: "Quality Issue" },
+                                                        { label: "Preventative Maintenance", value: "Preventative Maintenance" },
+                                                        { label: "Others", value: "Others" },
+                                                    ]}
+                                                />
+                                            </Col>
+                                        )}
+                                        {Number(rejectQty) > 0 && (
+                                            <Col md={6}>
+                                                <SelectInput
+                                                    label="Reject Reason"
+                                                    name="rejectReason"
+                                                    value={rejectReason}
+                                                    onChange={(e) => setRejectReason(e.target.value)}
+                                                    options={[
+                                                        { value: "Quality Issue", label: "Quality Issue" },
+                                                        { value: "Machine Defect", label: "Machine Defect" },
+                                                        { value: "Material Defect", label: "Material Defect" },
+                                                        { value: "Operator Error", label: "Operator Error" },
+                                                        { value: "Others", label: "Others" }
+                                                    ]}
+                                                />
+                                            </Col>
+                                        )}
+                                        {Number(scrapQty) > 0 && (
+                                            <Col md={6}>
+                                                <SelectInput
+                                                    label="Scrap Reason"
+                                                    name="scrapReason"
+                                                    value={scrapReason}
+                                                    onChange={(e) => setScrapReason(e.target.value)}
+                                                    options={[
+                                                        { value: "Startup Scrap", label: "Startup Scrap" },
+                                                        { value: "Process Setting", label: "Process Setting" },
+                                                        { value: "Material Purging", label: "Material Purging" },
+                                                        { value: "Others", label: "Others" }
+                                                    ]}
+                                                />
+                                            </Col>
+                                        )}
+                                        {(downtimeReason === "Others" || rejectReason === "Others" || scrapReason === "Others") && (
+                                            <Col md={12}>
+                                                <TextInput
+                                                    label="Remarks (Reason for Others)"
+                                                    name="remarks"
+                                                    value={remarks}
+                                                    required
+                                                    placeholder="Enter specific reason"
+                                                    onChange={(e) => setRemarks(e.target.value)}
+                                                />
+                                            </Col>
+                                        )}
                                     </Row>
 
                                     <div className="form-actions d-flex justify-content-end gap-3 mt-4 pt-3 border-top">

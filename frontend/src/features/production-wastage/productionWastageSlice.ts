@@ -106,34 +106,50 @@ const productionWastageSlice = createSlice({
       })
       .addCase(fetchProductionWastages.fulfilled, (state, action) => {
         state.loading = false;
-        state.data = action.payload;
+        state.data = Array.isArray(action.payload)
+          ? action.payload
+          : (action.payload?.data && Array.isArray(action.payload.data) ? action.payload.data : []);
       })
       .addCase(fetchProductionWastages.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload as string;
       })
       .addCase(createProductionWastage.fulfilled, (state, action) => {
-        state.data.unshift(action.payload);
+        const record = action.payload?.data || action.payload;
+        if (record && Array.isArray(state.data)) {
+          state.data.unshift(record);
+        }
       })
       .addCase(updateProductionWastage.fulfilled, (state, action) => {
-        const index = state.data.findIndex((m) => String(m.id) === String(action.payload.id));
-        if (index !== -1) {
-          state.data[index] = action.payload;
+        const record = action.payload?.data || action.payload;
+        if (record && Array.isArray(state.data)) {
+          const index = state.data.findIndex((m) => String(m.id) === String(record.id));
+          if (index !== -1) {
+            state.data[index] = record;
+          }
         }
       })
       .addCase(deleteProductionWastage.fulfilled, (state, action) => {
-        state.data = state.data.filter((m) => String(m.id) !== String(action.payload));
+        if (Array.isArray(state.data)) {
+          state.data = state.data.filter((m) => String(m.id) !== String(action.payload));
+        }
       })
       .addCase(approveProductionWastage.fulfilled, (state, action) => {
-        const index = state.data.findIndex((m) => String(m.id) === String(action.payload.id));
-        if (index !== -1) {
-          state.data[index] = action.payload;
+        const record = action.payload?.data || action.payload;
+        if (record && Array.isArray(state.data)) {
+          const index = state.data.findIndex((m) => String(m.id) === String(record.id));
+          if (index !== -1) {
+            state.data[index] = record;
+          }
         }
       })
       .addCase(rejectProductionWastage.fulfilled, (state, action) => {
-        const index = state.data.findIndex((m) => String(m.id) === String(action.payload.id));
-        if (index !== -1) {
-          state.data[index] = action.payload;
+        const record = action.payload?.data || action.payload;
+        if (record && Array.isArray(state.data)) {
+          const index = state.data.findIndex((m) => String(m.id) === String(record.id));
+          if (index !== -1) {
+            state.data[index] = record;
+          }
         }
       });
   },

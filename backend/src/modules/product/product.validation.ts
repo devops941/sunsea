@@ -41,6 +41,9 @@ export const createProductSchema = z.object({
     isActive: z
       .union([z.literal("true"), z.literal("false")])
       .optional(),
+      
+    openingStockQty: z.string().optional(),
+    openingStockStoreId: z.string().optional(),
   }),
 });
 

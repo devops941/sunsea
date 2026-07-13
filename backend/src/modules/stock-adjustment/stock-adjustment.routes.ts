@@ -14,6 +14,13 @@ const router = Router();
 
 router.use(authMiddleware);
 
+// Must be before /:id to avoid param conflict
+router.get(
+  "/production-orders",
+  requirePermission("raw_material_stocks.view"),
+  StockAdjustmentController.getProductionOrdersForIssue
+);
+
 router.post(
   "/",
   requirePermission("raw_material_stocks.create"),

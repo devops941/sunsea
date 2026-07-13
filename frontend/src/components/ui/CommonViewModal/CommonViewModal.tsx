@@ -15,6 +15,7 @@ const CommonViewModal: React.FC<CommonViewModalProps> = ({
   statusNode,
   sections,
   footer,
+  customContent,
 }) => {
   return (
     <Modal
@@ -105,6 +106,12 @@ const CommonViewModal: React.FC<CommonViewModalProps> = ({
             </div>
           ))}
         </div>
+
+        {customContent && (
+          <div className="mt-4">
+            {customContent}
+          </div>
+        )}
 
         {footer && (
           <div className="view-footer mt-4 pt-3 border-top d-flex justify-content-end gap-3">
