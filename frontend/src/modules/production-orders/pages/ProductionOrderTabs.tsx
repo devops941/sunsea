@@ -1,16 +1,15 @@
 import React from "react";
 import { Container } from "react-bootstrap";
 import { useLocation, useNavigate } from "react-router-dom";
-import { FaPlay, FaHistory, FaClipboardCheck, FaTrashAlt, FaCalendarWeek, FaCalendarDay, FaClock } from "react-icons/fa";
+import { FaPlay, FaHistory, FaTrashAlt, FaCalendarWeek, FaCalendarDay, FaClock } from "react-icons/fa";
 import Tabs from "../../../components/ui/tab/Tabs";
 import type { TabItem } from "../../../components/ui/tab/Tabs";
 
 import ProductionOrderList from "./ProductionOrderList";
 import AllProductionOrderList from "./AllProductionOrderList";
-import ApprovedSalesOrderList from "./ApprovedSalesOrderList";
 import WastageList from "../../production-wastage/pages/WastageList";
 import WeeklyMachineScheduleList from "../../weekly-machine-schedules/pages/WeeklyMachineScheduleList";
-import DailyMachinePlanning from "../../daily-machine-planning/pages/DailyMachinePlanning";
+import DailyProductionPlanningPage from "../../daily-machine-planning/pages/DailyProductionPlanningPage";
 import HourlyWorkReportList from "../../hourly-work-reports/pages/HourlyWorkReportList";
 
 const ProductionOrderTabs: React.FC = () => {
@@ -43,7 +42,7 @@ const ProductionOrderTabs: React.FC = () => {
         { key: "history", label: "Order History", icon: <FaHistory />, content: <AllProductionOrderList /> },
         { key: "active", label: "Production Orders", icon: <FaPlay />, content: <ProductionOrderList /> },
         { key: "weekly", label: "Weekly Schedules", icon: <FaCalendarWeek />, content: <WeeklyMachineScheduleList /> },
-        { key: "daily", label: "Daily Planning", icon: <FaCalendarDay />, content: <DailyMachinePlanning /> },
+        { key: "daily", label: "Daily Planning", icon: <FaCalendarDay />, content: <DailyProductionPlanningPage /> },
         { key: "hourly", label: "Hourly Production", icon: <FaClock />, content: <HourlyWorkReportList /> },
         { key: "wastage", label: "Production Wastage", icon: <FaTrashAlt />, content: <WastageList /> }
     ];

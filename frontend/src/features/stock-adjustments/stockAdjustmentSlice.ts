@@ -71,16 +71,34 @@ export const approveStockAdjustment = createAsyncThunk(
   }
 );
 
+export const fetchProductionOrdersForIssue = createAsyncThunk(
+  "stockAdjustments/fetchProductionOrdersForIssue",
+  async (_, { rejectWithValue }) => {
+    try {
+      const data = await stockAdjustmentService.fetchProductionOrdersForIssue();
+      return data;
+    } catch (error: any) {
+      return rejectWithValue(
+        error.response?.data?.message || "Failed to fetch production orders"
+      );
+    }
+  }
+);
+
 interface StockAdjustmentState {
   data: any[];
+  meta: any | null;
   currentAdjustment: any | null;
+  productionOrdersForIssue: any[];
   loading: boolean;
   error: string | null;
 }
 
 const initialState: StockAdjustmentState = {
   data: [],
+  meta: null,
   currentAdjustment: null,
+  productionOrdersForIssue: [],
   loading: false,
   error: null,
 };
@@ -105,7 +123,8 @@ const stockAdjustmentSlice = createSlice({
       })
       .addCase(fetchStockAdjustments.fulfilled, (state, action) => {
         state.loading = false;
-        state.data = action.payload;
+        state.data = Array.isArray(action.payload) ? action.payload : (action.payload?.data || []);
+        if (action.payload?.meta) state.meta = action.payload.meta;
       })
       .addCase(fetchStockAdjustments.rejected, (state, action) => {
         state.loading = false;
@@ -131,7 +150,7 @@ const stockAdjustmentSlice = createSlice({
       })
       .addCase(createStockAdjustment.fulfilled, (state, action) => {
         state.loading = false;
-        state.data.unshift(action.payload);
+        if (action.payload) state.data.unshift(action.payload);
       })
       .addCase(createStockAdjustment.rejected, (state, action) => {
         state.loading = false;
@@ -144,12 +163,10 @@ const stockAdjustmentSlice = createSlice({
       })
       .addCase(updateStockAdjustment.fulfilled, (state, action) => {
         state.loading = false;
-        const index = state.data.findIndex(a => a.id === action.payload.id);
-        if (index !== -1) {
-          state.data[index] = action.payload;
-        }
-        if (state.currentAdjustment?.id === action.payload.id) {
-          state.currentAdjustment = action.payload;
+        if (action.payload) {
+          const index = state.data.findIndex(a => a.id === action.payload.id);
+          if (index !== -1) state.data[index] = action.payload;
+          if (state.currentAdjustment?.id === action.payload.id) state.currentAdjustment = action.payload;
         }
       })
       .addCase(updateStockAdjustment.rejected, (state, action) => {
@@ -163,17 +180,26 @@ const stockAdjustmentSlice = createSlice({
       })
       .addCase(approveStockAdjustment.fulfilled, (state, action) => {
         state.loading = false;
-        const index = state.data.findIndex(a => a.id === action.payload.id);
-        if (index !== -1) {
-          state.data[index] = action.payload;
-        }
-        if (state.currentAdjustment?.id === action.payload.id) {
-          state.currentAdjustment = action.payload;
+        if (action.payload) {
+          const index = state.data.findIndex(a => a.id === action.payload.id);
+          if (index !== -1) state.data[index] = action.payload;
+          if (state.currentAdjustment?.id === action.payload.id) state.currentAdjustment = action.payload;
         }
       })
       .addCase(approveStockAdjustment.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload as string;
+      })
+      // Production Orders For Issue
+      .addCase(fetchProductionOrdersForIssue.pending, (state) => {
+        state.loading = true;
+      })
+      .addCase(fetchProductionOrdersForIssue.fulfilled, (state, action) => {
+        state.loading = false;
+        state.productionOrdersForIssue = action.payload || [];
+      })
+      .addCase(fetchProductionOrdersForIssue.rejected, (state) => {
+        state.loading = false;
       });
   },
 });

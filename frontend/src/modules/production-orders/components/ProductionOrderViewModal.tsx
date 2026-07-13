@@ -1,19 +1,23 @@
 import React, { useEffect, useState } from "react";
-import { Modal, Spinner, Row, Col } from "react-bootstrap";
+import { Modal, Spinner, Row, Col, Button } from "react-bootstrap";
 import { toast } from "react-toastify";
 import { productionOrderService } from "../../../services/productionOrderService";
 import type { ProductionOrder } from "../../../services/productionOrderService";
 import { rawMaterialService } from "../../../services/rawMaterialService";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
+import { MaterialIssueModal } from "./MaterialIssueModal";
 
 interface ProductionOrderViewModalProps {
     show: boolean;
     onHide: () => void;
     order: ProductionOrder | null;
+    onSuccess?: () => void;
 }
 
-export const ProductionOrderViewModal: React.FC<ProductionOrderViewModalProps> = ({ show, onHide, order }) => {
+export const ProductionOrderViewModal: React.FC<ProductionOrderViewModalProps> = ({ show, onHide, order, onSuccess }) => {
     const [fullOrder, setFullOrder] = useState<any>(null);
+    const [showIssueModal, setShowIssueModal] = useState(false);
+    const [selectedProdForIssue, setSelectedProdForIssue] = useState<any>(null);
     const [loading, setLoading] = useState(false);
     const [rawMaterialsMap, setRawMaterialsMap] = useState<Map<string, any>>(new Map());
 
@@ -38,10 +42,16 @@ export const ProductionOrderViewModal: React.FC<ProductionOrderViewModalProps> =
             Promise.all(fetchIds.map((id: string) => productionOrderService.getById(id)))
                 .then((dataArray) => {
                     if (dataArray.length === 1) {
-                        setFullOrder(dataArray[0]);
+                        const o = dataArray[0];
+                        if (o && o.products) {
+                            o.products = o.products.map((p: any) => ({ ...p, productionOrderId: o.productionOrderId, status: o.status }));
+                        }
+                        setFullOrder(o);
                     } else if (dataArray.length > 1) {
                         const mergedOrder = { ...dataArray[0] };
-                        mergedOrder.products = dataArray.flatMap((d: any) => d.products || []);
+                        mergedOrder.products = dataArray.flatMap((d: any) => 
+                            (d.products || []).map((p: any) => ({ ...p, productionOrderId: d.productionOrderId, status: d.status }))
+                        );
                         mergedOrder.productionOrderId = order.productionOrderId || order.id;
                         setFullOrder(mergedOrder);
                     }
@@ -137,19 +147,11 @@ export const ProductionOrderViewModal: React.FC<ProductionOrderViewModalProps> =
                             </Col>
                         </Row>
                         <Row className="mb-4">
-                            <Col md={3}>
+                            <Col md={6}>
                                 <div className="text-muted small">Order Type</div>
                                 <div className="fw-bold">{fullOrder?.orderType || order.orderType || "-"}</div>
                             </Col>
-                            <Col md={3}>
-                                <div className="text-muted small">Batch No</div>
-                                <div className="fw-bold">{fullOrder?.batchNo || order.batchNo || "-"}</div>
-                            </Col>
-                            <Col md={3}>
-                                <div className="text-muted small">Lot No</div>
-                                <div className="fw-bold">{fullOrder?.lotNo || order.lotNo || "-"}</div>
-                            </Col>
-                            <Col md={3}>
+                            <Col md={6}>
                                 <div className="text-muted small">Color Type</div>
                                 <div className="fw-bold">
                                     {(fullOrder?.colorType || order?.colorType) ? (
@@ -169,7 +171,7 @@ export const ProductionOrderViewModal: React.FC<ProductionOrderViewModalProps> =
                                 <Row className="mb-4 mt-3">
                                     <Col md={3}>
                                         <div className="text-muted small">Production Qty</div>
-                                        <div className="fw-bold">{prod.quantity} {prod.uom}</div>
+                                        <div className="fw-bold">{prod.quantity} {prod.uom?.toLowerCase() === 'ea' ? 'pcs' : prod.uom}</div>
                                     </Col>
                                     <Col md={3}>
                                         <div className="text-muted small">Weight Used</div>
@@ -177,7 +179,7 @@ export const ProductionOrderViewModal: React.FC<ProductionOrderViewModalProps> =
                                     </Col>
                                     <Col md={3}>
                                         <div className="text-muted small">Unit (UOM)</div>
-                                        <div className="fw-bold">{prod.uom}</div>
+                                        <div className="fw-bold">{prod.uom?.toLowerCase() === 'ea' ? 'pcs' : prod.uom}</div>
                                     </Col>
                                 </Row>
 
@@ -231,11 +233,75 @@ export const ProductionOrderViewModal: React.FC<ProductionOrderViewModalProps> =
                                         </table>
                                     </div>
                                 </div>
+                                {["RM_AVAILABLE", "READY_FOR_PLANNING", "SCHEDULED"].includes(prod.status || fullOrder?.status) && (
+                                    <div className="d-flex justify-content-end mt-2">
+                                        <Button 
+                                            variant="success" 
+                                            size="sm"
+                                            onClick={() => {
+                                                setSelectedProdForIssue(prod);
+                                                setShowIssueModal(true);
+                                            }}
+                                            className="fw-semibold px-3"
+                                        >
+                                            Issue Raw Materials
+                                        </Button>
+                                    </div>
+                                )}
                             </div>
                         ))}
                     </>
                 )}
             </Modal.Body>
+            <Modal.Footer>
+                <Button variant="secondary" onClick={onHide}>
+                    Close
+                </Button>
+            </Modal.Footer>
+
+            {selectedProdForIssue && (
+                <MaterialIssueModal
+                    show={showIssueModal}
+                    onHide={() => {
+                        setShowIssueModal(false);
+                        setSelectedProdForIssue(null);
+                    }}
+                    productionOrderId={selectedProdForIssue.productionOrderId}
+                    rawMaterials={selectedProdForIssue.rawMaterials || []}
+                    rawMaterialsMap={rawMaterialsMap}
+                    defaultStoreId={fullOrder?.sourceStoreId}
+                    onSuccess={() => {
+                        // Reload details in modal
+                        setLoading(true);
+                        const fetchIds = ((order as any).items && Array.isArray((order as any).items) && (order as any).items.length > 0)
+                            ? (order as any).items.map((i: any) => i.productionOrderId || i.id)
+                            : [order.productionOrderId || order.id];
+            
+                        Promise.all(fetchIds.map((id: string) => productionOrderService.getById(id)))
+                            .then((dataArray) => {
+                                if (dataArray.length === 1) {
+                                    const o = dataArray[0];
+                                    if (o && o.products) {
+                                        o.products = o.products.map((p: any) => ({ ...p, productionOrderId: o.productionOrderId, status: o.status }));
+                                    }
+                                    setFullOrder(o);
+                                } else if (dataArray.length > 1) {
+                                    const mergedOrder = { ...dataArray[0] };
+                                    mergedOrder.products = dataArray.flatMap((d: any) => 
+                                        (d.products || []).map((p: any) => ({ ...p, productionOrderId: d.productionOrderId, status: d.status }))
+                                    );
+                                    mergedOrder.productionOrderId = order.productionOrderId || order.id;
+                                    setFullOrder(mergedOrder);
+                                }
+                            })
+                            .catch(err => console.error("Failed to reload PO details after issue", err))
+                            .finally(() => setLoading(false));
+
+                        // Trigger parent refresh
+                        onSuccess?.();
+                    }}
+                />
+            )}
         </Modal>
     );
 };

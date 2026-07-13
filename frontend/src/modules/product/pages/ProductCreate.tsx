@@ -12,6 +12,7 @@ import CustomButton from "../../../components/ui/custombutton/CustomButton";
 import { useProducts } from "../../../hooks/useProducts";
 import { useCategories } from "../../../hooks/useCategories";
 import { productService } from "../../../services/productService";
+import { storeService } from "../../../services/storeService";
 import { useColors } from "../../../hooks/useColors";
 import { useSizes } from "../../../hooks/useSizes";
 import { useUOMs } from "../../../hooks/useUOMs";
@@ -53,6 +54,7 @@ const ProductCreatePage: React.FC = () => {
     const [imageFiles, setImageFiles] = useState<File[]>([]);
     const [imagePreviews, setImagePreviews] = useState<string[]>([]);
     const [errors, setErrors] = useState<Record<string, string>>({});
+    const [stores, setStores] = useState<any[]>([]);
 
     const [formData, setFormData] = useState({
         productCode: "",
@@ -79,6 +81,8 @@ const ProductCreatePage: React.FC = () => {
         // Flat pricing — used when no color type selected
         minimumQty: "",
         maximumQty: "",
+        openingStockQty: "",
+        openingStockStoreId: "",
     });
 
     // ✅ Per‑color‑type pricing rows — automatically synchronised with colorType
@@ -100,6 +104,16 @@ const ProductCreatePage: React.FC = () => {
             }
         };
         fetchCode();
+        
+        storeService.fetchAll({ limit: 1000 })
+            .then(res => {
+                const data = Array.isArray(res?.stores) ? res.stores : Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
+                setStores(data);
+                const fgStore = data.find((s: any) => s.storeName.toLowerCase().includes('finish'));
+                if (fgStore) {
+                    setFormData(prev => ({ ...prev, openingStockStoreId: fgStore.storeId }));
+                }
+            }).catch(() => {});
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     // Cleanup image previews
@@ -335,6 +349,8 @@ const ProductCreatePage: React.FC = () => {
             // cess: "",
             minimumQty: '',
             maximumQty: '',
+            openingStockQty: "",
+            openingStockStoreId: "",
         });
         setColorTypePricing([]);
         setErrors({});
@@ -374,6 +390,9 @@ const ProductCreatePage: React.FC = () => {
             if (formData.sizeId) payload.append("sizeId", formData.sizeId);
             payload.append("minimumQty", String(formData.minimumQty));
             payload.append("maximumQty", String(formData.maximumQty));
+            
+            if (formData.openingStockQty) payload.append("openingStockQty", formData.openingStockQty);
+            if (formData.openingStockStoreId) payload.append("openingStockStoreId", formData.openingStockStoreId);
 
             // Append color type IDs (sc/mc) as an array
             formData.colorType.forEach(type => payload.append("colorType[]", type));
@@ -426,6 +445,11 @@ const ProductCreatePage: React.FC = () => {
             label: `${t.taxName} (${t.taxRate}%)`,
         })),
     ], [gstTaxes, gstLoading]);
+
+    const storeOptions = useMemo(() => [
+        { value: "", label: "-- Select Store --" },
+        ...stores.map(s => ({ value: String(s.storeId), label: `${s.storeName} (${s.storeCode || ''})` })),
+    ], [stores]);
 
     // ─── Render ───────────────────────────────────────────────────────────
     return (
@@ -510,6 +534,29 @@ const ProductCreatePage: React.FC = () => {
                                     { value: "false", label: "Inactive" },
                                 ]}
                                 onChange={handleChange}
+                            />
+                        </Col>
+
+                        <Col lg={4} md={6}>
+                            <TextInput
+                                label="Opening Stock Qty"
+                                name="openingStockQty"
+                                type="number"
+                                placeholder="0"
+                                value={formData.openingStockQty}
+                                onChange={handleChange}
+                                error={errors.openingStockQty}
+                            />
+                        </Col>
+
+                        <Col lg={4} md={6}>
+                            <SelectInput
+                                label="Opening Stock Store"
+                                name="openingStockStoreId"
+                                value={formData.openingStockStoreId}
+                                options={storeOptions}
+                                onChange={handleChange}
+                                error={errors.openingStockStoreId}
                             />
                         </Col>
 

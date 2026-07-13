@@ -33,6 +33,7 @@ import hourlyProductionRoutes from "../modules/hourly-production/hourly-producti
 import rawMaterialTransactionRoutes from "../modules/raw-material-transaction/raw-material-transaction.routes";
 import weeklyProgramRoutes from "../modules/weekly-machine-program/weekly-program.routes";
 import dailyScheduleRoutes from "../modules/daily-schedule/daily-schedule.routes";
+import dailyPlanRoutes from "../modules/daily-production-plan/daily-plan.routes";
 import reportsRoutes from "../modules/reports/reports.routes";
 import salesOrderRoutes from "../modules/sales-order/sales-order.routes";
 import billOfMaterialRoutes from "../modules/bill-of-material/billOfMaterial.routes";
@@ -46,6 +47,7 @@ import invoiceSettingsRoutes from "../modules/invoice-settings/invoice-settings.
 import expenseRoutes from "../modules/expense/expense.routes";
 import grnInvoiceRoutes from "../modules/grn-invoice/grn-invoice.routes";
 import salesInvoiceRoutes from "../modules/sales-invoice/sales-invoice.routes";
+import oeeRoutes from "../modules/oee/oee.routes";
 
 const router = Router();
 
@@ -91,6 +93,7 @@ router.use("/hourly-productions", hourlyProductionRoutes);
 router.use("/raw-material-transactions", rawMaterialTransactionRoutes);
 router.use("/weekly-machine-programs", weeklyProgramRoutes);
 router.use("/daily-schedule", dailyScheduleRoutes);
+router.use("/daily-production-plans", dailyPlanRoutes);
 router.use("/reports", reportsRoutes);
 router.use("/bill-of-materials", billOfMaterialRoutes);
 router.use("/sales-orders", salesOrderRoutes);
@@ -102,5 +105,6 @@ router.use("/invoice-settings", invoiceSettingsRoutes);
 router.use("/expenses", expenseRoutes);
 router.use("/grn-invoices", grnInvoiceRoutes);
 router.use("/sales-invoices", salesInvoiceRoutes);
+router.use("/oee", oeeRoutes);
 
 export default router;

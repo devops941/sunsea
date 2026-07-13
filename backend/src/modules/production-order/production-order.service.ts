@@ -86,34 +86,10 @@ class ProductionOrderService {
     let calculatedStatus = data.status ?? "PLANNED";
     let rmMoves: { rawMaterialId: string; qty: number }[] = [];
 
-    if (calculatedStatus !== "DRAFT") {
-      if (data.rawMaterials && data.rawMaterials.length > 0) {
-        let allAvailable = true;
-        
-        const aggregatedRms: Record<string, number> = {};
-        for (const rm of data.rawMaterials) {
-          aggregatedRms[rm.rawMaterialId] = (aggregatedRms[rm.rawMaterialId] || 0) + Number(rm.requiredQty);
-        }
-
-        for (const [rawMaterialId, totalRequired] of Object.entries(aggregatedRms)) {
-          const stock = await prisma.rawMaterial.findUnique({
-            where: { rawMaterialId }
-          });
-          
-          const availableStock = stock ? Number(stock.onHandQty) - Number(stock.reservedQty) : 0;
-          if (!stock || availableStock < totalRequired) {
-            allAvailable = false;
-            break;
-          }
-        }
-        calculatedStatus = allAvailable ? "RM_AVAILABLE" : "RM_PENDING";
-
-        if (allAvailable) {
-          for (const [rawMaterialId, totalRequired] of Object.entries(aggregatedRms)) {
-            rmMoves.push({ rawMaterialId, qty: totalRequired });
-          }
-        }
-      }
+    if (calculatedStatus !== "DRAFT" && data.rawMaterials && data.rawMaterials.length > 0) {
+      const rmCheck = await this.checkRawMaterialAvailability(data.rawMaterials);
+      calculatedStatus = rmCheck.allAvailable ? "RM_AVAILABLE" : "RM_PENDING";
+      rmMoves = rmCheck.rmMoves;
     }
 
     return prisma.$transaction(async (tx) => {
@@ -683,26 +659,12 @@ class ProductionOrderService {
     if (existing.status === "DRAFT" && data.status && data.status !== "DRAFT") {
       const rawMaterialsToUse = data.rawMaterials ?? [];
       if (rawMaterialsToUse.length > 0) {
-        let allAvailable = true;
+        const rmCheck = await this.checkRawMaterialAvailability(rawMaterialsToUse);
+        calculatedStatus = rmCheck.allAvailable ? "RM_AVAILABLE" : "RM_PENDING";
         
-        const aggregatedRms: Record<string, number> = {};
-        for (const rm of rawMaterialsToUse) {
-          aggregatedRms[rm.rawMaterialId] = (aggregatedRms[rm.rawMaterialId] || 0) + Number(rm.requiredQty);
-        }
-
-        for (const [rawMaterialId, totalRequired] of Object.entries(aggregatedRms)) {
-          const stock = await prisma.rawMaterial.findUnique({ where: { rawMaterialId } });
-          const availableStock = stock ? Number(stock.onHandQty) - Number(stock.reservedQty) : 0;
-          if (!stock || availableStock < totalRequired) {
-            allAvailable = false;
-            break;
-          }
-        }
-        calculatedStatus = allAvailable ? "RM_AVAILABLE" : "RM_PENDING";
-        
-        if (allAvailable) {
-          for (const [rawMaterialId, totalRequired] of Object.entries(aggregatedRms)) {
-            rmMoves.push({ type: "RESERVE", rawMaterialId, qty: totalRequired });
+        if (rmCheck.allAvailable) {
+          for (const move of rmCheck.rmMoves) {
+            rmMoves.push({ type: "RESERVE", rawMaterialId: move.rawMaterialId, qty: move.qty });
           }
         }
       } else {
@@ -714,25 +676,12 @@ class ProductionOrderService {
     if ((existing.status === "RM_PENDING" || existing.status === "DRAFT") && data.status === "PLANNED") {
       const rawMaterialsToUse = data.rawMaterials ?? (existing.draftRawMaterials as any[]) ?? [];
       if (rawMaterialsToUse.length > 0) {
-        let allAvailable = true;
-        const aggregatedRms: Record<string, number> = {};
-        for (const rm of rawMaterialsToUse) {
-          aggregatedRms[rm.rawMaterialId] = (aggregatedRms[rm.rawMaterialId] || 0) + Number(rm.requiredQty);
-        }
+        const rmCheck = await this.checkRawMaterialAvailability(rawMaterialsToUse);
+        calculatedStatus = rmCheck.allAvailable ? "RM_AVAILABLE" : "RM_PENDING";
 
-        for (const [rawMaterialId, totalRequired] of Object.entries(aggregatedRms)) {
-          const stock = await prisma.rawMaterial.findUnique({ where: { rawMaterialId } });
-          const availableStock = stock ? Number(stock.onHandQty) - Number(stock.reservedQty) : 0;
-          if (!stock || availableStock < totalRequired) {
-            allAvailable = false;
-            break;
-          }
-        }
-        calculatedStatus = allAvailable ? "RM_AVAILABLE" : "RM_PENDING";
-
-        if (allAvailable) {
-          for (const [rawMaterialId, totalRequired] of Object.entries(aggregatedRms)) {
-            rmMoves.push({ type: "RESERVE", rawMaterialId, qty: totalRequired });
+        if (rmCheck.allAvailable) {
+          for (const move of rmCheck.rmMoves) {
+            rmMoves.push({ type: "RESERVE", rawMaterialId: move.rawMaterialId, qty: move.qty });
           }
         }
       } else {
@@ -748,7 +697,29 @@ class ProductionOrderService {
       }
     }
 
-    // Confirmed / IN_PROGRESS -> COMPLETED (Consume stock and generate finished goods)
+    // *** PRODUCTION START GATING: MATERIAL_ISSUED or IN_PROGRESS status requires a completed Material Issue ***
+    if (
+      calculatedStatus === "IN_PROGRESS" &&
+      existing.status !== "IN_PROGRESS" &&
+      existing.status !== "IN PROGRESS"
+    ) {
+      const materialIssueAdj = await prisma.stockAdjustment.findFirst({
+        where: {
+          productionOrderId,
+          adjustmentType: "PRODUCTION_MATERIAL_ISSUE",
+          status: "APPROVED",
+        },
+      });
+
+      if (!materialIssueAdj) {
+        throw new ApiError(
+          400,
+          "Production cannot be started because the required raw materials have not yet been issued. Please complete the Material Issue through Stock Adjustment before starting production."
+        );
+      }
+    }
+
+
     let shouldProduceFG = false;
     if (existing.status !== "COMPLETED" && calculatedStatus === "COMPLETED") {
       const rawMaterialsToUse = (existing.draftRawMaterials as any[]) || [];
@@ -1025,6 +996,127 @@ class ProductionOrderService {
     const prefix = lastId.substring(0, lastId.indexOf(numberStr));
     const suffix = lastId.substring(lastId.indexOf(numberStr) + numberStr.length);
     return `${prefix}${paddedNumber}${suffix}`;
+  }
+
+  /**
+   * Helper to check raw material availability and generate reservation moves
+   */
+  private async checkRawMaterialAvailability(rawMaterials: any[]) {
+    let allAvailable = true;
+    const aggregatedRms: Record<string, number> = {};
+    const rmMoves: { rawMaterialId: string; qty: number }[] = [];
+
+    for (const rm of rawMaterials) {
+      aggregatedRms[rm.rawMaterialId] = (aggregatedRms[rm.rawMaterialId] || 0) + Number(rm.requiredQty);
+    }
+
+    for (const [rawMaterialId, totalRequired] of Object.entries(aggregatedRms)) {
+      const stock = await prisma.rawMaterial.findUnique({
+        where: { rawMaterialId }
+      });
+      
+      const availableStock = stock ? Number(stock.onHandQty) - Number(stock.reservedQty) : 0;
+      if (!stock || availableStock < totalRequired) {
+        allAvailable = false;
+        break;
+      }
+    }
+
+    if (allAvailable) {
+      for (const [rawMaterialId, totalRequired] of Object.entries(aggregatedRms)) {
+        rmMoves.push({ rawMaterialId, qty: totalRequired });
+      }
+    }
+
+    return { allAvailable, rmMoves };
+  }
+
+  async issueMaterials(productionOrderId: string, data: { items: { rawMaterialId: string; storeId: string; qty: number; remarks?: string }[] }, userId?: string) {
+    const { items } = data;
+
+    const order = await prisma.productionOrder.findUnique({
+      where: { productionOrderId },
+    });
+    if (!order) {
+      throw new ApiError(404, `Production Order with ID ${productionOrderId} not found`);
+    }
+
+    return prisma.$transaction(async (tx) => {
+      const dateStr = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 14);
+      const adjustmentNumber = `ADJ-PO-${productionOrderId}-${dateStr}`;
+
+      const stockAdjustment = await tx.stockAdjustment.create({
+        data: {
+          adjustmentNumber,
+          adjustmentDate: new Date(),
+          adjustmentType: "PRODUCTION_MATERIAL_ISSUE",
+          productionOrderId,
+          reason: `Material issued for Production Order: ${productionOrderId}`,
+          status: "APPROVED",
+          approvedBy: userId,
+          approvedAt: new Date(),
+          createdBy: userId,
+        },
+      });
+
+      for (const item of items) {
+        const { rawMaterialId, storeId, qty, remarks } = item;
+
+        const rm = await tx.rawMaterial.findUnique({
+          where: { rawMaterialId },
+        });
+        if (!rm) {
+          throw new ApiError(404, `Raw Material with ID ${rawMaterialId} not found`);
+        }
+
+        const currentQty = rm.onHandQty;
+        const newOnHand = Number(rm.onHandQty) - qty;
+        const newReserved = Math.max(0, Number(rm.reservedQty) - qty);
+
+        await tx.rawMaterial.update({
+          where: { rawMaterialId },
+          data: {
+            onHandQty: newOnHand,
+            reservedQty: newReserved,
+            updatedBy: userId,
+          },
+        });
+
+        await tx.rawMaterialTransaction.create({
+          data: {
+            storeId,
+            rawMaterialId,
+            txnType: "MATERIAL_ISSUE",
+            qty,
+            remarks: remarks || `Issued for Production Order ${productionOrderId}`,
+            productionOrderId,
+          },
+        });
+
+        await tx.stockAdjustmentItem.create({
+          data: {
+            stockAdjustmentId: stockAdjustment.id,
+            itemType: "RAW_MATERIAL",
+            rawMaterialId,
+            storeId,
+            currentQty,
+            adjustedQty: newOnHand,
+            difference: -qty,
+            remarks: remarks || `Issued for Production Order ${productionOrderId}`,
+          },
+        });
+      }
+
+      const updatedOrder = await tx.productionOrder.update({
+        where: { productionOrderId },
+        data: {
+          status: "MATERIAL_ISSUED",
+          updatedBy: userId,
+        },
+      });
+
+      return updatedOrder;
+    });
   }
 }
 

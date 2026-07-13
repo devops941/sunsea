@@ -11,7 +11,7 @@ import { productionOrderService } from "../../../services/productionOrderService
 import type { ProductionOrder } from "../../../services/productionOrderService";
 import { rawMaterialService } from "../../../services/rawMaterialService";
 
-const ITEMS_PER_PAGE = 3;
+const ITEMS_PER_PAGE = 10;
 
 const AllProductionOrderList: React.FC = () => {
     const [data, setData] = useState<ProductionOrder[]>([]);
@@ -321,6 +321,7 @@ const AllProductionOrderList: React.FC = () => {
                     show={showViewModal}
                     onHide={() => setShowViewModal(false)}
                     order={selectedItem}
+                    onSuccess={fetchOrders}
                 />
 
             </Container>

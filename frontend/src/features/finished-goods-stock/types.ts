@@ -11,7 +11,7 @@ export interface FinishedGoodsStock {
         id: string;
         productName: string;
         productCode: string;
-        colorType: string;
+        colorType?: string;
         category?: {
             id: string;
             categoryName: string;
@@ -19,7 +19,21 @@ export interface FinishedGoodsStock {
         uom?: {
             id: string;
             name: string;
+            uomCode?: string;
         };
+        colors?: {
+            color?: {
+                colorName: string;
+            };
+        }[];
+        size?: {
+            id: string;
+            sizeName: string;
+            sizeCode: string;
+        };
+        weightPerPiece?: string | number;
+        dimensions?: string;
+        minimumQty?: string | number;
     };
     createdAt: string;
     updatedAt: string;

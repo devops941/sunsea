@@ -452,6 +452,7 @@ model Shift {
   HourlyProduction     HourlyProduction[]
   productionWastages   ProductionWastage[]
   WeeklyMachineProgram WeeklyMachineProgram[]
+  dailyProductionPlans DailyProductionPlan[]
 
   @@map("shifts")
 }
@@ -681,6 +682,8 @@ model Machine {
   productionOrders      ProductionOrder[]
   productionWastages    ProductionWastage[]
   weeklyMachinePrograms WeeklyMachineProgram[]
+  dailyProductionPlans  DailyProductionPlan[]
+  oeeSnapshots          MachineOeeSnapshot[]
 
   @@map("machines")
 }
@@ -905,10 +908,13 @@ model ProductionOrder {
   draftRawMaterials         Json?                      @map("draft_raw_materials")
   finishedGoodsTransactions FinishedGoodsTransaction[]
   hourlyProductions         HourlyProduction[]
+  rawMaterialTransactions   RawMaterialTransaction[]
   Machine                   Machine?                   @relation(fields: [machineMachineId], references: [machineId])
   productItem               Product                    @relation(fields: [productItemId], references: [id])
   productionWastages        ProductionWastage[]
   weeklyMachinePrograms     WeeklyMachineProgram[]
+  dailyProductionPlans      DailyProductionPlan[]
+  stockAdjustments          StockAdjustment[]
 
   @@index([orderDate])
   @@index([dueDate])
@@ -943,6 +949,7 @@ model WeeklyMachineProgram {
   Product           Product?        @relation("ProductWeeklyPrograms", fields: [productId], references: [id])
   productionOrder   ProductionOrder @relation(fields: [productionOrderId], references: [productionOrderId])
   shift             Shift?          @relation(fields: [shiftId], references: [shiftCode], onDelete: Cascade)
+  dailyProductionPlans DailyProductionPlan[]
 
   @@unique([machineId, shiftId, weekStartDate, dayOfWeek, sequenceNo])
   @@index([productionOrderId])
@@ -964,7 +971,11 @@ model HourlyProduction {
   rejectQty          Decimal             @default(0) @map("reject_qty") @db.Decimal(14, 3)
   scrapQty           Decimal             @default(0) @map("scrap_qty") @db.Decimal(14, 3)
   downtime           Decimal             @default(0) @map("downtime") @db.Decimal(10, 2)
+  runtimeMinutes     Decimal             @default(60) @map("runtime_minutes") @db.Decimal(10, 2)
   remarks            String?             @db.VarChar(255)
+  downtimeReason     String?             @map("downtime_reason") @db.VarChar(100)
+  rejectReason       String?             @map("reject_reason") @db.VarChar(100)
+  scrapReason        String?             @map("scrap_reason") @db.VarChar(100)
   operatorId         String?             @map("operator_id") @db.VarChar(20)
   createdAt          DateTime            @default(now()) @map("created_at")
   updatedAt          DateTime            @updatedAt @map("updated_at")
@@ -972,29 +983,67 @@ model HourlyProduction {
   productionOrder    ProductionOrder     @relation(fields: [productionOrderId], references: [productionOrderId], onDelete: Cascade)
   shift              Shift               @relation(fields: [shiftId], references: [shiftCode], onDelete: Cascade)
   productionWastages ProductionWastage[]
+  dailyPlanId        String?             @map("daily_plan_id") @db.VarChar(50)
+  dailyPlan          DailyProductionPlan? @relation(fields: [dailyPlanId], references: [dailyPlanId])
 
   @@unique([productionDate, machineId, shiftId, hourIndex])
   @@index([productionOrderId])
   @@index([machineId])
   @@index([shiftId])
+  @@index([dailyPlanId])
   @@map("hourly_productions")
 }
 
+model DailyProductionPlan {
+  dailyPlanId       String               @id @map("daily_plan_id") @db.VarChar(50)
+  weeklyProgramId   String               @map("weekly_program_id") @db.VarChar(20)
+  productionOrderId String               @map("production_order_id") @db.VarChar(20)
+  productionDate     DateTime             @map("production_date") @db.Date
+  machineId         String               @map("machine_id") @db.VarChar(20)
+  shiftId           String               @map("shift_id") @db.VarChar(20)
+  plannedQty        Decimal              @map("planned_qty") @db.Decimal(12, 3)
+  plannedHours      Decimal?             @map("planned_hours") @db.Decimal(10, 2)
+  priority          String               @default("MEDIUM") @db.VarChar(20)
+  status            String               @default("DRAFT") @db.VarChar(20)
+  remarks           String?              @db.VarChar(255)
+  createdAt         DateTime             @default(now()) @map("created_at")
+  updatedAt         DateTime             @updatedAt @map("updated_at")
+  createdBy         String?              @map("created_by") @db.VarChar(36)
+  updatedBy         String?              @map("updated_by") @db.VarChar(36)
+
+  weeklyMachineProgram WeeklyMachineProgram @relation(fields: [weeklyProgramId], references: [weeklyProgramId], onDelete: Cascade)
+  productionOrder      ProductionOrder      @relation(fields: [productionOrderId], references: [productionOrderId], onDelete: Cascade)
+  machine              Machine              @relation(fields: [machineId], references: [machineId], onDelete: Cascade)
+  shift                Shift                @relation(fields: [shiftId], references: [shiftCode], onDelete: Cascade)
+  hourlyProductions    HourlyProduction[]
+
+  @@index([weeklyProgramId])
+  @@index([productionOrderId])
+  @@index([machineId])
+  @@index([shiftId])
+  @@index([productionDate])
+  @@index([status])
+  @@map("daily_production_plans")
+}
+
 model RawMaterialTransaction {
-  rmTxnId       BigInt      @id @default(autoincrement()) @map("rm_txn_id")
-  storeId       String      @map("store_id") @db.VarChar(20)
-  rawMaterialId String      @map("raw_material_id") @db.VarChar(20)
-  txnType       String      @map("txn_type") @db.VarChar(30)
-  qty           Decimal     @map("qty") @db.Decimal(14, 3)
-  txnDateTime   DateTime    @default(now()) @map("txn_date_time")
-  remarks       String?     @map("remarks") @db.VarChar(255)
-  createdAt     DateTime    @default(now()) @map("created_at")
-  rawMaterial   RawMaterial @relation(fields: [rawMaterialId], references: [rawMaterialId], onDelete: Cascade)
-  store         Store       @relation(fields: [storeId], references: [storeId], onDelete: Cascade)
+  rmTxnId           BigInt           @id @default(autoincrement()) @map("rm_txn_id")
+  storeId           String           @map("store_id") @db.VarChar(20)
+  rawMaterialId     String           @map("raw_material_id") @db.VarChar(20)
+  txnType           String           @map("txn_type") @db.VarChar(30)
+  qty               Decimal          @map("qty") @db.Decimal(14, 3)
+  txnDateTime       DateTime         @default(now()) @map("txn_date_time")
+  remarks           String?          @map("remarks") @db.VarChar(255)
+  createdAt         DateTime         @default(now()) @map("created_at")
+  productionOrderId String?          @map("production_order_id") @db.VarChar(20)
+  rawMaterial       RawMaterial      @relation(fields: [rawMaterialId], references: [rawMaterialId], onDelete: Cascade)
+  store             Store            @relation(fields: [storeId], references: [storeId], onDelete: Cascade)
+  productionOrder   ProductionOrder? @relation(fields: [productionOrderId], references: [productionOrderId], onDelete: SetNull)
 
   @@index([storeId])
   @@index([rawMaterialId])
   @@index([txnDateTime])
+  @@index([productionOrderId])
   @@map("raw_material_transactions")
 }
 
@@ -1309,25 +1358,30 @@ model ProductionWastage {
 }
 
 model StockAdjustment {
-  id               BigInt                @id @default(autoincrement()) @map("adj_id")
-  adjustmentNumber String                @unique @map("adjustment_number") @db.VarChar(50)
-  adjustmentDate   DateTime              @map("adjustment_date")
-  reason           String?               @db.VarChar(255)
-  status           AdjustmentStatus      @default(DRAFT)
-  approvedBy       String?               @map("approved_by") @db.VarChar(36)
-  approvedAt       DateTime?             @map("approved_at")
-  createdBy        String?               @map("created_by") @db.VarChar(36)
-  updatedBy        String?               @map("updated_by") @db.VarChar(36)
-  createdAt        DateTime              @default(now()) @map("created_at")
-  updatedAt        DateTime              @updatedAt @map("updated_at")
-  sourceDocument   String?               @map("source_document") @db.VarChar(50)
-  sourceDocId      String?               @map("source_doc_id") @db.VarChar(50)
-  autoGenerated    Boolean               @default(false) @map("auto_generated")
-  type             String?               @map("type") @db.VarChar(50)
-  items            StockAdjustmentItem[]
+  id                BigInt                @id @default(autoincrement()) @map("adj_id")
+  adjustmentNumber  String                @unique @map("adjustment_number") @db.VarChar(50)
+  adjustmentDate    DateTime              @map("adjustment_date")
+  adjustmentType    String                @default("STOCK_INCREASE") @map("adjustment_type") @db.VarChar(40)
+  reason            String?               @db.VarChar(255)
+  status            AdjustmentStatus      @default(DRAFT)
+  approvedBy        String?               @map("approved_by") @db.VarChar(36)
+  approvedAt        DateTime?             @map("approved_at")
+  createdBy         String?               @map("created_by") @db.VarChar(36)
+  updatedBy         String?               @map("updated_by") @db.VarChar(36)
+  createdAt         DateTime              @default(now()) @map("created_at")
+  updatedAt         DateTime              @updatedAt @map("updated_at")
+  sourceDocument    String?               @map("source_document") @db.VarChar(50)
+  sourceDocId       String?               @map("source_doc_id") @db.VarChar(50)
+  autoGenerated     Boolean               @default(false) @map("auto_generated")
+  type              String?               @map("type") @db.VarChar(50)
+  productionOrderId String?               @map("production_order_id") @db.VarChar(20)
+  productionOrder   ProductionOrder?      @relation(fields: [productionOrderId], references: [productionOrderId])
+  items             StockAdjustmentItem[]
 
   @@index([adjustmentDate])
   @@index([status])
+  @@index([adjustmentType])
+  @@index([productionOrderId])
   @@map("stock_adjustments")
 }
 
@@ -1367,6 +1421,8 @@ enum MachineStatus {
   RUNNING
   BREAKDOWN
   MAINTENANCE
+  MATERIAL_WAITING
+  SETUP
 }
 
 enum MachineType {
@@ -1603,3 +1659,28 @@ model SalesInvoiceItem {
   @@map("sales_invoice_items")
 }
 
+/// Stores calculated OEE metrics per machine per shift for historical lookup and reporting
+model MachineOeeSnapshot {
+  id             BigInt   @id @default(autoincrement())
+  machineId      String   @map("machine_id") @db.VarChar(20)
+  dailyPlanId    String?  @map("daily_plan_id") @db.VarChar(50)
+  productionDate DateTime @map("production_date") @db.Date
+  shiftId        String   @map("shift_id") @db.VarChar(20)
+  plannedRunTime Decimal  @map("planned_run_time") @db.Decimal(10, 2) // minutes
+  actualRunTime  Decimal  @map("actual_run_time") @db.Decimal(10, 2)  // minutes
+  totalDowntime  Decimal  @map("total_downtime") @db.Decimal(10, 2)   // minutes
+  totalProduced  Decimal  @map("total_produced") @db.Decimal(14, 3)
+  goodQty        Decimal  @map("good_qty") @db.Decimal(14, 3)
+  rejectQty      Decimal  @map("reject_qty") @db.Decimal(14, 3)
+  availability   Decimal  @map("availability") @db.Decimal(5, 2)
+  performance    Decimal  @map("performance") @db.Decimal(5, 2)
+  quality        Decimal  @map("quality") @db.Decimal(5, 2)
+  oeePercent     Decimal  @map("oee_percent") @db.Decimal(5, 2)
+  calculatedAt   DateTime @default(now()) @map("calculated_at")
+  machine        Machine  @relation(fields: [machineId], references: [machineId], onDelete: Cascade)
+
+  @@unique([machineId, productionDate, shiftId])
+  @@index([machineId, productionDate])
+  @@index([dailyPlanId])
+  @@map("machine_oee_snapshots")
+}

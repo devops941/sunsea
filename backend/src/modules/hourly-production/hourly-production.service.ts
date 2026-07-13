@@ -1,6 +1,8 @@
 import { prisma } from "../../config/prisma";
 import { ApiError } from "../../utils/ApiError";
 import { CreateHourlyProductionInput, UpdateHourlyProductionInput } from "./hourly-production.validation";
+import weeklyProgramService from "../weekly-machine-program/weekly-program.service";
+import oeeService from "../oee/oee.service";
 
 function getMondayAndDayOfWeek(dateInput: Date | string) {
   let date: Date;
@@ -34,7 +36,9 @@ async function syncProductionOrderQuantities(tx: any, productionOrderId: string)
   const order = await tx.productionOrder.findUnique({ where: { productionOrderId } });
   let newStatus = order?.status || "IN_PROGRESS";
   
-  if (newStatus !== "COMPLETED" && newStatus !== "IN_PROGRESS" && newStatus !== "FG_RECEIVED" && newStatus !== "READY_FOR_DISPATCH" && newStatus !== "DISPATCHED") {
+  if (aggregates._sum.qtyProduced && order?.targetQty && Number(aggregates._sum.qtyProduced) >= Number(order.targetQty)) {
+    newStatus = "COMPLETED";
+  } else if (newStatus !== "COMPLETED" && newStatus !== "IN_PROGRESS" && newStatus !== "FG_RECEIVED" && newStatus !== "READY_FOR_DISPATCH" && newStatus !== "DISPATCHED") {
     newStatus = "IN_PROGRESS";
   }
 
@@ -64,38 +68,87 @@ class HourlyProductionService {
     const [yyyy, mm, dd] = data.productionDate.split("-").map(Number);
     const prodDate = new Date(Date.UTC(yyyy, mm - 1, dd));
 
-    const weeklyProgram = await prisma.weeklyMachineProgram.findFirst({
-      where: {
-        machineId: data.machineId,
-        shiftId: data.shiftId,
-        weekStartDate: monday,
-        dayOfWeek: dayOfWeek,
-        productionOrderId: data.productionOrderId,
+    // Daily Production Plan check and validation
+    let dailyPlan = null;
+    if (data.dailyPlanId) {
+      dailyPlan = await prisma.dailyProductionPlan.findUnique({
+        where: { dailyPlanId: data.dailyPlanId }
+      });
+      if (!dailyPlan) {
+        throw new ApiError(404, `Daily Production Plan with ID ${data.dailyPlanId} not found`);
       }
-    });
+    } else {
+      // Find a daily plan matching the current logging context
+      dailyPlan = await prisma.dailyProductionPlan.findFirst({
+        where: {
+          productionDate: prodDate,
+          machineId: data.machineId,
+          shiftId: data.shiftId,
+          productionOrderId: data.productionOrderId,
+        }
+      });
+    }
+
+    if (dailyPlan) {
+      // Rule: Hourly Production can only be entered against an approved or in-progress Daily Plan
+      const allowedStatuses = ["APPROVED", "IN_PROGRESS"];
+      if (!allowedStatuses.includes(dailyPlan.status.toUpperCase())) {
+        throw new ApiError(400, `Hourly Production can only be entered against an approved Daily Plan. Current status: ${dailyPlan.status}`);
+      }
+      
+      // Auto-link dailyPlanId in the reference object
+      data.dailyPlanId = dailyPlan.dailyPlanId;
+    }
+
+    let weeklyProgram = null;
+    if (dailyPlan && dailyPlan.weeklyProgramId) {
+      weeklyProgram = await prisma.weeklyMachineProgram.findUnique({
+        where: { weeklyProgramId: dailyPlan.weeklyProgramId }
+      });
+    }
+
+    if (!weeklyProgram) {
+      weeklyProgram = await prisma.weeklyMachineProgram.findFirst({
+        where: {
+          machineId: data.machineId,
+          shiftId: data.shiftId,
+          weekStartDate: monday,
+          dayOfWeek: dayOfWeek,
+          productionOrderId: data.productionOrderId,
+        }
+      });
+    }
 
     if (!weeklyProgram) {
       throw new ApiError(400, "Entry without Daily Plan: No weekly machine schedule (Daily Plan) exists for this machine, date, and shift");
     }
 
     // 3. Entry after Shift Closed
-    if (weeklyProgram.status.toUpperCase() === "COMPLETED" || weeklyProgram.status.toUpperCase() === "CLOSED") {
-      throw new ApiError(400, "Entry after Shift Closed: The shift schedule has already been closed");
+    if (dailyPlan) {
+      if (["COMPLETED", "CLOSED", "CANCELLED"].includes(dailyPlan.status.toUpperCase())) {
+        throw new ApiError(400, "Entry after Shift Closed: The daily plan schedule has already been closed");
+      }
+    } else if (weeklyProgram) {
+      if (["COMPLETED", "CLOSED"].includes(weeklyProgram.status.toUpperCase())) {
+        throw new ApiError(400, "Entry after Shift Closed: The shift schedule has already been closed");
+      }
     }
 
     // 4. Duplicate Hour Entry
-    const duplicate = await prisma.hourlyProduction.findFirst({
-      where: {
-        productionDate: prodDate,
-        machineId: data.machineId,
-        shiftId: data.shiftId,
-        hourIndex: data.hourIndex,
-        ...(excludeId ? { hourlyProductionId: { not: excludeId } } : {})
-      }
-    });
+    if (Number(data.hourIndex) > 0) {
+      const duplicate = await prisma.hourlyProduction.findFirst({
+        where: {
+          productionDate: prodDate,
+          machineId: data.machineId,
+          shiftId: data.shiftId,
+          hourIndex: Number(data.hourIndex),
+          ...(excludeId ? { hourlyProductionId: { not: excludeId } } : {})
+        }
+      });
 
-    if (duplicate) {
-      throw new ApiError(409, `Duplicate Hour Entry: An hourly production log already exists for this machine, date, shift, and hour index ${data.hourIndex}`);
+      if (duplicate) {
+        throw new ApiError(409, `Duplicate Hour Entry: An hourly production log already exists for this machine, date, shift, and hour index ${data.hourIndex}`);
+      }
     }
 
     // 5. Future Time Entry (Commented out to allow logging and testing future dates)
@@ -151,18 +204,19 @@ class HourlyProductionService {
     }
     */
 
-    return { order, weeklyProgram };
+    return { order, weeklyProgram, dailyPlan };
   }
 
-  async create(data: CreateHourlyProductionInput) {
+  async create(data: any) {
     const [yyyy, mm, dd] = data.productionDate.split("-").map(Number);
     const prodDate = new Date(Date.UTC(yyyy, mm - 1, dd));
 
-    const { weeklyProgram } = await this.validateHourlyEntry(data);
+    const { weeklyProgram, dailyPlan } = await this.validateHourlyEntry(data);
 
     return prisma.$transaction(async (tx) => {
       const created = await tx.hourlyProduction.create({
         data: {
+          dailyPlanId: dailyPlan?.dailyPlanId ?? null,
           productionOrderId: data.productionOrderId,
           productionDate: prodDate,
           shiftId: data.shiftId,
@@ -173,6 +227,9 @@ class HourlyProductionService {
           scrapQty: data.scrapQty ?? 0,
           downtime: data.downtime ?? 0,
           remarks: data.remarks ?? null,
+          downtimeReason: data.downtimeReason ?? null,
+          rejectReason: data.rejectReason ?? null,
+          scrapReason: data.scrapReason ?? null,
           operatorId: data.operatorId ?? null,
         },
         include: {
@@ -180,15 +237,82 @@ class HourlyProductionService {
         },
       });
 
-      if (weeklyProgram.status !== "COMPLETED" && weeklyProgram.status !== "IN_PROGRESS") {
-        await tx.weeklyMachineProgram.update({
-          where: { weeklyProgramId: weeklyProgram.weeklyProgramId },
-          data: { status: "IN_PROGRESS" },
+      // Calculate if this is the last hour of the shift
+      const shift = await tx.shift.findUnique({
+        where: { shiftCode: data.shiftId }
+      });
+
+      let totalHours = 8;
+      if (shift && shift.startTime && shift.endTime) {
+        const [startH, startM] = shift.startTime.split(":").map(Number);
+        const [endH, endM] = shift.endTime.split(":").map(Number);
+        let startMinutes = startH * 60 + startM;
+        let endMinutes = endH * 60 + endM;
+        if (endMinutes <= startMinutes) {
+          endMinutes += 24 * 60;
+        }
+        totalHours = Math.floor((endMinutes - startMinutes) / 60);
+      }
+
+      const isLastHour = Number(data.hourIndex) === totalHours;
+
+      if (isLastHour) {
+        // Aggregate total qty produced for this machine, date, and shift
+        // Stop current run and carry forward pending qty to next shift if under-produced
+        await weeklyProgramService.stopProgramAndCarryForwardInternal(tx, weeklyProgram.weeklyProgramId, data.operatorId ?? undefined);
+
+        const wpNum = parseInt(weeklyProgram.weeklyProgramId.replace(/\D/g, ""), 10) || 1;
+        // Automatically log a SYSTEM_STOP
+        await tx.hourlyProduction.create({
+          data: {
+            dailyPlanId: dailyPlan?.dailyPlanId ?? null,
+            productionOrderId: data.productionOrderId,
+            productionDate: prodDate,
+            shiftId: data.shiftId,
+            machineId: data.machineId,
+            hourIndex: -(10000 + wpNum),
+            qtyProduced: 0,
+            rejectQty: 0,
+            scrapQty: 0,
+            downtime: 0,
+            remarks: "Shift Hours Completed",
+            downtimeReason: "Shift Completed",
+            operatorId: "SYSTEM"
+          }
         });
+
+        if (dailyPlan?.dailyPlanId) {
+          await tx.dailyProductionPlan.update({
+            where: { dailyPlanId: dailyPlan.dailyPlanId },
+            data: { status: "COMPLETED" },
+          });
+        }
+      } else {
+        // Ensure status is IN_PROGRESS if not the last hour
+        if (weeklyProgram.status !== "COMPLETED" && weeklyProgram.status !== "IN_PROGRESS") {
+          await tx.weeklyMachineProgram.update({
+            where: { weeklyProgramId: weeklyProgram.weeklyProgramId },
+            data: { status: "IN_PROGRESS" },
+          });
+        }
       }
 
       await syncProductionOrderQuantities(tx, data.productionOrderId);
       return created;
+    }).then(async (result) => {
+      // Auto-trigger OEE snapshot recalculation after transaction commits
+      try {
+        await oeeService.recalculateAndSaveSnapshot({
+          machineId: data.machineId,
+          productionDate: data.productionDate,
+          shiftId: data.shiftId,
+          dailyPlanId: result.dailyPlanId ?? null,
+        });
+      } catch (e) {
+        // OEE calculation errors should not fail the main operation
+        console.error("OEE snapshot recalculation failed:", e);
+      }
+      return result;
     });
   }
 
@@ -216,7 +340,11 @@ class HourlyProductionService {
       include: {
         productionOrder: {
           include: {
-            productItem: true,
+            productItem: {
+              include: {
+                uom: true,
+              }
+            },
           }
         },
         machine: true,
@@ -231,19 +359,82 @@ class HourlyProductionService {
     const enrichedLogs = await Promise.all(logs.map(async (log) => {
       const { monday, dayOfWeek } = getMondayAndDayOfWeek(log.productionDate);
       
-      const weeklyProgram = await prisma.weeklyMachineProgram.findFirst({
-        where: {
-          machineId: log.machineId,
-          shiftId: log.shiftId,
-          weekStartDate: monday,
-          dayOfWeek: dayOfWeek,
-          productionOrderId: log.productionOrderId,
+      let shiftPlannedQty = 0;
+      let weeklyProgramStatus = null;
+      let weeklyProgramId = null;
+
+      if (log.dailyPlanId) {
+        const dailyPlan = await prisma.dailyProductionPlan.findUnique({
+          where: { dailyPlanId: log.dailyPlanId }
+        });
+        if (dailyPlan) {
+          shiftPlannedQty = Number(dailyPlan.plannedQty);
+          weeklyProgramStatus = dailyPlan.status;
+          weeklyProgramId = dailyPlan.weeklyProgramId;
         }
-      });
+      }
+
+      if (!shiftPlannedQty) {
+        let weeklyProgram = null;
+        const hourIdx = Number(log.hourIndex);
+
+        if (hourIdx < 0) {
+          // Decode weeklyProgramId from hourIndex
+          const absVal = Math.abs(hourIdx);
+          const wpNum = absVal >= 10000 ? absVal - 10000 : absVal;
+          const decodedWpId = `WP${String(wpNum).padStart(4, '0')}`;
+          weeklyProgram = await prisma.weeklyMachineProgram.findUnique({
+            where: { weeklyProgramId: decodedWpId }
+          });
+        }
+
+        // Fallback: search by coordinate, ordering by weeklyProgramId desc to get the newest (active) program first
+        if (!weeklyProgram) {
+          weeklyProgram = await prisma.weeklyMachineProgram.findFirst({
+            where: {
+              machineId: log.machineId,
+              shiftId: log.shiftId,
+              weekStartDate: monday,
+              dayOfWeek: dayOfWeek,
+              productionOrderId: log.productionOrderId,
+            },
+            orderBy: {
+              weeklyProgramId: "desc"
+            }
+          });
+        }
+
+        if (weeklyProgram) {
+          shiftPlannedQty = Number(weeklyProgram.plannedQty);
+          weeklyProgramStatus = weeklyProgram.status;
+          weeklyProgramId = weeklyProgram.weeklyProgramId;
+        }
+      }
       
+      // ── Per-hour OEE calculation ───────────────────────────────────────────
+      const qtyProduced = Number(log.qtyProduced);
+      const rejectQty = Number(log.rejectQty);
+      const scrapQty = Number(log.scrapQty);
+      const downtimeMinutes = Number(log.downtime);
+      const runtimeMinutes = Number((log as any).runtimeMinutes ?? 60);
+      const goodQty = Math.max(0, qtyProduced - rejectQty - scrapQty);
+
+      const actualRunTime = Math.max(0, runtimeMinutes - downtimeMinutes);
+      const availabilityPct = runtimeMinutes > 0 ? Math.min(100, Math.round((actualRunTime / runtimeMinutes) * 10000) / 100) : 0;
+      const qualityPct = qtyProduced > 0 ? Math.min(100, Math.round((goodQty / qtyProduced) * 10000) / 100) : 100;
+      const hourlyOEE = Math.round((availabilityPct * 100 * qualityPct) / 10000 * 100) / 100;
+      // Performance defaults to 100 per hour (machine-level cycleTime not available per-slot)
+
       return {
         ...log,
-        shiftPlannedQty: weeklyProgram ? Number(weeklyProgram.plannedQty) : 0,
+        shiftPlannedQty,
+        weeklyProgramStatus,
+        weeklyProgramId,
+        goodQty,
+        availabilityPct,
+        qualityPct,
+        performancePct: 100,
+        hourlyOEE,
       };
     }));
 
@@ -256,7 +447,11 @@ class HourlyProductionService {
       include: {
         productionOrder: {
           include: {
-            productItem: true,
+            productItem: {
+              include: {
+                uom: true,
+              }
+            }
           }
         },
         machine: true,
@@ -276,6 +471,7 @@ class HourlyProductionService {
 
     // Merge existing and update data for validation
     const merged = {
+      dailyPlanId: data.dailyPlanId !== undefined ? data.dailyPlanId : (existing.dailyPlanId || null),
       productionOrderId: data.productionOrderId ?? existing.productionOrderId,
       productionDate: data.productionDate ?? existing.productionDate.toISOString().split("T")[0],
       shiftId: data.shiftId ?? existing.shiftId,
@@ -286,12 +482,16 @@ class HourlyProductionService {
       scrapQty: data.scrapQty ?? Number(existing.scrapQty),
       downtime: data.downtime ?? Number(existing.downtime),
       remarks: data.remarks ?? existing.remarks,
+      downtimeReason: data.downtimeReason ?? existing.downtimeReason,
+      rejectReason: data.rejectReason ?? existing.rejectReason,
+      scrapReason: data.scrapReason ?? existing.scrapReason,
       operatorId: data.operatorId ?? existing.operatorId,
     };
 
     await this.validateHourlyEntry(merged, hourlyProductionId);
 
     const updateData: any = {};
+    if (merged.dailyPlanId !== undefined) updateData.dailyPlanId = merged.dailyPlanId ?? null;
     if (data.productionOrderId) updateData.productionOrderId = data.productionOrderId;
     if (data.productionDate) {
       const [yyyy, mm, dd] = data.productionDate.split("-").map(Number);
@@ -305,6 +505,9 @@ class HourlyProductionService {
     if (data.scrapQty !== undefined) updateData.scrapQty = data.scrapQty;
     if (data.downtime !== undefined) updateData.downtime = data.downtime;
     if (data.remarks !== undefined) updateData.remarks = data.remarks;
+    if (data.downtimeReason !== undefined) updateData.downtimeReason = data.downtimeReason;
+    if (data.rejectReason !== undefined) updateData.rejectReason = data.rejectReason;
+    if (data.scrapReason !== undefined) updateData.scrapReason = data.scrapReason;
     if (data.operatorId !== undefined) updateData.operatorId = data.operatorId;
 
     return prisma.$transaction(async (tx) => {

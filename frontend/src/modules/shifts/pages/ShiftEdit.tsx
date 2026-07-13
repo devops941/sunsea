@@ -19,6 +19,7 @@ const initialFormState = {
     endTime: "",
     breakDuration: "",
     gracePeriod: "",
+    isActive: true,
 };
 
 interface FormErrors {
@@ -37,6 +38,7 @@ const ShiftEdit: React.FC = () => {
 
     const [formData, setFormData] = useState(initialFormState);
     const [errors, setErrors] = useState<FormErrors>({});
+    const [isAssigned, setIsAssigned] = useState(false);
 
     useEffect(() => {
         if (location.state) {
@@ -52,7 +54,9 @@ const ShiftEdit: React.FC = () => {
                 gracePeriod: location.state.gracePeriod !== null && location.state.gracePeriod !== undefined
                     ? String(location.state.gracePeriod)
                     : "",
+                isActive: location.state.isActive ?? true,
             });
+            setIsAssigned(location.state.isAssigned || false);
         } else {
             toast.error("No shift data provided.");
             navigate("/shifts");
@@ -107,6 +111,7 @@ const ShiftEdit: React.FC = () => {
             endTime: formData.endTime,
             breakDuration: formData.breakDuration ? Number(formData.breakDuration) : null,
             gracePeriod: formData.gracePeriod ? Number(formData.gracePeriod) : null,
+            isActive: formData.isActive,
         };
         try {
             await dispatch(updateShift({ id: formData.id, data: payload })).unwrap();
@@ -141,6 +146,12 @@ const ShiftEdit: React.FC = () => {
                 </div>
 
                 <form onSubmit={handleSubmit} className="form-inner">
+                    {isAssigned && (
+                        <div className="alert alert-warning py-2 mb-4 d-flex align-items-center small">
+                            <i className="bi bi-info-circle-fill me-2"></i>
+                            This shift is currently assigned to production plans or logs. You can only toggle its Active/Inactive status.
+                        </div>
+                    )}
                     <Row className="g-3">
                         <Col md={6}>
                             <TextInput
@@ -162,6 +173,7 @@ const ShiftEdit: React.FC = () => {
                                 required
                                 onChange={handleChange}
                                 error={errors.shiftName}
+                                disabled={isAssigned}
                             />
                         </Col>
                         <Col md={6}>
@@ -177,6 +189,7 @@ const ShiftEdit: React.FC = () => {
                                     }
                                 }}
                                 error={errors.startTime}
+                                disabled={isAssigned}
                             />
                         </Col>
                         <Col md={6}>
@@ -192,6 +205,7 @@ const ShiftEdit: React.FC = () => {
                                     }
                                 }}
                                 error={errors.endTime}
+                                disabled={isAssigned}
                             />
                         </Col>
                         <Col md={6}>
@@ -203,6 +217,7 @@ const ShiftEdit: React.FC = () => {
                                 placeholder="e.g. 30"
                                 onChange={handleChange}
                                 error={errors.breakDuration}
+                                disabled={isAssigned}
                             />
                         </Col>
                         <Col md={6}>
@@ -214,7 +229,26 @@ const ShiftEdit: React.FC = () => {
                                 placeholder="e.g. 15"
                                 onChange={handleChange}
                                 error={errors.gracePeriod}
+                                disabled={isAssigned}
                             />
+                        </Col>
+                        <Col md={12}>
+                            <div className="d-flex align-items-center gap-3 mt-2 p-3 bg-light rounded border">
+                                <label className="form-label mb-0 fw-bold">Status: </label>
+                                <div className="form-check form-switch mb-0">
+                                    <input 
+                                        className="form-check-input" 
+                                        type="checkbox" 
+                                        id="isActiveSwitch"
+                                        checked={formData.isActive}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, isActive: e.target.checked }))}
+                                        style={{ cursor: "pointer", width: "40px", height: "20px" }}
+                                    />
+                                    <label className="form-check-label ms-2" htmlFor="isActiveSwitch">
+                                        {formData.isActive ? "Active" : "Inactive"}
+                                    </label>
+                                </div>
+                            </div>
                         </Col>
                     </Row>
 

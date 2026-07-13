@@ -31,5 +31,10 @@ export const stockAdjustmentService = {
   delete: async (id: string | number) => {
     const response = await apiClient.delete(`${BASE_URL}/${id}`);
     return response.data;
-  }
+  },
+
+  fetchProductionOrdersForIssue: async () => {
+    const response = await apiClient.get(`${BASE_URL}/production-orders`);
+    return response.data.data;
+  },
 };

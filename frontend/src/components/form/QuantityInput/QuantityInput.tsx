@@ -12,6 +12,7 @@ interface QuantityInputProps {
   error?: string;
   onChange: (e: any) => void;
   disabled?: boolean;
+  step?: string;
 }
 
 const conversionRates: Record<string, number> = {
@@ -27,6 +28,12 @@ const conversionRates: Record<string, number> = {
   "cm-m": 0.01,
   "dz-each": 12,
   "each-dz": 1 / 12,
+  "dz-pcs": 12,
+  "pcs-dz": 1 / 12,
+  "hrs-mins": 60,
+  "mins-hrs": 1 / 60,
+  "hours-mins": 60,
+  "mins-hours": 1 / 60,
 };
 
 const convert = (val: number, fromUnit: string, toUnit: string) => {
@@ -46,6 +53,7 @@ const QuantityInput: React.FC<QuantityInputProps> = ({
   error,
   onChange,
   disabled = false,
+  step,
 }) => {
   const uomList = baseUoms ? baseUoms.split(",").map((u) => u.trim()).filter(Boolean) : [];
   const primaryUom = uomList.length > 0 ? uomList[0] : "";
@@ -122,6 +130,7 @@ const QuantityInput: React.FC<QuantityInputProps> = ({
           isInvalid={!!error}
           disabled={disabled || !primaryUom}
           placeholder="0.00"
+          step={step || "any"}
           className="text-input-control"
           style={{ borderRight: "none", borderTopRightRadius: 0, borderBottomRightRadius: 0, width: "1%", flex: "1 1 auto" }}
         />

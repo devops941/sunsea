@@ -117,4 +117,9 @@ export const productionOrderService = {
         const response = await apiClient.delete(`${config.productionOrder.base}/${id}`);
         return response.data?.data || response.data;
     },
+
+    issueMaterials: async (id: number | string, data: { items: Array<{ rawMaterialId: string; storeId: string; qty: number; remarks?: string }> }): Promise<any> => {
+        const response = await apiClient.post(`${config.productionOrder.base}/${id}/issue-materials`, data);
+        return response.data?.data || response.data;
+    },
 };

@@ -1,24 +1,20 @@
-import React, { useState, useCallback, useEffect, useMemo } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { Container, Row, Col, Spinner, Card } from "react-bootstrap";
-import { FaSearch, FaPlus, FaCalendarAlt, FaCheckCircle, FaShoppingCart, FaEye, FaChevronLeft, FaChevronRight } from "react-icons/fa";
+import {FaPlus, FaCalendarAlt, FaCheckCircle, FaShoppingCart, FaEye, FaChevronLeft, FaChevronRight } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 
-import ViewButton from "../../../components/ui/viewbutton/ViewButton";
 import EditButton from "../../../components/ui/EditButton/EditButton";
 import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import CustomButton from "../../../components/ui/Button/Button";
 import IconButton from "../../../components/ui/IconButton/IconButton";
-import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import ProductionOrderViewModal from "../components/ProductionOrderViewModal";
 import { productionOrderService } from "../../../services/productionOrderService";
 import type { ProductionOrder } from "../../../services/productionOrderService";
 import { rawMaterialService } from "../../../services/rawMaterialService";
-import { salesOrderService, type SalesOrder } from "../../../services/salesOrderService";
-import { storeService } from "../../../services/storeService";
-import { billOfMaterialService } from "../../../services/billOfMaterialService";
+import { salesOrderService } from "../../../services/salesOrderService";
 
 const ITEMS_PER_PAGE = 20;
 
@@ -28,13 +24,8 @@ const ProductionOrderList: React.FC = () => {
     // --- State ---
     const [combinedData, setCombinedData] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
-    const [searchTerm, setSearchTerm] = useState("");
-    const [statusFilter, setStatusFilter] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
     const [totalItems, setTotalItems] = useState(0);
-
-    const [stores, setStores] = useState<any[]>([]);
-    const [boms, setBoms] = useState<any[]>([]);
 
     const [showViewModal, setShowViewModal] = useState(false);
     const [selectedItem, setSelectedItem] = useState<ProductionOrder | null>(null);
@@ -44,29 +35,7 @@ const ProductionOrderList: React.FC = () => {
 
     const [rawMaterialsMap, setRawMaterialsMap] = useState<Map<string, any>>(new Map());
 
-    // Fetch helper options
-    const fetchDependencies = useCallback(async () => {
-        const extractArray = (d: any): any[] => {
-            if (Array.isArray(d)) return d;
-            if (Array.isArray(d?.data)) return d.data;
-            if (Array.isArray(d?.data?.data)) return d.data.data;
-            return [];
-        };
-        try {
-            const [storeRes, bomRes] = await Promise.all([
-                storeService.fetchAll({ limit: 1000 }),
-                billOfMaterialService.fetchAll()
-            ]);
-            setStores(extractArray(storeRes));
-            setBoms(extractArray(bomRes));
-        } catch (error) {
-            console.error("Failed to load options", error);
-        }
-    }, []);
 
-    useEffect(() => {
-        fetchDependencies();
-    }, [fetchDependencies]);
 
     // Fetch raw materials map
     const fetchRawMaterials = useCallback(async () => {
@@ -93,7 +62,7 @@ const ProductionOrderList: React.FC = () => {
             const soRes = await salesOrderService.fetchAll({
                 status: "IN_PRODUCTION"
             });
-            const soList = soRes.data || soRes || [];
+            const soList: any[] = (soRes as any).data || soRes || [];
 
             // 2. Fetch Production Orders
             const poRes = await productionOrderService.fetchAll({
@@ -170,50 +139,27 @@ const ProductionOrderList: React.FC = () => {
             // Combine both mapped and directMapped
             let combinedList = [...mapped, ...directMapped];
 
-            // Filter out scheduled and completed items to make this an unscheduled backlog
-            combinedList = combinedList.filter(item => !["SCHEDULED", "IN_PROGRESS", "COMPLETED"].includes(item.status));
+            // Filter out scheduled, completed, and cancelled items to make this an unscheduled backlog
+            combinedList = combinedList.filter(item => !["SCHEDULED", "IN_PROGRESS", "COMPLETED", "CANCELLED", "CANCELED", "DELETED"].includes(item.status?.toUpperCase()));
 
-            // 5. Filter by status if selected
-            let filtered = combinedList;
-            if (statusFilter) {
-                filtered = filtered.filter(item => item.status === statusFilter);
-            }
-
-            // 6. Filter by search term
-            if (searchTerm) {
-                const lower = searchTerm.toLowerCase();
-                filtered = filtered.filter(item => 
-                    item.orderNo?.toLowerCase().includes(lower) ||
-                    item.customer?.firmName?.toLowerCase().includes(lower)
-                );
-            }
-
-            setTotalItems(filtered.length);
+            setTotalItems(combinedList.length);
             
             // 7. Paginate
             const start = (currentPage - 1) * ITEMS_PER_PAGE;
-            setCombinedData(filtered.slice(start, start + ITEMS_PER_PAGE));
+            setCombinedData(combinedList.slice(start, start + ITEMS_PER_PAGE));
         } catch (error) {
             console.error("Failed to load combined dashboard data", error);
             toast.error("Failed to load dashboard data");
         } finally {
             setLoading(false);
         }
-    }, [currentPage, searchTerm, statusFilter]);
+    }, [currentPage]);
 
     useEffect(() => {
         fetchCombinedData();
     }, [fetchCombinedData]);
 
-    const handleSearch = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-        setSearchTerm(e.target.value);
-        setCurrentPage(1);
-    }, []);
 
-    const handleStatusFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-        setStatusFilter(e.target.value);
-        setCurrentPage(1);
-    };
 
     const handleCreateProductionOrder = (so: any) => {
         navigate(`/production-orders/create`, {
@@ -223,86 +169,6 @@ const ProductionOrderList: React.FC = () => {
 
     const handleOpenEdit = (po: any) => {
         navigate(`/production-orders/edit/${po.productionOrderId}`);
-    };
-
-    // Auto-create Production Order & Assign Raw Materials directly from Sales Order row
-    const handleAutoPlanAndAllocateRM = async (order: any) => {
-        setLoading(true);
-        try {
-            // Fetch complete Sales Order details
-            const so = await salesOrderService.fetchById(order.id);
-            const items = so?.items || [];
-            
-            if (items.length === 0) {
-                toast.error("Sales Order has no items to plan.");
-                setLoading(false);
-                return;
-            }
-
-            // Get next Base ID
-            const nextIdRes = await productionOrderService.fetchNextId();
-            const basePoId = nextIdRes || `PO-${Date.now()}`;
-
-            // Resolve default store ID
-            const defaultStoreId = stores[0]?.storeId || "STR-001";
-
-            const getValidPriority = (p?: string) => {
-                if (!p) return "MEDIUM";
-                const up = p.toUpperCase();
-                if (["LOW", "MEDIUM", "HIGH", "URGENT"].includes(up)) return up;
-                if (up === "NORMAL") return "MEDIUM";
-                return "MEDIUM";
-            };
-
-            // Loop to create Production Orders (PLANNED status triggers RM check on backend)
-            for (let idx = 0; idx < items.length; idx++) {
-                const item = items[idx];
-                const bom = boms.find((b: any) => Number(b.productId) === Number(item.productId));
-                const targetQty = Number(item.quantity) || 0;
-                const damageQty = 100;
-                const totalQty = targetQty + damageQty;
-
-                const productRawMaterials = (bom?.items || []).map((bomItem: any) => ({
-                    rawMaterialId: bomItem.rawMaterialId?.toString() || "",
-                    requiredQty: Number((totalQty * (Number(bomItem.requiredQuantity) || 0)).toFixed(3)),
-                    uom: bomItem.uom || "KG",
-                    storeId: defaultStoreId,
-                    remarks: ""
-                }));
-
-                const payload = {
-                    productionOrderId: `${basePoId}-${idx + 1}`,
-                    orderDate: so.orderDate ? new Date(so.orderDate).toISOString() : new Date().toISOString(),
-                    dueDate: so.expectedCompletionDate ? new Date(so.expectedCompletionDate).toISOString() : new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString(),
-                    priority: so.dispatchType ? getValidPriority(so.dispatchType) : "MEDIUM",
-                    orderType: so.orderType ? so.orderType.toUpperCase() : "STANDARD",
-                    batchNo: null,
-                    lotNo: null,
-                    sourceSalesOrderId: so.id.toString(),
-                    sourceSalesOrderLineId: item.id?.toString() || null,
-                    sourceStoreId: defaultStoreId,
-                    destinationStoreId: defaultStoreId,
-                    status: "PLANNED",
-                    remarks: so.remarks || null,
-                    productItemId: item.productId?.toString(),
-                    targetQty: targetQty,
-                    damageQty: damageQty,
-                    uom: item.product?.uom?.name || "PCS",
-                    colorType: item.colorType || "sc",
-                    rawMaterials: productRawMaterials,
-                };
-
-                await productionOrderService.create(payload as any);
-            }
-
-            toast.success(`Production Order(s) created and raw material allocation processed for Sales Order ${order.orderNo}!`);
-            fetchCombinedData();
-        } catch (error: any) {
-            console.error("Auto allocation failed:", error);
-            toast.error(error?.response?.data?.message || error?.message || "Failed to assign raw materials.");
-        } finally {
-            setLoading(false);
-        }
     };
 
     const handleAllocateRM = async (order: any) => {
@@ -319,7 +185,7 @@ const ProductionOrderList: React.FC = () => {
 
             for (const po of targetPOs) {
                 const fullPo = await productionOrderService.getById(po.productionOrderId);
-                const cleanRawMaterials = (fullPo.draftRawMaterials || []).map((rm: any) => ({
+                const cleanRawMaterials = ((fullPo as any).draftRawMaterials || []).map((rm: any) => ({
                     rawMaterialId: rm.rawMaterialId?.toString() || "",
                     requiredQty: Number(rm.requiredQty),
                     uom: rm.uom || "KG",
@@ -384,7 +250,6 @@ const ProductionOrderList: React.FC = () => {
     return (
         <div className="inner-container">
             <Container fluid>
-                {/* HEADER SECTION */}
                 <div className="page-header mb-4">
                     <Row className="align-items-center g-3">
                         <Col lg={4} md={12}>
@@ -399,7 +264,6 @@ const ProductionOrderList: React.FC = () => {
                                     text="Weekly Scheduling"
                                     icon={FaCalendarAlt}
                                     onClick={() => navigate("/weekly-machine-schedules/create")}
-                                    style={{ backgroundColor: "var(--color-primary-dark, #0f766e)", borderColor: "var(--color-primary-dark, #0f766e)" }}
                                 />
                                 <CustomButton
                                     text="Add Production Order"
@@ -411,16 +275,14 @@ const ProductionOrderList: React.FC = () => {
                     </Row>
                 </div>
 
-                {/* DASHBOARD CARD - ONE TABLE FOR PRODUCTION ORDERS */}
                 <Card className="border-0 shadow-sm mb-4">
-                  
                     <Card.Body className="p-0">
                         <div className="table-responsive">
                             <table className="master-data-table mb-0" style={{ width: "100%" }}>
                                 <thead>
                                     <tr>
                                         <th style={{ width: "60px" }}>#</th>
-                                        <th>SO NO / PO NO</th>
+                                        <th>PO NO</th>
                                         <th>ORDER DATE</th>
                                         <th>EXPECTED DATE</th>
                                         <th>CUSTOMER</th>
@@ -473,9 +335,10 @@ const ProductionOrderList: React.FC = () => {
                                                                         : 0;
                                                                     const reqQty = Number(rm.requiredQty || 0);
 
-                                                                    const parentPO = item.productionOrders?.find((po: any) => 
-                                                                        (po.draftRawMaterials || []).some((drm: any) => drm.rawMaterialId === rm.rawMaterialId)
-                                                                    );
+                                                                    const parentPO = item.productionOrders?.find((po: any) => {
+                                                                        const rawMaterials = po.draftRawMaterials || [];
+                                                                        return rawMaterials.some((drm: any) => drm.rawMaterialId === rm.rawMaterialId);
+                                                                    });
                                                                     const isReservedStatus = parentPO 
                                                                         ? ["RM_AVAILABLE", "READY_FOR_PLANNING", "SCHEDULED", "IN_PROGRESS", "IN PROGRESS"].includes(parentPO.status) 
                                                                         : false;
@@ -555,7 +418,7 @@ const ProductionOrderList: React.FC = () => {
                                                                     }}
                                                                 />
                                                             )}
-                                                            {item.primaryPO && !["SCHEDULED", "IN_PROGRESS", "COMPLETED"].includes(item.primaryPO.status) && (
+                                                            {item.primaryPO && !["SCHEDULED", "IN_PROGRESS", "COMPLETED", "CANCELLED", "CANCELED", "DELETED"].includes(item.primaryPO.status?.toUpperCase()) && (
                                                                 <>
                                                                     <EditButton onClick={() => handleOpenEdit(item.primaryPO)} />
                                                                     {item.isDirect && (
@@ -606,6 +469,7 @@ const ProductionOrderList: React.FC = () => {
                     show={showViewModal}
                     onHide={() => setShowViewModal(false)}
                     order={selectedItem}
+                    onSuccess={fetchCombinedData}
                 />
 
                 {/* DELETE PO MODAL */}

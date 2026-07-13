@@ -8,6 +8,7 @@ import PublicRoute from "./PublicRoute";
 
 
 const Dashboard = lazy(() => import("../modules/dashboard/pages/DashboardPage"));
+const OeeDashboard = lazy(() => import("../modules/dashboard/pages/OeeDashboard"));
 const CompanySettings = lazy(() => import("../modules/company/pages/CompanySettings"));
 
 const OrganizationTabs = lazy(() => import("../modules/company/pages/OrganizationTabs"));
@@ -120,6 +121,7 @@ const ReportsTabs = lazy(() => import("../modules/reports/pages/ReportsTabs"));
 
 const HourlyWorkReportCreate = lazy(() => import("../modules/hourly-work-reports/pages/HourlyWorkReportCreate"));
 const HourlyWorkReportEdit = lazy(() => import("../modules/hourly-work-reports/pages/HourlyWorkReportEdit"));
+const DailyPlanCreate = lazy(() => import("../modules/daily-machine-planning/pages/DailyPlanCreate"));
 
 
 const WastageForm = lazy(() => import("../modules/production-wastage/pages/WastageCreate"));
@@ -182,9 +184,13 @@ const AppRoutes = () => {
             {/* ========================================================================= */}
             {/* CORE & DASHBOARD                                                          */}
             {/* ========================================================================= */}
-            <Route path="/" element={<Dashboard />} />
-            {/* Dashboard Route */}
+            <Route index element={<Dashboard />} />
             <Route path="/dashboard" element={<Dashboard />} />
+            
+            <Route element={<ProtectedRoute permission="reports.view" />}>
+              <Route path="/oee-dashboard" element={<OeeDashboard />} />
+            </Route>
+
             <Route path="/company/edit" element={<CompanySettings />} />
             <Route path="/company/view" element={<OrganizationTabs />} />
             <Route path="/settings/company" element={<OrganizationTabs />} />
@@ -475,6 +481,14 @@ const AppRoutes = () => {
             {/* Daily Machine Planning */}
             <Route element={<ProtectedRoute permission="weekly_programs.view" />}>
               <Route path="/daily-machine-planning" element={<ProductionOrderTabs />} />
+            </Route>
+
+            {/* Daily Production Plans Create / Edit */}
+            <Route element={<ProtectedRoute permission="weekly_programs.create" />}>
+              <Route path="/daily-production-plans/create" element={<DailyPlanCreate />} />
+            </Route>
+            <Route element={<ProtectedRoute permission="weekly_programs.edit" />}>
+              <Route path="/daily-production-plans/edit/:id" element={<DailyPlanCreate />} />
             </Route>
 
             {/* Shift Execution Board */}

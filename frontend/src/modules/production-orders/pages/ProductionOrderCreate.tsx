@@ -854,7 +854,15 @@ const ProductionOrderCreate: React.FC = () => {
                         destinationStoreId: fullOrder.destinationStoreId?.toString() || "",
                         status: fullOrder.status || "PLANNED",
                         remarks: fullOrder.remarks || "",
-                        products: [{
+                        products: (fullOrder as any).products ? (fullOrder as any).products.map((p: any) => ({
+                            productItemId: p.productItemId?.toString() || p.productId?.toString() || "",
+                            targetQty: Number(p.targetQty || p.quantity || 0),
+                            damageQty: Number((fullOrder as any).damageQty) || 100,
+                            uom: fullOrder.uom || "PCS",
+                            sourceSalesOrderLineId: fullOrder.sourceSalesOrderLineId || "",
+                            rawMaterials: rmRows,
+                            colorType: fullOrder.colorType || "sc",
+                        })) : [{
                             productItemId: fullOrder.productItemId?.toString() || "",
                             targetQty: Number(fullOrder.targetQty) || 0,
                             damageQty: Number((fullOrder as any).damageQty) || 100,

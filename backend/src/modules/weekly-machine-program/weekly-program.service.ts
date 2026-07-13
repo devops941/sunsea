@@ -182,6 +182,23 @@ class WeeklyProgramService {
     });
   }
 
+  // Fetch all programs that are PLANNED or IN_PROGRESS (pending/active across all weeks)
+  async findPending() {
+    return prisma.weeklyMachineProgram.findMany({
+      where: {
+        status: { in: ["PLANNED", "IN_PROGRESS"] }
+      },
+      orderBy: { createdAt: "asc" },
+      include: {
+        productionOrder: {
+          include: { productItem: true }
+        },
+        machine: true,
+        shift: true,
+      }
+    });
+  }
+
   async findById(weeklyProgramId: string) {
     const weeklyProgram = await prisma.weeklyMachineProgram.findUnique({
       where: { weeklyProgramId },
@@ -211,8 +228,8 @@ class WeeklyProgramService {
     if (data.weekStartDate) updateData.weekStartDate = new Date(data.weekStartDate);
     if (data.weekEndDate) updateData.weekEndDate = new Date(data.weekEndDate);
 
-    const checkMachineId = data.machineId || existingProgram.machineId;
-    const checkShiftId = data.shiftId || existingProgram.shiftId;
+    const checkMachineId = data.machineId !== undefined ? data.machineId : existingProgram.machineId;
+    const checkShiftId = data.shiftId !== undefined ? data.shiftId : existingProgram.shiftId;
     const checkWeekStartDate = data.weekStartDate ? new Date(data.weekStartDate) : existingProgram.weekStartDate;
     const checkDayOfWeek = data.dayOfWeek !== undefined ? data.dayOfWeek : existingProgram.dayOfWeek;
     const checkStatus = data.status || existingProgram.status;
@@ -267,6 +284,14 @@ class WeeklyProgramService {
     }
 
     const updatedProgram = await prisma.$transaction(async (tx) => {
+      // Determine if program is being stopped/freed
+      const isStopping = existingProgram.status === "IN_PROGRESS" && 
+        (data.status === "PLANNED" || data.status === "COMPLETED" || data.machineId === null);
+
+      if (isStopping) {
+        return await this.stopProgramAndCarryForwardInternal(tx, weeklyProgramId, userId);
+      }
+
       const res = await tx.weeklyMachineProgram.update({
         where: { weeklyProgramId },
         data: updateData,
@@ -348,7 +373,11 @@ class WeeklyProgramService {
       include: {
         productionOrder: {
           include: {
-            productItem: true,
+            productItem: {
+              include: {
+                uom: true,
+              }
+            }
           },
         },
         shift: true,
@@ -404,12 +433,16 @@ class WeeklyProgramService {
                   productionOrderId: p.productionOrderId,
                   productCode: p.productionOrder.productItem.productCode,
                   productName: p.productionOrder.productItem.productName,
+                  productId: p.productId ? Number(p.productId) : (p.productionOrder?.productItemId ? Number(p.productionOrder.productItemId) : null),
+                  uom: (p.productionOrder.productItem.uom?.uomCode?.toLowerCase() === "ea" ? "pcs" : p.productionOrder.productItem.uom?.uomCode) || "pcs",
                   plannedQty,
                   producedQty,
                   remainingQty,
                   status: p.status,
                   priority: p.priority,
                   sequenceNo: p.sequenceNo,
+                  poTargetQty: Number(p.productionOrder.targetQty || 0),
+                  poProducedQty: Number(p.productionOrder.producedQty || 0),
                 };
               })
             );
@@ -442,6 +475,163 @@ class WeeklyProgramService {
       })),
       days,
     };
+  }
+
+  async stopProgramAndCarryForward(weeklyProgramId: string, userId?: string) {
+    return await prisma.$transaction(async (tx) => {
+      return await this.stopProgramAndCarryForwardInternal(tx, weeklyProgramId, userId);
+    });
+  }
+
+  async stopProgramAndCarryForwardInternal(tx: any, weeklyProgramId: string, userId?: string) {
+    const existingProgram = await tx.weeklyMachineProgram.findUnique({
+      where: { weeklyProgramId }
+    });
+
+    if (!existingProgram) return null;
+
+    // Determine the actual production date from the program's week/day fields
+    // dayOfWeek: 1=Monday ... 7=Sunday
+    const weekMonday = new Date(existingProgram.weekStartDate);
+    const targetDate = new Date(weekMonday);
+    targetDate.setUTCDate(weekMonday.getUTCDate() + (existingProgram.dayOfWeek - 1));
+    const nextDay = new Date(targetDate);
+    nextDay.setUTCDate(targetDate.getUTCDate() + 1);
+
+    const aggregates = await tx.hourlyProduction.aggregate({
+      where: {
+        productionOrderId: existingProgram.productionOrderId,
+        productionDate: {
+          gte: targetDate,
+          lt: nextDay
+        },
+        machineId: existingProgram.machineId || undefined,
+        shiftId: existingProgram.shiftId || undefined,
+      },
+      _sum: {
+        qtyProduced: true
+      }
+    });
+
+    const totalProduced = Number(aggregates._sum.qtyProduced || 0);
+    const originalPlannedQty = Number(existingProgram.plannedQty || 0);
+    const pendingQty = originalPlannedQty - totalProduced;
+
+    let res;
+    if (pendingQty > 0) {
+      // 1. Complete original program at actual produced qty
+      res = await tx.weeklyMachineProgram.update({
+        where: { weeklyProgramId },
+        data: {
+          status: "COMPLETED",
+          plannedQty: totalProduced,
+          machineId: null,
+          shiftId: null,
+          updatedBy: userId,
+        },
+        include: {
+          productionOrder: true,
+          machine: true,
+          shift: true,
+        }
+      });
+
+      // 2. Find next shift and day
+      const shifts = await tx.shift.findMany({ where: { isActive: true } });
+      shifts.sort((a: any, b: any) => a.startTime.localeCompare(b.startTime));
+      const currentIndex = shifts.findIndex((s: any) => s.shiftCode === (existingProgram.shiftId || ""));
+      
+      let nextDayOfWeek = existingProgram.dayOfWeek;
+      let nextShiftId = existingProgram.shiftId || (shifts[0] ? shifts[0].shiftCode : null);
+      let nextWeekStartDate = new Date(existingProgram.weekStartDate);
+
+      if (currentIndex !== -1 && currentIndex < shifts.length - 1) {
+        nextShiftId = shifts[currentIndex + 1].shiftCode;
+      } else {
+        if (shifts.length > 0) nextShiftId = shifts[0].shiftCode;
+        nextDayOfWeek = existingProgram.dayOfWeek + 1;
+        if (nextDayOfWeek > 7) {
+          nextDayOfWeek = 1;
+          nextWeekStartDate.setDate(nextWeekStartDate.getDate() + 7);
+        }
+      }
+
+      // 3. Conflict Check
+      let targetMachineId = existingProgram.machineId;
+      let targetShiftId = nextShiftId;
+
+      if (targetMachineId && targetShiftId) {
+        const conflictingProgram = await tx.weeklyMachineProgram.findFirst({
+          where: {
+            machineId: targetMachineId,
+            shiftId: targetShiftId,
+            weekStartDate: nextWeekStartDate,
+            dayOfWeek: nextDayOfWeek,
+            status: { in: ["PLANNED", "IN_PROGRESS", "APPROVED", "RELEASED"] }
+          }
+        });
+        if (conflictingProgram) {
+          targetMachineId = null;
+          targetShiftId = null;
+        }
+      } else {
+        targetMachineId = null;
+        targetShiftId = null;
+      }
+
+      // 4. Create new WeeklyMachineProgram for pending qty
+      const nextWeeklyProgramId = await this.generateNextWeeklyProgramId(tx);
+      await tx.weeklyMachineProgram.create({
+        data: {
+          weeklyProgramId: nextWeeklyProgramId,
+          weekStartDate: nextWeekStartDate,
+          weekEndDate: new Date(nextWeekStartDate.getTime() + 6 * 24 * 60 * 60 * 1000),
+          machineId: targetMachineId,
+          dayOfWeek: nextDayOfWeek,
+          shiftId: targetShiftId,
+          plannedQty: pendingQty,
+          status: "PLANNED",
+          productionOrderId: existingProgram.productionOrderId,
+        }
+      });
+    } else {
+      // If target met/exceeded, complete the run normally
+      res = await tx.weeklyMachineProgram.update({
+        where: { weeklyProgramId },
+        data: {
+          status: "COMPLETED",
+          machineId: null,
+          shiftId: null,
+          updatedBy: userId,
+        },
+        include: {
+          productionOrder: true,
+          machine: true,
+          shift: true,
+        }
+      });
+    }
+
+    await StatusSyncService.syncProductionOrderStatus(tx, existingProgram.productionOrderId);
+    return res;
+  }
+
+  async generateNextWeeklyProgramId(tx: any): Promise<string> {
+    const programs = await tx.weeklyMachineProgram.findMany({
+      select: { weeklyProgramId: true }
+    });
+
+    let maxNum = 0;
+    for (const p of programs) {
+      if (p.weeklyProgramId && p.weeklyProgramId.startsWith("WP")) {
+        const num = parseInt(p.weeklyProgramId.slice(2), 10);
+        if (!isNaN(num) && num > maxNum) {
+          maxNum = num;
+        }
+      }
+    }
+
+    return `WP${String(maxNum + 1).padStart(4, '0')}`;
   }
 }
 

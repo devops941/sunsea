@@ -1,12 +1,11 @@
 import React from "react";
 import { Container } from "react-bootstrap";
 import { useLocation, useNavigate } from "react-router-dom";
-import { FaUsers, FaBuilding, FaClock, FaUserTie, FaTruck, FaCogs } from "react-icons/fa";
+import { FaUsers, FaClock, FaUserTie, FaTruck, FaCogs } from "react-icons/fa";
 import Tabs from "../../../components/ui/tab/Tabs";
 import type { TabItem } from "../../../components/ui/tab/Tabs";
 
 import Employeelist from "../../employee/pages/EmployeeList";
-import DepartmentList from "../../departments/pages/DepartmentList";
 import ShiftList from "../../shifts/pages/ShiftList";
 import CustomerListPage from "../../customers/pages/CustomerListPage";
 import SupplierListPage from "../../supplier/pages/SupplierList";
@@ -19,7 +18,6 @@ const HROrganizationTabs: React.FC = () => {
     // Map pathnames to tab keys
     const pathToKey: Record<string, string> = {
         "/employees": "employees",
-        "/departments": "departments",
         "/shifts": "shifts",
         "/customers": "customers",
         "/suppliers": "suppliers",
@@ -28,7 +26,6 @@ const HROrganizationTabs: React.FC = () => {
 
     const keyToPath: Record<string, string> = {
         "employees": "/employees",
-        "departments": "/departments",
         "shifts": "/shifts",
         "customers": "/customers",
         "suppliers": "/suppliers",
@@ -39,10 +36,9 @@ const HROrganizationTabs: React.FC = () => {
 
     const tabs: TabItem[] = [
         { key: "employees", label: "Employees", icon: <FaUsers />, content: <Employeelist /> },
-        { key: "departments", label: "Departments", icon: <FaBuilding />, content: <DepartmentList /> },
-        { key: "shifts", label: "Shift Management", icon: <FaClock />, content: <ShiftList /> },
         { key: "customers", label: "Customers", icon: <FaUserTie />, content: <CustomerListPage /> },
         { key: "suppliers", label: "Suppliers", icon: <FaTruck />, content: <SupplierListPage /> },
+        { key: "shifts", label: "Shift Management", icon: <FaClock />, content: <ShiftList /> },
         { key: "machines", label: "Machines", icon: <FaCogs />, content: <MachineList /> }
     ];
 

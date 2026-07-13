@@ -202,7 +202,7 @@ const ShiftList: React.FC = () => {
                                                     <div className="table-action-group">
                                                         <ViewButton onClick={() => handleOpenView(item)} />
                                                         {canEditShift && <EditButton onClick={() => handleOpenEdit(item)} />}
-                                                        {canDeleteShift && <DeleteButton onClick={() => triggerDelete(item.id)} />}
+                                                        {canDeleteShift && !item.isAssigned && <DeleteButton onClick={() => triggerDelete(item.id)} />}
                                                     </div>
                                                 </td>
                                             </tr>

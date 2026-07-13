@@ -55,7 +55,18 @@ class FinishedGoodsStockService {
     return prisma.finishedGoodsStock.findMany({
       include: {
         store: true,
-        product: true,
+        product: {
+          include: {
+            category: true,
+            colors: {
+              include: {
+                color: true,
+              },
+            },
+            uom: true,
+            size: true,
+          },
+        },
       },
       orderBy: {
         updatedAt: "desc",
@@ -73,7 +84,18 @@ class FinishedGoodsStockService {
       },
       include: {
         store: true,
-        product: true,
+        product: {
+          include: {
+            category: true,
+            colors: {
+              include: {
+                color: true,
+              },
+            },
+            uom: true,
+            size: true,
+          },
+        },
       },
     });
 

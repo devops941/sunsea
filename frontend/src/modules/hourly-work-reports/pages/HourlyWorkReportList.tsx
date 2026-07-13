@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
-import { Container, Row, Col, Spinner} from "react-bootstrap";
+import { Container, Row, Col, Spinner, Button, Card, Badge } from "react-bootstrap";
 import { FaChevronLeft, FaChevronRight, FaChevronDown, FaChevronUp } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -25,7 +25,15 @@ const HourlyWorkReportList: React.FC = () => {
     const { user } = useAppSelector((state) => state.auth);
 
     const [searchTerm, setSearchTerm] = useState("");
-    const [filterDate, setFilterDate] = useState("");
+    const getTodayDateStr = () => {
+        const d = new Date();
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+
+    const [filterDate, setFilterDate] = useState(getTodayDateStr());
     const [currentPage, setCurrentPage] = useState(1);
 
     const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -78,6 +86,16 @@ const HourlyWorkReportList: React.FC = () => {
             const key = `${dateStr}_${item.machineId}_${item.shiftId}`;
 
             if (!groups[key]) {
+                let shiftTotalHours = 8;
+                if (item.shift?.startTime && item.shift?.endTime) {
+                    const [startH, startM] = item.shift.startTime.split(":").map(Number);
+                    const [endH, endM] = item.shift.endTime.split(":").map(Number);
+                    let startMin = startH * 60 + startM;
+                    let endMin = endH * 60 + endM;
+                    if (endMin <= startMin) endMin += 24 * 60;
+                    shiftTotalHours = Math.floor((endMin - startMin) / 60);
+                }
+
                 groups[key] = {
                     key,
                     productionDate: dateStr,
@@ -88,18 +106,21 @@ const HourlyWorkReportList: React.FC = () => {
                     productionOrderId: item.productionOrderId,
                     productName: item.productionOrder?.productItem?.productName || "Unknown Product",
                     productCode: item.productionOrder?.productItem?.productCode || "",
-                    uom: (item.productionOrder?.uom?.toLowerCase() === "ea" ? "pcs" : item.productionOrder?.uom) || "pcs",
-                    plannedQty: item.shiftPlannedQty || 0,
+                    uom: (item.productionOrder?.productItem?.uom?.uomCode?.toLowerCase() === "ea" ? "pcs" : item.productionOrder?.productItem?.uom?.uomCode) || "pcs",
+                    plannedQty: Number(item.shiftPlannedQty || item.productionOrder?.targetQty || 0),
+                    poTargetQty: Number(item.productionOrder?.targetQty || 0),
+                    weeklyProgramStatus: item.weeklyProgramStatus || null,
+                    weeklyProgramId: item.weeklyProgramId || null,
                     totalQtyProduced: 0,
                     totalRejectQty: 0,
                     totalScrapQty: 0,
                     totalDowntime: 0,
                     hours: [],
-                    shiftTotalHours: 8 // Assuming 8 hours standard shift length
+                    shiftTotalHours: shiftTotalHours
                 };
             }
 
-            if (item.remarks !== "SYSTEM_START") {
+            if (Number(item.hourIndex) > 0) {
                 groups[key].totalQtyProduced += Number(item.qtyProduced || 0);
                 groups[key].totalRejectQty += Number(item.rejectQty || 0);
                 groups[key].totalScrapQty += Number(item.scrapQty || 0);
@@ -122,7 +143,15 @@ const HourlyWorkReportList: React.FC = () => {
             group.hours.sort((x: any, y: any) => Number(x.hourIndex) - Number(y.hourIndex));
         });
 
-        return result;
+        // Show a group if:
+        // 1. It has real hourly entries (positive hourIndex)
+        // 2. OR it's actively IN_PROGRESS (started but no entries yet) so user can log the first hour
+        // We intentionally exclude PLANNED/COMPLETED groups with 0 entries to avoid ghost rows
+        return result.filter((group: any) => {
+            if (group.hours.length > 0) return true;
+            // Show active sessions so user can add their first hourly entry
+            return group.weeklyProgramStatus === "IN_PROGRESS";
+        });
     }, [data]);
 
     const totalPages = Math.ceil(groupedData.length / ITEMS_PER_PAGE);
@@ -148,6 +177,7 @@ const HourlyWorkReportList: React.FC = () => {
                 productName: group.productName,
                 productCode: group.productCode,
                 plannedQty: group.plannedQty,
+                uom: group.uom,
                 hourIndex: nextHourIndex
             }
         });
@@ -221,6 +251,7 @@ const HourlyWorkReportList: React.FC = () => {
                                     <th>PO ID</th>
                                     <th>PRODUCT</th>
                                     <th>HOURS LOGGED</th>
+                                    <th>TARGET</th>
                                     <th>TOTAL PRODUCED</th>
                                     <th>REJECT / SCRAP</th>
                                     <th>DOWNTIME</th>
@@ -230,18 +261,25 @@ const HourlyWorkReportList: React.FC = () => {
                             <tbody>
                                 {loading ? (
                                     <tr>
-                                        <td colSpan={11} className="text-center p-4">
+                                        <td colSpan={12} className="text-center p-4">
                                             <Spinner animation="border" variant="primary" />
                                         </td>
                                     </tr>
                                 ) : paginatedData.length > 0 ? (
                                     paginatedData.map((group) => {
                                         const isExpanded = !!expandedGroups[group.key];
+                                        const isActiveNoEntry = group.weeklyProgramStatus === "IN_PROGRESS" && group.hours.length === 0;
                                         return (
                                             <React.Fragment key={group.key}>
                                                 <tr
                                                     className="master-data-row"
-                                                    style={{ cursor: "pointer" }}
+                                                    style={{
+                                                        cursor: "pointer",
+                                                        ...(isActiveNoEntry ? {
+                                                            background: "linear-gradient(90deg, #f0fdf4 0%, #fff 100%)",
+                                                            borderLeft: "4px solid #16a34a"
+                                                        } : {})
+                                                    }}
                                                     onClick={() => toggleGroup(group.key)}
                                                 >
                                                     <td className="master-data-cell text-center">
@@ -263,10 +301,23 @@ const HourlyWorkReportList: React.FC = () => {
                                                         {group.productName}
                                                     </td>
                                                     <td className="master-data-cell fw-bold" style={{ color: "var(--color-primary)" }}>
-                                                        {group.hours.length} {group.hours.length === 1 ? "Hour" : "Hours"}
+                                                        {isActiveNoEntry ? (
+                                                            <span style={{ color: "#16a34a", fontWeight: 700, fontSize: "12px" }}>
+                                                                ● Running
+                                                            </span>
+                                                        ) : (
+                                                            <>{group.hours.length} {group.hours.length === 1 ? "Hour" : "Hours"}</>
+                                                        )}
+                                                    </td>
+                                                    <td className="master-data-cell fw-bold text-dark">
+                                                        {group.plannedQty} <span className="small text-muted">{group.uom}</span>
                                                     </td>
                                                     <td className="master-data-cell fw-bold text-success">
-                                                        {group.totalQtyProduced} <span className="small text-muted">{group.uom}</span>
+                                                        {isActiveNoEntry ? (
+                                                            <span className="text-muted">— pcs</span>
+                                                        ) : (
+                                                            <>{group.totalQtyProduced} <span className="small text-muted">{group.uom}</span></>
+                                                        )}
                                                     </td>
                                                     <td className="master-data-cell">
                                                         <span className="text-danger small fw-semibold">R: {group.totalRejectQty}</span> | <span className="text-warning small fw-semibold">S: {group.totalScrapQty}</span>
@@ -278,14 +329,26 @@ const HourlyWorkReportList: React.FC = () => {
                                                         {group.hours.length >= group.shiftTotalHours ? (
                                                             <div className="d-flex flex-column align-items-end justify-content-center gap-1">
                                                                 <div className="d-flex align-items-center justify-content-end gap-2">
-                                                                    <span className={`fw-bold small ${group.totalQtyProduced >= group.plannedQty ? 'text-success' : 'text-danger'}`}>
-                                                                        Completed
-                                                                    </span>
+                                                                    {group.totalQtyProduced >= group.plannedQty || group.hours.length >= group.shiftTotalHours || group.weeklyProgramStatus === 'COMPLETED' ? (
+                                                                        <span className="fw-bold small text-success">
+                                                                            Completed
+                                                                        </span>
+                                                                    ) : (
+                                                                        <span className="fw-bold small text-danger">
+                                                                            On Hold
+                                                                        </span>
+                                                                    )}
                                                                     <ViewButton onClick={() => handleView(group)} />
                                                                 </div>
-                                                                {group.totalQtyProduced < group.plannedQty && (
-                                                                    <span className="text-danger fw-bold" style={{ fontSize: '10px' }}>Target Not Reached</span>
-                                                                )}
+                                                                {group.totalQtyProduced < group.plannedQty ? (
+                                                                    <span className="text-danger fw-bold" style={{ fontSize: '10px' }}>
+                                                                        Pending: {group.plannedQty - group.totalQtyProduced} {group.uom}
+                                                                    </span>
+                                                                ) : group.totalQtyProduced > group.plannedQty ? (
+                                                                    <span className="text-success fw-bold" style={{ fontSize: '10px' }}>
+                                                                        Extra: +{group.totalQtyProduced - group.plannedQty} {group.uom}
+                                                                    </span>
+                                                                ) : null}
                                                             </div>
                                                         ) : (
                                                             <CustomButton
@@ -298,46 +361,108 @@ const HourlyWorkReportList: React.FC = () => {
                                                 </tr>
                                                 {isExpanded && (
                                                     <tr>
-                                                        <td colSpan={11} className="bg-light p-3" onClick={(e) => e.stopPropagation()}>
-                                                            <div className="rounded-3 p-3 border bg-white shadow-sm">
-                                                                <h6 className="fw-bold mb-3" style={{ color: "var(--color-primary)", letterSpacing: "0.5px" }}>
-                                                                    HOURLY ENTRIES DETAILS
-                                                                </h6>
-                                                                <table className="master-data-table text-center align-middle mb-0">
-                                                                    <thead>
-                                                                        <tr>
-                                                                            <th>Hour Index</th>
-                                                                            <th>Produced Qty</th>
-                                                                            <th>Reject Qty</th>
-                                                                            <th>Scrap Qty</th>
-                                                                            <th>Downtime</th>
-                                                                            <th>Operator</th>
-                                                                            <th>Remarks</th>
-                                                                            <th style={{ width: "120px", textAlign: "right" }}>Actions</th>
-                                                                        </tr>
-                                                                    </thead>
-                                                                    <tbody>
-                                                                        {group.hours.map((h: any) => (
-                                                                            <tr key={h.hourlyProductionId} className="master-data-row">
-                                                                                <td className="master-data-cell fw-bold text-dark font-monospace">Hour {h.hourIndex}</td>
-                                                                                <td className="master-data-cell fw-bold text-success">{h.qtyProduced}</td>
-                                                                                <td className="master-data-cell text-danger fw-semibold">{h.rejectQty}</td>
-                                                                                <td className="master-data-cell text-warning fw-semibold">{h.scrapQty}</td>
-                                                                                <td className="master-data-cell text-muted">{h.downtime > 0 ? `${h.downtime} Mins` : "-"}</td>
-                                                                                <td className="master-data-cell text-dark small">{h.operatorId || "-"}</td>
-                                                                                <td className="master-data-cell text-muted small text-start">{h.remarks || "-"}</td>
-                                                                                <td className="master-data-cell text-end">
-                                                                                    <div className="table-action-group justify-content-end">
+                                                        <td colSpan={12} className="bg-light p-3" onClick={(e) => e.stopPropagation()}>
+                                                            <div className="rounded-3 p-4 border bg-white shadow-sm">
+                                                                {/* SHIFT SUMMARY DASHBOARD */}
+                                                                <div className="d-flex align-items-center justify-content-between mb-4">
+                                                                    <h6 className="fw-bold mb-0" style={{ color: "var(--color-primary)", letterSpacing: "0.5px" }}>
+                                                                        SHIFT SUMMARY DASHBOARD
+                                                                    </h6>
+                                                                    {group.hours.length < group.shiftTotalHours && (
+                                                                      <Button variant="primary" size="sm" onClick={() => handleAddHourly(group)} className="fw-bold rounded-pill px-4 shadow-sm" style={{ background: "linear-gradient(45deg, var(--color-primary), #005f4b)", border: "none" }}>
+                                                                          + Log Next Hour (H{group.hours.length + 1})
+                                                                      </Button>
+                                                                    )}
+                                                                </div>
+                                                                <div className="row g-3 mb-4">
+                                                                    <div className="col-md-3">
+                                                                        <div className="p-3 rounded-3 border bg-light text-center">
+                                                                            <div className="text-muted small fw-bold mb-1 text-uppercase">Efficiency (OEE)</div>
+                                                                            <h3 className="mb-0 fw-bold" style={{ color: "var(--color-primary)" }}>
+                                                                                {group.plannedQty > 0 ? ((group.totalQtyProduced / group.plannedQty) * 100).toFixed(1) : 0}%
+                                                                            </h3>
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="col-md-3">
+                                                                        <div className="p-3 rounded-3 border bg-light text-center">
+                                                                            <div className="text-muted small fw-bold mb-1 text-uppercase">Total Produced</div>
+                                                                            <h3 className="mb-0 fw-bold text-success">
+                                                                                {group.totalQtyProduced}
+                                                                            </h3>
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="col-md-3">
+                                                                        <div className="p-3 rounded-3 border bg-light text-center">
+                                                                            <div className="text-muted small fw-bold mb-1 text-uppercase">Scrap Rate</div>
+                                                                            <h3 className="mb-0 fw-bold text-warning">
+                                                                                {group.totalQtyProduced > 0 ? ((group.totalScrapQty / group.totalQtyProduced) * 100).toFixed(1) : 0}%
+                                                                            </h3>
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="col-md-3">
+                                                                        <div className="p-3 rounded-3 border bg-light text-center">
+                                                                            <div className="text-muted small fw-bold mb-1 text-uppercase">Total Downtime</div>
+                                                                            <h3 className="mb-0 fw-bold text-danger">
+                                                                                {group.totalDowntime > 0 ? `${group.totalDowntime} min` : "0 min"}
+                                                                            </h3>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+
+                                                                {/* TIMELINE */}
+                                                                <h6 className="fw-bold mb-3 text-secondary text-uppercase" style={{ fontSize: "12px", letterSpacing: "0.5px" }}>Hourly Timeline</h6>
+                                                                {group.hours.length === 0 ? (
+                                                                    <div className="text-center text-muted p-4 border rounded-3 bg-light" style={{ borderStyle: "dashed !important" }}>
+                                                                        No hours logged yet for this shift. Click "Log Next Hour" to start.
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className="d-flex flex-column gap-2">
+                                                                        {group.hours.map((h: any) => {
+                                                                            const hasIssues = h.scrapQty > 0 || h.downtime > 0 || h.rejectQty > 0;
+                                                                            return (
+                                                                                <div key={h.hourlyProductionId} className="d-flex align-items-center p-3 rounded-3 border position-relative" style={{ background: hasIssues ? "#fff5f5" : "#f8f9fa", borderColor: hasIssues ? "#ffc9c9" : "#dee2e6" }}>
+                                                                                    {hasIssues && <div className="position-absolute start-0 top-0 bottom-0 rounded-start" style={{ width: "4px", background: "#ef4444" }}></div>}
+                                                                                    {!hasIssues && <div className="position-absolute start-0 top-0 bottom-0 rounded-start" style={{ width: "4px", background: "#10b981" }}></div>}
+                                                                                    <div className="me-4 text-center ms-2" style={{ minWidth: "60px" }}>
+                                                                                        <div className="fw-bold text-muted small text-uppercase mb-1">Hour</div>
+                                                                                        <h4 className="mb-0 fw-bold font-monospace" style={{ color: "var(--color-primary)" }}>{h.hourIndex}</h4>
+                                                                                    </div>
+                                                                                    <div className="flex-grow-1 row align-items-center">
+                                                                                        <div className="col-3">
+                                                                                            <div className="small text-muted mb-1">Produced</div>
+                                                                                            <div className="fw-bold text-success fs-5">{h.qtyProduced} <span className="small fs-6 text-muted">{group.uom}</span></div>
+                                                                                        </div>
+                                                                                        <div className="col-2">
+                                                                                            <div className="small text-muted mb-1">Reject</div>
+                                                                                            <div className={h.rejectQty > 0 ? "fw-bold text-danger" : "text-muted"}>{h.rejectQty || 0}</div>
+                                                                                        </div>
+                                                                                        <div className="col-2">
+                                                                                            <div className="small text-muted mb-1">Scrap</div>
+                                                                                            <div className={h.scrapQty > 0 ? "fw-bold text-warning" : "text-muted"}>{h.scrapQty || 0}</div>
+                                                                                        </div>
+                                                                                        <div className="col-3">
+                                                                                            <div className="small text-muted mb-1">Downtime</div>
+                                                                                            <div className={h.downtime > 0 ? "fw-bold text-danger" : "text-muted"}>
+                                                                                                {h.downtime > 0 ? `${h.downtime} min` : "—"}
+                                                                                                {h.downtimeReason && <div className="small fw-normal text-muted" style={{fontSize: "10px", lineHeight: 1.1}}>{h.downtimeReason}</div>}
+                                                                                            </div>
+                                                                                        </div>
+                                                                                        <div className="col-2">
+                                                                                            <div className="small text-muted mb-1">Operator</div>
+                                                                                            <div className="text-dark small text-truncate" title={h.operatorId}>{h.operatorId || "—"}</div>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                    <div className="ms-3 d-flex gap-2">
                                                                                         <EditButton onClick={() => handleOpenEdit(h)} />
                                                                                         {user?.roleId === "ROLE_ADMIN" && (
                                                                                             <DeleteButton onClick={() => triggerDelete(h.hourlyProductionId?.toString())} />
                                                                                         )}
                                                                                     </div>
-                                                                                </td>
-                                                                            </tr>
-                                                                        ))}
-                                                                    </tbody>
-                                                                </table>
+                                                                                </div>
+                                                                            );
+                                                                        })}
+                                                                    </div>
+                                                                )}
                                                             </div>
                                                         </td>
                                                     </tr>
