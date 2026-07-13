@@ -7,7 +7,10 @@ export type PurchaseOrderStatus =
     | "REJECTED"
     | "RECEIVED"
     | "COMPLETED"
-    | "CANCELLED";
+    | "CANCELLED"
+    | "OPEN"
+    | "PARTIALLY_RECEIVED"
+    | "CLOSED";
 
 export interface Address {
     addressLine1: string;
@@ -141,6 +144,9 @@ export interface CreatePurchaseOrderDto {
     shippingPincode: string;
     sameAsBilling?: boolean;
     remarks?: string;
+    storeId?: string;
+    discountType?: "PERCENT" | "FLAT";
+    discountValue?: number;
     status?: PurchaseOrderStatus;
     items: Array<{
         productId: string;

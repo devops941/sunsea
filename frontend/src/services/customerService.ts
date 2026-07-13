@@ -33,4 +33,9 @@ export const customerService = {
     const response = await apiClient.get(config.customer.base + "/next-code");
     return response?.data?.data || "";
   },
+
+  fetchCreditStatus: async (id: string): Promise<any> => {
+    const response = await apiClient.get(`${config.customer.base}/${id}/credit-status`);
+    return response.data?.data || response.data;
+  },
 };

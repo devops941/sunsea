@@ -79,6 +79,35 @@ const PendingQuotationList: React.FC = () => {
 
 
 
+    const renderReasonBadges = (reason?: string | null) => {
+        if (!reason) return null;
+        const reasons = reason.split(",");
+        return (
+            <div className="d-flex flex-wrap gap-1 mt-1">
+                {reasons.map((r) => {
+                    let label = r;
+                    let variant = "secondary";
+                    if (r === "CREDIT_LIMIT_EXCEEDED") {
+                        label = "Credit Limit Exceeded";
+                        variant = "danger";
+                    } else if (r === "OVERDUE_INVOICE") {
+                        label = "Overdue Invoice";
+                        variant = "warning";
+                    }
+                    return (
+                        <span
+                            key={r}
+                            className={`badge bg-${variant} text-white`}
+                            style={{ fontSize: "0.72rem", padding: "0.2em 0.4em" }}
+                        >
+                            {label}
+                        </span>
+                    );
+                })}
+            </div>
+        );
+    };
+
     const formatDate = (dateStr: string) => {
         if (!dateStr) return "N/A";
         const d = new Date(dateStr);
@@ -163,7 +192,10 @@ const PendingQuotationList: React.FC = () => {
                                             <td className="master-data-cell">
                                                 {(currentPage - 1) * ITEMS_PER_PAGE + index + 1}
                                             </td>
-                                            <td className="master-data-cell">{item.orderNo}</td>
+                                            <td className="master-data-cell">
+                                                <div>{item.orderNo}</div>
+                                                {renderReasonBadges(item.mdApprovalReason)}
+                                            </td>
                                             <td className="master-data-cell">{formatDate(item.orderDate)}</td>
                                             <td className="master-data-cell">
                                                 {item.customer?.displayName || item.customer?.firmName || "N/A"}
@@ -301,6 +333,19 @@ const PendingQuotationList: React.FC = () => {
                                         },
                                     ],
                                 },
+                                ...(selectedItem.mdApprovalReason
+                                    ? [
+                                        {
+                                            title: "Credit Check Snapshot",
+                                            fields: [
+                                                { label: "Reasons", value: selectedItem.mdApprovalReason.split(",").map(r => r === "CREDIT_LIMIT_EXCEEDED" ? "Credit Limit Exceeded" : r === "OVERDUE_INVOICE" ? "Overdue Invoice" : r).join(", ") },
+                                                { label: "Credit Limit (at time of order)", value: formatCurrency(selectedItem.creditCheckLimit ?? 0) },
+                                                { label: "Outstanding Balance", value: formatCurrency(selectedItem.creditCheckOutstanding ?? 0) },
+                                                { label: "Exceeded By", value: formatCurrency(selectedItem.creditCheckExceededBy ?? 0) },
+                                            ],
+                                        },
+                                    ]
+                                    : []),
                                 {
                                     title: "Timestamps",
                                     fields: [

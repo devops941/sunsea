@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import salesOrderService from "./sales-order.service";
+import creditCheckService from "./creditCheckService";
 import { ApiResponse } from "../../utils/ApiResponse";
 import { asyncHandler } from "../../utils/asyncHandler";
 import {
@@ -18,6 +19,18 @@ class SalesOrderController {
         const order = await salesOrderService.create(req.body);
         return res.status(201).json(
             new ApiResponse("Sales Order created successfully", order)
+        );
+    });
+
+    checkCreditBlock = asyncHandler(async (req: Request, res: Response) => {
+        const customerId = req.query.customerId as string;
+        if (!customerId) {
+            return res.status(400).json(new ApiResponse("customerId is required", { blocked: false }));
+        }
+
+        const blockResult = await creditCheckService.hasBlockingPendingOrder(customerId);
+        return res.status(200).json(
+            new ApiResponse("Credit block check completed successfully", blockResult)
         );
     });
 

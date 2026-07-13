@@ -28,6 +28,13 @@ router.post(
 
 
 router.get(
+    "/credit-block-check",
+    authMiddleware,
+    requirePermission("sales_order.view"),
+    SalesOrderController.checkCreditBlock
+);
+
+router.get(
     "/",
     authMiddleware,
     requirePermission("sales_order.view"),

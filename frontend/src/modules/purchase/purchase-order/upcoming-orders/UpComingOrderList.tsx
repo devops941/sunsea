@@ -38,7 +38,7 @@ const UpcomingOrderList: React.FC = () => {
                 page: currentPage,
                 pageSize: ITEMS_PER_PAGE,
                 search: searchTerm || undefined,
-                status: "APPROVED" as PurchaseOrderStatus, // Always filter to pending approval
+                status: "OPEN,PARTIALLY_RECEIVED" as any,
             });
 
             setData(response.data || []);

@@ -13,6 +13,9 @@ interface StatusBadgeProps {
 const statusColors: Record<string, { bg: string; text: string }> = {
     // ========== DRAFT & GENERAL ==========
     DRAFT: { bg: '#f3e8ff', text: '#6b21a8' },           // Gray - not yet submitted
+    OPEN: { bg: '#e0f2fe', text: '#0369a1' },             // Sky Blue
+    PARTIALLY_RECEIVED: { bg: '#ffedd5', text: '#c2410c' },       // Orange
+    CLOSED: { bg: '#f3f4f6', text: '#374151' },                   // Dark Gray
 
     // ========== MD APPROVAL FLOW ==========
     PENDING_MD_APPROVAL: { bg: '#fef3c7', text: '#b45309' },  // Amber - awaiting MD review

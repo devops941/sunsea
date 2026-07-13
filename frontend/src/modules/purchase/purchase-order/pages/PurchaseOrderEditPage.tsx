@@ -12,6 +12,7 @@ import { fetchStores } from "../../../../features/stores/storeSlice";
 import TextInput from "../../../../components/form/TextInput/TextInput";
 import SelectInput from "../../../../components/form/SelectInput/SelectInput";
 import CustomButton from "../../../../components/ui/custombutton/CustomButton";
+import QuantityInput from "../../../../components/form/QuantityInput/QuantityInput";
 import CityStateSelect from "../../../../components/ui/CityStateSelect/CityStateSelect";
 import type { StateCityOption } from "../../../../components/ui/CityStateSelect/CityStateSelect";
 import { usePurchaseOrders } from "../../../../hooks/usePurchaseOrder";
@@ -42,6 +43,7 @@ const initialFormData: PurchaseOrderFormData = {
   billingPincode: "",
 
   sameAsBilling: false,
+  storeId: "",
 
   shippingAddressLine1: "",
   shippingCity: "",
@@ -590,7 +592,7 @@ const PurchaseOrderEditPage: React.FC = () => {
           }
           : undefined,
         unitPrice: parsedUnitPrice,
-        uom: rawMaterial?.baseUom || "",
+        uom: rawMaterial?.baseUom ? rawMaterial.baseUom.split(",")[0].trim() : "",
         tax: totalGstRate,
         taxableAmount,
         cgstRate,
@@ -682,6 +684,9 @@ const PurchaseOrderEditPage: React.FC = () => {
         shippingState: formData.shippingState,
         shippingPincode: formData.shippingPincode,
         sameAsBilling: formData.sameAsBilling,
+        storeId: formData.storeId,
+        discountType: formData.discountType,
+        discountValue: formData.discountValue,
         remarks: formData.remarks,
         items: formData.items.map((item) => ({
           productId: item.productId,
@@ -759,18 +764,6 @@ const PurchaseOrderEditPage: React.FC = () => {
     { value: "COMPLETED", label: "Completed" },
     { value: "CANCELLED", label: "Cancelled" },
   ];
-
-
-
-  const uomOptions = useMemo(() => {
-    return [
-      { value: "", label: "-- Select UOM --" },
-      ...(activeUOMs || []).map((u: any) => ({
-        value: u.uomName as string,
-        label: u.uomName as string,
-      }))
-    ];
-  }, [activeUOMs]);
 
   const isLocked = formData.status !== "DRAFT" && formData.status !== "PENDING";
 
@@ -998,8 +991,7 @@ const PurchaseOrderEditPage: React.FC = () => {
                   <tr>
                     <th style={{ width: "50px" }}>#</th>
                     <th style={{ minWidth: "220px" }}>RAW MATERIAL</th>
-                    <th style={{ minWidth: "100px" }}>UOM</th>
-                    <th style={{ minWidth: "100px" }}>QTY</th>
+                    <th style={{ minWidth: "200px" }}>QUANTITY / UOM</th>
                     <th style={{ minWidth: "120px" }}>UNIT PRICE (₹)</th>
                     <th style={{ minWidth: "115px" }}>TAX %</th>
                     <th style={{ minWidth: "120px" }}>TAXABLE (₹)</th>
@@ -1013,6 +1005,11 @@ const PurchaseOrderEditPage: React.FC = () => {
                     const lineSubtotal = qty * price;
 
                     const taxableAmount = lineSubtotal;
+
+                    const itemRawMaterial = rawMaterials.find(
+                      (rm) => String(rm.rawMaterialId) === String(item.productId)
+                    );
+                    const baseUoms = itemRawMaterial?.baseUom || "";
 
                     return (
                       <tr key={index}>
@@ -1029,27 +1026,14 @@ const PurchaseOrderEditPage: React.FC = () => {
                           />
                         </td>
                         <td>
-                          <SelectInput
-                            label=""
-                            name={`items[${index}].uom`}
-                            options={uomOptions}
-                            value={item.uom || ""}
-                            onChange={(e) => handleItemChange(index, "uom", e.target.value)}
-                            error={errors[`items.${index}.uom`]}
-                            disabled={isLocked}
-                          />
-                        </td>
-                        <td>
-                          <TextInput
+                          <QuantityInput
                             label=""
                             name={`items[${index}].quantity`}
-                            type="number"
-                            value={String(item.quantity)}
-                            onChange={(e) => handleItemChange(index, "quantity", Number(e.target.value))}
+                            value={item.quantity}
+                            baseUoms={baseUoms}
+                            required
                             error={errors[`items.${index}.quantity`]}
-                            min={0.01}
-                            step={0.01}
-                            placeholder="0.00"
+                            onChange={(e) => handleItemChange(index, "quantity", Number(e.target.value))}
                             disabled={isLocked}
                           />
                         </td>

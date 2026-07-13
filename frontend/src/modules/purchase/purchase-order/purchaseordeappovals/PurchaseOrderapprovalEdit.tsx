@@ -113,9 +113,9 @@ const PurchaseOrderViewPage: React.FC = () => {
         setActionLoading(true);
         try {
             if (actionMode === "approve") {
-                await purchaseOrderService.updateStatus(po.id, "APPROVED");
+                await purchaseOrderService.updateStatus(po.id, "OPEN");
                 toast.success("Purchase Order approved.");
-                setPo((prev: any) => ({ ...prev, status: "APPROVED" }));
+                setPo((prev: any) => ({ ...prev, status: "OPEN" }));
                 setActionMode(null);
                 navigate("/purchase-order-approvals");
             } else if (actionMode === "reject") {

@@ -25,6 +25,9 @@ const STATUS_COLORS: Record<PurchaseOrderStatus, string> = {
   COMPLETED: "info",
   CANCELLED: "dark",
   RECEIVED: "info",
+  OPEN: "success",
+  PARTIALLY_RECEIVED: "warning",
+  CLOSED: "secondary",
 };
 
 const PurchaseOrderListPage: React.FC = () => {
@@ -161,6 +164,9 @@ const PurchaseOrderListPage: React.FC = () => {
                     <option value="DRAFT">Draft</option>
                     <option value="PENDING">Pending</option>
                     <option value="APPROVED">Approved</option>
+                    <option value="OPEN">Open</option>
+                    <option value="PARTIALLY_RECEIVED">Partially Received</option>
+                    <option value="CLOSED">Closed</option>
                     <option value="REJECTED">Rejected</option>
                     <option value="COMPLETED">Completed</option>
                     <option value="CANCELLED">Cancelled</option>

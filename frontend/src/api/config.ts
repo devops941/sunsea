@@ -133,6 +133,16 @@ const config = {
         updateGstTax: "/gst-tax",
         deleteGstTax: "/gst-tax",
     },
+    grnInvoice: {
+        base: "/grn-invoices",
+        nextCode: "/grn-invoices/next-code",
+    },
+    invoiceSettings: {
+        base: "/invoice-settings",
+    },
+    salesInvoice: {
+        base: "/sales-invoices",
+    },
 
 
 }

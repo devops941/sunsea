@@ -7,10 +7,12 @@ import { toast } from "react-toastify";
 import CustomButton from "../../../../components/ui/custombutton/CustomButton";
 import SelectInput from "../../../../components/form/SelectInput/SelectInput";
 import TextInput from "../../../../components/form/TextInput/TextInput";
+import QuantityInput from "../../../../components/form/QuantityInput/QuantityInput";
 import Section from "../../../../components/ui/Section/Section";
 import CityStateSelect from "../../../../components/ui/CityStateSelect/CityStateSelect";
 import type { StateCityOption } from "../../../../components/ui/CityStateSelect/CityStateSelect";
 import { purchaseOrderService } from "../../../../services/purchaseOrderService";
+import { grnInvoiceService } from "../../../../services/grnInvoiceService";
 import type { PurchaseOrder } from "../../../../features/purchaseOrder/types";
 import { useAppDispatch, useAppSelector } from "../../../../hooks/reduxHooks";
 import { fetchLocations } from "../../../../features/locations/locationSlice";
@@ -100,6 +102,7 @@ const InvoiceDetailPage: React.FC = () => {
         paymentMethod: "",
         referenceNumber: "",
         paymentDate: "",
+        updateStock: true,
     });
 
     const [items, setItems] = useState<GRNItem[]>([]);
@@ -112,13 +115,21 @@ const InvoiceDetailPage: React.FC = () => {
         dispatch(fetchStores(undefined));
         loadActiveUOMs();
         purchaseOrderService
-            .fetchAll({ status: "APPROVED" })
+            .fetchAll({ status: "OPEN,PARTIALLY_RECEIVED" as any })
             .then((res) => {
                 const list = Array.isArray(res) ? res : (res?.data || []);
                 setApprovedPOs(list);
             })
-            .catch(() => toast.error("Failed to load approved orders"))
+            .catch(() => toast.error("Failed to load active orders"))
             .finally(() => setLoadingPOs(false));
+
+        grnInvoiceService.fetchNextCode()
+            .then((code) => {
+                if (code) {
+                    setForm((prev) => ({ ...prev, grnNumber: code }));
+                }
+            })
+            .catch((err) => console.error("Failed to fetch next GRN number:", err));
     }, [dispatch, loadSuppliers, loadActiveUOMs]);
 
     useEffect(() => {
@@ -165,6 +176,7 @@ const InvoiceDetailPage: React.FC = () => {
             .then((po: any) => {
                 setSelectedPO(po);
                 const sup = po.supplier;
+                const fullSupplier = (suppliers || []).find((s: any) => String(s.id) === String(po.supplierId || sup?.id));
                 const matchedStore = (stores || []).find((s: any) => s.location?.city?.toLowerCase() === po.billingCity?.toLowerCase());
                 setForm((prev) => ({
                     ...prev,
@@ -179,29 +191,39 @@ const InvoiceDetailPage: React.FC = () => {
                     shippingCity: po.shippingCity || "",
                     shippingState: po.shippingState || "",
                     shippingPincode: po.shippingPincode || "",
-                    gstNumber: sup?.gstin || "",
-                    contactName: sup?.contactPerson || "",
-                    mobileNumber: sup?.mobile || sup?.phone || "",
-                    email: sup?.email || "",
-                    supplierAddress: [sup?.billingAddressLine1, sup?.billingCity, sup?.billingState].filter(Boolean).join(", "),
+                    gstNumber: fullSupplier?.gstin || "",
+                    contactName: fullSupplier?.contactPerson || "",
+                    mobileNumber: fullSupplier?.mobile || fullSupplier?.phone || "",
+                    email: fullSupplier?.email || "",
+                    supplierAddress: [fullSupplier?.billingAddressLine1, fullSupplier?.billingCity, fullSupplier?.billingState].filter(Boolean).join(", "),
                 }));
-                // Populate items from PO
-                setItems(
-                    (po.items || []).map((item: any) => ({
-                        productId: item.productId || "",
-                        description: item.product?.materialName || item.product?.productName || item.productId,
-                        uom: item.uom || "",
-                        qty: item.quantity || 1,
-                        unitPrice: Number(item.unitPrice || 0),
-                        tax: Number(item.tax || 0),
-                        taxableAmount: Number(item.taxableAmount || 0),
-                        netAmount: Number(item.lineTotal || item.netAmount || 0),
-                    }))
-                );
+                // Populate items from PO, setting qty to remaining unreceived quantity
+                const autoPopulatedItems = (po.items || [])
+                    .map((item: any) => {
+                        const remainingQty = (Number(item.quantity) || 0) - (Number(item.receivedQty) || 0);
+                        const qty = remainingQty > 0 ? remainingQty : 0;
+                        const unitPrice = Number(item.unitPrice || 0);
+                        const tax = Number(item.tax || 0);
+                        const taxableAmount = qty * unitPrice;
+                        const netAmount = taxableAmount + (taxableAmount * tax) / 100;
+                        return {
+                            productId: item.productId || "",
+                            description: item.product?.materialName || item.product?.productName || item.productId,
+                            uom: item.uom || "",
+                            qty,
+                            unitPrice,
+                            tax,
+                            taxableAmount,
+                            netAmount,
+                        };
+                    })
+                    .filter((item: any) => item.qty > 0);
+
+                setItems(autoPopulatedItems);
             })
             .catch(() => toast.error("Failed to load PO details"))
             .finally(() => setLoadingPO(false));
-    }, [form.poId, locations]);
+    }, [form.poId, locations, suppliers, stores]);
 
     // ── When supplier selected manually → auto-fill supplier details ──────────────
     useEffect(() => {
@@ -322,15 +344,6 @@ const InvoiceDetailPage: React.FC = () => {
         })),
     ], [suppliers]);
 
-    const uomOptions = useMemo(() => {
-        return [
-            { value: "", label: "-- Select UOM --" },
-            ...(activeUOMs || []).map((u: any) => ({
-                value: u.uomName,
-                label: u.uomName,
-            }))
-        ];
-    }, [activeUOMs]);
 
     const storeOptions = useMemo(() => [
         { value: "", label: "Select" },
@@ -359,6 +372,17 @@ const InvoiceDetailPage: React.FC = () => {
             const updated = [...prev];
             updated[index] = { ...updated[index], [field]: value };
             const item = updated[index];
+            
+            if (!item.uom) {
+                const itemRawMaterial = rawMaterials.find(
+                    (rm) => String(rm.rawMaterialId) === String(item.productId)
+                );
+                const fallbackUoms = (activeUOMs || []).map((u: any) => u.uomName).join(",");
+                const baseUoms = itemRawMaterial?.baseUom || fallbackUoms;
+                const primaryUom = baseUoms.split(",")[0].trim();
+                updated[index].uom = primaryUom;
+            }
+
             const lineSubtotal = item.qty * item.unitPrice;
             const taxableAmount = lineSubtotal;
             const taxAmt = (taxableAmount * item.tax) / 100;
@@ -406,11 +430,81 @@ const InvoiceDetailPage: React.FC = () => {
             return;
         }
         setSaving(true);
-        setTimeout(() => {
+        try {
+            const payload = new FormData();
+            if (form.poId) payload.append("poId", form.poId);
+            payload.append("invoiceNo", form.invoiceNo);
+            payload.append("grnDate", form.grnDate);
+            payload.append("supplierId", String(form.supplierId));
+            payload.append("storeId", form.storeId);
+            payload.append("billingAddressLine1", form.billingAddressLine1);
+            payload.append("billingCity", form.billingCity);
+            payload.append("billingState", form.billingState);
+            payload.append("billingPincode", form.billingPincode);
+            payload.append(
+                "shippingAddressLine1",
+                form.sameAsBilling ? form.billingAddressLine1 : form.shippingAddressLine1
+            );
+            payload.append(
+                "shippingCity",
+                form.sameAsBilling ? form.billingCity : form.shippingCity
+            );
+            payload.append(
+                "shippingState",
+                form.sameAsBilling ? form.billingState : form.shippingState
+            );
+            payload.append(
+                "shippingPincode",
+                form.sameAsBilling ? form.billingPincode : form.shippingPincode
+            );
+            payload.append("sameAsBilling", String(form.sameAsBilling));
+            payload.append("updateStock", String(form.updateStock));
+
+            if (form.receiveDate) payload.append("receiveDate", form.receiveDate);
+            if (form.billDueDate) payload.append("billDueDate", form.billDueDate);
+            if (form.challanNo) payload.append("challanNo", form.challanNo);
+            if (form.transport) payload.append("transport", form.transport);
+            if (form.eWayBill) payload.append("eWayBill", form.eWayBill);
+            if (form.remarks) payload.append("remarks", form.remarks);
+
+            payload.append("discountType", form.discountType.toUpperCase());
+            payload.append("discountValue", String(form.discountValue));
+            payload.append("roundingAdjust", String(form.roundingAdjust));
+
+            payload.append("paymentStatus", form.paymentStatus);
+            if (form.paymentMethod) payload.append("paymentMethod", form.paymentMethod);
+            if (form.referenceNumber) payload.append("referenceNumber", form.referenceNumber);
+            if (form.paymentDate) payload.append("paymentDate", form.paymentDate);
+
+            // Append items as JSON string
+            payload.append(
+                "items",
+                JSON.stringify(
+                    items.map((item) => ({
+                        productId: item.productId,
+                        description: item.description,
+                        uom: item.uom,
+                        quantity: Number(item.qty),
+                        unitPrice: Number(item.unitPrice),
+                        tax: Number(item.tax || 0),
+                    }))
+                )
+            );
+
+            // Append file if selected
+            if (form.invoiceImage) {
+                payload.append("invoiceImage", form.invoiceImage);
+            }
+
+            await grnInvoiceService.create(payload);
             toast.success("GRN / Invoice created successfully!");
-            setSaving(false);
             navigate("/invoice");
-        }, 1000);
+        } catch (error: any) {
+            const errorMsg = error.response?.data?.message || "Failed to create GRN / Invoice";
+            toast.error(errorMsg);
+        } finally {
+            setSaving(false);
+        }
     };
 
     const isPOSelected = !!form.poId && !!selectedPO;
@@ -615,18 +709,30 @@ const InvoiceDetailPage: React.FC = () => {
                                     <TextInput label="E-Way Bill" name="eWayBill" value={form.eWayBill} onChange={handleChange} placeholder="Optional" />
                                 </Col>
                                 <Col xl={2} lg={2} md={4} sm={6}>
+                                    <div className="d-flex flex-column" style={{ minHeight: "68px", justifyContent: "end", paddingBottom: "10px" }}>
+                                        <div className="d-flex align-items-center gap-2">
+                                            <input
+                                                type="checkbox"
+                                                id="updateStock"
+                                                name="updateStock"
+                                                checked={form.updateStock}
+                                                onChange={(e) => setForm((prev: any) => ({ ...prev, updateStock: e.target.checked }))}
+                                                style={{ width: "16px", height: "16px", cursor: "pointer" }}
+                                            />
+                                            <label htmlFor="updateStock" style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--color-text-secondary)", margin: 0, cursor: "pointer" }}>
+                                                Update Stock
+                                            </label>
+                                        </div>
+                                    </div>
+                                </Col>
+                                <Col xl={2} lg={2} md={4} sm={6}>
                                     <label className="form-label" style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--color-text-secondary)" }}>Invoice Copy Upload</label>
-                                    <label
-                                        style={{
-                                            cursor: "pointer", display: "flex", alignItems: "center", gap: "8px",
-                                            padding: "7px 12px", border: "1px solid var(--color-border)",
-                                            borderRadius: "var(--radius-sm, 6px)", background: "var(--color-bg)",
-                                            color: "var(--color-text-secondary)", fontSize: "0.85rem", width: "100%",
-                                        }}
-                                    >
-                                        {form.invoiceImage ? form.invoiceImage.name : "Choose File No file chosen"}
-                                        <input type="file" accept="image/*,.pdf" onChange={handleFileChange} style={{ display: "none" }} />
-                                    </label>
+                                    <input
+                                        type="file"
+                                        accept="image/png,image/jpeg,image/webp,application/pdf"
+                                        className="form-control"
+                                        onChange={handleFileChange}
+                                    />
                                 </Col>
                             </Row>
                         </div>
@@ -661,8 +767,7 @@ const InvoiceDetailPage: React.FC = () => {
                                 <colgroup>
                                     <col style={{ width: "4%" }} />
                                     <col style={{ width: "22%" }} />
-                                    <col style={{ width: "14%" }} />
-                                    <col style={{ width: "10%" }} />
+                                    <col style={{ width: "24%" }} />
                                     <col style={{ width: "12%" }} />
                                     <col style={{ width: "14%" }} />
                                     <col style={{ width: "10%" }} />
@@ -673,8 +778,7 @@ const InvoiceDetailPage: React.FC = () => {
                                     <tr>
                                         <th>#</th>
                                         <th>PRODUCT / DESCRIPTION</th>
-                                        <th>UOM</th>
-                                        <th>QTY</th>
+                                        <th>QUANTITY / UOM</th>
                                         <th>UNIT PRICE (₹)</th>
                                         <th>TAX %</th>
 
@@ -683,30 +787,35 @@ const InvoiceDetailPage: React.FC = () => {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {items.map((item, idx) => (
-                                        <tr key={idx} className="master-data-row">
-                                            <td className="master-data-cell text-center">{idx + 1}</td>
-                                            <td className="master-data-cell">
-                                                <input
-                                                    className="form-control form-control-sm"
-                                                    value={item.description}
-                                                    onChange={(e) => updateItem(idx, "description", e.target.value)}
-                                                    placeholder="Product name"
-                                                />
-                                            </td>
-                                            <td className="master-data-cell">
-                                                <SelectInput
-                                                    label=""
-                                                    hideLabel={true}
-                                                    name={`items[${idx}].uom`}
-                                                    options={uomOptions}
-                                                    value={item.uom || ""}
-                                                    onChange={(e) => updateItem(idx, "uom", e.target.value)}
-                                                />
-                                            </td>
-                                            <td className="master-data-cell">
-                                                <input className="form-control form-control-sm" type="number" min={0.01} step={0.01} value={item.qty} onChange={(e) => updateItem(idx, "qty", Number(e.target.value))} />
-                                            </td>
+                                    {items.map((item, idx) => {
+                                        const itemRawMaterial = rawMaterials.find(
+                                            (rm) => String(rm.rawMaterialId) === String(item.productId)
+                                        );
+                                        const fallbackUoms = (activeUOMs || []).map((u: any) => u.uomName).join(",");
+                                        const baseUoms = itemRawMaterial?.baseUom || fallbackUoms;
+
+                                        return (
+                                            <tr key={idx} className="master-data-row">
+                                                <td className="master-data-cell text-center">{idx + 1}</td>
+                                                <td className="master-data-cell">
+                                                    <input
+                                                        className="form-control form-control-sm"
+                                                        value={item.description}
+                                                        onChange={(e) => updateItem(idx, "description", e.target.value)}
+                                                        placeholder="Product name"
+                                                    />
+                                                </td>
+                                                <td className="master-data-cell">
+                                                    <QuantityInput
+                                                        label=""
+                                                        name={`items[${idx}].qty`}
+                                                        value={item.qty}
+                                                        baseUoms={baseUoms}
+                                                        required
+                                                        error={errors[`items.${idx}.qty`]}
+                                                        onChange={(e) => updateItem(idx, "qty", Number(e.target.value))}
+                                                    />
+                                                </td>
                                             <td className="master-data-cell">
                                                 <input className="form-control form-control-sm" type="number" min={0} step={0.01} value={item.unitPrice} onChange={(e) => updateItem(idx, "unitPrice", Number(e.target.value))} />
                                             </td>
@@ -722,11 +831,12 @@ const InvoiceDetailPage: React.FC = () => {
                                             </td>
 
                                             <td className="master-data-cell text-end fw-semibold">₹{item.netAmount.toFixed(2)}</td>
-                                            <td className="master-data-cell text-center">
-                                                <CustomButton text="" icon={FaTrash} type="button" variant="danger" size="sm" onClick={() => removeItem(idx)} />
-                                            </td>
+                                             <td className="master-data-cell text-center">
+                                                 <CustomButton text="" icon={FaTrash} type="button" variant="danger" size="sm" onClick={() => removeItem(idx)} />
+                                             </td>
                                         </tr>
-                                    ))}
+                                    );
+                                })}
                                     {items.length === 0 && (
                                         <tr><td colSpan={9} className="text-center text-muted py-4">No items added</td></tr>
                                     )}

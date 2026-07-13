@@ -156,6 +156,7 @@ const PurchaseOrderEditPage = lazy(() => import("../modules/purchase/purchase-or
 const PurchaseOrderViewPage = lazy(() => import("../modules/purchase/purchase-order/purchaseordeappovals/PurchaseOrderapprovalEdit"));
 
 const InvoiceDetail = lazy(() => import("../modules/purchase/purchase-order/upcoming-orders/InvoiceDetailPage"));
+const SalesInvoiceForm = lazy(() => import("../modules/sales-order-invoice/SalesInvoiceCreate"));
 // profile
 const ProfilePage = lazy(() => import("../modules/profile/ProfilePage"));
 const Settings = lazy(() => import("../modules/settings/Setting"))
@@ -189,6 +190,7 @@ const AppRoutes = () => {
             <Route path="/settings/company" element={<OrganizationTabs />} />
             <Route path="/settings/gst-taxes" element={<OrganizationTabs />} />
             <Route path="/whatsapp" element={<OrganizationTabs />} />
+            <Route path="/settings/invoice" element={<OrganizationTabs />} />
             {/* Sample Route */}
             <Route path="/sample" element={<Sample />} />
 
@@ -585,6 +587,16 @@ const AppRoutes = () => {
             {/* Pending Quotations Route */}
             <Route element={<ProtectedRoute permission="reports.view" />}>
               <Route path="/pending-quotations" element={<SalesTabs />} />
+            </Route>
+
+            {/* Sales Invoice Route */}
+            <Route element={<ProtectedRoute permission="reports.view" />}>
+              <Route path="/sales-invoices" element={<SalesTabs />} />
+            </Route>
+
+            {/* Create Sales Invoice Route */}
+            <Route element={<ProtectedRoute permission="reports.view" />}>
+              <Route path="/sales-invoices/create" element={<SalesInvoiceForm />} />
             </Route>
 
             {/* Pending Quotations Edit :Id Route */}

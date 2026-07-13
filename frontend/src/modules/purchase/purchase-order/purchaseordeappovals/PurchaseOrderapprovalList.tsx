@@ -86,7 +86,7 @@ const POMDApproval: React.FC = () => {
     // ─── Approve / Reject actions ───────────────────────────────────────
     const handleApprove = async (id: string) => {
         try {
-            await purchaseOrderService.updateStatus(id, "APPROVED");
+            await purchaseOrderService.updateStatus(id, "OPEN");
             setShowViewModal(false);
             toast.success("Purchase order approved!");
             fetchOrders();
