@@ -193,7 +193,7 @@ const BillOfMaterialEdit: React.FC = () => {
 
     return (
         <div className="p-4 md:p-6 bg-gray-50 min-h-screen">
-            <div className="w-full max-w-7xl mx-auto space-y-6">
+            <div className="w-full  space-y-6">
                 <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-white p-4 rounded-xl shadow-sm border border-gray-100">
                     <div>
                         <h2 className="text-xl font-bold text-gray-800">

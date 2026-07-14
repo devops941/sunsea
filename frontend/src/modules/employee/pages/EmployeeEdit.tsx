@@ -193,7 +193,7 @@ const EmployeeEdit: React.FC = () => {
   }, [roles]);
 
   return (
-    <div className="w-full max-w-7xl mx-auto space-y-6">
+    <div className="w-full  space-y-6">
       {/* Page Header */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200">
         <div className="px-6 py-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">

@@ -524,19 +524,19 @@ const StockAdjustmentForm: React.FC = () => {
                 </div>
                 {selectedPO && (
                   <>
-                    <div className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg flex flex-col justify-center min-h-[66px]">
+                    <div className="px-3 py-2 bg-white border border-slate-200 rounded-lg flex flex-col justify-center min-h-[66px]">
                       <span className="text-xs text-slate-500 mb-1">Product</span>
                       <span className="text-sm font-semibold text-slate-800 truncate">
                         {selectedPO.productItem?.productName || "—"}
                       </span>
                     </div>
-                    <div className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg flex flex-col justify-center min-h-[66px]">
+                    <div className="px-3 py-2 bg-white border border-slate-200 rounded-lg flex flex-col justify-center min-h-[66px]">
                       <span className="text-xs text-slate-500 mb-1">Planned Qty</span>
                       <span className="text-sm font-semibold text-slate-800">
                         {Number(selectedPO.targetQty).toLocaleString()} {selectedPO.uom}
                       </span>
                     </div>
-                    <div className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg flex flex-col justify-center min-h-[66px]">
+                    <div className="px-3 py-2 bg-white border border-slate-200 rounded-lg flex flex-col justify-center min-h-[66px]">
                       <span className="text-xs text-slate-500 mb-1">Machine</span>
                       <span className="text-sm font-semibold text-slate-800 truncate">
                         {selectedPO.Machine?.machineName || selectedPO.machineMachineId || "—"}

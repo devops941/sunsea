@@ -130,13 +130,13 @@ const QuantityInput: React.FC<QuantityInputProps> = ({
           disabled={disabled || !primaryUom}
           placeholder="0.00"
           step={step || "any"}
-          className={`flex-1 w-full bg-transparent px-3 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-none border-r border-slate-200 h-[35px] ${disabled ? "bg-slate-50 opacity-60 cursor-not-allowed" : ""}`}
+          className={`flex-1 w-full bg-transparent px-3 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-none border-r border-slate-200 h-[35px] ${disabled ? "bg-white opacity-60 cursor-not-allowed" : ""}`}
         />
         <select
           value={uomList.length > 0 ? selectedUom : ""}
           onChange={handleUomChange}
           disabled={disabled || uomList.length === 0}
-          className={`px-3  text-[10px] font-medium text-slate-700 bg-slate-50 focus:outline-none cursor-pointer hover:bg-slate-100 transition-colors max-w-[100px] min-w-[80px] ${disabled ? "opacity-60 cursor-not-allowed" : ""}`}
+          className={`px-3  text-[10px] font-medium text-slate-700 bg-white focus:outline-none cursor-pointer hover:bg-slate-100 transition-colors max-w-[100px] min-w-[80px] ${disabled ? "opacity-60 cursor-not-allowed" : ""}`}
         >
           {uomList.length > 0 ? (
             uomList.map((u) => (

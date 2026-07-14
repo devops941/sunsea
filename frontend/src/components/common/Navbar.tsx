@@ -38,7 +38,7 @@ const TopNavbar: React.FC<NavbarProps> = ({
   };
 
   return (
-    <header className="flex items-center justify-between h-[72px] bg-[#F8F8F8] border-b border-black/10 px-4 md:px-6 shadow-sm shrink-0">
+    <header className="flex items-center justify-between h-[72px] bg-[#ffffff] border-b border-black/10 px-4 md:px-6 shadow-sm shrink-0">
       {/* Left Section */}
       <div className="flex items-center gap-4">
         {/* Mobile Menu */}

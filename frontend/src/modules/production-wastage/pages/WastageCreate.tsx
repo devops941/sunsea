@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Container, Row, Col, Card, Form } from "react-bootstrap";
+import { FaSave, FaArrowLeft } from "react-icons/fa";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
@@ -203,267 +203,274 @@ const WastageForm: React.FC = () => {
   };
 
   return (
-    <div className="inner-container">
-      <Container fluid className="px-4 py-3">
+    <div className="min-h-screen bg-white p-4 md:p-6">
+      <div className="max-w-7xl mx-auto">
         {/* Page Header */}
-        <div className="page-header mb-4">
-          <div className="page-header-info">
-            <h2 className="page-title">{isEdit ? "Edit Wastage Audit Log" : "Log Production Wastage"}</h2>
-            
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6">
+          <div>
+            <h2 className="text-2xl font-bold text-slate-800">
+              {isEdit ? "Edit Wastage Audit Log" : "Log Production Wastage"}
+            </h2>
+            <div className="text-sm text-slate-500 mt-1">
+              {isEdit ? "Update details for the selected wastage record" : "Record new production wastage"}
+            </div>
+          </div>
+          <div className="mt-4 md:mt-0 flex gap-2">
+            <button
+              type="button"
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 font-medium transition-colors"
+              onClick={() => navigate("/production-wastages")}
+            >
+              <FaArrowLeft /> Back to List
+            </button>
           </div>
         </div>
 
         {/* Form Card */}
-        <Card className="border-0 shadow-sm rounded-3 p-4">
-          <Form onSubmit={handleSubmit} className="form-inner" noValidate>
-            <Row className="g-3">
-              {/* Section 1: Wastage Details */}
-              <Col md={12}>
-                <h6 className="section-title border-bottom-0">1. Wastage Details</h6>
-                <div className="p-3 border rounded">
-                  <Row className="g-3">
-                    <Col lg={4} md={6}>
-                      <TextInput
-                        label="Wastage Logging Date"
-                        name="wastageDate"
-                        type="date"
-                        value={formData.wastageDate}
-                        onChange={handleChange}
-                        required
-                      />
-                      {errors.wastageDate && <span className="text-danger small">{errors.wastageDate}</span>}
-                    </Col>
-                    <Col lg={4} md={6}>
-                      <SelectInput
-                        label="Production Order Reference"
-                        name="productionOrderId"
-                        value={formData.productionOrderId}
-                        options={[
-                          { label: "Select Production Order", value: "" },
-                          ...productionOrders.map((po) => ({
-                            label: `${po.productionOrderId} - ${po.productItem?.productName || "Product"}`,
-                            value: po.productionOrderId ? String(po.productionOrderId) : "",
-                          })),
-                        ]}
-                        onChange={handleChange}
-                        required
-                        disabled={isEdit}
-                      />
-                      {errors.productionOrderId && <span className="text-danger small">{errors.productionOrderId}</span>}
-                    </Col>
-                    <Col lg={4} md={6}>
-                      <SelectInput
-                        label="Wastage Type classification"
-                        name="wastageType"
-                        value={formData.wastageType}
-                        options={WASTAGE_TYPES}
-                        onChange={handleChange}
-                        required
-                      />
-                      {errors.wastageType && <span className="text-danger small">{errors.wastageType}</span>}
-                    </Col>
-                    <Col lg={4} md={6}>
-                      <SelectInput
-                        label="Machine Location"
-                        name="machineId"
-                        value={formData.machineId}
-                        options={[
-                          { label: "Select Machine", value: "" },
-                          ...machines.map((m) => ({
-                            label: m.machineName,
-                            value: m.machineId,
-                          })),
-                        ]}
-                        onChange={handleChange}
-                        required
-                      />
-                      {errors.machineId && <span className="text-danger small">{errors.machineId}</span>}
-                    </Col>
-                    <Col lg={4} md={6}>
-                      <SelectInput
-                        label="Shift Classification"
-                        name="shiftId"
-                        value={formData.shiftId}
-                        options={[
-                          { label: "Select Shift", value: "" },
-                          ...shifts.map((s) => ({
-                            label: s.shiftName,
-                            value: s.shiftCode,
-                          })),
-                        ]}
-                        onChange={handleChange}
-                        required
-                      />
-                      {errors.shiftId && <span className="text-danger small">{errors.shiftId}</span>}
-                    </Col>
-                    <Col lg={4} md={6}>
-                      <SelectInput
-                        label="Product Item"
-                        name="productId"
-                        value={formData.productId}
-                        options={[
-                          { label: "Select Product", value: "" },
-                          ...products.map((p: any) => ({
-                            label: p.productName,
-                            value: String(p.id),
-                          })),
-                        ]}
-                        onChange={handleChange}
-                        required
-                        disabled={isEdit}
-                      />
-                      {errors.productId && <span className="text-danger small">{errors.productId}</span>}
-                    </Col>
-                    <Col lg={4} md={6}>
-                      <SelectInput
-                        label="Raw Material Component (Optional)"
-                        name="rawMaterialId"
-                        value={formData.rawMaterialId}
-                        options={[
-                          { label: "Select Raw Material if wasted", value: "" },
-                          ...rawMaterials.map((rm) => ({
-                            label: rm.materialName,
-                            value: rm.rawMaterialId,
-                          })),
-                        ]}
-                        onChange={handleChange}
-                      />
-                      {errors.rawMaterialId && <span className="text-danger small">{errors.rawMaterialId}</span>}
-                    </Col>
-                    <Col lg={4} md={6}>
-                      <TextInput
-                        label="Wastage Quantity"
-                        name="quantity"
-                        type="number"
-                        step="0.001"
-                        value={formData.quantity}
-                        onChange={handleChange}
-                        placeholder="e.g. 50"
-                        required
-                      />
-                      {errors.quantity && <span className="text-danger small">{errors.quantity}</span>}
-                    </Col>
-                    <Col lg={2} md={6}>
-                      <SelectInput
-                        label="UOM"
-                        name="uom"
-                        value={formData.uom}
-                        options={[
-                          { label: "Select UOM", value: "" },
-                          ...activeUOMs.map((uom: any) => ({
-                            label: uom.uomCode,
-                            value: uom.uomCode,
-                          })),
-                        ]}
-                        onChange={handleChange}
-                        required
-                      />
-                      {errors.uom && <span className="text-danger small">{errors.uom}</span>}
-                    </Col>
-                  </Row>
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+          <form onSubmit={handleSubmit} noValidate>
+            
+            {/* Section 1: Wastage Details */}
+            <div className="p-6 border-b border-slate-100">
+              <h3 className="text-lg font-bold text-slate-800 mb-4">1. Wastage Details</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div>
+                  <TextInput
+                    label="Wastage Logging Date"
+                    name="wastageDate"
+                    type="date"
+                    value={formData.wastageDate}
+                    onChange={handleChange}
+                    required
+                  />
+                  {errors.wastageDate && <span className="text-red-500 text-xs mt-1 block">{errors.wastageDate}</span>}
                 </div>
-              </Col>
-
-              {/* Section 2: Explanation & Auditing Notes */}
-              <Col md={12}>
-                <h6 className="section-title border-bottom-0 mt-3">2. Explanation & Auditing Notes</h6>
-                <div className="p-3 border rounded">
-                  <Row className="g-3">
-                    <Col md={4}>
-                      <Form.Group className="mb-3">
-                        <Form.Label className="small fw-semibold text-secondary">Reason for Wastage</Form.Label>
-                        <Form.Control
-                          as="textarea"
-                          rows={3}
-                          name="reason"
-                          value={formData.reason}
-                          onChange={handleChange}
-                          placeholder="Provide specific details about the breakdown, raw material defect, setup scrap, etc."
-                        />
-                        {errors.reason && <span className="text-danger small">{errors.reason}</span>}
-                      </Form.Group>
-                    </Col>
-                    <Col md={4}>
-                      <Form.Group className="mb-3">
-                        <Form.Label className="small fw-semibold text-secondary">Corrective Action Taken</Form.Label>
-                        <Form.Control
-                          as="textarea"
-                          rows={3}
-                          name="correctiveAction"
-                          value={formData.correctiveAction}
-                          onChange={handleChange}
-                          placeholder="Enter immediate corrective action taken to prevent recurrence..."
-                        />
-                        {errors.correctiveAction && <span className="text-danger small">{errors.correctiveAction}</span>}
-                      </Form.Group>
-                    </Col>
-                    <Col md={4}>
-                      <Form.Group className="mb-3">
-                        <Form.Label className="small fw-semibold text-secondary">Remarks / General Audit Notes</Form.Label>
-                        <Form.Control
-                          as="textarea"
-                          rows={3}
-                          name="remarks"
-                          value={formData.remarks}
-                          onChange={handleChange}
-                          placeholder="General auditing notes..."
-                        />
-                        {errors.remarks && <span className="text-danger small">{errors.remarks}</span>}
-                      </Form.Group>
-                    </Col>
-                  </Row>
+                <div>
+                  <SelectInput
+                    label="Production Order Reference"
+                    name="productionOrderId"
+                    value={formData.productionOrderId}
+                    options={[
+                      { label: "Select Production Order", value: "" },
+                      ...productionOrders.map((po) => ({
+                        label: `${po.productionOrderId} - ${po.productItem?.productName || "Product"}`,
+                        value: po.productionOrderId ? String(po.productionOrderId) : "",
+                      })),
+                    ]}
+                    onChange={handleChange}
+                    required
+                    disabled={isEdit}
+                  />
+                  {errors.productionOrderId && <span className="text-red-500 text-xs mt-1 block">{errors.productionOrderId}</span>}
                 </div>
-              </Col>
-
-              {/* Section 3: Action & Rework Audits */}
-              <Col md={12}>
-                <h6 className="section-title border-bottom-0 mt-3">3. Action & Rework Audits</h6>
-                <div className="p-3 border rounded">
-                  <Row className="g-3 align-items-center">
-                    <Col md={6}>
-                      <Form.Check
-                        type="switch"
-                        id="isRecyclable-switch"
-                        label="This scrap is recyclable"
-                        name="isRecyclable"
-                        checked={formData.isRecyclable}
-                        onChange={handleCheckboxChange}
-                        className="fw-semibold text-secondary"
-                      />
-                    </Col>
-                    <Col md={6}>
-                      <Form.Check
-                        type="switch"
-                        id="sentForRework-switch"
-                        label="This scrap has been sent for rework"
-                        name="sentForRework"
-                        checked={formData.sentForRework}
-                        onChange={handleCheckboxChange}
-                        className="fw-semibold text-secondary"
-                      />
-                    </Col>
-                  </Row>
+                <div>
+                  <SelectInput
+                    label="Wastage Type classification"
+                    name="wastageType"
+                    value={formData.wastageType}
+                    options={WASTAGE_TYPES}
+                    onChange={handleChange}
+                    required
+                  />
+                  {errors.wastageType && <span className="text-red-500 text-xs mt-1 block">{errors.wastageType}</span>}
                 </div>
-              </Col>
-            </Row>
-
-
-            <div className="d-flex justify-content-end gap-3 mt-4 border-top pt-3">
-              <CustomButton
-                text="Cancel"
-                variant="secondary"
-                onClick={() => navigate("/production-wastages")}
-              />
-              <CustomButton
-                text={loading ? "Saving..." : (isEdit ? "Update Log" : "Submit Log")}
-                type="submit"
-                variant="primary"
-                disabled={loading}
-              />
+                <div>
+                  <SelectInput
+                    label="Machine Location"
+                    name="machineId"
+                    value={formData.machineId}
+                    options={[
+                      { label: "Select Machine", value: "" },
+                      ...machines.map((m) => ({
+                        label: m.machineName,
+                        value: m.machineId,
+                      })),
+                    ]}
+                    onChange={handleChange}
+                    required
+                  />
+                  {errors.machineId && <span className="text-red-500 text-xs mt-1 block">{errors.machineId}</span>}
+                </div>
+                <div>
+                  <SelectInput
+                    label="Shift Classification"
+                    name="shiftId"
+                    value={formData.shiftId}
+                    options={[
+                      { label: "Select Shift", value: "" },
+                      ...shifts.map((s) => ({
+                        label: s.shiftName,
+                        value: s.shiftCode,
+                      })),
+                    ]}
+                    onChange={handleChange}
+                    required
+                  />
+                  {errors.shiftId && <span className="text-red-500 text-xs mt-1 block">{errors.shiftId}</span>}
+                </div>
+                <div>
+                  <SelectInput
+                    label="Product Item"
+                    name="productId"
+                    value={formData.productId}
+                    options={[
+                      { label: "Select Product", value: "" },
+                      ...products.map((p: any) => ({
+                        label: p.productName,
+                        value: String(p.id),
+                      })),
+                    ]}
+                    onChange={handleChange}
+                    required
+                    disabled={isEdit}
+                  />
+                  {errors.productId && <span className="text-red-500 text-xs mt-1 block">{errors.productId}</span>}
+                </div>
+                <div>
+                  <SelectInput
+                    label="Raw Material Component (Optional)"
+                    name="rawMaterialId"
+                    value={formData.rawMaterialId}
+                    options={[
+                      { label: "Select Raw Material if wasted", value: "" },
+                      ...rawMaterials.map((rm) => ({
+                        label: rm.materialName,
+                        value: rm.rawMaterialId,
+                      })),
+                    ]}
+                    onChange={handleChange}
+                  />
+                  {errors.rawMaterialId && <span className="text-red-500 text-xs mt-1 block">{errors.rawMaterialId}</span>}
+                </div>
+                <div className="flex gap-4">
+                  <div className="flex-1">
+                    <TextInput
+                      label="Wastage Quantity"
+                      name="quantity"
+                      type="number"
+                      step="0.001"
+                      value={formData.quantity}
+                      onChange={handleChange}
+                      placeholder="e.g. 50"
+                      required
+                    />
+                    {errors.quantity && <span className="text-red-500 text-xs mt-1 block">{errors.quantity}</span>}
+                  </div>
+                  <div className="w-1/3">
+                    <SelectInput
+                      label="UOM"
+                      name="uom"
+                      value={formData.uom}
+                      options={[
+                        { label: "Select UOM", value: "" },
+                        ...activeUOMs.map((uom: any) => ({
+                          label: uom.uomCode,
+                          value: uom.uomCode,
+                        })),
+                      ]}
+                      onChange={handleChange}
+                      required
+                    />
+                    {errors.uom && <span className="text-red-500 text-xs mt-1 block">{errors.uom}</span>}
+                  </div>
+                </div>
+              </div>
             </div>
-          </Form>
-        </Card>
-      </Container>
+
+            {/* Section 2: Explanation & Auditing Notes */}
+            <div className="p-6 border-b border-slate-100 bg-white/50">
+              <h3 className="text-lg font-bold text-slate-800 mb-4">2. Explanation & Auditing Notes</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Reason for Wastage</label>
+                  <textarea
+                    className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none bg-white"
+                    rows={3}
+                    name="reason"
+                    value={formData.reason}
+                    onChange={handleChange}
+                    placeholder="Provide specific details about the breakdown, raw material defect, setup scrap, etc."
+                  />
+                  {errors.reason && <span className="text-red-500 text-xs mt-1 block">{errors.reason}</span>}
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Corrective Action Taken</label>
+                  <textarea
+                    className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none bg-white"
+                    rows={3}
+                    name="correctiveAction"
+                    value={formData.correctiveAction}
+                    onChange={handleChange}
+                    placeholder="Enter immediate corrective action taken to prevent recurrence..."
+                  />
+                  {errors.correctiveAction && <span className="text-red-500 text-xs mt-1 block">{errors.correctiveAction}</span>}
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Remarks / General Audit Notes</label>
+                  <textarea
+                    className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none bg-white"
+                    rows={3}
+                    name="remarks"
+                    value={formData.remarks}
+                    onChange={handleChange}
+                    placeholder="General auditing notes..."
+                  />
+                  {errors.remarks && <span className="text-red-500 text-xs mt-1 block">{errors.remarks}</span>}
+                </div>
+              </div>
+            </div>
+
+            {/* Section 3: Action & Rework Audits */}
+            <div className="p-6">
+              <h3 className="text-lg font-bold text-slate-800 mb-4">3. Action & Rework Audits</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-blue-50/50 p-4 rounded-xl border border-blue-100">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    name="isRecyclable"
+                    checked={formData.isRecyclable}
+                    onChange={handleCheckboxChange}
+                    className="w-5 h-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="font-semibold text-slate-700">This scrap is recyclable</span>
+                </label>
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    name="sentForRework"
+                    checked={formData.sentForRework}
+                    onChange={handleCheckboxChange}
+                    className="w-5 h-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="font-semibold text-slate-700">This scrap has been sent for rework</span>
+                </label>
+              </div>
+            </div>
+
+            <div className="p-6 bg-white border-t border-slate-200 flex justify-end gap-3 rounded-b-2xl">
+              <button
+                type="button"
+                className="px-6 py-2.5 rounded-lg text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 font-semibold transition-colors flex items-center gap-2"
+                onClick={() => navigate("/production-wastages")}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-6 py-2.5 rounded-lg text-white font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                style={{ backgroundColor: "var(--color-primary, #003428)" }}
+                disabled={loading}
+              >
+                {loading ? (
+                  <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> Saving...</>
+                ) : (
+                  <><FaSave /> {isEdit ? "Update Log" : "Submit Log"}</>
+                )}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
     </div>
   );
 };

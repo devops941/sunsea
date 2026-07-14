@@ -315,15 +315,15 @@ const CustomerEditPage: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex justify-center items-center">
+      <div className="min-h-screen bg-white flex justify-center items-center">
         <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"></div>
       </div>
     );
   }
 
   return (
-    <div className="p-4 md:p-6 min-h-screen bg-slate-50">
-      <div className="max-w-7xl mx-auto space-y-3">
+    <div className="p-4 md:p-6 min-h-screen bg-white">
+      <div className=" space-y-3">
 
         {/* Main Form Card */}
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200">
@@ -538,7 +538,7 @@ const CustomerEditPage: React.FC = () => {
 
               <div className="space-y-6">
                 {formData.bankAccounts.map((bank, index) => (
-                  <div key={index} className="p-4 border border-slate-200 rounded-xl bg-slate-50 relative">
+                  <div key={index} className="p-4 border border-slate-200 rounded-xl bg-white relative">
                     {formData.bankAccounts.length > 1 && (
                       <div className="absolute top-4 right-4">
                         <button

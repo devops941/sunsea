@@ -77,7 +77,7 @@ const TextArea: React.FC<TextAreaProps> = ({
               ? "border-red-500 bg-white focus:border-red-500 focus:ring-4 focus:ring-red-500/15"
               : "border-slate-300 bg-white hover:border-slate-400 focus:border-primary focus:ring-4 focus:ring-primary/15"
             }
-            ${disabled ? "bg-slate-50 cursor-not-allowed text-slate-400" : ""}
+            ${disabled ? "bg-white cursor-not-allowed text-slate-400" : ""}
             resize-y
           `}
         />

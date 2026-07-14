@@ -536,8 +536,8 @@ const SupplierCreate: React.FC = () => {
     };
 
     return (
-        <div className="p-4 md:p-6 min-h-screen bg-slate-50">
-            <div className="max-w-7xl mx-auto space-y-3">
+        <div className="p-4 md:p-6 min-h-screen bg-white">
+            <div className=" space-y-3">
                 <div className="bg-white rounded-2xl shadow-sm border border-slate-200">
                     <div className="p-6 border-b border-slate-200 flex items-center justify-between">
                         <h2 className="text-2xl font-bold text-slate-800">Add New Supplier</h2>
@@ -853,7 +853,7 @@ const SupplierCreate: React.FC = () => {
                         {/* ADDITIONAL DELIVERY ADDRESSES */}
                         <div>
                             <h3 className="text-lg font-semibold text-slate-700 mb-2">Additional Delivery / Plant Addresses</h3>
-                            <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl mb-4">
+                            <div className="bg-white border border-slate-200 p-4 rounded-xl mb-4">
                                 <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-3">
                                     <TextInput
                                         label="Label (e.g. Chennai Plant)"
@@ -948,7 +948,7 @@ const SupplierCreate: React.FC = () => {
 
                             <div className="space-y-6">
                                 {formData.bankAccounts.map((bank, index) => (
-                                    <div key={index} className="p-4 border border-slate-200 rounded-xl bg-slate-50 relative">
+                                    <div key={index} className="p-4 border border-slate-200 rounded-xl bg-white relative">
                                         {formData.bankAccounts.length > 1 && (
                                             <div className="absolute top-4 right-4">
                                                 <button

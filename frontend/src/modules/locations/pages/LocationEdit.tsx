@@ -144,8 +144,8 @@ const LocationEdit: React.FC = () => {
     };
 
     return (
-        <div className="p-4 md:p-6 min-h-screen bg-slate-50">
-            <div className="max-w-7xl mx-auto space-y-3">
+        <div className="p-4 md:p-6 min-h-screen bg-white">
+            <div className=" space-y-3">
                 <div className="bg-white rounded-2xl shadow-sm border border-slate-200">
                     <div className="p-6 border-b border-slate-200 flex items-center justify-between">
                         <h2 className="text-2xl font-bold text-slate-800">Edit Location</h2>

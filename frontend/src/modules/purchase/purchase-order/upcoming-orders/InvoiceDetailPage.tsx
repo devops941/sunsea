@@ -751,7 +751,7 @@ const InvoiceDetailPage: React.FC = () => {
                     {/* Summary section */}
                     <div className="flex flex-col md:flex-row justify-end mt-6">
                         <div className="w-full md:w-1/2 lg:w-1/3 border border-gray-200 rounded-lg overflow-hidden shadow-sm">
-                            <div className="bg-slate-50 px-4 py-3 border-b border-gray-200 font-semibold text-gray-700">Order Summary</div>
+                            <div className="bg-white px-4 py-3 border-b border-gray-200 font-semibold text-gray-700">Order Summary</div>
                             <div className="p-4 space-y-3 bg-white">
                                 <div className="flex justify-between text-sm text-gray-600">
                                     <span>Subtotal</span>
@@ -805,7 +805,7 @@ const InvoiceDetailPage: React.FC = () => {
                                     <span className="font-semibold text-green-600">₹{totalTax.toFixed(2)}</span>
                                 </div>
                             </div>
-                            <div className="bg-slate-50 px-4 py-3 border-t border-gray-200 flex justify-between items-center">
+                            <div className="bg-white px-4 py-3 border-t border-gray-200 flex justify-between items-center">
                                 <span className="font-bold text-gray-800">Grand Total</span>
                                 <span className="font-extrabold text-blue-600 text-lg">₹{grandTotal.toFixed(2)}</span>
                             </div>

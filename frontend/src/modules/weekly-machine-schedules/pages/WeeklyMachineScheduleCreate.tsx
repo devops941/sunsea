@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { Container, Row, Col, Card, Spinner } from "react-bootstrap";
 import { FaSave, FaArrowLeft, FaCheck } from "react-icons/fa";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -126,7 +125,7 @@ const WeeklyMachineScheduleCreate: React.FC = () => {
 
     const handleSubmit = async () => {
         const selectedIds = Object.keys(selectedOrders).filter(id => selectedOrders[id]);
-        
+
         if (selectedIds.length === 0) {
             toast.error("Please select at least one order to allocate.");
             return;
@@ -147,8 +146,8 @@ const WeeklyMachineScheduleCreate: React.FC = () => {
                 const actualId = await weeklyProgramService.fetchNextId();
 
                 const validPriorities = ["LOW", "MEDIUM", "HIGH", "URGENT"];
-                const mappedPriority = (po.priority && typeof po.priority === 'string' && validPriorities.includes(po.priority.toUpperCase())) 
-                    ? po.priority.toUpperCase() 
+                const mappedPriority = (po.priority && typeof po.priority === 'string' && validPriorities.includes(po.priority.toUpperCase()))
+                    ? po.priority.toUpperCase()
                     : "MEDIUM";
 
                 const payload = {
@@ -160,7 +159,7 @@ const WeeklyMachineScheduleCreate: React.FC = () => {
                     dayOfWeek: 1, // Default to Monday
                     shiftId: null, // Shift remains null until production start
                     plannedQty: qty,
-                    plannedHours: 0, 
+                    plannedHours: 0,
                     setupHours: 0,
                     sequenceNo: i + 1,
                     priority: mappedPriority,
@@ -194,23 +193,23 @@ const WeeklyMachineScheduleCreate: React.FC = () => {
 
     return (
         <div className="inner-container">
-            <Container fluid>
+            <div className="p-4 md:p-6 min-h-screen bg-white"><div className="w-full">
                 <div className="page-header mb-4">
-                    <Row className="align-items-center g-3">
-                        <Col lg={6}>
-                            <h2 className="page-title">Allocate Weekly Schedule</h2>
-                            
-                        </Col>
-                        <Col lg={6} className="text-end">
+                    <div className="flex flex-col md:flex-row items-center justify-between mb-6">
+                        <div>
+                            <h2 className="text-2xl font-bold text-slate-800">Allocate Weekly Schedule</h2>
+
+                        </div>
+                        <div>
                             <CustomButton text="Back to List" icon={FaArrowLeft} onClick={() => navigate("/weekly-machine-schedules")} />
-                        </Col>
-                    </Row>
+                        </div>
+                    </div>
                 </div>
 
-                <Card className="mb-4 shadow-sm border-0">
-                    <Card.Body>
-                        <Row className="g-3">
-                            <Col md={6}>
+                <div className="  mb-6">
+                    <div className="p-4 md:p-6">
+                        <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+                            <div className="md:col-span-6 lg:col-span-4">
                                 <TextInput
                                     label="Week Start Date"
                                     name="weekStartDate"
@@ -219,8 +218,8 @@ const WeeklyMachineScheduleCreate: React.FC = () => {
                                     required
                                     onChange={handleDateChange}
                                 />
-                            </Col>
-                            <Col md={6}>
+                            </div>
+                            <div className="md:col-span-6 lg:col-span-4">
                                 <TextInput
                                     label="Week End Date"
                                     name="weekEndDate"
@@ -229,52 +228,52 @@ const WeeklyMachineScheduleCreate: React.FC = () => {
                                     disabled
                                     onChange={() => { }}
                                 />
-                            </Col>
-                        </Row>
-                    </Card.Body>
-                </Card>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
                 {weekStartDate ? (
-                    <Card className="border-0 shadow-sm mb-3">
-                          
-                            {selectedCount > 0 && (
-                                <div className="d-flex align-items-center gap-3">
-                                    <span className="fw-bold text-primary">{selectedCount} Selected</span>
-                                    <CustomButton
-                                        text={isSubmitting ? "Saving..." : "Confirm & Save Allocation"}
-                                        icon={FaSave}
-                                        onClick={handleSubmit}
-                                        disabled={isSubmitting}
-                                    />
-                                </div>
-                            )}
-                        <Card.Body className="p-0">
-                            {loadingPo ? (
-                                <div className="text-center p-5"><Spinner animation="border" variant="primary" /></div>
-                            ) : displayOrders.length > 0 ? (
-                                <div className="table-responsive">
-                                    <table className="master-data-table mb-0" style={{ width: "100%" }}>
-                                        <thead>
-                                            <tr>
-                                                <th style={{ width: "50px", textAlign: "center" }}>
-                                                    <FaCheck className="text-muted" />
-                                                </th>
-                                                <th>Production Order</th>
-                                                <th>Product</th>
+                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 mb-6">
 
-                                                <th>Qty</th>
-                                                <th>Status / Priority</th>
+                        {selectedCount > 0 && (
+                            <div className="flex items-center gap-3 p-6 border-b border-slate-200">
+                                <span className="font-bold text-primary">{selectedCount} Selected</span>
+                                <CustomButton
+                                    text={isSubmitting ? "Saving..." : "Confirm & Save Allocation"}
+                                    icon={FaSave}
+                                    onClick={handleSubmit}
+                                    disabled={isSubmitting}
+                                />
+                            </div>
+                        )}
+                        <div className="p-0">
+                            {loadingPo ? (
+                                <div className="text-center p-10 text-slate-500">Loading...</div>
+                            ) : displayOrders.length > 0 ? (
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left text-sm text-slate-600">
+                                        <thead className="bg-slate-50 border-b border-slate-200 text-slate-700">
+                                            <tr>
+                                                <th className="px-4 py-3" style={{ width: "50px", textAlign: "center" }}>
+                                                    <FaCheck className="text-slate-500" />
+                                                </th>
+                                                <th className="px-4 py-3">Production Order</th>
+                                                <th className="px-4 py-3">Product</th>
+
+                                                <th className="px-4 py-3">Qty</th>
+                                                <th className="px-4 py-3">Status / Priority</th>
                                             </tr>
                                         </thead>
-                                        <tbody>
+                                        <tbody className="divide-y divide-slate-100">
                                             {/* Render Pending Orders first */}
                                             {displayOrders.map((po: any) => {
                                                 const targetQty = Number(po.targetQty);
                                                 const isSelected = !!selectedOrders[po.productionOrderId];
 
                                                 return (
-                                                    <tr key={po.productionOrderId} className={`master-data-row ${isSelected ? "table-primary" : ""}`}>
-                                                        <td className="master-data-cell text-center">
+                                                    <tr key={po.productionOrderId} className={`hover:bg-slate-50 transition-colors ${isSelected ? "bg-blue-50" : ""}`}>
+                                                        <td className="px-4 py-3 text-center">
                                                             <input
                                                                 type="checkbox"
                                                                 className="form-check-input"
@@ -283,44 +282,45 @@ const WeeklyMachineScheduleCreate: React.FC = () => {
                                                                 onChange={() => handleToggleSelect(po.productionOrderId)}
                                                             />
                                                         </td>
-                                                        <td className="master-data-cell fw-bold">{po.productionOrderId}</td>
-                                                        <td className="master-data-cell">{po.productItem?.productName || "-"}</td>
+                                                        <td className="px-4 py-3 font-bold text-slate-800">{po.productionOrderId}</td>
+                                                        <td className="px-4 py-3">{po.productItem?.productName || "-"}</td>
 
-                                                        <td className="master-data-cell">{targetQty} <span className="small text-muted">PCS</span></td>
-                                                        <td className="master-data-cell"><StatusBadge status={po.priority || 'MEDIUM'} /></td>
+                                                        <td className="px-4 py-3">{targetQty} <span className="small text-slate-500">PCS</span></td>
+                                                        <td className="px-4 py-3"><StatusBadge status={po.priority || 'MEDIUM'} /></td>
                                                     </tr>
                                                 );
                                             })}
 
                                             {/* Render Already Scheduled Orders below them if week is selected */}
                                             {weekStartDate && alreadyScheduled.length > 0 && alreadyScheduled.map((program: any) => (
-                                                <tr key={`sched-${program.weeklyProgramId}`} className="master-data-row text-muted bg-light">
-                                                    <td className="master-data-cell text-center">
+                                                <tr key={`sched-${program.weeklyProgramId}`} className="hover:bg-slate-50 transition-colors text-slate-500 bg-white">
+                                                    <td className="px-4 py-3 text-center">
                                                         {/* No checkbox for already scheduled items */}
                                                     </td>
-                                                    <td className="master-data-cell fw-bold opacity-75">{program.productionOrderId}</td>
-                                                    <td className="master-data-cell opacity-75">{program.productionOrder?.productItem?.productName || "-"}</td>
+                                                    <td className="px-4 py-3 font-bold text-slate-800 opacity-70">{program.productionOrderId}</td>
+                                                    <td className="px-4 py-3 opacity-70">{program.productionOrder?.productItem?.productName || "-"}</td>
 
-                                                    <td className="master-data-cell opacity-75">{Number(program.plannedQty)} <span className="small">PCS</span></td>
-                                                    <td className="master-data-cell opacity-75"><StatusBadge status={program.status || 'SCHEDULED'} /></td>
+                                                    <td className="px-4 py-3 opacity-70">{Number(program.plannedQty)} <span className="small">PCS</span></td>
+                                                    <td className="px-4 py-3 opacity-70"><StatusBadge status={program.status || 'SCHEDULED'} /></td>
                                                 </tr>
                                             ))}
                                         </tbody>
                                     </table>
                                 </div>
                             ) : (
-                                <div className="text-center p-5 text-muted">
+                                <div className="text-center p-5 text-slate-500">
                                     No ready production orders (RM_AVAILABLE) found for scheduling.
                                 </div>
                             )}
-                        </Card.Body>
-                    </Card>
+                        </div>
+                    </div>
                 ) : (
-                    <Card className="text-center p-5 border-dashed bg-transparent text-muted mb-4">
-                        Please select a Week Start Date to view and allocate ready production orders.
-                    </Card>
+                    <div className="text-center p-10 border-2 border-dashed border-slate-300 rounded-2xl bg-white text-slate-500 mb-6 shadow-sm">
+                        <div className="text-lg font-medium mb-1">Waiting for Week Start Date</div>
+                        <div className="text-sm opacity-80">Please select a Week Start Date above to view and allocate ready production orders.</div>
+                    </div>
                 )}
-            </Container>
+            </div></div>
         </div>
     );
 };

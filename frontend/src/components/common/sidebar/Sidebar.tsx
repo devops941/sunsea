@@ -77,7 +77,7 @@ const Sidebar = () => {
 
   return (
     <aside
-      className={`h-screen bg-[#F8F8F8] shadow-md text-gray-700 relative overflow-visible flex flex-col transition-[width] duration-300 ease-in-out z-50  ${activeCollapsed ? "w-[80px]" : "w-[240px]"}`}
+      className={`h-screen bg-[#ffffff] shadow-md text-gray-700 relative overflow-visible flex flex-col transition-[width] duration-300 ease-in-out z-50  ${activeCollapsed ? "w-[80px]" : "w-[240px]"}`}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >

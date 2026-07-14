@@ -14,8 +14,8 @@ const App: React.FC = () => {
   if (!isInitialized) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-[#f4f7f9]">
-        <div className="custom-pulse-loader">S</div>
-        <div className="custom-loader-text">SUNSEA ERP</div>
+
+        <div className="">SUNSEA ERP</div>
       </div>
     );
   }

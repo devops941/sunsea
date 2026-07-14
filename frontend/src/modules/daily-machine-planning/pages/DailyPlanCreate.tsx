@@ -86,7 +86,7 @@ const DailyPlanCreate: React.FC = () => {
     }
     dailyPlanService.getAll({ productionDate, machineId }).then((res) => {
       setPlansForDateAndMachine(res.data || []);
-    }).catch(() => {});
+    }).catch(() => { });
 
     // Fetch OEE summary for selected machine
     setLoadingOee(true);
@@ -113,7 +113,7 @@ const DailyPlanCreate: React.FC = () => {
           return sum + Math.max(Number(p.plannedHours || 0), loggedHours);
         }
       }, 0);
-      
+
       hoursMap[s.shiftCode] = Math.max(0, shiftHrs - plannedHrsSum);
     });
 
@@ -141,7 +141,7 @@ const DailyPlanCreate: React.FC = () => {
       const res = await weeklyProgramService.getAll({});
       const list: any[] = Array.isArray(res.data) ? res.data : (Array.isArray(res) ? res : []);
       const stateWpId = (location.state as any)?.weeklyProgramId;
-      
+
       setWeeklyPrograms(list.filter((p: any) => {
         if (p.status === "COMPLETED" || p.status === "CANCELLED") {
           return p.weeklyProgramId === stateWpId;
@@ -153,7 +153,7 @@ const DailyPlanCreate: React.FC = () => {
         const isSelectedWeek = p.weekStartDate && p.weekStartDate.startsWith(selectedWeekPrefix);
         const isPending = ["PLANNED", "APPROVED", "IN_PROGRESS"].includes(p.status);
         if (!isSelectedWeek && isPending) {
-           return { ...p, _isBacklog: true };
+          return { ...p, _isBacklog: true };
         }
         return p;
       }));
@@ -218,7 +218,7 @@ const DailyPlanCreate: React.FC = () => {
           return sum + Math.max(Number(p.plannedQty || 0), produced);
         }, 0);
       const poTarget = Number(wp.productionOrder?.targetQty || 0);
-      
+
       const baseCapacity = Number(wp.plannedQty || 0) > 0 ? Number(wp.plannedQty) : poTarget;
       const remainingRaw = Math.max(0, baseCapacity - alreadyPlanned);
       const remaining = Math.round(remainingRaw * 1000) / 1000;
@@ -284,11 +284,11 @@ const DailyPlanCreate: React.FC = () => {
   // ── Derived values ───────────────────────────────────────────────────────
   const allowedMachines = useMemo(() =>
     (machines || []).filter((m: any) => m.machineId !== "MAC-001")
-  , [machines]);
+    , [machines]);
 
   const selectedShiftInfo = useMemo(() =>
     shifts.find((s: any) => s.shiftCode === shiftId)
-  , [shiftId, shifts]);
+    , [shiftId, shifts]);
 
   const overCapacity = remainingQty !== null && Number(plannedQty) > remainingQty;
 
@@ -375,7 +375,7 @@ const DailyPlanCreate: React.FC = () => {
 
   // ── Render ───────────────────────────────────────────────────────────────
   return (
-    <div className="p-4 md:p-6 min-h-screen bg-slate-50">
+    <div className="p-4 md:p-6 min-h-screen bg-white">
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200">
         {/* Page Header */}
         <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-slate-200">
@@ -415,81 +415,80 @@ const DailyPlanCreate: React.FC = () => {
                 </div>
                 <div className="p-5">
                   <div>
-                      <label className="form-label fw-bold small text-muted text-uppercase mb-1">
-                        Weekly Program <span className="text-danger">*</span>
-                      </label>
-                      {loadingWeekly ? (
-                        <div className="d-flex align-items-center gap-2 py-2 text-muted small">
-                          <Spinner size="sm" /> Loading weekly programs...
-                        </div>
-                      ) : (
-                        <>
-                          <select
-                            className="form-select"
-                            style={{ height: "44px", borderRadius: "8px", backgroundColor: (isEdit || (location.state as any)?.weeklyProgramId) ? "#e9ecef" : undefined }}
-                            required
-                            disabled={isEdit || !!(location.state as any)?.weeklyProgramId}
-                            value={weeklyProgramId}
-                            onChange={(e) => setWeeklyProgramId(e.target.value)}
-                          >
-                            <option value="">— Select Weekly Program —</option>
-                            {weeklyPrograms.map((wp: any) => (
-                              <option key={wp.weeklyProgramId} value={wp.weeklyProgramId}>
-                                {wp.weeklyProgramId} — {wp.productionOrderId} — {wp.productionOrder?.productItem?.productName} (Planned: {wp.plannedQty} pcs) {wp._isBacklog ? "⚠️ [PENDING FROM PREVIOUS WEEK]" : ""}
-                              </option>
-                            ))}
-                          </select>
-                          {formErrors.weeklyProgramId && <div className="text-danger small mt-1">{formErrors.weeklyProgramId}</div>}
-                        </>
-                      )}
+                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
+                      Weekly Program <span className="text-red-500">*</span>
+                    </label>
+                    {loadingWeekly ? (
+                      <div className="flex items-center gap-2 py-2 text-slate-500 text-sm">
+                        <div className="inline-block w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin"></div> Loading weekly programs...
+                      </div>
+                    ) : (
+                      <>
+                        <select
+                          className="w-full h-11 px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-100 disabled:text-slate-500"
+                          required
+                          disabled={isEdit || !!(location.state as any)?.weeklyProgramId}
+                          value={weeklyProgramId}
+                          onChange={(e) => setWeeklyProgramId(e.target.value)}
+                        >
+                          <option value="">— Select Weekly Program —</option>
+                          {weeklyPrograms.map((wp: any) => (
+                            <option key={wp.weeklyProgramId} value={wp.weeklyProgramId}>
+                              {wp.weeklyProgramId} — {wp.productionOrderId} — {wp.productionOrder?.productItem?.productName} (Planned: {wp.plannedQty} pcs) {wp._isBacklog ? "⚠️ [PENDING FROM PREVIOUS WEEK]" : ""}
+                            </option>
+                          ))}
+                        </select>
+                        {formErrors.weeklyProgramId && <div className="text-red-500 text-xs mt-1">{formErrors.weeklyProgramId}</div>}
+                      </>
+                    )}
                   </div>
 
                   {/* Auto-filled info banner */}
                   {selectedWeeklyProg && (
                     <div className="mt-4">
-                      <div className="rounded-xl p-4 mt-4" style={{ background: "#f0fdf4", border: "1px solid #86efac" }}>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      <div className="rounded-xl p-4 mt-4 bg-green-50 border border-green-200">
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                           <div>
-                              <div className="text-muted small text-uppercase fw-bold mb-1">Production Order</div>
-                              <div className="fw-bold">{selectedWeeklyProg.productionOrderId}</div>
+                            <div className="text-slate-500 text-xs font-bold uppercase mb-1">Production Order</div>
+                            <div className="font-bold text-slate-800">{selectedWeeklyProg.productionOrderId}</div>
                           </div>
                           <div>
-                              <div className="text-muted small text-uppercase fw-bold mb-1">Product</div>
-                              <div className="fw-semibold text-dark small">
-                                {selectedWeeklyProg.productionOrder?.productItem?.productName || "—"}
+                            <div className="text-slate-500 text-xs font-bold uppercase mb-1">Product</div>
+                            <div className="font-semibold text-slate-800 text-sm">
+                              {selectedWeeklyProg.productionOrder?.productItem?.productName || "—"}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-slate-500 text-xs font-bold uppercase mb-1">Weekly Target</div>
+                            <div className="font-bold text-slate-800">{selectedWeeklyProg.plannedQty} pcs</div>
+                          </div>
+                          <div>
+                            <div className="text-slate-500 text-xs font-bold uppercase mb-1">Remaining Capacity</div>
+                            {loadingRemaining ? (
+                              <div className="inline-block w-4 h-4 border-2 border-green-400 border-t-transparent rounded-full animate-spin"></div>
+                            ) : (
+                              <div className={`font-bold ${remainingQty === 0 ? "text-red-600" : "text-green-600"}`}>
+                                {remainingQty !== null ? `${remainingQty} pcs` : "—"}
                               </div>
+                            )}
                           </div>
                           <div>
-                              <div className="text-muted small text-uppercase fw-bold mb-1">Weekly Target</div>
-                              <div className="fw-bold">{selectedWeeklyProg.plannedQty} pcs</div>
+                            <div className="text-slate-500 text-xs font-bold uppercase mb-1">Week</div>
+                            <div className="text-sm font-medium text-slate-700">
+                              {selectedWeeklyProg.weekStartDate?.split("T")[0]} → {selectedWeeklyProg.weekEndDate?.split("T")[0]}
+                            </div>
                           </div>
                           <div>
-                              <div className="text-muted small text-uppercase fw-bold mb-1">Remaining Capacity</div>
-                              {loadingRemaining ? (
-                                <Spinner size="sm" />
-                              ) : (
-                                <div className={`fw-bold ${remainingQty === 0 ? "text-danger" : "text-success"}`}>
-                                  {remainingQty !== null ? `${remainingQty} pcs` : "—"}
-                                </div>
-                              )}
+                            <div className="text-slate-500 text-xs font-bold uppercase mb-1">PO Status</div>
+                            <StatusBadge status={selectedWeeklyProg.productionOrder?.status || selectedWeeklyProg.status} />
                           </div>
                           <div>
-                              <div className="text-muted small text-uppercase fw-bold mb-1">Week</div>
-                              <div className="small fw-medium">
-                                {selectedWeeklyProg.weekStartDate?.split("T")[0]} → {selectedWeeklyProg.weekEndDate?.split("T")[0]}
-                              </div>
+                            <div className="text-slate-500 text-xs font-bold uppercase mb-1">PO Target Qty</div>
+                            <div className="font-bold text-slate-800">{selectedWeeklyProg.productionOrder?.targetQty || "—"} pcs</div>
                           </div>
                           <div>
-                              <div className="text-muted small text-uppercase fw-bold mb-1">PO Status</div>
-                              <StatusBadge status={selectedWeeklyProg.productionOrder?.status || selectedWeeklyProg.status} />
-                          </div>
-                          <div>
-                              <div className="text-muted small text-uppercase fw-bold mb-1">PO Target Qty</div>
-                              <div className="fw-bold">{selectedWeeklyProg.productionOrder?.targetQty || "—"} pcs</div>
-                          </div>
-                          <div>
-                              <div className="text-muted small text-uppercase fw-bold mb-1">Produced So Far</div>
-                              <div className="fw-bold">{selectedWeeklyProg.productionOrder?.producedQty || 0} pcs</div>
+                            <div className="text-slate-500 text-xs font-bold uppercase mb-1">Produced So Far</div>
+                            <div className="font-bold text-slate-800">{selectedWeeklyProg.productionOrder?.producedQty || 0} pcs</div>
                           </div>
                         </div>
                       </div>
@@ -521,12 +520,11 @@ const DailyPlanCreate: React.FC = () => {
 
                     {/* Machine */}
                     <div>
-                      <label className="form-label fw-bold small text-muted text-uppercase mb-1">
-                        Machine <span className="text-danger">*</span>
+                      <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
+                        Machine <span className="text-red-500">*</span>
                       </label>
                       <select
-                        className="form-select"
-                        style={{ height: "44px", borderRadius: "8px" }}
+                        className="w-full h-11 px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                         required
                         value={machineId}
                         onChange={(e) => setMachineId(e.target.value)}
@@ -538,65 +536,61 @@ const DailyPlanCreate: React.FC = () => {
                           </option>
                         ))}
                       </select>
-                      {formErrors.machineId && <div className="text-danger small mt-1">{formErrors.machineId}</div>}
+                      {formErrors.machineId && <div className="text-red-500 text-xs mt-1">{formErrors.machineId}</div>}
                     </div>
 
                     {/* ─── Machine OEE Panel ─────────────────────────────────── */}
                     {machineId && (
                       <div className="md:col-span-2">
                         {loadingOee ? (
-                          <div className="d-flex align-items-center gap-2 py-2 text-muted small">
-                            <span className="spinner-border spinner-border-sm" />
+                          <div className="flex items-center gap-2 py-2 text-slate-500 text-sm">
+                            <div className="inline-block w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin"></div>
                             Loading machine OEE...
                           </div>
                         ) : machineOeeSummary ? (
-                          <div className="rounded-3 p-3" style={{ background: "#f8faff", border: "1px solid #bfdbfe" }}>
-                            <div className="d-flex align-items-center justify-content-between mb-2">
-                              <span className="fw-bold small" style={{ color: "#1e40af" }}>
-                                <FaIndustry className="me-1" />
+                          <div className="rounded-xl p-4 bg-blue-50 border border-blue-200">
+                            <div className="flex items-center justify-between mb-3">
+                              <span className="font-bold text-sm text-blue-800 flex items-center">
+                                <FaIndustry className="mr-2" />
                                 {machineOeeSummary.machineName} — Today's OEE
                               </span>
-                              <span className="badge" style={{
-                                background: machineOeeSummary.machineStatus === 'RUNNING' ? '#dcfce7' : machineOeeSummary.machineStatus === 'BREAKDOWN' ? '#fee2e2' : '#f3f4f6',
-                                color: machineOeeSummary.machineStatus === 'RUNNING' ? '#166534' : machineOeeSummary.machineStatus === 'BREAKDOWN' ? '#991b1b' : '#374151',
-                                fontSize: '10px', fontWeight: '700', padding: '4px 8px', borderRadius: '12px'
-                              }}>
+                              <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${machineOeeSummary.machineStatus === 'RUNNING' ? 'bg-green-100 text-green-800' : machineOeeSummary.machineStatus === 'BREAKDOWN' ? 'bg-red-100 text-red-800' : 'bg-slate-100 text-slate-700'}`}>
                                 {machineOeeSummary.machineStatus === 'RUNNING' ? '● ' : '○ '}{machineOeeSummary.machineStatus || 'IDLE'}
                               </span>
                             </div>
-                            <div className="row g-2">
+                            <div className="grid grid-cols-4 gap-2">
                               {machineOeeSummary.oeeToday ? (
                                 <>
-                                  <div className="col-3 text-center">
-                                    <div style={{ fontSize: '18px', fontWeight: '800', color: '#1d4ed8' }}>
+                                  <div className="text-center">
+                                    <div className="text-lg font-extrabold text-blue-700">
                                       {machineOeeSummary.oeeToday.oeePercent}%
                                     </div>
-                                    <div className="text-muted" style={{ fontSize: '10px' }}>OEE</div>
+                                    <div className="text-slate-500 text-[10px] uppercase">OEE</div>
                                   </div>
-                                  <div className="col-3 text-center">
-                                    <div style={{ fontSize: '14px', fontWeight: '700', color: '#15803d' }}>
+                                  <div className="text-center">
+                                    <div className="text-sm font-bold text-green-700">
                                       {machineOeeSummary.oeeToday.availability}%
                                     </div>
-                                    <div className="text-muted" style={{ fontSize: '10px' }}>Availability</div>
+                                    <div className="text-slate-500 text-[10px] uppercase">Availability</div>
                                   </div>
-                                  <div className="col-3 text-center">
-                                    <div style={{ fontSize: '14px', fontWeight: '700', color: '#b45309' }}>
+                                  <div className="text-center">
+                                    <div className="text-sm font-bold text-amber-700">
                                       {machineOeeSummary.oeeToday.performance}%
                                     </div>
-                                    <div className="text-muted" style={{ fontSize: '10px' }}>Performance</div>
+                                    <div className="text-slate-500 text-[10px] uppercase">Performance</div>
                                   </div>
-                                  <div className="col-3 text-center">
-                                    <div style={{ fontSize: '14px', fontWeight: '700', color: '#7c3aed' }}>
+                                  <div className="text-center">
+                                    <div className="text-sm font-bold text-purple-700">
                                       {machineOeeSummary.oeeToday.quality}%
                                     </div>
-                                    <div className="text-muted" style={{ fontSize: '10px' }}>Quality</div>
+                                    <div className="text-slate-500 text-[10px] uppercase">Quality</div>
                                   </div>
                                 </>
                               ) : (
-                                <div className="col-12 text-center text-muted small">No production logged today — OEE will appear after first hourly entry</div>
+                                <div className="col-span-4 text-center text-slate-500 text-sm py-2">No production logged today — OEE will appear after first hourly entry</div>
                               )}
                             </div>
-                            <div className="d-flex gap-3 mt-2" style={{ fontSize: '11px', color: '#6b7280' }}>
+                            <div className="flex gap-4 mt-3 text-xs text-slate-500 justify-center border-t border-blue-200/50 pt-2">
                               <span>📋 Today: {machineOeeSummary.todayPlannedHours}h planned</span>
                               <span>⏱ Downtime: {machineOeeSummary.downtimeToday} min</span>
                               <span>🔄 Active orders: {machineOeeSummary.runningOrdersCount}</span>
@@ -608,12 +602,11 @@ const DailyPlanCreate: React.FC = () => {
 
                     {/* Shift */}
                     <div>
-                      <label className="form-label fw-bold small text-muted text-uppercase mb-1">
-                        Shift <span className="text-danger">*</span>
+                      <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
+                        Shift <span className="text-red-500">*</span>
                       </label>
                       <select
-                        className="form-select"
-                        style={{ height: "44px", borderRadius: "8px" }}
+                        className="w-full h-11 px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                         required
                         value={shiftId}
                         onChange={(e) => setShiftId(e.target.value)}
@@ -629,14 +622,14 @@ const DailyPlanCreate: React.FC = () => {
                           );
                         })}
                       </select>
-                      {formErrors.shiftId && <div className="text-danger small mt-1">{formErrors.shiftId}</div>}
+                      {formErrors.shiftId && <div className="text-red-500 text-xs mt-1">{formErrors.shiftId}</div>}
 
                       {/* Shift hours info */}
                       {selectedShiftInfo && (
-                        <div className="mt-1 d-flex align-items-center gap-2 text-muted small">
+                        <div className="mt-2 flex items-center gap-2 text-slate-500 text-xs">
                           <FaClock size={12} />
                           {selectedShiftInfo.startTime} → {selectedShiftInfo.endTime} &nbsp;|&nbsp;
-                          <strong className="text-dark">
+                          <strong className="text-slate-800">
                             {computeShiftHours(selectedShiftInfo.startTime, selectedShiftInfo.endTime)} hrs auto-filled
                           </strong>
                         </div>
@@ -646,10 +639,9 @@ const DailyPlanCreate: React.FC = () => {
                     {/* Status (only for edit) */}
                     {isEdit && (
                       <div>
-                        <label className="form-label fw-bold small text-muted text-uppercase mb-1">Status</label>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Status</label>
                         <select
-                          className="form-select"
-                          style={{ height: "44px", borderRadius: "8px" }}
+                          className="w-full h-11 px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                           value={status}
                           onChange={(e) => setStatus(e.target.value)}
                         >
@@ -718,17 +710,16 @@ const DailyPlanCreate: React.FC = () => {
 
                     {/* Priority — auto-filled from PO */}
                     <div>
-                      <label className="form-label fw-bold small text-muted text-uppercase mb-1">
+                      <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
                         Priority
                         {selectedWeeklyProg?.productionOrder?.priority && (
-                          <span className="ms-2 text-success fw-normal" style={{ fontSize: "10px" }}>
-                            <FaCheckCircle className="me-1" />auto from PO
+                          <span className="ml-2 text-green-600 font-normal text-[10px] inline-flex items-center">
+                            <FaCheckCircle className="mr-1" />auto from PO
                           </span>
                         )}
                       </label>
                       <select
-                        className="form-select"
-                        style={{ height: "44px", borderRadius: "8px" }}
+                        className="w-full h-11 px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                         value={priority}
                         onChange={(e) => setPriority(e.target.value)}
                       >
@@ -741,11 +732,10 @@ const DailyPlanCreate: React.FC = () => {
 
                     {/* Remarks */}
                     <div className="md:col-span-2">
-                      <label className="form-label fw-bold small text-muted text-uppercase mb-1">Remarks</label>
+                      <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Remarks</label>
                       <textarea
-                        className="form-control"
+                        className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
                         rows={3}
-                        style={{ borderRadius: "8px" }}
                         value={remarks}
                         onChange={(e) => setRemarks(e.target.value)}
                         placeholder="Optional notes for this daily production plan..."
@@ -843,16 +833,16 @@ const DailyPlanCreate: React.FC = () => {
 
                     {/* Capacity Warning */}
                     {overCapacity && (
-                      <Alert variant="danger" className="py-2 px-3 mb-0 small">
-                        <FaExclamationTriangle className="me-1" />
-                        Planned qty exceeds the remaining capacity of <strong>{remainingQty} pcs</strong>.
-                      </Alert>
+                      <div className="py-2 px-3 rounded text-red-800 bg-red-100 border border-red-200 text-xs flex items-center">
+                        <FaExclamationTriangle className="mr-2" />
+                        Planned qty exceeds the remaining capacity of <strong className="ml-1">{remainingQty} pcs</strong>.
+                      </div>
                     )}
 
                     {remainingQty === 0 && !overCapacity && (
-                      <Alert variant="warning" className="py-2 px-3 mb-0 small">
+                      <div className="py-2 px-3 rounded text-amber-800 bg-amber-100 border border-amber-200 text-xs">
                         No remaining capacity on this weekly program.
-                      </Alert>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -862,26 +852,22 @@ const DailyPlanCreate: React.FC = () => {
                   <div className="flex flex-col gap-2">
                     <button
                       type="submit"
-                      className="btn text-white w-100 fw-bold py-2 rounded-3"
-                      style={{
-                        backgroundColor: "var(--color-primary, #003428)",
-                        borderColor: "var(--color-primary, #003428)",
-                        fontSize: "15px"
-                      }}
+                      className="w-full flex justify-center items-center py-2.5 rounded-lg text-white font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      style={{ backgroundColor: "var(--color-primary, #003428)" }}
                       disabled={isSubmitting}
                     >
                       {isSubmitting ? (
-                        <><Spinner size="sm" className="me-2" />Saving...</>
+                        <><div className="inline-block w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin"></div>Saving...</>
                       ) : (
-                        <><FaSave className="me-2" />{isEdit ? "Update Plan" : "Create Daily Plan"}</>
+                        <><FaSave className="mr-2" />{isEdit ? "Update Plan" : "Create Daily Plan"}</>
                       )}
                     </button>
                     <button
                       type="button"
-                      className="btn btn-light w-100 rounded-3"
+                      className="w-full flex justify-center items-center py-2.5 rounded-lg text-slate-700 bg-slate-100 hover:bg-slate-200 font-semibold transition-colors"
                       onClick={() => navigate("/daily-machine-planning")}
                     >
-                      <FaArrowLeft className="me-2" />Cancel
+                      <FaArrowLeft className="mr-2" />Cancel
                     </button>
                   </div>
                 </div>
