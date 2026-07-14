@@ -448,7 +448,7 @@ const ProductCreatePage: React.FC = () => {
 
     const storeOptions = useMemo(() => [
         { value: "", label: "-- Select Store --" },
-        ...stores.map(s => ({ value: String(s.storeId), label: `${s.storeName} (${s.storeCode || ''})` })),
+        ...stores.map(s => ({ value: String(s.storeId), label: s.storeCode ? `${s.storeName} (${s.storeCode})` : s.storeName })),
     ], [stores]);
 
     // ─── Render ───────────────────────────────────────────────────────────

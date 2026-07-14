@@ -168,7 +168,7 @@ const ProductEdit: React.FC = () => {
             displayName: productData.displayName || "",
             itemCode: productData.itemCode || "",
             categoryId: productData.categoryId ? String(productData.categoryId) : "",
-            uomId: productData.uomId ? String(productData.uomId) : "",
+            uomId: productData.uom?.code || productData.uom?.uomCode || (productData.uomId ? String(productData.uomId) : ""),
             capacityLitres: productData.capacityLitres != null ? String(productData.capacityLitres) : "",
             weightPerPiece: productData.weightPerPiece != null ? String(productData.weightPerPiece) : "",
             bundleQty: productData.bundleQty != null ? String(productData.bundleQty) : "",
@@ -523,7 +523,7 @@ const ProductEdit: React.FC = () => {
     const storeOptions = useMemo(
         () => [
             { value: "", label: "-- Select Store --" },
-            ...stores.map((s) => ({ value: String(s.storeId), label: `${s.storeName} (${s.storeCode || ""})` })),
+            ...stores.map((s) => ({ value: String(s.storeId), label: s.storeCode ? `${s.storeName} (${s.storeCode})` : s.storeName })),
         ],
         [stores]
     );

@@ -503,13 +503,16 @@ async function main() {
   ];
 
   for (const department of departments) {
-    await prisma.department.upsert({
-      where: {
-        code: department.code,
-      },
-      update: {},
-      create: department,
+    const existing = await prisma.department.findFirst({
+      where: { name: department.name },
     });
+    if (!existing) {
+      await prisma.department.create({
+        data: {
+          name: department.name,
+        },
+      });
+    }
   }
 
   // =========================

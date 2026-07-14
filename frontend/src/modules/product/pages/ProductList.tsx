@@ -153,7 +153,12 @@ const ProductList: React.FC = () => {
                                                 <td className="master-data-cell">{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</td>
                                                 <td className="master-data-cell">{product.productCode}</td>
                                                 <td className="master-data-cell">{product.productName}</td>
-                                                <td className="master-data-cell">{product.uom?.code || product.uom?.uomCode || "N/A"}</td>
+                                                <td className="master-data-cell">
+                                                    {(() => {
+                                                        const code = product.uom?.code || product.uom?.uomCode;
+                                                        return code?.toLowerCase() === 'ea' ? 'pcs' : (code || "N/A");
+                                                    })()}
+                                                </td>
                                                 <td className="master-data-cell">{product.category?.name || product.category?.categoryName || "N/A"}</td>
                                                 {/* <td className="master-data-cell">{product.subCategory?.name || product.subCategory?.subCategoryName || "N/A"}</td> */}
                                                 {/* <td className="master-data-cell">
@@ -226,7 +231,10 @@ const ProductList: React.FC = () => {
                             fields: [
                                 { label: "Product Name", value: selectedProduct.productName },
                                 { label: "Product Code", value: selectedProduct.productCode },
-                                { label: "UOM", value: selectedProduct.uom?.code || selectedProduct.uom?.uomCode || "N/A" },
+                                { label: "UOM", value: (() => {
+                                    const code = selectedProduct.uom?.code || selectedProduct.uom?.uomCode;
+                                    return code?.toLowerCase() === 'ea' ? 'pcs' : (code || "N/A");
+                                })() },
                                 { label: "Category", value: selectedProduct.category?.name || selectedProduct.category?.categoryName || "N/A" },
                                 { label: "Class", value: selectedProduct.subCategory?.name || selectedProduct.subCategory?.subCategoryName || "N/A" },
                                 { label: "MRP", value: selectedProduct.pricing?.length > 0 && selectedProduct.pricing[0].mrp != null ? `₹${selectedProduct.pricing[0].mrp}` : "N/A" },

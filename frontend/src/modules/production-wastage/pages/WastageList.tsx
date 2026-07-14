@@ -162,7 +162,7 @@ const WastageList: React.FC = () => {
                       <td className="master-data-cell">
                         <StatusBadge status={item.wastageType} />
                       </td>
-                      <td className="master-data-cell fw-bold">{item.quantity} {item.uom}</td>
+                      <td className="master-data-cell fw-bold">{item.quantity} {item.uom && item.uom.toUpperCase() === "PCS" ? "kg" : String(item.uom || "kg").toLowerCase()}</td>
                       <td className="master-data-cell text-muted">
                         {item.reason ? (
                           <span

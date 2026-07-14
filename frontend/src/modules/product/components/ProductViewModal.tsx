@@ -101,7 +101,12 @@ const ProductViewModal: React.FC<ProductViewModalProps> = ({
                         <Col md={4}>
                             <div className="info-item">
                                 <label>UOM</label>
-                                <p>{product.uom?.name || "N/A"}</p>
+                                <p>
+                                    {(() => {
+                                        const code = product.uom?.code || (product.uom as any)?.uomCode;
+                                        return code?.toLowerCase() === 'ea' ? 'pcs' : (product.uom?.name || "N/A");
+                                    })()}
+                                </p>
                             </div>
                         </Col>
 
