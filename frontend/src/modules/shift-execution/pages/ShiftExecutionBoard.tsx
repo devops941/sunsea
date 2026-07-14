@@ -134,6 +134,7 @@ const ShiftExecutionBoard: React.FC = () => {
       (po) => 
         ((po as any).machineId === selectedMachineId || !selectedMachineId) &&
         ((po as any).shiftId === selectedShiftId || !selectedShiftId) &&
+        po.status !== "POST_PRODUCTION" &&
         po.status !== "COMPLETED" &&
         po.status !== "CANCELLED"
     );
@@ -151,7 +152,7 @@ const ShiftExecutionBoard: React.FC = () => {
       if (newStatus === "IN PROGRESS") {
         payload.actualStartDateTime = new Date().toISOString();
         toast.info("Shift production started!");
-      } else if (newStatus === "COMPLETED") {
+      } else if (newStatus === "POST_PRODUCTION") {
         payload.actualEndDateTime = new Date().toISOString();
         // sum actuals to update order's produced qty
         let sumActual = 0;
@@ -167,7 +168,7 @@ const ShiftExecutionBoard: React.FC = () => {
         payload.producedQty = sumActual;
         payload.rejectedQty = sumReject;
         payload.scrapQty = sumScrap;
-        toast.success("Shift production completed! Produced goods updated.");
+        toast.success("Shift production finishing phase initiated! Status updated to Post-Production.");
       }
 
       await dispatch(updateProductionOrder({ id: Number(activeOrderId), data: payload })).unwrap();
@@ -493,10 +494,10 @@ const ShiftExecutionBoard: React.FC = () => {
                         <FaPlay size={14} /> Start Shift / Resume
                       </Button>
                       <Button 
-                        variant={activeOrder.status === "COMPLETED" ? "success" : "outline-success"}
-                        onClick={() => handleStatusChange("COMPLETED")}
+                        variant={activeOrder.status === "POST_PRODUCTION" ? "success" : "outline-success"}
+                        onClick={() => handleStatusChange("POST_PRODUCTION")}
                         className="d-flex align-items-center justify-content-center gap-2 py-2 fw-semibold"
-                        disabled={activeOrder.status === "COMPLETED"}
+                        disabled={activeOrder.status === "POST_PRODUCTION" || activeOrder.status === "COMPLETED"}
                       >
                         <FaCheck size={14} /> Complete Shift / Finish
                       </Button>

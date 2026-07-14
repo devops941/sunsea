@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
-export const createCategorySchema = z.object({
+// CAT-004 fix: wrapped in body: z.object({}) so validateMiddleware can parse it correctly
+const categoryBodySchema = z.object({
   categoryCode: z
     .string()
     .min(2, 'Category code is required')
@@ -16,11 +17,18 @@ export const createCategorySchema = z.object({
   isActive: z.boolean().optional(),
 });
 
-export const updateCategorySchema =
-  createCategorySchema.partial();
+export const createCategorySchema = z.object({
+  body: categoryBodySchema,
+});
 
-export type CreateCategoryInput =
-  z.infer<typeof createCategorySchema>;
+export const updateCategorySchema = z.object({
+  body: categoryBodySchema.partial(),
+  params: z.object({ id: z.string().regex(/^\d+$/, 'Invalid category id') }),
+});
 
-export type UpdateCategoryInput =
-  z.infer<typeof updateCategorySchema>;
+export const categoryIdSchema = z.object({
+  params: z.object({ id: z.string().regex(/^\d+$/, 'Invalid category id') }),
+});
+
+export type CreateCategoryInput = z.infer<typeof createCategorySchema>['body'];
+export type UpdateCategoryInput = z.infer<typeof updateCategorySchema>['body'];

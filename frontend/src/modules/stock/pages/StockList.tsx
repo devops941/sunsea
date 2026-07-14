@@ -191,7 +191,7 @@ const StockList: React.FC = () => {
                         {
                             header: "STORE / LOCATION",
                             render: (item) => {
-                                const locCode = (item as any).storeLocation?.locationCode || item.locationId || "-";
+                                const locCode = (item as any).storeLocation?.locationCode || (item as any).store?.location?.locationCode || (item as any).store?.location?.locationName || (item as any).store?.locationDesc || item.locationId || "-";
                                 return (
                                     <div className="flex flex-col">
                                         <span className="font-medium text-slate-700">{item.store?.storeName || item.storeId || "-"}</span>
@@ -278,7 +278,7 @@ const StockList: React.FC = () => {
                             { label: "Reorder Level", value: ((selectedItem as any).reorderLevel || selectedItem.rawMaterial?.reorderLevel) != null ? `${(selectedItem as any).reorderLevel || selectedItem.rawMaterial?.reorderLevel} ${(selectedItem as any).baseUom || selectedItem.rawMaterial?.baseUom || ""}` : "N/A" },
                             { label: "Minimum Stock", value: ((selectedItem as any).minimumStock || selectedItem.rawMaterial?.minimumStock) != null ? formatExportQty((selectedItem as any).minimumStock || selectedItem.rawMaterial?.minimumStock, (selectedItem as any).baseUom || selectedItem.rawMaterial?.baseUom || "") : "N/A" },
                             { label: "Store", value: selectedItem.store?.storeName || selectedItem.storeId || "N/A" },
-                            { label: "Store Location", value: (selectedItem as any).storeLocation?.locationCode || selectedItem.locationId || "N/A" },
+                            { label: "Store Location", value: (selectedItem as any).storeLocation?.locationCode || (selectedItem as any).store?.location?.locationCode || (selectedItem as any).store?.location?.locationName || (selectedItem as any).store?.locationDesc || selectedItem.locationId || "N/A" },
                             { label: "Batch No", value: selectedItem.batchNo || "N/A" },
                             { label: "Physical Stock", value: formatExportQty(selectedItem.onHandQty ?? 0, (selectedItem as any).baseUom || selectedItem.rawMaterial?.baseUom || "") },
                             { label: "Reserved Stock", value: formatExportQty(selectedItem.reservedQty ?? 0, (selectedItem as any).baseUom || selectedItem.rawMaterial?.baseUom || "") },

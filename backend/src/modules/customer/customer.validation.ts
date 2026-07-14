@@ -46,7 +46,8 @@ export const createCustomerSchema = z.object({
   shippingState: z.string().optional().nullable(),
   shippingPincode: z.string().optional().nullable(),
 
-  stateCode: z.string().length(2),
+  // BUG-CUST-005 fix: added user-friendly error message to stateCode length validation
+  stateCode: z.string().length(2, "State code must be exactly 2 digits (e.g. 33 for Tamil Nadu)"),
 
   creditLimit: z.number().optional(),
   creditDays: z.number().optional(),

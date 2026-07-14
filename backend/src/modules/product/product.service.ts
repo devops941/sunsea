@@ -24,7 +24,7 @@ function toIdArray(value: any): number[] {
 
 class ProductService {
   private async resolveUomId(uomInput: any): Promise<number | null> {
-    console.log('=== RESOLVE UOM ===', uomInput);
+
     if (!uomInput) return null;
 
     // If it's already a valid number ID
@@ -511,6 +511,13 @@ class ProductService {
 
   async delete(id: bigint) {
     await this.findById(id);
+    const [salesCount, stockCount] = await Promise.all([
+      prisma.salesOrderItem.count({ where: { productId: id } }),
+      prisma.finishedGoodsStock.count({ where: { productId: id } })
+    ]);
+    if (salesCount > 0 || stockCount > 0) {
+      throw new Error("Cannot delete product as it is referenced in sales orders or stock");
+    }
     return prisma.product.delete({ where: { id } });
   }
 
@@ -524,7 +531,7 @@ class ProductService {
     }
 
     const lastId = lastItem.productCode;
-    const match = lastId.match(/\d+/);
+    const match = lastId.match(/\d+$/);
     if (!match) {
       return lastId + "001";
     }

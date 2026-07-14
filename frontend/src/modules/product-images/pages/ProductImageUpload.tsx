@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Container, Row, Col, Card, Spinner } from "react-bootstrap";
+import { Container, Row, Col, Card } from "react-bootstrap";
 import { FaSave, FaTrash, FaCheckCircle, FaStar } from "react-icons/fa";
 import { toast } from "react-toastify";
 // adjust path to match where this file actually lives
@@ -226,7 +226,7 @@ const ProductImageUpload: React.FC = () => {
                             </h4>
                             {loading ? (
                                 <div className="text-center p-5">
-                                    <Spinner animation="border" variant="primary" />
+                                    <div className="animate-spin rounded-full border-b-2 border-indigo-600 h-8 w-8"></div>
                                 </div>
                             ) : activeImages.length > 0 ? (
                                 <Row className="g-3">

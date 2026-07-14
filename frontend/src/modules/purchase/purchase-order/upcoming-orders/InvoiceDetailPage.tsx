@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Container, Row, Col, Spinner } from "react-bootstrap";
+import { Container, Row, Col } from "react-bootstrap";
 import { FaPlus, FaTrash, FaArrowLeft, FaBoxOpen, FaFileInvoice, FaMapMarkerAlt, FaTruck, FaUser, FaCreditCard, FaHashtag } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -513,7 +513,7 @@ const InvoiceDetailPage: React.FC = () => {
     if (loadingPOs) {
         return (
             <div className="inner-container d-flex justify-content-center align-items-center" style={{ minHeight: "300px" }}>
-                <Spinner animation="border" />
+                <div className="animate-spin rounded-full border-b-2 border-indigo-600 h-8 w-8"></div>
             </div>
         );
     }
@@ -540,7 +540,7 @@ const InvoiceDetailPage: React.FC = () => {
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                         <div>
                             <SelectInput label="PO (Optional)" name="poId" value={form.poId} options={poOptions} onChange={handleChange} />
-                            {loadingPO && <div className="text-muted small mt-1"><Spinner size="sm" /> Loading…</div>}
+                            {loadingPO && <div className="text-muted small mt-1"><div className="animate-spin rounded-full border-b-2 border-indigo-600 h-4 w-4 border-b-2"></div> Loading…</div>}
                         </div>
                         <div>
                             <TextInput label="GRN Number" name="grnNumber" value={form.grnNumber} onChange={handleChange} disabled />

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { FaSearch, FaPlus } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -22,7 +22,8 @@ const StorageStoreList: React.FC = () => {
     const navigate = useNavigate();
     const dispatch = useAppDispatch();
 
-    const { data, loading, error } = useAppSelector(state => state.stores);
+    const { data, loading, error, totalPages } = useAppSelector(state => state.stores);
+    useEffect(() => { if (error) toast.error(error); }, [error]);
     const [storeType, setStoreType] = useState("");
     const storeTypeOptions = [
         { label: "All Store Types", value: "" },
@@ -61,20 +62,8 @@ const StorageStoreList: React.FC = () => {
         setCurrentPage(1);
     };
 
-    const filteredData = useMemo(() => {
-        return data
-            .filter(item =>
-                item.storeId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                item.storeName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                (item as any).location?.locationName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                item.storeTypeRef?.name?.toLowerCase().includes(searchTerm.toLowerCase())
-            )
-            .sort((a, b) => a.storeId.localeCompare(b.storeId));
-    }, [data, searchTerm]);
-
-    const totalPages = Math.ceil(filteredData.length / ITEMS_PER_PAGE);
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-    const paginatedData = filteredData.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+    const paginatedData = data;
     
     const handleOpenView = useCallback((item: Store) => {
         setSelectedItem(item);

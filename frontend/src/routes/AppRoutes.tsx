@@ -7,7 +7,7 @@ import PublicRoute from "./PublicRoute";
 
 
 const Dashboard = lazy(() => import("../modules/dashboard/pages/DashboardPage"));
-const OeeDashboard = lazy(() => import("../modules/dashboard/pages/OeeDashboard"));
+// const OeeDashboard = lazy(() => import("../modules/dashboard/pages/OeeDashboard"));
 const CompanySettings = lazy(() => import("../modules/company/pages/CompanySettings"));
 
 const OrganizationTabs = lazy(() => import("../modules/company/pages/OrganizationTabs"));
@@ -146,7 +146,7 @@ const UpdateQuatation = lazy(() => import("../modules/sales/quatation/UpdateQuat
 const SalesTabs = lazy(() => import("../modules/sales/pages/SalesTabs"));
 const PurchaseTabs = lazy(() => import("../modules/purchase/pages/PurchaseTabs"));
 
-const ExpensesList = lazy(() => import("../modules/expenses/ExpensesList"));
+// const ExpensesList = lazy(() => import("../modules/expenses/ExpensesList"));
 
 
 // Purchase Order Module
@@ -186,10 +186,6 @@ const AppRoutes = () => {
             <Route index element={<Dashboard />} />
             <Route path="/dashboard" element={<Dashboard />} />
             
-            <Route element={<ProtectedRoute permission="reports.view" />}>
-              <Route path="/oee-dashboard" element={<OeeDashboard />} />
-            </Route>
-
             <Route path="/company/edit" element={<CompanySettings />} />
             <Route path="/company/view" element={<OrganizationTabs />} />
             <Route path="/settings/company" element={<OrganizationTabs />} />
@@ -523,6 +519,11 @@ const AppRoutes = () => {
             <Route element={<ProtectedRoute permission="production_orders.view" />}>
               <Route path="/production-orders" element={<ProductionOrderTabs />} />
               <Route path="/allproduction-orders" element={<ProductionOrderTabs />} />
+              <Route path="/weekly-machine-schedules" element={<ProductionOrderTabs />} />
+              <Route path="/daily-machine-planning" element={<ProductionOrderTabs />} />
+              <Route path="/hourly-work-reports" element={<ProductionOrderTabs />} />
+              <Route path="/production-wastages" element={<ProductionOrderTabs />} />
+              <Route path="/oee-dashboard" element={<ProductionOrderTabs />} />
               {/* Approved Sales Orders Route */}
               <Route path="/approved-sales-orders" element={<ProductionOrderTabs />} />
             </Route>

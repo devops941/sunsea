@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Modal, Button, Form, Table, Spinner } from "react-bootstrap";
+import { Modal, Button, Form, Table } from "react-bootstrap";
 import { toast } from "react-toastify";
 import { productionOrderService } from "../../../services/productionOrderService";
 import { storeService } from "../../../services/storeService";
@@ -206,7 +206,7 @@ export const MaterialIssueModal: React.FC<MaterialIssueModalProps> = ({
                     <Button variant="success" type="submit" disabled={issuing}>
                         {issuing ? (
                             <>
-                                <Spinner animation="border" size="sm" className="me-2" />
+                                <div className="animate-spin rounded-full border-b-2 border-indigo-600 h-4 w-4 border-b-2 mr-2"></div>
                                 Issuing...
                             </>
                         ) : (

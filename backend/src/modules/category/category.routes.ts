@@ -4,6 +4,12 @@ import categoryController from "./category.controller";
 
 import { authMiddleware } from "../../middleware/auth.middleware";
 import { requirePermission } from "../../middleware/permission.middleware";
+import { validateMiddleware } from "../../middleware/validate.middleware";
+import {
+  createCategorySchema,
+  updateCategorySchema,
+  categoryIdSchema,
+} from "./category.validation";
 
 const router = Router();
 
@@ -23,6 +29,7 @@ router.post(
   "/",
   authMiddleware,
   requirePermission("categories.create"),
+  validateMiddleware(createCategorySchema), // CAT-004 fix: added validation middleware
   categoryController.create
 );
 
@@ -43,6 +50,7 @@ router.get(
   "/:id",
   authMiddleware,
   requirePermission("categories.view"),
+  validateMiddleware(categoryIdSchema), // CAT-004 fix: added validation middleware
   categoryController.findById
 );
 
@@ -53,6 +61,7 @@ router.put(
   "/:id",
   authMiddleware,
   requirePermission("categories.edit"),
+  validateMiddleware(updateCategorySchema), // CAT-004 fix: added validation middleware
   categoryController.update
 );
 
@@ -63,6 +72,7 @@ router.delete(
   "/:id",
   authMiddleware,
   requirePermission("categories.delete"),
+  validateMiddleware(categoryIdSchema), // CAT-004 fix: added validation middleware
   categoryController.delete
 );
 

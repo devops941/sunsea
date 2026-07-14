@@ -19,10 +19,10 @@ import DataTable from "../../../components/ui/table/DataTable";
 const ITEMS_PER_PAGE = 10;
 const locationTypeOptions = [
     { label: "All Types", value: "" },
-    { label: "Store", value: "STORE" },
-    { label: "Warehouse", value: "WAREHOUSE" },
-    { label: "Factory", value: "FACTORY" },
-    { label: "Office", value: "OFFICE" },
+    { label: "Store", value: "Store" },
+    { label: "Warehouse", value: "Warehouse" },
+    { label: "Factory", value: "Factory" },
+    { label: "Office", value: "Office" },
 ];
 
 const LocationList: React.FC = () => {
@@ -30,6 +30,7 @@ const LocationList: React.FC = () => {
     const dispatch = useAppDispatch();
 
     const { data, loading, error, totalPages } = useAppSelector(state => state.locations);
+    useEffect(() => { if (error) toast.error(error); }, [error]);
 
     const [searchTerm, setSearchTerm] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
@@ -94,9 +95,7 @@ const LocationList: React.FC = () => {
         }
     };
 
-    if (error) {
-        toast.error(error);
-    }
+    
 
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
 

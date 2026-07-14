@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
-import { Container, Row, Col, Spinner } from "react-bootstrap";
+import { Container, Row, Col } from "react-bootstrap";
 import { FaSearch, FaPlus, FaChevronLeft, FaChevronRight } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -86,7 +86,7 @@ const RawMaterialList: React.FC = () => {
         { header: "ID", accessor: (item: any) => item.rawMaterialId || "-" },
         { header: "CATEGORY", accessor: (item: any) => item.category?.name || item.categoryId || "-" },
         { header: "STORE", accessor: (item: any) => item.store?.storeName || item.storeId || "-" },
-        { header: "LOCATION", accessor: (item: any) => item.storeLocation?.locationCode || "-" },
+        { header: "LOCATION", accessor: (item: any) => item.storeLocation?.locationCode || item.store?.location?.locationCode || item.store?.location?.locationName || item.store?.locationDesc || item.locationId || "-" },
         { header: "PHYSICAL STOCK", accessor: (item: any) => `${item.onHandQty ?? 0} ${(item.baseUom || "").split(',')[0]}` },
         { header: "MIN STOCK", accessor: (item: any) => `${item.minimumStock ?? 0} ${(item.baseUom || "").split(',')[0]}` },
         { header: "RESERVED", accessor: (item: any) => `${item.reservedQty ?? 0} ${(item.baseUom || "").split(',')[0]}` },
@@ -198,7 +198,7 @@ const RawMaterialList: React.FC = () => {
                                 {loading ? (
                                     <tr>
                                         <td colSpan={10} className="text-center p-4">
-                                            <Spinner animation="border" variant="primary" />
+                                            <div className="animate-spin rounded-full border-b-2 border-indigo-600 h-8 w-8"></div>
                                         </td>
                                     </tr>
                                 ) : paginatedData.length > 0 ? (
@@ -215,7 +215,7 @@ const RawMaterialList: React.FC = () => {
                                             <td className="master-data-cell">
                                                 <div>{item.store?.storeName || item.storeId || "-"}</div>
                                                 <span className="text-muted" style={{ fontSize: "0.82rem" }}>
-                                                    Loc: {item.storeLocation?.locationCode || "-"}
+                                                    Loc: {item.storeLocation?.locationCode || (item.store as any)?.location?.locationCode || (item.store as any)?.location?.locationName || (item.store as any)?.locationDesc || item.locationId || "-"}
                                                 </span>
                                             </td>
                                             <td className="master-data-cell">
@@ -311,7 +311,7 @@ const RawMaterialList: React.FC = () => {
                                 { label: "Unit Price (₹)", value: selectedItem.unitPrice !== null && selectedItem.unitPrice !== undefined ? String(selectedItem.unitPrice) : "N/A" },
                                 { label: "Average Cost (₹)", value: selectedItem.avgCost !== null && selectedItem.avgCost !== undefined ? String(selectedItem.avgCost) : "N/A" },
                                 { label: "Store", value: selectedItem.store?.storeName || selectedItem.storeId || "N/A" },
-                                { label: "Store Location", value: selectedItem.storeLocation?.locationCode || "N/A" },
+                                { label: "Store Location", value: selectedItem.storeLocation?.locationCode || (selectedItem.store as any)?.location?.locationCode || (selectedItem.store as any)?.location?.locationName || (selectedItem.store as any)?.locationDesc || selectedItem.locationId || "N/A" },
                                 { label: "Batch No", value: selectedItem.batchNo || "N/A" },
                                 { label: "Physical Stock", value: `${selectedItem.onHandQty ?? 0} ${selectedItem.baseUom?.split(',')[0]}` },
                                 { label: "Reserved Stock", value: `${selectedItem.reservedQty ?? 0} ${selectedItem.baseUom?.split(',')[0]}` },

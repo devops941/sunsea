@@ -321,14 +321,12 @@ const DailyPlanCreate: React.FC = () => {
         if (!errors[path]) errors[path] = issue.message;
       });
       setFormErrors(errors);
-      toast.error("Please fix the validation errors.");
-      return;
+        return;
     }
 
     if (!isEdit && overCapacity) {
       setFormErrors({ plannedQty: `Cannot exceed weekly remaining capacity (${remainingQty} pcs)` });
-      toast.error("Planned Quantity exceeds remaining capacity.");
-      return;
+        return;
     }
 
     setFormErrors({});

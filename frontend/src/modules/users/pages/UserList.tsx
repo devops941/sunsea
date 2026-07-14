@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Container, Row, Col, Modal, Spinner } from "react-bootstrap";
+import { Container, Row, Col, Modal } from "react-bootstrap";
 import { FaSearch, FaChevronLeft, FaChevronRight, FaSave } from "react-icons/fa";
 import { toast } from "react-toastify";
 import ViewButton from "../../../components/ui/viewbutton/ViewButton";
@@ -140,7 +140,7 @@ const UserList: React.FC = () => {
                     <div className="master-table-body">
                         {loading && users.length === 0 ? (
                             <div className="text-center p-5">
-                                <Spinner animation="border" variant="primary" />
+                                <div className="animate-spin rounded-full border-b-2 border-indigo-600 h-8 w-8"></div>
                             </div>
                         ) : (
                             <table className="master-data-table">

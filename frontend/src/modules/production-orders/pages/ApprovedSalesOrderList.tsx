@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from "react";
-import { Container, Row, Col, Spinner, Alert, Modal } from "react-bootstrap";
+import { Container, Row, Col, Alert, Modal } from "react-bootstrap";
 import { FaPlus, FaSearch } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -150,7 +150,7 @@ const ApprovedSalesOrderList: React.FC = () => {
                                 {loading ? (
                                     <tr>
                                         <td colSpan={10} className="text-center p-4">
-                                            <Spinner animation="border" size="sm" className="me-2" />
+                                            <div className="animate-spin rounded-full border-b-2 border-indigo-600 h-4 w-4 border-b-2 mr-2"></div>
                                             Loading approved sales orders...
                                         </td>
                                     </tr>
@@ -239,7 +239,7 @@ const ApprovedSalesOrderList: React.FC = () => {
                                                     <td className="master-data-cell">{item.quantity} {(item.product as any)?.uom?.name || "PCS"}</td>
                                                     <td className="master-data-cell">
                                                         {loadingStages ? (
-                                                            <Spinner animation="border" size="sm" />
+                                                            <div className="animate-spin rounded-full border-b-2 border-indigo-600 h-4 w-4 border-b-2"></div>
                                                         ) : (
                                                             <StatusBadge status={orderProductionStages[item.productId.toString()] || 'NOT_STARTED'} />
                                                         )}

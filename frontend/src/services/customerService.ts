@@ -3,11 +3,21 @@ import config from "../api/config";
 import type { Customer, CreateCustomerDto, UpdateCustomerDto } from "../features/customer/types";
 
 export const customerService = {
-  fetchAll: async (search?: string): Promise<Customer[]> => {
+  // BUG-CUST-004 fix: added page and limit params for server-side pagination
+  fetchAll: async (params?: { search?: string; page?: number; limit?: number }): Promise<{ customers: Customer[]; total: number; page: number; totalPages: number }> => {
     const response = await apiClient.get(config.customer.base, {
-      params: { search }
+      params: {
+        search: params?.search,
+        page: params?.page ?? 1,
+        limit: params?.limit ?? 10,
+      },
     });
-    return response.data?.data || response.data;
+    const data = response.data?.data || response.data;
+    // Handle both paginated shape { customers, total, page, totalPages } and plain array (fallback)
+    if (Array.isArray(data)) {
+      return { customers: data, total: data.length, page: 1, totalPages: 1 };
+    }
+    return data;
   },
 
   fetchById: async (id: string): Promise<Customer> => {

@@ -5,10 +5,16 @@ import type { CreateCustomerDto, UpdateCustomerDto } from "../features/customer/
 
 export const useCustomers = () => {
   const dispatch = useAppDispatch();
-  const { customers, loading, error } = useAppSelector((state) => state.customers);
+  // BUG-CUST-004 fix: expose pagination metadata from state
+  const { customers, loading, error, total, page, totalPages } = useAppSelector((state) => state.customers);
 
-  const loadCustomers = useCallback((search?: string) => {
-    dispatch(fetchCustomers(search));
+  // BUG-CUST-004 fix: accept page and limit params for server-side pagination
+  const loadCustomers = useCallback((params?: { search?: string; page?: number; limit?: number } | string) => {
+    if (typeof params === "string") {
+      dispatch(fetchCustomers({ search: params }));
+    } else {
+      dispatch(fetchCustomers(params ?? {}));
+    }
   }, [dispatch]);
 
   const addCustomer = useCallback(
@@ -36,6 +42,9 @@ export const useCustomers = () => {
     customers,
     loading,
     error,
+    total,
+    page,
+    totalPages,
     loadCustomers,
     addCustomer,
     editCustomer,

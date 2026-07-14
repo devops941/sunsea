@@ -44,7 +44,8 @@ import { validatePhoneNumber } from "../../../components/ui/PhoneInput/PhoneInpu
 
 
 const supplierFormSchema = z.object({
-    companyId: z.string().uuid("Company ID must be a valid UUID"),
+    // BUG-SUP-001 fix: companyId is resolved server-side — make it optional in frontend validation
+    companyId: z.string().optional(),
     supplierCode: z.string().trim().min(1, "Supplier code is required").max(20, "Maximum 20 characters allowed"),
     legalName: z.string().trim().min(1, "Legal name is required").max(160, "Maximum 160 characters allowed"),
     displayName: z.string().trim().max(80, "Maximum 80 characters allowed").optional().nullable(),
@@ -134,9 +135,10 @@ const SupplierCreate: React.FC = () => {
     const [selectedParentCategories, setSelectedParentCategories] = useState<string[]>([]);
 
     const [formData, setFormData] = useState({
-        companyId: "d67768ba-bcde-4321-a123-bcdef9876543",
-        supplierCode: "",
-        createdByOn: user?.username || "",
+      // BUG-SUP-001 fix: companyId is now resolved server-side — no longer hardcoded here
+      companyId: "",
+      supplierCode: "",
+      createdByOn: user?.username || "",
         legalName: "",
         displayName: "",
         vendorType: "Manufacturer",
@@ -234,7 +236,8 @@ const SupplierCreate: React.FC = () => {
 
     const handleClear = () => {
         setFormData({
-            companyId: "d67768ba-bcde-4321-a123-bcdef9876543",
+            // BUG-SUP-001 fix: companyId resolved server-side
+            companyId: "",
             supplierCode: "",
             createdByOn: user?.username || "",
             legalName: "",

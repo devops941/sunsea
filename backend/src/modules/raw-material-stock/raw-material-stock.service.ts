@@ -61,7 +61,11 @@ class RawMaterialStockService {
     const stockItems = await prisma.rawMaterial.findMany({
       where: whereClause,
       include: {
-        store: true,
+        store: {
+          include: {
+            location: true
+          }
+        },
         category: true,
         storeLocation: true
       },

@@ -100,6 +100,12 @@ class StoreService {
             fullName: true,
           },
         },
+        _count: {
+          select: { 
+            rawMaterials: true,
+            finishedGoodsStocks: true,
+          },
+        },
       },
       orderBy: {
         [sortBy]: sortOrder,
@@ -141,6 +147,9 @@ class StoreService {
             fullName: true,
           },
         },
+        _count: {
+          select: { rawMaterials: true },
+        },
       },
     });
 
@@ -152,7 +161,22 @@ class StoreService {
   }
 
   async update(storeId: string, data: UpdateStoreInput, userId?: string) {
-    await this.findById(storeId);
+    const existingStore = await this.findById(storeId);
+
+    const rawMaterialCount = await prisma.rawMaterial.count({
+      where: { storeId },
+    });
+
+    const finishedGoodsCount = await prisma.finishedGoodsStock.count({
+      where: { storeId },
+    });
+
+    if (rawMaterialCount > 0 || finishedGoodsCount > 0) {
+      throw new ApiError(
+        400,
+        "Cannot update this store because it is already assigned to stock."
+      );
+    }
 
     return prisma.store.update({
       where: { storeId },
@@ -178,16 +202,30 @@ class StoreService {
       where: { storeId },
     });
 
-    if (rawMaterialCount > 0) {
+    const finishedGoodsCount = await prisma.finishedGoodsStock.count({
+      where: { storeId },
+    });
+
+    if (rawMaterialCount > 0 || finishedGoodsCount > 0) {
       throw new ApiError(
         400,
-        "Cannot delete this store because it is already assigned to a raw material."
+        "Cannot delete this store because it is already assigned to stock."
       );
     }
 
-    return prisma.store.delete({
-      where: { storeId },
-    });
+    try {
+      return await prisma.store.delete({
+        where: { storeId },
+      });
+    } catch (error: any) {
+      if (error.code === 'P2003' || (error.message && error.message.includes('foreign key constraint'))) {
+        throw new ApiError(
+          400,
+          "Cannot delete this store because it is currently in use by other records."
+        );
+      }
+      throw error;
+    }
   }
   async getNextStoreId() {
     const lastStore = await prisma.store.findFirst({

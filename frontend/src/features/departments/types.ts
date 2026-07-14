@@ -4,6 +4,9 @@ export interface Department {
   description?: string | null;
   createdAt: string;
   updatedAt: string;
+  _count?: {
+    employees: number;
+  };
 }
 
 export interface CreateDepartmentDto {

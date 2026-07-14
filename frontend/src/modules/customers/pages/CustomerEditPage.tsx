@@ -401,7 +401,8 @@ const CustomerEditPage: React.FC = () => {
                   <IndiaPhoneInput label="Mobile" name="mobile" value={formData.mobile} placeholder="98400 XXXXX" required onChange={handleChange} error={errors.mobile} />
                 </div>
                 <div>
-                  <IndiaPhoneInput label="Alt. Phone" name="altPhone" value={formData.altPhone} placeholder="98400 XXXXX" required onChange={handleChange} error={errors.altPhone} />
+                  {/* BUG-CUST-003 fix: altPhone is optional on the backend — removed required prop */}
+                  <IndiaPhoneInput label="Alt. Phone" name="altPhone" value={formData.altPhone} placeholder="98400 XXXXX" onChange={handleChange} error={errors.altPhone} />
                 </div>
                 <div>
                   <IndiaPhoneInput label="WhatsApp #" name="whatsapp" value={formData.whatsapp} placeholder="98400 XXXXX" onChange={handleChange} error={errors.whatsapp} />

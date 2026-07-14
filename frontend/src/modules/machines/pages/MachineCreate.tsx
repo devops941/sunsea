@@ -6,7 +6,7 @@ import { z } from "zod";
 import TextInput from "../../../components/form/TextInput/TextInput";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import CustomButton from "../../../components/ui/Button/Button";
-import Button from "../../../components/ui/Button/Button"
+// BUG-MAC fix: removed duplicate Button import — using CustomButton consistently
 import { useAppDispatch } from "../../../hooks/reduxHooks";
 import { createMachine } from "../../../features/machines/machineSlice";
 import { machineService } from "../../../services/machineService";
@@ -359,7 +359,7 @@ const MachineCreate: React.FC = () => {
                             onClick={handleClear}
                             disabled={isSubmitting}
                         />
-                        <Button
+                        <CustomButton
                             text={isSubmitting ? "Saving..." : "Save Machine"}
                             icon={FaSave}
                             type="submit"

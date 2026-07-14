@@ -1,7 +1,7 @@
 import React from "react";
 import { Container } from "react-bootstrap";
 import { useLocation, useNavigate } from "react-router-dom";
-import { FaPlay, FaHistory, FaTrashAlt, FaCalendarWeek, FaCalendarDay, FaClock } from "react-icons/fa";
+import { FaPlay, FaHistory, FaTrashAlt, FaCalendarWeek, FaCalendarDay, FaClock, FaChartBar } from "react-icons/fa";
 import Tabs from "../../../components/ui/tab/Tabs";
 import type { TabItem } from "../../../components/ui/tab/Tabs";
 
@@ -11,6 +11,7 @@ import WastageList from "../../production-wastage/pages/WastageList";
 import WeeklyMachineScheduleList from "../../weekly-machine-schedules/pages/WeeklyMachineScheduleList";
 import DailyProductionPlanningPage from "../../daily-machine-planning/pages/DailyProductionPlanningPage";
 import HourlyWorkReportList from "../../hourly-work-reports/pages/HourlyWorkReportList";
+import OeeDashboard from "../../dashboard/pages/OeeDashboard";
 
 const ProductionOrderTabs: React.FC = () => {
     const location = useLocation();
@@ -24,7 +25,8 @@ const ProductionOrderTabs: React.FC = () => {
         "/weekly-machine-schedules": "weekly",
         "/daily-machine-planning": "daily",
         "/hourly-work-reports": "hourly",
-        "/production-wastages": "wastage"
+        "/production-wastages": "wastage",
+        "/oee-dashboard": "oee"
     };
 
     const keyToPath: Record<string, string> = {
@@ -33,7 +35,8 @@ const ProductionOrderTabs: React.FC = () => {
         "weekly": "/weekly-machine-schedules",
         "daily": "/daily-machine-planning",
         "hourly": "/hourly-work-reports",
-        "wastage": "/production-wastages"
+        "wastage": "/production-wastages",
+        "oee": "/oee-dashboard"
     };
 
     const activeTab = pathToKey[location.pathname] || "active";
@@ -44,7 +47,8 @@ const ProductionOrderTabs: React.FC = () => {
         { key: "weekly", label: "Weekly Schedules", icon: <FaCalendarWeek />, content: <WeeklyMachineScheduleList /> },
         { key: "daily", label: "Daily Planning", icon: <FaCalendarDay />, content: <DailyProductionPlanningPage /> },
         { key: "hourly", label: "Hourly Production", icon: <FaClock />, content: <HourlyWorkReportList /> },
-        { key: "wastage", label: "Production Wastage", icon: <FaTrashAlt />, content: <WastageList /> }
+        { key: "wastage", label: "Production Wastage", icon: <FaTrashAlt />, content: <WastageList /> },
+        { key: "oee", label: "OEE Dashboard", icon: <FaChartBar />, content: <OeeDashboard /> }
     ];
 
     const handleTabChange = (key: string) => {

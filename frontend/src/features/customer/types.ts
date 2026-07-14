@@ -12,10 +12,10 @@ export interface Customer {
   whatsapp?: string | null;
   email?: string | null;
   gstin?: string | null;
-  //pan?: string | null;
-  //gstRegType?: string | null;
-  //tdsSection?: string | null;
-  //tcsRate?: number | string | null;
+  pan?: string | null;
+  gstRegType?: string | null;
+  tdsSection?: string | null;
+  tcsRate?: number | string | null;
   billingAddressLine1: string;
   billingCity: string;
   billingState: string;
@@ -114,4 +114,8 @@ export interface CustomerState {
   customers: Customer[];
   loading: boolean;
   error: string | null;
+  // BUG-CUST-004 fix: added pagination metadata
+  total: number;
+  page: number;
+  totalPages: number;
 }

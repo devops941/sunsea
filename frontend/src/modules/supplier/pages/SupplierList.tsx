@@ -22,6 +22,8 @@ const SupplierList: React.FC = () => {
     const canEditSupplier = hasPermission("supplier.edit");
     const canDeleteSupplier = hasPermission("supplier.delete");
     const canViewPricing = hasPermission("supplierpricelist.view");
+    // BUG-SUP-009 fix: added missing create permission check
+    const canCreateSupplier = hasPermission("supplier.create");
 
     const [showViewModal, setShowViewModal] = useState(false);
     const [selectedSupplier, setSelectedSupplier] = useState<any>(null);
@@ -113,11 +115,14 @@ const SupplierList: React.FC = () => {
                                     onChange={handleSearch}
                                 />
                             </div>
+                            {/* BUG-SUP-009 fix: only show Add Supplier button to users with create permission */}
+                            {canCreateSupplier && (
                             <CustomButton
                                 text="Add Supplier"
                                 icon={FaPlus}
                                 onClick={() => navigate("/suppliers/create")}
                             />
+                            )}
                         </div>
                     </div>
 

@@ -83,8 +83,8 @@ const SizeList: React.FC = () => {
         setEditMode(true);
         setFormData({
             id: String(size.id),
-            code: size.code,
-            name: size.name,
+            code: size.sizeCode,
+            name: size.sizeName,
             description: size.description || "",
             status: size.status,
         });
