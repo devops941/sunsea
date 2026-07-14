@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { Container, Row, Col, Card, Spinner, Modal, Button, OverlayTrigger, Tooltip } from "react-bootstrap";
+import CommonModal from "../../../components/ui/Modal/CommonModal";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import {
@@ -33,26 +33,26 @@ const formatLocalDateString = (d: Date) => {
 };
 
 const STATUS_FLOW: Record<string, { label: string; next: string | null; color: string }> = {
-  DRAFT:       { label: "Draft",       next: "PLANNED",    color: "secondary" },
-  PLANNED:     { label: "Planned",     next: "APPROVED",   color: "info" },
-  APPROVED:    { label: "Approved",    next: "IN_PROGRESS",color: "primary" },
-  IN_PROGRESS: { label: "In Progress", next: "COMPLETED",  color: "success" },
-  COMPLETED:   { label: "Completed",   next: null,          color: "dark" },
-  CANCELLED:   { label: "Cancelled",   next: null,          color: "danger" },
-  STOPPED:     { label: "Stopped",     next: null,          color: "danger" },
+  DRAFT: { label: "Draft", next: "PLANNED", color: "secondary" },
+  PLANNED: { label: "Planned", next: "APPROVED", color: "info" },
+  APPROVED: { label: "Approved", next: "IN_PROGRESS", color: "primary" },
+  IN_PROGRESS: { label: "In Progress", next: "COMPLETED", color: "success" },
+  COMPLETED: { label: "Completed", next: null, color: "success" },
+  CANCELLED: { label: "Cancelled", next: null, color: "danger" },
+  STOPPED: { label: "Stopped", next: null, color: "danger" },
 };
 
 const NEXT_ACTION_LABELS: Record<string, string> = {
-  DRAFT:       "Mark as Planned",
-  PLANNED:     "Approve Plan",
-  APPROVED:    "Start Production",
+  DRAFT: "Mark as Planned",
+  PLANNED: "Approve Plan",
+  APPROVED: "Start Production",
   IN_PROGRESS: "Mark Completed",
 };
 
 const NEXT_ACTION_ICONS: Record<string, any> = {
-  DRAFT:       FaCalendarAlt,
-  PLANNED:     FaThumbsUp,
-  APPROVED:    FaPlay,
+  DRAFT: FaCalendarAlt,
+  PLANNED: FaThumbsUp,
+  APPROVED: FaPlay,
   IN_PROGRESS: FaCheckCircle,
 };
 
@@ -327,40 +327,38 @@ const DailyProductionPlanningPage: React.FC = () => {
   // ──────────────────────────────────────────────────────────────
   const allowedMachines = useMemo(() =>
     (machines || []).filter((m: any) => m.machineId !== "MAC-001")
-  , [machines]);
+    , [machines]);
 
   return (
-    <div className="inner-container">
-      <Container fluid>
+    <div className="p-4 md:p-6 min-h-screen bg-white">
+      <div className="w-full">
         {/* Page Header */}
-        <div className="page-header">
-          <Row className="align-items-center g-3">
-            <Col lg={5} md={12}>
+        <div className="mb-6">
+          <div className="flex flex-col lg:flex-row items-start lg:items-start justify-between gap-4">
+            <div className="flex-1">
               <div className="page-header-info">
-                <h2 className="page-title">Daily Production Planning</h2>
-                <div className="page-breadcrumb">Home / Production / Daily Plans</div>
+                <h2 className="text-2xl font-bold text-slate-800">Daily Production Planning</h2>
+
               </div>
-            </Col>
-            <Col lg={7} md={12}>
-              <div className="page-header-actions d-flex align-items-center justify-content-lg-end gap-2 flex-wrap">
+            </div>
+            <div className="flex-1 w-full lg:w-auto">
+              <div className="flex flex-wrap items-center lg:justify-end gap-3">
                 {/* Date Filter */}
-                <div style={{ width: "160px" }}>
+                <div className="w-40">
                   <input
                     type="date"
-                    className="form-control"
-                    style={{ height: "42px", borderRadius: "8px", fontSize: "13px" }}
+                    className="w-full h-10 px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     value={filterDate}
                     onChange={(e) => setFilterDate(e.target.value)}
                   />
                 </div>
 
                 {/* Machine Filter */}
-                <div style={{ width: "160px" }}>
+                <div className="w-40">
                   <select
-                    className="form-select"
+                    className="w-full h-10 px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     value={filterMachine}
                     onChange={(e) => setFilterMachine(e.target.value)}
-                    style={{ height: "42px", borderRadius: "8px", fontSize: "13px" }}
                   >
                     <option value="">All Machines</option>
                     {allowedMachines.map((m: any) => (
@@ -370,12 +368,11 @@ const DailyProductionPlanningPage: React.FC = () => {
                 </div>
 
                 {/* Status Filter */}
-                <div style={{ width: "140px" }}>
+                <div className="w-36">
                   <select
-                    className="form-select"
+                    className="w-full h-10 px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     value={filterStatus}
                     onChange={(e) => setFilterStatus(e.target.value)}
-                    style={{ height: "42px", borderRadius: "8px", fontSize: "13px" }}
                   >
                     <option value="">All Status</option>
                     {Object.keys(STATUS_FLOW).map(s => (
@@ -388,7 +385,6 @@ const DailyProductionPlanningPage: React.FC = () => {
                   text="New Production Order"
                   icon={FaPlus}
                   onClick={() => navigate("/production-orders/create")}
-                  style={{ marginRight: "8px" }}
                 />
                 <CustomButton
                   text="New Daily Plan"
@@ -396,60 +392,56 @@ const DailyProductionPlanningPage: React.FC = () => {
                   onClick={openCreateForm}
                 />
               </div>
-            </Col>
-          </Row>
+            </div>
+          </div>
         </div>
 
         {/* Stats Cards */}
-        <Row className="g-3 mb-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
           {[
-            { label: "Total Plans", value: stats.total, icon: FaCalendarAlt, color: "primary", bgClass: "bg-light" },
-            { label: "Approved", value: stats.approved, icon: FaCheckCircle, color: "info", bgClass: "bg-info bg-opacity-10" },
-            { label: "In Progress", value: stats.running, icon: FaPlay, color: "success", bgClass: "bg-success bg-opacity-10" },
-            { label: "Completed", value: stats.completed, icon: FaStop, color: "secondary", bgClass: "bg-secondary bg-opacity-10" },
+            { label: "Total Plans", value: stats.total, icon: FaCalendarAlt, colorClass: "text-blue-600", bgClass: "bg-blue-50" },
+            { label: "Approved", value: stats.approved, icon: FaCheckCircle, colorClass: "text-sky-600", bgClass: "bg-sky-50" },
+            { label: "In Progress", value: stats.running, icon: FaPlay, colorClass: "text-emerald-600", bgClass: "bg-emerald-50" },
+            { label: "Completed", value: stats.completed, icon: FaStop, colorClass: "text-teal-600", bgClass: "bg-teal-50" },
           ].map((stat) => (
-            <Col xl={3} sm={6} key={stat.label}>
-              <Card className="border-0 shadow-sm rounded-3">
-                <Card.Body className="d-flex align-items-center p-3">
-                  <div className={`p-3 rounded-circle ${stat.bgClass} text-${stat.color} me-3`}>
-                    <stat.icon size={20} />
-                  </div>
-                  <div>
-                    <h6 className="text-muted small text-uppercase mb-1 fw-bold">{stat.label}</h6>
-                    <h4 className="mb-0 fw-bold text-dark">{stat.value}</h4>
-                  </div>
-                </Card.Body>
-              </Card>
-            </Col>
+            <div key={stat.label} className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex items-center">
+              <div className={`p-3 rounded-full ${stat.bgClass} ${stat.colorClass} mr-4`}>
+                <stat.icon size={20} />
+              </div>
+              <div>
+                <h6 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">{stat.label}</h6>
+                <h4 className="text-xl font-bold text-slate-800 m-0">{stat.value}</h4>
+              </div>
+            </div>
           ))}
-        </Row>
+        </div>
 
         {/* Daily Plans Table */}
-        <Card className="border-0 shadow-sm rounded-3 mb-4">
-          <Card.Body className="p-0">
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 mb-6 overflow-hidden">
+          <div className="p-0">
             {loading ? (
-              <div className="text-center py-5">
-                <Spinner animation="border" variant="primary" />
-                <p className="mt-3 text-muted">Loading daily plans...</p>
+              <div className="text-center py-10">
+                <div className="inline-block w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                <p className="mt-3 text-slate-500">Loading daily plans...</p>
               </div>
             ) : filteredPlans.length > 0 ? (
-              <div className="table-responsive">
-                <table className="master-data-table mb-0" style={{ width: "100%" }}>
-                  <thead>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm border-collapse">
+                  <thead className="bg-blue-50 text-primary border-b border-slate-200 uppercase tracking-wide text-xs">
                     <tr>
-                      <th style={{ width: "50px" }}>#</th>
-                      <th>PLAN ID</th>
-                      <th>PRODUCTION ORDER</th>
-                      <th>DATE</th>
-                      <th>MACHINE / SHIFT</th>
-                      <th>PLANNED QTY</th>
-                      <th style={{ width: "180px" }}>PROGRESS</th>
-                      <th>PRIORITY</th>
-                      <th>STATUS</th>
-                      <th style={{ width: "180px", textAlign: "right" }}>ACTIONS</th>
+                      <th className="px-4 py-3.5 font-semibold w-[50px]">#</th>
+                      <th className="px-4 py-3.5 font-semibold">PLAN ID</th>
+                      <th className="px-4 py-3.5 font-semibold">PRODUCTION ORDER</th>
+                      <th className="px-4 py-3.5 font-semibold">DATE</th>
+                      <th className="px-4 py-3.5 font-semibold">MACHINE / SHIFT</th>
+                      <th className="px-4 py-3.5 font-semibold">PLANNED QTY</th>
+                      <th className="px-4 py-3.5 font-semibold w-[180px]">PROGRESS</th>
+                      <th className="px-4 py-3.5 font-semibold">PRIORITY</th>
+                      <th className="px-4 py-3.5 font-semibold">STATUS</th>
+                      <th className="px-4 py-3.5 font-semibold w-[180px] text-right">ACTIONS</th>
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody className="divide-y divide-slate-100">
                     {filteredPlans.map((plan: any, idx: number) => {
                       const plannedQty = Number(plan.plannedQty || 0);
                       const producedQty = Array.isArray(plan.hourlyProductions)
@@ -459,7 +451,7 @@ const DailyProductionPlanningPage: React.FC = () => {
                       const nextStatus = STATUS_FLOW[plan.status]?.next;
                       const canAdvance = !!nextStatus && plan.status !== "COMPLETED" && plan.status !== "CANCELLED";
                       const canLog = plan.status === "IN_PROGRESS";
-                      
+
                       const pendingQty = plannedQty > producedQty ? plannedQty - producedQty : 0;
                       const forwardedToPlan = filteredPlans.find((p: any) => p.remarks?.includes(`Carried forward from Daily Plan ${plan.dailyPlanId}`));
                       const forwardedFromMatch = plan.remarks?.match(/Carried forward from Daily Plan ([\w-]+)/i);
@@ -469,228 +461,226 @@ const DailyProductionPlanningPage: React.FC = () => {
 
                       return (
                         <React.Fragment key={plan.dailyPlanId}>
-                          <tr className={`master-data-row ${expandedRow === plan.dailyPlanId ? "bg-light" : ""}`} style={{ cursor: "pointer" }} onClick={() => toggleExpandRow(plan.dailyPlanId)}>
-                            <td className="master-data-cell text-muted">{idx + 1}</td>
-                          <td className="master-data-cell fw-bold" style={{ fontFamily: "monospace" }}>
-                            <div>{plan.dailyPlanId}</div>
-                            {forwardedToPlan && (
-                              <div className="mt-1 d-flex align-items-center gap-1" style={{ fontSize: "11px", color: "#8b5cf6", fontWeight: 600 }}>
-                                <span>↪</span> Fwd to {forwardedToPlan.dailyPlanId}
-                              </div>
-                            )}
-                            {forwardedFromPlanId && (
-                              <div className="mt-1 d-flex align-items-center gap-1" style={{ fontSize: "11px", color: "#3b82f6", fontWeight: 600 }}>
-                                <span style={{ fontSize: "14px", lineHeight: "1" }}>↳</span> Fwd from {forwardedFromPlanId}
-                              </div>
-                            )}
-                          </td>
-                          <td className="master-data-cell">
-                            <div className="fw-semibold">{plan.productionOrderId}</div>
-                            <div className="text-muted small">
-                              {plan.productionOrder?.productItem?.productName || "—"}
-                            </div>
-                          </td>
-                          <td className="master-data-cell">
-                            <div className="fw-medium">{plan.productionDate?.split("T")[0] || "—"}</div>
-                          </td>
-                          <td className="master-data-cell">
-                            <div className="fw-semibold">
-                              <FaIndustry className="me-1 text-secondary" />
-                              {plan.machine?.machineName || plan.machineId || "—"}
-                            </div>
-                            <div className="d-flex align-items-center gap-2 mt-1">
-                              <span className="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25" style={{ fontSize: "10px" }}>
-                                {plan.shift?.shiftName || plan.shiftId || "—"}
-                              </span>
-                              {(plan.shift?.startTime && plan.shift?.endTime) && (
-                                <span className="text-muted" style={{ fontSize: "10px" }}>
-                                  {plan.shift.startTime.slice(0,5)} - {plan.shift.endTime.slice(0,5)}
-                                </span>
+                          <tr className={`border-b border-slate-100 hover:bg-slate-50 transition-colors ${expandedRow === plan.dailyPlanId ? "bg-blue-50/50" : ""}`} style={{ cursor: "pointer" }} onClick={() => toggleExpandRow(plan.dailyPlanId)}>
+                            <td className="px-4 py-3 text-slate-500">{idx + 1}</td>
+                            <td className="px-4 py-3 font-bold font-mono">
+                              <div>{plan.dailyPlanId}</div>
+                              {forwardedToPlan && (
+                                <div className="mt-1 flex items-center gap-1 text-[11px] text-purple-600 font-semibold">
+                                  <span>↪</span> Fwd to {forwardedToPlan.dailyPlanId}
+                                </div>
                               )}
-                            </div>
-                          </td>
-                          <td className="master-data-cell fw-medium">
-                            <div>{plannedQty.toLocaleString()} pcs</div>
-                            {plan.plannedHours && (
-                              <div className="text-muted small">{plan.plannedHours} hrs</div>
-                            )}
-                          </td>
-                          <td className="master-data-cell">
-                            <div className="mb-1">
-                              <CustomProgressBar progressPercent={progressPercent} />
-                            </div>
-                            <div className="d-flex align-items-center justify-content-between small">
-                              <span className="text-muted">{producedQty} / {plannedQty} pcs</span>
-                              {producedQty > plannedQty ? (
-                                <span className="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 py-1 px-2" style={{ fontSize: "9px" }}>
-                                  +{producedQty - plannedQty} Over
+                              {forwardedFromPlanId && (
+                                <div className="mt-1 flex items-center gap-1 text-[11px] text-blue-500 font-semibold">
+                                  <span className="text-[14px] leading-none">↳</span> Fwd from {forwardedFromPlanId}
+                                </div>
+                              )}
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="font-semibold text-slate-800">{plan.productionOrderId}</div>
+                              <div className="text-slate-500 text-xs mt-1 line-clamp-1" title={plan.productionOrder?.productItem?.productName || ""}>
+                                {plan.productionOrder?.productItem?.productName || "—"}
+                              </div>
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="font-medium text-slate-700">{plan.productionDate?.split("T")[0] || "—"}</div>
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="font-semibold text-slate-700 flex items-center">
+                                <FaIndustry className="mr-2 text-slate-400" />
+                                {plan.machine?.machineName || plan.machineId || "—"}
+                              </div>
+                              <div className="flex items-center gap-2 mt-1.5">
+                                <span className="bg-slate-100 text-slate-600 border border-slate-200 px-2 py-0.5 rounded text-[10px] font-medium">
+                                  {plan.shift?.shiftName || plan.shiftId || "—"}
                                 </span>
-                              ) : pendingQty > 0 ? (
-                                <span className="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25 py-1 px-2" style={{ fontSize: "9px" }}>
-                                  {pendingQty} Pending
-                                </span>
-                              ) : null}
-                            </div>
-                          </td>
-                          <td className="master-data-cell">
-                            <StatusBadge status={plan.priority || "MEDIUM"} />
-                          </td>
-                          <td className="master-data-cell">
-                            <div className="d-flex align-items-center gap-2">
-                              <StatusBadge status={plan.status === "COMPLETED" && producedQty < plannedQty ? "SHORT_CLOSED" : plan.status} />
-                              {(plan.status === "STOPPED" || plan.status === "CANCELLED") && plan.remarks && (
-                                <OverlayTrigger
-                                  placement="top"
-                                  overlay={
-                                    <Tooltip id={`tooltip-${plan.dailyPlanId}`}>
-                                      <div className="text-start" style={{ fontSize: "12px" }}>
-                                        <span className="fw-bold text-warning">Reason:</span><br/>
-                                        {plan.remarks.includes("Stopped:") || plan.remarks.includes("Cancelled:") 
+                                {(plan.shift?.startTime && plan.shift?.endTime) && (
+                                  <span className="text-slate-500 text-[10px]">
+                                    {plan.shift.startTime.slice(0, 5)} - {plan.shift.endTime.slice(0, 5)}
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 font-medium text-slate-700">
+                              <div>{plannedQty.toLocaleString()} pcs</div>
+                              {plan.plannedHours && (
+                                <div className="text-slate-500 text-xs mt-0.5">{plan.plannedHours} hrs</div>
+                              )}
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="mb-1">
+                                <CustomProgressBar progressPercent={progressPercent} />
+                              </div>
+                              <div className="flex items-center justify-between text-xs">
+                                <span className="text-slate-500">{producedQty} / {plannedQty} pcs</span>
+                                {producedQty > plannedQty ? (
+                                  <span className="bg-emerald-100 text-emerald-700 border border-emerald-200 py-0.5 px-2 rounded text-[9px] font-bold">
+                                    +{producedQty - plannedQty} Over
+                                  </span>
+                                ) : pendingQty > 0 ? (
+                                  <span className="bg-rose-100 text-rose-700 border border-rose-200 py-0.5 px-2 rounded text-[9px] font-bold">
+                                    {pendingQty} Pending
+                                  </span>
+                                ) : null}
+                              </div>
+                            </td>
+                            <td className="px-4 py-3">
+                              <StatusBadge status={plan.priority || "MEDIUM"} />
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-2">
+                                <StatusBadge status={plan.status === "COMPLETED" && producedQty < plannedQty ? "SHORT_CLOSED" : plan.status} />
+                                {(plan.status === "STOPPED" || plan.status === "CANCELLED") && plan.remarks && (
+                                  <div className="group relative flex items-center justify-center cursor-pointer">
+                                    <FaInfoCircle className="text-rose-500 text-[15px] opacity-85 hover:opacity-100 transition-opacity" />
+                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-slate-800 text-white text-xs rounded-md opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10 text-center shadow-lg">
+                                      <span className="font-bold text-amber-400 block mb-1 text-left">Reason:</span>
+                                      <div className="text-left">
+                                        {plan.remarks.includes("Stopped:") || plan.remarks.includes("Cancelled:")
                                           ? plan.remarks.split("|").pop()?.replace("Stopped:", "")?.replace("Cancelled:", "").trim()
                                           : plan.remarks}
                                       </div>
-                                    </Tooltip>
-                                  }
-                                >
-                                  <span style={{ cursor: "pointer" }}>
-                                    <FaInfoCircle className="text-danger" style={{ fontSize: "15px", opacity: 0.85 }} />
-                                  </span>
-                                </OverlayTrigger>
-                              )}
-                            </div>
-                          </td>
-                          <td className="master-data-cell text-end">
-                            <div className="table-action-group justify-content-end" onClick={e => e.stopPropagation()}>
-                              {/* View */}
-                              <ViewButton onClick={() => { setViewPlan(plan); setShowViewModal(true); }} />
-
-                              {/* Log Hourly (only if APPROVED or IN_PROGRESS) */}
-                              {canLog && (
-                                <IconButton
-                                  variant="primary"
-                                  title="Log Hourly Production"
-                                  icon={FaClipboardList}
-                                  onClick={() => handleLogHourly(plan)}
-                                />
-                              )}
-
-                              {/* Advance Status */}
-                              {canAdvance && (
-                                <IconButton
-                                  variant="success"
-                                  title={NEXT_ACTION_LABELS[plan.status] || `Move to ${nextStatus}`}
-                                  icon={NEXT_ACTION_ICONS[plan.status] || FaArrowRight}
-                                  onClick={() => handleStatusAdvance(plan, producedQty)}
-                                />
-                              )}
-
-                              {/* Stop Production (only if IN_PROGRESS) */}
-                              {plan.status === "IN_PROGRESS" && (
-                                <IconButton
-                                  variant="danger"
-                                  title="Stop Production"
-                                  icon={FaStop}
-                                  onClick={() => handleStopProductionClick(plan)}
-                                />
-                              )}
-
-                              {/* Edit (only DRAFT or PLANNED) */}
-                              {(plan.status === "DRAFT" || plan.status === "PLANNED") && (
-                                <IconButton
-                                  variant="info"
-                                  title="Edit Plan"
-                                  icon={FaEdit}
-                                  onClick={() => openEditForm(plan)}
-                                />
-                              )}
-
-                              {/* Cancel (only if not started: DRAFT, PLANNED) */}
-                              {["DRAFT", "PLANNED"].includes(plan.status) && (
-                                <IconButton
-                                  variant="warning"
-                                  title="Cancel Plan"
-                                  icon={FaBan}
-                                  onClick={() => handleCancelPlan(plan)}
-                                />
-                              )}
-
-                              {/* Carry Forward */}
-                              {canCarryForward && (
-                                <IconButton
-                                  variant="warning"
-                                  title={`Carry Forward ${pendingQty} pcs`}
-                                  icon={FaShare}
-                                  onClick={() => handleCarryForward(plan, pendingQty)}
-                                />
-                              )}
-
-                              {/* Delete (only DRAFT or CANCELLED) */}
-                              {(plan.status === "DRAFT" || plan.status === "CANCELLED") && (
-                                <DeleteButton onClick={() => { setDeletePlanId(plan.dailyPlanId); setShowDeleteModal(true); }} />
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                        {expandedRow === plan.dailyPlanId && (
-                          <tr className="bg-light">
-                            <td colSpan={10} className="p-0 border-0">
-                              <div className="px-4 py-3 border-bottom shadow-inner" style={{ background: "#f8f9fa", boxShadow: "inset 0 3px 6px rgba(0,0,0,0.02)" }}>
-                                <div className="d-flex align-items-center justify-content-between mb-3">
-                                  <h6 className="fw-bold text-uppercase mb-0" style={{ color: "var(--color-primary)", fontSize: "11px", letterSpacing: "0.5px" }}>
-                                    Hourly Production Breakdown
-                                  </h6>
-                                  {canLog && (
-                                    <Button size="sm" variant="outline-primary" style={{ fontSize: "11px", padding: "4px 10px" }} onClick={() => handleLogHourly(plan)}>
-                                      + Log Hour
-                                    </Button>
-                                  )}
-                                </div>
-                                {(!plan.hourlyProductions || plan.hourlyProductions.length === 0) ? (
-                                  <div className="text-center text-muted p-3 border rounded-3 bg-white" style={{ fontSize: "12px" }}>
-                                    No hourly entries recorded yet for this plan.
-                                  </div>
-                                ) : (
-                                  <div className="rounded-3 border overflow-hidden bg-white">
-                                    <table className="table table-sm table-hover text-center align-middle mb-0" style={{ fontSize: "12px" }}>
-                                      <thead className="bg-light text-muted">
-                                        <tr>
-                                          <th className="fw-semibold">Hour</th>
-                                          <th className="fw-semibold">Produced</th>
-                                          <th className="fw-semibold">Reject</th>
-                                          <th className="fw-semibold">Scrap</th>
-                                          <th className="fw-semibold">Downtime</th>
-                                          <th className="fw-semibold">Operator</th>
-                                        </tr>
-                                      </thead>
-                                      <tbody>
-                                        {plan.hourlyProductions.sort((a: any, b: any) => Number(a.hourIndex) - Number(b.hourIndex)).map((h: any) => (
-                                          <tr key={h.hourlyProductionId}>
-                                            <td className="fw-bold font-monospace text-secondary">H{h.hourIndex}</td>
-                                            <td className="fw-bold text-success">{h.qtyProduced}</td>
-                                            <td className={h.rejectQty > 0 ? "text-danger fw-medium" : "text-muted"}>{h.rejectQty || 0}</td>
-                                            <td className={h.scrapQty > 0 ? "text-warning fw-medium" : "text-muted"}>{h.scrapQty || 0}</td>
-                                            <td className={h.downtime > 0 ? "text-danger fw-medium" : "text-muted"}>{h.downtime > 0 ? `${h.downtime} min` : "—"}</td>
-                                            <td className="text-muted">{h.operator?.name || h.operatorId || "—"}</td>
-                                          </tr>
-                                        ))}
-                                      </tbody>
-                                      <tfoot className="bg-light fw-bold text-dark">
-                                        <tr>
-                                          <td>Total</td>
-                                          <td className="text-success">{producedQty}</td>
-                                          <td className="text-danger">{plan.hourlyProductions.reduce((s:number, h:any) => s + Number(h.rejectQty || 0), 0)}</td>
-                                          <td className="text-warning">{plan.hourlyProductions.reduce((s:number, h:any) => s + Number(h.scrapQty || 0), 0)}</td>
-                                          <td className="text-danger">{(() => { const t = plan.hourlyProductions.reduce((s:number, h:any) => s + Number(h.downtime || 0), 0); return t > 0 ? `${t} min` : "—"; })()}</td>
-                                          <td></td>
-                                        </tr>
-                                      </tfoot>
-                                    </table>
+                                      <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800"></div>
+                                    </div>
                                   </div>
                                 )}
                               </div>
                             </td>
+                            <td className="px-4 py-3 text-right">
+                              <div className="flex items-center justify-end gap-1" onClick={e => e.stopPropagation()}>
+                                {/* View */}
+                                <ViewButton onClick={() => { setViewPlan(plan); setShowViewModal(true); }} />
+
+                                {/* Log Hourly (only if APPROVED or IN_PROGRESS) */}
+                                {canLog && (
+                                  <IconButton
+                                    variant="primary"
+                                    title="Log Hourly Production"
+                                    icon={FaClipboardList}
+                                    onClick={() => handleLogHourly(plan)}
+                                  />
+                                )}
+
+                                {/* Advance Status */}
+                                {canAdvance && (
+                                  <IconButton
+                                    variant="success"
+                                    title={NEXT_ACTION_LABELS[plan.status] || `Move to ${nextStatus}`}
+                                    icon={NEXT_ACTION_ICONS[plan.status] || FaArrowRight}
+                                    onClick={() => handleStatusAdvance(plan, producedQty)}
+                                  />
+                                )}
+
+                                {/* Stop Production (only if IN_PROGRESS) */}
+                                {plan.status === "IN_PROGRESS" && (
+                                  <IconButton
+                                    variant="danger"
+                                    title="Stop Production"
+                                    icon={FaStop}
+                                    onClick={() => handleStopProductionClick(plan)}
+                                  />
+                                )}
+
+                                {/* Edit (only DRAFT or PLANNED) */}
+                                {(plan.status === "DRAFT" || plan.status === "PLANNED") && (
+                                  <IconButton
+                                    variant="info"
+                                    title="Edit Plan"
+                                    icon={FaEdit}
+                                    onClick={() => openEditForm(plan)}
+                                  />
+                                )}
+
+                                {/* Cancel (only if not started: DRAFT, PLANNED) */}
+                                {["DRAFT", "PLANNED"].includes(plan.status) && (
+                                  <IconButton
+                                    variant="warning"
+                                    title="Cancel Plan"
+                                    icon={FaBan}
+                                    onClick={() => handleCancelPlan(plan)}
+                                  />
+                                )}
+
+                                {/* Carry Forward */}
+                                {canCarryForward && (
+                                  <IconButton
+                                    variant="warning"
+                                    title={`Carry Forward ${pendingQty} pcs`}
+                                    icon={FaShare}
+                                    onClick={() => handleCarryForward(plan, pendingQty)}
+                                  />
+                                )}
+
+                                {/* Delete (only DRAFT or CANCELLED) */}
+                                {(plan.status === "DRAFT" || plan.status === "CANCELLED") && (
+                                  <DeleteButton onClick={() => { setDeletePlanId(plan.dailyPlanId); setShowDeleteModal(true); }} />
+                                )}
+                              </div>
+                            </td>
                           </tr>
-                        )}
+                          {expandedRow === plan.dailyPlanId && (
+                            <tr className="bg-white border-b border-slate-200">
+                              <td colSpan={10} className="p-0">
+                                <div className="px-6 py-4 shadow-inner bg-white/50">
+                                  <div className="flex items-center justify-between mb-4">
+                                    <h6 className="font-bold text-xs text-primary uppercase tracking-wider mb-0">
+                                      Hourly Production Breakdown
+                                    </h6>
+                                    {canLog && (
+                                      <button
+                                        className="text-xs font-semibold px-3 py-1.5 border border-primary text-primary rounded-md hover:bg-primary hover:text-white transition-colors"
+                                        onClick={() => handleLogHourly(plan)}
+                                      >
+                                        + Log Hour
+                                      </button>
+                                    )}
+                                  </div>
+                                  {(!plan.hourlyProductions || plan.hourlyProductions.length === 0) ? (
+                                    <div className="text-center text-slate-500 p-4 border border-slate-200 rounded-lg bg-white text-sm">
+                                      No hourly entries recorded yet for this plan.
+                                    </div>
+                                  ) : (
+                                    <div className="rounded-lg border border-slate-200 overflow-hidden bg-white">
+                                      <table className="w-full text-sm text-center">
+                                        <thead className="bg-slate-50 text-slate-500 border-b border-slate-200">
+                                          <tr>
+                                            <th className="px-3 py-2 font-semibold">Hour</th>
+                                            <th className="px-3 py-2 font-semibold">Produced</th>
+                                            <th className="px-3 py-2 font-semibold">Reject</th>
+                                            <th className="px-3 py-2 font-semibold">Scrap</th>
+                                            <th className="px-3 py-2 font-semibold">Downtime</th>
+                                            <th className="px-3 py-2 font-semibold">Operator</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100">
+                                          {plan.hourlyProductions.sort((a: any, b: any) => Number(a.hourIndex) - Number(b.hourIndex)).map((h: any) => (
+                                            <tr key={h.hourlyProductionId} className="hover:bg-slate-50">
+                                              <td className="px-3 py-2 font-bold font-mono text-slate-500">H{h.hourIndex}</td>
+                                              <td className="px-3 py-2 font-bold text-emerald-600">{h.qtyProduced}</td>
+                                              <td className={`px-3 py-2 ${h.rejectQty > 0 ? "text-rose-600 font-medium" : "text-slate-400"}`}>{h.rejectQty || 0}</td>
+                                              <td className={`px-3 py-2 ${h.scrapQty > 0 ? "text-amber-500 font-medium" : "text-slate-400"}`}>{h.scrapQty || 0}</td>
+                                              <td className={`px-3 py-2 ${h.downtime > 0 ? "text-rose-600 font-medium" : "text-slate-400"}`}>{h.downtime > 0 ? `${h.downtime} min` : "—"}</td>
+                                              <td className="px-3 py-2 text-slate-500">{h.operator?.name || h.operatorId || "—"}</td>
+                                            </tr>
+                                          ))}
+                                        </tbody>
+                                        <tfoot className="bg-white font-bold text-slate-700 border-t border-slate-200">
+                                          <tr>
+                                            <td className="px-3 py-2">Total</td>
+                                            <td className="px-3 py-2 text-emerald-600">{producedQty}</td>
+                                            <td className="px-3 py-2 text-rose-600">{plan.hourlyProductions.reduce((s: number, h: any) => s + Number(h.rejectQty || 0), 0)}</td>
+                                            <td className="px-3 py-2 text-amber-500">{plan.hourlyProductions.reduce((s: number, h: any) => s + Number(h.scrapQty || 0), 0)}</td>
+                                            <td className="px-3 py-2 text-rose-600">{(() => { const t = plan.hourlyProductions.reduce((s: number, h: any) => s + Number(h.downtime || 0), 0); return t > 0 ? `${t} min` : "—"; })()}</td>
+                                            <td className="px-3 py-2"></td>
+                                          </tr>
+                                        </tfoot>
+                                      </table>
+                                    </div>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          )}
                         </React.Fragment>
                       );
                     })}
@@ -698,204 +688,225 @@ const DailyProductionPlanningPage: React.FC = () => {
                 </table>
               </div>
             ) : (
-              <div className="text-center py-5">
-                <FaCalendarAlt size={32} className="text-muted mb-3" />
-                <h5 className="text-muted mb-1">No daily plans found</h5>
-                <p className="text-muted small mb-0">
+              <div className="text-center py-12">
+                <FaCalendarAlt className="text-slate-300 mx-auto mb-3" size={32} />
+                <h5 className="text-slate-500 mb-1 font-semibold">No daily plans found</h5>
+                <p className="text-slate-400 text-sm mb-0">
                   Click "New Daily Plan" to schedule a production run for today.
                 </p>
               </div>
             )}
-          </Card.Body>
-        </Card>
+          </div>
+        </div>
 
 
 
         {/* ─────── View Modal ─────── */}
-        <Modal show={showViewModal} onHide={() => { setShowViewModal(false); setViewPlan(null); }} centered size="lg">
-          <Modal.Header closeButton style={{ background: "var(--color-primary, #003428)", color: "#fff" }}>
-            <Modal.Title className="fs-5 fw-bold">
-              Daily Plan — {viewPlan?.dailyPlanId}
-            </Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
-            {viewPlan && (
-              <>
-                <Row className="g-3 mb-4">
-                  <Col md={6}>
-                    <div className="p-3 bg-light rounded-3 border">
-                      <h6 className="fw-bold text-uppercase text-muted mb-2" style={{ fontSize: "11px" }}>Plan Details</h6>
-                      <div className="d-flex flex-column gap-1">
-                        <span><strong>Production Order:</strong> {viewPlan.productionOrderId}</span>
-                        <span><strong>Product:</strong> {viewPlan.productionOrder?.productItem?.productName || "—"}</span>
-                        <span><strong>Date:</strong> {viewPlan.productionDate?.split("T")[0]}</span>
-                        <span><strong>Machine:</strong> {viewPlan.machine?.machineName || viewPlan.machineId}</span>
-                        <span><strong>Shift:</strong> {viewPlan.shift?.shiftName || viewPlan.shiftId}</span>
-                      </div>
-                    </div>
-                  </Col>
-                  <Col md={6}>
-                    <div className="p-3 bg-light rounded-3 border">
-                      <h6 className="fw-bold text-uppercase text-muted mb-2" style={{ fontSize: "11px" }}>Quantities</h6>
-                      <div className="d-flex flex-column gap-1">
-                        <span><strong>Planned Qty:</strong> {viewPlan.plannedQty} pcs</span>
-                        <span><strong>Planned Hours:</strong> {viewPlan.plannedHours || "—"} hrs</span>
-                        <span><strong>Priority:</strong> <StatusBadge status={viewPlan.priority || "MEDIUM"} /></span>
-                        <span><strong>Status:</strong> <StatusBadge status={viewPlan.status} /></span>
-                        {viewPlan.remarks && <span><strong>Remarks:</strong> {viewPlan.remarks}</span>}
-                      </div>
-                    </div>
-                  </Col>
-                </Row>
-
-                <h6 className="fw-bold text-uppercase mb-3" style={{ color: "var(--color-primary)", fontSize: "12px", letterSpacing: "0.5px" }}>
-                  Hourly Production Entries
-                </h6>
-                {loadingViewLogs ? (
-                  <div className="text-center py-3"><Spinner size="sm" /> Loading...</div>
-                ) : viewHourlyLogs.length > 0 ? (
-                  <div className="rounded-3 border overflow-hidden">
-                    <table className="master-data-table text-center align-middle mb-0" style={{ width: "100%" }}>
-                      <thead className="bg-light">
-                        <tr>
-                          <th>Hour</th>
-                          <th>Produced</th>
-                          <th>Reject</th>
-                          <th>Scrap</th>
-                          <th>Downtime</th>
-                          <th style={{ color: '#15803d' }}>Avail%</th>
-                          <th style={{ color: '#7c3aed' }}>Qual%</th>
-                          <th style={{ color: '#1d4ed8', fontWeight: '800' }}>OEE%</th>
-                          <th>Operator</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {viewHourlyLogs.map((h: any) => (
-                          <tr key={h.hourlyProductionId} className="master-data-row border-bottom">
-                            <td className="master-data-cell fw-bold font-monospace">H{h.hourIndex}</td>
-                            <td className="master-data-cell fw-bold text-success">{h.qtyProduced}</td>
-                            <td className="master-data-cell text-danger">{h.rejectQty || 0}</td>
-                            <td className="master-data-cell text-warning">{h.scrapQty || 0}</td>
-                            <td className="master-data-cell text-muted">{h.downtime > 0 ? `${h.downtime} min` : "—"}</td>
-                            <td className="master-data-cell" style={{ color: '#15803d', fontWeight: '600' }}>
-                              {h.availabilityPct !== undefined ? `${h.availabilityPct}%` : '—'}
-                            </td>
-                            <td className="master-data-cell" style={{ color: '#7c3aed', fontWeight: '600' }}>
-                              {h.qualityPct !== undefined ? `${h.qualityPct}%` : '—'}
-                            </td>
-                            <td className="master-data-cell" style={{ color: '#1d4ed8', fontWeight: '800' }}>
-                              {h.hourlyOEE !== undefined ? `${h.hourlyOEE}%` : '—'}
-                            </td>
-                            <td className="master-data-cell text-muted small">{h.operatorId || "—"}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                      <tfoot className="bg-light fw-bold">
-                        <tr>
-                          <td>Total</td>
-                          <td className="text-success">{viewHourlyLogs.reduce((s, h) => s + Number(h.qtyProduced || 0), 0)}</td>
-                          <td className="text-danger">{viewHourlyLogs.reduce((s, h) => s + Number(h.rejectQty || 0), 0)}</td>
-                          <td className="text-warning">{viewHourlyLogs.reduce((s, h) => s + Number(h.scrapQty || 0), 0)}</td>
-                          <td className="text-muted">{(() => { const t = viewHourlyLogs.reduce((s, h) => s + Number(h.downtime || 0), 0); return t > 0 ? `${t} min` : "—"; })()}</td>
-                          <td colSpan={3} className="text-center text-muted small">Avg from OEE Summary below</td>
-                          <td></td>
-                        </tr>
-                      </tfoot>
-                    </table>
-                  </div>
-                ) : (
-                  <div className="text-center text-muted p-4 border rounded-3 bg-light">
-                    No hourly entries recorded yet for this plan.
-                  </div>
+        <CommonModal
+          show={showViewModal}
+          onHide={() => { setShowViewModal(false); setViewPlan(null); }}
+          title={`Daily Plan — ${viewPlan?.dailyPlanId}`}
+          footer={
+            viewPlan && (
+              <div className="flex gap-2">
+                {(viewPlan.status === "APPROVED" || viewPlan.status === "IN_PROGRESS") && (
+                  <button
+                    className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium text-sm"
+                    onClick={() => { setShowViewModal(false); handleLogHourly(viewPlan); }}
+                  >
+                    <FaClipboardList /> Log Hourly Entry
+                  </button>
                 )}
+                <button
+                  className="px-4 py-2 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 transition-colors font-medium text-sm"
+                  onClick={() => setShowViewModal(false)}
+                >
+                  Close
+                </button>
+              </div>
+            )
+          }
+        >
+          {viewPlan && (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <div className="p-4 bg-white rounded-xl border border-slate-200">
+                  <h6 className="font-bold text-xs text-slate-500 uppercase tracking-wider mb-3">Plan Details</h6>
+                  <div className="flex flex-col gap-2 text-sm text-slate-700">
+                    <span><strong className="text-slate-900">Production Order:</strong> {viewPlan.productionOrderId}</span>
+                    <span><strong className="text-slate-900">Product:</strong> {viewPlan.productionOrder?.productItem?.productName || "—"}</span>
+                    <span><strong className="text-slate-900">Date:</strong> {viewPlan.productionDate?.split("T")[0]}</span>
+                    <span><strong className="text-slate-900">Machine:</strong> {viewPlan.machine?.machineName || viewPlan.machineId}</span>
+                    <span><strong className="text-slate-900">Shift:</strong> {viewPlan.shift?.shiftName || viewPlan.shiftId}</span>
+                  </div>
+                </div>
+                <div className="p-4 bg-white rounded-xl border border-slate-200">
+                  <h6 className="font-bold text-xs text-slate-500 uppercase tracking-wider mb-3">Quantities</h6>
+                  <div className="flex flex-col gap-2 text-sm text-slate-700">
+                    <span><strong className="text-slate-900">Planned Qty:</strong> {viewPlan.plannedQty} pcs</span>
+                    <span><strong className="text-slate-900">Planned Hours:</strong> {viewPlan.plannedHours || "—"} hrs</span>
+                    <span className="flex items-center gap-2"><strong className="text-slate-900">Priority:</strong> <StatusBadge status={viewPlan.priority || "MEDIUM"} /></span>
+                    <span className="flex items-center gap-2"><strong className="text-slate-900">Status:</strong> <StatusBadge status={viewPlan.status} /></span>
+                    {viewPlan.remarks && <span><strong className="text-slate-900">Remarks:</strong> {viewPlan.remarks}</span>}
+                  </div>
+                </div>
+              </div>
 
-                {/* ─── OEE & Production Summary ─────────────────────────────── */}
-                {viewPlanOeeSummary && (
-                  <div className="mt-4 rounded-3 p-3" style={{ background: "linear-gradient(135deg, #1e3a5f 0%, #1e40af 100%)", color: "#fff" }}>
-                    <div className="fw-bold mb-3" style={{ fontSize: '13px', letterSpacing: '0.05em', textTransform: 'uppercase', opacity: 0.9 }}>
-                      📊 Production OEE Summary
-                    </div>
-                    <div className="row g-2 text-center mb-3">
-                      <div className="col-4 col-md-2">
-                        <div style={{ fontSize: '20px', fontWeight: '800' }}>{viewPlanOeeSummary.oeePercent}%</div>
-                        <div style={{ fontSize: '9px', opacity: 0.75, textTransform: 'uppercase' }}>Overall OEE</div>
-                      </div>
-                      <div className="col-4 col-md-2">
-                        <div style={{ fontSize: '16px', fontWeight: '700', color: '#86efac' }}>{viewPlanOeeSummary.availability}%</div>
-                        <div style={{ fontSize: '9px', opacity: 0.75, textTransform: 'uppercase' }}>Availability</div>
-                      </div>
-                      <div className="col-4 col-md-2">
-                        <div style={{ fontSize: '16px', fontWeight: '700', color: '#fde68a' }}>{viewPlanOeeSummary.performance}%</div>
-                        <div style={{ fontSize: '9px', opacity: 0.75, textTransform: 'uppercase' }}>Performance</div>
-                      </div>
-                      <div className="col-4 col-md-2">
-                        <div style={{ fontSize: '16px', fontWeight: '700', color: '#c4b5fd' }}>{viewPlanOeeSummary.quality}%</div>
-                        <div style={{ fontSize: '9px', opacity: 0.75, textTransform: 'uppercase' }}>Quality</div>
-                      </div>
-                      <div className="col-4 col-md-2">
-                        <div style={{ fontSize: '16px', fontWeight: '700' }}>{viewPlanOeeSummary.runtimeMinutes} <span style={{ fontSize: '11px' }}>min</span></div>
-                        <div style={{ fontSize: '9px', opacity: 0.75, textTransform: 'uppercase' }}>Runtime</div>
-                      </div>
-                      <div className="col-4 col-md-2">
-                        <div style={{ fontSize: '16px', fontWeight: '700', color: '#fca5a5' }}>{viewPlanOeeSummary.downtimeMinutes} <span style={{ fontSize: '11px' }}>min</span></div>
-                        <div style={{ fontSize: '9px', opacity: 0.75, textTransform: 'uppercase' }}>Downtime</div>
-                      </div>
-                    </div>
-                    <div className="row g-2 text-center">
-                      {[
-                        { label: 'Planned', value: viewPlanOeeSummary.targetQty, color: '#93c5fd' },
-                        { label: 'Produced', value: viewPlanOeeSummary.producedQty, color: '#86efac' },
-                        { label: 'Good Qty', value: viewPlanOeeSummary.goodQty, color: '#6ee7b7' },
-                        { label: 'Reject', value: viewPlanOeeSummary.rejectQty, color: '#fca5a5' },
-                        { label: 'Scrap', value: viewPlanOeeSummary.scrapQty, color: '#fde68a' },
-                        { label: 'Remaining', value: viewPlanOeeSummary.remainingQty, color: '#e2e8f0' },
-                      ].map(({ label, value, color }) => (
-                        <div key={label} className="col-4 col-md-2">
-                          <div style={{ fontSize: '14px', fontWeight: '700', color }}>{Number(value)}</div>
-                          <div style={{ fontSize: '9px', opacity: 0.75, textTransform: 'uppercase' }}>{label}</div>
-                        </div>
+              <h6 className="font-bold text-xs text-primary uppercase tracking-wider mb-3">
+                Hourly Production Entries
+              </h6>
+              {loadingViewLogs ? (
+                <div className="text-center py-6">
+                  <div className="inline-block w-6 h-6 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                  <p className="mt-2 text-slate-500 text-sm">Loading...</p>
+                </div>
+              ) : viewHourlyLogs.length > 0 ? (
+                <div className="rounded-lg border border-slate-200 overflow-x-auto">
+                  <table className="w-full text-sm text-center border-collapse">
+                    <thead className="bg-slate-50 text-slate-600 border-b border-slate-200">
+                      <tr>
+                        <th className="px-2 py-2 font-semibold">Hour</th>
+                        <th className="px-2 py-2 font-semibold">Produced</th>
+                        <th className="px-2 py-2 font-semibold">Reject</th>
+                        <th className="px-2 py-2 font-semibold">Scrap</th>
+                        <th className="px-2 py-2 font-semibold">Downtime</th>
+                        <th className="px-2 py-2 font-semibold text-emerald-700">Avail%</th>
+                        <th className="px-2 py-2 font-semibold text-purple-700">Qual%</th>
+                        <th className="px-2 py-2 font-bold text-blue-700">OEE%</th>
+                        <th className="px-2 py-2 font-semibold">Operator</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 text-slate-700">
+                      {viewHourlyLogs.map((h: any) => (
+                        <tr key={h.hourlyProductionId} className="hover:bg-slate-50">
+                          <td className="px-2 py-2 font-bold font-mono">H{h.hourIndex}</td>
+                          <td className="px-2 py-2 font-bold text-emerald-600">{h.qtyProduced}</td>
+                          <td className="px-2 py-2 text-rose-600">{h.rejectQty || 0}</td>
+                          <td className="px-2 py-2 text-amber-500">{h.scrapQty || 0}</td>
+                          <td className="px-2 py-2 text-slate-500">{h.downtime > 0 ? `${h.downtime} min` : "—"}</td>
+                          <td className="px-2 py-2 font-semibold text-emerald-700">
+                            {h.availabilityPct !== undefined ? `${h.availabilityPct}%` : '—'}
+                          </td>
+                          <td className="px-2 py-2 font-semibold text-purple-700">
+                            {h.qualityPct !== undefined ? `${h.qualityPct}%` : '—'}
+                          </td>
+                          <td className="px-2 py-2 font-extrabold text-blue-700">
+                            {h.hourlyOEE !== undefined ? `${h.hourlyOEE}%` : '—'}
+                          </td>
+                          <td className="px-2 py-2 text-slate-500 text-xs">{h.operatorId || "—"}</td>
+                        </tr>
                       ))}
+                    </tbody>
+                    <tfoot className="bg-white font-bold border-t border-slate-200">
+                      <tr>
+                        <td className="px-2 py-2">Total</td>
+                        <td className="px-2 py-2 text-emerald-600">{viewHourlyLogs.reduce((s, h) => s + Number(h.qtyProduced || 0), 0)}</td>
+                        <td className="px-2 py-2 text-rose-600">{viewHourlyLogs.reduce((s, h) => s + Number(h.rejectQty || 0), 0)}</td>
+                        <td className="px-2 py-2 text-amber-500">{viewHourlyLogs.reduce((s, h) => s + Number(h.scrapQty || 0), 0)}</td>
+                        <td className="px-2 py-2 text-slate-500">{(() => { const t = viewHourlyLogs.reduce((s, h) => s + Number(h.downtime || 0), 0); return t > 0 ? `${t} min` : "—"; })()}</td>
+                        <td colSpan={3} className="px-2 py-2 text-center text-slate-400 font-normal text-xs">Avg from OEE Summary below</td>
+                        <td></td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              ) : (
+                <div className="text-center text-slate-500 p-6 border border-slate-200 rounded-lg bg-white">
+                  No hourly entries recorded yet for this plan.
+                </div>
+              )}
+
+              {/* ─── OEE & Production Summary ─────────────────────────────── */}
+              {viewPlanOeeSummary && (
+                <div className="mt-6 rounded-xl p-4 bg-gradient-to-br from-slate-800 to-blue-900 text-white shadow-lg">
+                  <div className="font-bold mb-4 text-[13px] tracking-wider uppercase opacity-90">
+                    📊 Production OEE Summary
+                  </div>
+                  <div className="grid grid-cols-3 md:grid-cols-6 gap-4 text-center mb-4">
+                    <div>
+                      <div className="text-2xl font-extrabold">{viewPlanOeeSummary.oeePercent}%</div>
+                      <div className="text-[9px] opacity-75 uppercase tracking-wider mt-1">Overall OEE</div>
+                    </div>
+                    <div>
+                      <div className="text-lg font-bold text-emerald-300">{viewPlanOeeSummary.availability}%</div>
+                      <div className="text-[9px] opacity-75 uppercase tracking-wider mt-1">Availability</div>
+                    </div>
+                    <div>
+                      <div className="text-lg font-bold text-amber-200">{viewPlanOeeSummary.performance}%</div>
+                      <div className="text-[9px] opacity-75 uppercase tracking-wider mt-1">Performance</div>
+                    </div>
+                    <div>
+                      <div className="text-lg font-bold text-purple-300">{viewPlanOeeSummary.quality}%</div>
+                      <div className="text-[9px] opacity-75 uppercase tracking-wider mt-1">Quality</div>
+                    </div>
+                    <div>
+                      <div className="text-lg font-bold">{viewPlanOeeSummary.runtimeMinutes} <span className="text-[11px] font-normal">min</span></div>
+                      <div className="text-[9px] opacity-75 uppercase tracking-wider mt-1">Runtime</div>
+                    </div>
+                    <div>
+                      <div className="text-lg font-bold text-rose-300">{viewPlanOeeSummary.downtimeMinutes} <span className="text-[11px] font-normal">min</span></div>
+                      <div className="text-[9px] opacity-75 uppercase tracking-wider mt-1">Downtime</div>
                     </div>
                   </div>
-                )}
-              </>
-            )}
-          </Modal.Body>
-          <Modal.Footer>
-            {viewPlan && (viewPlan.status === "APPROVED" || viewPlan.status === "IN_PROGRESS") && (
-              <Button
-                variant="success"
-                className="rounded-3"
-                onClick={() => { setShowViewModal(false); handleLogHourly(viewPlan); }}
-              >
-                <FaClipboardList className="me-2" /> Log Hourly Entry
-              </Button>
-            )}
-            <Button variant="secondary" className="rounded-3" onClick={() => setShowViewModal(false)}>
-              Close
-            </Button>
-          </Modal.Footer>
-        </Modal>
+                  <div className="grid grid-cols-3 md:grid-cols-6 gap-4 text-center pt-4 border-t border-white/20">
+                    {[
+                      { label: 'Planned', value: viewPlanOeeSummary.targetQty, color: 'text-blue-300' },
+                      { label: 'Produced', value: viewPlanOeeSummary.producedQty, color: 'text-emerald-300' },
+                      { label: 'Good Qty', value: viewPlanOeeSummary.goodQty, color: 'text-emerald-200' },
+                      { label: 'Reject', value: viewPlanOeeSummary.rejectQty, color: 'text-rose-300' },
+                      { label: 'Scrap', value: viewPlanOeeSummary.scrapQty, color: 'text-amber-200' },
+                      { label: 'Remaining', value: viewPlanOeeSummary.remainingQty, color: 'text-slate-300' },
+                    ].map(({ label, value, color }) => (
+                      <div key={label}>
+                        <div className={`text-sm font-bold ${color}`}>{Number(value)}</div>
+                        <div className="text-[9px] opacity-75 uppercase tracking-wider mt-1">{label}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </CommonModal>
 
         {/* ─────── Stop Production Modal ─────── */}
-        <Modal show={showStopModal} onHide={() => { setShowStopModal(false); setStopPlan(null); }} centered>
-          <Modal.Header closeButton className="bg-danger text-white">
-            <Modal.Title className="fs-5 fw-bold">Stop Production Plan</Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
-            <p>You are about to stop the production plan <strong>{stopPlan?.dailyPlanId}</strong> prematurely.</p>
-            <p className="small text-muted">
+        <CommonModal
+          show={showStopModal}
+          onHide={() => { setShowStopModal(false); setStopPlan(null); }}
+          title={<span className="text-rose-600">Stop Production Plan</span>}
+          footer={
+            <div className="flex gap-2">
+              <button
+                className="px-4 py-2 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 transition-colors font-medium text-sm"
+                onClick={() => { setShowStopModal(false); setStopPlan(null); }}
+                disabled={isStopping}
+              >
+                Cancel
+              </button>
+              <button
+                className="px-4 py-2 bg-rose-600 text-white rounded-lg hover:bg-rose-700 transition-colors font-medium text-sm disabled:opacity-50"
+                onClick={confirmStopProduction}
+                disabled={isStopping || !stopReason.trim()}
+              >
+                {isStopping ? "Stopping..." : "Stop Production"}
+              </button>
+            </div>
+          }
+        >
+          <div className="text-slate-700 text-sm">
+            <p className="mb-2">You are about to stop the production plan <strong className="text-slate-900">{stopPlan?.dailyPlanId}</strong> prematurely.</p>
+            <p className="text-xs text-slate-500 bg-white p-3 rounded-lg border border-slate-200 mb-4">
               The number of logged hourly productions is <strong>{
                 Array.isArray(stopPlan?.hourlyProductions)
                   ? stopPlan.hourlyProductions.filter((h: any) => Number(h.hourIndex) > 0).length
                   : 0
-              }</strong>. 
+              }</strong>.
               The planned hours for this plan will be adjusted to match the logged hours to release the remaining shift capacity.
             </p>
-            <div className="form-group mt-3">
-              <label className="form-label fw-bold">Reason for Stopping *</label>
+            <div className="flex flex-col gap-1.5">
+              <label className="font-bold text-slate-800 text-sm">Reason for Stopping <span className="text-rose-500">*</span></label>
               <textarea
-                className="form-control"
+                className="w-full border border-slate-300 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent"
                 rows={3}
                 placeholder="e.g. Urgent production order PO-XXX required on this machine"
                 value={stopReason}
@@ -903,16 +914,8 @@ const DailyProductionPlanningPage: React.FC = () => {
                 required
               />
             </div>
-          </Modal.Body>
-          <Modal.Footer>
-            <Button variant="secondary" onClick={() => { setShowStopModal(false); setStopPlan(null); }} disabled={isStopping}>
-              Cancel
-            </Button>
-            <Button variant="danger" onClick={confirmStopProduction} disabled={isStopping || !stopReason.trim()}>
-              {isStopping ? "Stopping..." : "Stop Production"}
-            </Button>
-          </Modal.Footer>
-        </Modal>
+          </div>
+        </CommonModal>
 
         {/* ─────── Status Advance Confirm Modal ─────── */}
         <CommonConfirmModal
@@ -935,7 +938,7 @@ const DailyProductionPlanningPage: React.FC = () => {
           confirmText="Delete"
           confirmVariant="danger"
         />
-      </Container>
+      </div>
     </div>
   );
 };

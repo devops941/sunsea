@@ -146,7 +146,7 @@ const TimePickerInput: React.FC<TimePickerInputProps> = ({
 
         {isOpen && !disabled && (
           <div className="absolute top-[40px] left-0 z-50 bg-white border border-slate-200 rounded-xl shadow-lg w-[320px] overflow-hidden">
-            <div className="flex bg-slate-50 border-b border-slate-200">
+            <div className="flex bg-white border-b border-slate-200">
               {/* Hour Column */}
               <div className="flex-1 border-r border-slate-200">
                 <div className="text-center py-2 text-xs font-bold text-slate-500 uppercase bg-slate-100 border-b border-slate-200">Hour</div>

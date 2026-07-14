@@ -161,8 +161,8 @@ const SupplierMaterialPricingList: React.FC = () => {
     };
 
     return (
-        <div className="w-full min-h-screen bg-slate-50/50 p-4 md:p-6 lg:p-8">
-            <div className="max-w-7xl mx-auto space-y-6">
+        <div className="w-full min-h-screen bg-white/50 p-4 md:p-6 lg:p-8">
+            <div className=" space-y-6">
                 
                 {/* Header Section */}
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
@@ -192,7 +192,7 @@ const SupplierMaterialPricingList: React.FC = () => {
                     <div className="overflow-x-auto">
                         <table className="w-full text-left text-sm whitespace-nowrap">
                             <thead>
-                                <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-600 font-semibold">
+                                <tr className="bg-white/80 border-b border-slate-200 text-slate-600 font-semibold">
                                     <th className="px-6 py-4">Raw Material</th>
                                     <th className="px-6 py-4">Current Price</th>
                                     <th className="px-6 py-4">Valid From</th>
@@ -214,7 +214,7 @@ const SupplierMaterialPricingList: React.FC = () => {
 
                                 {!loading && rows.length === 0 && (
                                     <tr>
-                                        <td colSpan={5} className="px-6 py-12 text-center text-slate-500 bg-slate-50/50">
+                                        <td colSpan={5} className="px-6 py-12 text-center text-slate-500 bg-white/50">
                                             No raw materials priced for this supplier yet.
                                         </td>
                                     </tr>
@@ -268,7 +268,7 @@ const SupplierMaterialPricingList: React.FC = () => {
                                             </tr>
 
                                             {isExpanded && (
-                                                <tr className="bg-slate-50 border-b border-slate-200 shadow-inner">
+                                                <tr className="bg-white border-b border-slate-200 shadow-inner">
                                                     <td colSpan={5} className="p-0">
                                                         <div className="px-6 py-5">
                                                             {historyLoading === row.rawMaterialId ? (
@@ -388,7 +388,7 @@ const SupplierMaterialPricingList: React.FC = () => {
                             </div>
                         </div>
 
-                        <div className="flex items-center justify-end gap-3 px-6 py-4 bg-slate-50 border-t border-slate-100">
+                        <div className="flex items-center justify-end gap-3 px-6 py-4 bg-white border-t border-slate-100">
                             <button
                                 type="button"
                                 onClick={closeReviseModal}

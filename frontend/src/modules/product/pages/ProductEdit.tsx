@@ -633,7 +633,7 @@ const ProductEdit: React.FC = () => {
                     <div className="pt-2">
                         <h6 className="text-base font-semibold text-gray-800 mb-3">Product Images</h6>
                         <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-5 gap-3">
-                            <div className="col-span-1 md:col-span-2 border border-slate-200 rounded-xl p-4 bg-slate-50 flex flex-col justify-center h-32">
+                            <div className="col-span-1 md:col-span-2 border border-slate-200 rounded-xl p-4 bg-white flex flex-col justify-center h-32">
                                 <input
                                     ref={fileInputRef}
                                     type="file"
@@ -700,7 +700,7 @@ const ProductEdit: React.FC = () => {
                             ))}
 
                             {!hasAnyImage && (
-                                <div className="col-span-1 border border-slate-200 rounded-xl p-2 h-32 flex flex-col items-center justify-center bg-slate-50 text-slate-400">
+                                <div className="col-span-1 border border-slate-200 rounded-xl p-2 h-32 flex flex-col items-center justify-center bg-white text-slate-400">
                                     <FaImage size={24} className="mb-2" />
                                     <span className="text-xs">No images</span>
                                 </div>
@@ -816,7 +816,7 @@ const ProductEdit: React.FC = () => {
 
                         {colorTypePricing.length !== 0 && (
                             <div className="mt-4 border border-slate-200 rounded-xl overflow-hidden">
-                                <div className="bg-slate-50 px-4 py-3 border-b border-slate-200">
+                                <div className="bg-white px-4 py-3 border-b border-slate-200">
                                     <h6 className="font-semibold text-slate-700 m-0">Price Per Color Type</h6>
                                 </div>
                                 <div className="overflow-x-auto">

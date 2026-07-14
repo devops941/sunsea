@@ -222,7 +222,7 @@ const EmployeeCreatePage: React.FC = () => {
   };
 
   return (
-    <div className="w-full max-w-7xl mx-auto space-y-6">
+    <div className="w-full  space-y-6">
       {/* Page Header */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200">
         <div className="px-6 py-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
@@ -345,7 +345,7 @@ const EmployeeCreatePage: React.FC = () => {
             </div>
 
             {formData.createLoginAccount && (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 bg-slate-50 p-6 rounded-xl border border-slate-100 animate-[fadeIn_0.3s_ease]">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 bg-white p-6 rounded-xl border border-slate-100 animate-[fadeIn_0.3s_ease]">
                 <TextInput
                   label="Username"
                   name="username"

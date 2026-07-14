@@ -128,8 +128,8 @@ const ShiftList: React.FC = () => {
     };
 
     return (
-        <div className="p-4 md:p-6 min-h-screen bg-slate-50">
-            <div className="max-w-7xl mx-auto">
+        <div className="p-4 md:p-6 min-h-screen bg-white">
+            <div className="">
                 
                 <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                     {/* Page Header */}
@@ -142,7 +142,7 @@ const ShiftList: React.FC = () => {
                                 <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                                 <input
                                     type="text"
-                                    className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                                    className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
                                     placeholder="Search shifts..."
                                     value={searchTerm}
                                     onChange={handleSearch}

@@ -118,7 +118,7 @@ const defaultValues: ProductionOrderFormValues = {
     id: undefined,
     sourceSalesOrderId: "",
     sourceSalesOrderLineId: "",
-    products: [{ productItemId: "", targetQty: 0, damageQty: 100, uom: "PCS", sourceSalesOrderLineId: "", rawMaterials: [], colorType: "sc" }],
+    products: [{ productItemId: "", targetQty: 0, damageQty: 100, uom: "PCS", sourceSalesOrderLineId: "", rawMaterials: [{ rawMaterialId: "", requiredQty: "", uom: "", storeId: "", remarks: "" }], colorType: "sc" }],
     productionOrderId: "",
     orderDate: today,
     dueDate: nextWeek,
@@ -257,7 +257,7 @@ const RawMaterialRowInner: React.FC<RawMaterialRowInnerProps> = React.memo(({
     return (
         <tr className="master-data-row">
             {/* STORE */}
-            <td className="master-data-cell">
+            <td className="px-4 py-3">
                 <Controller
                     name={`products.${productIndex}.rawMaterials.${index}.storeId` as const}
                     control={control}
@@ -279,7 +279,7 @@ const RawMaterialRowInner: React.FC<RawMaterialRowInnerProps> = React.memo(({
             </td>
 
             {/* RAW MATERIAL */}
-            <td className="master-data-cell">
+            <td className="px-4 py-3">
                 <Controller
                     name={`products.${productIndex}.rawMaterials.${index}.rawMaterialId` as const}
                     control={control}
@@ -314,7 +314,7 @@ const RawMaterialRowInner: React.FC<RawMaterialRowInnerProps> = React.memo(({
             </td>
 
             {/* REQUIRED QTY & UOM */}
-            <td className="master-data-cell">
+            <td className="px-4 py-3">
                 <Controller
                     name={`products.${productIndex}.rawMaterials.${index}.requiredQty` as const}
                     control={control}
@@ -339,7 +339,7 @@ const RawMaterialRowInner: React.FC<RawMaterialRowInnerProps> = React.memo(({
             </td>
 
             {/* REMARKS */}
-            <td className="master-data-cell">
+            <td className="px-4 py-3">
                 <Controller
                     name={`products.${productIndex}.rawMaterials.${index}.remarks` as const}
                     control={control}
@@ -356,7 +356,7 @@ const RawMaterialRowInner: React.FC<RawMaterialRowInnerProps> = React.memo(({
             </td>
 
             {/* DELETE */}
-            <td className="master-data-cell text-center align-middle">
+            <td className="px-4 py-3 text-center align-middle">
                 <DeleteButton onClick={() => remove(index)} />
             </td>
         </tr>
@@ -418,66 +418,67 @@ const ProductRawMaterialsSection: React.FC<ProductRawMaterialsSectionProps> = Re
                 />
             </div>
 
-            {fields.length === 0 ? (
-                <div className="text-slate-500 text-center p-3 border rounded bg-light">
-                    No raw materials added. Click 'Add Material Row' to include materials.
-                </div>
-            ) : (
-                <div className="overflow-x-auto mt-2 mb-2">
-                    <table className="w-full text-left text-sm text-slate-600">
-                        <thead className="bg-slate-50 border-b border-slate-200 text-slate-700">
+            <div className="mt-2 mb-2">
+                <table className="w-full text-left text-sm text-slate-600">
+                    <thead className="text-slate-700">
+                        <tr>
+                            <th>
+                                STORE{" "}
+                                <span className="text-red-500">
+                                    *
+                                </span>
+                            </th>
+                            <th>
+                                RAW MATERIAL{" "}
+                                <span className="text-red-500">
+                                    *
+                                </span>
+                            </th>
+                            <th>
+                                REQUIRED QTY & UOM{" "}
+                                <span className="text-red-500">
+                                    *
+                                </span>
+                            </th>
+                            <th>REMARKS</th>
+                            <th />
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                        {fields.length === 0 && (
                             <tr>
-                                <th>
-                                    STORE{" "}
-                                    <span className="text-red-500">
-                                        *
-                                    </span>
-                                </th>
-                                <th>
-                                    RAW MATERIAL{" "}
-                                    <span className="text-red-500">
-                                        *
-                                    </span>
-                                </th>
-                                <th>
-                                    REQUIRED QTY & UOM{" "}
-                                    <span className="text-red-500">
-                                        *
-                                    </span>
-                                </th>
-                                <th>REMARKS</th>
-                                <th />
+                                <td colSpan={5} className="px-4 py-3 text-center text-slate-500 bg-white rounded">
+                                    No raw materials added. Click 'Add Material Row' to include materials.
+                                </td>
                             </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                            {fields.map((item, index) => (
-                                <RawMaterialRowInner
-                                    key={item.id}
-                                    productIndex={productIndex}
-                                    index={index}
-                                    control={control}
-                                    remove={remove}
-                                    storeOptions={storeOptions}
-                                    errors={errors?.rawMaterials?.[index]}
-                                    watch={watch}
-                                    rowState={
-                                        rowRmStates[item.id] ?? {
-                                            options: [],
-                                            loading: false,
-                                            fetchedForStoreId: null,
-                                        }
+                        )}
+                        {fields.map((item, index) => (
+                            <RawMaterialRowInner
+                                key={item.id}
+                                productIndex={productIndex}
+                                index={index}
+                                control={control}
+                                remove={remove}
+                                storeOptions={storeOptions}
+                                errors={errors?.rawMaterials?.[index]}
+                                watch={watch}
+                                rowState={
+                                    rowRmStates[item.id] ?? {
+                                        options: [],
+                                        loading: false,
+                                        fetchedForStoreId: null,
                                     }
-                                    onStoreChange={(idx, storeId) => handleStoreChange(productIndex, idx, storeId, item.id)}
-                                    onRmChange={(idx, rmValue) => handleRmChange(productIndex, idx, rmValue, item.id)}
-                                    fetchRawMaterialsForStore={fetchRawMaterialsForStore}
-                                    fieldId={item.id}
-                                    setValue={setValue}
-                                />
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            )}
+                                }
+                                onStoreChange={(idx, storeId) => handleStoreChange(productIndex, idx, storeId, item.id)}
+                                onRmChange={(idx, rmValue) => handleRmChange(productIndex, idx, rmValue, item.id)}
+                                fetchRawMaterialsForStore={fetchRawMaterialsForStore}
+                                fieldId={item.id}
+                                setValue={setValue}
+                            />
+                        ))}
+                    </tbody>
+                </table>
+            </div>
         </div>
     );
 });
@@ -636,7 +637,7 @@ const ProductionOrderCreate: React.FC = () => {
             setSelectedSalesOrder(null);
             setSelectedSalesOrderItems([]);
             setValue("sourceSalesOrderLineId", "");
-            setValue("products", [{ productItemId: "", targetQty: 0, damageQty: 100, uom: "PCS", rawMaterials: [] }]);
+            setValue("products", [{ productItemId: "", targetQty: 0, damageQty: 100, uom: "PCS", rawMaterials: [{ rawMaterialId: "", requiredQty: "", uom: "", storeId: "", remarks: "" }] }]);
             return;
         }
 
@@ -658,7 +659,7 @@ const ProductionOrderCreate: React.FC = () => {
                                 damageQty: 100,
                                 uom: item.product?.uom?.name || "PCS",
                                 sourceSalesOrderLineId: item.id?.toString() || "",
-                                rawMaterials: [],
+                                rawMaterials: [{ rawMaterialId: "", requiredQty: "", uom: "", storeId: "", remarks: "" }],
                                 colorType: item.colorType || "sc"
                             };
                         });
@@ -886,7 +887,7 @@ const ProductionOrderCreate: React.FC = () => {
                 ...defaultValues,
                 sourceSalesOrderId:
                     (location.state as any)?.sourceSalesOrderId?.toString() || "",
-                products: [{ productItemId: "", targetQty: 0, damageQty: 100, uom: "PCS", rawMaterials: [], colorType: "sc" }],
+                products: [{ productItemId: "", targetQty: 0, damageQty: 100, uom: "PCS", rawMaterials: [{ rawMaterialId: "", requiredQty: "", uom: "", storeId: "", remarks: "" }], colorType: "sc" }],
             });
 
             productionOrderService
@@ -993,10 +994,10 @@ const ProductionOrderCreate: React.FC = () => {
 
     // ── Render ──────────────────────────────────────────────────────────────
     return (
-        <div className="p-4 md:p-6 min-h-screen bg-slate-50">
+        <div className="p-4 md:p-6 min-h-screen bg-white">
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200">
                 {/* Page Header */}
-                <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-slate-200">
+                <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 ">
                     <div>
                         <h2 className="text-2xl font-bold text-slate-800">
                             {isEditMode
@@ -1015,7 +1016,7 @@ const ProductionOrderCreate: React.FC = () => {
 
                 <form
                     onSubmit={handleSubmit(onSubmit)}
-                    className="form-inner"
+                    className="space-y-6"
                     noValidate
                 >
                     <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
@@ -1109,26 +1110,26 @@ const ProductionOrderCreate: React.FC = () => {
                                                                 key={i}
                                                                 className="master-data-row"
                                                             >
-                                                                <td className="master-data-cell">
+                                                                <td className="px-4 py-3">
                                                                     {i + 1}
                                                                 </td>
-                                                                <td className="master-data-cell fw-medium">
+                                                                <td className="px-4 py-3 font-medium">
                                                                     {item.product
                                                                         ?.productName ||
                                                                         `Product ID: ${item.productId}`}
                                                                 </td>
-                                                                <td className="master-data-cell">
+                                                                <td className="px-4 py-3">
                                                                     {item.product
                                                                         ?.productCode ||
                                                                         "-"}
                                                                 </td>
-                                                                <td className="master-data-cell">
+                                                                <td className="px-4 py-3">
                                                                     {item.colorType === 'mc' ? 'Multi Color' : (item.colorType === 'sc' ? 'Single Color' : '-')}
                                                                 </td>
-                                                                <td className="master-data-cell">
+                                                                <td className="px-4 py-3">
                                                                     {item.quantity}
                                                                 </td>
-                                                                <td className="master-data-cell">
+                                                                <td className="px-4 py-3">
                                                                     {item.product?.uom
                                                                         ?.name || "PCS"}
                                                                 </td>
@@ -1144,7 +1145,7 @@ const ProductionOrderCreate: React.FC = () => {
                         )}
                         <div className="md:col-span-12 p-4 md:p-6">
                             <div className="flex justify-between items-center mb-3">
-                                <h6 className="mb-0 border-b border-slate-200 pb-3-0 section-title ">
+                                <h6 className="text-lg font-bold text-slate-800 mb-6 ">
                                     {watchSalesOrderId ? "2. Production Item Details" : "1. Direct Production Item Details"}
                                 </h6>
                                 {!watchSalesOrderId && (
@@ -1152,15 +1153,15 @@ const ProductionOrderCreate: React.FC = () => {
                                         text="Add Production"
                                         icon={FaPlus}
                                         type="button"
-                                        onClick={() => appendProduct({ productItemId: "", targetQty: 0, damageQty: 100, uom: "PCS", rawMaterials: [] })}
+                                        onClick={() => appendProduct({ productItemId: "", targetQty: 0, damageQty: 100, uom: "PCS", rawMaterials: [{ rawMaterialId: "", requiredQty: "", uom: "", storeId: "", remarks: "" }] })}
                                     />
                                 )}
                             </div>
                             <div className="p-0">
                                 {productFields.map((prodItem, index) => (
-                                    <div key={prodItem.id} className={index > 0 ? "mt-4 pt-4 border-top" : ""}>
-                                        <div className="flex justify-between items-center mb-2">
-                                            <span className=" section-title border-b border-slate-200 pb-3-0 ">Product {index + 1}</span>
+                                    <div key={prodItem.id} className={index > 0 ? "mt-4 pt-4 border-t border-slate-200" : ""}>
+                                        <div className="flex justify-between items-center mb-4">
+                                            <h3 className="text-lg font-bold text-slate-800 border-b border-slate-200 pb-2 flex-grow">Product {index + 1}</h3>
                                             {!watchSalesOrderId && productFields.length > 1 && (
                                                 <DeleteButton onClick={() => removeProduct(index)} />
                                             )}
@@ -1360,7 +1361,7 @@ const ProductionOrderCreate: React.FC = () => {
 
 
                         {/* ── 2. General Details ──────────────────────────── */}
-                        <div className="md:col-span-12 p-4 md:p-6">
+                        <div className="md:col-span-12 lg:col-span-4 p-4 md:p-6">
 
                             <h6 className="text-lg font-bold text-slate-800 mb-6">
                                 2. General Details
@@ -1416,11 +1417,11 @@ const ProductionOrderCreate: React.FC = () => {
                                 text={isSubmitting ? "Saving..." : "Save as Draft"}
                                 onClick={handleSubmit((data) => onSubmit({ ...data, status: "DRAFT" }))}
                                 disabled={isSubmitting}
-                                className="bg-slate-500 hover:bg-slate-600 text-white"
+
                             />
                         </div>
                         <div className="ml-2">
-                            <Button
+                            <CustomButton
                                 text={
                                     isSubmitting
                                         ? isEditMode

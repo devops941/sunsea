@@ -120,7 +120,7 @@ const StockAdjustmentList: React.FC = () => {
   };
 
   return (
-    <div className="p-4 md:p-6 min-h-screen bg-slate-50">
+    <div className="p-4 md:p-6 min-h-screen bg-white">
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
         {/* Page Header */}
         <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-slate-200">
@@ -207,7 +207,7 @@ const StockAdjustmentList: React.FC = () => {
 
         {/* Advanced Date Filters */}
         {showFilters && (
-          <div className="p-4 bg-slate-50 border-b border-slate-200 flex flex-wrap items-end gap-4">
+          <div className="p-4 bg-white border-b border-slate-200 flex flex-wrap items-end gap-4">
             <div>
               <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Date From</label>
               <input

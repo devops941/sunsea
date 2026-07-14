@@ -15,6 +15,7 @@ import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
 import ViewButton from "../../../components/ui/viewbutton/ViewButton";
 import FilterCard from "../../../components/ui/FilterCard/FilterCard";
 import WastageViewModal from "../components/WastageViewModal";
+import DataTable from "../../../components/ui/table/DataTable";
 import { FaPlus } from "react-icons/fa";
 const WastageList: React.FC = () => {
 
@@ -100,7 +101,7 @@ const WastageList: React.FC = () => {
   const displayWastages = Array.isArray(wastages) ? wastages : (wastages?.data && Array.isArray(wastages.data) ? wastages.data : []);
 
   return (
-    <div className="p-4 md:p-6 min-h-screen bg-slate-50">
+    <div className="p-4 md:p-6 min-h-screen bg-white">
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
         {/* Page Header */}
         <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-slate-200">
@@ -117,69 +118,71 @@ const WastageList: React.FC = () => {
         </div>
 
         {/* Table */}
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-slate-50 text-slate-600 border-b border-slate-200">
-              <tr>
-                <th className="px-4 py-3 font-semibold w-14">#</th>
-                <th className="px-4 py-3 font-semibold">DATE</th>
-                <th className="px-4 py-3 font-semibold">PRODUCT</th>
-                <th className="px-4 py-3 font-semibold">MACHINE</th>
-                <th className="px-4 py-3 font-semibold">SHIFT</th>
-                <th className="px-4 py-3 font-semibold">WASTAGE TYPE</th>
-                <th className="px-4 py-3 font-semibold">QUANTITY</th>
-                <th className="px-4 py-3 font-semibold">REASON</th>
-                <th className="px-4 py-3 font-semibold">STATUS</th>
-                <th className="px-4 py-3 font-semibold">ACTIONS</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {loading ? (
-                <tr>
-                  <td colSpan={10} className="text-center py-10 text-slate-500">
-                    <div className="flex items-center justify-center gap-2">
-                      <div className="w-5 h-5 border-2 border-teal-500 border-t-transparent rounded-full animate-spin" />
-                      Loading wastage records...
-                    </div>
-                  </td>
-                </tr>
-              ) : displayWastages.length > 0 ? (
-                displayWastages.map((item: any, index: number) => (
-                  <tr key={String(item.id)} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="px-4 py-3 text-slate-500">{index + 1}</td>
-                    <td className="px-4 py-3 font-mono text-slate-600">{new Date(item.wastageDate).toLocaleDateString()}</td>
-                    <td className="px-4 py-3 font-semibold text-slate-800">{item.product?.productName || "Unknown"}</td>
-                    <td className="px-4 py-3 text-slate-500">{item.machine?.machineName || item.machineId}</td>
-                    <td className="px-4 py-3 text-slate-600">{item.shift?.shiftName || item.shiftId}</td>
-                    <td className="px-4 py-3"><StatusBadge status={item.wastageType} /></td>
-                    <td className="px-4 py-3 font-bold text-slate-800">{item.quantity} {item.uom && item.uom.toUpperCase() === "PCS" ? "kg" : String(item.uom || "kg").toLowerCase()}</td>
-                    <td className="px-4 py-3 text-slate-500">
-                      {item.reason ? (
-                        <span title={item.reason} className="block max-w-[150px] truncate cursor-help">{item.reason}</span>
-                      ) : "-"}
-                    </td>
-                    <td className="px-4 py-3"><StatusBadge status={item.status} /></td>
-                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex items-center gap-2">
-                        <ViewButton onClick={() => handleView(item)} />
-                        {item.status === "DRAFT" && (
-                          <>
-                            <EditButton onClick={() => navigate(`/production-wastages/edit/${item.id}`, { state: item })} />
-                            <DeleteButton onClick={() => handleDeleteClick(String(item.id))} />
-                          </>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={10} className="text-center py-10 text-slate-500">No wastage logs reported matching criteria.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          data={displayWastages}
+          rowKey={(item) => String(item.id)}
+          loading={loading}
+          emptyMessage="No wastage logs reported matching criteria."
+          columns={[
+            {
+              header: "#",
+              width: "60px",
+              render: (_item: any, index: number) => index + 1,
+            },
+            {
+              header: "DATE",
+              render: (item: any) => <span className="font-mono text-slate-600">{new Date(item.wastageDate).toLocaleDateString()}</span>,
+            },
+            {
+              header: "PRODUCT",
+              render: (item: any) => <span className="font-semibold text-slate-800">{item.product?.productName || "Unknown"}</span>,
+            },
+            {
+              header: "MACHINE",
+              render: (item: any) => <span className="text-slate-500">{item.machine?.machineName || item.machineId}</span>,
+            },
+            {
+              header: "SHIFT",
+              render: (item: any) => <span className="text-slate-600">{item.shift?.shiftName || item.shiftId}</span>,
+            },
+            {
+              header: "WASTAGE TYPE",
+              render: (item: any) => <StatusBadge status={item.wastageType} />,
+            },
+            {
+              header: "QUANTITY",
+              render: (item: any) => (
+                <span className="font-bold text-slate-800">
+                  {item.quantity} {item.uom && item.uom.toUpperCase() === "PCS" ? "kg" : String(item.uom || "kg").toLowerCase()}
+                </span>
+              ),
+            },
+            {
+              header: "REASON",
+              render: (item: any) => item.reason ? (
+                <span title={item.reason} className="block max-w-[150px] truncate cursor-help text-slate-500">{item.reason}</span>
+              ) : <span className="text-slate-500">-</span>,
+            },
+            {
+              header: "STATUS",
+              render: (item: any) => <StatusBadge status={item.status} />,
+            },
+            {
+              header: "ACTIONS",
+              render: (item: any) => (
+                <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                  <ViewButton onClick={() => handleView(item)} />
+                  {item.status === "DRAFT" && (
+                    <>
+                      <EditButton onClick={() => navigate(`/production-wastages/edit/${item.id}`, { state: item })} />
+                      <DeleteButton onClick={() => handleDeleteClick(String(item.id))} />
+                    </>
+                  )}
+                </div>
+              ),
+            },
+          ]}
+        />
       </div>
 
       {/* Delete Confirmation Modal */}
