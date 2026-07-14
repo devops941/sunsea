@@ -1,11 +1,11 @@
+
 import React, { useState, useEffect, useMemo } from "react";
-import { Row, Col, Form } from "react-bootstrap";
 import { FaSave, FaHashtag, FaCalendarAlt, FaFileInvoice } from "react-icons/fa";
 import { toast } from "react-toastify";
 
 import TextInput from "../../components/form/TextInput/TextInput";
-import CustomButton from "../../components/ui/custombutton/CustomButton";
-import Section from "../../components/ui/Section/Section";
+import CustomButton from "../../components/ui/Button/Button";
+
 import { invoiceSettingsService, type InvoiceSettingDto } from "../../services/invoiceSettingsService";
 
 // Month (0-indexed) your financial year starts in.
@@ -196,151 +196,168 @@ const SalesInvoiceCreate: React.FC = () => {
     }
 
     return (
-        <Form onSubmit={handleSubmit}>
-            {/* 1. Invoice Numbering */}
-            <Section title="Invoice Numbering" icon={<FaHashtag />}>
-                <p className="text-muted small mb-4">Configure how invoice numbers are generated</p>
-                <Row className="g-3">
-                    <Col md={6}>
-                        <TextInput
-                            label="Invoice Prefix"
-                            name="invoicePrefix"
-                            value={formData.invoicePrefix}
-                            onChange={handleChange}
-                            required
-                            error={errors.invoicePrefix}
-                        />
-                        <small className="text-muted">Prefix for all invoice numbers (e.g., INV, BILL)</small>
-                    </Col>
-                    <Col md={6}>
-                        <TextInput
-                            label="Sequence Length"
-                            name="sequenceLength"
-                            type="number"
-                            min={1}
-                            value={String(formData.sequenceLength)}
-                            onChange={handleChange}
-                            required
-                            error={errors.sequenceLength}
-                        />
-                        <small className="text-muted">Number of digits in sequence (e.g., 4 = 0001)</small>
-                    </Col>
-                    <Col md={12}>
-                        <TextInput
-                            label="Current Sequence Number"
-                            name="currentSequenceNumber"
-                            type="number"
-                            value={String(formData.currentSequenceNumber)}
-                            onChange={handleChange}
-                            disabled
-                        />
-                        <small className="text-muted">Auto-incremented with each invoice. Cannot be manually edited.</small>
-                    </Col>
-                </Row>
-            </Section>
+        <div className="w-full mx-auto">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+                {/* Page Header */}
+                <div className="px-6 py-4 border-b border-gray-100">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div>
+                            <h2 className="text-xl font-bold text-gray-800">
+                                Invoice Configuration
+                            </h2>
+                        </div>
+                    </div>
+                </div>
 
-            {/* 2. Financial Year */}
-            <Section title="Financial Year" icon={<FaCalendarAlt />}>
-                <p className="text-muted small mb-4">Configure financial year for invoice numbering</p>
-                <Row className="g-3">
-                    {/* Auto/Manual toggle placed first so it's clear it controls the fields below */}
-                    <Col md={12}>
-                        <Form.Group className="d-flex align-items-center justify-content-between mb-2">
+                <form onSubmit={handleSubmit} className="px-6 py-4 space-y-6" noValidate>
+                    {/* 1. Invoice Numbering */}
+                    <div>
+                        <h6 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                            <FaHashtag className="text-blue-500" /> Invoice Numbering
+                        </h6>
+                        <p className="text-sm text-gray-500 mb-4 mt-[-10px]">Configure how invoice numbers are generated</p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             <div>
-                                <Form.Label
-                                    className="mb-0 fw-bold"
-                                    style={{ fontSize: "0.85rem", color: "var(--color-text-secondary)" }}
-                                >
-                                    Auto Financial Year
-                                </Form.Label>
-                                <div className="text-muted small">
+                                <TextInput
+                                    label="Invoice Prefix"
+                                    name="invoicePrefix"
+                                    value={formData.invoicePrefix}
+                                    onChange={handleChange as any}
+                                    required
+                                    error={errors.invoicePrefix}
+                                />
+                                <small className="text-gray-400">Prefix for all invoice numbers (e.g., INV, BILL)</small>
+                            </div>
+                            <div>
+                                <TextInput
+                                    label="Sequence Length"
+                                    name="sequenceLength"
+                                    type="number"
+                                    min={1}
+                                    value={String(formData.sequenceLength)}
+                                    onChange={handleChange as any}
+                                    required
+                                    error={errors.sequenceLength}
+                                />
+                                <small className="text-gray-400">Number of digits in sequence (e.g., 4 = 0001)</small>
+                            </div>
+                            <div>
+                                <TextInput
+                                    label="Current Sequence Number"
+                                    name="currentSequenceNumber"
+                                    type="number"
+                                    value={String(formData.currentSequenceNumber)}
+                                    onChange={handleChange as any}
+                                    disabled
+                                />
+                                <small className="text-gray-400">Auto-incremented with each invoice.</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 2. Financial Year */}
+                    <div>
+                        <h6 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                            <FaCalendarAlt className="text-orange-500" /> Financial Year
+                        </h6>
+                        <p className="text-sm text-gray-500 mb-4 mt-[-10px]">Configure financial year for invoice numbering</p>
+
+                        <div className="mb-4 flex items-center justify-between bg-gray-50 p-3 rounded-md border border-gray-100">
+                            <div>
+                                <div className="font-semibold text-sm text-gray-700">Auto Financial Year</div>
+                                <div className="text-xs text-gray-500">
                                     {formData.autoFinancialYear
                                         ? "System automatically determines the financial year based on today's date"
                                         : "Manually set your financial year start date"}
                                 </div>
                             </div>
-                            <Form.Check
-                                type="switch"
-                                id="autoFinancialYear"
-                                name="autoFinancialYear"
-                                checked={formData.autoFinancialYear}
-                                onChange={handleChange}
-                                style={{ scale: "1.2", cursor: "pointer" }}
-                            />
-                        </Form.Group>
-                    </Col>
-
-                    <Col md={6}>
-                        <TextInput
-                            label="Financial Year Start"
-                            name="financialYearStart"
-                            type="date"
-                            value={formData.financialYearStart}
-                            onChange={handleChange}
-                            required
-                            error={errors.financialYearStart}
-                            disabled={formData.autoFinancialYear}
-                        />
-                        <small className="text-muted">
-                            {formData.autoFinancialYear
-                                ? "Auto-calculated — disabled while Auto Financial Year is on"
-                                : "Start date of your financial year (full date with year)"}
-                        </small>
-                    </Col>
-                    <Col md={6}>
-                        <TextInput
-                            label="Financial Year End"
-                            name="financialYearEnd"
-                            type="date"
-                            value={formData.financialYearEnd}
-                            onChange={handleChange}
-                            disabled
-                        />
-                        <small className="text-muted">Auto-calculated as one day before start date (next year)</small>
-                    </Col>
-                </Row>
-            </Section>
-
-            {/* 3. Invoice Format */}
-            <Section title="Invoice Format" icon={<FaFileInvoice />}>
-                <p className="text-muted small mb-4">Auto-generated invoice number format based on your settings</p>
-                <Row className="g-3">
-                    <Col md={12}>
-                        <TextInput
-                            label="Format Template"
-                            name="formatTemplate"
-                            value={formData.formatTemplate}
-                            onChange={handleChange}
-                            required
-                            error={errors.formatTemplate}
-                        />
-                        <small className="text-muted">
-                            Variables: {"{PREFIX}"} - Invoice Prefix, {"{FY}"} - Financial Year, {"{SEQ}"} - Sequence Number
-                        </small>
-                    </Col>
-                    <Col md={12} className="mt-4">
-                        <label className="form-label fw-bold small text-muted">Preview</label>
-                        <div
-                            className="p-3 mb-2 rounded font-monospace text-center fs-4 border border-secondary-subtle"
-                            style={{
-                                background: "#f3f4f6",
-                                color: "#1f2937",
-                                letterSpacing: "1px",
-                                fontWeight: 600,
-                            }}
-                        >
-                            {livePreview}
+                            <div>
+                                <label className="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" name="autoFinancialYear" className="sr-only peer" checked={formData.autoFinancialYear} onChange={handleChange as any} />
+                                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                                </label>
+                            </div>
                         </div>
-                        <small className="text-muted">This is how your next invoice number will look</small>
-                    </Col>
-                </Row>
-            </Section>
 
-            {/* Submit Button */}
-            <div className="d-flex justify-content-end mt-4 mb-3">
-                <CustomButton text="Save Settings" icon={FaSave} type="submit" loading={saving} variant="primary" />
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <TextInput
+                                    label="Financial Year Start"
+                                    name="financialYearStart"
+                                    type="date"
+                                    value={formData.financialYearStart}
+                                    onChange={handleChange as any}
+                                    required
+                                    error={errors.financialYearStart}
+                                    disabled={formData.autoFinancialYear}
+                                />
+                                <small className="text-gray-400">
+                                    {formData.autoFinancialYear
+                                        ? "Auto-calculated — disabled while Auto Financial Year is on"
+                                        : "Start date of your financial year"}
+                                </small>
+                            </div>
+                            <div>
+                                <TextInput
+                                    label="Financial Year End"
+                                    name="financialYearEnd"
+                                    type="date"
+                                    value={formData.financialYearEnd}
+                                    onChange={handleChange as any}
+                                    disabled
+                                />
+                                <small className="text-gray-400">Auto-calculated as one day before start date (next year)</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 3. Invoice Format */}
+                    <div>
+                        <h6 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                            <FaFileInvoice className="text-purple-500" /> Invoice Format
+                        </h6>
+                        <p className="text-sm text-gray-500 mb-4 mt-[-10px]">Auto-generated invoice number format based on your settings</p>
+
+                        <div className="grid grid-cols-1 gap-4">
+                            <div>
+                                <TextInput
+                                    label="Format Template"
+                                    name="formatTemplate"
+                                    value={formData.formatTemplate}
+                                    onChange={handleChange as any}
+                                    required
+                                    error={errors.formatTemplate}
+                                />
+                                <small className="text-gray-400">
+                                    Variables: {"{PREFIX}"} - Invoice Prefix, {"{FY}"} - Financial Year, {"{SEQ}"} - Sequence Number
+                                </small>
+                            </div>
+
+                            <div className="mt-2">
+                                <label className="block text-sm font-semibold text-gray-700 mb-1">Preview</label>
+                                <div
+                                    className="p-3 mb-1 rounded text-center text-xl border border-gray-200"
+                                    style={{
+                                        background: "#f8fafc",
+                                        color: "#1e293b",
+                                        letterSpacing: "2px",
+                                        fontFamily: "monospace",
+                                        fontWeight: 600,
+                                    }}
+                                >
+                                    {livePreview}
+                                </div>
+                                <small className="text-gray-400">This is how your next invoice number will look</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="flex flex-wrap justify-end gap-3 mt-8 pt-4 border-t border-gray-200">
+                        <CustomButton text={saving ? "Saving..." : "Save Settings"} icon={FaSave} type="submit" disabled={saving} />
+                    </div>
+                </form>
             </div>
-        </Form>
+        </div>
     );
 };
 

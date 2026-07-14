@@ -753,6 +753,15 @@ const PurchaseOrderCreatePage: React.FC = () => {
     })),
   ], [gstTaxes, gstLoading]);
 
+  const uomOptions = useMemo(() => [
+    { value: "", label: "-- Select UOM --" },
+    ...(activeUOMs || []).map((uom: any) => ({
+      value: uom.uomName,
+      label: uom.uomName,
+    })),
+  ], [activeUOMs]);
+
+  console.log(uomOptions, 'hkj')
 
   const supplierMaterialIds = selectedSupplier?.materialPrices
     ? selectedSupplier.materialPrices.map((mp: any) => String(mp.rawMaterialId))
@@ -763,9 +772,11 @@ const PurchaseOrderCreatePage: React.FC = () => {
     : rawMaterials;
 
   const productOptions = filteredRawMaterials.map((rm) => ({
-    value: rm.rawMaterialId || "",
+    value: String(rm.rawMaterialId || ""),
     label: `${rm.rawMaterialId || ""} - ${rm.materialName || ""}`,
   }));
+
+  console.log(productOptions, "productOptions")
 
   // ============================================================
   // UI
@@ -851,14 +862,13 @@ const PurchaseOrderCreatePage: React.FC = () => {
             <CustomButton text="Add Item" icon={FaPlus} onClick={addItem} type="button" />
           </div>
 
-          <div className="rounded-xl border border-slate-200 bg-white [&_.mb-\[18px\]]:!mb-0 [&_.select-input-group]:!mb-0 overflow-x-auto">
+          <div className="rounded-xl border border-slate-200 bg-white [&_.mb-\[18px\]]:!mb-0 [&_.select-input-group]:!mb-0 overflow-visible">
             <table className="min-w-full divide-y divide-slate-200">
               <thead className="bg-slate-50/80">
                 <tr>
                   <th className="px-3 py-3 text-center text-[11px] font-bold text-slate-500 uppercase tracking-widest w-12 border-b border-slate-200">#</th>
                   <th className="px-3 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200">RAW MATERIAL</th>
-                  <th className="px-3 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200">UOM</th>
-                  <th className="px-3 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200">QTY</th>
+                  <th className="px-3 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200 min-w-[200px]">QTY & UOM</th>
                   <th className="px-3 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200">UNIT PRICE (₹)</th>
                   <th className="px-3 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200">TAX %</th>
                   <th className="px-3 py-3 text-right text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200">TAXABLE (₹)</th>
@@ -874,8 +884,17 @@ const PurchaseOrderCreatePage: React.FC = () => {
                     <tr key={index} className="hover:bg-slate-50/50 transition-colors duration-200">
                       <td className="px-3 py-2 whitespace-nowrap text-sm font-medium text-slate-400 text-center">{index + 1}</td>
                       <td className="px-3 py-2 whitespace-nowrap"><SelectInput label="" name={`items[${index}].productId`} value={item.productId ? String(item.productId) : ""} options={[{ value: "", label: "-- Select Material --" }, ...productOptions]} onChange={(e) => handleItemProductChange(index, e.target.value)} error={errors[`items.${index}.productId`]} hideLabel /></td>
-                      <td className="px-3 py-2 whitespace-nowrap"><SelectInput label="" name={`items[${index}].uom`} options={uomOptions} value={item.uom || ""} onChange={(e) => handleItemChange(index, "uom", e.target.value)} error={errors[`items.${index}.uom`]} hideLabel /></td>
-                      <td className="px-3 py-2 whitespace-nowrap"><TextInput label="" name={`items[${index}].quantity`} type="number" value={String(item.quantity)} onChange={(e) => handleItemChange(index, "quantity", Number(e.target.value))} error={errors[`items.${index}.quantity`]} min={0.01} step={0.01} placeholder="0.00" /></td>
+                      <td className="px-3 py-2 whitespace-nowrap align-top">
+                        <QuantityInput 
+                          name={`items[${index}].quantity`} 
+                          value={item.quantity} 
+                          baseUoms={[item.uom || "KG", ...uomOptions.map(o => o.value).filter(v => v !== (item.uom || "KG"))].join(",")}
+                          onChange={(e) => handleItemChange(index, "quantity", Number(e.target.value))} 
+                          error={errors[`items.${index}.quantity`]} 
+                          step="0.01" 
+                          hideLabel 
+                        />
+                      </td>
                       <td className="px-3 py-2 whitespace-nowrap"><TextInput label="" name={`items[${index}].unitPrice`} type="number" value={String(item.unitPrice)} onChange={(e) => handleItemChange(index, "unitPrice", Number(e.target.value))} error={errors[`items.${index}.unitPrice`]} min={0} step={0.01} placeholder="0.00" disabled /></td>
                       <td className="px-3 py-2 whitespace-nowrap"><SelectInput label="" name={`items[${index}].tax`} options={gstOptions} value={String(item.tax || 0)} onChange={(e) => handleItemChange(index, "tax", Number(e.target.value))} hideLabel /></td>
                       <td className="px-3 py-2 whitespace-nowrap text-right font-medium text-slate-700">₹{taxableAmount.toFixed(2)}</td>
@@ -892,7 +911,7 @@ const PurchaseOrderCreatePage: React.FC = () => {
                     </tr>
                   );
                 })}
-                {formData.items.length === 0 && <tr><td colSpan={8} className="px-3 py-4 text-center text-slate-400 font-medium">No items added — click "Add Item" to begin</td></tr>}
+                {formData.items.length === 0 && <tr><td colSpan={7} className="px-3 py-4 text-center text-slate-400 font-medium">No items added — click "Add Item" to begin</td></tr>}
               </tbody>
             </table>
           </div>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { Container, Row, Col } from "react-bootstrap";
-import { FaSave, FaEraser, FaPlus, FaTrash } from "react-icons/fa";
+
+import { FaSave, FaEraser, FaPlus, FaTrash, FaArrowLeft, FaTimes } from "react-icons/fa";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import { z } from "zod";
@@ -8,7 +8,7 @@ import { z } from "zod";
 import TextInput from "../../../components/form/TextInput/TextInput";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import Button from "../../../components/ui/Button/Button";
-import CustomButton from "../../../components/ui/custombutton/CustomButton";
+import CustomButton from "../../../components/ui/Button/Button";
 import Checkbox from "../../../components/form/CheckboxInput/CheckboxInput";
 import { useSuppliers } from "../../../hooks/useSuppliers";
 import type { SupplierAddress } from "../../../features/supplier/types";
@@ -18,6 +18,28 @@ import MultiSelect from "../../../components/form/multiSelect/MultiSelect";
 import IndiaPhoneInput from "../../../components/ui/PhoneInput/PhoneInput";
 import CityStateSelect from "../../../components/ui/CityStateSelect/CityStateSelect";
 import type { StateCityOption } from "../../../components/ui/CityStateSelect/CityStateSelect";
+import AddressForm from "../../../components/form/AddressFrom/AddressFrom";
+
+const getGstStateCode = (stateNameOrCode: string): string => {
+  const normalized = stateNameOrCode.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const mapping: Record<string, string> = {
+    jk: "01", hp: "02", pb: "03", ch: "04", ut: "05", hr: "06", dl: "07",
+    rj: "08", up: "09", br: "10", sk: "11", ar: "12", nl: "13", mn: "14",
+    mz: "15", tr: "16", ml: "17", as: "18", wb: "19", jh: "20", or: "21",
+    od: "21", ct: "22", cg: "22", mp: "23", gj: "24", dd: "26", dn: "26",
+    mh: "27", ap: "37", ka: "29", ga: "30", ld: "31", kl: "32", tn: "33",
+    py: "34", an: "35", tg: "36", ts: "36", la: "38", jammuandkashmir: "01",
+    himachalpradesh: "02", punjab: "03", chandigarh: "04", uttarakhand: "05",
+    haryana: "06", delhi: "07", rajasthan: "08", uttarpradesh: "09", bihar: "10",
+    sikkim: "11", arunachalpradesh: "12", nagaland: "13", manipur: "14", mizoram: "15",
+    tripura: "16", meghalaya: "17", assam: "18", westbengal: "19", jharkhand: "20",
+    odisha: "21", chhattisgarh: "22", madhyapradesh: "23", gujarat: "24", damananddiu: "26",
+    dadraandnagarhaveli: "26", maharashtra: "27", andhrapradesh: "37", karnataka: "29",
+    goa: "30", lakshadweep: "31", kerala: "32", tamilnadu: "33", puducherry: "34",
+    andamanandnicobarislands: "35", telangana: "36", ladakh: "38",
+  };
+  return mapping[normalized] || "";
+};
 
 const supplierFormSchema = z.object({
     companyId: z.string().uuid("Company ID must be a valid UUID"),
@@ -143,7 +165,7 @@ const SupplierEdit: React.FC = () => {
         isDefault: false,
     });
 
-    useEffect(() => {
+    const handleClear = () => {
         if (supplierData) {
             setFormData({
                 companyId: supplierData.companyId || "d67768ba-bcde-4321-a123-bcdef9876543",
@@ -223,6 +245,10 @@ const SupplierEdit: React.FC = () => {
                 setAddresses(supplierData.addresses);
             }
         }
+    };
+
+    useEffect(() => {
+        handleClear();
     }, [supplierData]);
 
     // Fetch categories and raw materials on mount
@@ -592,654 +618,503 @@ const SupplierEdit: React.FC = () => {
     };
 
     return (
-        <div className="inner-container">
-            <Container fluid>
-                <div className="page-header">
-                    <Row className="align-items-center g-3">
-                        <Col lg={6} md={12}>
-                            <div className="page-header-info">
-                                
-                                <h2 className="page-title">Edit Supplier</h2>
+        <div className="p-4 md:p-6 min-h-screen bg-slate-50">
+            <div className="max-w-7xl mx-auto space-y-3">
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200">
+                    <div className="p-6 border-b border-slate-200 flex items-center justify-between">
+                        <h2 className="text-2xl font-bold text-slate-800">Edit Supplier</h2>
+                        <CustomButton
+                            text="Back"
+                            icon={FaArrowLeft}
+                            onClick={() => navigate("/suppliers")}
+                        />
+                    </div>
+
+                    <form onSubmit={handleSubmit} className="p-6 space-y-4" noValidate>
+                        {/* SUPPLIER HEADER */}
+                        <div>
+                            <h3 className="text-lg font-semibold text-slate-700 mb-2">Identification & Status</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                <div>
+                                    <TextInput
+                                        label="SUPPLIER CODE"
+                                        name="supplierCode"
+                                        value={formData.supplierCode}
+                                        placeholder="SUP-001"
+                                        required
+                                        error={errors.supplierCode}
+                                        onChange={handleChange}
+                                        disabled
+                                    />
+                                </div>
+                                <div>
+                                    <SelectInput
+                                        label="Status"
+                                        name="status"
+                                        value={formData.status}
+                                        options={[
+                                            { value: "Active", label: "Active" },
+                                            { value: "Backup", label: "Backup" },
+                                            { value: "Inactive", label: "Inactive" },
+                                            { value: "Blacklisted", label: "Blacklisted" },
+                                        ]}
+                                        error={errors.status}
+                                        onChange={handleChange}
+                                    />
+                                </div>
+                                <div>
+                                    <TextInput
+                                        label="Created by-on"
+                                        name="createdByOn"
+                                        value={formData.createdByOn}
+                                        placeholder=""
+                                        onChange={handleChange}
+                                        disabled
+                                        error={errors.createdByOn}
+                                    />
+                                </div>
                             </div>
-                        </Col>
-                    </Row>
-                </div>
+                        </div>
 
-                <form onSubmit={handleSubmit} className="form-inner" noValidate>
-                    {/* SUPPLIER HEADER */}
-                    <Row className="mb-4">
-                        <h2 className="form-title">Supplier Header</h2>
-                        <Col lg={4} md={6}>
-                            <TextInput
-                                label="COMPANY ID"
-                                name="companyId"
-                                value={formData.companyId}
-                                placeholder="Enter Company UUID"
-                                required
-                                error={errors.companyId}
-                                onChange={handleChange}
-                            />
-                        </Col>
-                        <Col lg={4} md={6}>
-                            <TextInput
-                                label="SUPPLIER CODE"
-                                name="supplierCode"
-                                value={formData.supplierCode}
-                                placeholder="SUP-001"
-                                required
-                                error={errors.supplierCode}
-                                onChange={handleChange}
-                            />
-                        </Col>
-                        <Col lg={4} md={6}>
-                            <SelectInput
-                                label="Status"
-                                name="status"
-                                value={formData.status}
-                                options={[
-                                    { value: "Active", label: "Active" },
-                                    { value: "Backup", label: "Backup" },
-                                    { value: "Inactive", label: "Inactive" },
-                                    { value: "Blacklisted", label: "Blacklisted" },
-                                ]}
-                                error={errors.status}
-                                onChange={handleChange}
-                            />
-                        </Col>
-                    </Row>
+                        {/* BASIC INFORMATION */}
+                        <div>
+                            <h3 className="text-lg font-semibold text-slate-700 mb-2">Basic Information</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                <TextInput
+                                    label="LEGAL NAME"
+                                    name="legalName"
+                                    value={formData.legalName}
+                                    placeholder="Sri Vinayaga Chemicals Pvt Ltd"
+                                    required
+                                    error={errors.legalName}
+                                    onChange={handleChange}
+                                />
+                                <TextInput
+                                    label="Display Name"
+                                    name="displayName"
+                                    value={formData.displayName}
+                                    placeholder="SVC"
+                                    error={errors.displayName}
+                                    onChange={handleChange}
+                                />
+                                <SelectInput
+                                    label="VENDOR TYPE"
+                                    name="vendorType"
+                                    value={formData.vendorType}
+                                    options={[
+                                        { value: "Manufacturer", label: "Manufacturer" },
+                                        { value: "Trader", label: "Trader" },
+                                        { value: "Service", label: "Service" },
+                                        { value: "Logistics", label: "Logistics" },
+                                    ]}
+                                    error={errors.vendorType}
+                                    onChange={handleChange}
+                                />
+                                <MultiSelect
+                                    label="Raw Material Category"
+                                    name="parentCategories"
+                                    options={categoryOptions}
+                                    value={selectedParentCategories}
+                                    onChange={handleParentCategoryChange}
+                                    required
+                                />
+                                <MultiSelect
+                                    label="Raw Materials"
+                                    name="category"
+                                    options={rawMaterialOptions}
+                                    value={formData.category}
+                                    onChange={handleCategoryChange}
+                                    error={errors.category}
+                                    required
+                                />
 
-                    {/* BASIC INFORMATION */}
-                    <Row className="mb-4">
-                        <h2 className="form-title">Basic Information</h2>
-                        <Col lg={4} md={6}>
-                            <TextInput
-                                label="LEGAL NAME"
-                                name="legalName"
-                                value={formData.legalName}
-                                placeholder="Sri Vinayaga Chemicals Pvt Ltd"
-                                required
-                                error={errors.legalName}
-                                onChange={handleChange}
-                            />
-                        </Col>
-                        <Col lg={4} md={6}>
-                            <TextInput
-                                label="Display Name"
-                                name="displayName"
-                                value={formData.displayName}
-                                placeholder="SVC"
-                                error={errors.displayName}
-                                onChange={handleChange}
-                            />
-                        </Col>
-                        <Col lg={4} md={6}>
-                            <SelectInput
-                                label="VENDOR TYPE"
-                                name="vendorType"
-                                value={formData.vendorType}
-                                options={[
-                                    { value: "Manufacturer", label: "Manufacturer" },
-                                    { value: "Trader", label: "Trader" },
-                                    { value: "Service", label: "Service" },
-                                    { value: "Logistics", label: "Logistics" },
-                                ]}
-                                error={errors.vendorType}
-                                onChange={handleChange}
-                            />
-                        </Col>
-                        <Col lg={4} md={6} className="mt-3">
-                            <MultiSelect
-                                label="Raw Material Category"
-                                name="parentCategories"
-                                options={categoryOptions}
-                                value={selectedParentCategories}
-                                onChange={handleParentCategoryChange}
-                                required
-                            />
-                        </Col>
-                        <Col lg={4} md={6} className="mt-3">
-                            <MultiSelect
-                                label="Raw Materials"
-                                name="category"
-                                options={rawMaterialOptions}
-                                value={formData.category}
-                                onChange={handleCategoryChange}
-                                error={errors.category}
-                                required
-                            />
-                        </Col>
+                                {materialPrices.length > 0 && (
+                                    <div className="lg:col-span-3 mt-3">
+                                        <h3 className="text-sm font-bold text-slate-700 mb-2 uppercase">Raw Material Pricing</h3>
+                                        <div className="border border-slate-200 rounded-md overflow-hidden">
+                                            <table className="w-full text-sm text-left">
+                                                <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+                                                    <tr>
+                                                        <th className="px-4 py-2">Raw Material</th>
+                                                        <th className="px-4 py-2">Price (₹)</th>
+                                                        <th className="px-4 py-2">Valid From</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-slate-200">
+                                                    {materialPrices.map((mp, index) => (
+                                                        <tr key={mp.rawMaterialId} className="bg-white">
+                                                            <td className="px-4 py-2 font-medium text-slate-700">{mp.materialName}</td>
+                                                            <td className="px-4 py-2">
+                                                                <TextInput
+                                                                    label=""
+                                                                    name={`price-${index}`}
+                                                                    type="number"
+                                                                    value={String(mp.price)}
+                                                                    onChange={(e) => handlePriceChange(index, "price", Number(e.target.value))}
+                                                                    min={0}
+                                                                    step={0.01}
+                                                                />
+                                                            </td>
+                                                            <td className="px-4 py-2">
+                                                                <TextInput
+                                                                    label=""
+                                                                    name={`validFrom-${index}`}
+                                                                    type="date"
+                                                                    value={mp.validFrom}
+                                                                    onChange={(e) => handlePriceChange(index, "validFrom", e.target.value)}
+                                                                />
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                )}
 
-                        {materialPrices.length > 0 && (
-                            <Row className="mb-4">
-                                <h2 className="form-title">Raw Material Pricing</h2>
-                                <Col lg={12}>
-                                    <table className="table table-bordered table-sm align-middle">
-                                        <thead>
+                                <TextInput
+                                    label="Contact Person"
+                                    name="contactPerson"
+                                    value={formData.contactPerson}
+                                    placeholder="Contact person name"
+                                    error={errors.contactPerson}
+                                    onChange={handleChange}
+                                />
+                                <TextInput
+                                    label="Designation"
+                                    name="designation"
+                                    value={formData.designation}
+                                    placeholder="Enter designation"
+                                    error={errors.designation}
+                                    onChange={handleChange}
+                                />
+                                <IndiaPhoneInput
+                                    label="Mobile Number"
+                                    name="mobile"
+                                    value={formData.mobile}
+                                    placeholder="Enter mobile number"
+                                    required
+                                    error={errors.mobile}
+                                    onChange={handleChange}
+                                />
+                                <IndiaPhoneInput
+                                    label="Alt Phone"
+                                    name="altPhone"
+                                    value={formData.altPhone}
+                                    placeholder="Enter secondary number"
+                                    error={errors.altPhone}
+                                    onChange={handleChange}
+                                />
+                                <IndiaPhoneInput
+                                    label="WhatsApp Number"
+                                    name="whatsapp"
+                                    value={formData.whatsapp}
+                                    placeholder="e.g. 9840012345"
+                                    error={errors.whatsapp}
+                                    onChange={handleChange}
+                                />
+                                <TextInput
+                                    label="Email"
+                                    name="email"
+                                    value={formData.email}
+                                    placeholder="sales@svchemicals.com"
+                                    error={errors.email}
+                                    onChange={handleChange}
+                                />
+                            </div>
+                        </div>
+
+                        {/* GST & TAX */}
+                        <div>
+                            <h3 className="text-lg font-semibold text-slate-700 mb-2">GST & MSME</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                <TextInput
+                                    label="GSTIN"
+                                    name="gstin"
+                                    value={formData.gstin}
+                                    placeholder="33ABCDE1234F1Z5"
+                                    error={errors.gstin}
+                                    onChange={handleChange}
+                                />
+                                <TextInput
+                                    label="PAN"
+                                    name="pan"
+                                    value={formData.pan}
+                                    placeholder="ABCDE1234F"
+                                    error={errors.pan}
+                                    onChange={handleChange}
+                                />
+                            </div>
+                        </div>
+
+                        {/* BILLING ADDRESS */}
+                        <div>
+                            <h3 className="text-lg font-semibold text-slate-700 mb-2">Billing Address</h3>
+                            <div className="grid grid-cols-1 gap-10">
+                                <div className="space-y-2">
+                                    <AddressForm
+                                        addressValue={formData.billingAddressLine1}
+                                        onAddressChange={(v) => handleChange({ target: { name: "billingAddressLine1", value: v } })}
+                                        addressError={errors.billingAddressLine1}
+
+                                        stateValue={formData.billingAddressState}
+                                        onStateChange={(v) => {
+                                            const gstCode = getGstStateCode(v);
+                                            setFormData(prev => ({
+                                                ...prev, billingAddressState: v, billingAddressCity: "", stateCode: gstCode || prev.stateCode
+                                            }));
+                                            setErrors(prev => ({ ...prev, billingAddressState: "", billingAddressCity: "", stateCode: "" }));
+                                        }}
+                                        stateError={errors.billingAddressState}
+
+                                        cityValue={formData.billingAddressCity}
+                                        onCityChange={(v) => {
+                                            setFormData(prev => ({ ...prev, billingAddressCity: v }));
+                                            setErrors(prev => ({ ...prev, billingAddressCity: "" }));
+                                        }}
+                                        cityError={errors.billingAddressCity}
+
+                                        pincodeValue={formData.billingAddressPincode}
+                                        onPincodeChange={(v) => handleChange({ target: { name: "billingAddressPincode", value: v } })}
+                                        pincodeError={errors.billingAddressPincode}
+                                        required
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* COMMERCIAL TERMS */}
+                        <div>
+                            <h3 className="text-lg font-semibold text-slate-700 mb-2">Commercial Terms</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                <SelectInput
+                                    label="Payment Terms"
+                                    name="paymentTerms"
+                                    value={formData.paymentTerms}
+                                    options={[
+                                        { value: "Advance", label: "Advance" },
+                                        { value: "Net15", label: "Net15 (15 Days)" },
+                                        { value: "Net30", label: "Net30 (30 Days)" },
+                                        { value: "Net45", label: "Net45 (45 Days)" },
+                                        { value: "Net60", label: "Net60 (60 Days)" },
+                                    ]}
+                                    error={errors.paymentTerms}
+                                    onChange={handleChange}
+                                />
+                                <TextInput
+                                    label="Lead Time (Days)"
+                                    name="leadTimeDays"
+                                    value={String(formData.leadTimeDays)}
+                                    placeholder="7"
+                                    required
+                                    error={errors.leadTimeDays}
+                                    onChange={handleChange}
+                                />
+                                <SelectInput
+                                    label="Currency"
+                                    name="currency"
+                                    value={formData.currency}
+                                    options={[
+                                        { value: "INR", label: "INR" },
+                                        { value: "USD", label: "USD" },
+                                    ]}
+                                    error={errors.currency}
+                                    onChange={handleChange}
+                                />
+                                <TextInput
+                                    label="Min Order Qty (MOQ)"
+                                    name="minOrderQty"
+                                    value={String(formData.minOrderQty)}
+                                    placeholder="1000"
+                                    error={errors.minOrderQty}
+                                    onChange={handleChange}
+                                />
+                            </div>
+                        </div>
+
+                        {/* ADDITIONAL DELIVERY ADDRESSES */}
+                        <div>
+                            <h3 className="text-lg font-semibold text-slate-700 mb-2">Additional Delivery / Plant Addresses</h3>
+                            <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl mb-4">
+                                <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                                    <TextInput
+                                        label="Label (e.g. Chennai Plant)"
+                                        name="label"
+                                        value={tempAddress.label}
+                                        onChange={(e) => setTempAddress(prev => ({ ...prev, label: e.target.value }))}
+                                    />
+                                    <div className="md:col-span-2 lg:col-span-3">
+                                        <AddressForm
+                                            addressValue={tempAddress.addressLine1}
+                                            onAddressChange={(v) => setTempAddress(prev => ({ ...prev, addressLine1: v }))}
+
+                                            stateValue={tempAddress.state}
+                                            onStateChange={(v) => {
+                                                const gstCode = getGstStateCode(v);
+                                                setTempAddress(prev => ({ ...prev, state: v, city: "", stateCode: gstCode || prev.stateCode }));
+                                            }}
+
+                                            cityValue={tempAddress.city}
+                                            onCityChange={(v) => setTempAddress(prev => ({ ...prev, city: v }))}
+
+                                            pincodeValue={tempAddress.pincode}
+                                            onPincodeChange={(v) => setTempAddress(prev => ({ ...prev, pincode: v }))}
+                                        />
+                                    </div>
+                                    <div className="flex items-center justify-between col-span-full mt-2">
+                                        <label className="flex items-center gap-2 text-sm font-semibold text-slate-700 cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                name="isDefault"
+                                                checked={tempAddress.isDefault}
+                                                onChange={(e) => setTempAddress(prev => ({ ...prev, isDefault: e.target.checked }))}
+                                                className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary"
+                                            />
+                                            Set as Default
+                                        </label>
+                                        <CustomButton
+                                            text="Add Address"
+                                            icon={FaPlus}
+                                            onClick={addShippingAddress}
+                                            type="button"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Plant Addresses List Table */}
+                            {addresses.length > 0 && (
+                                <div className="border border-slate-200 rounded-md overflow-hidden">
+                                    <table className="w-full text-sm text-left">
+                                        <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
                                             <tr>
-                                                <th>Raw Material</th>
-                                                <th>Price (₹)</th>
-                                                <th>Valid From</th>
+                                                <th className="px-4 py-2">Label</th>
+                                                <th className="px-4 py-2">Address</th>
+                                                <th className="px-4 py-2">State Code</th>
+                                                <th className="px-4 py-2">Default</th>
+                                                <th className="px-4 py-2 text-center" style={{ width: "80px" }}>Actions</th>
                                             </tr>
                                         </thead>
-                                        <tbody>
-                                            {materialPrices.map((mp, index) => (
-                                                <tr key={mp.rawMaterialId}>
-                                                    <td>{mp.materialName}</td>
-                                                    <td>
-                                                        <TextInput
-                                                            label=""
-                                                            name={`price-${index}`}
-                                                            type="number"
-                                                            value={String(mp.price)}
-                                                            onChange={(e) => handlePriceChange(index, "price", Number(e.target.value))}
-                                                            min={0}
-                                                            step={0.01}
-                                                        />
+                                        <tbody className="divide-y divide-slate-200">
+                                            {addresses.map((addr, idx) => (
+                                                <tr key={idx} className="bg-white">
+                                                    <td className="px-4 py-2 font-medium">{addr.label}</td>
+                                                    <td className="px-4 py-2">{`${addr.address.addressLine1}, ${addr.address.addressLine2 || ""}, ${addr.address.city}, ${addr.address.state} - ${addr.address.pincode}`}</td>
+                                                    <td className="px-4 py-2">{addr.stateCode}</td>
+                                                    <td className="px-4 py-2">
+                                                        {addr.isDefault ? <span className="text-green-600 font-semibold">Yes</span> : "No"}
                                                     </td>
-                                                    <td>
-                                                        <TextInput
-                                                            label=""
-                                                            name={`validFrom-${index}`}
-                                                            type="date"
-                                                            value={mp.validFrom}
-                                                            onChange={(e) => handlePriceChange(index, "validFrom", e.target.value)}
-                                                        />
+                                                    <td className="px-4 py-2 text-center">
+                                                        <button
+                                                            type="button"
+                                                            className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
+                                                            onClick={() => removeShippingAddress(idx)}
+                                                        >
+                                                            <FaTrash />
+                                                        </button>
                                                     </td>
                                                 </tr>
                                             ))}
                                         </tbody>
                                     </table>
-                                </Col>
-                            </Row>
-                        )}
-                        <Col lg={4} md={6} className="mt-3">
-                            <TextInput
-                                label="Contact Person"
-                                name="contactPerson"
-                                value={formData.contactPerson}
-                                placeholder="Contact person name"
-                                error={errors.contactPerson}
-                                onChange={handleChange}
-                            />
-                        </Col>
-                        <Col lg={4} md={6} className="mt-3">
-                            <TextInput
-                                label="Designation"
-                                name="designation"
-                                value={formData.designation}
-                                placeholder="Enter designation"
-                                error={errors.designation}
-                                onChange={handleChange}
-                            />
-                        </Col>
-                        <Col lg={4} md={6} className="mt-3">
-                            <IndiaPhoneInput
-                                label="Mobile Number"
-                                name="mobile"
-                                value={formData.mobile}
-                                placeholder="Enter mobile number"
-                                required
-                                error={errors.mobile}
-                                onChange={handleChange}
-                            />
-                        </Col>
-                        <Col lg={4} md={6} className="mt-3">
-                            <IndiaPhoneInput
-                                label="Alt Phone"
-                                name="altPhone"
-                                value={formData.altPhone}
-                                placeholder="Enter secondary number"
-                                error={errors.altPhone}
-                                onChange={handleChange}
-                            />
-                        </Col>
-                        <Col lg={4} md={6} className="mt-3">
-                            <IndiaPhoneInput
-                                label="WhatsApp Number"
-                                name="whatsapp"
-                                value={formData.whatsapp}
-                                placeholder="e.g. 9840012345"
-                                error={errors.whatsapp}
-                                onChange={handleChange}
-                            />
-                        </Col>
-                        <Col lg={4} md={6} className="mt-3">
-                            <TextInput
-                                label="Email"
-                                name="email"
-                                value={formData.email}
-                                placeholder="sales@svchemicals.com"
-                                error={errors.email}
-                                onChange={handleChange}
-                            />
-                        </Col>
-                        <Col lg={4} md={6} className="mt-3">
-                            <TextInput
-                                label="Website"
-                                name="website"
-                                value={formData.website}
-                                placeholder="https://"
-                                error={errors.website}
-                                onChange={handleChange}
-                            />
-                        </Col>
-                    </Row>
-
-                    {/* BILLING ADDRESS */}
-                    <Row className="mb-4">
-                        <h2 className="form-title">Billing Address</h2>
-                        <Col lg={6}>
-                            <TextInput
-                                label="Address Line 1"
-                                name="billingAddressLine1"
-                                value={formData.billingAddressLine1}
-                                placeholder="No.12, Anna Salai"
-                                required
-                                error={errors.billingAddressLine1}
-                                onChange={handleChange}
-                            />
-                        </Col>
-                        <Col lg={6}>
-                            <TextInput
-                                label="Address Line 2"
-                                name="billingAddressLine2"
-                                value={formData.billingAddressLine2}
-                                placeholder="Kappalur"
-                                error={errors.billingAddressLine2}
-                                onChange={handleChange}
-                            />
-                        </Col>
-                        <CityStateSelect
-                            stateLabel="State"
-                            cityLabel="City"
-                            stateValue={formData.billingAddressState}
-                            cityValue={formData.billingAddressCity}
-                            onStateChange={handleStateChange}
-                            onCityChange={handleCityChange}
-                            stateError={errors.billingAddressState}
-                            cityError={errors.billingAddressCity}
-                            required
-                        />
-                        <Col lg={3} md={6} className="mt-3">
-                            <TextInput
-                                label="Pincode"
-                                name="billingAddressPincode"
-                                value={formData.billingAddressPincode}
-                                placeholder="625008"
-                                required
-                                error={errors.billingAddressPincode}
-                                onChange={handleChange}
-                            />
-                        </Col>
-                        {/* <Col lg={3} md={6} className="mt-3">
-                            <TextInput
-                                label="State Code"
-                                name="stateCode"
-                                value={formData.stateCode}
-                                placeholder="TN"
-                                required
-                                error={errors.stateCode}
-                                onChange={handleChange}
-                            />
-                        </Col> */}
-                    </Row>
-
-                    {/* GST & TAX */}
-                    <Row className="mb-4">
-                        <h2 className="form-title">GST & MSME</h2>
-                        <Col lg={4} md={6}>
-                            <TextInput
-                                label="GSTIN"
-                                name="gstin"
-                                value={formData.gstin}
-                                placeholder="33ABCDE1234F1Z5"
-                                error={errors.gstin}
-                                onChange={handleChange}
-                            />
-                        </Col>
-                        <Col lg={4} md={6}>
-                            <TextInput
-                                label="PAN"
-                                name="pan"
-                                value={formData.pan}
-                                placeholder="ABCDE1234F"
-                                error={errors.pan}
-                                onChange={handleChange}
-                            />
-                        </Col>
-                        <Col lg={4} md={6}>
-                            <TextInput
-                                label="GST Registration Type"
-                                name="gstRegType"
-                                value={formData.gstRegType}
-                                placeholder="Registered / Composition"
-                                error={errors.gstRegType}
-                                onChange={handleChange}
-                            />
-                        </Col>
-                        <Col lg={4} md={6} className="mt-3">
-                            <SelectInput
-                                label="MSME Status"
-                                name="msmeStatus"
-                                value={formData.msmeStatus}
-                                options={[
-                                    { value: "Micro", label: "Micro" },
-                                    { value: "Small", label: "Small" },
-                                    { value: "Medium", label: "Medium" },
-                                    { value: "None", label: "None" },
-                                ]}
-                                error={errors.msmeStatus}
-                                onChange={handleChange}
-                            />
-                        </Col>
-                        <Col lg={4} md={6} className="mt-3">
-                            <TextInput
-                                label="Udyam Registration No."
-                                name="udyamNo"
-                                value={formData.udyamNo}
-                                placeholder="UDYAM-TN-00-12345"
-                                error={errors.udyamNo}
-                                onChange={handleChange}
-                            />
-                        </Col>
-                        <Col lg={4} md={6} className="mt-3">
-                            <TextInput
-                                label="TDS Section"
-                                name="tdsSection"
-                                value={formData.tdsSection}
-                                placeholder="194Q"
-                                error={errors.tdsSection}
-                                onChange={handleChange}
-                            />
-                        </Col>
-                    </Row>
-
-                    {/* BANK DETAILS */}
-                    <Row className="mb-4">
-                        <div className="d-flex justify-content-between align-items-center mb-3">
-                            <h2 className="form-title mb-0">Bank Account Details</h2>
-                            <CustomButton
-                                text="Add another bank"
-                                onClick={addBankAccount}
-                                type="button"
-                            />
+                                </div>
+                            )}
                         </div>
 
-                        {formData.bankAccounts.map((bank, index) => (
-                            <div key={index} className="bank-account-block mb-4 p-3 border rounded">
-                                {formData.bankAccounts.length > 1 && (
-                                    <div className="d-flex justify-content-between mb-2">
-                                        <h6 className="mb-0">Bank #{index + 1}</h6>
-                                        <CustomButton
-                                            text="Remove"
-                                            onClick={() => removeBankAccount(index)}
-                                            type="button"
-                                        />
+                        {/* BANK DETAILS */}
+                        <div>
+                            <div className="flex items-center justify-between mb-2">
+                                <h3 className="text-lg font-semibold text-slate-700">Bank Account Details</h3>
+                                <CustomButton text="Add Bank Account" onClick={addBankAccount} type="button" />
+                            </div>
+
+                            <div className="space-y-6">
+                                {formData.bankAccounts.map((bank, index) => (
+                                    <div key={index} className="p-4 border border-slate-200 rounded-xl bg-slate-50 relative">
+                                        {formData.bankAccounts.length > 1 && (
+                                            <div className="absolute top-4 right-4">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => removeBankAccount(index)}
+                                                    className="text-red-500 hover:text-red-700 text-sm font-semibold transition-colors"
+                                                >
+                                                    Remove
+                                                </button>
+                                            </div>
+                                        )}
+                                        <h6 className="font-bold text-slate-600 mb-2">Bank #{index + 1}</h6>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                            <TextInput
+                                                label="Account Holder Name"
+                                                name="bankHolderName"
+                                                value={bank.bankHolderName}
+                                                onChange={(e) => handleBankChange(index, e)}
+                                                error={errors[`bankAccounts.${index}.bankHolderName`]}
+                                            />
+                                            <TextInput
+                                                label="Bank Name"
+                                                name="bankName"
+                                                value={bank.bankName}
+                                                onChange={(e) => handleBankChange(index, e)}
+                                                error={errors[`bankAccounts.${index}.bankName`]}
+                                            />
+                                            <TextInput
+                                                label="Account Number"
+                                                name="accountNumber"
+                                                value={bank.accountNumber}
+                                                onChange={(e) => handleBankChange(index, e)}
+                                                error={errors[`bankAccounts.${index}.accountNumber`]}
+                                            />
+                                            <TextInput
+                                                label="IFSC Code"
+                                                name="ifscCode"
+                                                value={bank.ifscCode}
+                                                onChange={(e) => handleBankChange(index, e)}
+                                                error={errors[`bankAccounts.${index}.ifscCode`]}
+                                            />
+                                            <TextInput
+                                                label="Branch Name"
+                                                name="branchName"
+                                                value={bank.branchName}
+                                                onChange={(e) => handleBankChange(index, e)}
+                                                error={errors[`bankAccounts.${index}.branchName`]}
+                                            />
+                                            <IndiaPhoneInput
+                                                label="GPay / PhonePe Number"
+                                                name="upiMobileNumber"
+                                                value={bank.upiMobileNumber}
+                                                placeholder="9876543210"
+                                                onChange={(e) => handleBankChange(index, e as React.ChangeEvent<HTMLInputElement>)}
+                                                error={errors[`bankAccounts.${index}.upiMobileNumber`]}
+                                            />
+                                        </div>
                                     </div>
-                                )}
-
-                                <Row>
-                                    <Col lg={4} md={6}>
-                                        <TextInput
-                                            label="Account Holder Name"
-                                            name="bankHolderName"
-                                            value={bank.bankHolderName}
-                                            onChange={(e) => handleBankChange(index, e)}
-                                            error={errors[`bankAccounts.${index}.bankHolderName`]}
-                                        />
-                                    </Col>
-
-                                    <Col lg={4} md={6}>
-                                        <TextInput
-                                            label="Bank Name"
-                                            name="bankName"
-                                            value={bank.bankName}
-                                            onChange={(e) => handleBankChange(index, e)}
-                                            error={errors[`bankAccounts.${index}.bankName`]}
-                                        />
-                                    </Col>
-
-                                    <Col lg={4} md={6}>
-                                        <TextInput
-                                            label="Account Number"
-                                            name="accountNumber"
-                                            value={bank.accountNumber}
-                                            onChange={(e) => handleBankChange(index, e)}
-                                            error={errors[`bankAccounts.${index}.accountNumber`]}
-                                        />
-                                    </Col>
-
-                                    <Col lg={4} md={6}>
-                                        <TextInput
-                                            label="IFSC Code"
-                                            name="ifscCode"
-                                            value={bank.ifscCode}
-                                            onChange={(e) => handleBankChange(index, e)}
-                                            error={errors[`bankAccounts.${index}.ifscCode`]}
-                                        />
-                                    </Col>
-
-                                    <Col lg={4} md={6}>
-                                        <TextInput
-                                            label="Branch Name"
-                                            name="branchName"
-                                            value={bank.branchName}
-                                            onChange={(e) => handleBankChange(index, e)}
-                                            error={errors[`bankAccounts.${index}.branchName`]}
-                                        />
-                                    </Col>
-
-                                    <Col lg={4} md={6}>
-                                        <IndiaPhoneInput
-                                            label="GPay / PhonePe Number"
-                                            name="upiMobileNumber"
-                                            value={bank.upiMobileNumber}
-                                            placeholder="98765XXXXX"
-                                            onChange={(e) => handleBankChange(index, e as React.ChangeEvent<HTMLInputElement>)}
-                                            error={errors[`bankAccounts.${index}.upiMobileNumber`]}
-                                        />
-                                    </Col>
-                                </Row>
+                                ))}
                             </div>
-                        ))}
-                    </Row>
+                        </div>
 
-                    {/* COMMERCIAL TERMS */}
-                    <Row className="mb-4">
-                        <h2 className="form-title">Commercial Terms</h2>
-                        <Col lg={4} md={6}>
-                            <SelectInput
-                                label="Payment Terms"
-                                name="paymentTerms"
-                                value={formData.paymentTerms}
-                                options={[
-                                    { value: "Advance", label: "Advance" },
-                                    { value: "Net15", label: "Net15 (15 Days)" },
-                                    { value: "Net30", label: "Net30 (30 Days)" },
-                                    { value: "Net45", label: "Net45 (45 Days)" },
-                                    { value: "Net60", label: "Net60 (60 Days)" },
-                                ]}
-                                error={errors.paymentTerms}
-                                onChange={handleChange}
+                        {/* FORM ACTIONS */}
+                        <div className="flex justify-end gap-3 pt-6 border-t border-slate-200">
+                            <CustomButton
+                                text="Clear Form"
+                                icon={FaEraser}
+                                onClick={handleClear}
+                                type="button"
                             />
-                        </Col>
-                        <Col lg={4} md={6}>
-                            <TextInput
-                                label="Lead Time (Days)"
-                                name="leadTimeDays"
-                                value={String(formData.leadTimeDays)}
-                                placeholder="7"
-                                required
-                                error={errors.leadTimeDays}
-                                onChange={handleChange}
+                            <CustomButton
+                                text="Save Supplier"
+                                icon={FaSave}
+                                type="submit"
+                                disabled={loading}
                             />
-                        </Col>
-                        <Col lg={4} md={6}>
-                            <SelectInput
-                                label="Currency"
-                                name="currency"
-                                value={formData.currency}
-                                options={[
-                                    { value: "INR", label: "INR" },
-                                    { value: "USD", label: "USD" },
-                                ]}
-                                error={errors.currency}
-                                onChange={handleChange}
-                            />
-                        </Col>
-                        <Col lg={4} md={6} className="mt-3">
-                            <TextInput
-                                label="Min Order Qty (MOQ)"
-                                name="minOrderQty"
-                                value={String(formData.minOrderQty)}
-                                placeholder="1000"
-                                error={errors.minOrderQty}
-                                onChange={handleChange}
-                            />
-                        </Col>
-                    </Row>
-
-                    {/* ADDITIONAL DELIVERY ADDRESSES */}
-                    <Row className="mb-4">
-                        <h2 className="form-title">Additional Delivery / Plant Addresses</h2>
-                        <Col lg={12} className="mb-3">
-                            <div className="p-3 border rounded bg-light">
-                                <Row className="g-3">
-                                    <Col md={3}>
-                                        <TextInput
-                                            label="Address Label (e.g. Chennai Plant)"
-                                            name="label"
-                                            value={tempAddress.label}
-                                            onChange={handleTempAddressChange}
-                                        />
-                                    </Col>
-                                    <Col md={3}>
-                                        <TextInput
-                                            label="Address Line 1"
-                                            name="addressLine1"
-                                            value={tempAddress.addressLine1}
-                                            onChange={handleTempAddressChange}
-                                        />
-                                    </Col>
-                                    <Col md={3}>
-                                        <TextInput
-                                            label="Address Line 2"
-                                            name="addressLine2"
-                                            value={tempAddress.addressLine2}
-                                            onChange={handleTempAddressChange}
-                                        />
-                                    </Col>
-                                    <Col md={3}>
-                                        <TextInput
-                                            label="City"
-                                            name="city"
-                                            value={tempAddress.city}
-                                            onChange={handleTempAddressChange}
-                                        />
-                                    </Col>
-                                    <Col md={3}>
-                                        <TextInput
-                                            label="State"
-                                            name="state"
-                                            value={tempAddress.state}
-                                            onChange={handleTempAddressChange}
-                                        />
-                                    </Col>
-                                    <Col md={3}>
-                                        <TextInput
-                                            label="Pincode"
-                                            name="pincode"
-                                            value={tempAddress.pincode}
-                                            onChange={handleTempAddressChange}
-                                        />
-                                    </Col>
-                                    <Col md={2}>
-                                        <TextInput
-                                            label="State Code"
-                                            name="stateCode"
-                                            value={tempAddress.stateCode}
-                                            onChange={handleTempAddressChange}
-                                        />
-                                    </Col>
-                                    <Col md={2} className="d-flex align-items-center mt-4">
-                                        <Checkbox
-                                            label="Default"
-                                            name="isDefault"
-                                            checked={tempAddress.isDefault}
-                                            onChange={handleTempAddressChange}
-                                        />
-                                    </Col>
-                                    <Col md={12} className="d-flex justify-content-end">
-                                        <CustomButton
-                                            text="Add Address"
-                                            icon={FaPlus}
-                                            onClick={addShippingAddress}
-                                        />
-                                    </Col>
-                                </Row>
-                            </div>
-                        </Col>
-
-                        {/* Plant Addresses List Table */}
-                        {addresses.length > 0 && (
-                            <Col lg={12}>
-                                <table className="table table-bordered table-striped align-middle">
-                                    <thead>
-                                        <tr>
-                                            <th>Label</th>
-                                            <th>Address</th>
-                                            <th>State Code</th>
-                                            <th>Default</th>
-                                            <th style={{ width: "80px" }}>Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {addresses.map((addr, idx) => (
-                                            <tr key={idx}>
-                                                <td>{addr.label}</td>
-                                                <td>{`${addr.address.addressLine1}, ${addr.address.addressLine2 || ""}, ${addr.address.city}, ${addr.address.state} - ${addr.address.pincode}`}</td>
-                                                <td>{addr.stateCode}</td>
-                                                <td>{addr.isDefault ? "Yes" : "No"}</td>
-                                                <td className="text-center">
-                                                    <button
-                                                        type="button"
-                                                        className="btn btn-sm btn-outline-danger"
-                                                        onClick={() => removeShippingAddress(idx)}
-                                                    >
-                                                        <FaTrash />
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </Col>
-                        )}
-                    </Row>
-
-                    {/* FORM ACTIONS */}
-                    <Row className="mt-4">
-                        <Col lg={12}>
-                            <div className="form-actions d-flex justify-content-end">
-                                <CustomButton
-                                    text="Cancel"
-                                    icon={FaEraser}
-                                    onClick={() => navigate("/suppliers")}
-                                    className="me-3"
-                                />
-                                <Button
-                                    text="Update Supplier"
-                                    icon={FaSave}
-                                    type="submit"
-                                    disabled={loading}
-                                />
-                            </div>
-                        </Col>
-                    </Row>
-                </form>
-            </Container>
+                        </div>
+                    </form>
+                </div>
+            </div>
         </div>
     );
+
 };
 
 export default SupplierEdit;

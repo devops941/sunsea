@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { z } from "zod";
-import { Container, Row, Col, Card, Spinner, Alert } from "react-bootstrap";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 import {
@@ -376,59 +375,46 @@ const DailyPlanCreate: React.FC = () => {
 
   // ── Render ───────────────────────────────────────────────────────────────
   return (
-    <div className="inner-container">
-      <Container fluid>
+    <div className="p-4 md:p-6 min-h-screen bg-slate-50">
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200">
         {/* Page Header */}
-        <div className="page-header">
-          <Row className="align-items-center g-3">
-            <Col lg={6} md={12}>
-              <div className="page-header-info">
-                <h2 className="page-title mb-1">
-                  {isEdit ? "Edit Daily Production Plan" : "New Daily Production Plan"}
-                </h2>
-                <div className="page-breadcrumb text-muted small">
-                  Home / Production / Daily Planning / {isEdit ? "Edit" : "Create"}
-                </div>
-              </div>
-            </Col>
-            <Col lg={6} md={12}>
-              <div className="page-header-actions justify-content-lg-end">
-                <CustomButton
-                  text="Back to Daily Planning"
-                  icon={FaArrowLeft}
-                  onClick={() => navigate("/daily-machine-planning")}
-                  className="shadow-sm btn-secondary"
-                />
-              </div>
-            </Col>
-          </Row>
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-slate-200">
+          <div>
+            <h2 className="text-2xl font-bold text-slate-800">
+              {isEdit ? "Edit Daily Production Plan" : "New Daily Production Plan"}
+            </h2>
+            <p className="text-sm text-slate-500 mt-1">Home / Production / Daily Planning / {isEdit ? "Edit" : "Create"}</p>
+          </div>
+          <CustomButton
+            text="Back to Daily Planning"
+            icon={FaArrowLeft}
+            onClick={() => navigate("/daily-machine-planning")}
+          />
         </div>
 
         {submitError && (
-          <Alert variant="danger" className="mb-4 shadow-sm border-0 rounded-3 d-flex align-items-center gap-3">
-            <FaExclamationTriangle size={24} />
+          <div className="mx-6 mt-4 p-4 rounded-xl bg-red-50 border border-red-200 flex items-center gap-3">
+            <FaExclamationTriangle className="text-red-500" size={20} />
             <div>
-              <h6 className="mb-1 fw-bold">Failed to Save Plan</h6>
-              <p className="mb-0 small">{submitError}</p>
+              <p className="font-bold text-red-700 text-sm">Failed to Save Plan</p>
+              <p className="text-red-600 text-xs">{submitError}</p>
             </div>
-          </Alert>
+          </div>
         )}
 
-        <form onSubmit={handleSubmit}>
-          <Row className="g-4">
-            {/* ─── LEFT: Weekly Program & Auto-fill Info ─── */}
-            <Col xl={8} lg={7}>
+        <form onSubmit={handleSubmit} className="p-6">
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+            {/* ─── LEFT: Form Sections ─── */}
+            <div className="xl:col-span-2 space-y-6">
 
               {/* Section 1: Weekly Program */}
-              <Card className="border-0 shadow-sm rounded-3 mb-4">
-                <Card.Header className="bg-white border-bottom py-3 px-4">
-                  <h6 className="mb-0 fw-bold d-flex align-items-center gap-2" style={{ color: "var(--color-primary)" }}>
-                    <FaCalendarAlt /> Step 1 — Select Weekly Program
-                  </h6>
-                </Card.Header>
-                <Card.Body className="p-4">
-                  <Row className="g-3">
-                    <Col md={12}>
+              <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+                <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-2">
+                  <FaCalendarAlt className="text-teal-600" />
+                  <h6 className="font-bold text-slate-800">Step 1 — Select Weekly Program</h6>
+                </div>
+                <div className="p-5">
+                  <div>
                       <label className="form-label fw-bold small text-muted text-uppercase mb-1">
                         Weekly Program <span className="text-danger">*</span>
                       </label>
@@ -456,28 +442,28 @@ const DailyPlanCreate: React.FC = () => {
                           {formErrors.weeklyProgramId && <div className="text-danger small mt-1">{formErrors.weeklyProgramId}</div>}
                         </>
                       )}
-                    </Col>
+                  </div>
 
-                    {/* Auto-filled info banner */}
-                    {selectedWeeklyProg && (
-                      <Col md={12}>
-                        <div className="rounded-3 p-3" style={{ background: "#f0fdf4", border: "1px solid #86efac" }}>
-                          <Row className="g-2">
-                            <Col sm={6} md={3}>
+                  {/* Auto-filled info banner */}
+                  {selectedWeeklyProg && (
+                    <div className="mt-4">
+                      <div className="rounded-xl p-4 mt-4" style={{ background: "#f0fdf4", border: "1px solid #86efac" }}>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                          <div>
                               <div className="text-muted small text-uppercase fw-bold mb-1">Production Order</div>
                               <div className="fw-bold">{selectedWeeklyProg.productionOrderId}</div>
-                            </Col>
-                            <Col sm={6} md={3}>
+                          </div>
+                          <div>
                               <div className="text-muted small text-uppercase fw-bold mb-1">Product</div>
                               <div className="fw-semibold text-dark small">
                                 {selectedWeeklyProg.productionOrder?.productItem?.productName || "—"}
                               </div>
-                            </Col>
-                            <Col sm={6} md={3}>
+                          </div>
+                          <div>
                               <div className="text-muted small text-uppercase fw-bold mb-1">Weekly Target</div>
                               <div className="fw-bold">{selectedWeeklyProg.plannedQty} pcs</div>
-                            </Col>
-                            <Col sm={6} md={3}>
+                          </div>
+                          <div>
                               <div className="text-muted small text-uppercase fw-bold mb-1">Remaining Capacity</div>
                               {loadingRemaining ? (
                                 <Spinner size="sm" />
@@ -486,44 +472,42 @@ const DailyPlanCreate: React.FC = () => {
                                   {remainingQty !== null ? `${remainingQty} pcs` : "—"}
                                 </div>
                               )}
-                            </Col>
-                            <Col sm={6} md={3}>
+                          </div>
+                          <div>
                               <div className="text-muted small text-uppercase fw-bold mb-1">Week</div>
                               <div className="small fw-medium">
                                 {selectedWeeklyProg.weekStartDate?.split("T")[0]} → {selectedWeeklyProg.weekEndDate?.split("T")[0]}
                               </div>
-                            </Col>
-                            <Col sm={6} md={3}>
+                          </div>
+                          <div>
                               <div className="text-muted small text-uppercase fw-bold mb-1">PO Status</div>
                               <StatusBadge status={selectedWeeklyProg.productionOrder?.status || selectedWeeklyProg.status} />
-                            </Col>
-                            <Col sm={6} md={3}>
+                          </div>
+                          <div>
                               <div className="text-muted small text-uppercase fw-bold mb-1">PO Target Qty</div>
                               <div className="fw-bold">{selectedWeeklyProg.productionOrder?.targetQty || "—"} pcs</div>
-                            </Col>
-                            <Col sm={6} md={3}>
+                          </div>
+                          <div>
                               <div className="text-muted small text-uppercase fw-bold mb-1">Produced So Far</div>
                               <div className="fw-bold">{selectedWeeklyProg.productionOrder?.producedQty || 0} pcs</div>
-                            </Col>
-                          </Row>
+                          </div>
                         </div>
-                      </Col>
-                    )}
-                  </Row>
-                </Card.Body>
-              </Card>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
 
               {/* Section 2: Schedule */}
-              <Card className="border-0 shadow-sm rounded-3 mb-4">
-                <Card.Header className="bg-white border-bottom py-3 px-4">
-                  <h6 className="mb-0 fw-bold d-flex align-items-center gap-2" style={{ color: "var(--color-primary)" }}>
-                    <FaIndustry /> Step 2 — Schedule Details
-                  </h6>
-                </Card.Header>
-                <Card.Body className="p-4">
-                  <Row className="g-3">
+              <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+                <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-2">
+                  <FaIndustry className="text-teal-600" />
+                  <h6 className="font-bold text-slate-800">Step 2 — Schedule Details</h6>
+                </div>
+                <div className="p-5">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {/* Production Date */}
-                    <Col md={6}>
+                    <div>
                       <TextInput
                         label="Production Date *"
                         name="productionDate"
@@ -533,10 +517,10 @@ const DailyPlanCreate: React.FC = () => {
                         error={formErrors.productionDate}
                         onChange={(e) => setProductionDate(e.target.value)}
                       />
-                    </Col>
+                    </div>
 
                     {/* Machine */}
-                    <Col md={6}>
+                    <div>
                       <label className="form-label fw-bold small text-muted text-uppercase mb-1">
                         Machine <span className="text-danger">*</span>
                       </label>
@@ -555,11 +539,11 @@ const DailyPlanCreate: React.FC = () => {
                         ))}
                       </select>
                       {formErrors.machineId && <div className="text-danger small mt-1">{formErrors.machineId}</div>}
-                    </Col>
+                    </div>
 
                     {/* ─── Machine OEE Panel ─────────────────────────────────── */}
                     {machineId && (
-                      <Col md={12}>
+                      <div className="md:col-span-2">
                         {loadingOee ? (
                           <div className="d-flex align-items-center gap-2 py-2 text-muted small">
                             <span className="spinner-border spinner-border-sm" />
@@ -619,11 +603,11 @@ const DailyPlanCreate: React.FC = () => {
                             </div>
                           </div>
                         ) : null}
-                      </Col>
+                      </div>
                     )}
 
                     {/* Shift */}
-                    <Col md={6}>
+                    <div>
                       <label className="form-label fw-bold small text-muted text-uppercase mb-1">
                         Shift <span className="text-danger">*</span>
                       </label>
@@ -657,11 +641,11 @@ const DailyPlanCreate: React.FC = () => {
                           </strong>
                         </div>
                       )}
-                    </Col>
+                    </div>
 
                     {/* Status (only for edit) */}
                     {isEdit && (
-                      <Col md={6}>
+                      <div>
                         <label className="form-label fw-bold small text-muted text-uppercase mb-1">Status</label>
                         <select
                           className="form-select"
@@ -676,23 +660,22 @@ const DailyPlanCreate: React.FC = () => {
                           <option value="COMPLETED">Completed</option>
                           <option value="CANCELLED">Cancelled</option>
                         </select>
-                      </Col>
+                      </div>
                     )}
-                  </Row>
-                </Card.Body>
-              </Card>
+                  </div>
+                </div>
+              </div>
 
               {/* Section 3: Quantity & Hours */}
-              <Card className="border-0 shadow-sm rounded-3 mb-4">
-                <Card.Header className="bg-white border-bottom py-3 px-4">
-                  <h6 className="mb-0 fw-bold d-flex align-items-center gap-2" style={{ color: "var(--color-primary)" }}>
-                    <FaBoxes /> Step 3 — Quantity & Time
-                  </h6>
-                </Card.Header>
-                <Card.Body className="p-4">
-                  <Row className="g-3">
+              <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+                <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-2">
+                  <FaBoxes className="text-teal-600" />
+                  <h6 className="font-bold text-slate-800">Step 3 — Quantity & Time</h6>
+                </div>
+                <div className="p-5">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     {/* Planned Qty */}
-                    <Col md={4}>
+                    <div>
                       <TextInput
                         label="Planned Quantity (pcs) *"
                         name="plannedQty"
@@ -714,10 +697,10 @@ const DailyPlanCreate: React.FC = () => {
                           Remaining after this plan: {remainingQty - Number(plannedQty)} pcs
                         </div>
                       )}
-                    </Col>
+                    </div>
 
                     {/* Planned Hours — auto-filled from shift */}
-                    <Col md={4}>
+                    <div>
                       <TextInput
                         label="Planned Hours"
                         name="plannedHours"
@@ -731,10 +714,10 @@ const DailyPlanCreate: React.FC = () => {
                         <FaClock size={11} className="me-1" />
                         Auto-filled based on selected shift
                       </div>
-                    </Col>
+                    </div>
 
                     {/* Priority — auto-filled from PO */}
-                    <Col md={4}>
+                    <div>
                       <label className="form-label fw-bold small text-muted text-uppercase mb-1">
                         Priority
                         {selectedWeeklyProg?.productionOrder?.priority && (
@@ -754,10 +737,10 @@ const DailyPlanCreate: React.FC = () => {
                         <option value="HIGH">HIGH</option>
                         <option value="URGENT">URGENT</option>
                       </select>
-                    </Col>
+                    </div>
 
                     {/* Remarks */}
-                    <Col md={12}>
+                    <div className="md:col-span-2">
                       <label className="form-label fw-bold small text-muted text-uppercase mb-1">Remarks</label>
                       <textarea
                         className="form-control"
@@ -767,25 +750,25 @@ const DailyPlanCreate: React.FC = () => {
                         onChange={(e) => setRemarks(e.target.value)}
                         placeholder="Optional notes for this daily production plan..."
                       />
-                    </Col>
-                  </Row>
-                </Card.Body>
-              </Card>
-            </Col>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
 
             {/* ─── RIGHT: Summary Card ─── */}
-            <Col xl={4} lg={5}>
-              <Card className="border-0 shadow-sm rounded-3 sticky-top" style={{ top: "80px" }}>
-                <Card.Header className="py-3 px-4" style={{ background: "var(--color-primary, #003428)", color: "#fff", borderRadius: "12px 12px 0 0" }}>
-                  <h6 className="mb-0 fw-bold d-flex align-items-center gap-2">
+            <div className="xl:col-span-1">
+              <div className="bg-white rounded-xl border border-slate-200 overflow-hidden sticky top-20">
+                <div className="px-5 py-4" style={{ background: "var(--color-primary, #003428)" }}>
+                  <h6 className="font-bold text-white flex items-center gap-2">
                     <FaInfoCircle /> Plan Summary
                   </h6>
-                </Card.Header>
-                <Card.Body className="p-4">
-                  <div className="d-flex flex-column gap-3">
+                </div>
+                <div className="p-5">
+                  <div className="flex flex-col gap-4">
 
                     {/* Weekly Program */}
-                    <div className="summary-row d-flex justify-content-between border-bottom pb-2">
+                    <div className="flex justify-between border-b border-slate-100 pb-3">
                       <span className="text-muted small fw-bold text-uppercase">Weekly Program</span>
                       <span className="fw-semibold text-end" style={{ maxWidth: "60%", fontSize: "13px" }}>
                         {weeklyProgramId || <span className="text-muted">Not selected</span>}
@@ -794,7 +777,7 @@ const DailyPlanCreate: React.FC = () => {
 
                     {/* Production Order */}
                     {selectedWeeklyProg && (
-                      <div className="summary-row d-flex justify-content-between border-bottom pb-2">
+                      <div className="flex justify-between border-b border-slate-100 pb-3">
                         <span className="text-muted small fw-bold text-uppercase">Production Order</span>
                         <div className="text-end">
                           <div className="fw-semibold" style={{ fontSize: "13px" }}>{selectedWeeklyProg.productionOrderId}</div>
@@ -806,7 +789,7 @@ const DailyPlanCreate: React.FC = () => {
                     )}
 
                     {/* Date */}
-                    <div className="summary-row d-flex justify-content-between border-bottom pb-2">
+                    <div className="flex justify-between border-b border-slate-100 pb-3">
                       <span className="text-muted small fw-bold text-uppercase">Date</span>
                       <span className="fw-semibold" style={{ fontSize: "13px" }}>
                         {productionDate || <span className="text-muted">Not set</span>}
@@ -814,7 +797,7 @@ const DailyPlanCreate: React.FC = () => {
                     </div>
 
                     {/* Machine */}
-                    <div className="summary-row d-flex justify-content-between border-bottom pb-2">
+                    <div className="flex justify-between border-b border-slate-100 pb-3">
                       <span className="text-muted small fw-bold text-uppercase">Machine</span>
                       <span className="fw-semibold" style={{ fontSize: "13px" }}>
                         {machineId ? allowedMachines.find((m: any) => m.machineId === machineId)?.machineName || machineId : <span className="text-muted">Not selected</span>}
@@ -822,7 +805,7 @@ const DailyPlanCreate: React.FC = () => {
                     </div>
 
                     {/* Shift */}
-                    <div className="summary-row d-flex justify-content-between border-bottom pb-2">
+                    <div className="flex justify-between border-b border-slate-100 pb-3">
                       <span className="text-muted small fw-bold text-uppercase">Shift</span>
                       <div className="text-end">
                         <div className="fw-semibold" style={{ fontSize: "13px" }}>
@@ -837,7 +820,7 @@ const DailyPlanCreate: React.FC = () => {
                     </div>
 
                     {/* Planned Qty */}
-                    <div className="summary-row d-flex justify-content-between border-bottom pb-2">
+                    <div className="flex justify-between border-b border-slate-100 pb-3">
                       <span className="text-muted small fw-bold text-uppercase">Planned Qty</span>
                       <span className={`fw-bold ${overCapacity ? "text-danger" : "text-dark"}`} style={{ fontSize: "16px" }}>
                         {plannedQty ? `${Number(plannedQty).toLocaleString()} pcs` : <span className="text-muted fw-normal">—</span>}
@@ -845,7 +828,7 @@ const DailyPlanCreate: React.FC = () => {
                     </div>
 
                     {/* Planned Hours */}
-                    <div className="summary-row d-flex justify-content-between border-bottom pb-2">
+                    <div className="flex justify-between border-b border-slate-100 pb-3">
                       <span className="text-muted small fw-bold text-uppercase">Planned Hours</span>
                       <span className="fw-semibold" style={{ fontSize: "13px" }}>
                         {plannedHours ? `${plannedHours} hrs` : "—"}
@@ -853,7 +836,7 @@ const DailyPlanCreate: React.FC = () => {
                     </div>
 
                     {/* Priority */}
-                    <div className="summary-row d-flex justify-content-between border-bottom pb-2">
+                    <div className="flex justify-between border-b border-slate-100 pb-3">
                       <span className="text-muted small fw-bold text-uppercase">Priority</span>
                       <StatusBadge status={priority || "MEDIUM"} />
                     </div>
@@ -872,11 +855,11 @@ const DailyPlanCreate: React.FC = () => {
                       </Alert>
                     )}
                   </div>
-                </Card.Body>
+                </div>
 
                 {/* Save Button */}
-                <Card.Footer className="bg-white border-top p-4">
-                  <div className="d-flex gap-2 flex-column">
+                <div className="px-5 py-4 border-t border-slate-100">
+                  <div className="flex flex-col gap-2">
                     <button
                       type="submit"
                       className="btn text-white w-100 fw-bold py-2 rounded-3"
@@ -901,12 +884,12 @@ const DailyPlanCreate: React.FC = () => {
                       <FaArrowLeft className="me-2" />Cancel
                     </button>
                   </div>
-                </Card.Footer>
-              </Card>
-            </Col>
-          </Row>
+                </div>
+              </div>
+            </div>
+          </div>
         </form>
-      </Container>
+      </div>
     </div>
   );
 };

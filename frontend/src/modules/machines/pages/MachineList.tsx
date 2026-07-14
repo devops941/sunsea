@@ -1,6 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
-import { Container, Row, Col, Spinner } from "react-bootstrap";
-import { FaSearch, FaPlus, FaChevronLeft, FaChevronRight } from "react-icons/fa";
+import { FaPlus } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 
@@ -12,6 +11,8 @@ import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
 import CustomButton from "../../../components/ui/Button/Button";
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
+import DataTable from "../../../components/ui/table/DataTable";
+import SearchInput from "../../../components/ui/SearchInput/SearchInput";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -81,113 +82,63 @@ const MachineList: React.FC = () => {
     };
 
     return (
-        <div className="inner-container">
-            <Container fluid>
-                <div className="page-header">
-                    <Row className="align-items-center g-3">
-                        <Col lg={6} md={12}>
-                            <div className="page-header-info">
-                                <h2 className="page-title">Machine Management</h2>
-                                
-                            </div>
-                        </Col>
-                        <Col lg={6} md={12}>
-                            <div className="page-header-actions">
-                                <div className="page-search-wrap">
-                                    <FaSearch className="page-search-icon" />
-                                    <input
-                                        type="text"
-                                        className="page-search-input"
-                                        placeholder="Search machines..."
-                                        value={searchTerm}
-                                        onChange={handleSearch}
-                                    />
-                                </div>
-                                <CustomButton
-                                    text="Add Machine"
-                                    icon={FaPlus}
-                                    onClick={handleOpenAdd}
-                                />
-                            </div>
-                        </Col>
-                    </Row>
-                </div>
-
-                <div className="master-table-body table-wrap">
-                    <div className="master-table-body">
-                        <table className="master-data-table">
-                            <thead>
-                                <tr>
-                                    <th style={{ width: "60px" }}>#</th>
-                                    <th>MACHINE ID</th>
-                                    <th>MACHINE NAME</th>
-                                    <th>TECH TYPE</th>
-                                    <th>MACHINE TYPE</th>
-                                    <th>CAPACITY</th>
-                                    <th>MACHINE STATUS</th>
-                                    <th>ACTIVE STATUS</th>
-                                    <th>ACTIONS</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {loading ? (
-                                    <tr>
-                                        <td colSpan={9} className="text-center p-4">
-                                            <Spinner animation="border" variant="primary" />
-                                        </td>
-                                    </tr>
-                                ) : paginatedData.length > 0 ? (
-                                    paginatedData.map((item, index) => (
-                                        <tr key={item.machineId} className="master-data-row">
-                                            <td className="master-data-cell">{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</td>
-                                            <td className="master-data-cell">{item.machineId}</td>
-                                            <td className="master-data-cell">{item.machineName}</td>
-                                            <td className="master-data-cell">{item.technologyType || "-"}</td>
-                                            <td className="master-data-cell">{item.machineType || "-"}</td>
-                                            <td className="master-data-cell">{item.capacity || "-"}</td>
-                                            <td className="master-data-cell">{item.machineStatus || "-"}</td>
-                                            <td className="master-data-cell">
-                                                <StatusBadge status={item.isActive ? "ACTIVE" : "INACTIVE"} />
-                                            </td>
-                                            <td className="master-data-cell">
-                                                <div className="table-action-group">
-                                                    <EditButton onClick={() => handleOpenEdit(item)} />
-                                                    <DeleteButton onClick={() => triggerDelete(item.machineId)} />
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))
-                                ) : (
-                                    <tr>
-                                        <td colSpan={9} className="text-center p-4">No machines found.</td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
-
-                        {totalPages > 1 && (
-                            <div className="pagination-wrap">
-                                <button
-                                    className="pagination-btn"
-                                    disabled={currentPage === 1}
-                                    onClick={() => setCurrentPage(prev => prev - 1)}
-                                >
-                                    <FaChevronLeft />
-                                </button>
-                                <div className="pagination-info">
-                                    Page {currentPage} of {totalPages}
-                                </div>
-                                <button
-                                    className="pagination-btn"
-                                    disabled={currentPage === totalPages}
-                                    onClick={() => setCurrentPage(prev => prev + 1)}
-                                >
-                                    <FaChevronRight />
-                                </button>
-                            </div>
-                        )}
+        <div>
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-slate-200">
+                    <div>
+                        <h2 className="text-2xl font-bold text-slate-800">Machine Management</h2>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-3 relative w-full lg:w-auto">
+                        <SearchInput
+                            value={searchTerm}
+                            onChange={handleSearch}
+                            placeholder="Search machines..."
+                        />
+                        <CustomButton
+                            text="Add Machine"
+                            icon={FaPlus}
+                            onClick={handleOpenAdd}
+                        />
                     </div>
                 </div>
+
+                <DataTable
+                    data={paginatedData}
+                    rowKey={(item) => item.machineId}
+                    loading={loading}
+                    emptyMessage="No machines found."
+                    pagination={{
+                        currentPage,
+                        totalPages,
+                        onPageChange: (page) => setCurrentPage(page),
+                    }}
+                    columns={[
+                        {
+                            header: "#",
+                            width: "60px",
+                            render: (_item, index) => startIndex + index + 1,
+                        },
+                        { header: "MACHINE ID", accessor: "machineId" },
+                        { header: "MACHINE NAME", accessor: "machineName" },
+                        { header: "TECH TYPE", render: (item) => item.technologyType || "-" },
+                        { header: "MACHINE TYPE", render: (item) => item.machineType || "-" },
+                        { header: "CAPACITY", render: (item) => item.capacity || "-" },
+                        { header: "MACHINE STATUS", render: (item) => item.machineStatus || "-" },
+                        {
+                            header: "ACTIVE STATUS",
+                            render: (item) => <StatusBadge status={item.isActive ? "ACTIVE" : "INACTIVE"} />
+                        },
+                        {
+                            header: "ACTIONS",
+                            render: (item) => (
+                                <div className="flex items-center gap-2">
+                                    <EditButton onClick={() => handleOpenEdit(item)} />
+                                    <DeleteButton onClick={() => triggerDelete(item.machineId)} />
+                                </div>
+                            ),
+                        },
+                    ]}
+                />
 
                 <CommonConfirmModal
                     show={showDeleteModal}
@@ -198,7 +149,7 @@ const MachineList: React.FC = () => {
                     confirmText="Delete"
                     confirmVariant="danger"
                 />
-            </Container>
+            </div>
         </div>
     );
 };

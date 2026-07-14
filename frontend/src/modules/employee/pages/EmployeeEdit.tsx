@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { Container, Row, Col, Form } from "react-bootstrap";
-import { FaUser, FaPhoneAlt, FaEnvelope, FaIdCard, FaLock, FaSave } from "react-icons/fa";
+import { FaUser, FaPhoneAlt, FaEnvelope, FaIdCard, FaLock, FaSave, FaKey, FaTimes } from "react-icons/fa";
 import { toast } from "react-toastify";
 import TextInput from "../../../components/form/TextInput/TextInput";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
-import CustomButton from "../../../components/ui/custombutton/CustomButton";
+import CustomButton from "../../../components/ui/Button/Button";
+import BackButton from "../../../components/ui/BackButton/BackButton";
 import { useEmployees } from "../../../hooks/useEmployees";
 import { useDepartments } from "../../../hooks/useDepartments";
 
@@ -193,88 +193,78 @@ const EmployeeEdit: React.FC = () => {
   }, [roles]);
 
   return (
-    <div className="inner-container">
-      <Container fluid>
-        <div className="page-header">
-          <Row className="align-items-center g-3">
-            <Col lg={6} md={12}>
-              <div className="page-header-info">
-                <h2 className="page-title">Edit Employee</h2>
-                
-              </div>
-            </Col>
-          </Row>
+    <div className="w-full max-w-7xl mx-auto space-y-6">
+      {/* Page Header */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+        <div className="px-6 py-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <h2 className="text-2xl font-bold text-slate-800">
+              Edit Employee
+            </h2>
+          </div>
+          <BackButton />
         </div>
+      </div>
 
-        <form onSubmit={handleSubmit} className="form-inner">
-          <Row className="mb-4">
-            <h2 className="form-title">Basic & Professional Information</h2>
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+        <form onSubmit={handleSubmit} className="px-6 py-6 space-y-8" noValidate>
+          {/* General Info */}
+          <div>
+            <div className="flex items-center gap-2 mb-6 pb-2 border-b border-gray-100">
+              <FaUser className="text-primary text-xl" />
+              <h3 className="text-lg font-semibold text-gray-700">Basic & Professional Information</h3>
+            </div>
 
-            <Col lg={4} md={6}>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               <TextInput
                 label="Employee Code"
                 name="empCode"
                 value={formData.empCode}
                 placeholder="e.g. EMP001"
-                icon={<FaIdCard />}
                 required
-                onChange={handleChange}
+                onChange={handleChange as any}
                 error={errors.empCode}
                 disabled
               />
-            </Col>
 
-            <Col lg={4} md={6}>
               <TextInput
                 label="Employee Name"
                 name="fullName"
                 value={formData.fullName}
                 placeholder="Enter Employee Name"
-                icon={<FaUser />}
                 required
-                onChange={handleChange}
+                onChange={handleChange as any}
                 error={errors.fullName}
               />
-            </Col>
 
-            <Col lg={4} md={6}>
               <TextInput
                 label="Phone Number"
                 name="mobile"
                 value={formData.mobile}
                 placeholder="Enter Mobile Number"
-                icon={<FaPhoneAlt />}
-                onChange={handleChange}
+                onChange={handleChange as any}
                 error={errors.mobile}
               />
-            </Col>
 
-            <Col lg={4} md={6}>
               <TextInput
                 label="Email Address"
                 name="email"
                 type="email"
                 value={formData.email}
                 placeholder="Enter Email Address"
-                icon={<FaEnvelope />}
-                onChange={handleChange}
+                onChange={handleChange as any}
                 error={errors.email}
               />
-            </Col>
 
-            <Col lg={4} md={6}>
               <SelectInput
                 label="Department"
                 name="departmentId"
                 value={formData.departmentId}
                 options={departmentOptions}
-                onChange={handleChange}
+                onChange={handleChange as any}
+                defaultOptionLabel="Select Department"
               />
-            </Col>
 
-
-
-            <Col lg={4} md={6}>
               <SelectInput
                 label="Status"
                 name="status"
@@ -285,113 +275,110 @@ const EmployeeEdit: React.FC = () => {
                   { value: "resigned", label: "Resigned" },
                   { value: "terminated", label: "Terminated" },
                 ]}
-                onChange={handleChange}
+                onChange={handleChange as any}
               />
-            </Col>
-            <Col lg={4} md={6}>
+
               <TextInput
-                label="Updated BY"
+                label="Updated By"
                 name="updatedByOn"
                 value={user?.username}
-                icon={<FaIdCard />}
                 required
-                onChange={handleChange}
+                onChange={handleChange as any}
                 disabled
               />
-            </Col>
-          </Row>
+            </div>
+          </div>
 
           {/* User Login Account Section */}
-          <div className="section-divider my-4"></div>
-          <Row className="mb-4">
-            <Col lg={12}>
-              <Form.Group className="mb-3">
-                <Form.Check
-                  type="switch"
-                  id="createLoginAccount-switch"
-                  label={employeeData?.user ? "Manage Login Account" : "Create Login Account"}
-                  name="createLoginAccount"
-                  checked={formData.createLoginAccount}
-                  onChange={handleChange}
-                  className="custom-switch fs-5 fw-semibold text-primary"
-                />
-              </Form.Group>
-            </Col>
+          <div>
+            <div className="flex items-center justify-between mb-6 pb-2 border-b border-gray-100">
+              <div className="flex items-center gap-2">
+                <FaKey className="text-primary text-xl" />
+                <h3 className="text-lg font-semibold text-gray-700">Login Account Settings</h3>
+              </div>
+              <div className="flex items-center">
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    name="createLoginAccount"
+                    className="sr-only peer"
+                    checked={formData.createLoginAccount}
+                    onChange={handleChange as any}
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                  <span className="ml-3 text-sm font-medium text-gray-700">
+                    {employeeData?.user ? "Manage Login Account" : "Create Login Account"}
+                  </span>
+                </label>
+              </div>
+            </div>
 
             {formData.createLoginAccount && (
-              <>
-                <h2 className="form-title mt-2">Login Account Details</h2>
-                <Col lg={3} md={6}>
-                  <TextInput
-                    label="Username"
-                    name="username"
-                    value={formData.username}
-                    placeholder="Enter username"
-                    icon={<FaUser />}
-                    required
-                    onChange={handleChange}
-                    error={errors.username}
-                  />
-                </Col>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 bg-gray-50 p-6 rounded-lg border border-gray-200">
+                <TextInput
+                  label="Username"
+                  name="username"
+                  value={formData.username}
+                  placeholder="Enter username"
+                  required
+                  onChange={handleChange as any}
+                  error={errors.username}
+                />
 
-                <Col lg={3} md={6}>
-                  <TextInput
-                    label="Password"
-                    name="password"
-                    type="password"
-                    value={formData.password}
-                    placeholder={employeeData?.user ? "Leave empty to keep current password" : "Enter password"}
-                    icon={<FaLock />}
-                    required={!employeeData?.user}
-                    onChange={handleChange}
-                    error={errors.password}
-                  />
-                </Col>
+                <TextInput
+                  label="Password"
+                  name="password"
+                  type="password"
+                  value={formData.password}
+                  placeholder={employeeData?.user ? "Leave empty to keep current" : "Enter password"}
+                  required={!employeeData?.user}
+                  onChange={handleChange as any}
+                  error={errors.password}
+                />
 
-                <Col lg={3} md={6}>
-                  <SelectInput
-                    label="Role"
-                    name="roleId"
-                    value={formData.roleId}
-                    options={roleOptions}
-                    defaultOptionLabel="Select Role"
-                    required
-                    onChange={handleChange}
-                    error={errors.roleId}
-                  />
-                </Col>
+                <SelectInput
+                  label="Role"
+                  name="roleId"
+                  value={formData.roleId}
+                  options={roleOptions}
+                  defaultOptionLabel="Select Role"
+                  required
+                  onChange={handleChange as any}
+                  error={errors.roleId}
+                />
 
-                <Col lg={3} md={6}>
-                  <SelectInput
-                    label="User Status"
-                    name="userStatus"
-                    value={formData.userStatus}
-                    options={[
-                      { value: "active", label: "Active" },
-                      { value: "suspended", label: "Suspended" },
-                      { value: "locked", label: "Locked" },
-                    ]}
-                    onChange={handleChange}
-                  />
-                </Col>
-
-              </>
-            )}
-          </Row>
-
-          <Row className="mt-4">
-            <Col lg={12}>
-              <div className="form-actions d-flex justify-content-end gap-3">
-                <CustomButton
-                  text="Save Changes"
-                  icon={FaSave}
-                  type="submit"
+                <SelectInput
+                  label="User Status"
+                  name="userStatus"
+                  value={formData.userStatus}
+                  options={[
+                    { value: "active", label: "Active" },
+                    { value: "suspended", label: "Suspended" },
+                    { value: "locked", label: "Locked" },
+                  ]}
+                  onChange={handleChange as any}
                 />
               </div>
-            </Col>
-          </Row>
+            )}
+          </div>
+
+          <div className="flex items-center justify-end gap-3 pt-6 border-t border-gray-100">
+            <CustomButton
+              text="Cancel"
+              icon={FaTimes}
+              variant="secondary"
+              onClick={() => navigate("/employees")}
+              type="button"
+            />
+            <CustomButton
+              text="Save Changes"
+              icon={FaSave}
+              type="submit"
+              variant="primary"
+            />
+          </div>
         </form>
-      </Container>
+      </div>
     </div>
   );
 };

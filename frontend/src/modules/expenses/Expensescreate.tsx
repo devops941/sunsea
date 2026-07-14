@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from "react";
-import { Container, Row, Col } from "react-bootstrap";
 import { FaSave, FaEraser, FaArrowLeft } from "react-icons/fa";
 import { toast } from "react-toastify";
 import TextInput from "../../components/form/TextInput/TextInput";
 import SelectInput from "../../components/form/SelectInput/SelectInput";
 import DateInput from "../../components/form/DateInput/DateInput";
 import FileUpload from "../../components/form/FileUpload/FileUpload";
+import TextArea from "../../components/form/TextArea/TextArea";
 import CustomButton from "../../components/ui/custombutton/CustomButton";
 import apiClient from "../../api/apiClient";
 import { useExpenses } from "../../hooks/useExpenses";
+import BackButton from "../../components/ui/BackButton/BackButton";
 
 interface ExpenseFormData {
   expenseNumber: string;
@@ -235,33 +236,32 @@ const ExpensesCreate: React.FC<ExpensesCreateProps> = ({
   ];
 
   return (
-    <div className="inner-container">
-      <Container fluid>
-        <div className="page-header">
-          <Row className="align-items-center g-3">
-            <Col lg={6} md={12}>
-              <div className="page-header-info">
-                <h2 className="page-title">
-                  {isEdit ? `Edit Expense: ${formData.expenseNumber}` : "Create Expense"}
-                </h2>
-                
-              </div>
-            </Col>
-            <Col lg={6} md={12}>
-              <div className="page-header-actions">
-                <CustomButton text="Back to List" icon={FaArrowLeft} onClick={onCancel} variant="outline" />
-              </div>
-            </Col>
-          </Row>
+    <div className="w-full mx-auto">
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+        <div className="px-6 py-4 ">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h2 className="text-xl font-bold text-gray-800">
+                {isEdit ? `Edit Expense: ${formData.expenseNumber}` : "Create Expense"}
+              </h2>
+            </div>
+            <div>
+              <BackButton
+                text="Back to List"
+
+
+              />
+            </div>
+          </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="form-inner">
-          <Row className="mb-4">
-            <h2 className="form-title">Expense Info</h2>
-
-            <Col lg={4} md={6}>
+        <form onSubmit={handleSubmit} className="px-6 py-3 space-y-4" noValidate>
+          {/* Expense Info */}
+          <div>
+            <h6 className="text-lg font-semibold text-gray-800 mb-4">Expense Info</h6>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
               <TextInput
-                label="Expense Number"
+                label="Expense Number *"
                 name="expenseNumber"
                 value={formData.expenseNumber}
                 placeholder="e.g. EXP-001"
@@ -270,11 +270,9 @@ const ExpensesCreate: React.FC<ExpensesCreateProps> = ({
                 onChange={handleChange}
                 error={errors.expenseNumber}
               />
-            </Col>
 
-            <Col lg={4} md={6}>
               <SelectInput
-                label="Expense Category"
+                label="Expense Category *"
                 name="expenseCategory"
                 value={formData.expenseCategory}
                 options={categories}
@@ -284,23 +282,21 @@ const ExpensesCreate: React.FC<ExpensesCreateProps> = ({
                 onChange={handleChange}
                 error={errors.expenseCategory}
               />
-            </Col>
 
-            <Col lg={4} md={6}>
-              <DateInput
-                label="Expense Date"
-                name="date"
-                value={formData.date}
-                required
-                disabled={saving}
-                onChange={handleChange}
-              />
-              {errors.date && <span className="text-danger small mt-1 d-block">{errors.date}</span>}
-            </Col>
+              <div>
+                <DateInput
+                  label="Expense Date *"
+                  name="date"
+                  value={formData.date}
+                  required
+                  disabled={saving}
+                  onChange={handleChange}
+                />
+                {errors.date && <span className="text-red-500 text-sm mt-1 block">{errors.date}</span>}
+              </div>
 
-            <Col lg={4} md={6}>
               <TextInput
-                label="Expense Name"
+                label="Expense Name *"
                 name="expense"
                 value={formData.expense}
                 placeholder="e.g. Server hosting fees"
@@ -309,11 +305,9 @@ const ExpensesCreate: React.FC<ExpensesCreateProps> = ({
                 onChange={handleChange}
                 error={errors.expense}
               />
-            </Col>
 
-            <Col lg={4} md={6}>
               <TextInput
-                label="Amount (₹)"
+                label="Amount (₹) *"
                 name="amount"
                 type="number"
                 value={formData.amount}
@@ -323,9 +317,7 @@ const ExpensesCreate: React.FC<ExpensesCreateProps> = ({
                 onChange={handleChange}
                 error={errors.amount}
               />
-            </Col>
 
-            <Col lg={4} md={6}>
               <SelectInput
                 label="Supplier (Optional)"
                 name="supplier"
@@ -336,15 +328,15 @@ const ExpensesCreate: React.FC<ExpensesCreateProps> = ({
                 onChange={handleChange}
                 error={errors.supplier}
               />
-            </Col>
-          </Row>
+            </div>
+          </div>
 
-          <Row className="mb-4">
-            <h2 className="form-title">Payment & Processing</h2>
-
-            <Col lg={4} md={6}>
+          {/* Payment & Processing */}
+          <div className="mt-6">
+            <h6 className="text-lg font-semibold text-gray-800 mb-4">Payment & Processing</h6>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
               <SelectInput
-                label="Payment Method"
+                label="Payment Method *"
                 name="paymentMethod"
                 value={formData.paymentMethod}
                 options={paymentMethods}
@@ -354,11 +346,9 @@ const ExpensesCreate: React.FC<ExpensesCreateProps> = ({
                 onChange={handleChange}
                 error={errors.paymentMethod}
               />
-            </Col>
 
-            <Col lg={4} md={6}>
               <SelectInput
-                label="Status"
+                label="Status *"
                 name="status"
                 value={formData.status}
                 options={statuses}
@@ -367,50 +357,47 @@ const ExpensesCreate: React.FC<ExpensesCreateProps> = ({
                 onChange={handleChange}
                 error={errors.status}
               />
-            </Col>
 
-            <Col lg={4} md={6}>
               <FileUpload
                 label={formData.receiptInvoice ? `Receipt: ${formData.receiptInvoice}` : "Upload Receipt/Invoice"}
                 name="receiptInvoice"
                 onChange={handleFileChange}
               />
-            </Col>
-          </Row>
+            </div>
+          </div>
 
-          <Row className="mb-4">
-            <h2 className="form-title">Descriptions & Notes</h2>
+          {/* Descriptions & Notes */}
+          <div className="mt-6">
+            <h6 className="text-lg font-semibold text-gray-800 mb-4">Descriptions & Notes</h6>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              <div>
+                <TextArea
+                  label="Description"
+                  name="description"
+                  value={formData.description}
+                  onChange={handleChange}
+                  disabled={saving}
+                  placeholder="Enter details about this expense..."
+                  rows={2}
+                />
+              </div>
 
-            <Col lg={6}>
-              <label className="text-input-label mb-2">Description</label>
-              <textarea
-                name="description"
-                value={formData.description}
-                onChange={handleChange}
-                disabled={saving}
-                placeholder="Enter details about this expense..."
-                rows={4}
-                className="form-control"
-                style={{ borderRadius: "8px", border: "1px solid #dcdcdc" }}
-              />
-            </Col>
+              <div>
+                <TextArea
+                  label="Internal Notes"
+                  name="notes"
+                  value={formData.notes}
+                  onChange={handleChange}
+                  disabled={saving}
+                  placeholder="Enter internal audit/review notes..."
+                  rows={2}
+                />
+              </div>
+            </div>
+          </div>
 
-            <Col lg={6}>
-              <label className="text-input-label mb-2">Internal Notes</label>
-              <textarea
-                name="notes"
-                value={formData.notes}
-                onChange={handleChange}
-                disabled={saving}
-                placeholder="Enter internal audit/review notes..."
-                rows={4}
-                className="form-control"
-                style={{ borderRadius: "8px", border: "1px solid #dcdcdc" }}
-              />
-            </Col>
-          </Row>
-
-          <div className="form-actions d-flex justify-content-end gap-3 mt-4">
+          {/* Form Actions */}
+          <div className="flex flex-wrap justify-end gap-3 mt-8 pt-4 border-t border-gray-200">
             <CustomButton
               text="Clear"
               icon={FaEraser}
@@ -427,7 +414,7 @@ const ExpensesCreate: React.FC<ExpensesCreateProps> = ({
             />
           </div>
         </form>
-      </Container>
+      </div>
     </div>
   );
 };

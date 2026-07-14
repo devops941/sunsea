@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import { Container, Row, Col } from "react-bootstrap";
 import { FaSave, FaEraser, FaArrowLeft } from "react-icons/fa";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -159,31 +158,22 @@ const MachineEdit: React.FC = () => {
     };
 
     return (
-        <div className="inner-container">
-            <Container fluid>
-                <div className="page-header">
-                    <Row className="align-items-center g-3">
-                        <Col lg={6} md={12}>
-                            <div className="page-header-info">
-                                <h2 className="page-title">Edit Machine</h2>
-                                
-                            </div>
-                        </Col>
-                        <Col lg={6} md={12}>
-                            <div className="page-header-actions">
-                                <CustomButton
-                                    text="Back to List"
-                                    icon={FaArrowLeft}
-                                    onClick={() => navigate("/machines")}
-                                />
-                            </div>
-                        </Col>
-                    </Row>
+        <div className="w-full mx-auto">
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className="px-6 py-5 border-b border-slate-200">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <h2 className="text-xl font-bold text-slate-800">Edit Machine</h2>
+                        <CustomButton
+                            text="Back to List"
+                            icon={FaArrowLeft}
+                            onClick={() => navigate("/machines")}
+                        />
+                    </div>
                 </div>
 
-                <form onSubmit={handleSubmit} className="form-inner" noValidate>
-                    <Row className="g-3">
-                        <Col md={6}>
+                <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4" noValidate>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+                        <div>
                             <TextInput
                                 label="Machine ID"
                                 name="machineId"
@@ -194,8 +184,8 @@ const MachineEdit: React.FC = () => {
                                 error={errors.machineId}
                                 onChange={handleChange}
                             />
-                        </Col>
-                        <Col md={6}>
+                        </div>
+                        <div>
                             <TextInput
                                 label="Machine Name"
                                 name="machineName"
@@ -205,8 +195,8 @@ const MachineEdit: React.FC = () => {
                                 error={errors.machineName}
                                 onChange={handleChange}
                             />
-                        </Col>
-                        <Col md={6}>
+                        </div>
+                        <div>
                             <SelectInput
                                 label="Technology Type"
                                 name="technologyType"
@@ -228,8 +218,8 @@ const MachineEdit: React.FC = () => {
                                 error={errors.technologyType}
                                 onChange={handleChange}
                             />
-                        </Col>
-                        <Col md={6}>
+                        </div>
+                        <div>
                             <SelectInput
                                 label="Machine Type"
                                 name="machineType"
@@ -243,9 +233,9 @@ const MachineEdit: React.FC = () => {
                                 error={errors.machineType}
                                 onChange={handleChange}
                             />
-                        </Col>
+                        </div>
                         
-                        <Col md={6}>
+                        <div>
                             <SelectInput
                                 label="Operator"
                                 name="operatorId"
@@ -258,9 +248,9 @@ const MachineEdit: React.FC = () => {
                                 error={errors.operatorId}
                                 onChange={handleChange}
                             />
-                        </Col>
+                        </div>
                         
-                        <Col md={6}>
+                        <div>
                             <TextInput
                                 label="Capacity"
                                 name="capacity"
@@ -271,9 +261,9 @@ const MachineEdit: React.FC = () => {
                                 error={errors.capacity}
                                 onChange={handleChange}
                             />
-                        </Col>
+                        </div>
                         
-                        <Col md={6}>
+                        <div>
                             <TextInput
                                 label="Target Temperature (°C)"
                                 name="targetTemperature"
@@ -284,9 +274,9 @@ const MachineEdit: React.FC = () => {
                                 error={errors.targetTemperature}
                                 onChange={handleChange}
                             />
-                        </Col>
+                        </div>
                         
-                        <Col md={6}>
+                        <div>
                             <TextInput
                                 label="Target Load (%)"
                                 name="targetLoadPercent"
@@ -297,9 +287,9 @@ const MachineEdit: React.FC = () => {
                                 error={errors.targetLoadPercent}
                                 onChange={handleChange}
                             />
-                        </Col>
+                        </div>
                         
-                        <Col md={6}>
+                        <div>
                             <TextInput
                                 label="Manufacturer"
                                 name="manufacturer"
@@ -309,9 +299,9 @@ const MachineEdit: React.FC = () => {
                                 error={errors.manufacturer}
                                 onChange={handleChange}
                             />
-                        </Col>
+                        </div>
 
-                        <Col md={6}>
+                        <div>
                             <TextInput
                                 label="Model Number"
                                 name="modelNumber"
@@ -321,9 +311,9 @@ const MachineEdit: React.FC = () => {
                                 error={errors.modelNumber}
                                 onChange={handleChange}
                             />
-                        </Col>
+                        </div>
                         
-                        <Col md={6}>
+                        <div>
                             <TextInput
                                 label="Cycle Time"
                                 name="cycleTime"
@@ -334,9 +324,9 @@ const MachineEdit: React.FC = () => {
                                 error={errors.cycleTime}
                                 onChange={handleChange}
                             />
-                        </Col>
+                        </div>
                         
-                        <Col md={6}>
+                        <div>
                             <SelectInput
                                 label="Machine Status"
                                 name="machineStatus"
@@ -352,9 +342,9 @@ const MachineEdit: React.FC = () => {
                                 error={errors.machineStatus}
                                 onChange={handleChange}
                             />
-                        </Col>
+                        </div>
 
-                        <Col md={6}>
+                        <div>
                             <TextInput
                                 label="Description"
                                 name="description"
@@ -363,8 +353,8 @@ const MachineEdit: React.FC = () => {
                                 error={errors.description}
                                 onChange={handleChange}
                             />
-                        </Col>
-                        <Col md={6}>
+                        </div>
+                        <div>
                             <SelectInput
                                 label="Active Status"
                                 name="isActive"
@@ -378,27 +368,25 @@ const MachineEdit: React.FC = () => {
                                 error={errors.isActive}
                                 onChange={handleChange}
                             />
-                        </Col>
-                    </Row>
+                        </div>
+                    </div>
 
-                    <div className="form-actions d-flex justify-content-end gap-3 mt-4">
+                    <div className="flex justify-end gap-3 mt-8 pt-5 border-t border-slate-100">
                         <CustomButton
                             text="Cancel"
                             icon={FaEraser}
                             onClick={() => navigate("/machines")}
                             disabled={isSubmitting}
                         />
-                        <div className="ms-2">
-                            <CustomButton
-                                text={isSubmitting ? "Updating..." : "Update Machine"}
-                                icon={FaSave}
-                                type="submit"
-                                disabled={isSubmitting}
-                            />
-                        </div>
+                        <CustomButton
+                            text={isSubmitting ? "Updating..." : "Update Machine"}
+                            icon={FaSave}
+                            type="submit"
+                            disabled={isSubmitting}
+                        />
                     </div>
                 </form>
-            </Container>
+            </div>
         </div>
     );
 };

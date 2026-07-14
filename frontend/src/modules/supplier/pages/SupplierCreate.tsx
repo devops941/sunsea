@@ -14,9 +14,32 @@ import { useSelector } from "react-redux";
 import { supplierService } from "../../../services/supplierService";
 import { rawMaterialService } from "../../../services/rawMaterialService";
 import { rawMaterialCategoryService } from "../../../services/rawMaterialCategoryService";
+import CityStateSelect from "../../../components/ui/CityStateSelect/CityStateSelect";
+import type { StateCityOption } from "../../../components/ui/CityStateSelect/CityStateSelect";
 import MultiSelect from "../../../components/form/multiSelect/MultiSelect";
 import IndiaPhoneInput from "../../../components/ui/PhoneInput/PhoneInput";
 import AddressForm from "../../../components/form/AddressFrom/AddressFrom";
+
+const getGstStateCode = (stateNameOrCode: string): string => {
+  const normalized = stateNameOrCode.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const mapping: Record<string, string> = {
+    jk: "01", hp: "02", pb: "03", ch: "04", ut: "05", hr: "06", dl: "07",
+    rj: "08", up: "09", br: "10", sk: "11", ar: "12", nl: "13", mn: "14",
+    mz: "15", tr: "16", ml: "17", as: "18", wb: "19", jh: "20", or: "21",
+    od: "21", ct: "22", cg: "22", mp: "23", gj: "24", dd: "26", dn: "26",
+    mh: "27", ap: "37", ka: "29", ga: "30", ld: "31", kl: "32", tn: "33",
+    py: "34", an: "35", tg: "36", ts: "36", la: "38", jammuandkashmir: "01",
+    himachalpradesh: "02", punjab: "03", chandigarh: "04", uttarakhand: "05",
+    haryana: "06", delhi: "07", rajasthan: "08", uttarpradesh: "09", bihar: "10",
+    sikkim: "11", arunachalpradesh: "12", nagaland: "13", manipur: "14", mizoram: "15",
+    tripura: "16", meghalaya: "17", assam: "18", westbengal: "19", jharkhand: "20",
+    odisha: "21", chhattisgarh: "22", madhyapradesh: "23", gujarat: "24", damananddiu: "26",
+    dadraandnagarhaveli: "26", maharashtra: "27", andhrapradesh: "37", karnataka: "29",
+    goa: "30", lakshadweep: "31", kerala: "32", tamilnadu: "33", puducherry: "34",
+    andamanandnicobarislands: "35", telangana: "36", ladakh: "38",
+  };
+  return mapping[normalized] || "";
+};
 import { validatePhoneNumber } from "../../../components/ui/PhoneInput/PhoneInput";
 
 

@@ -14,7 +14,7 @@ interface TextInputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement
   preventNegative?: boolean;
   as?: "input" | "textarea";
   rows?: number;
-  onChange?: (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
+  onChange?: (event: any) => void;
 }
 
 const TextInput: React.FC<TextInputProps> = ({

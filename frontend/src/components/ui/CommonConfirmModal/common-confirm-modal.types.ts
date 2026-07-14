@@ -9,7 +9,7 @@ export interface CommonConfirmModalProps {
   message?: string | React.ReactNode;
 
   confirmText?: string;
-
+  confirmDisabled?: boolean;
   size?: "sm" | "md" | "lg" | "xl";
 
   confirmVariant?:

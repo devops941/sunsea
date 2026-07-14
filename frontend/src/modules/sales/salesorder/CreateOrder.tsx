@@ -630,7 +630,7 @@ const SalesOrderForm: React.FC = () => {
                                     </div>
                                 </div>
                             )}
-                        </Col>
+                        </div>
 
                         {customerTypeOptions.length >= 1 && (
                             <div>

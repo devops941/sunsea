@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import { Container, Row, Col } from "react-bootstrap";
 import { FaSave, FaEraser, FaArrowLeft } from "react-icons/fa";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -363,65 +362,47 @@ const RawMaterialEdit: React.FC = () => {
     };
 
     return (
-        <div className="inner-container">
-            <Container fluid>
-                <div className="page-header">
-                    <Row className="align-items-center g-3">
-                        <Col lg={6} md={12}>
-                            <div className="page-header-info">
-                                <h2 className="page-title">Edit Raw Material</h2>
-                                
-                            </div>
-                        </Col>
-                        <Col lg={6} md={12}>
-                            <div className="page-header-actions">
-                                <CustomButton
-                                    text="Back to List"
-                                    icon={FaArrowLeft}
-                                    onClick={() => navigate("/raw-materials")}
-                                />
-                            </div>
-                        </Col>
-                    </Row>
+        <div className="w-full mx-auto">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+                <div className="px-6 py-4 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <h2 className="text-xl font-bold text-gray-800">
+                        Edit Raw Material
+                    </h2>
+                    <CustomButton
+                        text="Back to List"
+                        icon={FaArrowLeft}
+                        onClick={() => navigate("/raw-materials")}
+                    />
                 </div>
 
-                <form onSubmit={handleSubmit} className="form-inner" noValidate>
+                <form onSubmit={handleSubmit} className="px-6 py-4 space-y-8" noValidate>
                     {/* Basic Information */}
-                    <Row className="mb-4">
-                        <h2 className="form-title">Basic Information</h2>
-
-                        <Col lg={4} md={6}>
+                    <div>
+                        <h6 className="text-base font-semibold text-gray-800 mb-4 border-b border-gray-100 pb-2">Basic Information</h6>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                             <TextInput
                                 label="Raw Material ID"
                                 name="rawMaterialId"
                                 value={formData.rawMaterialId}
-                                placeholder="e.g. RM001"
-                                required
                                 disabled={true}
+                                required
                                 error={errors.rawMaterialId}
                                 onChange={handleChange}
                             />
-                        </Col>
-
-                        <Col lg={4} md={6}>
                             <TextInput
                                 label="Material Name"
                                 name="materialName"
                                 value={formData.materialName}
-                                placeholder="e.g. Cotton Yarn 40s"
                                 required
                                 error={errors.materialName}
                                 onChange={handleChange}
                             />
-                        </Col>
-
-                        <Col lg={4} md={6}>
                             <SelectInput
                                 label="Store"
                                 name="storeId"
                                 value={formData.storeId}
                                 options={[
-                                    { label: "Select a store", value: "" },
+                                    { label: "Select Store", value: "" },
                                     ...(stores || []).map((store: any) => ({
                                         label: store.storeName,
                                         value: store.storeId
@@ -431,39 +412,33 @@ const RawMaterialEdit: React.FC = () => {
                                 error={errors.storeId}
                                 onChange={handleChange}
                             />
-                        </Col>
-
-                        <Col lg={4} md={6}>
                             <SelectInput
                                 label="Raw Material Category"
                                 name="categoryId"
                                 value={formData.categoryId}
                                 options={[
-                                    { label: "Select category", value: "" },
+                                    { label: "Select Category", value: "" },
                                     ...(rawMaterialCategories || []).map((cat: any) => ({
                                         label: cat.name,
                                         value: String(cat.id)
                                     }))
                                 ]}
+                                required
                                 error={errors.categoryId}
                                 onChange={handleChange}
-                                required
                             />
-                        </Col>
-
-                        <Col lg={4} md={6}>
                             <UOMSelect
                                 name="baseUom"
                                 label="Base UOM"
                                 value={formData.baseUom}
                                 required
                                 isMulti
-                                category={["length", "mass", "each"]}
+                                category={["length", "mass", "each","volume"]}
                                 allowedCodes={[
                                     "kg", "g", "t", "ton",
                                     "l", "ml", "ltr",
                                     "m", "cm", "mtr",
-                                    "ea", "dz"
+                                    "dz", "ea"
                                 ]}
                                 onChange={(value) => {
                                     setFormData(prev => ({ ...prev, baseUom: value }));
@@ -473,21 +448,14 @@ const RawMaterialEdit: React.FC = () => {
                                 }}
                                 error={errors.baseUom}
                             />
-                        </Col>
-
-                        <Col lg={4} md={6}>
                             <TextInput
                                 label="HSN Code"
                                 name="hsnCode"
                                 value={formData.hsnCode}
-                                placeholder="e.g. 3901"
+                                required
                                 error={errors.hsnCode}
                                 onChange={handleChange}
-                                required
                             />
-                        </Col>
-
-                        <Col lg={4} md={6}>
                             <SelectInput
                                 label="Status"
                                 name="status"
@@ -500,14 +468,13 @@ const RawMaterialEdit: React.FC = () => {
                                 error={errors.status}
                                 onChange={handleChange}
                             />
-                        </Col>
-                    </Row>
+                        </div>
+                    </div>
 
                     {/* Stock Information */}
-                    <Row className="mb-4">
-                        <h2 className="form-title">Stock Information</h2>
-
-                        <Col lg={4} md={6}>
+                    <div>
+                        <h6 className="text-base font-semibold text-gray-800 mb-4 border-b border-gray-100 pb-2">Stock Information</h6>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                             <QuantityInput
                                 label="Opening Stock"
                                 name="onHandQty"
@@ -517,86 +484,92 @@ const RawMaterialEdit: React.FC = () => {
                                 error={errors.onHandQty}
                                 onChange={handleChange}
                             />
-                        </Col>
-
-                        <Col lg={4} md={6}>
-                            <QuantityInput
-                                label="Reserved Quantity"
-                                name="reservedQty"
-                                value={formData.reservedQty}
-                                baseUoms={formData.baseUom}
-                                required
-                                error={errors.reservedQty}
-                                onChange={handleChange}
-                            />
-                        </Col>
-
-                        <Col lg={4} md={6}>
                             <QuantityInput
                                 label="Minimum Stock"
                                 name="minimumStock"
                                 value={formData.minimumStock}
                                 baseUoms={formData.baseUom}
+                                required
                                 error={errors.minimumStock}
                                 onChange={handleChange}
-                                required
                             />
-                        </Col>
-
-                        <Col lg={4} md={6}>
                             <QuantityInput
                                 label="Reorder Level"
                                 name="reorderLevel"
                                 value={formData.reorderLevel}
                                 baseUoms={formData.baseUom}
+                                required
                                 error={errors.reorderLevel}
                                 onChange={handleChange}
-                                required
                             />
-                        </Col>
-
-                        <Col lg={4} md={6}>
                             <TextInput
                                 type="number"
-                                label="Lead Time (Days)"
+                                label="Delivery Days"
                                 name="leadTimeDays"
                                 value={formData.leadTimeDays}
-                                placeholder="e.g. 5"
+                                required
                                 error={errors.leadTimeDays}
                                 onChange={handleChange}
-                                required
                             />
-                        </Col>
-                    </Row>
+                        </div>
+                    </div>
 
                     {/* Pricing & Value */}
-                    <Row className="mb-4">
-                        <h2 className="form-title">Pricing & Value</h2>
-
-                        <Col lg={4} md={6}>
+                    <div>
+                        <h6 className="text-base font-semibold text-gray-800 mb-4 border-b border-gray-100 pb-2">Pricing & Value</h6>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                            <TextInput
+                                type="number"
+                                label="Average Cost"
+                                name="avgCost"
+                                value={formData.avgCost}
+                                required
+                                error={errors.avgCost}
+                                onChange={handleChange}
+                            />
                             <TextInput
                                 type="number"
                                 label="Unit Price"
                                 name="unitPrice"
                                 value={formData.unitPrice}
-                                placeholder="e.g. 50.00"
                                 required
                                 error={errors.unitPrice}
                                 onChange={handleChange}
                             />
-                        </Col>
-                    </Row>
+                            <SelectInput
+                                label="GST TYPE (%)"
+                                name="gstTaxRateId"
+                                value={formData.gstTaxRateId}
+                                options={gstOptions}
+                                required
+                                onChange={handleChange}
+                                error={errors.gstTaxRateId}
+                                disabled={gstLoading}
+                            />
+                        </div>
+                    </div>
 
-                    <Row className="mt-4">
-                        <Col lg={12}>
-                            <div className="form-actions d-flex justify-content-end gap-3">
-                                <CustomButton text="Cancel" icon={FaEraser} onClick={() => navigate("/raw-materials")} disabled={isSubmitting} />
-                                <CustomButton text={isSubmitting ? "Updating..." : "Update Material"} icon={FaSave} type="submit" disabled={isSubmitting} />
-                            </div>
-                        </Col>
-                    </Row>
+                    {/* Other Details */}
+                    <div>
+                        <h6 className="text-base font-semibold text-gray-800 mb-4 border-b border-gray-100 pb-2">Other Details</h6>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                            <TextInput
+                                label="Remarks"
+                                name="remarks"
+                                value={formData.remarks}
+                                required
+                                error={errors.remarks}
+                                onChange={handleChange}
+                            />
+                        </div>
+                    </div>
+
+                    <div className="flex justify-end gap-3 pt-4 border-t border-gray-100 mt-6">
+                        
+                        <CustomButton text={isSubmitting ? "Saving..." : "Save Material"} icon={FaSave} type="submit" disabled={isSubmitting} />
+                    </div>
                 </form>
-            </Container>
+            </div>
         </div>
     );
 };

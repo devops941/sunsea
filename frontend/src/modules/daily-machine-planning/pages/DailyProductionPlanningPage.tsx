@@ -385,6 +385,12 @@ const DailyProductionPlanningPage: React.FC = () => {
                 </div>
 
                 <CustomButton
+                  text="New Production Order"
+                  icon={FaPlus}
+                  onClick={() => navigate("/production-orders/create")}
+                  style={{ marginRight: "8px" }}
+                />
+                <CustomButton
                   text="New Daily Plan"
                   icon={FaPlus}
                   onClick={openCreateForm}

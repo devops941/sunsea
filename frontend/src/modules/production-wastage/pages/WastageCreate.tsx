@@ -147,7 +147,7 @@ const WastageForm: React.FC = () => {
         setFormData((prev) => ({
           ...prev,
           productId: String(selectedPO.productItemId),
-          uom: selectedPO.uom || "PCS",
+          uom: "KG",
           machineId: selectedPO.machineMachineId || selectedPO.machineId || prev.machineId,
           shiftId: selectedPO.shiftId ? String(selectedPO.shiftId) : prev.shiftId,
         }));

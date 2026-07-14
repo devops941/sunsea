@@ -1,11 +1,10 @@
 import React, { useState, useCallback, useEffect } from "react";
-import { Container, Row, Col, Spinner, Modal } from "react-bootstrap";
-import { FaSearch, FaChevronLeft, FaChevronRight, FaCheck, FaTimes } from "react-icons/fa";
+import { Modal } from "react-bootstrap";
+import { FaTimes } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useSelector } from "react-redux";
 
-//import EditButton from "../../../../components/ui/EditButton/EditButton";
 import CommonViewModal from "../../../../components/ui/CommonViewModal/CommonViewModal";
 import CommonConfirmModal from "../../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import StatusBadge from "../../../../components/ui/StatusBadge/Badge";
@@ -15,6 +14,8 @@ import ViewButton from "../../../../components/ui/viewbutton/ViewButton";
 import CustomButton from "../../../../components/ui/custombutton/CustomButton";
 import TextInput from "../../../../components/form/TextInput/TextInput";
 import EditButton from "../../../../components/ui/EditButton/EditButton";
+import DataTable from "../../../../components/ui/table/DataTable";
+import SearchInput from "../../../../components/ui/SearchInput/SearchInput";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -142,119 +143,62 @@ const POMDApproval: React.FC = () => {
         [navigate]
     );
 
-
-
     return (
-        <div className="inner-container">
-            <Container fluid>
+        <div>
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                 {/* Page Header */}
-                <div className="page-header">
-                    <Row className="align-items-center g-3">
-                        <Col lg={6} md={12}>
-                            <div className="page-header-info">
-                                <h2 className="page-title">PO MD Approval List</h2>
-                                
-                            </div>
-                        </Col>
-                        <Col lg={6} md={12}>
-                            <div className="page-header-actions">
-                                <div className="page-search-wrap">
-                                    <FaSearch className="page-search-icon" />
-                                    <input
-                                        type="text"
-                                        className="page-search-input"
-                                        placeholder="Search purchase orders..."
-                                        value={searchTerm}
-                                        onChange={handleSearch}
-                                    />
-                                </div>
-                            </div>
-                        </Col>
-                    </Row>
+                <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-slate-200">
+                    <div>
+                        <h2 className="text-2xl font-bold text-slate-800">PO MD Approval List</h2>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-3 relative w-full lg:w-auto">
+                        <SearchInput
+                            value={searchTerm}
+                            onChange={handleSearch}
+                            placeholder="Search purchase orders..."
+                        />
+                    </div>
                 </div>
 
                 {/* Table */}
-                <div className="master-table-body table-wrap">
-                    <div className="master-table-body">
-                        <table className="master-data-table">
-                            <thead>
-                                <tr>
-                                    <th style={{ width: "60px" }}>#</th>
-                                    <th>PO NO</th>
-                                    <th>PO DATE</th>
-                                    <th>SUPPLIER</th>
-                                    <th>NET AMOUNT</th>
-                                    <th>STATUS</th>
-                                    <th>ACTIONS</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {loading ? (
-                                    <tr>
-                                        <td colSpan={7} className="text-center p-4">
-                                            <Spinner animation="border" size="sm" className="me-2" />
-                                            Loading purchase orders...
-                                        </td>
-                                    </tr>
-                                ) : data.length > 0 ? (
-                                    data.map((item, index) => (
-                                        <tr key={item.id} className="master-data-row">
-                                            <td className="master-data-cell">
-                                                {(currentPage - 1) * ITEMS_PER_PAGE + index + 1}
-                                            </td>
-                                            <td className="master-data-cell">{item.poNumber}</td>
-                                            <td className="master-data-cell">{formatDate(item.poDate)}</td>
-                                            <td className="master-data-cell">
-                                                {item.supplier?.supplierName || "N/A"}
-                                            </td>
-                                            <td className="master-data-cell">
-                                                {formatCurrency(item.netAmount)}
-                                            </td>
-                                            <td className="master-data-cell">
-                                                <StatusBadge status={item.status ?? ""} />
-                                            </td>
-                                            <td className="master-data-cell">
-                                                <div className="table-action-group">
-                                                    <ViewButton onClick={() => handleOpenView(item)} />
-                                                    <EditButton onClick={() => handleOpenEdit(item)} />
-
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))
-                                ) : (
-                                    <tr>
-                                        <td colSpan={7} className="text-center p-4">
-                                            No purchase orders pending approval.
-                                        </td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
-
-                        {totalPages > 1 && (
-                            <div className="pagination-wrap">
-                                <button
-                                    className="pagination-btn"
-                                    disabled={currentPage === 1}
-                                    onClick={() => setCurrentPage((prev) => prev - 1)}
-                                >
-                                    <FaChevronLeft />
-                                </button>
-                                <div className="pagination-info">
-                                    Page {currentPage} of {totalPages}
+                <DataTable
+                    data={data}
+                    rowKey={(item) => item.id}
+                    loading={loading}
+                    emptyMessage="No purchase orders pending approval."
+                    pagination={{
+                        currentPage,
+                        totalPages,
+                        onPageChange: (page) => setCurrentPage(page),
+                    }}
+                    columns={[
+                        {
+                            header: "#",
+                            width: "60px",
+                            render: (_item, index) => (currentPage - 1) * ITEMS_PER_PAGE + index + 1,
+                        },
+                        { header: "PO NO", accessor: "poNumber" },
+                        { header: "PO DATE", render: (item) => formatDate(item.poDate) },
+                        {
+                            header: "SUPPLIER",
+                            render: (item) => item.supplier?.supplierName || "N/A",
+                        },
+                        {
+                            header: "NET AMOUNT",
+                            render: (item) => formatCurrency(item.netAmount),
+                        },
+                        { header: "STATUS", render: (item) => <StatusBadge status={item.status ?? ""} /> },
+                        {
+                            header: "ACTIONS",
+                            render: (item) => (
+                                <div className="flex items-center gap-2">
+                                    <ViewButton onClick={() => handleOpenView(item)} />
+                                    <EditButton onClick={() => handleOpenEdit(item)} />
                                 </div>
-                                <button
-                                    className="pagination-btn"
-                                    disabled={currentPage === totalPages}
-                                    onClick={() => setCurrentPage((prev) => prev + 1)}
-                                >
-                                    <FaChevronRight />
-                                </button>
-                            </div>
-                        )}
-                    </div>
-                </div>
+                            ),
+                        },
+                    ]}
+                />
 
                 {/* View Modal */}
                 <CommonViewModal
@@ -333,10 +277,8 @@ const POMDApproval: React.FC = () => {
                                         { label: "Created at", value: formatDate(selectedItem.createdAt) },
                                         { label: "Last updated", value: formatDate(selectedItem.updatedAt) },
                                         { label: "Created by", value: user?.username || "N/A" },
-
                                     ],
                                 },
-
                             ]
                             : []
                     }
@@ -387,7 +329,7 @@ const POMDApproval: React.FC = () => {
                         />
                     </Modal.Footer>
                 </Modal>
-            </Container>
+            </div>
         </div>
     );
 };

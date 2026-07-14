@@ -11,6 +11,7 @@ const CommonConfirmModal: React.FC<CommonConfirmModalProps> = ({
   message = "Are you sure you want to perform this action?",
   confirmText = "Confirm",
   confirmVariant = "danger",
+  confirmDisabled = false,
 }) => {
   // Handle escape key to close
   useEffect(() => {
@@ -64,6 +65,7 @@ const CommonConfirmModal: React.FC<CommonConfirmModalProps> = ({
               text={confirmText}
               icon={FaTrash}
               onClick={onConfirm}
+              disabled={confirmDisabled}
               className={isDanger ? "!bg-red-500 hover:!bg-red-600 !text-white !border-red-500 px-6" : "px-6"}
             />
           </div>

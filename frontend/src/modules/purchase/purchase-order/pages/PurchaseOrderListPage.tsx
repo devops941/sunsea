@@ -201,37 +201,6 @@ const PurchaseOrderListPage: React.FC = () => {
                   onChange={(e) => setDraftFromDate(e.target.value)}
                 />
               </div>
-            </Col >
-            <Col lg={6} md={12}>
-              <div className="page-header-actions">
-                <div className="page-filter-wrap" style={{ minWidth: "150px" }}>
-                  <select
-                    className="form-select"
-                    value={statusFilter}
-                    onChange={handleStatusFilter}
-                  >
-                    <option value="">All Status</option>
-                    <option value="DRAFT">Draft</option>
-                    <option value="PENDING">Pending</option>
-                    <option value="APPROVED">Approved</option>
-                    <option value="OPEN">Open</option>
-                    <option value="PARTIALLY_RECEIVED">Partially Received</option>
-                    <option value="CLOSED">Closed</option>
-                    <option value="REJECTED">Rejected</option>
-                    <option value="COMPLETED">Completed</option>
-                    <option value="CANCELLED">Cancelled</option>
-                  </select>
-                </div>
-                <div className="page-search-wrap">
-                  <FaSearch className="page-search-icon" />
-                  <input
-                    type="text"
-                    className="page-search-input"
-                    placeholder="Search by PO # or Supplier..."
-                    value={searchTerm}
-                    onChange={handleSearch}
-                  />
-                </div>
 
                 <div className="mb-3">
                   <label className="block mb-1 text-[11px] uppercase tracking-wider text-gray-500 font-semibold">

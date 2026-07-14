@@ -7,7 +7,7 @@ import CustomButton from "../../components/ui/Button/Button";
 import type { RootState, AppDispatch } from "../../app/store";
 import { fetchProfile } from "../../features/profiles/profileSlice";
 import { StatusBadge } from "../../components/ui/StatusBadge/Badge";
-import "../../modules/company/pages/CompanyProfile.css";
+
 
 const formatDate = (date?: string | null) =>
     date ? new Date(date).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' }) : "N/A";

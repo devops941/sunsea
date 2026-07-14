@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Container, Row, Col, Spinner } from "react-bootstrap";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
@@ -101,113 +100,87 @@ const WastageList: React.FC = () => {
   const displayWastages = Array.isArray(wastages) ? wastages : (wastages?.data && Array.isArray(wastages.data) ? wastages.data : []);
 
   return (
-    <div className="inner-container">
-      <Container fluid>
-        {/* Header */}
-        <div className="page-header">
-          <Row className="align-items-center g-3">
-            <Col lg={6} md={12}>
-              <div className="page-header-info">
-                <h2 className="page-title">Production Wastage Auditing</h2>
-                
-              </div>
-            </Col>
-            <Col lg={6} md={12}>
-              <div className="page-header-actions">
-                <CustomButton
-                  text="Add Wastage Log"
-                  onClick={() => navigate("/production-wastages/create")}
-                  icon={FaPlus}
-                />
-              </div>
-            </Col>
-          </Row>
-        </div>
-
-
-        {/* Data Table */}
-        <div className="master-table-body table-wrap">
-          <div className="master-table-body">
-            <table className="master-data-table">
-              <thead>
-                <tr>
-                  <th style={{ width: "60px" }}>#</th>
-                  <th>DATE</th>
-                  <th>PRODUCT</th>
-                  <th>MACHINE</th>
-                  <th>SHIFT</th>
-                  <th>WASTAGE TYPE</th>
-                  <th>QUANTITY</th>
-                  <th>REASON</th>
-                  <th>STATUS</th>
-                  <th>ACTIONS</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr>
-                    <td colSpan={9} className="text-center p-4">
-                      <Spinner animation="border" size="sm" className="me-2" />
-                      Loading wastage records...
-                    </td>
-                  </tr>
-                ) : displayWastages.length > 0 ? (
-                  displayWastages.map((item: any, index: number) => (
-                    <tr key={String(item.id)} className="master-data-row">
-                      <td className="master-data-cell">{index + 1}</td>
-                      <td className="master-data-cell font-monospace">{new Date(item.wastageDate).toLocaleDateString()}</td>
-                      <td className="master-data-cell fw-semibold">{item.product?.productName || "Unknown"}</td>
-                      <td className="master-data-cell text-muted">{item.machine?.machineName || item.machineId}</td>
-                      <td className="master-data-cell">{item.shift?.shiftName || item.shiftId}</td>
-                      <td className="master-data-cell">
-                        <StatusBadge status={item.wastageType} />
-                      </td>
-                      <td className="master-data-cell fw-bold">{item.quantity} {item.uom}</td>
-                      <td className="master-data-cell text-muted">
-                        {item.reason ? (
-                          <span
-                            title={item.reason}
-                            style={{
-                              maxWidth: "150px",
-                              display: "inline-block",
-                              whiteSpace: "nowrap",
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
-                              cursor: "help"
-                            }}
-                          >
-                            {item.reason}
-                          </span>
-                        ) : (
-                          "-"
-                        )}
-                      </td>
-                      <td className="master-data-cell">
-                        <StatusBadge status={item.status} />
-                      </td>
-                      <td className="master-data-cell text-end pe-3" onClick={(e) => e.stopPropagation()}>
-                        <div className="d-flex align-items-center justify-content-end gap-2">
-                          <ViewButton onClick={() => handleView(item)} />
-                          {item.status === "DRAFT" && (
-                            <>
-                              <EditButton onClick={() => navigate(`/production-wastages/edit/${item.id}`, { state: item })} />
-                              <DeleteButton onClick={() => handleDeleteClick(String(item.id))} />
-                            </>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={9} className="text-muted py-4 text-center">No wastage logs reported matching criteria.</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+    <div className="p-4 md:p-6 min-h-screen bg-slate-50">
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        {/* Page Header */}
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-slate-200">
+          <div>
+            <h2 className="text-2xl font-bold text-slate-800">Production Wastage Auditing</h2>
+          </div>
+          <div className="flex items-center gap-3">
+            <CustomButton
+              text="Add Wastage Log"
+              onClick={() => navigate("/production-wastages/create")}
+              icon={FaPlus}
+            />
           </div>
         </div>
-      </Container>
+
+        {/* Table */}
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-slate-50 text-slate-600 border-b border-slate-200">
+              <tr>
+                <th className="px-4 py-3 font-semibold w-14">#</th>
+                <th className="px-4 py-3 font-semibold">DATE</th>
+                <th className="px-4 py-3 font-semibold">PRODUCT</th>
+                <th className="px-4 py-3 font-semibold">MACHINE</th>
+                <th className="px-4 py-3 font-semibold">SHIFT</th>
+                <th className="px-4 py-3 font-semibold">WASTAGE TYPE</th>
+                <th className="px-4 py-3 font-semibold">QUANTITY</th>
+                <th className="px-4 py-3 font-semibold">REASON</th>
+                <th className="px-4 py-3 font-semibold">STATUS</th>
+                <th className="px-4 py-3 font-semibold">ACTIONS</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {loading ? (
+                <tr>
+                  <td colSpan={10} className="text-center py-10 text-slate-500">
+                    <div className="flex items-center justify-center gap-2">
+                      <div className="w-5 h-5 border-2 border-teal-500 border-t-transparent rounded-full animate-spin" />
+                      Loading wastage records...
+                    </div>
+                  </td>
+                </tr>
+              ) : displayWastages.length > 0 ? (
+                displayWastages.map((item: any, index: number) => (
+                  <tr key={String(item.id)} className="hover:bg-slate-50/50 transition-colors">
+                    <td className="px-4 py-3 text-slate-500">{index + 1}</td>
+                    <td className="px-4 py-3 font-mono text-slate-600">{new Date(item.wastageDate).toLocaleDateString()}</td>
+                    <td className="px-4 py-3 font-semibold text-slate-800">{item.product?.productName || "Unknown"}</td>
+                    <td className="px-4 py-3 text-slate-500">{item.machine?.machineName || item.machineId}</td>
+                    <td className="px-4 py-3 text-slate-600">{item.shift?.shiftName || item.shiftId}</td>
+                    <td className="px-4 py-3"><StatusBadge status={item.wastageType} /></td>
+                    <td className="px-4 py-3 font-bold text-slate-800">{item.quantity} {item.uom && item.uom.toUpperCase() === "PCS" ? "kg" : String(item.uom || "kg").toLowerCase()}</td>
+                    <td className="px-4 py-3 text-slate-500">
+                      {item.reason ? (
+                        <span title={item.reason} className="block max-w-[150px] truncate cursor-help">{item.reason}</span>
+                      ) : "-"}
+                    </td>
+                    <td className="px-4 py-3"><StatusBadge status={item.status} /></td>
+                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center gap-2">
+                        <ViewButton onClick={() => handleView(item)} />
+                        {item.status === "DRAFT" && (
+                          <>
+                            <EditButton onClick={() => navigate(`/production-wastages/edit/${item.id}`, { state: item })} />
+                            <DeleteButton onClick={() => handleDeleteClick(String(item.id))} />
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={10} className="text-center py-10 text-slate-500">No wastage logs reported matching criteria.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
 
       {/* Delete Confirmation Modal */}
       <CommonConfirmModal
@@ -215,12 +188,11 @@ const WastageList: React.FC = () => {
         onHide={() => setShowDeleteModal(false)}
         onConfirm={handleDeleteConfirm}
         title="Delete Wastage Log"
-        message="Are you sure you want to delete this production wastage log? This will remove it from the system permanently."
+        bodyText="Are you sure you want to delete this wastage log? This action cannot be undone."
         confirmText="Delete"
         confirmVariant="danger"
       />
 
-      {/* Detail View Modal */}
       <WastageViewModal
         show={showViewModal}
         onHide={() => setShowViewModal(false)}

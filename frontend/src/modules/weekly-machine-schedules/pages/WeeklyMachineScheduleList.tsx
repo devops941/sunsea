@@ -1,5 +1,4 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
-import { Container, Row, Col, Spinner } from "react-bootstrap";
 import { FaChevronLeft, FaChevronRight, FaChevronDown, FaChevronRight as FaCaretRight, FaPlus } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -208,181 +207,167 @@ const WeeklyMachineScheduleList: React.FC = () => {
     };
 
     return (
-        <div className="inner-container">
-            <Container fluid>
-                <div className="page-header">
-                    <Row className="align-items-center g-3">
-                        <Col lg={4} md={12}>
-                            <div className="page-header-info">
-                                <h2 className="page-title">Weekly Machine Schedules</h2>
-                                
-                            </div>
-                        </Col>
-                        <Col lg={8} md={12}>
-                            <div className="page-header-actions weekely-list d-flex gap-2 align-items-center flex-wrap">
-                                <div style={{ width: '150px' }}>
-                                    <TextInput
-                                        label=""
-                                        name="filterWeek"
-                                        type="date"
-                                        value={filterWeekStartDate}
-                                        onChange={handleDateChange}
-                                    />
-                                </div>
-                                <div style={{ width: '250px' }}>
-                                    <TextInput
-                                        label=""
-                                        name="search"
-                                        type="text"
-                                        placeholder="Search..."
-                                        value={searchTerm}
-                                        onChange={handleSearch}
-                                    />
-                                </div>
-                                <CustomButton
-                                    text="Add Schedule"
-                                    icon={FaPlus}
-                                    onClick={handleOpenAdd}
-                                />
-                            </div>
-                        </Col>
-                    </Row>
-                </div>
-
-                <div className="master-table-body table-wrap">
-                    <div className="master-table-body">
-                        <table className="master-data-table">
-                            <thead>
-                                <tr>
-                                    <th style={{ width: "40px" }}></th>
-                                    <th>WEEK PERIOD</th>
-                                    <th>TOTAL PRODUCTION ORDERS</th>
-                                    <th>TOTAL WEEKLY QUANTITY</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {loading ? (
-                                    <tr>
-                                        <td colSpan={4} className="text-center p-4">
-                                            <Spinner animation="border" variant="primary" />
-                                        </td>
-                                    </tr>
-                                ) : paginatedGroups.length > 0 ? (
-                                    paginatedGroups.map((group: any) => (
-                                        <React.Fragment key={group.weekKey}>
-                                            {/* Parent Row (Week) */}
-                                            <tr 
-                                                className={`master-data-row cursor-pointer ${expandedGroups[group.weekKey] ? 'bg-light' : ''}`}
-                                                onClick={() => toggleGroup(group.weekKey)}
-                                                style={{ transition: "background-color 0.2s" }}
-                                            >
-                                                <td className="master-data-cell text-center text-secondary" style={{ width: "40px" }}>
-                                                    {expandedGroups[group.weekKey] ? <FaChevronDown /> : <FaCaretRight />}
-                                                </td>
-                                                <td className="master-data-cell fw-bold text-dark">
-                                                    {getFormattedWeekLabel(group.weekStartDate, group.weekEndDate)}
-                                                </td>
-                                                <td className="master-data-cell">
-                                                    <StatusBadge 
-                                                        status="UNKNOWN" 
-                                                        customText={`${group.totalOrders} Production Order(s)`} 
-                                                        customColor={{ bg: '#e9ecef', text: '#0f766e' }}
-                                                    />
-                                                </td>
-                                                <td className="master-data-cell fw-bold text-success">
-                                                    {group.totalPlannedQty} <span className="fw-normal text-muted small">{group.uom?.toLowerCase() === 'ea' ? 'pcs' : group.uom}</span>
-                                                </td>
-                                            </tr>
-
-                                            {/* Expanded Sub-table Details */}
-                                            {expandedGroups[group.weekKey] && (
-                                                <tr>
-                                                    <td></td>
-                                                    <td colSpan={3} className="p-3 bg-light rounded" style={{ borderLeft: "3px solid var(--color-primary, #0f766e)" }}>
-                                                        <div className="table-responsive">
-                                                            <table className="master-data-table mb-0 shadow-sm" style={{ width: "100%", background: "#fff", borderRadius: "8px", overflow: "hidden" }}>
-                                                                 <thead>
-                                                                    <tr style={{ background: "#f1f5f9" }}>
-                                                                        <th className="master-data-cell fw-bold text-uppercase text-secondary" style={{ fontSize: "11px" }}>Production Order</th>
-                                                                        <th className="master-data-cell fw-bold text-uppercase text-secondary" style={{ fontSize: "11px" }}>Product Name</th>
-                                                                        <th className="master-data-cell fw-bold text-uppercase text-secondary" style={{ fontSize: "11px" }}>Planned Qty</th>
-                                                                        <th className="master-data-cell fw-bold text-uppercase text-secondary" style={{ fontSize: "11px" }}>Status</th>
-                                                                        <th className="master-data-cell fw-bold text-uppercase text-secondary text-end" style={{ fontSize: "11px", width: "120px" }}>Actions</th>
-                                                                    </tr>
-                                                                </thead>
-                                                                <tbody>
-                                                                    {group.ordersList.map((order: any) => (
-                                                                        <tr key={order.productionOrderId} className="master-data-row">
-                                                                            <td className="master-data-cell fw-bold text-dark">{order.productionOrderId}</td>
-                                                                            <td className="master-data-cell fw-semibold">{order.productName}</td>
-                                                                            <td className="master-data-cell fw-bold text-success">{order.plannedQty} {order.uom?.toLowerCase() === 'ea' ? 'pcs' : order.uom}</td>
-                                                                            <td className="master-data-cell">
-                                                                                <StatusBadge status={order.status} />
-                                                                            </td>
-                                                                            <td className="master-data-cell text-end">
-                                                                                {["IN_PROGRESS", "IN_PRODUCTION", "COMPLETED", "ON_HOLD", "FG_RECEIVED", "READY_FOR_DISPATCH", "DISPATCHED"].includes(order.status) ? (
-                                                                                    <span className="text-secondary small fw-medium fst-italic">Started</span>
-                                                                                ) : (
-                                                                                    <div className="d-flex justify-content-end gap-2">
-                                                                                        <DeleteButton onClick={(e) => { e.stopPropagation(); triggerGroupDelete(order); }} />
-                                                                                    </div>
-                                                                                )}
-                                                                            </td>
-                                                                        </tr>
-                                                                    ))}
-                                                                </tbody>
-                                                            </table>
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            )}
-                                        </React.Fragment>
-                                    ))
-                                ) : (
-                                    <tr>
-                                        <td colSpan={4} className="text-center p-4">No schedules found.</td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
-
-                        {totalPages > 1 && (
-                            <div className="pagination-wrap">
-                                <button
-                                    className="pagination-btn"
-                                    disabled={currentPage === 1}
-                                    onClick={() => setCurrentPage(prev => prev - 1)}
-                                >
-                                    <FaChevronLeft />
-                                </button>
-                                <div className="pagination-info">Page {currentPage} of {totalPages}</div>
-                                <button
-                                    className="pagination-btn"
-                                    disabled={currentPage === totalPages}
-                                    onClick={() => setCurrentPage(prev => prev + 1)}
-                                >
-                                    <FaChevronRight />
-                                </button>
-                            </div>
-                        )}
+        <div className="p-4 md:p-6 min-h-screen bg-slate-50">
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                {/* Page Header */}
+                <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-slate-200">
+                    <div>
+                        <h2 className="text-2xl font-bold text-slate-800">Weekly Machine Schedules</h2>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-3">
+                        <div style={{ width: '160px' }}>
+                            <TextInput
+                                label=""
+                                name="filterWeek"
+                                type="date"
+                                value={filterWeekStartDate}
+                                onChange={handleDateChange}
+                            />
+                        </div>
+                        <div style={{ width: '220px' }}>
+                            <TextInput
+                                label=""
+                                name="search"
+                                type="text"
+                                placeholder="Search..."
+                                value={searchTerm}
+                                onChange={handleSearch}
+                            />
+                        </div>
+                        <CustomButton
+                            text="Add Schedule"
+                            icon={FaPlus}
+                            onClick={handleOpenAdd}
+                        />
                     </div>
                 </div>
 
-                <CommonConfirmModal
-                    show={showDeleteModal}
-                    onHide={() => setShowDeleteModal(false)}
-                    onConfirm={handleDeleteConfirm}
-                    title="Delete Weekly Schedule Allocation"
-                    message={
-                        <>
-                            Are you sure you want to delete this weekly schedule allocation?<br/>
-                            This will clear all shift run slots allocated to this order for the week.
-                        </>
-                    }
-                    confirmText="Delete"
-                    confirmVariant="danger"
-                />
-            </Container>
+                {/* Table */}
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left text-sm">
+                        <thead className="bg-slate-50 text-slate-600 border-b border-slate-200">
+                            <tr>
+                                <th className="px-4 py-3 font-semibold w-10"></th>
+                                <th className="px-4 py-3 font-semibold">WEEK PERIOD</th>
+                                <th className="px-4 py-3 font-semibold">TOTAL PRODUCTION ORDERS</th>
+                                <th className="px-4 py-3 font-semibold">TOTAL WEEKLY QUANTITY</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                            {loading ? (
+                                <tr>
+                                    <td colSpan={4} className="text-center py-10 text-slate-500">
+                                        <div className="flex items-center justify-center gap-2">
+                                            <div className="w-5 h-5 border-2 border-teal-500 border-t-transparent rounded-full animate-spin" />
+                                            Loading schedules...
+                                        </div>
+                                    </td>
+                                </tr>
+                            ) : paginatedGroups.length > 0 ? (
+                                paginatedGroups.map((group: any) => (
+                                    <React.Fragment key={group.weekKey}>
+                                        {/* Parent Row (Week) */}
+                                        <tr
+                                            className={`hover:bg-slate-50/50 transition-colors cursor-pointer ${expandedGroups[group.weekKey] ? 'bg-slate-50' : ''}`}
+                                            onClick={() => toggleGroup(group.weekKey)}
+                                        >
+                                            <td className="px-4 py-3 text-center text-slate-400">
+                                                {expandedGroups[group.weekKey] ? <FaChevronDown size={12} /> : <FaCaretRight size={12} />}
+                                            </td>
+                                            <td className="px-4 py-3 font-bold text-slate-800">
+                                                {getFormattedWeekLabel(group.weekStartDate, group.weekEndDate)}
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <StatusBadge
+                                                    status="UNKNOWN"
+                                                    customText={`${group.totalOrders} Production Order(s)`}
+                                                    customColor={{ bg: '#e9ecef', text: '#0f766e' }}
+                                                />
+                                            </td>
+                                            <td className="px-4 py-3 font-bold text-emerald-600">
+                                                {group.totalPlannedQty} <span className="font-normal text-slate-400 text-xs">{group.uom?.toLowerCase() === 'ea' ? 'pcs' : group.uom}</span>
+                                            </td>
+                                        </tr>
+
+                                        {/* Expanded Sub-rows */}
+                                        {expandedGroups[group.weekKey] && (
+                                            <tr>
+                                                <td></td>
+                                                <td colSpan={3} className="px-3 pb-3 pt-1 bg-slate-50" style={{ borderLeft: "3px solid #0f766e" }}>
+                                                    <div className="rounded-xl overflow-hidden border border-slate-200 bg-white shadow-sm">
+                                                        <table className="w-full text-left text-sm">
+                                                            <thead className="bg-slate-100 text-slate-500 text-xs uppercase">
+                                                                <tr>
+                                                                    <th className="px-4 py-2 font-semibold">Production Order</th>
+                                                                    <th className="px-4 py-2 font-semibold">Product Name</th>
+                                                                    <th className="px-4 py-2 font-semibold">Planned Qty</th>
+                                                                    <th className="px-4 py-2 font-semibold">Status</th>
+                                                                    <th className="px-4 py-2 font-semibold text-right w-28">Actions</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody className="divide-y divide-slate-100">
+                                                                {group.ordersList.map((order: any) => (
+                                                                    <tr key={order.productionOrderId} className="hover:bg-slate-50 transition-colors">
+                                                                        <td className="px-4 py-2 font-bold text-slate-800">{order.productionOrderId}</td>
+                                                                        <td className="px-4 py-2 font-semibold text-slate-700">{order.productName}</td>
+                                                                        <td className="px-4 py-2 font-bold text-emerald-600">{order.plannedQty} {order.uom?.toLowerCase() === 'ea' ? 'pcs' : order.uom}</td>
+                                                                        <td className="px-4 py-2"><StatusBadge status={order.status} /></td>
+                                                                        <td className="px-4 py-2 text-right">
+                                                                            {["IN_PROGRESS", "IN_PRODUCTION", "COMPLETED", "ON_HOLD", "FG_RECEIVED", "READY_FOR_DISPATCH", "DISPATCHED"].includes(order.status) ? (
+                                                                                <span className="text-slate-400 text-xs italic">Started</span>
+                                                                            ) : (
+                                                                                <div className="flex justify-end gap-2">
+                                                                                    <DeleteButton onClick={(e) => { e.stopPropagation(); triggerGroupDelete(order); }} />
+                                                                                </div>
+                                                                            )}
+                                                                        </td>
+                                                                    </tr>
+                                                                ))}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </React.Fragment>
+                                ))
+                            ) : (
+                                <tr>
+                                    <td colSpan={4} className="text-center py-10 text-slate-500">No schedules found.</td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+
+                {/* Pagination */}
+                {totalPages > 1 && (
+                    <div className="flex items-center justify-center gap-2 py-4 border-t border-slate-200">
+                        <button className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-40" disabled={currentPage === 1} onClick={() => setCurrentPage(prev => prev - 1)}>
+                            <svg className="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+                        </button>
+                        <span className="text-sm text-slate-600">Page {currentPage} of {totalPages}</span>
+                        <button className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-40" disabled={currentPage === totalPages} onClick={() => setCurrentPage(prev => prev + 1)}>
+                            <svg className="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                        </button>
+                    </div>
+                )}
+            </div>
+
+            <CommonConfirmModal
+                show={showDeleteModal}
+                onHide={() => setShowDeleteModal(false)}
+                onConfirm={handleDeleteConfirm}
+                title="Delete Weekly Schedule Allocation"
+                message={
+                    <>
+                        Are you sure you want to delete this weekly schedule allocation?<br/>
+                        This will clear all shift run slots allocated to this order for the week.
+                    </>
+                }
+                confirmText="Delete"
+                confirmVariant="danger"
+            />
         </div>
     );
 };

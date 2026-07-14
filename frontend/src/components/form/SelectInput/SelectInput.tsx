@@ -18,6 +18,7 @@ interface SelectInputProps {
   error?: string;
   icon?: React.ReactNode;
   disabled?: boolean;
+  noMargin?: boolean;
   onChange: (event: React.ChangeEvent<HTMLSelectElement>) => void;
 }
 
@@ -32,6 +33,7 @@ const SelectInput: React.FC<SelectInputProps> = ({
   error,
   icon,
   disabled,
+  noMargin = false,
   onChange,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -66,7 +68,7 @@ const SelectInput: React.FC<SelectInputProps> = ({
   const displayLabel = selectedOption ? selectedOption.label : defaultOptionLabel || "Select an option";
 
   return (
-    <div className="mb-[18px] group flex flex-col w-full" ref={dropdownRef}>
+    <div className={`${noMargin ? "" : "mb-[18px] "}group flex flex-col w-full`} ref={dropdownRef}>
       {!hideLabel && (
         <label className={`
           flex items-center gap-[6px] mb-2

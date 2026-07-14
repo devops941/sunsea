@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import { Container, Row, Col, Card, Form, Alert } from "react-bootstrap";
 import { FaSave, FaPlus, FaTimes, FaInfoCircle } from "react-icons/fa";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -18,7 +17,7 @@ import { fetchProducts } from "../../../features/product/productSlice";
 import { fetchStores } from "../../../features/stores/storeSlice";
 import { fetchFinishedGoodsStocks } from "../../../features/finished-goods-stock/finishedGoodsStockSlice";
 
-import CustomButton from "../../../components/ui/custombutton/CustomButton";
+import CustomButton from "../../../components/ui/Button/Button";
 import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
 import TextInput from "../../../components/form/TextInput/TextInput";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
@@ -434,220 +433,324 @@ const StockAdjustmentForm: React.FC = () => {
 
   // ── Render ──────────────────────────────
   return (
-    <div className="inner-container py-4">
-      <Container fluid>
-        {/* HEADER */}
-        <div className="page-header mb-4">
-          <div className="page-header-info">
-            <h2 className="page-title">
+    <div className="w-full mx-auto">
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+        {/* Page Header */}
+        <div className="px-6 py-4 border-b border-gray-100">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <h2 className="text-xl font-bold text-gray-800">
               {isEditMode ? "Edit Stock Adjustment" : "New Stock Adjustment"}
             </h2>
-            <div className="page-breadcrumb">
-              Home / Inventory & Warehouse / Stock Adjustments / {isEditMode ? "Edit" : "Create"}
-            </div>
           </div>
         </div>
 
-        {/* Form Card */}
-        <Card className="border-0 shadow-sm rounded-3 p-4">
-          <Form onSubmit={(e) => e.preventDefault()} className="form-inner" noValidate>
-            
-            {/* Section 1: Adjustment Information */}
-            <div className="mb-4">
-              <h6 className="section-title border-bottom-0 mb-3">1. Adjustment Information</h6>
-              <div className="p-3 border rounded">
-                <Row className="g-3">
-                  <Col md={3}>
-                    <TextInput
-                      label="Adjustment Number*"
-                      name="adjustmentNumber"
-                      value={formData.adjustmentNumber}
-                      onChange={(e) =>
-                        setFormData({ ...formData, adjustmentNumber: e.target.value })
-                      }
-                      disabled={true}
-                      error={errors.adjustmentNumber}
-                    />
-                  </Col>
-                  <Col md={3}>
-                    <TextInput
-                      label="Adjustment Date*"
-                      name="adjustmentDate"
-                      type="date"
-                      value={formData.adjustmentDate}
-                      onChange={(e) =>
-                        setFormData({ ...formData, adjustmentDate: e.target.value })
-                      }
-                      error={errors.adjustmentDate}
-                    />
-                  </Col>
-                  <Col md={3}>
-                    <div className="mb-3">
-                      <label className="form-label fw-semibold text-secondary small">
-                        Adjustment Type*
-                      </label>
-                      <Form.Select
-                        value={formData.adjustmentType}
-                        onChange={(e) => {
-                          setFormData({
-                            ...formData,
-                            adjustmentType: e.target.value,
-                            productionOrderId: "",
-                            items: [],
-                          });
-                          setSelectedPO(null);
-                          setPmiItems([]);
-                        }}
-                        disabled={isEditMode}
-                        className={errors.adjustmentType ? "is-invalid" : ""}
-                      >
-                        {ADJUSTMENT_TYPES.map((t) => (
-                          <option key={t.value} value={t.value}>
-                            {t.label}
-                          </option>
-                        ))}
-                      </Form.Select>
-                      {errors.adjustmentType && (
-                        <div className="invalid-feedback">{errors.adjustmentType}</div>
-                      )}
-                    </div>
-                  </Col>
-                  <Col md={3}>
-                    <TextInput
-                      label="Reason / Description*"
-                      name="reason"
-                      placeholder="Reason for this adjustment"
-                      value={formData.reason}
-                      onChange={(e) =>
-                        setFormData({ ...formData, reason: e.target.value })
-                      }
-                      error={errors.reason}
-                    />
-                  </Col>
-                </Row>
-              </div>
+        <form onSubmit={(e) => e.preventDefault()} className="px-6 py-3 space-y-4" noValidate>
+          {/* Section 1: Adjustment Information */}
+          <div>
+            <h6 className="text-base font-semibold text-gray-800 mb-3">1. Adjustment Information</h6>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+              <TextInput
+                label="Adjustment Number*"
+                name="adjustmentNumber"
+                value={formData.adjustmentNumber}
+                onChange={(e) =>
+                  setFormData({ ...formData, adjustmentNumber: e.target.value })
+                }
+                disabled={true}
+                error={errors.adjustmentNumber}
+              />
+              <TextInput
+                label="Adjustment Date*"
+                name="adjustmentDate"
+                type="date"
+                value={formData.adjustmentDate}
+                onChange={(e) =>
+                  setFormData({ ...formData, adjustmentDate: e.target.value })
+                }
+                error={errors.adjustmentDate}
+              />
+              <SelectInput
+                label="Adjustment Type*"
+                name="adjustmentType"
+                value={formData.adjustmentType}
+                onChange={(e) => {
+                  setFormData({
+                    ...formData,
+                    adjustmentType: e.target.value,
+                    productionOrderId: "",
+                    items: [],
+                  });
+                  setSelectedPO(null);
+                  setPmiItems([]);
+                }}
+                disabled={isEditMode}
+                error={errors.adjustmentType}
+                options={ADJUSTMENT_TYPES}
+              />
+              <TextInput
+                label="Reason / Description*"
+                name="reason"
+                placeholder="Reason for this adjustment"
+                value={formData.reason}
+                onChange={(e) =>
+                  setFormData({ ...formData, reason: e.target.value })
+                }
+                error={errors.reason}
+              />
             </div>
+          </div>
 
-            {/* Section 2: Production Order Selection (PMI Only) */}
-            {isPMI && (
-              <div className="mb-4">
-                <h6 className="section-title border-bottom-0 mb-3 mt-3">2. Production Order Selection</h6>
-                <div className="p-3 border rounded">
-                  <Row className="g-3">
-                    <Col md={4}>
-                      <label className="form-label fw-semibold text-secondary small">
-                        Production Order*
-                      </label>
-                      <Form.Select
-                        value={formData.productionOrderId}
-                        onChange={(e) => handlePOSelect(e.target.value)}
-                        className={errors.productionOrderId ? "is-invalid" : ""}
-                        disabled={isEditMode}
-                      >
-                        <option value="">-- Select Production Order --</option>
-                        {productionOrdersForIssue.map((po: any) => (
-                          <option key={po.productionOrderId} value={po.productionOrderId}>
-                            {po.productionOrderId} — {po.productItem?.productName || ""}
-                          </option>
-                        ))}
-                      </Form.Select>
-                      {errors.productionOrderId && (
-                        <div className="invalid-feedback">{errors.productionOrderId}</div>
-                      )}
-                    </Col>
-                    {selectedPO && (
-                      <>
-                        <Col md={2}>
-                          <label className="form-label text-muted small">Product</label>
-                          <div className="fw-semibold">
-                            {selectedPO.productItem?.productName || "—"}
-                          </div>
-                          <div className="text-muted small">
-                            {selectedPO.productItem?.productCode}
-                          </div>
-                        </Col>
-                        <Col md={2}>
-                          <label className="form-label text-muted small">Planned Qty</label>
-                          <div className="fw-semibold">
-                            {Number(selectedPO.targetQty).toLocaleString()} {selectedPO.uom}
-                          </div>
-                        </Col>
-                        <Col md={2}>
-                          <label className="form-label text-muted small">Due Date</label>
-                          <div className="fw-semibold">
-                            {formatDate(selectedPO.dueDate)}
-                          </div>
-                        </Col>
-                        <Col md={2}>
-                          <label className="form-label text-muted small">Machine</label>
-                          <div className="fw-semibold">
-                            {selectedPO.Machine?.machineName || selectedPO.machineMachineId || "—"}
-                          </div>
-                        </Col>
-                      </>
-                    )}
-                  </Row>
-
-                  {!formData.productionOrderId && (
-                    <Alert variant="info" className="mt-3 mb-0 d-flex align-items-center gap-2">
-                      <FaInfoCircle />
-                      <span>
-                        Select a Production Order to load its reserved raw materials for issue.
-                        Only orders in <strong>Approved / RM Available</strong> status are shown.
+          {/* Section 2: Production Order Selection (PMI Only) */}
+          {isPMI && (
+            <div className="pt-2">
+              <h6 className="text-base font-semibold text-gray-800 mb-3">2. Production Order Selection</h6>
+              <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-3 items-start">
+                <div className="lg:col-span-2">
+                  <SelectInput
+                    label="Production Order*"
+                    name="productionOrderId"
+                    value={formData.productionOrderId}
+                    onChange={(e) => handlePOSelect(e.target.value)}
+                    error={errors.productionOrderId}
+                    disabled={isEditMode}
+                    options={[
+                      { label: "-- Select Production Order --", value: "" },
+                      ...productionOrdersForIssue.map((po: any) => ({
+                        label: `${po.productionOrderId} — ${po.productItem?.productName || ""}`,
+                        value: po.productionOrderId,
+                      })),
+                    ]}
+                  />
+                </div>
+                {selectedPO && (
+                  <>
+                    <div className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg flex flex-col justify-center min-h-[66px]">
+                      <span className="text-xs text-slate-500 mb-1">Product</span>
+                      <span className="text-sm font-semibold text-slate-800 truncate">
+                        {selectedPO.productItem?.productName || "—"}
                       </span>
-                    </Alert>
-                  )}
+                    </div>
+                    <div className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg flex flex-col justify-center min-h-[66px]">
+                      <span className="text-xs text-slate-500 mb-1">Planned Qty</span>
+                      <span className="text-sm font-semibold text-slate-800">
+                        {Number(selectedPO.targetQty).toLocaleString()} {selectedPO.uom}
+                      </span>
+                    </div>
+                    <div className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg flex flex-col justify-center min-h-[66px]">
+                      <span className="text-xs text-slate-500 mb-1">Machine</span>
+                      <span className="text-sm font-semibold text-slate-800 truncate">
+                        {selectedPO.Machine?.machineName || selectedPO.machineMachineId || "—"}
+                      </span>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {!formData.productionOrderId && (
+                <div className="mt-3 p-3 bg-blue-50 border border-blue-200 text-blue-700 rounded-lg flex items-center gap-2 text-sm">
+                  <FaInfoCircle className="flex-shrink-0" />
+                  <span>
+                    Select a Production Order to load its reserved raw materials for issue.
+                    Only orders in <strong>Approved / RM Available</strong> status are shown.
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Section 3: Raw Materials to Issue (PMI Only) */}
+          {isPMI && selectedPO && pmiItems.length > 0 && (
+            <div className="pt-2 border-t border-gray-100 mt-4">
+              <h6 className="text-base font-semibold text-gray-800 mb-3">3. Raw Materials to Issue</h6>
+              <div className="border border-slate-200 rounded-xl">
+                <div>
+                  <table className="w-full text-left text-sm whitespace-nowrap">
+                    <thead className="bg-slate-50 text-slate-600">
+                      <tr>
+                        <th className="px-4 py-3 font-semibold border-b border-slate-200">RM CODE</th>
+                        <th className="px-4 py-3 font-semibold border-b border-slate-200">MATERIAL NAME</th>
+                        <th className="px-4 py-3 font-semibold border-b border-slate-200 text-right">REQUIRED QTY</th>
+                        <th className="px-4 py-3 font-semibold border-b border-slate-200 text-right">RESERVED QTY</th>
+                        <th className="px-4 py-3 font-semibold border-b border-slate-200 text-right">ALREADY ISSUED</th>
+                        <th className="px-4 py-3 font-semibold border-b border-slate-200 text-right">REMAINING</th>
+                        <th className="px-4 py-3 font-semibold border-b border-slate-200 text-right">AVAILABLE STOCK</th>
+                        <th className="px-4 py-3 font-semibold border-b border-slate-200">UOM</th>
+                        <th className="px-4 py-3 font-semibold border-b border-slate-200 min-w-[200px]">STORE*</th>
+                        <th className="px-4 py-3 font-semibold border-b border-slate-200 min-w-[150px]">ISSUE QTY*</th>
+                        <th className="px-4 py-3 font-semibold border-b border-slate-200 min-w-[180px]">REMARKS</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {pmiItems.map((item, index) => {
+                        const isOver = item.issueQty > item.availableStock;
+                        return (
+                          <tr key={index} className={`hover:bg-slate-50/50 transition-colors ${isOver ? 'bg-red-50' : ''}`}>
+                            <td className="px-4 py-3 font-mono text-xs">{item.rawMaterialId}</td>
+                            <td className="px-4 py-3 font-medium text-slate-800">{item.materialName}</td>
+                            <td className="px-4 py-3 text-right">{Number(item.requiredQty).toFixed(2)}</td>
+                            <td className="px-4 py-3 text-right">{Number(item.reservedQty).toFixed(2)}</td>
+                            <td className="px-4 py-3 text-right">{Number(item.alreadyIssuedQty).toFixed(2)}</td>
+                            <td className="px-4 py-3 text-right text-yellow-600 font-semibold">{Number(item.remainingQty).toFixed(2)}</td>
+                            <td className="px-4 py-3 text-right text-green-600 font-semibold">{Number(item.availableStock).toFixed(2)}</td>
+                            <td className="px-4 py-3 text-slate-500">{item.uom}</td>
+                            <td className="px-4 py-3 align-top">
+                              <SelectInput
+                                label=""
+                                hideLabel
+                                noMargin
+                                name={`storeId-${index}`}
+                                value={item.storeId || ""}
+                                options={[
+                                  { label: "Select Store", value: "" },
+                                  ...stores.map((s) => ({
+                                    label: s.storeName,
+                                    value: s.storeId,
+                                  })),
+                                ]}
+                                onChange={(e) =>
+                                  handlePMIItemChange(index, "storeId", e.target.value)
+                                }
+                              />
+                            </td>
+                            <td className="px-4 py-3 align-top">
+                              <QuantityInput
+                                label=""
+                                name={`issueQty-${index}`}
+                                value={item.issueQty}
+                                baseUoms={item.uom}
+                                step="0.001"
+                                onChange={(e: any) =>
+                                  handlePMIItemChange(index, "issueQty", Number(e.target.value))
+                                }
+                              />
+                            </td>
+                            <td className="px-4 py-3 align-top">
+                              <TextInput
+                                label=""
+                                name={`remarks-${index}`}
+                                placeholder="Remarks..."
+                                value={item.remarks || ""}
+                                onChange={(e) =>
+                                  handlePMIItemChange(index, "remarks", e.target.value)
+                                }
+                              />
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               </div>
-            )}
+            </div>
+          )}
 
-            {/* Section 3: Raw Materials to Issue (PMI Only) */}
-            {isPMI && selectedPO && pmiItems.length > 0 && (
-              <div className="mb-4">
-                <h6 className="section-title border-bottom-0 mb-3 mt-3">3. Raw Materials to Issue</h6>
-                <div className="p-3 border rounded">
-                  <div className="table-wrap">
-                    <table className="master-data-table">
-                      <thead>
-                        <tr>
-                          <th>RM CODE</th>
-                          <th>MATERIAL NAME</th>
-                          <th className="text-end">REQUIRED QTY</th>
-                          <th className="text-end">RESERVED QTY</th>
-                          <th className="text-end">ALREADY ISSUED</th>
-                          <th className="text-end">REMAINING</th>
-                          <th className="text-end">AVAILABLE STOCK</th>
-                          <th>UOM</th>
-                          <th style={{ minWidth: "220px" }}>STORE*</th>
-                          <th style={{ minWidth: "200px" }} className="text-end">ISSUE QTY*</th>
-                          <th style={{ minWidth: "180px" }}>REMARKS</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {pmiItems.map((item, index) => {
-                          const isOver = item.issueQty > item.availableStock;
+          {/* Section 2: Adjustment Items (Regular Adjustment Only) */}
+          {!isPMI && (
+            <div className="pt-2 border-t border-gray-100 mt-4">
+              <div className="flex justify-between items-center mb-3">
+                <h6 className="text-base font-semibold text-gray-800 m-0">2. Adjustment Items</h6>
+                <CustomButton
+                  text="Add Item"
+                  icon={FaPlus}
+                  onClick={addItem}
+                />
+              </div>
+              <div className="border border-slate-200 rounded-xl">
+                <div>
+                  <table className="w-full text-left text-sm whitespace-nowrap">
+                    <thead className="bg-slate-50 text-slate-600">
+                      <tr>
+                        <th className="px-4 py-3 font-semibold border-b border-slate-200 min-w-[150px]">ITEM TYPE</th>
+                        <th className="px-4 py-3 font-semibold border-b border-slate-200 min-w-[200px]">ITEM SELECTION</th>
+                        <th className="px-4 py-3 font-semibold border-b border-slate-200 min-w-[200px]">STORE</th>
+                        <th className="px-4 py-3 font-semibold border-b border-slate-200 text-right w-24">CURRENT QTY</th>
+                        <th className="px-4 py-3 font-semibold border-b border-slate-200 text-right w-32">ADJUSTED QTY</th>
+                        <th className="px-4 py-3 font-semibold border-b border-slate-200 text-center w-24">DIFF</th>
+                        <th className="px-4 py-3 font-semibold border-b border-slate-200 min-w-[150px]">REMARKS</th>
+                        <th className="px-4 py-3 font-semibold border-b border-slate-200 text-center w-16">ACTION</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {formData.items.length > 0 ? (
+                        formData.items.map((item: any, index: number) => {
+                          const itemSelectionError =
+                            errors[`items.${index}.rawMaterialId`] ||
+                            errors[`items.${index}.productItemId`] ||
+                            errors[`items.${index}.itemSelection`];
+                          const storeError = errors[`items.${index}.storeId`];
+                          const adjustedQtyError = errors[`items.${index}.adjustedQty`];
+
                           return (
-                            <tr key={index} className={`master-data-row ${isOver ? "table-danger" : ""}`}>
-                              <td className="master-data-cell">
-                                <code>{item.rawMaterialId}</code>
-                              </td>
-                              <td className="master-data-cell fw-semibold">{item.materialName}</td>
-                              <td className="master-data-cell text-end">{Number(item.requiredQty).toFixed(2)}</td>
-                              <td className="master-data-cell text-end">{Number(item.reservedQty).toFixed(2)}</td>
-                              <td className="master-data-cell text-end">{Number(item.alreadyIssuedQty).toFixed(2)}</td>
-                              <td className="master-data-cell text-end text-warning fw-semibold">
-                                {Number(item.remainingQty).toFixed(2)}
-                              </td>
-                              <td className="master-data-cell text-end text-success fw-semibold">
-                                {Number(item.availableStock).toFixed(2)}
-                              </td>
-                              <td className="master-data-cell">{item.uom}</td>
-                              <td className="master-data-cell">
+                            <tr key={index} className="hover:bg-slate-50/50 transition-colors">
+                              <td className="px-4 py-3 align-top">
                                 <SelectInput
                                   label=""
                                   hideLabel
+                                  noMargin
+                                  name={`itemType-${index}`}
+                                  value={item.itemType}
+                                  options={[
+                                    { label: "Raw Material", value: "RAW_MATERIAL" },
+                                    { label: "Finished Goods", value: "FINISHED_GOODS" },
+                                  ]}
+                                  onChange={(e) =>
+                                    handleItemChange(index, "itemType", e.target.value)
+                                  }
+                                />
+                              </td>
+                              <td className="px-4 py-3 align-top">
+                                {item.itemType === "RAW_MATERIAL" ? (
+                                  <SelectInput
+                                    label=""
+                                    hideLabel
+                                    noMargin
+                                    name={`rawMaterialId-${index}`}
+                                    value={item.rawMaterialId || ""}
+                                    error={itemSelectionError}
+                                    required
+                                    options={[
+                                      { label: "Select Material", value: "" },
+                                      ...rawMaterials.map((rm) => ({
+                                        label: `${rm.materialName} (${rm.rawMaterialId})`,
+                                        value: rm.rawMaterialId,
+                                      })),
+                                    ]}
+                                    onChange={(e) =>
+                                      handleItemChange(index, "rawMaterialId", e.target.value)
+                                    }
+                                  />
+                                ) : (
+                                  <SelectInput
+                                    label=""
+                                    hideLabel
+                                    noMargin
+                                    name={`productItemId-${index}`}
+                                    value={item.productItemId || ""}
+                                    error={itemSelectionError}
+                                    required
+                                    options={[
+                                      { label: "Select Product", value: "" },
+                                      ...products.map((p) => ({
+                                        label: `${p.productName} (${p.productCode})`,
+                                        value: p.id.toString(),
+                                      })),
+                                    ]}
+                                    onChange={(e) =>
+                                      handleItemChange(index, "productItemId", e.target.value)
+                                    }
+                                  />
+                                )}
+                              </td>
+                              <td className="px-4 py-3 align-top">
+                                <SelectInput
+                                  label=""
+                                  hideLabel
+                                  noMargin
                                   name={`storeId-${index}`}
                                   value={item.storeId || ""}
+                                  error={storeError}
+                                  required
                                   options={[
                                     { label: "Select Store", value: "" },
                                     ...stores.map((s) => ({
@@ -656,242 +759,82 @@ const StockAdjustmentForm: React.FC = () => {
                                     })),
                                   ]}
                                   onChange={(e) =>
-                                    handlePMIItemChange(index, "storeId", e.target.value)
+                                    handleItemChange(index, "storeId", e.target.value)
                                   }
                                 />
                               </td>
-                              <td className="master-data-cell">
-                                <QuantityInput
+                              <td className="px-4 py-3 align-top text-right pt-4">
+                                {String(item.currentQty)}
+                              </td>
+                              <td className="px-4 py-3 align-top">
+                                <TextInput
                                   label=""
-                                  name={`issueQty-${index}`}
-                                  value={item.issueQty}
-                                  baseUoms={item.uom}
-                                  step="0.001"
+                                  name={`adjustedQty-${index}`}
+                                  type="number"
+                                  value={String(item.adjustedQty)}
+                                  error={adjustedQtyError}
+                                  required
                                   onChange={(e: any) =>
-                                    handlePMIItemChange(index, "issueQty", Number(e.target.value))
+                                    handleItemChange(index, "adjustedQty", e.target.value)
                                   }
                                 />
                               </td>
-                              <td className="master-data-cell">
+                              <td className={`px-4 py-3 align-top text-center pt-4 font-bold ${item.difference > 0
+                                ? "text-green-600"
+                                : item.difference < 0
+                                  ? "text-red-600"
+                                  : "text-slate-400"
+                                }`}>
+                                {item.difference > 0 ? `+${item.difference}` : item.difference}
+                              </td>
+                              <td className="px-4 py-3 align-top">
                                 <TextInput
                                   label=""
                                   name={`remarks-${index}`}
-                                  placeholder="Remarks..."
+                                  placeholder="Remarks"
                                   value={item.remarks || ""}
-                                  onChange={(e) =>
-                                    handlePMIItemChange(index, "remarks", e.target.value)
+                                  onChange={(e: any) =>
+                                    handleItemChange(index, "remarks", e.target.value)
                                   }
                                 />
                               </td>
+                              <td className="px-4 py-3 align-top text-center pt-4">
+                                <DeleteButton onClick={() => removeItem(index)} />
+                              </td>
                             </tr>
                           );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Section 2: Adjustment Items (Regular Adjustment Only) */}
-            {!isPMI && (
-              <div className="mb-4">
-                <div className="d-flex justify-content-between align-items-center mb-3 mt-3">
-                  <h6 className="section-title border-bottom-0 mb-0">2. Adjustment Items</h6>
-                  <CustomButton
-                    text="Add Item"
-                    icon={FaPlus}
-                    onClick={addItem}
-                    className="btn-sm"
-                  />
-                </div>
-                <div className="p-3 border rounded">
-                  <div className="table-wrap">
-                    <table className="master-data-table">
-                      <thead>
+                        })
+                      ) : (
                         <tr>
-                          <th style={{ width: "15%" }}>ITEM TYPE</th>
-                          <th style={{ width: "25%" }}>ITEM SELECTION</th>
-                          <th style={{ width: "20%" }}>STORE</th>
-                          <th style={{ width: "10%" }} className="text-end">CURRENT QTY</th>
-                          <th style={{ width: "10%" }} className="text-end">ADJUSTED QTY</th>
-                          <th style={{ width: "8%" }} className="text-center">DIFF</th>
-                          <th style={{ width: "15%" }}>REMARKS</th>
-                          <th style={{ width: "7%" }} className="text-center">ACTION</th>
+                          <td colSpan={8} className="text-center py-8 text-slate-500">
+                            No adjustment items added. Click "Add Item" to begin.
+                          </td>
                         </tr>
-                      </thead>
-                      <tbody>
-                        {formData.items.length > 0 ? (
-                          formData.items.map((item: any, index: number) => {
-                            const itemSelectionError =
-                              errors[`items.${index}.rawMaterialId`] ||
-                              errors[`items.${index}.productItemId`] ||
-                              errors[`items.${index}.itemSelection`];
-                            const storeError = errors[`items.${index}.storeId`];
-                            const adjustedQtyError = errors[`items.${index}.adjustedQty`];
-
-                            return (
-                              <tr key={index} className="master-data-row">
-                                <td className="master-data-cell">
-                                  <SelectInput
-                                    label=""
-                                    hideLabel
-                                    name={`itemType-${index}`}
-                                    value={item.itemType}
-                                    options={[
-                                      { label: "Raw Material", value: "RAW_MATERIAL" },
-                                      { label: "Finished Goods", value: "FINISHED_GOODS" },
-                                    ]}
-                                    onChange={(e) =>
-                                      handleItemChange(index, "itemType", e.target.value)
-                                    }
-                                  />
-                                </td>
-                                <td className="master-data-cell">
-                                  {item.itemType === "RAW_MATERIAL" ? (
-                                    <SelectInput
-                                      label=""
-                                      hideLabel
-                                      name={`rawMaterialId-${index}`}
-                                      value={item.rawMaterialId || ""}
-                                      error={itemSelectionError}
-                                      required
-                                      options={[
-                                        { label: "Select Material", value: "" },
-                                        ...rawMaterials.map((rm) => ({
-                                          label: `${rm.materialName} (${rm.rawMaterialId})`,
-                                          value: rm.rawMaterialId,
-                                        })),
-                                      ]}
-                                      onChange={(e) =>
-                                        handleItemChange(index, "rawMaterialId", e.target.value)
-                                      }
-                                    />
-                                  ) : (
-                                    <SelectInput
-                                      label=""
-                                      hideLabel
-                                      name={`productItemId-${index}`}
-                                      value={item.productItemId || ""}
-                                      error={itemSelectionError}
-                                      required
-                                      options={[
-                                        { label: "Select Product", value: "" },
-                                        ...products.map((p) => ({
-                                          label: `${p.productName} (${p.productCode})`,
-                                          value: p.id.toString(),
-                                        })),
-                                      ]}
-                                      onChange={(e) =>
-                                        handleItemChange(index, "productItemId", e.target.value)
-                                      }
-                                    />
-                                  )}
-                                </td>
-                                <td className="master-data-cell">
-                                  <SelectInput
-                                    label=""
-                                    hideLabel
-                                    name={`storeId-${index}`}
-                                    value={item.storeId || ""}
-                                    error={storeError}
-                                    required
-                                    options={[
-                                      { label: "Select Store", value: "" },
-                                      ...stores.map((s) => ({
-                                        label: s.storeName,
-                                        value: s.storeId,
-                                      })),
-                                    ]}
-                                    onChange={(e) =>
-                                      handleItemChange(index, "storeId", e.target.value)
-                                    }
-                                  />
-                                </td>
-                                <td className="master-data-cell">
-                                  <TextInput
-                                    label=""
-                                    name={`currentQty-${index}`}
-                                    type="number"
-                                    value={String(item.currentQty)}
-                                    disabled
-                                    onChange={() => {}}
-                                  />
-                                </td>
-                                <td className="master-data-cell">
-                                  <TextInput
-                                    label=""
-                                    name={`adjustedQty-${index}`}
-                                    type="number"
-                                    value={String(item.adjustedQty)}
-                                    error={adjustedQtyError}
-                                    required
-                                    onChange={(e: any) =>
-                                      handleItemChange(index, "adjustedQty", e.target.value)
-                                    }
-                                  />
-                                </td>
-                                <td
-                                  className={`master-data-cell fw-bold text-center ${
-                                    item.difference > 0
-                                      ? "text-success"
-                                      : item.difference < 0
-                                      ? "text-danger"
-                                      : "text-muted"
-                                  }`}
-                                >
-                                  {item.difference > 0 ? `+${item.difference}` : item.difference}
-                                </td>
-                                <td className="master-data-cell">
-                                  <TextInput
-                                    label=""
-                                    name={`remarks-${index}`}
-                                    placeholder="Remarks"
-                                    value={item.remarks || ""}
-                                    onChange={(e: any) =>
-                                      handleItemChange(index, "remarks", e.target.value)
-                                    }
-                                  />
-                                </td>
-                                <td className="master-data-cell text-center">
-                                  <DeleteButton onClick={() => removeItem(index)} />
-                                </td>
-                              </tr>
-                            );
-                          })
-                        ) : (
-                          <tr>
-                            <td colSpan={8} className="text-center py-5 text-muted">
-                              <div className="mb-2">No adjustment items added.</div>
-                            </td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
+                      )}
+                    </tbody>
+                  </table>
                 </div>
               </div>
-            )}
-
-            {/* Action Buttons */}
-            <div className="d-flex justify-content-end gap-3 mt-4 border-top pt-3">
-              <CustomButton
-                text="Cancel"
-                variant="secondary"
-                icon={FaTimes}
-                onClick={() => navigate("/inventory/stock-adjustments")}
-              />
-              <CustomButton
-                text={isPMI ? "Save Material Issue" : "Save Adjustment"}
-                variant="primary"
-                icon={FaSave}
-                onClick={handleSubmit}
-                disabled={loading}
-              />
             </div>
-          </Form>
-        </Card>
-      </Container>
+          )}
+
+          {/* Form Actions */}
+          <div className="flex justify-end gap-3 pt-4 border-t border-gray-100 mt-4">
+            <CustomButton
+              text="Cancel"
+              icon={FaTimes}
+              onClick={() => navigate("/inventory/stock-adjustments")}
+            />
+            <CustomButton
+              text={isPMI ? "Save Material Issue" : "Save Adjustment"}
+              icon={FaSave}
+              type="submit"
+              onClick={handleSubmit}
+              disabled={loading}
+            />
+          </div>
+        </form>
+      </div>
     </div>
   );
 };
