@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Container, Row, Col, Card, Spinner } from "react-bootstrap";
+import { Container, Row, Col, Card } from "react-bootstrap";
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
 import { fetchProductionOrders } from "../../../features/production-orders/productionOrderSlice";
 import { fetchMachines } from "../../../features/machines/machineSlice";
@@ -182,7 +182,7 @@ const ProductionReportsCenter: React.FC = () => {
     if (loadingOrders || loadingBackend || loadingHourly) {
       return (
         <div className="text-center py-5">
-          <Spinner animation="border" variant="primary" />
+          <div className="animate-spin rounded-full border-b-2 border-indigo-600 h-8 w-8"></div>
           <p className="mt-2 text-muted">Preparing report grid data...</p>
         </div>
       );

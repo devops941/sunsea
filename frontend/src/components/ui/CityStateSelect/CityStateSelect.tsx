@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { GetState, GetCity } from "react-country-state-city";
 import SelectInput from "../../form/SelectInput/SelectInput";
 import TextInput from "../../form/TextInput/TextInput";
-import { FaMapMarkerAlt } from "react-icons/fa";
+// import { FaMapMarkerAlt } from "react-icons/fa";
 
 const INDIA_COUNTRY_ID = 101;
 
@@ -108,7 +108,7 @@ const CityStateSelect: React.FC<CityStateSelectProps> = ({
                     options={stateOptions}
                     onChange={handleStateSelect}
                     required={required}
-                    icon={<FaMapMarkerAlt />}
+                // icon={<FaMapMarkerAlt />}
                 />
                 {stateError && <div className="text-red-500 text-sm mt-1">{stateError}</div>}
             </div>
@@ -122,7 +122,7 @@ const CityStateSelect: React.FC<CityStateSelectProps> = ({
                     onChange={handleCitySelect}
                     disabled={!stateValue}
                     required={required}
-                    icon={<FaMapMarkerAlt />}
+                // icon={<FaMapMarkerAlt />}
                 />
                 {cityError && <div className="text-red-500 text-sm mt-1">{cityError}</div>}
             </div>

@@ -17,12 +17,16 @@ const ITEMS_PER_PAGE = 10;
 
 const CustomerListPage: React.FC = () => {
   const navigate = useNavigate();
-  const { customers, loading, error, loadCustomers, removeCustomer } = useCustomers();
+  // BUG-CUST-004 fix: destructure pagination metadata from hook
+  const { customers, loading, error, totalPages, loadCustomers, removeCustomer } = useCustomers();
+
+  
   const canEditCustomer = hasPermission("customers.edit");
   const canDeleteCustomer = hasPermission("customers.delete");
 
   const [showViewModal, setShowViewModal] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
+  // BUG-CUST-004 fix: currentPage drives server-side pagination
   const [currentPage, setCurrentPage] = useState(1);
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
@@ -30,12 +34,13 @@ const CustomerListPage: React.FC = () => {
 
   const [searchTerm, setSearchTerm] = useState(initialSearch);
 
+  // BUG-CUST-004 fix: send page + limit to server on every search/page change
   useEffect(() => {
     const timer = setTimeout(() => {
-      loadCustomers(searchTerm);
+      loadCustomers({ search: searchTerm, page: currentPage, limit: ITEMS_PER_PAGE });
     }, 500);
     return () => clearTimeout(timer);
-  }, [searchTerm, loadCustomers]);
+  }, [searchTerm, currentPage, loadCustomers]);
 
   // Custom confirm delete state
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -49,7 +54,7 @@ const CustomerListPage: React.FC = () => {
 
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(e.target.value);
-    setCurrentPage(1);
+    setCurrentPage(1); // reset to page 1 on new search
   };
 
   const handleView = useCallback((customer: any) => {
@@ -73,6 +78,8 @@ const CustomerListPage: React.FC = () => {
       try {
         await removeCustomer(customerToDelete);
         toast.success("Customer deleted successfully!");
+        // Reload current page after deletion
+        loadCustomers({ search: searchTerm, page: currentPage, limit: ITEMS_PER_PAGE });
       } catch (err: any) {
         toast.error(err.message || "Failed to delete customer");
       } finally {
@@ -81,11 +88,9 @@ const CustomerListPage: React.FC = () => {
       }
     }
   };
-  
-  const filteredCustomers = customers ?? [];
-  const totalPages = Math.ceil(filteredCustomers.length / ITEMS_PER_PAGE);
+
+  // BUG-CUST-004 fix: data already paginated by server — no client-side slicing needed
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-  const paginatedCustomers = filteredCustomers.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
   return (
     <div className="p-4 md:p-6 min-h-screen bg-white">
@@ -122,7 +127,7 @@ const CustomerListPage: React.FC = () => {
             </div>
           ) : (
             <DataTable
-              data={paginatedCustomers}
+              data={customers ?? []}
               rowKey={(customer) => customer.id}
               emptyMessage="No customers found."
               pagination={
@@ -130,7 +135,7 @@ const CustomerListPage: React.FC = () => {
                       ? {
                             currentPage,
                             totalPages,
-                            onPageChange: setCurrentPage,
+                            onPageChange: (page) => setCurrentPage(page),
                         }
                       : undefined
               }
@@ -139,12 +144,13 @@ const CustomerListPage: React.FC = () => {
                   { header: "CUSTOMER CODE", accessor: "customerCode" },
                   { header: "FIRM NAME", accessor: "firmName" },
                   { header: "MOBILE", render: (customer) => customer.mobile || "N/A" },
-                  { header: "GMAIL", render: (customer) => customer.email || "N/A" },
+                  // BUG-CUST-006 fix: renamed "GMAIL" to "EMAIL"
+                  { header: "EMAIL", render: (customer) => customer.email || "N/A" },
                   { header: "GST TYPE", render: (customer) => customer.gstRegType || "N/A" },
                   { header: "STATUS", render: (customer) => (
                     <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                        customer.status === "Active" 
-                            ? "bg-green-100 text-green-700 border border-green-200" 
+                        customer.status === "Active"
+                            ? "bg-green-100 text-green-700 border border-green-200"
                             : "bg-red-100 text-red-700 border border-red-200"
                     }`}>
                       {customer.status}

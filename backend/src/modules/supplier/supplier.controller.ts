@@ -2,13 +2,27 @@ import { Request, Response } from "express";
 import supplierService from "./supplier.service";
 import { asyncHandler } from "../../utils/asyncHandler";
 import { ApiResponse } from "../../utils/ApiResponse";
+import { ApiError } from "../../utils/ApiError";
+import { prisma } from "../../config/prisma";
 
 class SupplierController {
   create = asyncHandler(
     async (req: Request, res: Response) => {
-      const userId = req.user?.userId || "d67768ba-bcde-4321-a123-bcdef9876543"; // fallback to default admin seeded user if not present
+      // BUG-SUP-002 fix: removed hardcoded fallback UUID — always require authenticated user
+      const userId = req.user?.userId;
+      if (!userId) {
+        throw new ApiError(401, "Unauthorized: missing user context");
+      }
+
+      // BUG-SUP-001 fix: resolve companyId server-side — never trust it from the client
+      const company = await prisma.company.findFirst();
+      if (!company) {
+        throw new ApiError(500, "No company found in the system");
+      }
+
       const supplier = await supplierService.createSupplier({
         ...req.body,
+        companyId: company.id, // override any client-supplied companyId
         userId,
       });
 
@@ -88,7 +102,8 @@ class SupplierController {
       const nextCode = await supplierService.getNextSupplierCode();
       return res.status(200).json(
         new ApiResponse(
-          "Next customer code fetched successfully",
+          // BUG-SUP (message typo) fix: corrected "customer" → "supplier"
+          "Next supplier code fetched successfully",
           nextCode
         )
       );

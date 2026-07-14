@@ -41,15 +41,15 @@ class CustomerController {
 
   findAll = asyncHandler(
     async (req: Request, res: Response) => {
+      // BUG-CUST-004 fix: pass page and limit for server-side pagination
       const search = req.query.search ? String(req.query.search) : undefined;
-      const customers =
-        await customerService.getAllCustomers(search);
+      const page = req.query.page ? parseInt(String(req.query.page), 10) : 1;
+      const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : 10;
+
+      const result = await customerService.getAllCustomers({ search, page, limit });
 
       return res.status(200).json(
-        new ApiResponse(
-          "Customers fetched successfully",
-          customers
-        )
+        new ApiResponse("Customers fetched successfully", result)
       );
     }
   );

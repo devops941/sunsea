@@ -42,6 +42,7 @@ const statusColors: Record<string, { bg: string; text: string }> = {
     ON_HOLD: { bg: '#fce8e6', text: '#d93025' },                   // Red - paused
     IN_PRODUCTION: { bg: '#dbeafe', text: '#1d4ed8' },             // Blue - in production
     STOPPED: { bg: '#fee2e2', text: '#b91c1c' },                   // Red - stopped prematurely
+    POST_PRODUCTION: { bg: '#ede9fe', text: '#5b21b6' },           // Lavender/Purple - Post Production / Finishing Stage
 
     // ========== COMPLETION & DISPATCH ==========
     FG_RECEIVED: { bg: '#d1fae5', text: '#065f46' },               // Green - finished goods received
@@ -50,7 +51,7 @@ const statusColors: Record<string, { bg: string; text: string }> = {
     DISPATCHED: { bg: '#d1fae5', text: '#065f46' },                // Green - fully shipped
 
     // ========== FINAL STATES ==========
-    COMPLETED: { bg: '#d1fae5', text: '#065f46' },                 // Green - order complete
+    COMPLETED: { bg: '#ede9fe', text: '#5b21b6' },                 // Lavender/Purple - Post Production / Finishing Stage
     SHORT_CLOSED: { bg: '#ffedd5', text: '#c2410c' },              // Orange - closed without hitting target
     CANCELLED: { bg: '#f3e8ff', text: '#6b21a8' },                 // Purple - cancelled
 
@@ -82,18 +83,25 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, className = ''
     const colorScheme = customColor || statusColors[normalizedStatus] || { bg: '#f1f3f4', text: '#5f6368' };
 
     // Format display text: "PENDING_MD_APPROVAL" → "Pending MD Approval"
-    const displayText = customText || (status || 'UNKNOWN')
-        .replace(/_/g, ' ')
-        .toLowerCase()
-        .split(' ')
-        .map((word) => {
-            // Keep common acronyms uppercase
-            if (['md', 'rm', 'fg', 'wip', 'grn'].includes(word)) {
-                return word.toUpperCase();
-            }
-            return word.charAt(0).toUpperCase() + word.slice(1);
-        })
-        .join(' ');
+    let displayText = customText;
+    if (!displayText) {
+        if (normalizedStatus === 'COMPLETED' || normalizedStatus === 'POST_PRODUCTION') {
+            displayText = "Post Production";
+        } else {
+            displayText = (status || 'UNKNOWN')
+                .replace(/_/g, ' ')
+                .toLowerCase()
+                .split(' ')
+                .map((word) => {
+                    // Keep common acronyms uppercase
+                    if (['md', 'rm', 'fg', 'wip', 'grn'].includes(word)) {
+                        return word.toUpperCase();
+                    }
+                    return word.charAt(0).toUpperCase() + word.slice(1);
+                })
+                .join(' ');
+        }
+    }
 
     return (
         <span

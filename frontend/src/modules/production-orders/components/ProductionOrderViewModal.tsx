@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Modal, Spinner, Row, Col, Button } from "react-bootstrap";
+import { Modal, Row, Col, Button } from "react-bootstrap";
 import { toast } from "react-toastify";
 import { productionOrderService } from "../../../services/productionOrderService";
 import type { ProductionOrder } from "../../../services/productionOrderService";
@@ -102,7 +102,7 @@ export const ProductionOrderViewModal: React.FC<ProductionOrderViewModalProps> =
                 
                 {loading ? (
                     <div className="text-center p-4">
-                        <Spinner animation="border" size="sm" className="me-2" /> Loading details...
+                        <div className="animate-spin rounded-full border-b-2 border-indigo-600 h-4 w-4 border-b-2 mr-2"></div> Loading details...
                     </div>
                 ) : (
                     <>

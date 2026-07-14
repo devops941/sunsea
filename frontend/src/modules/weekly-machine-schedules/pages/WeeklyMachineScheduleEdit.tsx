@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { Container, Row, Col, Card, Spinner } from "react-bootstrap";
+import { Container, Row, Col, Card } from "react-bootstrap";
 import { FaSave, FaEraser, FaArrowLeft } from "react-icons/fa";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -298,7 +298,7 @@ const WeeklyMachineScheduleEdit: React.FC = () => {
 
                 {loadingPo || !currentPo ? (
                     <div className="text-center py-5">
-                        <Spinner animation="border" variant="primary" />
+                        <div className="animate-spin rounded-full border-b-2 border-indigo-600 h-8 w-8"></div>
                         <p className="mt-3 text-muted">Loading assignment details...</p>
                     </div>
                 ) : (

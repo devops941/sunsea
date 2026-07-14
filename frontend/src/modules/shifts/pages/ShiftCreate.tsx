@@ -244,21 +244,25 @@ const ShiftCreate: React.FC = () => {
                                 error={errors.endTime}
                             />
 
+                            {/* BUG-SHF-003 fix: min={0} prevents negative values via browser number spinner */}
                             <TextInput
                                 label="Break Duration (mins)"
                                 name="breakDuration"
                                 value={formData.breakDuration}
                                 type="number"
+                                min={0}
                                 placeholder="e.g. 30"
                                 onChange={handleChange}
                                 error={errors.breakDuration}
                             />
 
+                            {/* BUG-SHF-003 fix: min={0} prevents negative values via browser number spinner */}
                             <TextInput
                                 label="Grace Period (mins)"
                                 name="gracePeriod"
                                 value={formData.gracePeriod}
                                 type="number"
+                                min={0}
                                 placeholder="e.g. 15"
                                 onChange={handleChange}
                                 error={errors.gracePeriod}

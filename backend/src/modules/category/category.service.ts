@@ -90,30 +90,26 @@ class CategoryService {
   ) {
     await this.findById(id);
 
-    const existing =
-      await prisma.category.findFirst({
+    // CAT-008 fix: only check fields that are actually being updated (not undefined)
+    const orConditions: any[] = [];
+    if (data.categoryCode !== undefined) {
+      orConditions.push({ categoryCode: data.categoryCode });
+    }
+    if (data.categoryName !== undefined) {
+      orConditions.push({ categoryName: data.categoryName });
+    }
+
+    if (orConditions.length > 0) {
+      const existing = await prisma.category.findFirst({
         where: {
-          id: {
-            not: id,
-          },
-          OR: [
-            {
-              categoryCode:
-                data.categoryCode,
-            },
-            {
-              categoryName:
-                data.categoryName,
-            },
-          ],
+          id: { not: id },
+          OR: orConditions,
         },
       });
 
-    if (existing) {
-      throw new ApiError(
-        409,
-        "Category already exists"
-      );
+      if (existing) {
+        throw new ApiError(409, "Category already exists");
+      }
     }
 
     return prisma.category.update({
@@ -142,9 +138,7 @@ class CategoryService {
 
   async getNextCategoryId() {
     const lastItem = await prisma.category.findFirst({
-      orderBy: {
-        id: "desc",
-      },
+      orderBy: { id: "desc" },
     });
 
     if (!lastItem || !lastItem.categoryCode) {
@@ -152,7 +146,8 @@ class CategoryService {
     }
 
     const lastId = lastItem.categoryCode;
-    const match = lastId.match(/\d+/);
+    // CAT-005 fix: use last (trailing) number group
+    const match = lastId.match(/\d+(?!.*\d)/);
     if (!match) {
       return lastId + "001";
     }
@@ -160,8 +155,9 @@ class CategoryService {
     const numberStr = match[0];
     const nextNumber = parseInt(numberStr, 10) + 1;
     const paddedNumber = String(nextNumber).padStart(numberStr.length, "0");
-    const prefix = lastId.substring(0, lastId.indexOf(numberStr));
-    const suffix = lastId.substring(lastId.indexOf(numberStr) + numberStr.length);
+    const lastIndex = lastId.lastIndexOf(numberStr);
+    const prefix = lastId.substring(0, lastIndex);
+    const suffix = lastId.substring(lastIndex + numberStr.length);
     return `${prefix}${paddedNumber}${suffix}`;
   }
 }

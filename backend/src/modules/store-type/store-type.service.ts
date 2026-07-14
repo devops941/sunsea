@@ -63,12 +63,17 @@ async findAll(params: {
     ];
   }
 
-  const queryOptions: any = {
-    where,
-    orderBy: {
-      [sortBy]: sortOrder,
-    },
-  };
+    const queryOptions: any = {
+      where,
+      include: {
+        _count: {
+          select: { stores: true },
+        },
+      },
+      orderBy: {
+        [sortBy]: sortOrder,
+      },
+    };
 
   if (page !== undefined || limit !== undefined) {
     const p = page || 1;
@@ -105,7 +110,15 @@ async findAll(params: {
   }
 
   async update(id: number, data: UpdateStoreTypeInput) {
-    await this.findById(id);
+    const existingType = await this.findById(id);
+
+    const storesUsingType = await prisma.store.count({
+      where: { storeTypeId: id },
+    });
+
+    if (storesUsingType > 0) {
+      throw new ApiError(400, `Cannot update Store Type as it is associated with ${storesUsingType} store(s)`);
+    }
 
     // If code is updated, check for conflicts
     if (data.code) {

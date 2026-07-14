@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Container, Row, Col, Form, Spinner } from "react-bootstrap";
+import { Container, Row, Col, Form } from "react-bootstrap";
 import "./Login.css";
 import Logo from "../../../assets/images/sun-sea.webp"
 import { useNavigate, useLocation } from "react-router-dom";
@@ -199,7 +199,7 @@ const LoginPage = () => {
                                         >
                                             {loading ? (
                                                 <span className="d-flex align-items-center justify-content-center gap-2">
-                                                    <Spinner animation="border" size="sm" />
+                                                    <div className="animate-spin rounded-full border-b-2 border-indigo-600 h-4 w-4 border-b-2"></div>
                                                     Signing In...
                                                 </span>
                                             ) : (

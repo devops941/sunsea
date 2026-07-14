@@ -83,10 +83,11 @@ const CategoryList: React.FC = () => {
         setEditMode(true);
         setFormData({
             id: String(category.id),
-            code: category.code,
-            name: category.name,
+            // CAT-007 fix: use correct API field names categoryCode/categoryName
+            code: category.categoryCode,
+            name: category.categoryName,
             description: category.description || "",
-            status: category.status,
+            status: category.isActive ? "ACTIVE" : "INACTIVE",
         });
         setErrors({ code: "", name: "" });
         setShowFormModal(true);
@@ -148,11 +149,12 @@ const CategoryList: React.FC = () => {
         if (!validateForm()) return;
         
         try {
+            // CAT-006 fix: use correct API field names categoryCode/categoryName
             const payload = {
-                code: formData.code,
-                name: formData.name,
+                categoryCode: formData.code,
+                categoryName: formData.name,
                 description: formData.description,
-                status: formData.status
+                isActive: formData.status === "ACTIVE",
             };
 
             if (editMode) {
@@ -170,9 +172,10 @@ const CategoryList: React.FC = () => {
 
     const columns: DataTableColumn<any>[] = [
         { header: "#", render: (_, index) => startIndex + index + 1, width: "60px", align: "center" },
-        { header: "Code", accessor: "code" },
-        { header: "Name", accessor: "name" },
-        { header: "Status", render: (cat) => <StatusBadge status={cat.status} />, align: "center" },
+        // CAT-007 fix: use correct API field names categoryCode/categoryName
+        { header: "Code", render: (cat) => cat.categoryCode },
+        { header: "Name", render: (cat) => cat.categoryName },
+        { header: "Status", render: (cat) => <StatusBadge status={cat.isActive ? "ACTIVE" : "INACTIVE"} />, align: "center" },
         { header: "Created Date", render: (cat) => new Date(cat.createdAt).toLocaleDateString() },
         {
             header: "Actions",
@@ -305,16 +308,16 @@ const CategoryList: React.FC = () => {
                     show={showViewModal}
                     onHide={() => setShowViewModal(false)}
                     modalTitle="Category Details"
-                    avatarText={selectedCategory ? selectedCategory.name.charAt(0).toUpperCase() : ""}
-                    headerTitle={selectedCategory ? selectedCategory.name : ""}
-                    headerSubtitle={selectedCategory ? `Code: ${selectedCategory.code}` : ""}
+                    avatarText={selectedCategory ? selectedCategory.categoryName.charAt(0).toUpperCase() : ""}
+                    headerTitle={selectedCategory ? selectedCategory.categoryName : ""}
+                    headerSubtitle={selectedCategory ? `Code: ${selectedCategory.categoryCode}` : ""}
                     sections={selectedCategory ? [
                         {
                             fields: [
-                                { label: "Category Name", value: selectedCategory.name },
-                                { label: "Category Code", value: selectedCategory.code },
+                                { label: "Category Name", value: selectedCategory.categoryName },
+                                { label: "Category Code", value: selectedCategory.categoryCode },
                                 { label: "Description", value: selectedCategory.description || "N/A" },
-                                { label: "Status", value: <StatusBadge status={selectedCategory.status} /> },
+                                { label: "Status", value: <StatusBadge status={selectedCategory.isActive ? "ACTIVE" : "INACTIVE"} /> },
                                 { label: "Created Date", value: new Date(selectedCategory.createdAt).toLocaleString() },
                                 { label: "Updated Date", value: new Date(selectedCategory.updatedAt).toLocaleString() },
                             ]

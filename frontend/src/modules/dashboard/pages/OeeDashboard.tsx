@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Container, Row, Col, Card, Spinner, Badge } from 'react-bootstrap';
+import { Container, Row, Col, Card, Badge } from 'react-bootstrap';
 import { FaChartLine, FaIndustry, FaCogs, FaCheckCircle, FaExclamationTriangle, FaPauseCircle } from 'react-icons/fa';
 import { oeeService } from '../../../services/oeeService';
 import { toast } from 'react-toastify';
@@ -91,7 +91,7 @@ const OeeDashboard: React.FC = () => {
     if (loading && machines.length === 0) {
         return (
             <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '400px' }}>
-                <Spinner animation="border" variant="primary" />
+                <div className="animate-spin rounded-full border-b-2 border-indigo-600 h-8 w-8"></div>
             </div>
         );
     }

@@ -164,8 +164,8 @@ const StoreTypeList: React.FC = () => {
                                     render: (item) => (
                                         <div className="flex items-center gap-2">
                                             <ViewButton onClick={() => handleOpenView(item)} />
-                                            <EditButton onClick={() => handleOpenEdit(item)} />
-                                            <DeleteButton onClick={() => triggerDelete(item.id)} />
+                                            <EditButton onClick={() => handleOpenEdit(item)} disabled={(item as any)._count?.stores > 0} disabledMessage="Cannot edit this store type because it is associated with stores." />
+                                            <DeleteButton onClick={() => triggerDelete(item.id)} disabled={(item as any)._count?.stores > 0} disabledMessage="Cannot delete this store type because it is associated with stores." />
                                         </div>
                                     ),
                                     align: "right"

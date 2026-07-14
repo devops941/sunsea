@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo } from "react";
-import { Container, Row, Col, Card, ProgressBar, Spinner, Badge, Table } from "react-bootstrap";
+import { Container, Row, Col, Card, ProgressBar, Badge, Table } from "react-bootstrap";
 import { 
   FaExclamationTriangle, 
   FaCalendarDay, FaCalendarWeek, FaCalendarAlt 
@@ -399,7 +399,7 @@ const ProductionDashboard: React.FC = () => {
               
               {loadingMachines ? (
                 <div className="text-center py-5">
-                  <Spinner animation="border" variant="primary" />
+                  <div className="animate-spin rounded-full border-b-2 border-indigo-600 h-8 w-8"></div>
                 </div>
               ) : (
                 <Row className="g-3">

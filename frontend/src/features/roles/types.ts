@@ -6,6 +6,9 @@ export interface Role {
   isSystem: boolean;
   status: string;
   createdAt: string;
+  _count?: {
+    users: number;
+  };
 }
 
 export interface CreateRoleDto {

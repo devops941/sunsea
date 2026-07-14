@@ -74,6 +74,11 @@ class LocationService {
 
     const queryOptions: any = {
       where,
+      include: {
+        _count: {
+          select: { stores: true },
+        },
+      },
       orderBy: {
         [sortBy]: sortOrder,
       },
@@ -117,6 +122,11 @@ class LocationService {
 
   async update(locationId: string, data: UpdateLocationInput, userId?: string) {
     await this.findById(locationId);
+
+    const storeCount = await prisma.store.count({ where: { locationId } });
+    if (storeCount > 0) {
+      throw new ApiError(400, "Cannot update this location because it is already assigned to a store.");
+    }
 
     if (data.locationCode) {
       const existingCode = await prisma.location.findFirst({

@@ -68,19 +68,11 @@ const EmployeeCreatePage: React.FC = () => {
       ? (e.target as HTMLInputElement).checked
       : value;
 
-    setFormData(prev => {
-      const updated = {
-        ...prev,
-        [name]: val,
-      };
-
-      // RESET DESIGNATION WHEN DEPARTMENT CHANGES
-      if (name === "departmentId") {
-        updated.designationId = "";
-      }
-
-      return updated;
-    });
+    // BUG-EMP-007 fix: removed stale designationId reference that does not exist in formData
+    setFormData(prev => ({
+      ...prev,
+      [name]: val,
+    }));
 
     if (errors[name as keyof FormErrors]) {
       setErrors(prev => ({ ...prev, [name]: undefined }));
@@ -174,15 +166,20 @@ const EmployeeCreatePage: React.FC = () => {
       newErrors.fullName = "Employee name is required";
     }
 
-    const mobileError = validatePhoneNumber(formData.mobile, false); // Make mobile optional
-    if (mobileError) {
-      newErrors.mobile = mobileError;
+    // BUG-EMP-001 fix: mobile is optional — only validate format if a value is entered
+    if (formData.mobile) {
+      const mobileError = validatePhoneNumber(formData.mobile, true);
+      if (mobileError) {
+        newErrors.mobile = mobileError;
+      }
     }
 
+    // BUG-EMP-003 fix: department is required on Create (consistent enforcement)
     if (!formData.departmentId) {
       newErrors.departmentId = "Department is required";
     }
 
+    // BUG-EMP-002 fix: email is optional — only validate format/duplicate if a value is entered
     if (formData.email) {
       const emailFormatValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim());
       if (!emailFormatValid) {

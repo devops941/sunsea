@@ -42,7 +42,8 @@ const getGstStateCode = (stateNameOrCode: string): string => {
 };
 
 const supplierFormSchema = z.object({
-    companyId: z.string().uuid("Company ID must be a valid UUID"),
+    // BUG-SUP-001 fix: companyId is resolved server-side — make it optional in frontend validation
+    companyId: z.string().optional(),
     supplierCode: z.string().trim().min(1, "Supplier code is required").max(20, "Maximum 20 characters allowed"),
     legalName: z.string().trim().min(1, "Legal name is required").max(160, "Maximum 160 characters allowed"),
     displayName: z.string().trim().max(80, "Maximum 80 characters allowed").optional().nullable(),
@@ -101,7 +102,8 @@ const SupplierEdit: React.FC = () => {
     const [selectedParentCategories, setSelectedParentCategories] = useState<string[]>([]);
 
     const [formData, setFormData] = useState({
-        companyId: "d67768ba-bcde-4321-a123-bcdef9876543",
+        // BUG-SUP-001 fix: companyId resolved server-side — not hardcoded
+        companyId: "",
         supplierCode: "",
         legalName: "",
         displayName: "",
@@ -142,6 +144,8 @@ const SupplierEdit: React.FC = () => {
             },
         ],
         status: "Active",
+        // BUG-SUP-003 fix: added createdByOn to form state
+        createdByOn: "",
     });
 
     const [addresses, setAddresses] = useState<SupplierAddress[]>([]);
@@ -168,7 +172,8 @@ const SupplierEdit: React.FC = () => {
     const handleClear = () => {
         if (supplierData) {
             setFormData({
-                companyId: supplierData.companyId || "d67768ba-bcde-4321-a123-bcdef9876543",
+                // BUG-SUP-001 fix: use actual companyId from server data, not a hardcoded UUID
+                companyId: supplierData.companyId || "",
                 supplierCode: supplierData.supplierCode || "",
                 legalName: supplierData.legalName || "",
                 displayName: supplierData.displayName || "",
@@ -240,6 +245,10 @@ const SupplierEdit: React.FC = () => {
                                 }
                             ],
                 status: supplierData.status || "Active",
+                // BUG-SUP-003 fix: map createdByOn from supplier's creator user
+                createdByOn: supplierData.createdByUser?.fullName
+                    ? `${supplierData.createdByUser.fullName}${supplierData.createdAt ? " - " + new Date(supplierData.createdAt).toLocaleString() : ""}`
+                    : "",
             });
             if (supplierData.addresses) {
                 setAddresses(supplierData.addresses);

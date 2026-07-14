@@ -113,54 +113,31 @@ class ColorService {
   ) {
     await this.findById(id);
 
-    const existing =
-      await prisma.color.findFirst({
+    // CLR-006 fix: removed colorType and hexCode2 from duplicate check
+    // colorType only has 2 values ("sc"/"mc") — including it causes false 409 errors.
+    // Only colorCode, colorName, and hexCode (primary) should be unique.
+    const orConditions: any[] = [];
+    if (data.colorCode !== undefined) {
+      orConditions.push({ colorCode: data.colorCode });
+    }
+    if (data.colorName !== undefined) {
+      orConditions.push({ colorName: data.colorName });
+    }
+    if (data.hexCode !== undefined) {
+      orConditions.push({ hexCode: data.hexCode });
+    }
+
+    if (orConditions.length > 0) {
+      const existing = await prisma.color.findFirst({
         where: {
-          id: {
-            not: id,
-          },
-          OR: [
-            data.colorCode
-              ? {
-                colorCode:
-                  data.colorCode,
-              }
-              : {},
-
-            data.colorName
-              ? {
-                colorName:
-                  data.colorName,
-              }
-              : {},
-
-            data.hexCode ?
-              {
-                hexCode:
-                  data.hexCode,
-              }
-              : {},
-            data.hexCode2
-              ? {
-                hexCode2:
-                  data.hexCode2,
-              }
-              : {},
-            data.colorType
-              ? {
-                colorType:
-                  data.colorType,
-              }
-              : {},
-          ],
+          id: { not: id },
+          OR: orConditions,
         },
       });
 
-    if (existing) {
-      throw new ApiError(
-        409,
-        "Color already exists"
-      );
+      if (existing) {
+        throw new ApiError(409, "Color already exists");
+      }
     }
 
     return prisma.color.update({
@@ -184,9 +161,7 @@ class ColorService {
 
   async getNextColorId() {
     const lastItem = await prisma.color.findFirst({
-      orderBy: {
-        id: "desc",
-      },
+      orderBy: { id: "desc" },
     });
 
     if (!lastItem || !lastItem.colorCode) {
@@ -194,7 +169,8 @@ class ColorService {
     }
 
     const lastId = lastItem.colorCode;
-    const match = lastId.match(/\d+/);
+    // CLR-005 fix: use last (trailing) number group
+    const match = lastId.match(/\d+(?!.*\d)/);
     if (!match) {
       return lastId + "001";
     }
@@ -202,8 +178,9 @@ class ColorService {
     const numberStr = match[0];
     const nextNumber = parseInt(numberStr, 10) + 1;
     const paddedNumber = String(nextNumber).padStart(numberStr.length, "0");
-    const prefix = lastId.substring(0, lastId.indexOf(numberStr));
-    const suffix = lastId.substring(lastId.indexOf(numberStr) + numberStr.length);
+    const lastIndex = lastId.lastIndexOf(numberStr);
+    const prefix = lastId.substring(0, lastIndex);
+    const suffix = lastId.substring(lastIndex + numberStr.length);
     return `${prefix}${paddedNumber}${suffix}`;
   }
 }

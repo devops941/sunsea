@@ -8,6 +8,12 @@ export const shiftService = {
     return response.data?.data || response.data || [];
   },
 
+  // BUG-SHF-002 fix: added fetchById so ShiftEdit can load data when location.state is missing
+  fetchById: async (id: number): Promise<Shift> => {
+    const response = await apiClient.get(`${config.shift.base}/${id}`);
+    return response.data?.data || response.data;
+  },
+
   create: async (data: CreateShiftDto): Promise<Shift> => {
     const response = await apiClient.post(config.shift.base, data);
     return response.data?.data || response.data;

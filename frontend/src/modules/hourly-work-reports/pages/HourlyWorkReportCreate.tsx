@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { Container, Row, Col, Card, Alert, Spinner, Form } from "react-bootstrap";
+import { Container, Row, Col, Card, Alert, Form } from "react-bootstrap";
 import { FaSave, FaEraser, FaArrowLeft, FaInfoCircle, FaCheckCircle } from "react-icons/fa";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -559,7 +559,7 @@ const HourlyWorkReportCreate: React.FC = () => {
                                     <div className="mt-4 pt-3 border-top">
                                         {loadingPlan ? (
                                             <div className="text-center py-4">
-                                                <Spinner animation="border" size="sm" variant="primary" className="me-2" />
+                                                <div className="animate-spin rounded-full border-b-2 border-indigo-600 h-4 w-4 border-b-2 mr-2"></div>
                                                 <span className="text-muted small">Loading active plan...</span>
                                             </div>
                                         ) : activePlan ? (

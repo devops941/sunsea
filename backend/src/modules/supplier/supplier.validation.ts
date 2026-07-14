@@ -8,7 +8,10 @@ const addressSubSchema = z.object({
   addressLine2: z.string().optional().nullable(),
   city: z.string().min(1, "City is required"),
   state: z.string().min(1, "State is required"),
-  pincode: z.string().min(1, "Pincode is required"),
+  // BUG-SUP-006 fix: pincode must be exactly 6 digits
+  pincode: z
+    .string()
+    .regex(/^\d{6}$/, "Pincode must be exactly 6 digits"),
 });
 
 /**
@@ -40,8 +43,26 @@ export const createSupplierSchema = z.object({
     whatsapp: z.string().max(15).optional(),
     email: z.string().email("Invalid email address").max(120).optional().nullable().or(z.literal("")),
     website: z.string().max(200).optional().nullable(),
-    gstin: z.string().max(15).optional().nullable().or(z.literal("")),
-    pan: z.string().max(10).optional().nullable().or(z.literal("")),
+    // BUG-SUP-007 fix: GSTIN format validation (15-char pattern)
+    gstin: z
+      .string()
+      .regex(
+        /^\d{2}[A-Z]{5}\d{4}[A-Z][A-Z\d]Z[A-Z\d]$/,
+        "Invalid GSTIN format (e.g. 33ABCDE1234F1Z5)"
+      )
+      .optional()
+      .nullable()
+      .or(z.literal("")),
+    // BUG-SUP-008 fix: PAN format validation (10-char pattern)
+    pan: z
+      .string()
+      .regex(
+        /^[A-Z]{5}\d{4}[A-Z]$/,
+        "Invalid PAN format (e.g. ABCDE1234F)"
+      )
+      .optional()
+      .nullable()
+      .or(z.literal("")),
     gstRegType: z.string().max(20).optional().nullable(),
     msmeStatus: z.enum(["Micro", "Small", "Medium", "None"]).optional().nullable(),
     udyamNo: z.string().max(20).optional().nullable(),
@@ -49,7 +70,11 @@ export const createSupplierSchema = z.object({
     billingAddressLine1: z.string().min(1, "Billing Address Line 1 is required").max(255),
     billingCity: z.string().min(1, "City is required").max(100),
     billingState: z.string().min(1, "State is required").max(100),
-    billingPincode: z.string().min(1, "Pincode is required").max(20),
+    // BUG-SUP-006 fix: billingPincode must be exactly 6 digits
+    billingPincode: z
+      .string()
+      .regex(/^\d{6}$/, "Pincode must be exactly 6 digits")
+      .or(z.string().max(20)),  // keep max(20) for non-Indian use, but enforce 6-digit Indian format
     stateCode: z.string().length(2, "State code must be exactly 2 characters"),
     paymentTerms: z.enum(["Advance", "Net15", "Net30", "Net45", "Net60"]),
     leadTimeDays: z.number().int().min(0, "Lead time cannot be negative"),

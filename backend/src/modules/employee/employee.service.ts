@@ -246,7 +246,8 @@ class EmployeeService {
     }
 
     const lastCode = lastEmployee.empCode;
-    const match = lastCode.match(/\d+/);
+    // BUG-EMP-006 fix: use last (trailing) number group instead of the first
+    const match = lastCode.match(/\d+(?!.*\d)/);
     if (!match) {
       return lastCode + "001";
     }
@@ -254,18 +255,23 @@ class EmployeeService {
     const numberStr = match[0];
     const nextNumber = parseInt(numberStr, 10) + 1;
     const paddedNumber = String(nextNumber).padStart(numberStr.length, "0");
-    const prefix = lastCode.substring(0, lastCode.indexOf(numberStr));
-    const suffix = lastCode.substring(lastCode.indexOf(numberStr) + numberStr.length);
+    const lastIndex = lastCode.lastIndexOf(numberStr);
+    const prefix = lastCode.substring(0, lastIndex);
+    const suffix = lastCode.substring(lastIndex + numberStr.length);
     return `${prefix}${paddedNumber}${suffix}`;
   }
 
   async delete(id: bigint) {
     await this.findById(id);
 
-    return executeDeleteWithValidation(
-      () => prisma.employee.delete({ where: { id } }),
-      "Employee"
-    );
+    // BUG-EMP-008 fix: explicitly delete linked user account first to prevent orphaned records
+    return prisma.$transaction(async (tx) => {
+      const linkedUser = await tx.user.findUnique({ where: { employeeId: id } });
+      if (linkedUser) {
+        await tx.user.delete({ where: { userId: linkedUser.userId } });
+      }
+      return tx.employee.delete({ where: { id } });
+    });
   }
 }
 

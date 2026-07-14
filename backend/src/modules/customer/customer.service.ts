@@ -9,7 +9,6 @@ import {
 
 class CustomerService {
   async createCustomer(data: CreateCustomerInput, currentUser: { userId: string; companyId: string }) {
-    console.log(currentUser, 'lkjlk')
     const existingCustomer = await prisma.customer.findFirst({
       where: {
         companyId: currentUser.companyId,
@@ -31,24 +30,37 @@ class CustomerService {
     });
   }
 
-  async getAllCustomers(search?: string) {
+  // BUG-CUST-004 fix: added server-side pagination (page, limit, skip/take)
+  async getAllCustomers(params: { search?: string; page?: number; limit?: number }) {
+    const { search, page = 1, limit = 10 } = params;
+
     const whereClause = search
       ? {
-        OR: [
-          { customerCode: { contains: search, mode: "insensitive" as const } },
-          { firmName: { contains: search, mode: "insensitive" as const } },
-          { email: { contains: search, mode: "insensitive" as const } },
-          { mobile: { contains: search, mode: "insensitive" as const } },
-        ],
-      }
+          OR: [
+            { customerCode: { contains: search, mode: "insensitive" as const } },
+            { firmName: { contains: search, mode: "insensitive" as const } },
+            { email: { contains: search, mode: "insensitive" as const } },
+            { mobile: { contains: search, mode: "insensitive" as const } },
+          ],
+        }
       : {};
 
-    return prisma.customer.findMany({
-      where: whereClause,
-      orderBy: {
-        createdAt: "desc",
-      },
-    });
+    const [customers, total] = await Promise.all([
+      prisma.customer.findMany({
+        where: whereClause,
+        orderBy: { createdAt: "desc" },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      prisma.customer.count({ where: whereClause }),
+    ]);
+
+    return {
+      customers,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 
   async getNextCustomerCode() {

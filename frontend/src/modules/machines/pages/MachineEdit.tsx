@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from "react";
 import { FaSave, FaEraser, FaArrowLeft } from "react-icons/fa";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import { z } from "zod";
 import TextInput from "../../../components/form/TextInput/TextInput";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
+// BUG-MAC fix: removed duplicate Button import (was imported as both CustomButton and Button)
 import CustomButton from "../../../components/ui/Button/Button";
 import { useAppDispatch } from "../../../hooks/reduxHooks";
 import { updateMachine } from "../../../features/machines/machineSlice";
 import { useEmployees } from "../../../hooks/useEmployees";
+import { machineService } from "../../../services/machineService";
 
 const machineSchema = z.object({
     machineId: z.string().min(1, "Machine ID is required").max(20, "Maximum 20 characters allowed"),
@@ -47,12 +49,16 @@ const initialFormState = {
 const MachineEdit: React.FC = () => {
     const navigate = useNavigate();
     const locationState = useLocation();
+    // BUG-MAC fix: read machineId from URL params to support direct URL access / page refresh
+    const { machineId: idParam } = useParams<{ machineId: string }>();
     const dispatch = useAppDispatch();
     const { employees, loadEmployees } = useEmployees();
     
     const [formData, setFormData] = useState(initialFormState);
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [isSubmitting, setIsSubmitting] = useState(false);
+    // BUG-MAC fix: track API fetch loading state
+    const [fetchingData, setFetchingData] = useState(false);
 
     useEffect(() => {
         loadEmployees();
@@ -60,6 +66,7 @@ const MachineEdit: React.FC = () => {
 
     useEffect(() => {
         if (locationState.state) {
+            // Happy path: data passed via navigation state
             const s = locationState.state;
             setFormData({
                 machineId: s.machineId || "",
@@ -77,11 +84,40 @@ const MachineEdit: React.FC = () => {
                 description: s.description || "",
                 isActive: s.isActive ?? true,
             });
+        } else if (idParam) {
+            // BUG-MAC fix: no state (direct URL / page refresh) — fetch from API
+            setFetchingData(true);
+            machineService
+                .getById(idParam)
+                .then((res: any) => {
+                    const s = res?.data || res;
+                    setFormData({
+                        machineId: s.machineId || "",
+                        machineName: s.machineName || "",
+                        technologyType: s.technologyType || "",
+                        machineType: s.machineType || "",
+                        capacity: s.capacity ? String(s.capacity) : "",
+                        targetTemperature: s.targetTemperature ? String(s.targetTemperature) : "",
+                        targetLoadPercent: s.targetLoadPercent ? String(s.targetLoadPercent) : "",
+                        manufacturer: s.manufacturer || "",
+                        modelNumber: s.modelNumber || "",
+                        cycleTime: s.cycleTime ? String(s.cycleTime) : "",
+                        operatorId: s.operatorId || "",
+                        machineStatus: s.machineStatus || "IDLE",
+                        description: s.description || "",
+                        isActive: s.isActive ?? true,
+                    });
+                })
+                .catch(() => {
+                    toast.error("Failed to load machine data.");
+                    navigate("/machines");
+                })
+                .finally(() => setFetchingData(false));
         } else {
             toast.error("No machine data provided.");
             navigate("/machines");
         }
-    }, [locationState.state, navigate]);
+    }, [locationState.state, idParam, navigate]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
         const { name, value, type } = e.target;
@@ -158,6 +194,12 @@ const MachineEdit: React.FC = () => {
     };
 
     return (
+        // BUG-MAC fix: show spinner while fetching data via API fallback
+        fetchingData ? (
+            <div className="flex justify-center items-center h-64">
+                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"></div>
+            </div>
+        ) : (
         <div className="w-full mx-auto">
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                 <div className="px-6 py-5 border-b border-slate-200">
@@ -388,6 +430,7 @@ const MachineEdit: React.FC = () => {
                 </form>
             </div>
         </div>
+        ) // end ternary: fetchingData ? spinner : form
     );
 };
 

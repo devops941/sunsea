@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Row, Col, Form, Table } from "react-bootstrap";
+import { Row, Col, Form } from "react-bootstrap";
 import { FaSave, FaPlus, FaTrash, FaFileInvoiceDollar } from "react-icons/fa";
 import { toast } from "react-toastify";
 
 import TextInput from "../../components/form/TextInput/TextInput";
+import SelectInput from "../../components/form/SelectInput/SelectInput";
 import CustomButton from "../../components/ui/custombutton/CustomButton";
 import Section from "../../components/ui/Section/Section";
 import { invoiceSettingsService } from "../../services/invoiceSettingsService";
@@ -12,6 +13,7 @@ import { customerService } from "../../services/customerService";
 import { productService } from "../../services/productService";
 import { salesInvoiceService } from "../../services/salesInvoiceService";
 import { salesOrderService } from "../../services/salesOrderService";
+import { finishedGoodsStockService } from "../../services/finishedGoodsStockService";
 
 // ---- Types ----
 interface InvoiceLineItem {
@@ -49,6 +51,94 @@ const emptyLine = (): InvoiceLineItem => ({
   total: 0,
 });
 
+// ---- Financial Year and Invoice Number calculations ----
+
+const getFinancialYearForDate = (dateStr: string, settings: any) => {
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return null;
+
+  let startYear = date.getFullYear();
+  let fyStartMonth = 3; // April (0-indexed)
+  if (settings?.financialYearStart) {
+    const sDate = new Date(settings.financialYearStart);
+    if (!isNaN(sDate.getTime())) {
+      fyStartMonth = sDate.getMonth();
+    }
+  }
+
+  if (date.getMonth() < fyStartMonth) {
+    startYear -= 1;
+  }
+  const endYear = startYear + 1;
+  const fyLabel = `${startYear}-${String(endYear).slice(-2)}`;
+
+  // Check if matches the current financial year defined in active settings
+  let isCurrentFy = true;
+  if (settings?.financialYearStart && settings?.financialYearEnd) {
+    const settingsStart = new Date(settings.financialYearStart);
+    const settingsEnd = new Date(settings.financialYearEnd);
+    if (!isNaN(settingsStart.getTime()) && !isNaN(settingsEnd.getTime())) {
+      isCurrentFy = (date >= settingsStart && date <= settingsEnd);
+    }
+  } else {
+    const today = new Date();
+    let currentFyStartYear = today.getFullYear();
+    if (today.getMonth() < fyStartMonth) {
+      currentFyStartYear -= 1;
+    }
+    isCurrentFy = (startYear === currentFyStartYear);
+  }
+
+  return { startYear, endYear, fyLabel, isCurrentFy };
+};
+
+const extractSequenceNumber = (code: string): number => {
+  if (!code) return 0;
+  const match = code.match(/(\d+)\s*$/);
+  if (match) {
+    return parseInt(match[1], 10);
+  }
+  return 0;
+};
+
+const calculateInvoiceNumber = (dateStr: string, settings: any, orders: any[]) => {
+  if (!settings) return "";
+
+  const fyInfo = getFinancialYearForDate(dateStr, settings);
+  if (!fyInfo) return "";
+
+  const { fyLabel, isCurrentFy } = fyInfo;
+
+  let seq = settings.currentSequenceNumber || 1;
+
+  if (!isCurrentFy) {
+    // If previous year, find the highest sequence number of existing orders in that financial year
+    let maxSeq = 0;
+    orders.forEach((order: any) => {
+      const orderDateStr = order.orderDate || order.invoiceDate || order.createdAt;
+      if (!orderDateStr) return;
+
+      const orderFyInfo = getFinancialYearForDate(orderDateStr, settings);
+      if (orderFyInfo && orderFyInfo.fyLabel === fyLabel) {
+        const orderSeq = extractSequenceNumber(order.orderNo || order.invoiceNo || "");
+        if (orderSeq > maxSeq) {
+          maxSeq = orderSeq;
+        }
+      }
+    });
+    seq = maxSeq + 1;
+  }
+
+  const paddedSeq = String(seq).padStart(settings.sequenceLength || 4, "0");
+
+  let preview = settings.formatTemplate || "{PREFIX}-{FY}-{SEQ}";
+  preview = preview.replace(/{PREFIX}/g, settings.invoicePrefix || "");
+  preview = preview.replace(/{FY}/g, fyLabel);
+  preview = preview.replace(/{SEQ}/g, paddedSeq);
+
+  return preview;
+};
+
 const SalesInvoiceForm: React.FC = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
@@ -66,94 +156,9 @@ const SalesInvoiceForm: React.FC = () => {
   const [notes, setNotes] = useState("");
   const [lines, setLines] = useState<InvoiceLineItem[]>([emptyLine()]);
   const [errors, setErrors] = useState<Record<string, string>>({});
-
-  // ---- Financial Year and Invoice Number calculations ----
-
-  const getFinancialYearForDate = (dateStr: string, settings: any) => {
-    const date = new Date(dateStr);
-    if (isNaN(date.getTime())) return null;
-
-    let startYear = date.getFullYear();
-    let fyStartMonth = 3; // April (0-indexed)
-    if (settings?.financialYearStart) {
-      const sDate = new Date(settings.financialYearStart);
-      if (!isNaN(sDate.getTime())) {
-        fyStartMonth = sDate.getMonth();
-      }
-    }
-
-    if (date.getMonth() < fyStartMonth) {
-      startYear -= 1;
-    }
-    const endYear = startYear + 1;
-    const fyLabel = `${startYear}-${String(endYear).slice(-2)}`;
-
-    // Check if matches the current financial year defined in active settings
-    let isCurrentFy = true;
-    if (settings?.financialYearStart && settings?.financialYearEnd) {
-      const settingsStart = new Date(settings.financialYearStart);
-      const settingsEnd = new Date(settings.financialYearEnd);
-      if (!isNaN(settingsStart.getTime()) && !isNaN(settingsEnd.getTime())) {
-        isCurrentFy = (date >= settingsStart && date <= settingsEnd);
-      }
-    } else {
-      const today = new Date();
-      let currentFyStartYear = today.getFullYear();
-      if (today.getMonth() < fyStartMonth) {
-        currentFyStartYear -= 1;
-      }
-      isCurrentFy = (startYear === currentFyStartYear);
-    }
-
-    return { startYear, endYear, fyLabel, isCurrentFy };
-  };
-
-  const extractSequenceNumber = (code: string): number => {
-    if (!code) return 0;
-    const match = code.match(/(\d+)\s*$/);
-    if (match) {
-      return parseInt(match[1], 10);
-    }
-    return 0;
-  };
-
-  const calculateInvoiceNumber = (dateStr: string, settings: any, orders: any[]) => {
-    if (!settings) return "";
-
-    const fyInfo = getFinancialYearForDate(dateStr, settings);
-    if (!fyInfo) return "";
-
-    const { fyLabel, isCurrentFy } = fyInfo;
-
-    let seq = settings.currentSequenceNumber || 1;
-
-    if (!isCurrentFy) {
-      // If previous year, find the highest sequence number of existing orders in that financial year
-      let maxSeq = 0;
-      orders.forEach((order: any) => {
-        const orderDateStr = order.orderDate || order.invoiceDate || order.createdAt;
-        if (!orderDateStr) return;
-
-        const orderFyInfo = getFinancialYearForDate(orderDateStr, settings);
-        if (orderFyInfo && orderFyInfo.fyLabel === fyLabel) {
-          const orderSeq = extractSequenceNumber(order.orderNo || order.invoiceNo || "");
-          if (orderSeq > maxSeq) {
-            maxSeq = orderSeq;
-          }
-        }
-      });
-      seq = maxSeq + 1;
-    }
-
-    const paddedSeq = String(seq).padStart(settings.sequenceLength || 4, "0");
-
-    let preview = settings.formatTemplate || "{PREFIX}-{FY}-{SEQ}";
-    preview = preview.replace(/{PREFIX}/g, settings.invoicePrefix || "");
-    preview = preview.replace(/{FY}/g, fyLabel);
-    preview = preview.replace(/{SEQ}/g, paddedSeq);
-
-    return preview;
-  };
+  
+  const [salesOrders, setSalesOrders] = useState<any[]>([]);
+  const [selectedSalesOrderId, setSelectedSalesOrderId] = useState("");
 
   // ---- Load dropdown data + next invoice number preview ----
   useEffect(() => {
@@ -161,9 +166,11 @@ const SalesInvoiceForm: React.FC = () => {
       customerService.fetchAll(),
       productService.fetchAll(),
       invoiceSettingsService.getConfig(),
-      salesInvoiceService.fetchAll({ pageSize: 10000 }).catch(() => ({ data: [] } as any)),
+      salesInvoiceService.fetchAll({ pageSize: 100 }).catch(() => ({ data: [] } as any)),
+      salesOrderService.fetchAll({ pageSize: 100 }).catch(() => ({ data: [] } as any)),
+      finishedGoodsStockService.fetchAll().catch(() => []),
     ])
-      .then(([customerList, productList, settings, ordersResponse]) => {
+      .then(([customerList, productList, settings, ordersResponse, salesOrdersResponse, fgStockResponse]) => {
         const customerOptions: CustomerOption[] = (customerList || []).map((c: any) => ({
           id: c.id,
           name: c.firmName || c.displayName || c.customerCode || "Unknown Customer",
@@ -179,6 +186,39 @@ const SalesInvoiceForm: React.FC = () => {
 
         const ordersList = ordersResponse?.data || (ordersResponse as any)?.orders || [];
         setAllOrders(ordersList);
+
+        const salesOrdersList = salesOrdersResponse?.data || salesOrdersResponse || [];
+        
+        // Map Finished Goods Stock to onHandQty by productItemId
+        const fgList: any[] = Array.isArray(fgStockResponse) ? fgStockResponse : (fgStockResponse as any).data || [];
+        const fgStockMap = new Map<string, number>();
+        fgList.forEach((fg: any) => {
+          const prodId = (fg.productItemId || fg.productId)?.toString();
+          if (prodId) {
+            const qty = Number(fg.onHandQty || 0);
+            fgStockMap.set(prodId, (fgStockMap.get(prodId) || 0) + qty);
+          }
+        });
+
+        // Filter sales orders to only those that are fully available in stock
+        const filteredSalesOrders = salesOrdersList.filter((so: any) => {
+          let isAllAvailable = true;
+          if (so.items && so.items.length > 0) {
+            so.items.forEach((item: any) => {
+              const prodId = (item.productId || item.product?.id)?.toString();
+              const orderedQty = Number(item.quantity || 0);
+              const stockQty = fgStockMap.get(prodId) || 0;
+              if (stockQty < orderedQty) {
+                isAllAvailable = false;
+              }
+            });
+          } else {
+            isAllAvailable = false;
+          }
+          return isAllAvailable;
+        });
+
+        setSalesOrders(filteredSalesOrders);
 
         if (settings) {
           setInvoiceSettings(settings);
@@ -203,9 +243,55 @@ const SalesInvoiceForm: React.FC = () => {
     }
   }, [invoiceDate, invoiceSettings, allOrders]);
 
+  const handleSalesOrderChange = (soId: string) => {
+    setSelectedSalesOrderId(soId);
+    if (!soId) {
+      setLines([emptyLine()]);
+      return;
+    }
+
+    const selectedOrder = salesOrders.find((o) => o.id.toString() === soId || o.orderNo === soId);
+    if (selectedOrder) {
+      // 1. Auto-select Customer
+      if (selectedOrder.customerId) {
+        setCustomerId(selectedOrder.customerId.toString());
+      } else if (selectedOrder.customer?.id) {
+        setCustomerId(selectedOrder.customer.id.toString());
+      }
+
+      // 2. Populate Items table
+      if (selectedOrder.items && selectedOrder.items.length > 0) {
+        const newLines = selectedOrder.items.map((item: any) => {
+          const qty = Number(item.quantity || item.qty || 1);
+          const totalTaxable = Number(item.taxableAmount || item.lineSubtotal || 0);
+          const rate = qty > 0 ? (totalTaxable / qty) : Number(item.b2b || item.b2c || item.mrp || 0);
+          const taxPercent = Number(item.igstRate) > 0 
+            ? Number(item.igstRate) 
+            : (Number(item.cgstRate || 0) + Number(item.sgstRate || 0));
+          
+          const amount = qty * rate;
+          const taxAmount = (amount * taxPercent) / 100;
+          const total = amount + taxAmount;
+          return {
+            id: crypto.randomUUID(),
+            itemId: String(item.productId || ""),
+            itemName: item.product?.productName || item.productName || "Unknown Item",
+            qty,
+            rate,
+            taxPercent,
+            amount,
+            taxAmount,
+            total,
+          };
+        });
+        setLines(newLines);
+      }
+    }
+  };
+
   // ---- Line item handlers ----
   const recalcLine = (line: InvoiceLineItem): InvoiceLineItem => {
-    const amount = line.qty * line.rate;
+    const amount = line.amount !== undefined ? line.amount : (line.qty * line.rate);
     const taxAmount = (amount * line.taxPercent) / 100;
     return { ...line, amount, taxAmount, total: amount + taxAmount };
   };
@@ -214,7 +300,7 @@ const SalesInvoiceForm: React.FC = () => {
     setLines((prev) =>
       prev.map((line) => {
         if (line.id !== id) return line;
-        let updated = { ...line, [field]: value };
+        const updated = { ...line, [field]: value };
 
         // If item selected, auto-fill name + default rate
         if (field === "itemId") {
@@ -222,6 +308,17 @@ const SalesInvoiceForm: React.FC = () => {
           if (selected) {
             updated.itemName = selected.name;
             updated.rate = selected.defaultRate ?? 0;
+            updated.amount = updated.qty * updated.rate;
+          }
+        } else if (field === "qty" || field === "rate") {
+          const qty = field === "qty" ? Number(value) : updated.qty;
+          const rate = field === "rate" ? Number(value) : updated.rate;
+          updated.amount = qty * rate;
+        } else if (field === "amount") {
+          const amt = Number(value);
+          updated.amount = amt;
+          if (updated.qty > 0) {
+            updated.rate = amt / updated.qty;
           }
         }
         return recalcLine(updated);
@@ -308,24 +405,53 @@ const SalesInvoiceForm: React.FC = () => {
 
         <Row className="g-3">
           <Col md={4}>
-            <Form.Group>
-              <Form.Label className="fw-bold small">Customer *</Form.Label>
-              <Form.Select
-                value={customerId}
-                onChange={(e) => setCustomerId(e.target.value)}
-                isInvalid={!!errors.customerId}
-              >
-                <option value="">Select customer</option>
-                {customers.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </Form.Select>
-              {errors.customerId && (
-                <Form.Control.Feedback type="invalid">{errors.customerId}</Form.Control.Feedback>
-              )}
-            </Form.Group>
+            <SelectInput
+              label="Customer"
+              name="customerId"
+              required
+              value={customerId}
+              error={errors.customerId}
+              options={customers.map((c) => ({ label: c.name, value: c.id }))}
+              defaultOptionLabel="Select customer"
+              onChange={(e) => {
+                const newCustId = e.target.value;
+                setCustomerId(newCustId);
+                // Clear selected sales order if it doesn't match the new customer
+                if (selectedSalesOrderId) {
+                  const selectedOrder = salesOrders.find(
+                    (o) => o.id.toString() === selectedSalesOrderId || o.orderNo === selectedSalesOrderId
+                  );
+                  if (selectedOrder) {
+                    const orderCustId = (selectedOrder.customerId || selectedOrder.customer?.id)?.toString();
+                    if (orderCustId !== newCustId) {
+                      setSelectedSalesOrderId("");
+                      setLines([emptyLine()]);
+                    }
+                  }
+                }
+              }}
+            />
+          </Col>
+          <Col md={4}>
+            <SelectInput
+              label="Sales Order (Optional)"
+              name="selectedSalesOrderId"
+              value={selectedSalesOrderId}
+              disabled={!customerId}
+              options={salesOrders
+                .filter((so) => so.customerId?.toString() === customerId || so.customer?.id?.toString() === customerId)
+                .map((so) => {
+                  const orderDateStr = so.orderDate || so.createdAt;
+                  const formattedDate = orderDateStr 
+                    ? new Date(orderDateStr).toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" })
+                    : "N/A";
+                  const formattedAmount = `₹${Number(so.netAmount || so.grandTotal || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`;
+                  const labelStr = `${so.orderNo} — ${formattedDate} — ${formattedAmount}`;
+                  return { label: labelStr, value: so.id.toString() };
+                })}
+              defaultOptionLabel={customerId ? "-- Select Sales Order --" : "-- Select Customer First --"}
+              onChange={(e) => handleSalesOrderChange(e.target.value)}
+            />
           </Col>
           <Col md={4}>
             <TextInput
@@ -352,75 +478,77 @@ const SalesInvoiceForm: React.FC = () => {
 
       <Section title="Items" icon={<FaFileInvoiceDollar />}>
         {errors.lines && <div className="text-danger small mb-2">{errors.lines}</div>}
-        <Table bordered responsive size="sm">
-          <thead>
-            <tr>
-              <th style={{ minWidth: 200 }}>Item</th>
-              <th style={{ width: 90 }}>Qty</th>
-              <th style={{ width: 110 }}>Rate</th>
-              <th style={{ width: 90 }}>Tax %</th>
-              <th style={{ width: 110 }}>Amount</th>
-              <th style={{ width: 110 }}>Total</th>
-              <th style={{ width: 50 }}></th>
-            </tr>
-          </thead>
-          <tbody>
-            {lines.map((line) => (
-              <tr key={line.id}>
-                <td>
-                  <Form.Select
-                    size="sm"
-                    value={line.itemId}
-                    onChange={(e) => updateLine(line.id, "itemId", e.target.value)}
-                  >
-                    <option value="">Select item</option>
-                    {items.map((i) => (
-                      <option key={i.id} value={i.id}>
-                        {i.name}
-                      </option>
-                    ))}
-                  </Form.Select>
-                </td>
-                <td>
-                  <Form.Control
-                    size="sm"
-                    type="number"
-                    min={0}
-                    value={line.qty}
-                    onChange={(e) => updateLine(line.id, "qty", Number(e.target.value))}
-                  />
-                </td>
-                <td>
-                  <Form.Control
-                    size="sm"
-                    type="number"
-                    min={0}
-                    value={line.rate}
-                    onChange={(e) => updateLine(line.id, "rate", Number(e.target.value))}
-                  />
-                </td>
-                <td>
-                  <Form.Control
-                    size="sm"
-                    type="number"
-                    min={0}
-                    value={line.taxPercent}
-                    onChange={(e) => updateLine(line.id, "taxPercent", Number(e.target.value))}
-                  />
-                </td>
-                <td className="text-end align-middle">{line.amount.toFixed(2)}</td>
-                <td className="text-end align-middle fw-bold">{line.total.toFixed(2)}</td>
-                <td className="text-center align-middle">
-                  <FaTrash
-                    role="button"
-                    className="text-danger"
-                    onClick={() => removeLine(line.id)}
-                  />
-                </td>
+        <div className="master-table-body table-wrap">
+          <table className="master-data-table">
+            <thead>
+              <tr>
+                <th style={{ minWidth: 200 }}>Item</th>
+                <th style={{ width: 90 }}>Qty</th>
+                <th style={{ width: 110 }}>Rate</th>
+                <th style={{ width: 90 }}>Tax %</th>
+                <th style={{ width: 110 }}>Amount</th>
+                <th style={{ width: 110 }}>Total</th>
+                <th style={{ width: 50 }}></th>
               </tr>
-            ))}
-          </tbody>
-        </Table>
+            </thead>
+            <tbody>
+              {lines.map((line) => (
+                <tr key={line.id} className="master-data-row">
+                  <td className="master-data-cell">
+                    <SelectInput
+                      label=""
+                      name="itemId"
+                      value={line.itemId}
+                      options={items.map((i) => ({ label: i.name, value: i.id }))}
+                      defaultOptionLabel="Select item"
+                      onChange={(e) => updateLine(line.id, "itemId", e.target.value)}
+                    />
+                  </td>
+                  <td className="master-data-cell">
+                    <TextInput
+                      name="qty"
+                      type="number"
+                      value={String(line.qty)}
+                      onChange={(e) => updateLine(line.id, "qty", Number(e.target.value))}
+                    />
+                  </td>
+                  <td className="master-data-cell">
+                    <TextInput
+                      name="rate"
+                      type="number"
+                      value={String(line.rate)}
+                      onChange={(e) => updateLine(line.id, "rate", Number(e.target.value))}
+                    />
+                  </td>
+                  <td className="master-data-cell">
+                    <TextInput
+                      name="taxPercent"
+                      type="number"
+                      value={String(line.taxPercent)}
+                      onChange={(e) => updateLine(line.id, "taxPercent", Number(e.target.value))}
+                    />
+                  </td>
+                  <td className="master-data-cell">
+                    <TextInput
+                      name="amount"
+                      type="number"
+                      value={String(line.amount)}
+                      onChange={(e) => updateLine(line.id, "amount", Number(e.target.value))}
+                    />
+                  </td>
+                  <td className="master-data-cell text-end align-middle fw-bold">{line.total.toFixed(2)}</td>
+                  <td className="master-data-cell text-center align-middle">
+                    <FaTrash
+                      role="button"
+                      className="text-danger"
+                      onClick={() => removeLine(line.id)}
+                    />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
 
         <CustomButton text="Add Item" icon={FaPlus} type="button" variant="outline" onClick={addLine} />
 

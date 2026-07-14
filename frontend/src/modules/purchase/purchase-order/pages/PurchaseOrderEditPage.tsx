@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Container, Row, Col, Table, Spinner } from "react-bootstrap";
+import { Container, Row, Col, Table } from "react-bootstrap";
 import { FaSave, FaPlus, FaTrash, FaInfoCircle, FaUser, FaMapMarkerAlt, FaBoxOpen, FaPaperPlane } from "react-icons/fa";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -745,7 +745,7 @@ const PurchaseOrderEditPage: React.FC = () => {
   if (loading) {
     return (
       <div className="inner-container d-flex justify-content-center align-items-center" style={{ minHeight: "300px" }}>
-        <Spinner animation="border" />
+        <div className="animate-spin rounded-full border-b-2 border-indigo-600 h-8 w-8"></div>
       </div>
     );
   }

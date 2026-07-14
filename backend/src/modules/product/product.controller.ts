@@ -7,7 +7,7 @@ import { ApiResponse } from "../../utils/ApiResponse";
 
 class ProductController {
   create = asyncHandler(
-    async (req: Request, res: Response) => { console.log('=== CREATE REQ.BODY ===', req.body);
+    async (req: Request, res: Response) => {
       const product =
         await productService.create(
           req.body,

@@ -46,6 +46,7 @@ const EmployeeEdit: React.FC = () => {
     username?: string;
     password?: string;
     roleId?: string;
+    departmentId?: string;
   }
 
   const [errors, setErrors] = useState<FormErrors>({});
@@ -61,11 +62,15 @@ const EmployeeEdit: React.FC = () => {
       newErrors.fullName = "Employee name is required";
     }
 
-    if (formData.mobile.trim() && !/^\d{10}$/.test(formData.mobile.trim())) {
-      newErrors.mobile = "Enter a valid 10-digit mobile number";
+    // BUG-EMP-001 fix: mobile is optional — only validate format if a value is entered
+    if (formData.mobile && formData.mobile.trim()) {
+      if (!/^\d{10}$/.test(formData.mobile.trim())) {
+        newErrors.mobile = "Enter a valid 10-digit mobile number";
+      }
     }
 
-    if (formData.email) {
+    // BUG-EMP-002 fix: email is optional — only validate format/duplicate if a value is entered
+    if (formData.email && formData.email.trim()) {
       const emailFormatValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim());
       if (!emailFormatValid) {
         newErrors.email = "Enter a valid email address";
@@ -79,6 +84,11 @@ const EmployeeEdit: React.FC = () => {
           newErrors.email = "Email already exists";
         }
       }
+    }
+
+    // BUG-EMP-003 fix: department required on Edit — consistent with Create
+    if (!formData.departmentId) {
+      newErrors.departmentId = "Department is required";
     }
 
     if (formData.createLoginAccount) {
@@ -130,7 +140,7 @@ const EmployeeEdit: React.FC = () => {
 
 
     }
-  }, [employeeData]);
+  }, [employeeData, user?.username]);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -263,6 +273,8 @@ const EmployeeEdit: React.FC = () => {
                 options={departmentOptions}
                 onChange={handleChange as any}
                 defaultOptionLabel="Select Department"
+                required
+                error={errors.departmentId}
               />
 
               <SelectInput

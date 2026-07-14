@@ -18,12 +18,7 @@ export const sidebarItems: SidebarItem[] = [
     icon: FaTachometerAlt,
     path: "/dashboard",
   },
-  {
-    title: "OEE Dashboard",
-    icon: FaChartBar,
-    path: "/oee-dashboard",
-    permission: "reports.view",
-  },
+
   
   // 2. Core Business Flow (Sales -> Purchase -> Inventory -> Production)
   {
@@ -79,7 +74,7 @@ export const sidebarItems: SidebarItem[] = [
   {
     title: "Reports",
     icon: FaChartBar,
-    path: "/reports/production",
+    path: "/reports/sales",
     permission: "reports.view",
   },
   {

@@ -6,8 +6,8 @@ import { useDispatch, useSelector } from 'react-redux';
 import TextInput from "../../../components/form/TextInput/TextInput";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import ImageUpload from "../../../components/form/ImageUpload/ImageUpload";
-import CustomButton from "../../../components/ui/custombutton/CustomButton";
-import BackButton from "../../../components/ui/BackButton/BackButton";
+import Button from "../../../components/ui/Button/Button";
+// import BackButton from "../../../components/ui/BackButton/BackButton";
 import CityStateSelect from "../../../components/ui/CityStateSelect/CityStateSelect";
 import IndiaPhoneInput from "../../../components/ui/PhoneInput/PhoneInput";
 import type { RootState, AppDispatch } from '../../../app/store';
@@ -135,7 +135,7 @@ const CompanySettings: React.FC = () => {
   // Onboarding Screen Design
   if (company && !company.isOnboarded) {
     return (
-      <div className="fixed inset-0 z-[9999] bg-gray-100 flex justify-center items-start overflow-y-auto min-h-screen py-10 px-4">
+      <div className="fixed inset-0 z-9999 bg-gray-100 flex justify-center items-start overflow-y-auto min-h-screen py-10 px-4">
         <div className="w-full max-w-5xl mx-auto">
           <div className="text-center mb-8">
             <h2 className="text-3xl font-bold text-gray-800 pb-2">Welcome to Sunsea ERP</h2>
@@ -228,7 +228,7 @@ const CompanySettings: React.FC = () => {
                   </div>
                   <div>
                     <div className="mb-3 flex flex-col w-full group">
-                      <label className={`flex items-center gap-[6px] mb-2 text-xs font-bold uppercase tracking-[0.5px] transition-colors duration-250 ${errors.phone ? 'text-red-500' : 'text-slate-500'} group-focus-within:text-primary`}>Phone Number <span className="text-[#e53935] ml-0.5">*</span></label>
+                      <label className={`flex items-center gap-1.5 mb-2 text-xs font-bold uppercase tracking-[0.5px] transition-colors duration-250 ${errors.phone ? 'text-red-500' : 'text-slate-500'} group-focus-within:text-primary`}>Phone Number <span className="text-[#e53935] ml-0.5">*</span></label>
                       <IndiaPhoneInput
                         name="phone"
                         value={formData.phone || ""}
@@ -245,7 +245,7 @@ const CompanySettings: React.FC = () => {
               </div>
 
               <div className="flex justify-center mt-8 pt-4 border-t border-gray-200">
-                <CustomButton text="Complete Onboarding" icon={FaSave} type="submit" disabled={loading} className="py-3 px-8 text-lg" />
+                <Button text="Complete Onboarding" icon={FaSave} type="submit" disabled={loading} className="py-3 px-8 text-lg" />
               </div>
             </form>
           </div>
@@ -391,7 +391,7 @@ const CompanySettings: React.FC = () => {
                       checked={!!formData.isActive}
                       onChange={handleChange as any}
                     />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary shadow-inner"></div>
+                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary shadow-inner"></div>
                     <span className="ml-3 text-sm font-bold text-gray-700">Active Company</span>
                   </label>
                 </div>
@@ -400,7 +400,7 @@ const CompanySettings: React.FC = () => {
           </div>
 
           <div className="flex flex-wrap justify-end gap-3 mt-8 pt-4 border-t border-gray-200">
-            <CustomButton text={isEditMode ? "Save Changes" : "Create Company"} icon={FaSave} type="submit" disabled={loading} />
+            <Button text={isEditMode ? "Save Changes" : "Create Company"} icon={FaSave} type="submit" disabled={loading} />
           </div>
         </form>
       </div>

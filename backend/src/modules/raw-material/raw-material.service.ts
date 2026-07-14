@@ -62,7 +62,11 @@ class RawMaterialService {
     return prisma.rawMaterial.findMany({
       where: whereClause,
       include: {
-        store: true,
+        store: {
+          include: {
+            location: true
+          }
+        },
         category: true,
         storeLocation: true,
       },

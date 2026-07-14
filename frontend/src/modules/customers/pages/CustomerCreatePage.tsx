@@ -60,6 +60,7 @@ const CustomerCreatePage: React.FC = () => {
     email: "",
 
     gstin: "",
+    supplyStateName: "",
     stateCode: "",
 
     billingAddressLine1: "",
@@ -354,8 +355,7 @@ const CustomerCreatePage: React.FC = () => {
               <h3 className="text-lg font-semibold text-slate-700 mb-2">Identification & Status</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 <div>
-                  <TextInput label="Customer code" name="customerId" value={formData.customerId} onChange={handleChange} disabled />
-                  {errors.customerId && <div className="text-red-500 mt-1 text-sm">{errors.customerId}</div>}
+                  <TextInput label="Customer code" name="customerId" value={formData.customerId} onChange={handleChange} disabled error={errors.customerId} />
                 </div>
                 <div>
                   <SelectInput
@@ -368,11 +368,9 @@ const CustomerCreatePage: React.FC = () => {
                     ]}
                     onChange={handleChange}
                   />
-                  {errors.isActive && <div className="text-red-500 mt-1 text-sm">{errors.isActive}</div>}
                 </div>
                 <div>
-                  <TextInput label="Created by-on" name="createdByOn" value={formData.createdByOn} placeholder="" onChange={handleChange} disabled />
-                  {errors.createdByOn && <div className="text-red-500 mt-1 text-sm">{errors.createdByOn}</div>}
+                  <TextInput label="Created by-on" name="createdByOn" value={formData.createdByOn} placeholder="" onChange={handleChange} disabled error={errors.createdByOn} />
                 </div>
               </div>
             </div>
@@ -384,11 +382,11 @@ const CustomerCreatePage: React.FC = () => {
               <h3 className="text-lg font-semibold text-slate-700 mb-2">Basic Information</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
 
-                <TextInput label="Firm / Legal Name" name="firmName" value={formData.firmName} placeholder="e.g. Murugan Plastics" required onChange={handleChange} />
-                {errors.firmName && <div className="text-red-500 mt-1 text-sm">{errors.firmName}</div>}
+                <TextInput label="Firm / Legal Name" name="firmName" value={formData.firmName} placeholder="e.g. Murugan Plastics" required onChange={handleChange} error={errors.firmName} />
 
                 <div>
-                  <TextInput label="Display Name" name="displayName" value={formData.displayName} placeholder="Murugan" onChange={handleChange} />
+                  {/* BUG-CUST-007 fix: error prop was incorrectly pointing to errors.customerType */}
+                  <TextInput label="Display Name" name="displayName" value={formData.displayName} placeholder="Murugan" onChange={handleChange} error={errors.displayName} />
                 </div>
                 <div>
                   <MultiSelect
@@ -403,28 +401,25 @@ const CustomerCreatePage: React.FC = () => {
                     ]}
                     onChange={handleMultiSelectChange}
                   />
-                  {errors.customerType && <div className="text-red-500 mt-1 text-sm">{errors.customerType}</div>}
                 </div>
                 <div>
-                  <TextInput label="Contact Person" name="contactPerson" value={formData.contactPerson} placeholder="Mr. S. Murugan" onChange={handleChange} />
-                  {errors.contactPerson && <div className="text-red-500 mt-1 text-sm">{errors.contactPerson}</div>}
+                  <TextInput label="Contact Person" name="contactPerson" value={formData.contactPerson} placeholder="Mr. S. Murugan" onChange={handleChange} error={errors.contactPerson} />
                 </div>
                 <div>
-                  <TextInput label="Designation" name="designation" value={formData.designation} placeholder="Proprietor" onChange={handleChange} />
-                  {errors.designation && <div className="text-red-500 mt-1 text-sm">{errors.designation}</div>}
+                  <TextInput label="Designation" name="designation" value={formData.designation} placeholder="Proprietor" onChange={handleChange} error={errors.designation} />
                 </div>
                 <div>
                   <IndiaPhoneInput label="Mobile" name="mobile" value={formData.mobile} placeholder="98400 XXXXX" required onChange={handleChange} error={errors.mobile} />
                 </div>
                 <div>
-                  <IndiaPhoneInput label="Alt-Phone" name="altPhone" value={formData.altPhone} placeholder="98400 XXXXX" required onChange={handleChange} error={errors.altPhone} />
+                  {/* BUG-CUST-003 fix: altPhone is optional on the backend — removed required prop */}
+                  <IndiaPhoneInput label="Alt-Phone" name="altPhone" value={formData.altPhone} placeholder="98400 XXXXX" onChange={handleChange} error={errors.altPhone} />
                 </div>
                 <div>
                   <IndiaPhoneInput label="WhatsApp #" name="whatsapp" value={formData.whatsapp} placeholder="98400 XXXXX" onChange={handleChange} error={errors.whatsapp} />
                 </div>
                 <div>
-                  <TextInput label="Email" name="email" type="email" value={formData.email} placeholder="x@y.com" onChange={handleChange} />
-                  {errors.email && <div className="text-red-500 mt-1 text-sm">{errors.email}</div>}
+                  <TextInput label="Email" name="email" type="email" value={formData.email} placeholder="x@y.com" onChange={handleChange} error={errors.email} />
                 </div>
               </div>
             </div>
@@ -436,12 +431,10 @@ const CustomerCreatePage: React.FC = () => {
               <h3 className="text-lg font-semibold text-slate-700 mb-2">GST & Statutory</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 <div>
-                  <TextInput label="GSTIN (15 CHAR)" name="gstin" value={formData.gstin} placeholder="33AABC1234D1Z5" onChange={handleChange} />
-                  {errors.gstin && <div className="text-red-500 mt-1 text-sm">{errors.gstin}</div>}
+                  <TextInput label="GSTIN (15 CHAR)" name="gstin" value={formData.gstin} placeholder="33AABC1234D1Z5" onChange={handleChange} error={errors.gstin} />
                 </div>
                 <div>
-                  <TextInput label="Place Of Supply (State Code)" name="stateCode" value={formData.stateCode} placeholder="33" onChange={handleChange} />
-                  {errors.stateCode && <div className="text-red-500 mt-1 text-sm">{errors.stateCode}</div>}
+                  <TextInput label="Place Of Supply (State Code)" name="stateCode" value={formData.stateCode} placeholder="33" onChange={handleChange} error={errors.stateCode} />
                 </div>
               </div>
             </div>
@@ -500,7 +493,6 @@ const CustomerCreatePage: React.FC = () => {
                       Same as billing
                     </label>
                   </div>
-                  {errors.sameAsBilling && <div className="text-red-500 mt-1 text-sm">{errors.sameAsBilling}</div>}
 
                   <AddressForm
                     addressValue={formData.shippingAddressLine1}
@@ -538,12 +530,10 @@ const CustomerCreatePage: React.FC = () => {
               <h3 className="text-lg font-semibold text-slate-700 mb-2">Commercial Settings</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 <div>
-                  <TextInput label="Credit Limit ₹" name="creditLimit" type="number" value={formData.creditLimit} placeholder="300000" onChange={handleChange} preventNegative min={250000} />
-                  {errors.creditLimit && <div className="text-red-500 mt-1 text-sm">{errors.creditLimit}</div>}
+                  <TextInput label="Credit Limit ₹" name="creditLimit" type="number" value={formData.creditLimit} placeholder="300000" onChange={handleChange} preventNegative min={250000} error={errors.creditLimit} />
                 </div>
                 <div>
-                  <TextInput label="Credit Days (Net)" name="creditDays" value={formData.creditDays} onChange={handleChange} type="number" placeholder="30 days" preventNegative />
-                  {errors.creditDays && <div className="text-red-500 mt-1 text-sm">{errors.creditDays}</div>}
+                  <TextInput label="Credit Days (Net)" name="creditDays" value={formData.creditDays} onChange={handleChange} type="number" placeholder="30 days" preventNegative error={errors.creditDays} />
                 </div>
               </div>
             </div>

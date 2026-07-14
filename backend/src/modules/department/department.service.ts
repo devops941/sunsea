@@ -31,6 +31,11 @@ export const createDepartmentService =
 export const getAllDepartmentsService =
   async () => {
     return prisma.department.findMany({
+      include: {
+        _count: {
+          select: { employees: true }
+        }
+      },
       orderBy: {
         createdAt: "desc",
       },
@@ -51,6 +56,16 @@ export const deleteDepartmentService =
       );
     }
 
+    const employeesWithDepartment = await prisma.employee.findFirst({
+      where: {
+        departmentId: id,
+      },
+    });
+
+    if (employeesWithDepartment) {
+      throw new ApiError(400, "This department is currently assigned to one or more employees and cannot be deleted.");
+    }
+
     return prisma.department.delete({
       where: { id },
     });
@@ -67,6 +82,16 @@ export const updateDepartmentService =
   ) => {
 
     await getDepartmentByIdService(id);
+
+    const employeesWithDepartment = await prisma.employee.findFirst({
+      where: {
+        departmentId: id,
+      },
+    });
+
+    if (employeesWithDepartment) {
+      throw new ApiError(400, "This department is currently assigned to one or more employees and cannot be edited.");
+    }
 
     const existingDepartment =
       await prisma.department.findFirst({

@@ -18,7 +18,6 @@ const ITEMS_PER_PAGE = 10;
 const Employeelist: React.FC = () => {
   const navigate = useNavigate();
   const { employees, loading, error, loadEmployees, removeEmployee, totalPages } = useEmployees();
-
   const canCreateEmployee = hasPermission("employees.create");
   const canEditEmployee = hasPermission("employees.edit");
   const canDeleteEmployee = hasPermission("employees.delete");
@@ -92,7 +91,16 @@ const Employeelist: React.FC = () => {
     { header: "Employee Name", accessor: "fullName" },
     { header: "Mobile", render: (emp) => emp.mobile || "N/A" },
     { header: "Department", render: (emp) => emp.department?.name || "N/A" },
-    { header: "Status", render: (emp) => <StatusBadge status={emp.status === "active" ? "ACTIVE" : "INACTIVE"} />, align: "center" },
+    { header: "Status", render: (emp) => {
+      const statusMap: Record<string, string> = {
+        active: "ACTIVE",
+        inactive: "INACTIVE",
+        resigned: "RESIGNED",
+        terminated: "TERMINATED",
+      };
+      // BUG-EMP-009 fix: map all 4 statuses correctly instead of only active/inactive
+      return <StatusBadge status={statusMap[emp.status] ?? emp.status?.toUpperCase() ?? "INACTIVE"} />;
+    }, align: "center" },
     {
       header: "Actions",
       render: (emp) => (

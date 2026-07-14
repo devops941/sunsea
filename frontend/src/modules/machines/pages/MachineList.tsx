@@ -13,6 +13,8 @@ import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/Common
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import DataTable from "../../../components/ui/table/DataTable";
 import SearchInput from "../../../components/ui/SearchInput/SearchInput";
+// BUG-MAC: added permission guard utility
+import { hasPermission } from "../../../utils/permission";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -21,6 +23,11 @@ const MachineList: React.FC = () => {
     const dispatch = useAppDispatch();
     
     const { data, loading, error } = useAppSelector((state) => state.machines);
+
+    // BUG-MAC fix: permission guards for machine actions
+    const canCreateMachine = hasPermission("machines.create");
+    const canEditMachine = hasPermission("machines.edit");
+    const canDeleteMachine = hasPermission("machines.delete");
     
     const [searchTerm, setSearchTerm] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
@@ -94,11 +101,14 @@ const MachineList: React.FC = () => {
                             onChange={handleSearch}
                             placeholder="Search machines..."
                         />
-                        <CustomButton
-                            text="Add Machine"
-                            icon={FaPlus}
-                            onClick={handleOpenAdd}
-                        />
+                        {/* BUG-MAC fix: only show Add Machine button to users with create permission */}
+                        {canCreateMachine && (
+                            <CustomButton
+                                text="Add Machine"
+                                icon={FaPlus}
+                                onClick={handleOpenAdd}
+                            />
+                        )}
                     </div>
                 </div>
 
@@ -132,8 +142,9 @@ const MachineList: React.FC = () => {
                             header: "ACTIONS",
                             render: (item) => (
                                 <div className="flex items-center gap-2">
-                                    <EditButton onClick={() => handleOpenEdit(item)} />
-                                    <DeleteButton onClick={() => triggerDelete(item.machineId)} />
+                                    {/* BUG-MAC fix: guard edit/delete buttons with permissions */}
+                                    {canEditMachine && <EditButton onClick={() => handleOpenEdit(item)} />}
+                                    {canDeleteMachine && <DeleteButton onClick={() => triggerDelete(item.machineId)} />}
                                 </div>
                             ),
                         },

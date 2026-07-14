@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from "react";
-import { Container, Row, Col, Spinner } from "react-bootstrap";
+import { Container, Row, Col } from "react-bootstrap";
 import { FaSearch, FaChevronLeft, FaChevronRight, FaPlus, FaTrash, FaEye } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -9,6 +9,9 @@ import CommonViewModal from "../../components/ui/CommonViewModal/CommonViewModal
 import CommonConfirmModal from "../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import { salesInvoiceService } from "../../services/salesInvoiceService";
 import CustomButton from "../../components/ui/custombutton/CustomButton";
+import ViewButton from "../../components/ui/viewbutton/ViewButton";
+import DeleteButton from "../../components/ui/DeleteButton/DeleteButton";
+import StatusBadge from "../../components/ui/StatusBadge/Badge";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -134,16 +137,20 @@ const SalesInvoiceList: React.FC = () => {
                                     <th style={{ width: "60px" }}>#</th>
                                     <th>INVOICE NO</th>
                                     <th>INVOICE DATE</th>
+                                    <th>DUE DATE</th>
                                     <th>CUSTOMER</th>
+                                    <th>SUB TOTAL</th>
+                                    <th>TAX AMOUNT</th>
                                     <th>NET AMOUNT</th>
+                                    <th>STATUS</th>
                                     <th>ACTIONS</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {loading ? (
                                     <tr>
-                                        <td colSpan={6} className="text-center p-4">
-                                            <Spinner animation="border" size="sm" className="me-2" />
+                                        <td colSpan={10} className="text-center p-4">
+                                            <div className="animate-spin rounded-full border-b-2 border-indigo-600 h-4 w-4 border-b-2 mr-2"></div>
                                             Loading invoices...
                                         </td>
                                     </tr>
@@ -155,16 +162,26 @@ const SalesInvoiceList: React.FC = () => {
                                             </td>
                                             <td className="master-data-cell fw-semibold">{item.invoiceNo}</td>
                                             <td className="master-data-cell">{formatDate(item.invoiceDate)}</td>
+                                            <td className="master-data-cell">{formatDate(item.dueDate)}</td>
                                             <td className="master-data-cell">
                                                 {item.customer?.displayName || item.customer?.firmName || "N/A"}
+                                            </td>
+                                            <td className="master-data-cell fw-semibold">
+                                                {formatCurrency(item.subTotal)}
+                                            </td>
+                                            <td className="master-data-cell fw-semibold text-muted">
+                                                {formatCurrency(item.taxTotal)}
                                             </td>
                                             <td className="master-data-cell fw-semibold text-success">
                                                 {formatCurrency(item.grandTotal)}
                                             </td>
                                             <td className="master-data-cell">
+                                                <StatusBadge status={item.status} />
+                                            </td>
+                                            <td className="master-data-cell">
                                                 <div className="table-action-group d-flex gap-2">
-                                                    <CustomButton text="" icon={FaEye} variant="info" size="sm" onClick={() => handleOpenView(item)} />
-                                                    <CustomButton text="" icon={FaTrash} variant="danger" size="sm" onClick={() => {
+                                                    <ViewButton onClick={() => handleOpenView(item)} />
+                                                    <DeleteButton onClick={() => {
                                                         setItemToDelete(item.id);
                                                         setShowDeleteModal(true);
                                                     }} />
@@ -174,7 +191,7 @@ const SalesInvoiceList: React.FC = () => {
                                     ))
                                 ) : (
                                     <tr>
-                                        <td colSpan={6} className="text-center p-4">
+                                        <td colSpan={10} className="text-center p-4">
                                             No invoices found.
                                         </td>
                                     </tr>

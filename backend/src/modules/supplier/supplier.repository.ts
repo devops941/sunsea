@@ -20,6 +20,10 @@ export class SupplierRepository {
       include: {
         addresses: true,
         materialPrices: true,
+        // BUG-SUP-003 fix: include creator user so Edit page can show "Created by-on"
+        createdByUser: {
+          select: { userId: true, fullName: true },
+        },
       },
     });
   }
@@ -30,6 +34,10 @@ export class SupplierRepository {
       include: {
         addresses: true,
         materialPrices: true,
+        // BUG-SUP-003 fix: include creator user so Edit page can show "Created by-on"
+        createdByUser: {
+          select: { userId: true, fullName: true },
+        },
       },
     });
   }

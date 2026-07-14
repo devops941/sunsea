@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { Container, Row, Col, Card, Spinner, Modal, Button, Form } from "react-bootstrap";
+import { Container, Row, Col, Card, Modal, Button, Form } from "react-bootstrap";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
@@ -496,7 +496,7 @@ const DailyMachinePlanning: React.FC = () => {
           <Card.Body className="p-0">
             {loadingPlanning || loadingMachines ? (
               <div className="text-center py-5">
-                <Spinner animation="border" variant="primary" />
+                <div className="animate-spin rounded-full border-b-2 border-indigo-600 h-8 w-8"></div>
                 <p className="mt-3 text-muted">Loading production runs...</p>
               </div>
             ) : filteredPrograms.length > 0 ? (
@@ -811,7 +811,7 @@ const DailyMachinePlanning: React.FC = () => {
                 Hourly Entries Details
               </h6>
               {loadingLogs ? (
-                <div className="text-center py-3"><Spinner animation="border" size="sm" /> Loading logs...</div>
+                <div className="text-center py-3"><div className="animate-spin rounded-full border-b-2 border-indigo-600 h-4 w-4 border-b-2"></div> Loading logs...</div>
               ) : hourlyLogs.filter((h: any) => Number(h.hourIndex) > 0).length > 0 ? (
                 <div className="rounded-3 border bg-white shadow-sm overflow-hidden">
                   <table className="master-data-table text-center align-middle mb-0" style={{ width: "100%" }}>
