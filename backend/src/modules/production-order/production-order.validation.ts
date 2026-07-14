@@ -3,7 +3,7 @@ import { z } from "zod";
 /**
  * Production Order Status Enum
  */
-export const ProductionOrderStatusEnum = z.enum(["DRAFT", "PLANNED", "IN_PROGRESS", "COMPLETED", "CANCELLED", "ON_HOLD"]);
+export const ProductionOrderStatusEnum = z.enum(["DRAFT", "PLANNED", "IN_PROGRESS", "POST_PRODUCTION", "COMPLETED", "CANCELLED", "ON_HOLD"]);
 export type ProductionOrderStatus = z.infer<typeof ProductionOrderStatusEnum>;
 
 export const productionOrderBodyShape = z.object({

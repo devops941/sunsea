@@ -15,6 +15,7 @@ import { productionOrderService } from "../../../services/productionOrderService
 import type { ProductionOrder } from "../../../services/productionOrderService";
 import { rawMaterialService } from "../../../services/rawMaterialService";
 import { salesOrderService } from "../../../services/salesOrderService";
+import { finishedGoodsStockService } from "../../../services/finishedGoodsStockService";
 
 const ITEMS_PER_PAGE = 20;
 
@@ -70,6 +71,25 @@ const ProductionOrderList: React.FC = () => {
             } as any);
             const poList = poRes.data || [];
 
+            // 2.5 Fetch Finished Goods Stock
+            let fgList: any[] = [];
+            try {
+                const fgRes = await finishedGoodsStockService.fetchAll();
+                fgList = Array.isArray(fgRes) ? fgRes : (fgRes as any).data || [];
+            } catch (err) {
+                console.error("Failed to fetch Finished Goods Stock", err);
+            }
+
+            // Create stock map of productItemId -> onHandQty
+            const fgStockMap = new Map<string, number>();
+            fgList.forEach((fg: any) => {
+                const prodId = (fg.productItemId || fg.productId)?.toString();
+                if (prodId) {
+                    const qty = Number(fg.onHandQty || 0);
+                    fgStockMap.set(prodId, (fgStockMap.get(prodId) || 0) + qty);
+                }
+            });
+
             // 3. Map Sales Orders to their production orders
             const mapped = soList.map((so: any) => {
                 const associatedPOs = poList.filter((po: any) => 
@@ -97,6 +117,24 @@ const ProductionOrderList: React.FC = () => {
                         status = "DRAFT";
                     } else {
                         status = associatedPOs.find((po: any) => po.status !== "COMPLETED")?.status || "PLANNED";
+                    }
+                } else {
+                    // Check Finished Goods Stock
+                    let isAllAvailable = true;
+                    if (so.items && so.items.length > 0) {
+                        so.items.forEach((item: any) => {
+                            const prodId = (item.productId || item.product?.id)?.toString();
+                            const orderedQty = Number(item.quantity || 0);
+                            const stockQty = fgStockMap.get(prodId) || 0;
+                            if (stockQty < orderedQty) {
+                                isAllAvailable = false;
+                            }
+                        });
+                    } else {
+                        isAllAvailable = false;
+                    }
+                    if (isAllAvailable) {
+                        status = "AVAILABLE";
                     }
                 }
 

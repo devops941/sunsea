@@ -147,7 +147,7 @@ export const UOMSelect: React.FC<UOMSelectProps> = ({
               const options = filteredUnits
                 .filter((u) => !lockedCategory || u.category === lockedCategory)
                 .map((u) => ({
-                  label: `${u.label} (${u.code})`,
+                  label: u.code.toLowerCase() === 'ea' ? 'pcs' : `${u.label} (${u.code})`,
                   value: u.code,
                 }));
               const selectedOptions = currentValueArray
@@ -213,7 +213,7 @@ export const UOMSelect: React.FC<UOMSelectProps> = ({
                   <option value="">{placeholder}</option>
                   {filteredUnits && filteredUnits.map((u) => (
                     <option key={u.code} value={u.code}>
-                      {u.label} ({u.code})
+                      {u.code.toLowerCase() === 'ea' ? 'pcs' : `${u.label} (${u.code})`}
                     </option>
                   ))}
                 </Form.Select>
@@ -239,7 +239,7 @@ export const UOMSelect: React.FC<UOMSelectProps> = ({
               const options = filteredUnits
                 .filter((u) => !lockedCategory || u.category === lockedCategory)
                 .map((u) => ({
-                  label: `${u.label} (${u.code})`,
+                  label: u.code.toLowerCase() === 'ea' ? 'pcs' : `${u.label} (${u.code})`,
                   value: u.code,
                 }));
               const selectedOptions = currentValueArray
@@ -295,7 +295,7 @@ export const UOMSelect: React.FC<UOMSelectProps> = ({
               <option value="">{placeholder}</option>
               {filteredUnits && filteredUnits.map((u) => (
                 <option key={u.code} value={u.code}>
-                  {u.label} ({u.code})
+                  {u.code.toLowerCase() === 'ea' ? 'pcs' : `${u.label} (${u.code})`}
                 </option>
               ))}
             </Form.Select>

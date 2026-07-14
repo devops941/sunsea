@@ -987,7 +987,7 @@ const SupplierCreate: React.FC = () => {
                                 value={formData.currency}
                                 options={[
                                     { value: "INR", label: "INR" },
-                                    { value: "USD", label: "USD" },
+                                    // { value: "USD", label: "USD" },
                                 ]}
                                 error={errors.currency}
                                 onChange={handleChange}
