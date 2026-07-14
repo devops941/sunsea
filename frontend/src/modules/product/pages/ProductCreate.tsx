@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import { Container, Row, Col } from "react-bootstrap";
 import { FaSave, FaEraser, FaTimes } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -8,14 +7,13 @@ import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import UOMSelect from "../../../components/form/SelectInput/UOMSelect";
 import MultiSelect from "../../../components/form/multiSelect/MultiSelect";
 import QuantityInput from "../../../components/form/QuantityInput/QuantityInput";
-import CustomButton from "../../../components/ui/custombutton/CustomButton";
+import CustomButton from "../../../components/ui/Button/Button";
 import { useProducts } from "../../../hooks/useProducts";
 import { useCategories } from "../../../hooks/useCategories";
 import { productService } from "../../../services/productService";
 import { storeService } from "../../../services/storeService";
 import { useColors } from "../../../hooks/useColors";
 import { useSizes } from "../../../hooks/useSizes";
-import { useUOMs } from "../../../hooks/useUOMs";
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
 import { fetchGstTaxes, selectActiveGstTaxes } from "../../../features/gst/gstSlice";
 
@@ -77,8 +75,6 @@ const ProductCreatePage: React.FC = () => {
         sizeId: "",
         hsnCode: "",
         gstTaxRateId: "",
-        // cess: "",
-        // Flat pricing — used when no color type selected
         minimumQty: "",
         maximumQty: "",
         openingStockQty: "",
@@ -91,7 +87,6 @@ const ProductCreatePage: React.FC = () => {
     // Load initial data
     useEffect(() => {
         loadCategories({ isActive: true });
-        // loadActiveUOMs();
         dispatch(fetchGstTaxes({ status: "ACTIVE" }));
         loadColors({ isActive: true });
         loadSizes({ isActive: true });
@@ -104,7 +99,7 @@ const ProductCreatePage: React.FC = () => {
             }
         };
         fetchCode();
-        
+
         storeService.fetchAll({ limit: 1000 })
             .then(res => {
                 const data = Array.isArray(res?.stores) ? res.stores : Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
@@ -113,7 +108,7 @@ const ProductCreatePage: React.FC = () => {
                 if (fgStore) {
                     setFormData(prev => ({ ...prev, openingStockStoreId: fgStore.storeId }));
                 }
-            }).catch(() => {});
+            }).catch(() => { });
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     // Cleanup image previews
@@ -150,12 +145,6 @@ const ProductCreatePage: React.FC = () => {
             newErrors.gstTaxRateId = "GST Tax Type is required.";
         }
 
-        // if (formData.cess) {
-        //     const cess = Number(formData.cess);
-        //     if (isNaN(cess) || cess < 0 || cess > 100)
-        //         newErrors.cess = "CESS must be between 0 and 100.";
-        // }
-
         if (formData.bundleQty) {
             const qty = Number(formData.bundleQty);
             if (!Number.isInteger(qty) || qty <= 0)
@@ -170,15 +159,12 @@ const ProductCreatePage: React.FC = () => {
 
         // ── Minimum / Maximum Stock Qty ────────────────────────────────
         const minQty = formData.minimumQty ? Number(formData.minimumQty) : NaN;
-        const maxQty = formData.maximumQty ? Number(formData.maximumQty) : NaN;
 
         if (!formData.minimumQty.toString().trim()) {
             newErrors.minimumQty = "Minimum Stock Qty is required.";
         } else if (isNaN(minQty) || minQty < 0) {
             newErrors.minimumQty = "Minimum Stock Qty must be 0 or greater.";
         }
-
-
 
         // ── UOM ─────────────────────────────────────────────────────────
         if (!formData.uomId) {
@@ -224,7 +210,7 @@ const ProductCreatePage: React.FC = () => {
                     newErrors[`${prefix}.b2b`] = "Must be > 0";
             }
 
-            // Cross-check MRP >= B2B, now that both are validated numbers
+            // Cross-check MRP >= B2B
             if (row.mrp && row.b2b) {
                 const mrp = Number(row.mrp);
                 const b2b = Number(row.b2b);
@@ -346,7 +332,6 @@ const ProductCreatePage: React.FC = () => {
             sizeId: "",
             hsnCode: "",
             gstTaxRateId: "",
-            // cess: "",
             minimumQty: '',
             maximumQty: '',
             openingStockQty: "",
@@ -383,14 +368,13 @@ const ProductCreatePage: React.FC = () => {
             payload.append("isActive", String(formData.isActive === "true"));
             if (formData.hsnCode) payload.append("hsnCode", formData.hsnCode);
             if (formData.gstTaxRateId) payload.append("gstTaxRateId", formData.gstTaxRateId);
-            // if (formData.cess) payload.append("cess", formData.cess);
 
             // Append selected colors and size
             formData.colorIds.forEach(id => payload.append("colorIds", id));
             if (formData.sizeId) payload.append("sizeId", formData.sizeId);
             payload.append("minimumQty", String(formData.minimumQty));
             payload.append("maximumQty", String(formData.maximumQty));
-            
+
             if (formData.openingStockQty) payload.append("openingStockQty", formData.openingStockQty);
             if (formData.openingStockStoreId) payload.append("openingStockStoreId", formData.openingStockStoreId);
 
@@ -453,25 +437,20 @@ const ProductCreatePage: React.FC = () => {
 
     // ─── Render ───────────────────────────────────────────────────────────
     return (
-        <div className="inner-container">
-            <Container fluid>
-                <div className="page-header">
-                    <Row className="align-items-center g-3">
-                        <Col lg={6} md={12}>
-                            <div className="page-header-info">
-                                <h2 className="page-title">Create Product</h2>
-                                <div className="page-breadcrumb">Home / Products / Create Product</div>
-                            </div>
-                        </Col>
-                    </Row>
+        <div className="w-full mx-auto">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+                {/* Page Header */}
+                <div className="px-6 py-4 border-b border-gray-100">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <h2 className="text-xl font-bold text-gray-800">Create Product</h2>
+                    </div>
                 </div>
 
-                <form onSubmit={handleSubmit} className="form-inner">
+                <form onSubmit={handleSubmit} className="px-6 py-3 space-y-4">
                     {/* Basic Information */}
-                    <Row className="mb-4">
-                        <h2 className="form-title">Basic Information</h2>
-
-                        <Col lg={4} md={6}>
+                    <div>
+                        <h6 className="text-base font-semibold text-gray-800 mb-3">Basic Information</h6>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                             <TextInput
                                 label="Product Code"
                                 name="productCode"
@@ -481,9 +460,6 @@ const ProductCreatePage: React.FC = () => {
                                 onChange={handleChange}
                                 disabled
                             />
-                        </Col>
-
-                        <Col lg={4} md={6}>
                             <TextInput
                                 label="Product Name"
                                 name="productName"
@@ -493,11 +469,6 @@ const ProductCreatePage: React.FC = () => {
                                 onChange={handleChange}
                                 error={errors.productName}
                             />
-                        </Col>
-
-
-
-                        <Col lg={4} md={6}>
                             <SelectInput
                                 label="Category"
                                 name="categoryId"
@@ -507,11 +478,6 @@ const ProductCreatePage: React.FC = () => {
                                 onChange={handleChange}
                                 error={errors.categoryId}
                             />
-                        </Col>
-
-
-
-                        <Col lg={4} md={6}>
                             <TextInput
                                 label="Minimum Stock Qty"
                                 name="minimumQty"
@@ -522,9 +488,6 @@ const ProductCreatePage: React.FC = () => {
                                 required
                                 error={errors.minimumQty}
                             />
-                        </Col>
-
-                        <Col lg={4} md={6}>
                             <SelectInput
                                 label="Status"
                                 name="isActive"
@@ -535,9 +498,6 @@ const ProductCreatePage: React.FC = () => {
                                 ]}
                                 onChange={handleChange}
                             />
-                        </Col>
-
-                        <Col lg={4} md={6}>
                             <TextInput
                                 label="Opening Stock Qty"
                                 name="openingStockQty"
@@ -547,9 +507,6 @@ const ProductCreatePage: React.FC = () => {
                                 onChange={handleChange}
                                 error={errors.openingStockQty}
                             />
-                        </Col>
-
-                        <Col lg={4} md={6}>
                             <SelectInput
                                 label="Opening Stock Store"
                                 name="openingStockStoreId"
@@ -558,86 +515,74 @@ const ProductCreatePage: React.FC = () => {
                                 onChange={handleChange}
                                 error={errors.openingStockStoreId}
                             />
-                        </Col>
-
-                        <Col lg={12}>
-                            <TextInput
-                                label="Description"
-                                name="description"
-                                value={formData.description}
-                                placeholder="Enter catalogue description..."
-                                onChange={handleChange}
-                            />
-                        </Col>
-
-                    </Row>
+                            <div className="lg:col-span-2">
+                                <TextInput
+                                    label="Description"
+                                    name="description"
+                                    value={formData.description}
+                                    placeholder="Enter catalogue description..."
+                                    onChange={handleChange}
+                                />
+                            </div>
+                        </div>
+                    </div>
 
                     {/* Product Images */}
-                    <Row className="mb-4 align-items-start">
-                        <h2 className="form-title">Product Images</h2>
-
-                        <Col lg={3} md={4} sm={12}>
-                            <div className="border rounded p-3 h-100">
+                    <div className="pt-2">
+                        <h6 className="text-base font-semibold text-gray-800 mb-3">Product Images</h6>
+                        <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                            <div className="col-span-1 md:col-span-2 border border-slate-200 rounded-xl p-4 bg-slate-50 flex flex-col justify-center h-32">
                                 <input
                                     ref={fileInputRef}
                                     type="file"
                                     multiple
                                     accept="image/png,image/jpeg,image/webp"
-                                    className="form-control"
+                                    className="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
                                     onChange={handleImageChange}
                                 />
-                                <small className="text-muted d-block mt-2">
-                                    Maximum 3 images.<br />
-                                    First image will be the primary image.
-                                </small>
+                                <p className="text-xs text-slate-500 mt-2">
+                                    Max 3 images. First is primary.
+                                </p>
                                 {errors.images && (
-                                    <small className="text-danger d-block mt-1">{errors.images}</small>
+                                    <p className="text-xs text-red-500 mt-1">{errors.images}</p>
                                 )}
                             </div>
-                        </Col>
 
-                        {imagePreviews.map((preview, index) => (
-                            <Col lg={2} md={3} sm={4} xs={6} key={index}>
-                                <div className="border rounded p-2 position-relative" style={{ height: "120px" }}>
+                            {imagePreviews.map((preview, index) => (
+                                <div key={index} className="col-span-1 border border-slate-200 rounded-xl p-2 relative h-32 flex items-center justify-center bg-white shadow-sm">
                                     <img
                                         src={preview}
                                         alt={`Preview ${index + 1}`}
-                                        className="w-100 h-100"
-                                        style={{ objectFit: "contain", borderRadius: "6px" }}
+                                        className="max-h-full max-w-full object-contain rounded-lg"
                                     />
                                     {index === 0 && (
-                                        <span className="badge bg-success position-absolute" style={{ top: "10px", left: "10px" }}>
+                                        <span className="absolute top-2 left-2 bg-green-500 text-white text-[10px] font-bold px-2 py-1 rounded">
                                             Primary
                                         </span>
                                     )}
                                     <button
                                         type="button"
-                                        className="btn btn-danger btn-sm position-absolute"
-                                        style={{ top: "10px", right: "10px" }}
+                                        className="absolute top-2 right-2 bg-red-500 text-white p-1.5 rounded-full hover:bg-red-600 transition-colors shadow-sm"
                                         onClick={() => handleRemoveImage(index)}
                                     >
-                                        <FaTimes />
+                                        <FaTimes size={10} />
                                     </button>
                                 </div>
-                            </Col>
-                        ))}
-                    </Row>
+                            ))}
+                        </div>
+                    </div>
 
                     {/* Variants & Specifications */}
-                    <Row className="mb-4">
-                        <h2 className="form-title">Variants & Specifications</h2>
-
-                        <Col lg={4} md={6}>
+                    <div className="pt-2">
+                        <h6 className="text-base font-semibold text-gray-800 mb-3">Variants & Specifications</h6>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                             <UOMSelect
                                 name="uomId"
                                 label="UOM"
                                 value={formData.uomId}
                                 required
                                 category={["length", "mass", "each"]}
-                                allowedCodes={[
-                                    "ea"
-                                    // ,"dz"
-                                ]}
+                                allowedCodes={["ea"]}
                                 onChange={(value) => {
                                     setFormData(prev => ({ ...prev, uomId: value }));
                                     if (errors.uomId) {
@@ -646,9 +591,6 @@ const ProductCreatePage: React.FC = () => {
                                 }}
                                 error={errors.uomId}
                             />
-                        </Col>
-
-                        <Col lg={4} md={6}>
                             <TextInput
                                 label="Bundle/Package size"
                                 name="bundleQty"
@@ -658,11 +600,6 @@ const ProductCreatePage: React.FC = () => {
                                 onChange={handleChange}
                                 error={errors.bundleQty}
                             />
-                        </Col>
-
-
-
-                        <Col lg={4} md={6}>
                             <QuantityInput
                                 label="Weight Per Piece"
                                 name="weightPerPiece"
@@ -671,9 +608,6 @@ const ProductCreatePage: React.FC = () => {
                                 onChange={handleChange}
                                 error={errors.weightPerPiece}
                             />
-                        </Col>
-
-                        <Col lg={4} md={6}>
                             <MultiSelect
                                 label="Color Type"
                                 name="colorType"
@@ -687,9 +621,6 @@ const ProductCreatePage: React.FC = () => {
                                 required
                                 placeholder="Select color type"
                             />
-                        </Col>
-
-                        <Col lg={4} md={6}>
                             <MultiSelect
                                 label="Colors"
                                 name="colorIds"
@@ -700,13 +631,15 @@ const ProductCreatePage: React.FC = () => {
                                 error={errors.colorIds}
                                 placeholder="-- Select Colors --"
                             />
-                        </Col>
-
-                        <Col lg={4} md={6}>
-                            <SelectInput label="Sizes" name="sizeId" value={formData.sizeId} options={sizeOptions} onChange={handleChange} required error={errors.sizeId} />
-                        </Col>
-
-                        <Col lg={4} md={6}>
+                            <SelectInput
+                                label="Sizes"
+                                name="sizeId"
+                                value={formData.sizeId}
+                                options={sizeOptions}
+                                onChange={handleChange}
+                                required
+                                error={errors.sizeId}
+                            />
                             <TextInput
                                 label="Dimensions (L×B×H CM)"
                                 name="dimensions"
@@ -714,9 +647,6 @@ const ProductCreatePage: React.FC = () => {
                                 placeholder="e.g. 30×30×35"
                                 onChange={handleChange}
                             />
-                        </Col>
-
-                        <Col lg={4} md={6}>
                             <TextInput
                                 label="Mould Reference"
                                 name="mouldReference"
@@ -724,14 +654,13 @@ const ProductCreatePage: React.FC = () => {
                                 placeholder="e.g. MLD-99"
                                 onChange={handleChange}
                             />
-                        </Col>
-                    </Row>
+                        </div>
+                    </div>
 
                     {/* Pricing & Tax */}
-                    <Row className="mb-4">
-                        <h2 className="form-title">Pricing & Tax</h2>
-
-                        <Col lg={4} md={6}>
+                    <div className="pt-2">
+                        <h6 className="text-base font-semibold text-gray-800 mb-3">Pricing & Tax</h6>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 mb-4">
                             <TextInput
                                 label="HSN CODE"
                                 name="hsnCode"
@@ -741,9 +670,6 @@ const ProductCreatePage: React.FC = () => {
                                 onChange={handleChange}
                                 error={errors.hsnCode}
                             />
-                        </Col>
-
-                        <Col lg={4} md={6}>
                             <SelectInput
                                 label="GST TYPE (%)"
                                 name="gstTaxRateId"
@@ -751,46 +677,34 @@ const ProductCreatePage: React.FC = () => {
                                 options={gstOptions}
                                 required
                                 onChange={handleChange}
-                                error={errors.gstRate}
+                                error={errors.gstTaxRateId}
                                 disabled={gstLoading}
                             />
-                        </Col>
-
-                        {/* <Col lg={4} md={6}>
-                            <TextInput
-                                label="CESS (%)"
-                                name="cess"
-                                type="number"
-                                step="0.01"
-                                value={formData.cess}
-                                placeholder="e.g. 0"
-                                onChange={handleChange}
-                                error={errors.cess}
-                            />
-                        </Col> */}
+                        </div>
 
                         {colorTypePricing.length !== 0 && (
-                            <Col lg={12} className="mt-3">
-                                <h6 className="fw-semibold mb-2">Price Per Color Type</h6>
-                                <div className="master-table-body table-wrap">
-                                    <table className="master-data-table">
-                                        <thead>
+                            <div className="mt-4 border border-slate-200 rounded-xl overflow-hidden">
+                                <div className="bg-slate-50 px-4 py-3 border-b border-slate-200">
+                                    <h6 className="font-semibold text-slate-700 m-0">Price Per Color Type</h6>
+                                </div>
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left text-sm whitespace-nowrap">
+                                        <thead className="bg-slate-50 text-slate-600">
                                             <tr>
-                                                <th style={{ width: "140px" }}>COLOR TYPE</th>
-                                                <th>MRP (₹)</th>
-                                                <th>B2B (₹)</th>
-                                                <th>B2C (₹)</th>
-                                                <th>EXPORT (₹)</th>
+                                                <th className="px-4 py-3 font-semibold w-40 border-b border-slate-200">COLOR TYPE</th>
+                                                <th className="px-4 py-3 font-semibold border-b border-slate-200">MRP (₹)</th>
+                                                <th className="px-4 py-3 font-semibold border-b border-slate-200">B2B (₹)</th>
+                                                <th className="px-4 py-3 font-semibold border-b border-slate-200">B2C (₹)</th>
+                                                <th className="px-4 py-3 font-semibold border-b border-slate-200">EXPORT (₹)</th>
                                             </tr>
                                         </thead>
-                                        <tbody>
+                                        <tbody className="divide-y divide-slate-100">
                                             {colorTypePricing.map(row => (
-                                                <tr key={row.typeId} className="master-data-row">
-                                                    <td className="master-data-cell fw-semibold">
+                                                <tr key={row.typeId} className="hover:bg-slate-50/50 transition-colors">
+                                                    <td className="px-4 py-3 font-medium text-slate-800">
                                                         {row.typeName}
                                                     </td>
-
-                                                    <td className="master-data-cell">
+                                                    <td className="px-4 py-3 align-top">
                                                         <TextInput
                                                             label=""
                                                             name={`colorTypePricing.${row.typeId}.mrp`}
@@ -802,7 +716,7 @@ const ProductCreatePage: React.FC = () => {
                                                             error={errors[`colorTypePricing.${row.typeId}.mrp`]}
                                                         />
                                                     </td>
-                                                    <td className="master-data-cell">
+                                                    <td className="px-4 py-3 align-top">
                                                         <TextInput
                                                             label=""
                                                             name={`colorTypePricing.${row.typeId}.b2b`}
@@ -814,7 +728,7 @@ const ProductCreatePage: React.FC = () => {
                                                             error={errors[`colorTypePricing.${row.typeId}.b2b`]}
                                                         />
                                                     </td>
-                                                    <td className="master-data-cell">
+                                                    <td className="px-4 py-3 align-top">
                                                         <TextInput
                                                             label=""
                                                             name={`colorTypePricing.${row.typeId}.b2c`}
@@ -826,7 +740,7 @@ const ProductCreatePage: React.FC = () => {
                                                             error={errors[`colorTypePricing.${row.typeId}.b2c`]}
                                                         />
                                                     </td>
-                                                    <td className="master-data-cell">
+                                                    <td className="px-4 py-3 align-top">
                                                         <TextInput
                                                             label=""
                                                             name={`colorTypePricing.${row.typeId}.exportPrice`}
@@ -843,20 +757,17 @@ const ProductCreatePage: React.FC = () => {
                                         </tbody>
                                     </table>
                                 </div>
-                            </Col>
-                        )}
-                    </Row>
-
-                    <Row className="mt-4">
-                        <Col lg={12}>
-                            <div className="form-actions d-flex justify-content-end gap-3">
-                                <CustomButton text="Clear" icon={FaEraser} onClick={handleClear} />
-                                <CustomButton text="Save Product" icon={FaSave} type="submit" />
                             </div>
-                        </Col>
-                    </Row>
+                        )}
+                    </div>
+
+                    {/* Form Actions */}
+                    <div className="flex justify-end gap-3 pt-4 border-t border-gray-100 mt-4">
+                        <CustomButton text="Clear" icon={FaEraser} onClick={handleClear} variant="secondary" />
+                        <CustomButton text="Save Product" icon={FaSave} type="submit" />
+                    </div>
                 </form>
-            </Container>
+            </div>
         </div>
     );
 };

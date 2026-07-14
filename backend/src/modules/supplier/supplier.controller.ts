@@ -2,21 +2,11 @@ import { Request, Response } from "express";
 import supplierService from "./supplier.service";
 import { asyncHandler } from "../../utils/asyncHandler";
 import { ApiResponse } from "../../utils/ApiResponse";
-import { prisma } from "../../config/prisma";
 
 class SupplierController {
   create = asyncHandler(
     async (req: Request, res: Response) => {
-      let userId = req.user?.userId || "d67768ba-bcde-4321-a123-bcdef9876543"; // fallback to default admin seeded user if not present
-
-      // Resolve admin virtual ID or invalid fallback ID to a real user UUID to prevent P2025/P2003 constraint failure
-      if (userId.startsWith("admin_") || !(await prisma.user.findUnique({ where: { userId } }))) {
-        const firstUser = await prisma.user.findFirst();
-        if (firstUser) {
-          userId = firstUser.userId;
-        }
-      }
-
+      const userId = req.user?.userId || "d67768ba-bcde-4321-a123-bcdef9876543"; // fallback to default admin seeded user if not present
       const supplier = await supplierService.createSupplier({
         ...req.body,
         userId,
@@ -74,19 +64,7 @@ class SupplierController {
   update = asyncHandler(
     async (req: Request, res: Response) => {
       const id = String(req.params.id);
-      let userId = req.user?.userId;
-
-      if (userId) {
-        // Resolve admin virtual ID or invalid fallback ID to a real user UUID to prevent P2025/P2003 constraint failure
-        if (userId.startsWith("admin_") || !(await prisma.user.findUnique({ where: { userId } }))) {
-          const firstUser = await prisma.user.findFirst();
-          if (firstUser) {
-            userId = firstUser.userId;
-          } else {
-            userId = undefined;
-          }
-        }
-      }
+      const userId = req.user?.userId;
 
       const supplier = await supplierService.updateSupplier(
         id,

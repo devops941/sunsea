@@ -54,7 +54,7 @@ const Categorycreate: React.FC = () => {
                         {/* Left Section */}
                         <Col lg={6} md={12}>
                             <div className="page-header-info">
-                                <div className="page-breadcrumb"> Settings / Categorie / Add </div>
+                                
                                 <h2 className="page-title "> Add New Categorie </h2>
 
 

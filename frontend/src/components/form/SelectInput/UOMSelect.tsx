@@ -1,9 +1,9 @@
 import React from "react";
-import { Form, Spinner, Button } from "react-bootstrap";
 import { Controller } from "react-hook-form";
 import type { Control } from "react-hook-form";
 import Select, { components } from "react-select";
 import type { MultiValueProps } from "react-select";
+import { FaChevronDown } from "react-icons/fa";
 import { useUOM } from "../../../hooks/useUOM";
 
 const SortableMultiValue = (props: MultiValueProps<any>) => {
@@ -43,7 +43,106 @@ const SortableMultiValue = (props: MultiValueProps<any>) => {
   );
 };
 
-import "./SelectInput.css";
+const CustomSingleSelect = ({
+  value,
+  onChange,
+  options,
+  placeholder,
+  disabled,
+  error,
+}: {
+  value: string;
+  onChange: (val: string) => void;
+  options: any[];
+  placeholder: string;
+  disabled: boolean;
+  error?: boolean;
+}) => {
+  const [isOpen, setIsOpen] = React.useState(false);
+  const dropdownRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    if (isOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isOpen]);
+
+  const selectedOpt = options.find((u) => u.code === value);
+  const displayLabel = selectedOpt
+    ? (selectedOpt.code.toLowerCase() === 'ea' ? 'pcs' : `${selectedOpt.label} (${selectedOpt.code})`)
+    : placeholder;
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+        className={`
+          w-full h-[35px] pl-4 pr-10
+          border rounded-[10px] outline-none
+          text-[15px] font-medium flex items-center justify-between
+          transition-all duration-250 text-left
+          ${value ? "text-[#1f2937]" : "text-[#9ca3af]"}
+          ${error
+            ? "border-red-500 bg-white focus:border-red-500 focus:ring-4 focus:ring-red-500/15"
+            : "border-slate-300 bg-white hover:border-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/15"
+          }
+          ${isOpen ? (error ? "border-red-500 ring-4 ring-red-500/15" : "border-blue-500 ring-4 ring-blue-500/15") : ""}
+          ${disabled ? "bg-[#E5E7EB] cursor-not-allowed text-[#6B7280]" : "bg-white"}
+        `}
+      >
+        <span className="truncate">{displayLabel}</span>
+        <span className="absolute right-4 text-gray-500">
+          <FaChevronDown className={`text-xs transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
+        </span>
+      </button>
+
+      {isOpen && (
+        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-100 rounded-lg shadow-lg max-h-60 overflow-y-auto py-1 animate-in fade-in zoom-in-95 duration-100">
+          <div
+            onClick={() => {
+              onChange("");
+              setIsOpen(false);
+            }}
+            className={`
+              px-4 py-2.5 text-sm cursor-pointer
+              transition-colors duration-150
+              ${!value ? "bg-blue-50 text-blue-600 font-semibold" : "text-gray-500 hover:bg-gray-50"}
+            `}
+          >
+            {placeholder}
+          </div>
+          {options.map((u) => (
+            <div
+              key={u.code}
+              onClick={() => {
+                onChange(u.code);
+                setIsOpen(false);
+              }}
+              className={`
+                px-4 py-2.5 text-sm cursor-pointer
+                transition-colors duration-150
+                ${value === u.code
+                  ? "bg-blue-50 text-blue-600 font-semibold"
+                  : "text-gray-700 hover:bg-gray-50"
+                }
+              `}
+            >
+              {u.code.toLowerCase() === 'ea' ? 'pcs' : `${u.label} (${u.code})`}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
 
 interface UOMSelectProps {
   name: string;
@@ -78,23 +177,8 @@ export const UOMSelect: React.FC<UOMSelectProps> = ({
 }) => {
   const { units, loading, error: fetchError, retry } = useUOM();
 
-  // Filter units dynamically by category/categories and allowedCodes if provided
-  // Categories available: "length", "area", "mass", "volume", "time"
-  // Example Units:
-  // - mass: kg, g, ton, t
-  // - volume/liquid: l, ml, ltr
-  // - length: m, cm, mm, in, ft
-  // - area: sq_m, sq_ft, ac, ha
-  // - time: s, min, h, d
-
-  
   const filteredUnits = React.useMemo(() => {
     let result = units;
-
-    // Log the incoming units to the console so you can see all available values
-    if (units.length > 0) {
-      console.log("Fetched UOM Units: ", units);
-    }
 
     if (category) {
       const categoriesArray = Array.isArray(category)
@@ -111,24 +195,48 @@ export const UOMSelect: React.FC<UOMSelectProps> = ({
     return result;
   }, [units, category, allowedCodes]);
 
+  const selectStyles = (isError: boolean) => ({
+    control: (base: any, state: any) => ({
+      ...base,
+      minHeight: '35px',
+      borderRadius: '10px',
+      fontSize: '15px',
+      boxShadow: state.isFocused ? '0 0 0 4px rgba(59, 130, 246, 0.15)' : 'none',
+      borderColor: isError ? '#ef4444' : state.isFocused ? '#3b82f6' : '#cbd5e1',
+      '&:hover': {
+        borderColor: isError ? '#ef4444' : state.isFocused ? '#3b82f6' : '#94a3b8'
+      },
+      backgroundColor: disabled ? '#f8fafc' : '#ffffff',
+    })
+  });
+
   return (
-    <Form.Group className="select-input-group">
-      <Form.Label className="select-input-label">
+    <div className="mb-[18px] group flex flex-col w-full">
+      <label className={`
+        flex items-center gap-[6px] mb-2
+        text-xs font-bold uppercase
+        tracking-[0.5px]
+        transition-colors duration-250
+        ${error ? "text-red-500" : "text-slate-500"}
+        group-focus-within:text-primary
+      `}>
         <span>{label}</span>
-        {required && <span className="required-star">*</span>}
-      </Form.Label>
+        {required && (
+          <span className="text-[#e53935] ml-0.5">*</span>
+        )}
+      </label>
       
       {loading ? (
-        <div className="d-flex align-items-center gap-2 py-1">
-          <Spinner animation="border" size="sm" variant="primary" />
-          <span className="text-muted small">Loading units...</span>
+        <div className="flex items-center gap-2 py-1">
+          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
+          <span className="text-slate-500 text-sm font-medium">Loading units...</span>
         </div>
       ) : fetchError ? (
-        <div className="d-flex align-items-center gap-2 border border-danger rounded p-2 bg-light">
-          <span className="text-danger small">{fetchError}</span>
-          <Button variant="outline-danger" size="sm" onClick={retry}>
+        <div className="flex items-center gap-2 border border-red-500 rounded-lg p-2 bg-red-50">
+          <span className="text-red-500 text-sm font-medium">{fetchError}</span>
+          <button type="button" className="text-sm font-bold text-red-500 border border-red-500 px-2 py-0.5 rounded hover:bg-red-100 transition-colors" onClick={retry}>
             Retry
-          </Button>
+          </button>
         </div>
       ) : control ? (
         <Controller
@@ -174,13 +282,7 @@ export const UOMSelect: React.FC<UOMSelectProps> = ({
                         if (customOnChange) customOnChange(newValueStr);
                       }
                     } as any)}
-                    className={fieldState.error ? 'is-invalid' : ''}
-                    styles={{
-                      control: (base) => ({
-                        ...base,
-                        borderColor: fieldState.error ? '#dc3545' : base.borderColor,
-                      }),
-                    }}
+                    styles={selectStyles(!!fieldState.error)}
                     onChange={(selected: any) => {
                       const newValue = selected ? selected.map((s: any) => s.value).join(",") : "";
                       field.onChange(newValue);
@@ -190,37 +292,32 @@ export const UOMSelect: React.FC<UOMSelectProps> = ({
                     }}
                   />
                   {fieldState.error && (
-                    <span className="text-danger small mt-1 d-block" style={{ fontSize: "0.875rem" }}>
+                    <div className="text-[#dc3545] text-sm font-medium mt-1">
                       {fieldState.error.message}
-                    </span>
+                    </div>
                   )}
                 </>
               );
             }
             return (
               <>
-                <Form.Select
-                  {...field}
-                  disabled={disabled}
-                  className={`select-input-control ${fieldState.error ? 'is-invalid border-danger' : ''}`}
-                  onChange={(e) => {
-                    field.onChange(e);
+                <CustomSingleSelect
+                  value={field.value || ""}
+                  onChange={(val) => {
+                    field.onChange(val);
                     if (customOnChange) {
-                      customOnChange(e.target.value);
+                      customOnChange(val);
                     }
                   }}
-                >
-                  <option value="">{placeholder}</option>
-                  {filteredUnits && filteredUnits.map((u) => (
-                    <option key={u.code} value={u.code}>
-                      {u.code.toLowerCase() === 'ea' ? 'pcs' : `${u.label} (${u.code})`}
-                    </option>
-                  ))}
-                </Form.Select>
+                  options={filteredUnits}
+                  placeholder={placeholder}
+                  disabled={disabled}
+                  error={!!fieldState.error}
+                />
                 {fieldState.error && (
-                  <span className="text-danger small mt-1 d-block" style={{ fontSize: "0.875rem" }}>
+                  <div className="text-[#dc3545] text-sm font-medium mt-1">
                     {fieldState.error.message}
-                  </span>
+                  </div>
                 )}
               </>
             );
@@ -264,13 +361,7 @@ export const UOMSelect: React.FC<UOMSelectProps> = ({
                       if (customOnChange) customOnChange(newValueStr);
                     }
                   } as any)}
-                  className={error ? 'is-invalid' : ''}
-                  styles={{
-                    control: (base) => ({
-                      ...base,
-                      borderColor: error ? '#dc3545' : base.borderColor,
-                    }),
-                  }}
+                  styles={selectStyles(!!error)}
                   onChange={(selected: any) => {
                     if (customOnChange) {
                       const newValue = selected ? selected.map((s: any) => s.value).join(",") : "";
@@ -281,33 +372,27 @@ export const UOMSelect: React.FC<UOMSelectProps> = ({
               );
             })()
           ) : (
-            <Form.Select
-              name={name}
-              disabled={disabled}
-              value={value}
-              className={`select-input-control ${error ? 'is-invalid border-danger' : ''}`}
-              onChange={(e) => {
+            <CustomSingleSelect
+              value={value || ""}
+              onChange={(val) => {
                 if (customOnChange) {
-                  customOnChange(e.target.value);
+                  customOnChange(val);
                 }
               }}
-            >
-              <option value="">{placeholder}</option>
-              {filteredUnits && filteredUnits.map((u) => (
-                <option key={u.code} value={u.code}>
-                  {u.code.toLowerCase() === 'ea' ? 'pcs' : `${u.label} (${u.code})`}
-                </option>
-              ))}
-            </Form.Select>
+              options={filteredUnits}
+              placeholder={placeholder}
+              disabled={disabled}
+              error={!!error}
+            />
           )}
           {error && (
-            <span className="text-danger small mt-1 d-block" style={{ fontSize: "0.875rem" }}>
+            <div className="text-[#dc3545] text-sm font-medium mt-1">
               {error}
-            </span>
+            </div>
           )}
         </>
       )}
-    </Form.Group>
+    </div>
   );
 };
 

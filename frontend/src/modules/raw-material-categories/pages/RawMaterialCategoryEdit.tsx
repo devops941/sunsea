@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Container, Row, Col, Spinner } from "react-bootstrap";
+
 import { FaSave, FaArrowLeft } from "react-icons/fa";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -135,39 +135,33 @@ const RawMaterialCategoryEdit: React.FC = () => {
 
     if (fetching) {
         return (
-            <div className="text-center p-5">
-                <Spinner animation="border" variant="primary" />
-                <p className="mt-2">Loading category details...</p>
+            <div className="flex flex-col justify-center items-center py-20">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                <p className="mt-4 text-slate-500">Loading category details...</p>
             </div>
         );
     }
 
     return (
-        <div className="inner-container">
-            <Container fluid>
-                <div className="page-header">
-                    <Row className="align-items-center g-3">
-                        <Col lg={6} md={12}>
-                            <div className="page-header-info">
-                                <h2 className="page-title">Edit Raw Material Category</h2>
-                                <div className="page-breadcrumb">Home / Inventory & Warehouse / Raw Material Categories / Edit</div>
-                            </div>
-                        </Col>
-                        <Col lg={6} md={12}>
-                            <div className="page-header-actions">
-                                <CustomButton
-                                    text="Back to List"
-                                    icon={FaArrowLeft}
-                                    onClick={() => navigate("/raw-material-categories")}
-                                />
-                            </div>
-                        </Col>
-                    </Row>
+        <div className="w-full mx-auto">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+                {/* Page Header */}
+                <div className="px-6 py-4 border-b border-gray-100">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <h2 className="text-xl font-bold text-gray-800">Edit Raw Material Category</h2>
+                        <CustomButton
+                            text="Back to List"
+                            icon={FaArrowLeft}
+                            onClick={() => navigate("/raw-material-categories")}
+                        />
+                    </div>
                 </div>
 
-                <form onSubmit={handleSubmit} className="form-inner">
-                    <Row className="g-3">
-                        <Col md={6}>
+                <form onSubmit={handleSubmit} className="px-6 py-3 space-y-4">
+                    {/* Basic Information */}
+                    <div>
+                        <h6 className="text-base font-semibold text-gray-800 mb-3">Category Details</h6>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                             <TextInput
                                 label="Category Code"
                                 name="code"
@@ -177,8 +171,6 @@ const RawMaterialCategoryEdit: React.FC = () => {
                                 onChange={handleChange}
                                 disabled
                             />
-                        </Col>
-                        <Col md={6}>
                             <TextInput
                                 label="Category Name"
                                 name="name"
@@ -188,18 +180,6 @@ const RawMaterialCategoryEdit: React.FC = () => {
                                 error={errors.name}
                                 onChange={handleChange}
                             />
-                        </Col>
-                        <Col md={12}>
-                            <TextInput
-                                label="Description"
-                                name="description"
-                                value={formData.description}
-                                placeholder="Enter category description..."
-                                error={errors.description}
-                                onChange={handleChange}
-                            />
-                        </Col>
-                        <Col md={6}>
                             <SelectInput
                                 label="Status"
                                 name="status"
@@ -211,27 +191,36 @@ const RawMaterialCategoryEdit: React.FC = () => {
                                 error={errors.status}
                                 onChange={handleChange}
                             />
-                        </Col>
-                    </Row>
+                            <div className="lg:col-span-3">
+                                <TextInput
+                                    label="Description"
+                                    name="description"
+                                    value={formData.description}
+                                    placeholder="Enter category description..."
+                                    error={errors.description}
+                                    onChange={handleChange}
+                                />
+                            </div>
+                        </div>
+                    </div>
 
-                    <div className="form-actions d-flex justify-content-end gap-3 mt-4">
+                    {/* Form Actions */}
+                    <div className="flex justify-end gap-3 pt-4 border-t border-gray-100 mt-4">
                         <CustomButton
                             text="Cancel"
                             icon={FaArrowLeft}
                             onClick={() => navigate("/raw-material-categories")}
                             disabled={loading}
                         />
-                        <div className="ms-2">
-                            <CustomButton
-                                text={loading ? "Updating..." : "Update Category"}
-                                icon={FaSave}
-                                type="submit"
-                                disabled={loading}
-                            />
-                        </div>
+                        <CustomButton
+                            text={loading ? "Updating..." : "Update Category"}
+                            icon={FaSave}
+                            type="submit"
+                            disabled={loading}
+                        />
                     </div>
                 </form>
-            </Container>
+            </div>
         </div>
     );
 };

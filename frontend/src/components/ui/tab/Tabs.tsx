@@ -1,5 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
-import "./Tabs.css";
+import React, { useState } from "react";
 
 export interface TabItem {
     key: string;
@@ -16,9 +15,17 @@ interface TabsProps {
     activeKey?: string;
     onChange?: (key: string) => void;
     className?: string;
-    align?: 'left' | 'center' | 'right';
-    variant?: 'primary' | 'secondary';
+    align?: "left" | "center" | "right";
+    variant?: "primary" | "secondary";
+    /** Set true for the rounded "pill" look (was `.app-tabs--pill` in CSS) */
+    pill?: boolean;
 }
+
+const alignClasses: Record<NonNullable<TabsProps["align"]>, string> = {
+    left: "justify-start",
+    center: "justify-center",
+    right: "justify-end",
+};
 
 const Tabs: React.FC<TabsProps> = ({
     tabs,
@@ -28,6 +35,7 @@ const Tabs: React.FC<TabsProps> = ({
     className = "",
     align = "left",
     variant = "primary",
+    pill = false,
 }) => {
     const [internalKey, setInternalKey] = useState(
         defaultActiveKey || tabs[0]?.key
@@ -35,56 +43,89 @@ const Tabs: React.FC<TabsProps> = ({
     const isControlled = controlledKey !== undefined;
     const activeKey = isControlled ? controlledKey : internalKey;
 
-    const listRef = useRef<HTMLDivElement>(null);
-    const [indicator, setIndicator] = useState({ left: 0, width: 0 });
-
     const handleSelect = (key: string) => {
         if (!isControlled) setInternalKey(key);
         onChange?.(key);
     };
 
-    // Move the active-tab underline indicator
-    useEffect(() => {
-        const activeBtn = listRef.current?.querySelector<HTMLButtonElement>(
-            `[data-key="${activeKey}"]`
-        );
-        if (activeBtn) {
-            setIndicator({
-                left: activeBtn.offsetLeft,
-                width: activeBtn.offsetWidth,
-            });
-        }
-    }, [activeKey, tabs]);
-
     const activeTab = tabs.find((t) => t.key === activeKey);
 
+    // ---- shared button styles per variant ----
+    const getBtnClasses = (isActive: boolean) => {
+        if (variant === "secondary") {
+            return `flex items-center gap-2 whitespace-nowrap px-1 py-2.5 -mb-0.5
+                text-sm font-semibold border-b-2 transition-colors duration-200
+                disabled:opacity-45 disabled:cursor-not-allowed
+                ${isActive
+                    ? "border-emerald-700 text-emerald-700"
+                    : "border-transparent text-gray-500 hover:text-emerald-700"
+                }`;
+        }
+
+        if (pill) {
+            // rounded, filled-when-active pill variant
+            return `whitespace-nowrap px-4.5 py-2.5 text-sm font-semibold rounded-md
+                transition-all duration-200 disabled:opacity-45 disabled:cursor-not-allowed
+                ${isActive
+                    ? "bg-emerald-700 text-white"
+                    : "text-gray-500 hover:text-emerald-700"
+                }`;
+        }
+
+        // default primary — matches the sidebar's active-item look:
+        // solid color fill + white bold text when active, plain gray box when not
+        return `flex items-center gap-2 whitespace-nowrap rounded-md px-5 py-2.5
+            text-sm font-semibold transition-all duration-200
+            disabled:opacity-45 disabled:cursor-not-allowed
+            ${isActive
+                ? "bg-primary text-white font-bold shadow-sm shadow-red-600/20"
+                : "bg-gray-100 text-gray-500 hover:text-blue-600 hover:bg-gray-200"
+            }`;
+    };
+
+    // ---- container classes per variant ----
+    const listContainerClasses =
+        variant === "secondary"
+            ? "flex items-center gap-4 border-b-2 border-black/5 w-full min-w-max"
+            : pill
+                ? "inline-flex items-center gap-0 bg-gray-100 p-1.5 rounded-lg min-w-max"
+                : "inline-flex items-center gap-2 min-w-max";
+
     return (
-        <div className={`app-tabs ${className}`}>
-            <div className={`app-tabs-list-wrap app-tabs-align-${align}`}>
-                <div className={`app-tabs-list app-tabs-variant-${variant}`} ref={listRef} role="tablist">
-                    {tabs.map((tab) => (
-                        <button
-                            key={tab.key}
-                            type="button"
-                            role="tab"
-                            data-key={tab.key}
-                            aria-selected={activeKey === tab.key}
-                            disabled={tab.disabled}
-                            className={`app-tab-btn ${activeKey === tab.key ? "active" : ""}`}
-                            onClick={() => handleSelect(tab.key)}
-                        >
-                            {tab.icon && <span className="app-tab-icon">{tab.icon}</span>}
-                            <span>{tab.label}</span>
-                        </button>
-                    ))}
-                    <span
-                        className="app-tabs-indicator"
-                        style={{ left: indicator.left, width: indicator.width }}
-                    />
+        <div className={`w-full ${className}`}>
+            <div
+                className={`w-full overflow-x-auto pb-1 mt-3 mb-5 flex ${alignClasses[align]}
+                    [&::-webkit-scrollbar]:h-1
+                    [&::-webkit-scrollbar-thumb]:bg-gray-300
+                    [&::-webkit-scrollbar-thumb]:rounded-full`}
+            >
+                <div role="tablist" className={listContainerClasses}>
+                    {tabs.map((tab) => {
+                        const isActive = activeKey === tab.key;
+                        return (
+                            <button
+                                key={tab.key}
+                                type="button"
+                                role="tab"
+                                data-key={tab.key}
+                                aria-selected={isActive}
+                                disabled={tab.disabled}
+                                onClick={() => handleSelect(tab.key)}
+                                className={getBtnClasses(isActive)}
+                            >
+                                {tab.icon && (
+                                    <span className="inline-flex items-center text-[15px]">
+                                        {tab.icon}
+                                    </span>
+                                )}
+                                <span>{tab.label}</span>
+                            </button>
+                        );
+                    })}
                 </div>
             </div>
 
-            <div className="app-tabs-content">{activeTab?.content}</div>
+            <div className="animate-[fadeIn_0.25s_ease]">{activeTab?.content}</div>
         </div>
     );
 };

@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import { Container, Row, Col } from "react-bootstrap";
 import { FaSave, FaEraser, FaArrowLeft } from "react-icons/fa";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -12,17 +11,12 @@ import { fetchLocations } from "../../../features/locations/locationSlice";
 import { fetchEmployees } from "../../../features/employee/employeeSlice";
 import { fetchStoreTypes } from "../../../features/store-types/storeTypeSlice";
 import { z } from "zod";
-// Dynamic Store Types are now fetched from DB
-
-
 
 const STATUS_OPTIONS = [
     { label: "Active", value: "Active" },
     { label: "Inactive", value: "Inactive" },
     { label: "System", value: "System" },
 ];
-
-
 
 const storeSchema = z.object({
     storeName: z
@@ -110,7 +104,8 @@ const StorageStoreEdit: React.FC = () => {
     const handleChange = (
         e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
     ) => {
-        const { name, value, type } = e.target as any;
+        const { name, value } = e.target;
+        const type = (e.target as any).type;
         const checked =
             type === "checkbox"
                 ? (e.target as HTMLInputElement).checked
@@ -132,7 +127,6 @@ const StorageStoreEdit: React.FC = () => {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        // Validation
         try {
             storeSchema.parse(formData);
             setErrors({});
@@ -186,31 +180,20 @@ const StorageStoreEdit: React.FC = () => {
     };
 
     return (
-        <div className="inner-container">
-            <Container fluid>
-                <div className="page-header">
-                    <Row className="align-items-center g-3">
-                        <Col lg={6} md={12}>
-                            <div className="page-header-info">
-                                <h2 className="page-title">Edit Storage Store</h2>
-                                <div className="page-breadcrumb">Home / Inventory & Warehouse / Storage Stores / Edit</div>
-                            </div>
-                        </Col>
-                        <Col lg={6} md={12}>
-                            <div className="page-header-actions">
-                                <CustomButton
-                                    text="Back to List"
-                                    icon={FaArrowLeft}
-                                    onClick={() => navigate("/storage-stores")}
-                                />
-                            </div>
-                        </Col>
-                    </Row>
-                </div>
+        <div className="p-4 md:p-6 min-h-screen bg-slate-50">
+            <div className="max-w-7xl mx-auto space-y-3">
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200">
+                    <div className="p-6 border-b border-slate-200 flex items-center justify-between">
+                        <h2 className="text-2xl font-bold text-slate-800">Edit Storage Store</h2>
+                        <CustomButton
+                            text="Back to List"
+                            icon={FaArrowLeft}
+                            onClick={() => navigate("/storage-stores")}
+                        />
+                    </div>
 
-                <form onSubmit={handleSubmit} className="form-inner">
-                    <Row className="g-3">
-                        <Col md={4}>
+                    <form onSubmit={handleSubmit} className="p-6" noValidate>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             <TextInput
                                 label="Store ID"
                                 name="storeId"
@@ -220,9 +203,7 @@ const StorageStoreEdit: React.FC = () => {
                                 disabled={true}
                                 onChange={handleChange}
                             />
-                        </Col>
 
-                        <Col md={4}>
                             <TextInput
                                 label="Store Name"
                                 name="storeName"
@@ -232,8 +213,6 @@ const StorageStoreEdit: React.FC = () => {
                                 onChange={handleChange}
                                 error={errors.storeName}
                             />
-                        </Col>
-                        <Col md={4}>
                             <SelectInput
                                 label="Store Type"
                                 name="storeTypeId"
@@ -249,9 +228,7 @@ const StorageStoreEdit: React.FC = () => {
                                 required
                                 onChange={handleChange}
                             />
-                        </Col>
 
-                        <Col md={4}>
                             <SelectInput
                                 label="Location"
                                 name="locationId"
@@ -267,9 +244,7 @@ const StorageStoreEdit: React.FC = () => {
                                 required
                                 onChange={handleChange}
                             />
-                        </Col>
 
-                        <Col md={4}>
                             <SelectInput
                                 label="Store Incharge"
                                 name="inchargeId"
@@ -284,10 +259,7 @@ const StorageStoreEdit: React.FC = () => {
                                 ]}
                                 onChange={handleChange}
                             />
-                        </Col>
 
-
-                        <Col md={4}>
                             <SelectInput
                                 label="Status"
                                 name="status"
@@ -295,30 +267,51 @@ const StorageStoreEdit: React.FC = () => {
                                 options={STATUS_OPTIONS}
                                 onChange={handleChange}
                             />
-                        </Col>
-                        <Col md={4}>
+                            
                             <TextInput
-                                label="GST Place (State Code)"
+                                label="GST Place"
                                 name="gstPlace"
-                                required
-                                error={errors.gstPlace}
                                 value={formData.gstPlace}
-                                placeholder="e.g. 33"
+                                placeholder="e.g. Maharashtra"
                                 onChange={handleChange}
                             />
-                        </Col>
+                            <div className="flex items-center gap-2 mt-8 h-[42px]">
+                                <input
+                                    type="checkbox"
+                                    id="allowNegative"
+                                    name="allowNegative"
+                                    checked={formData.allowNegative}
+                                    onChange={handleChange}
+                                    className="w-4 h-4 text-indigo-600 bg-white border-slate-300 rounded focus:ring-indigo-500 cursor-pointer"
+                                />
+                                <label htmlFor="allowNegative" className="text-sm font-medium text-slate-700 cursor-pointer">
+                                    Allow Negative Stock
+                                </label>
+                            </div>
+                            
+                            <div className="flex items-center gap-2 mt-8 h-[42px]">
+                                <input
+                                    type="checkbox"
+                                    id="isActive"
+                                    name="isActive"
+                                    checked={formData.isActive}
+                                    onChange={handleChange}
+                                    className="w-4 h-4 text-indigo-600 bg-white border-slate-300 rounded focus:ring-indigo-500 cursor-pointer"
+                                />
+                                <label htmlFor="isActive" className="text-sm font-medium text-slate-700 cursor-pointer">
+                                    Is Active
+                                </label>
+                            </div>
+                        </div>
 
-
-                    </Row>
-
-                    <div className="form-actions d-flex justify-content-end gap-3 mt-4">
-                        <CustomButton
-                            text="Cancel"
-                            icon={FaEraser}
-                            onClick={() => navigate("/storage-stores")}
-                            disabled={isSubmitting}
-                        />
-                        <div className="ms-2">
+                        <div className="flex justify-end gap-3 pt-6 mt-6 border-t border-slate-200">
+                            <CustomButton
+                                text="Cancel"
+                                icon={FaEraser}
+                                onClick={() => navigate("/storage-stores")}
+                                disabled={isSubmitting}
+                                type="button"
+                            />
                             <CustomButton
                                 text={isSubmitting ? "Updating..." : "Update Store"}
                                 icon={FaSave}
@@ -326,9 +319,9 @@ const StorageStoreEdit: React.FC = () => {
                                 disabled={isSubmitting}
                             />
                         </div>
-                    </div>
-                </form>
-            </Container>
+                    </form>
+                </div>
+            </div>
         </div>
     );
 };

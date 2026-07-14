@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import { Container, Row, Col, Spinner } from "react-bootstrap";
 import { FaSearch, FaChevronLeft, FaChevronRight, FaPlus } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 
@@ -8,12 +7,14 @@ import { toast } from "react-toastify";
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
 import { fetchRawMaterialStocks } from "../../../features/raw-materials/rawMaterialStockSlice";
 import ViewButton from "../../../components/ui/viewbutton/ViewButton";
+import DataTable from "../../../components/ui/table/DataTable";
+import SearchInput from "../../../components/ui/SearchInput/SearchInput";
 import ExportCSVButton from "../../../components/ui/ExportCSVButton/ExportCSVButton";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import { storeService } from "../../../services/storeService";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import CommonViewModal from "../../../components/ui/CommonViewModal/CommonViewModal";
-import CustomButton from "../../../components/ui/custombutton/CustomButton";
+import CustomButton from "../../../components/ui/Button/Button";
 import EditButton from "../../../components/ui/EditButton/EditButton";
 import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
@@ -125,192 +126,141 @@ const StockList: React.FC = () => {
     ];
 
     return (
-        <div className="inner-container stock-list">
-            <Container fluid>
-                <div className="page-header">
-                    <Row className="align-items-center g-3">
-                        <Col lg={4} md={12}>
-                            <div className="page-header-info">
-                                <h2 className="page-title">Stock Ledger Management</h2>
-                                <div className="page-breadcrumb">Home / Inventory & Warehouse / Stock Ledger</div>
-                            </div>
-                        </Col>
-                        <Col lg={8} md={12}>
-                            <div className="page-header-actions">
-                               
-                                {/* <div className="page-search-wrap me-2" style={{ minWidth: "200px" }}>
-                                    <SelectInput
-                                        label="Select Store"
-                                        hideLabel
-                                        name="storeFilter"
-                                        value={storeId}
-                                        options={[
-                                            { label: "All Stores", value: "" },
-                                            ...stores.map(s => ({
-                                                label: s.storeName,
-                                                value: s.storeId
-                                            }))
-                                        ]}
-                                        onChange={(e) => {
-                                            setStoreId(e.target.value);
-                                            setCurrentPage(1);
-                                        }}
-                                    />
-                                </div> */}
-                                <div className="page-search-wrap">
-                                    <FaSearch className="page-search-icon" />
-                                    <input
-                                        type="text"
-                                        className="page-search-input"
-                                        placeholder="Search stock..."
-                                        value={searchTerm}
-                                        onChange={handleSearch}
-                                    />
-                                </div>
-                                
-                                <div className="me-2">
-                                    <ExportCSVButton
-                                        data={data || []}
-                                        columns={exportColumns}
-                                        filename="stock_ledger_balances.csv"
-                                    />
-                                </div>
-                                 <div className="me-2">
-                                    <CustomButton
-                                        text="Add Raw Material"
-                                        icon={FaPlus}
-                                        onClick={() => navigate("/raw-materials/create")}
-                                    />
-                                </div>
-                                
-                            </div>
-                        </Col>
-                    </Row>
-                </div>
+        <div className="p-4 md:p-6 min-h-screen bg-slate-50">
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                {/* Page Header */}
+                <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-slate-200">
+                    <div>
+                        <h2 className="text-2xl font-bold text-slate-800">Stock Ledger Management</h2>
+                    </div>
 
-                <div className="master-table-body table-wrap">
-                    <div className="master-table-body">
-                        <table className="master-data-table">
-                            <thead>
-                                <tr>
-                                    <th style={{ width: "60px" }}>#</th>
-                                    <th>NAME</th>
-                                    <th>CATEGORY</th>
-                                    <th>STORE / LOCATION</th>
-                                    <th>PHYSICAL STOCK</th>
-                                    <th>RESERVED</th>
-                                    <th>AVAILABLE</th>
-                                    <th>STATUS</th>
-                                    <th>ACTIONS</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {loading ? (
-                                    <tr>
-                                        <td colSpan={10} className="text-center p-4">
-                                            <Spinner animation="border" variant="primary" />
-                                        </td>
-                                    </tr>
-                                ) : paginatedData.length > 0 ? (
-                                    paginatedData.map((item, index) => {
-                                        const matName = (item as any).materialName || item.rawMaterial?.materialName || "-";
-                                        const baseUom = (item as any).baseUom || item.rawMaterial?.baseUom || "";
-                                        const minStock = Number((item as any).minimumStock || item.rawMaterial?.minimumStock || 0);
-                                        const reorderLevel = Number((item as any).reorderLevel || item.rawMaterial?.reorderLevel || 0);
-                                        const catName = (item as any).category?.categoryName || item.rawMaterial?.category?.name || (item as any).categoryId || "-";
-                                        const locCode = (item as any).storeLocation?.locationCode || item.locationId || "-";
-
-                                        const available = Number(item.onHandQty ?? 0) - Number(item.reservedQty ?? 0);
-
-                                        let availColor = "#2b8a3e";
-                                        if (available <= minStock) {
-                                            availColor = "#dc3545";
-                                        } else if (available <= reorderLevel) {
-                                            availColor = "#d97706";
-                                        }
-
-                                        return (
-                                            <tr key={item.id} className="master-data-row">
-                                                <td className="master-data-cell">{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</td>
-                                                <td className="master-data-cell">
-                                                    <div style={{ fontWeight: 600 }}>{matName}</div>
-                                                    <span className="text-muted" style={{ fontSize: "0.82rem" }}>
-                                                        ID: {item.rawMaterialId}
-                                                    </span>
-                                                </td>
-                                                <td className="master-data-cell">{catName}</td>
-                                                <td className="master-data-cell">
-                                                    <div>{item.store?.storeName || item.storeId || "-"}</div>
-                                                    <span className="text-muted" style={{ fontSize: "0.82rem" }}>
-                                                        Loc: {locCode}
-                                                    </span>
-                                                </td>
-
-                                                <td className="master-data-cell">
-                                                    <div>{formatDisplayQty(item.onHandQty, baseUom)}</div>
-                                                    <div className="text-muted" style={{ fontSize: "0.82rem" }}>
-                                                        {formatDisplayQty(minStock, baseUom, "Min: ")}
-                                                    </div>
-                                                </td>
-                                                <td className="master-data-cell">
-                                                    {formatDisplayQty(item.reservedQty, baseUom)}
-                                                </td>
-                                                <td className="master-data-cell" style={{ fontWeight: 600 }}>
-                                                    <span style={{ color: availColor }}>
-                                                        {formatDisplayQty(available, baseUom)}
-                                                    </span>
-                                                </td>
-                                                <td className="master-data-cell">
-                                                    <StatusBadge status={item.status || "Active"} />
-                                                </td>
-                                                <td className="master-data-cell">
-                                                    <div className="table-action-group">
-                                                        <ViewButton
-                                                            onClick={() => {
-                                                                setSelectedItem(item);
-                                                                setShowView(true);
-                                                            }}
-                                                        />
-                                                        <EditButton onClick={() => navigate(`/raw-materials/edit/${item.rawMaterialId}`)} />
-                                                        <DeleteButton onClick={() => handleDeleteClick(item.rawMaterialId)} />
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })
-                                ) : (
-                                    <tr>
-                                        <td colSpan={10} className="text-center p-4">No stock records found.</td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
-
-                        {totalPages > 1 && (
-                            <div className="pagination-wrap">
-                                <button
-                                    className="pagination-btn"
-                                    disabled={currentPage === 1}
-                                    onClick={() => setCurrentPage(prev => prev - 1)}
-                                >
-                                    <FaChevronLeft />
-                                </button>
-                                <div className="pagination-info">
-                                    Page {currentPage} of {totalPages}
-                                </div>
-                                <button
-                                    className="pagination-btn"
-                                    disabled={currentPage === totalPages}
-                                    onClick={() => setCurrentPage(prev => prev + 1)}
-                                >
-                                    <FaChevronRight />
-                                </button>
-                            </div>
-                        )}
+                    <div className="flex flex-wrap items-center gap-3 relative w-full lg:w-auto">
+                        <SearchInput
+                            value={searchTerm}
+                            onChange={handleSearch}
+                            placeholder="Search stock..."
+                        />
+                        <ExportCSVButton
+                            data={data || []}
+                            columns={exportColumns}
+                            filename="stock_ledger_balances.csv"
+                        />
+                        <CustomButton
+                            text="Add Raw Material"
+                            icon={FaPlus}
+                            onClick={() => navigate("/raw-materials/create")}
+                        />
                     </div>
                 </div>
 
-            </Container>
+                {/* Table */}
+                <DataTable
+                    data={paginatedData || []}
+                    rowKey={(item) => item.id}
+                    loading={loading}
+                    emptyMessage="No stock records found."
+                    pagination={{
+                        currentPage,
+                        totalPages,
+                        onPageChange: (page) => setCurrentPage(page)
+                    }}
+                    columns={[
+                        {
+                            header: "#",
+                            render: (_, index) => <span className="text-slate-500">{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</span>
+                        },
+                        {
+                            header: "NAME",
+                            render: (item) => {
+                                const matName = (item as any).materialName || item.rawMaterial?.materialName || "-";
+                                return (
+                                    <div className="flex flex-col">
+                                        <span className="font-semibold text-slate-800">{matName}</span>
+                                        <span className="text-xs text-slate-500">ID: {item.rawMaterialId}</span>
+                                    </div>
+                                );
+                            }
+                        },
+                        {
+                            header: "CATEGORY",
+                            render: (item) => {
+                                const catName = (item as any).category?.categoryName || item.rawMaterial?.category?.name || (item as any).categoryId || "-";
+                                return <span className="text-slate-600">{catName}</span>;
+                            }
+                        },
+                        {
+                            header: "STORE / LOCATION",
+                            render: (item) => {
+                                const locCode = (item as any).storeLocation?.locationCode || item.locationId || "-";
+                                return (
+                                    <div className="flex flex-col">
+                                        <span className="font-medium text-slate-700">{item.store?.storeName || item.storeId || "-"}</span>
+                                        <span className="text-xs text-slate-500">Loc: {locCode}</span>
+                                    </div>
+                                );
+                            }
+                        },
+                        {
+                            header: "PHYSICAL STOCK",
+                            render: (item) => {
+                                const baseUom = (item as any).baseUom || item.rawMaterial?.baseUom || "";
+                                const minStock = Number((item as any).minimumStock || item.rawMaterial?.minimumStock || 0);
+                                return (
+                                    <div className="flex flex-col">
+                                        <span className="text-slate-800">{formatDisplayQty(item.onHandQty, baseUom)}</span>
+                                        <span className="text-xs text-slate-500">{formatDisplayQty(minStock, baseUom, "Min: ")}</span>
+                                    </div>
+                                );
+                            }
+                        },
+                        {
+                            header: "RESERVED",
+                            render: (item) => {
+                                const baseUom = (item as any).baseUom || item.rawMaterial?.baseUom || "";
+                                return <span className="text-slate-600">{formatDisplayQty(item.reservedQty, baseUom)}</span>;
+                            }
+                        },
+                        {
+                            header: "AVAILABLE",
+                            render: (item) => {
+                                const baseUom = (item as any).baseUom || item.rawMaterial?.baseUom || "";
+                                const minStock = Number((item as any).minimumStock || item.rawMaterial?.minimumStock || 0);
+                                const reorderLevel = Number((item as any).reorderLevel || item.rawMaterial?.reorderLevel || 0);
+                                const available = Number(item.onHandQty ?? 0) - Number(item.reservedQty ?? 0);
+
+                                let availColorClass = "text-green-600";
+                                if (available <= minStock) {
+                                    availColorClass = "text-red-600";
+                                } else if (available <= reorderLevel) {
+                                    availColorClass = "text-amber-600";
+                                }
+
+                                return <span className={`font-semibold ${availColorClass}`}>{formatDisplayQty(available, baseUom)}</span>;
+                            }
+                        },
+                        {
+                            header: "STATUS",
+                            render: (item) => <StatusBadge status={item.status || "Active"} />
+                        },
+                        {
+                            header: "ACTIONS",
+                            render: (item) => (
+                                <div className="flex items-center gap-2">
+                                    <ViewButton
+                                        onClick={() => {
+                                            setSelectedItem(item);
+                                            setShowView(true);
+                                        }}
+                                    />
+                                    <EditButton onClick={() => navigate(`/raw-materials/edit/${item.rawMaterialId}`)} />
+                                    <DeleteButton onClick={() => handleDeleteClick(item.rawMaterialId)} />
+                                </div>
+                            )
+                        }
+                    ]}
+                />
+
+            </div>
 
             <CommonViewModal
                 show={showView}

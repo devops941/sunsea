@@ -178,9 +178,7 @@ const SubcategoryList: React.FC = () => {
                                     Sub Category Management
                                 </h2>
 
-                                <div className="page-breadcrumb">
-                                    Home / Sub Categories
-                                </div>
+                                
 
                             </div>
                         </Col>

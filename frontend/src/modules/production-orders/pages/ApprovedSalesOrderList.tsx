@@ -108,9 +108,7 @@ const ApprovedSalesOrderList: React.FC = () => {
                         <Col lg={6} md={12}>
                             <div className="page-header-info">
                                 <h2 className="page-title">Approved Sales Orders</h2>
-                                <div className="page-breadcrumb">
-                                    Home / Production / Approved Sales Orders
-                                </div>
+                                
                             </div>
                         </Col>
                         <Col lg={6} md={12}>

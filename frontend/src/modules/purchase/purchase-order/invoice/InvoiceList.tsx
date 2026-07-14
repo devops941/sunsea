@@ -1,6 +1,5 @@
 import React, { useState, useCallback, useEffect } from "react";
-import { Container, Row, Col, Spinner } from "react-bootstrap";
-import { FaSearch, FaChevronLeft, FaChevronRight, FaPlus, FaTrash, FaEye, FaFilePdf } from "react-icons/fa";
+import { FaPlus, FaFilePdf } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useSelector } from "react-redux";
@@ -8,7 +7,11 @@ import { useSelector } from "react-redux";
 import CommonViewModal from "../../../../components/ui/CommonViewModal/CommonViewModal";
 import CommonConfirmModal from "../../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import { grnInvoiceService } from "../../../../services/grnInvoiceService";
-import CustomButton from "../../../../components/ui/custombutton/CustomButton";
+import CustomButton from "../../../../components/ui/Button/Button";
+import DataTable from "../../../../components/ui/table/DataTable";
+import SearchInput from "../../../../components/ui/SearchInput/SearchInput";
+import ViewButton from "../../../../components/ui/viewbutton/ViewButton";
+import DeleteButton from "../../../../components/ui/DeleteButton/DeleteButton";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -93,121 +96,74 @@ const InvoiceList: React.FC = () => {
     };
 
     return (
-        <div className="inner-container">
-            <Container fluid>
+        <div>
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                 {/* Page Header */}
-                <div className="page-header">
-                    <Row className="align-items-center g-3">
-                        <Col lg={6} md={12}>
-                            <div className="page-header-info">
-                                <h2 className="page-title">Invoice List</h2>
-                                <div className="page-breadcrumb">Home / Purchase / Invoice List</div>
-                            </div>
-                        </Col>
-                        <Col lg={6} md={12}>
-                            <div className="page-header-actions">
-                                <div className="page-search-wrap">
-                                    <FaSearch className="page-search-icon" />
-                                    <input
-                                        type="text"
-                                        className="page-search-input"
-                                        placeholder="Search invoices..."
-                                        value={searchTerm}
-                                        onChange={handleSearch}
-                                    />
-                                </div>
-                                <CustomButton
-                                    text="Create Invoice"
-                                    icon={FaPlus}
-                                    onClick={() => navigate("/invoice/create")}
-                                />
-                            </div>
-                        </Col>
-                    </Row>
+                <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-slate-200">
+                    <div>
+                        <h2 className="text-2xl font-bold text-slate-800">Invoice List</h2>
+
+                    </div>
+                    <div className="flex flex-wrap items-center gap-3 relative w-full lg:w-auto">
+                        <SearchInput
+                            value={searchTerm}
+                            onChange={handleSearch}
+                            placeholder="Search invoices..."
+                        />
+                        <CustomButton
+                            text="Create Invoice"
+                            icon={FaPlus}
+                            onClick={() => navigate("/invoice/create")}
+                        />
+                    </div>
                 </div>
 
                 {/* Table */}
-                <div className="master-table-body table-wrap">
-                    <div className="master-table-body">
-                        <table className="master-data-table">
-                            <thead>
-                                <tr>
-                                    <th style={{ width: "60px" }}>#</th>
-                                    <th>GRN NO</th>
-                                    <th>INVOICE NO</th>
-                                    <th>GRN DATE</th>
-                                    <th>SUPPLIER</th>
-                                    <th>NET AMOUNT</th>
-                                    <th>ACTIONS</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {loading ? (
-                                    <tr>
-                                        <td colSpan={7} className="text-center p-4">
-                                            <Spinner animation="border" size="sm" className="me-2" />
-                                            Loading invoices...
-                                        </td>
-                                    </tr>
-                                ) : data.length > 0 ? (
-                                    data.map((item, index) => (
-                                        <tr key={item.id} className="master-data-row">
-                                            <td className="master-data-cell">
-                                                {(currentPage - 1) * ITEMS_PER_PAGE + index + 1}
-                                            </td>
-                                            <td className="master-data-cell fw-semibold">{item.grnNumber}</td>
-                                            <td className="master-data-cell">{item.invoiceNo}</td>
-                                            <td className="master-data-cell">{formatDate(item.grnDate)}</td>
-                                            <td className="master-data-cell">
-                                                {item.supplier?.displayName || item.supplier?.legalName || "N/A"}
-                                            </td>
-                                            <td className="master-data-cell fw-semibold text-success">
-                                                {formatCurrency(item.netAmount)}
-                                            </td>
-                                            <td className="master-data-cell">
-                                                <div className="table-action-group d-flex gap-2">
-                                                    <CustomButton text="" icon={FaEye} variant="info" size="sm" onClick={() => handleOpenView(item)} />
-                                                    <CustomButton text="" icon={FaTrash} variant="danger" size="sm" onClick={() => {
-                                                        setItemToDelete(item.id);
-                                                        setShowDeleteModal(true);
-                                                    }} />
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))
-                                ) : (
-                                    <tr>
-                                        <td colSpan={7} className="text-center p-4">
-                                            No invoices found.
-                                        </td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
-
-                        {totalPages > 1 && (
-                            <div className="pagination-wrap">
-                                <button
-                                    className="pagination-btn"
-                                    disabled={currentPage === 1}
-                                    onClick={() => setCurrentPage((prev) => prev - 1)}
-                                >
-                                    <FaChevronLeft />
-                                </button>
-                                <div className="pagination-info">
-                                    Page {currentPage} of {totalPages}
+                <DataTable
+                    data={data}
+                    rowKey={(item) => item.id}
+                    loading={loading}
+                    emptyMessage="No invoices found."
+                    pagination={{
+                        currentPage,
+                        totalPages,
+                        onPageChange: (page) => setCurrentPage(page),
+                    }}
+                    columns={[
+                        {
+                            header: "#",
+                            width: "60px",
+                            render: (_item, index) => (currentPage - 1) * ITEMS_PER_PAGE + index + 1,
+                        },
+                        { header: "GRN NO", accessor: "grnNumber" },
+                        { header: "INVOICE NO", accessor: "invoiceNo" },
+                        { header: "GRN DATE", render: (item) => formatDate(item.grnDate) },
+                        {
+                            header: "SUPPLIER",
+                            render: (item) => item.supplier?.displayName || item.supplier?.legalName || "N/A",
+                        },
+                        {
+                            header: "NET AMOUNT",
+                            render: (item) => (
+                                <span className="font-semibold text-green-600">
+                                    {formatCurrency(item.netAmount)}
+                                </span>
+                            ),
+                        },
+                        {
+                            header: "ACTIONS",
+                            render: (item) => (
+                                <div className="flex items-center gap-2">
+                                    <ViewButton onClick={() => handleOpenView(item)} />
+                                    <DeleteButton onClick={() => {
+                                        setItemToDelete(item.id);
+                                        setShowDeleteModal(true);
+                                    }} />
                                 </div>
-                                <button
-                                    className="pagination-btn"
-                                    disabled={currentPage === totalPages}
-                                    onClick={() => setCurrentPage((prev) => prev + 1)}
-                                >
-                                    <FaChevronRight />
-                                </button>
-                            </div>
-                        )}
-                    </div>
-                </div>
+                            ),
+                        },
+                    ]}
+                />
 
                 {/* View Modal */}
                 <CommonViewModal
@@ -341,7 +297,7 @@ const InvoiceList: React.FC = () => {
                     confirmText="Delete"
                     confirmVariant="danger"
                 />
-            </Container>
+            </div>
         </div>
     );
 };

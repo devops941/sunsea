@@ -1,12 +1,12 @@
 import React, { useEffect } from "react";
-import { Modal, Row, Col } from "react-bootstrap";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { FaFileInvoiceDollar } from "react-icons/fa";
+import { FaFileInvoiceDollar, FaEraser, FaSave } from "react-icons/fa";
 import TextInput from "../../components/form/TextInput/TextInput";
 import SelectInput from "../../components/form/SelectInput/SelectInput";
-import CustomButton from "../../components/ui/custombutton/CustomButton";
+import CustomButton from "../../components/ui/Button/Button";
+import CommonModal from "../../components/ui/Modal/CommonModal";
 
 // ─── Validation Schema ──────────────────────────────
 export const gstTaxSchema = z.object({
@@ -81,92 +81,82 @@ const GstTaxModal: React.FC<GstTaxModalProps> = ({ show, onClose, onSave, initia
     };
 
     return (
-        <Modal show={show} onHide={onClose} centered size="lg">
-            <Modal.Header closeButton>
-                <Modal.Title>
-                    {isEditMode ? "Edit GST Tax Rate" : "Add GST Tax Rate"}
-                </Modal.Title>
-            </Modal.Header>
-
-            <form onSubmit={handleSubmit(submit)} noValidate>
-                <Modal.Body>
-                    {/* ── Group 1: Identity ── */}
-                    <Row className="mb-3">
-                        <Col md={6}>
-                            <Controller
-                                name="taxName"
-                                control={control}
-                                render={({ field }) => (
-                                    <TextInput
-                                        label="Tax Name"
-                                        name={field.name}
-                                        value={field.value}
-                                        onChange={field.onChange}
-                                        onBlur={field.onBlur}
-                                        placeholder="e.g. GST 18%"
-                                        required
-                                        error={errors.taxName?.message}
-                                    />
-                                )}
-                            />
-                        </Col>
-
-                        {/* ── Group 2: Rate ── */}
-                        <Col md={6}>
-                            <Controller
-                                name="taxRate"
-                                control={control}
-                                render={({ field }) => (
-                                    <TextInput
-                                        label="Tax Rate (%)"
-                                        name={field.name}
-                                        type="number"
-                                        value={field.value}
-                                        onChange={field.onChange}
-                                        onBlur={field.onBlur}
-                                        placeholder="e.g. 18"
-                                        required
-                                        error={errors.taxRate?.message}
-                                    />
-                                )}
-                            />
-                        </Col>
-                    </Row>
-
-                    <Row className="mb-3">
-                        {/* ── Group 3: Status ── */}
-                        <Col md={6}>
-                            <Controller
-                                name="status"
-                                control={control}
-                                render={({ field }) => (
-                                    <SelectInput
-                                        label="Status"
-                                        name={field.name}
-                                        value={field.value}
-                                        options={STATUS_OPTIONS}
-                                        onChange={field.onChange}
-                                        required
-                                        error={errors.status?.message}
-                                    />
-                                )}
-                            />
-                        </Col>
-                    </Row>
-                </Modal.Body>
-
-                <Modal.Footer>
-                    <CustomButton text="Cancel" onClick={onClose} type="button" />
+        <CommonModal
+            show={show}
+            onHide={onClose}
+            title={isEditMode ? "Edit GST Tax Rate" : "Add GST Tax Rate"}
+            overflowVisible={true}
+            footer={
+                <div className="flex items-center justify-end gap-2 w-full">
+                    <CustomButton text="Cancel" icon={FaEraser} onClick={onClose} />
                     <CustomButton
                         text={isSubmitting ? "Saving..." : isEditMode ? "Update" : "Save"}
-                        icon={FaFileInvoiceDollar}
-                        type="submit"
+                        icon={FaSave}
+                        onClick={handleSubmit(submit)}
                         disabled={isSubmitting}
-                        className="btn-success"
                     />
-                </Modal.Footer>
+                </div>
+            }
+        >
+            <form onSubmit={handleSubmit(submit)} noValidate className="space-y-4 p-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <Controller
+                            name="taxName"
+                            control={control}
+                            render={({ field }) => (
+                                <TextInput
+                                    label="Tax Name"
+                                    name={field.name}
+                                    value={field.value}
+                                    onChange={field.onChange}
+                                    onBlur={field.onBlur}
+                                    placeholder="e.g. GST 18%"
+                                    required
+                                    error={errors.taxName?.message}
+                                />
+                            )}
+                        />
+                    </div>
+                    <div>
+                        <Controller
+                            name="taxRate"
+                            control={control}
+                            render={({ field }) => (
+                                <TextInput
+                                    label="Tax Rate (%)"
+                                    name={field.name}
+                                    type="number"
+                                    value={field.value}
+                                    onChange={field.onChange}
+                                    onBlur={field.onBlur}
+                                    placeholder="e.g. 18"
+                                    required
+                                    error={errors.taxRate?.message}
+                                />
+                            )}
+                        />
+                    </div>
+                    <div>
+                        <Controller
+                            name="status"
+                            control={control}
+                            render={({ field }) => (
+                                <SelectInput
+                                    label="Status"
+                                    name={field.name}
+                                    value={field.value}
+                                    options={STATUS_OPTIONS}
+                                    onChange={field.onChange}
+                                    required
+                                    error={errors.status?.message}
+                                />
+                            )}
+                        />
+                    </div>
+                </div>
             </form>
-        </Modal>
+        </CommonModal>
     );
 };
 

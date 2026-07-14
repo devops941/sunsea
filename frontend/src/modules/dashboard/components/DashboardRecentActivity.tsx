@@ -1,5 +1,4 @@
 import React from 'react';
-import { Row, Col, Card, Table, Badge } from 'react-bootstrap';
 import { FaListAlt, FaCalendarAlt } from 'react-icons/fa';
 
 export interface DashboardRecentActivityProps {
@@ -28,121 +27,125 @@ const DashboardRecentActivity: React.FC<DashboardRecentActivityProps> = ({ recen
 
     const getPriorityBadge = (priority: string) => {
         const p = priority?.toUpperCase() || 'NORMAL';
-        if (p === 'URGENT') return 'danger';
-        if (p === 'HIGH') return 'warning';
-        if (p === 'LOW') return 'secondary';
-        return 'info';
+        if (p === 'URGENT') return 'bg-red-100 text-red-800';
+        if (p === 'HIGH') return 'bg-yellow-100 text-yellow-800';
+        if (p === 'LOW') return 'bg-gray-100 text-gray-800';
+        return 'bg-blue-100 text-blue-800';
     };
 
     const getStatusBadge = (status: string) => {
         const s = status?.toUpperCase() || 'PLANNED';
-        if (s === 'COMPLETED') return 'success';
-        if (s === 'IN_PROGRESS' || s === 'IN PROGRESS') return 'primary';
-        if (s === 'CANCELLED') return 'danger';
-        return 'secondary';
+        if (s === 'COMPLETED') return 'bg-green-100 text-green-800';
+        if (s === 'IN_PROGRESS' || s === 'IN PROGRESS') return 'bg-blue-100 text-blue-800';
+        if (s === 'CANCELLED') return 'bg-red-100 text-red-800';
+        return 'bg-gray-100 text-gray-800';
     };
 
     return (
-        <Row className="g-4 mb-4">
-            <Col lg={6}>
-                <Card className="border-0 shadow-sm rounded-3 h-100">
-                    <Card.Body className="p-4 d-flex flex-column">
-                        <div className="d-flex align-items-center mb-4">
-                            <FaListAlt size={20} className="me-2 text-primary" />
-                            <h5 className="fw-bold mb-0">Recent Production Orders</h5>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            <div>
+                <div className="bg-white border-0 shadow-sm rounded-xl h-full flex flex-col">
+                    <div className="p-6 flex flex-col flex-grow">
+                        <div className="flex items-center mb-6">
+                            <FaListAlt size={20} className="mr-3 !text-primary" />
+                            <h5 className="font-bold mb-0 text-lg">Recent Production Orders</h5>
                         </div>
-                        <div className="table-responsive flex-grow-1">
-                            <Table hover className="align-middle mb-0" size="sm">
-                                <thead className="table-light">
+                        <div className="overflow-x-auto flex-grow rounded-lg border border-gray-200">
+                            <table className="min-w-full text-sm text-left whitespace-nowrap">
+                                <thead className="bg-gray-50 border-b border-gray-200">
                                     <tr>
-                                        <th>Order #</th>
-                                        <th>Product</th>
-                                        <th className="text-end">Qty</th>
-                                        <th className="text-center">Priority</th>
-                                        <th className="text-center">Status</th>
+                                        <th className="px-4 py-3 font-semibold text-gray-900">Order #</th>
+                                        <th className="px-4 py-3 font-semibold text-gray-900">Product</th>
+                                        <th className="px-4 py-3 font-semibold text-gray-900 text-right">Qty</th>
+                                        <th className="px-4 py-3 font-semibold text-gray-900 text-center">Priority</th>
+                                        <th className="px-4 py-3 font-semibold text-gray-900 text-center">Status</th>
                                     </tr>
                                 </thead>
-                                <tbody>
+                                <tbody className="divide-y divide-gray-200">
                                     {recentOrders.length > 0 ? recentOrders.map((order, idx) => (
-                                        <tr key={idx}>
-                                            <td className="fw-semibold font-monospace small">{order.productionOrderId}</td>
-                                            <td className="text-truncate" style={{ maxWidth: '150px' }} title={order.productName}>
+                                        <tr key={idx} className="hover:bg-gray-50">
+                                            <td className="px-4 py-3 font-semibold font-mono text-xs">{order.productionOrderId}</td>
+                                            <td className="px-4 py-3 truncate max-w-[150px]" title={order.productName}>
                                                 {order.productName}
                                             </td>
-                                            <td className="text-end fw-bold">
-                                                {order.quantity} <small className="text-muted fw-normal">{order.uom}</small>
+                                            <td className="px-4 py-3 text-right font-bold">
+                                                {order.quantity} <small className="text-gray-500 font-normal ml-1">{order.uom}</small>
                                             </td>
-                                            <td className="text-center">
-                                                <Badge bg={getPriorityBadge(order.priority)} className="bg-opacity-10 text-dark border">
+                                            <td className="px-4 py-3 text-center">
+                                                <span className={`inline-block px-2 py-1 text-xs font-semibold rounded-full border border-gray-200 bg-opacity-50 ${getPriorityBadge(order.priority)}`}>
                                                     {order.priority || 'Normal'}
-                                                </Badge>
+                                                </span>
                                             </td>
-                                            <td className="text-center">
-                                                <Badge bg={getStatusBadge(order.status)}>
+                                            <td className="px-4 py-3 text-center">
+                                                <span className={`inline-block px-2 py-1 text-xs font-semibold rounded-full ${getStatusBadge(order.status)}`}>
                                                     {order.status?.replace('_', ' ') || 'Planned'}
-                                                </Badge>
+                                                </span>
                                             </td>
                                         </tr>
                                     )) : (
                                         <tr>
-                                            <td colSpan={5} className="text-center py-4 text-muted">No recent orders found</td>
+                                            <td colSpan={5} className="px-4 py-8 text-center text-gray-500">No recent orders found</td>
                                         </tr>
                                     )}
                                 </tbody>
-                            </Table>
+                            </table>
                         </div>
-                    </Card.Body>
-                </Card>
-            </Col>
+                    </div>
+                </div>
+            </div>
 
-            <Col lg={6}>
-                <Card className="border-0 shadow-sm rounded-3 h-100">
-                    <Card.Body className="p-4 d-flex flex-column">
-                        <div className="d-flex align-items-center mb-4">
-                            <FaCalendarAlt size={20} className="me-2 text-success" />
-                            <h5 className="fw-bold mb-0">Recent Machine Schedules</h5>
+            <div>
+                <div className="bg-white border-0 shadow-sm rounded-xl h-full flex flex-col">
+                    <div className="p-6 flex flex-col flex-grow">
+                        <div className="flex items-center mb-6">
+                            <FaCalendarAlt size={20} className="mr-3 text-green-600" />
+                            <h5 className="font-bold mb-0 text-lg">Recent Machine Schedules</h5>
                         </div>
-                        <div className="table-responsive flex-grow-1">
-                            <Table hover className="align-middle mb-0" size="sm">
-                                <thead className="table-light">
+                        <div className="overflow-x-auto flex-grow rounded-lg border border-gray-200">
+                            <table className="min-w-full text-sm text-left whitespace-nowrap">
+                                <thead className="bg-gray-50 border-b border-gray-200">
                                     <tr>
-                                        <th>Machine / Shift</th>
-                                        <th>Day</th>
-                                        <th>Product</th>
-                                        <th className="text-end">Plan Qty</th>
-                                        <th className="text-end">Hrs</th>
+                                        <th className="px-4 py-3 font-semibold text-gray-900">Machine / Shift</th>
+                                        <th className="px-4 py-3 font-semibold text-gray-900">Day</th>
+                                        <th className="px-4 py-3 font-semibold text-gray-900">Product</th>
+                                        <th className="px-4 py-3 font-semibold text-gray-900 text-right">Plan Qty</th>
+                                        <th className="px-4 py-3 font-semibold text-gray-900 text-right">Hrs</th>
                                     </tr>
                                 </thead>
-                                <tbody>
+                                <tbody className="divide-y divide-gray-200">
                                     {recentSchedules.length > 0 ? recentSchedules.map((schedule, idx) => (
-                                        <tr key={idx}>
-                                            <td>
-                                                <div className="fw-semibold text-truncate" style={{ maxWidth: '120px' }}>{schedule.machineName}</div>
-                                                <small className="text-muted">{schedule.shiftName}</small>
+                                        <tr key={idx} className="hover:bg-gray-50">
+                                            <td className="px-4 py-3">
+                                                <div className="font-semibold truncate max-w-[120px]">{schedule.machineName}</div>
+                                                <small className="text-gray-500">{schedule.shiftName}</small>
                                             </td>
-                                            <td><span className="badge bg-light text-dark border">{schedule.day}</span></td>
-                                            <td className="text-truncate" style={{ maxWidth: '100px' }} title={schedule.productName}>
+                                            <td className="px-4 py-3">
+                                                <span className="inline-block px-2 py-1 text-xs font-semibold bg-gray-100 text-gray-800 border border-gray-200 rounded">
+                                                    {schedule.day}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-3 truncate max-w-[100px]" title={schedule.productName}>
                                                 {schedule.productName}
                                             </td>
-                                            <td className="text-end fw-bold">
+                                            <td className="px-4 py-3 text-right font-bold">
                                                 {schedule.plannedQty}
                                             </td>
-                                            <td className="text-end text-muted">
+                                            <td className="px-4 py-3 text-right text-gray-500">
                                                 {schedule.hours}
                                             </td>
                                         </tr>
                                     )) : (
                                         <tr>
-                                            <td colSpan={5} className="text-center py-4 text-muted">No recent schedules found</td>
+                                            <td colSpan={5} className="px-4 py-8 text-center text-gray-500">No recent schedules found</td>
                                         </tr>
                                     )}
                                 </tbody>
-                            </Table>
+                            </table>
                         </div>
-                    </Card.Body>
-                </Card>
-            </Col>
-        </Row>
+                    </div>
+                </div>
+            </div>
+        </div>
     );
 };
 

@@ -1,339 +1,337 @@
-import React, { useState } from "react";
-
-import {
-    Container,
-    Row,
-    Col,
-} from "react-bootstrap";
-
-import {
-    FaSearch,
-    FaPlus,
-    FaChevronLeft,
-    FaChevronRight,
-} from "react-icons/fa";
-
-import { useNavigate } from "react-router-dom";
-
+import React, { useState, useEffect, useCallback } from "react";
+import { FaSearch, FaPlus, FaSave, FaEraser } from "react-icons/fa";
+import { toast } from "react-toastify";
 import ViewButton from "../../../components/ui/viewbutton/ViewButton";
 import EditButton from "../../../components/ui/EditButton/EditButton";
-import CategoryViewModal from "../components/CategoryViewModal";
 import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
-
 import CustomButton from "../../../components/ui/Button/Button";
+import CommonViewModal from "../../../components/ui/CommonViewModal/CommonViewModal";
+import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
+import TextInput from "../../../components/form/TextInput/TextInput";
+import SelectInput from "../../../components/form/SelectInput/SelectInput";
+import { useCategories } from "../../../hooks/useCategories";
+import { categoryService } from "../../../services/categoryService";
+import StatusBadge from "../../../components/ui/StatusBadge/Badge";
+import DataTable, { type DataTableColumn } from "../../../components/ui/table/DataTable";
+import CommonModal from "../../../components/ui/Modal/CommonModal";
 
 const ITEMS_PER_PAGE = 10;
 
 const CategoryList: React.FC = () => {
+    const { categories, loading, error, loadCategories, addCategory, editCategory, removeCategory } = useCategories();
 
-    const navigate = useNavigate();
-
-    const [showViewModal, setShowViewModal] =
-        useState(false);
-
-    const [selectedcategorie, setSelectedcategorie] =
-        useState<any>(null);
-
-    const handleView = (id: number) => {
-    const category = categorie.find(
-        (item) => item.id === id
-    );
-
-    setSelectedcategorie(category);
-    setShowViewModal(true);
-};
-
+    const [searchTerm, setSearchTerm] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
+    const [showFormModal, setShowFormModal] = useState(false);
+    const [showViewModal, setShowViewModal] = useState(false);
+    const [editMode, setEditMode] = useState(false);
+    const [selectedCategory, setSelectedCategory] = useState<any>(null);
+    const [errors, setErrors] = useState({ code: "", name: "" });
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [itemToDelete, setItemToDelete] = useState<number | null>(null);
 
-    // const handleEdit = (id: string) => {
-    //   navigate(`/employees/edit/${id}`);
-    // };
+    const [formData, setFormData] = useState({
+        id: "",
+        code: "",
+        name: "",
+        description: "",
+        status: "ACTIVE",
+    });
 
-    const handleEdit = (categorie: any) => {
-        navigate(`/categories/edit/${categorie.id}`, {
-            state: categorie,
+    useEffect(() => {
+        loadCategories("");
+    }, [loadCategories]);
+
+    useEffect(() => {
+        if (error) {
+            toast.error(error);
+        }
+    }, [error]);
+
+    const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const value = e.target.value;
+        setSearchTerm(value);
+        setCurrentPage(1);
+        loadCategories(value);
+    };
+
+    const totalPages = Math.ceil(categories.length / ITEMS_PER_PAGE);
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    const paginatedCategories = categories.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
+    const handleOpenAdd = async () => {
+        setEditMode(false);
+        let nextCode = "";
+        try {
+            nextCode = await categoryService.fetchNextId();
+        } catch (error) {
+            console.error("Failed to fetch next category code:", error);
+        }
+
+        setFormData({
+            id: "",
+            code: nextCode,
+            name: "",
+            description: "",
+            status: "ACTIVE",
         });
+        setErrors({ code: "", name: "" });
+        setShowFormModal(true);
     };
 
+    const handleOpenEdit = useCallback((category: any) => {
+        setEditMode(true);
+        setFormData({
+            id: String(category.id),
+            code: category.code,
+            name: category.name,
+            description: category.description || "",
+            status: category.status,
+        });
+        setErrors({ code: "", name: "" });
+        setShowFormModal(true);
+    }, []);
 
-    const handleDelete = (id: number) => {
-        console.log("Delete Clicked for ID:", id);
+    const validateForm = () => {
+        const newErrors = { code: "", name: "" };
+        let isValid = true;
+
+        if (!formData.code.trim()) {
+            newErrors.code = "category code is required";
+            isValid = false;
+        }
+
+        if (!formData.name.trim()) {
+            newErrors.name = "category name is required";
+            isValid = false;
+        } else if (/^[0-9]+$/.test(formData.name.trim())) {
+            newErrors.name = "Category name cannot be only numbers";
+            isValid = false;
+        }
+
+        setErrors(newErrors);
+        return isValid;
     };
 
+    const handleOpenView = useCallback((category: any) => {
+        setSelectedCategory(category);
+        setShowViewModal(true);
+    }, []);
 
-    //   employee data
+    const triggerDelete = useCallback((id: number) => {
+        setItemToDelete(id);
+        setShowDeleteModal(true);
+    }, []);
 
-    const categorie = [
-  {
-    "id": 1,
-    "categoryCode": "RM",
-    "categoryName": "Raw Material",
-    "description": "Materials used in production",
-    "isActive": true
-  },
-  {
-    "id": 2,
-    "categoryCode": "SFG",
-    "categoryName": "Semi Finished Goods",
-    "description": "Products under processing",
-    "isActive": true
-  },
-  {
-    "id": 3,
-    "categoryCode": "FG",
-    "categoryName": "Finished Goods",
-    "description": "Ready for sale products",
-    "isActive": true
-  },
-  {
-    "id": 4,
-    "categoryCode": "PM",
-    "categoryName": "Packaging Material",
-    "description": "Packing and labeling materials",
-    "isActive": true
-  },
-  {
-    "id": 5,
-    "categoryCode": "SP",
-    "categoryName": "Spare Parts",
-    "description": "Machine spare parts",
-    "isActive": true
-  },
-  {
-    "id": 6,
-    "categoryCode": "CONS",
-    "categoryName": "Consumables",
-    "description": "Daily consumable items",
-    "isActive": true
-  },
-  {
-    "id": 7,
-    "categoryCode": "ELEC",
-    "categoryName": "Electrical Items",
-    "description": "Electrical components and accessories",
-    "isActive": true
-  },
-  {
-    "id": 8,
-    "categoryCode": "SAFE",
-    "categoryName": "Safety Equipment",
-    "description": "PPE and safety gear",
-    "isActive": true
-  },
-  {
-    "id": 9,
-    "categoryCode": "OFF",
-    "categoryName": "Office Supplies",
-    "description": "Office stationery and supplies",
-    "isActive": false
-  },
-  {
-    "id": 10,
-    "categoryCode": "MAIN",
-    "categoryName": "Maintenance Materials",
-    "description": "Maintenance and repair items",
-    "isActive": true
-  }
-]
-    const totalPages = Math.ceil(
-        categorie.length / ITEMS_PER_PAGE
-    );
+    const handleDeleteConfirm = async () => {
+        if (itemToDelete !== null) {
+            try {
+                await removeCategory(itemToDelete);
+                toast.success("Category deleted successfully!");
+            } catch (err: any) {
+                toast.error("Failed to delete category! as it is already assigned in product");
+            } finally {
+                setShowDeleteModal(false);
+                setItemToDelete(null);
+            }
+        }
+    };
 
-    const startIndex =
-        (currentPage - 1) * ITEMS_PER_PAGE;
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+        const { name, value } = e.target;
+        setFormData((prev) => ({ ...prev, [name]: value }));
+        setErrors((prev) => ({ ...prev, [name]: "" }));
+    };
 
-    const paginatedemployees =
-        categorie.slice(
-            startIndex,
-            startIndex + ITEMS_PER_PAGE
-        );
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!validateForm()) return;
+        
+        try {
+            const payload = {
+                code: formData.code,
+                name: formData.name,
+                description: formData.description,
+                status: formData.status
+            };
+
+            if (editMode) {
+                await editCategory(Number(formData.id), payload);
+                toast.success("Category updated successfully!");
+            } else {
+                await addCategory(payload);
+                toast.success("Category created successfully!");
+            }
+            setShowFormModal(false);
+        } catch (err: any) {
+            toast.error(err || "Operation failed");
+        }
+    };
+
+    const columns: DataTableColumn<any>[] = [
+        { header: "#", render: (_, index) => startIndex + index + 1, width: "60px", align: "center" },
+        { header: "Code", accessor: "code" },
+        { header: "Name", accessor: "name" },
+        { header: "Status", render: (cat) => <StatusBadge status={cat.status} />, align: "center" },
+        { header: "Created Date", render: (cat) => new Date(cat.createdAt).toLocaleDateString() },
+        {
+            header: "Actions",
+            render: (cat) => (
+                <div className="flex items-center gap-2 justify-end">
+                    <ViewButton onClick={() => handleOpenView(cat)} />
+                    <EditButton onClick={() => handleOpenEdit(cat)} />
+                    <DeleteButton onClick={() => triggerDelete(cat.id)} />
+                </div>
+            ),
+            align: "right"
+        }
+    ];
 
     return (
-
-
-        <div className="inner-container">
-            <Container fluid>
-
-                {/* page header */}
-                <div className="page-header">
-
-                    <Row className="align-items-center g-3">
-
-                        {/* Left Section */}
-                        <Col lg={6} md={12}>
-                            <div className="page-header-info">
-
-                                <h2 className="page-title">
-                                    categorie Management
-                                </h2>
-
-                                <div className="page-breadcrumb">
-                                    Home / categorie
-                                </div>
-
-                            </div>
-                        </Col>
-
-                        {/* Right Section */}
-                        <Col lg={6} md={12}>
-                            <div className="page-header-actions">
-
-                                <div className="page-search-wrap">
-
-                                    <FaSearch className="page-search-icon" />
-
-                                    <input
-                                        type="text"
-                                        className="page-search-input"
-                                        placeholder="Search categorie..."
-                                    />
-
-                                </div>
-
-                                <CustomButton
-                                    text="Add categorie"
-                                    icon={FaPlus}
-                                    onClick={() => navigate("/categories/create")}
+        <div className="p-4 md:p-6 min-h-screen bg-slate-50">
+            <div className="max-w-7xl mx-auto">
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                    {/* Page Header */}
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-6 border-b border-slate-200">
+                        <div>
+                            <h2 className="text-2xl font-bold text-slate-800">Category Management</h2>
+                        </div>
+                        <div className="flex items-center gap-3 w-full md:w-auto">
+                            <div className="relative w-full md:w-64">
+                                <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                <input
+                                    type="text"
+                                    className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                                    placeholder="Search categories..."
+                                    value={searchTerm}
+                                    onChange={handleSearch}
                                 />
-
                             </div>
-                        </Col>
-
-                    </Row>
-
-                </div>
-
-
-                {/* view table */}
-                <div className="master-table-body table-wrap">
-                    <div className="master-table-body">
-
-                        <table className="master-data-table">
-
-                            <thead>
-                                <tr>
-                                    <th>Category iD</th>
-                                    <th>Category Code </th>
-                                    <th>Category NAME</th>
-                                    <th>description</th>
-                                    <th>STATUS</th>
-                                    <th>ACTIONS</th>
-                                </tr>
-                            </thead>
-
-                            <tbody>
-
-                                {paginatedemployees.map((categorie) => (
-
-                                    <tr
-                                        key={categorie.id}
-                                        className="master-data-row"
-                                    >
-
-                                        <td className="master-data-cell">
-                                            {categorie.id}
-                                        </td>
-
-                                        <td className="master-data-cell">
-                                            {categorie.categoryCode}
-                                        </td>
-
-                                        <td className="master-data-cell">
-                                            {categorie.categoryName}
-                                        </td>
-
-                                        <td className="master-data-cell">
-                                            {categorie.description}
-                                        </td>
-
-                                        <td className="master-data-cell">
-                                            <span
-                                                className={
-                                                    categorie.isActive
-                                                        ? "status-pill status-pill--active"
-                                                        : "status-pill status-pill--inactive"
-                                                }
-                                            >
-                                                {categorie.isActive
-                                                    ? "Active"
-                                                    : "Inactive"}
-                                            </span>
-
-                                        </td>
-
-                                        <td className="master-data-cell">
-
-                                            <div className="table-action-group">
-
-                                                <ViewButton
-                                                    onClick={() => {
-
-                                                        handleView(categorie.id)
-                                                    }}
-                                                />
-
-                                                <EditButton
-                                                    onClick={() => handleEdit(categorie)}
-                                                />
-
-                                                <DeleteButton
-                                                    onClick={() =>
-                                                        handleDelete(categorie.id)}
-                                                />
-
-                                            </div>
-
-                                        </td>
-
-                                    </tr>
-
-                                ))}
-
-                            </tbody>
-
-                        </table>
-
-
-                        {/* pagenation */}
-                        <div className="pagination-wrap">
-                            <button
-                                className="pagination-btn"
-                                disabled={currentPage === 1}
-                                onClick={() =>
-                                    setCurrentPage(currentPage - 1)
-                                }
-                            >
-                                <FaChevronLeft />
-
-                            </button>
-
-                            <div className="pagination-info">
-                                Page {currentPage} of {totalPages}
-                            </div>
-
-                            <button
-                                className="pagination-btn"
-                                disabled={currentPage === totalPages}
-                                onClick={() =>
-                                    setCurrentPage(currentPage + 1)
-                                }
-                            >
-
-                                <FaChevronRight />
-                            </button>
-
+                            <CustomButton text="Add Category" icon={FaPlus} onClick={handleOpenAdd} />
                         </div>
                     </div>
 
+                    {/* Categories Table */}
+                    {loading && categories.length === 0 ? (
+                        <div className="flex justify-center items-center h-64">
+                            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"></div>
+                        </div>
+                    ) : (
+                        <DataTable
+                            columns={columns}
+                            data={paginatedCategories}
+                            rowKey={(row) => row.id}
+                            emptyMessage="No categories found."
+                            pagination={totalPages > 1 ? {
+                                currentPage,
+                                totalPages,
+                                onPageChange: setCurrentPage
+                            } : undefined}
+                        />
+                    )}
                 </div>
 
-                <CategoryViewModal
+                {/* Add/Edit Modal */}
+                <CommonModal
+                    show={showFormModal}
+                    onHide={() => setShowFormModal(false)}
+                    title={editMode ? "Edit Category" : "Add New Category"}
+                    overflowVisible={true}
+                    footer={
+                        <div className="flex items-center justify-end gap-2 w-full">
+                            <CustomButton
+                                text="Clear"
+                                icon={FaEraser}
+                                onClick={() => setFormData({
+                                    id: formData.id,
+                                    code: formData.code,
+                                    name: "",
+                                    description: "",
+                                    status: "ACTIVE",
+                                })}
+                            />
+                            <CustomButton
+                                text={editMode ? "Update" : "Save"}
+                                icon={FaSave}
+                                onClick={handleSubmit}
+                                disabled={loading}
+                            />
+                        </div>
+                    }
+                >
+                    <form onSubmit={handleSubmit} className="space-y-4 p-2">
+                        <div className="grid grid-cols-1 gap-4">
+                            <TextInput
+                                label="Category Code"
+                                name="code"
+                                value={formData.code}
+                                placeholder="e.g. CAT-01"
+                                required
+                                onChange={handleChange}
+                                disabled
+                                error={errors.code}
+                            />
+                            <TextInput
+                                label="Category Name"
+                                name="name"
+                                value={formData.name}
+                                placeholder="e.g. Electronics"
+                                required
+                                onChange={handleChange}
+                                error={errors.name}
+                            />
+                            <TextInput
+                                label="Description"
+                                name="description"
+                                value={formData.description}
+                                placeholder="Enter category description"
+                                onChange={handleChange}
+                            />
+                            <SelectInput
+                                label="Status"
+                                name="status"
+                                value={formData.status}
+                                options={[
+                                    { value: "ACTIVE", label: "Active" },
+                                    { value: "INACTIVE", label: "Inactive" },
+                                ]}
+                                onChange={handleChange}
+                            />
+                        </div>
+                    </form>
+                </CommonModal>
+
+                <CommonViewModal
                     show={showViewModal}
                     onHide={() => setShowViewModal(false)}
-                    category={selectedcategorie}
+                    modalTitle="Category Details"
+                    avatarText={selectedCategory ? selectedCategory.name.charAt(0).toUpperCase() : ""}
+                    headerTitle={selectedCategory ? selectedCategory.name : ""}
+                    headerSubtitle={selectedCategory ? `Code: ${selectedCategory.code}` : ""}
+                    sections={selectedCategory ? [
+                        {
+                            fields: [
+                                { label: "Category Name", value: selectedCategory.name },
+                                { label: "Category Code", value: selectedCategory.code },
+                                { label: "Description", value: selectedCategory.description || "N/A" },
+                                { label: "Status", value: <StatusBadge status={selectedCategory.status} /> },
+                                { label: "Created Date", value: new Date(selectedCategory.createdAt).toLocaleString() },
+                                { label: "Updated Date", value: new Date(selectedCategory.updatedAt).toLocaleString() },
+                            ]
+                        }
+                    ] : []}
                 />
 
-            </Container>
+                <CommonConfirmModal
+                    show={showDeleteModal}
+                    onHide={() => setShowDeleteModal(false)}
+                    onConfirm={handleDeleteConfirm}
+                    title="Confirm Delete"
+                    message="Are you sure you want to delete this category?"
+                    confirmText="Delete"
+                    confirmVariant="danger"
+                />
+            </div>
         </div>
     );
 };

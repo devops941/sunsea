@@ -4,13 +4,14 @@ import { FaPlus, FaTrash, FaArrowLeft, FaBoxOpen, FaFileInvoice, FaMapMarkerAlt,
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 
-import CustomButton from "../../../../components/ui/custombutton/CustomButton";
+import CustomButton from "../../../../components/ui/Button/Button";
 import SelectInput from "../../../../components/form/SelectInput/SelectInput";
 import TextInput from "../../../../components/form/TextInput/TextInput";
 import QuantityInput from "../../../../components/form/QuantityInput/QuantityInput";
-import Section from "../../../../components/ui/Section/Section";
-import CityStateSelect from "../../../../components/ui/CityStateSelect/CityStateSelect";
-import type { StateCityOption } from "../../../../components/ui/CityStateSelect/CityStateSelect";
+import BackButton from "../../../../components/ui/BackButton/BackButton";
+import AddressForm from "../../../../components/form/AddressFrom/AddressFrom";
+import DateInput from "../../../../components/form/DateInput/DateInput";
+import TextArea from "../../../../components/form/TextArea/TextArea";
 import { purchaseOrderService } from "../../../../services/purchaseOrderService";
 import { grnInvoiceService } from "../../../../services/grnInvoiceService";
 import type { PurchaseOrder } from "../../../../features/purchaseOrder/types";
@@ -372,7 +373,7 @@ const InvoiceDetailPage: React.FC = () => {
             const updated = [...prev];
             updated[index] = { ...updated[index], [field]: value };
             const item = updated[index];
-            
+
             if (!item.uom) {
                 const itemRawMaterial = rawMaterials.find(
                     (rm) => String(rm.rawMaterialId) === String(item.productId)
@@ -518,308 +519,209 @@ const InvoiceDetailPage: React.FC = () => {
     }
 
     return (
-        <div className="inner-container">
-            <Container fluid>
+        <div className="w-full mx-auto">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
                 {/* Page Header */}
-                <div className="page-header">
-                    <Row className="align-items-center g-3">
-                        <Col lg={6} md={12}>
-                            <div className="page-header-info">
-                                <h2 className="page-title">Create GRN / Invoice</h2>
-                                <div className="page-breadcrumb">Home / Purchase / Invoice / Create</div>
-                            </div>
-                        </Col>
-                    </Row>
+                <div className="px-6 py-4 border-b border-gray-200">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div>
+                            <h2 className="text-xl font-bold text-gray-800">
+                                Create GRN / Invoice
+                            </h2>
+                        </div>
+                        <div>
+                            <BackButton text="Back to List" />
+                        </div>
+                    </div>
                 </div>
 
-                <form onSubmit={handleSubmit} className="form-inner" noValidate>
-
+                <form onSubmit={handleSubmit} className="px-6 py-3 space-y-4" noValidate>
                     {/* ── Row 1: Header Fields ── */}
-                    <div className="mb-3" style={{
-                        background: "var(--color-surface)",
-                        border: "1px solid var(--color-border)",
-                        borderRadius: "var(--radius-md)",
-                        borderLeft: "4px solid var(--color-primary)",
-                        boxShadow: "var(--shadow-sm)",
-                        overflow: "hidden",
-                    }}>
-                        <div className="px-3 py-2" style={{ background: "var(--color-primary)", display: "flex", alignItems: "center", gap: "8px" }}>
-                            <FaHashtag style={{ color: "var(--color-secondary)", fontSize: "0.85rem" }} />
-                            <span style={{ color: "#fff", fontWeight: 600, fontSize: "0.85rem", letterSpacing: "0.04em", textTransform: "uppercase" }}>GRN Information</span>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                        <div>
+                            <SelectInput label="PO (Optional)" name="poId" value={form.poId} options={poOptions} onChange={handleChange} />
+                            {loadingPO && <div className="text-muted small mt-1"><Spinner size="sm" /> Loading…</div>}
                         </div>
-                        <div className="p-3">
-                            <Row className="g-3 align-items-end">
-                                <Col xl={2} lg={2} md={4} sm={6}>
-                                    <SelectInput label="PO (Optional)" name="poId" value={form.poId} options={poOptions} onChange={handleChange} />
-                                    {loadingPO && <div className="text-muted small mt-1"><Spinner size="sm" /> Loading…</div>}
-                                </Col>
-                                <Col xl={2} lg={2} md={4} sm={6}>
-                                    <TextInput label="GRN Number" name="grnNumber" value={form.grnNumber} onChange={handleChange} disabled />
-                                </Col>
-                                <Col xl={2} lg={2} md={4} sm={6}>
-                                    <TextInput label="Invoice No." name="invoiceNo" value={form.invoiceNo} onChange={handleChange} placeholder="Supplier invoice" required error={errors.invoiceNo} />
-                                </Col>
-                                <Col xl={2} lg={2} md={4} sm={6}>
-                                    <TextInput label="GRN Date" name="grnDate" type="date" value={form.grnDate} onChange={handleChange} required error={errors.grnDate} />
-                                </Col>
-                                <Col xl={2} lg={2} md={4} sm={6}>
-                                    <SelectInput label="Supplier" name="supplierId" value={form.supplierId} options={supplierOptions} onChange={handleChange} required error={errors.supplierId} disabled={isPOSelected} />
-                                </Col>
-                                <Col xl={2} lg={2} md={4} sm={6}>
-                                    <SelectInput label="Store" name="storeId" value={form.storeId} options={storeOptions} onChange={handleChange} required error={errors.storeId} disabled={isPOSelected} />
-                                </Col>
-                            </Row>
+                        <div>
+                            <TextInput label="GRN Number" name="grnNumber" value={form.grnNumber} onChange={handleChange} disabled />
+                        </div>
+                        <div>
+                            <TextInput label="Invoice No." name="invoiceNo" value={form.invoiceNo} onChange={handleChange} placeholder="Supplier invoice" required error={errors.invoiceNo} />
+                        </div>
+                        <div>
+                            <DateInput label="GRN Date" name="grnDate" value={form.grnDate} onChange={(val) => setForm(p => ({ ...p, grnDate: val }))} required />
+                            {errors.grnDate && <div className="text-red-500 text-sm mt-1">{errors.grnDate}</div>}
+                        </div>
+                        <div>
+                            <SelectInput label="Supplier" name="supplierId" value={form.supplierId} options={supplierOptions} onChange={handleChange} required disabled={isPOSelected} />
+                            {errors.supplierId && <div className="text-red-500 text-sm mt-1">{errors.supplierId}</div>}
+                        </div>
+                        <div>
+                            <SelectInput label="Store" name="storeId" value={form.storeId} options={storeOptions} onChange={handleChange} required disabled={isPOSelected} />
+                            {errors.storeId && <div className="text-red-500 text-sm mt-1">{errors.storeId}</div>}
                         </div>
                     </div>
 
-                    {/* ── Row 2: Billing & Shipping Address ── */}
-                    <div className="mb-3" style={{
-                        background: "var(--color-surface)",
-                        border: "1px solid var(--color-border)",
-                        borderRadius: "var(--radius-md)",
-                        borderLeft: "4px solid var(--color-secondary)",
-                        boxShadow: "var(--shadow-sm)",
-                        overflow: "hidden",
-                    }}>
-                        <div className="px-3 py-2" style={{ background: "#fdf6ee", borderBottom: "1px solid var(--color-border)", display: "flex", alignItems: "center", gap: "8px" }}>
-                            <FaMapMarkerAlt style={{ color: "var(--color-secondary)", fontSize: "0.85rem" }} />
-                            <span style={{ color: "var(--color-secondary)", fontWeight: 600, fontSize: "0.85rem", letterSpacing: "0.04em", textTransform: "uppercase" }}>Billing & Shipping Address</span>
+                    <div className="grid grid-cols-1 gap-4 mt-6">
+                        {/* Billing */}
+                        <div>
+                            <h6 className="text-lg font-semibold text-gray-800 mb-4">Billing Address</h6>
+                            <AddressForm
+                                addressValue={form.billingAddressLine1}
+                                onAddressChange={(val) => setForm((prev) => ({ ...prev, billingAddressLine1: val }))}
+                                addressError={errors.billingAddressLine1}
+                                stateValue={form.billingState}
+                                onStateChange={(val) => handleBillingStateChange({ name: val, isoCode: "" })}
+                                stateError={errors.billingState}
+                                cityValue={form.billingCity}
+                                onCityChange={(val) => handleBillingCityChange({ name: val, isoCode: "" })}
+                                cityError={errors.billingCity}
+                                pincodeValue={form.billingPincode}
+                                onPincodeChange={(val) => setForm((prev) => ({ ...prev, billingPincode: val }))}
+                                pincodeError={errors.billingPincode}
+                                disabled={isPOSelected}
+                                required
+                            />
                         </div>
-                        <div className="p-3">
-                            <Row className="g-3">
-                                <Col lg={6}>
-                                    <h6 className="mb-3">Billing Address</h6>
-                                    <TextInput
-                                        label="Address Line"
-                                        name="billingAddressLine1"
-                                        value={form.billingAddressLine1}
-                                        onChange={handleChange}
-                                        disabled={isPOSelected}
-                                        required
-                                        error={errors.billingAddressLine1}
-                                    />
-                                    <Row>
-                                        <CityStateSelect
-                                            stateLabel="State"
-                                            cityLabel="City"
-                                            stateValue={form.billingState}
-                                            cityValue={form.billingCity}
-                                            onStateChange={handleBillingStateChange}
-                                            onCityChange={handleBillingCityChange}
-                                            stateError={errors.billingState}
-                                            cityError={errors.billingCity}
-                                            required
-                                            disabled={isPOSelected}
-                                        />
-                                        <Col md={4}>
-                                            <TextInput
-                                                label="Pincode"
-                                                name="billingPincode"
-                                                value={form.billingPincode}
-                                                onChange={handleChange}
-                                                disabled={isPOSelected}
-                                                required
-                                                error={errors.billingPincode}
-                                            />
-                                        </Col>
-                                    </Row>
-                                </Col>
 
-                                <Col lg={6}>
-                                    <div className="d-flex align-items-center justify-content-between mb-3">
-                                        <h6 className="mb-0">Shipping Address</h6>
-                                        <div>
-                                            <input
-                                                type="checkbox"
-                                                name="sameAsBilling"
-                                                checked={form.sameAsBilling}
-                                                onChange={handleChange}
-                                                disabled={isPOSelected}
-                                            />{" "}
-                                            Same as billing
-                                        </div>
-                                    </div>
-                                    <TextInput
-                                        label="Address Line"
-                                        name="shippingAddressLine1"
-                                        value={form.shippingAddressLine1}
-                                        onChange={handleChange}
-                                        disabled={isPOSelected || form.sameAsBilling}
-                                        required={!form.sameAsBilling}
-                                        error={errors.shippingAddressLine1}
-                                    />
-                                    <Row>
-                                        <CityStateSelect
-                                            stateLabel="State"
-                                            cityLabel="City"
-                                            stateValue={form.shippingState}
-                                            cityValue={form.shippingCity}
-                                            onStateChange={handleShippingStateChange}
-                                            onCityChange={handleShippingCityChange}
-                                            stateError={errors.shippingState}
-                                            cityError={errors.shippingCity}
-                                            required={!form.sameAsBilling}
-                                            disabled={isPOSelected || form.sameAsBilling}
-                                        />
-                                        <Col md={4}>
-                                            <TextInput
-                                                label="Pincode"
-                                                name="shippingPincode"
-                                                value={form.shippingPincode}
-                                                onChange={handleChange}
-                                                disabled={isPOSelected || form.sameAsBilling}
-                                                required={!form.sameAsBilling}
-                                                error={errors.shippingPincode}
-                                            />
-                                        </Col>
-                                    </Row>
-                                </Col>
-                            </Row>
-                        </div>
-                    </div>
-
-                    {/* ── Row 3: Receive Date, Bill Due Date, Challan, Transport, E-Way Bill, Upload ── */}
-                    <div className="mb-3" style={{
-                        background: "var(--color-surface)",
-                        border: "1px solid var(--color-border)",
-                        borderRadius: "var(--radius-md)",
-                        borderLeft: "4px solid var(--color-info, #3B82F6)",
-                        boxShadow: "var(--shadow-sm)",
-                        overflow: "hidden",
-                    }}>
-                        <div className="px-3 py-2" style={{ background: "#eff6ff", borderBottom: "1px solid var(--color-border)", display: "flex", alignItems: "center", gap: "8px" }}>
-                            <FaTruck style={{ color: "var(--color-info, #3B82F6)", fontSize: "0.85rem" }} />
-                            <span style={{ color: "var(--color-info, #3B82F6)", fontWeight: 600, fontSize: "0.85rem", letterSpacing: "0.04em", textTransform: "uppercase" }}>Receipt Details</span>
-                        </div>
-                        <div className="p-3">
-                            <Row className="g-3 align-items-end">
-                                <Col xl={2} lg={2} md={4} sm={6}>
-                                    <TextInput label="Receive Date" name="receiveDate" type="date" value={form.receiveDate} onChange={handleChange} />
-                                </Col>
-                                <Col xl={2} lg={2} md={4} sm={6}>
-                                    <TextInput label="Bill Due Date" name="billDueDate" type="date" value={form.billDueDate} onChange={handleChange} />
-                                </Col>
-                                <Col xl={2} lg={2} md={4} sm={6}>
-                                    <TextInput label="Challan No" name="challanNo" value={form.challanNo} onChange={handleChange} placeholder="Optional" />
-                                </Col>
-                                <Col xl={2} lg={2} md={4} sm={6}>
-                                    <TextInput label="Transporter" name="transport" value={form.transport} onChange={handleChange} placeholder="Optional" />
-                                </Col>
-                                <Col xl={2} lg={2} md={4} sm={6}>
-                                    <TextInput label="E-Way Bill" name="eWayBill" value={form.eWayBill} onChange={handleChange} placeholder="Optional" />
-                                </Col>
-                                <Col xl={2} lg={2} md={4} sm={6}>
-                                    <div className="d-flex flex-column" style={{ minHeight: "68px", justifyContent: "end", paddingBottom: "10px" }}>
-                                        <div className="d-flex align-items-center gap-2">
-                                            <input
-                                                type="checkbox"
-                                                id="updateStock"
-                                                name="updateStock"
-                                                checked={form.updateStock}
-                                                onChange={(e) => setForm((prev: any) => ({ ...prev, updateStock: e.target.checked }))}
-                                                style={{ width: "16px", height: "16px", cursor: "pointer" }}
-                                            />
-                                            <label htmlFor="updateStock" style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--color-text-secondary)", margin: 0, cursor: "pointer" }}>
-                                                Update Stock
-                                            </label>
-                                        </div>
-                                    </div>
-                                </Col>
-                                <Col xl={2} lg={2} md={4} sm={6}>
-                                    <label className="form-label" style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--color-text-secondary)" }}>Invoice Copy Upload</label>
+                        {/* Shipping */}
+                        <div>
+                            <div className="flex items-center justify-between mb-4">
+                                <h6 className="text-lg font-semibold text-gray-800 mb-0">Shipping Address</h6>
+                                <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-700 mb-0">
                                     <input
-                                        type="file"
-                                        accept="image/png,image/jpeg,image/webp,application/pdf"
-                                        className="form-control"
-                                        onChange={handleFileChange}
+                                        type="checkbox"
+                                        className="w-4 h-4 text-blue-600 rounded border-gray-300"
+                                        checked={form.sameAsBilling}
+                                        onChange={(e) => setForm((prev) => ({ ...prev, sameAsBilling: e.target.checked }))}
+                                        disabled={isPOSelected}
                                     />
-                                </Col>
-                            </Row>
+                                    <span>Same as billing</span>
+                                </label>
+                            </div>
+                            <AddressForm
+                                addressValue={form.shippingAddressLine1}
+                                onAddressChange={(val) => setForm((prev) => ({ ...prev, shippingAddressLine1: val }))}
+                                addressError={errors.shippingAddressLine1}
+                                stateValue={form.shippingState}
+                                onStateChange={(val) => handleShippingStateChange({ name: val, isoCode: "" })}
+                                stateError={errors.shippingState}
+                                cityValue={form.shippingCity}
+                                onCityChange={(val) => handleShippingCityChange({ name: val, isoCode: "" })}
+                                cityError={errors.shippingCity}
+                                pincodeValue={form.shippingPincode}
+                                onPincodeChange={(val) => setForm((prev) => ({ ...prev, shippingPincode: val }))}
+                                pincodeError={errors.shippingPincode}
+                                required={!form.sameAsBilling}
+                                disabled={isPOSelected || form.sameAsBilling}
+                            />
                         </div>
                     </div>
 
-                    {/* ── Remarks ── */}
-                    <div className="p-3 mb-3" style={{ background: "var(--color-surface, #fff)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md, 8px)" }}>
-                        <label className="form-label" style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--color-text-secondary)" }}>
-                            Remarks (Optional)
-                        </label>
-                        <textarea
-                            name="remarks"
-                            value={form.remarks}
-                            onChange={handleChange}
-                            placeholder="Additional notes"
-                            rows={2}
-                            className="form-control"
-                            style={{ resize: "vertical", fontSize: "0.875rem" }}
-                        />
+                    {/* Receipt Details */}
+                    <div className="mt-6">
+                        <h6 className="text-lg font-semibold text-gray-800 mb-4">Receipt Details</h6>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                            <div>
+                                <DateInput label="Receive Date" name="receiveDate" value={form.receiveDate} onChange={(val) => setForm(p => ({ ...p, receiveDate: val }))} />
+                            </div>
+                            <div>
+                                <DateInput label="Bill Due Date" name="billDueDate" value={form.billDueDate} onChange={(val) => setForm(p => ({ ...p, billDueDate: val }))} />
+                            </div>
+                            <div>
+                                <TextInput label="Challan No" name="challanNo" value={form.challanNo} onChange={handleChange} placeholder="Optional" />
+                            </div>
+                            <div>
+                                <TextInput label="Transporter" name="transport" value={form.transport} onChange={handleChange} placeholder="Optional" />
+                            </div>
+                            <div>
+                                <TextInput label="E-Way Bill" name="eWayBill" value={form.eWayBill} onChange={handleChange} placeholder="Optional" />
+                            </div>
+                            <div>
+                                <div className="flex flex-col min-h-[68px] justify-end pb-[10px]">
+                                    <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-700 font-semibold mb-0">
+                                        <input
+                                            type="checkbox"
+                                            className="w-4 h-4 text-blue-600 rounded border-gray-300"
+                                            checked={form.updateStock}
+                                            onChange={(e) => setForm((prev: any) => ({ ...prev, updateStock: e.target.checked }))}
+                                        />
+                                        <span>Update Stock</span>
+                                    </label>
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-1">Invoice Copy Upload</label>
+                                <input
+                                    type="file"
+                                    accept="image/png,image/jpeg,image/webp,application/pdf"
+                                    className="w-full text-sm border border-gray-300 rounded p-2 focus:ring-1 focus:ring-blue-500 outline-none"
+                                    onChange={handleFileChange}
+                                />
+                            </div>
+                        </div>
                     </div>
 
-                    {/* ── Supplier Details ── */}
-
-
-                    {/* ── Items ── */}
-                    <Section title="Items" icon={<FaBoxOpen />}>
-                        <div className="d-flex justify-content-end mb-3">
-                            <CustomButton text="Add Item" icon={FaPlus} type="button" size="sm" onClick={addItem} />
+                    {/* Remarks */}
+                    <div className="grid grid-cols-1 gap-6 mt-6">
+                        <div>
+                            <TextArea label="Remarks (Optional)" name="remarks" value={form.remarks} placeholder="Additional notes..." rows={2} onChange={(val) => setForm(p => ({ ...p, remarks: val }))} />
                         </div>
-                        <div className="table-wrap" style={{ width: "100%", overflowX: "auto" }}>
-                            <table className="master-data-table" style={{ width: "100%", tableLayout: "fixed" }}>
-                                <colgroup>
-                                    <col style={{ width: "4%" }} />
-                                    <col style={{ width: "22%" }} />
-                                    <col style={{ width: "24%" }} />
-                                    <col style={{ width: "12%" }} />
-                                    <col style={{ width: "14%" }} />
-                                    <col style={{ width: "10%" }} />
-                                    <col style={{ width: "10%" }} />
-                                    <col style={{ width: "4%" }} />
-                                </colgroup>
-                                <thead>
-                                    <tr>
-                                        <th>#</th>
-                                        <th>PRODUCT / DESCRIPTION</th>
-                                        <th>QUANTITY / UOM</th>
-                                        <th>UNIT PRICE (₹)</th>
-                                        <th>TAX %</th>
+                    </div>
 
-                                        <th>NET (₹)</th>
-                                        <th>ACTION</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {items.map((item, idx) => {
-                                        const itemRawMaterial = rawMaterials.find(
-                                            (rm) => String(rm.rawMaterialId) === String(item.productId)
-                                        );
-                                        const fallbackUoms = (activeUOMs || []).map((u: any) => u.uomName).join(",");
-                                        const baseUoms = itemRawMaterial?.baseUom || fallbackUoms;
+                    {/* Items */}
+                    <div className="flex justify-between items-center mb-4 mt-6">
+                        <span className="text-lg font-semibold text-gray-800">Order Items</span>
+                        <CustomButton text="Add Item" icon={FaPlus} type="button" onClick={addItem} />
+                    </div>
 
-                                        return (
-                                            <tr key={idx} className="master-data-row">
-                                                <td className="master-data-cell text-center">{idx + 1}</td>
-                                                <td className="master-data-cell">
-                                                    <input
-                                                        className="form-control form-control-sm"
-                                                        value={item.description}
-                                                        onChange={(e) => updateItem(idx, "description", e.target.value)}
-                                                        placeholder="Product name"
-                                                    />
-                                                </td>
-                                                <td className="master-data-cell">
-                                                    <QuantityInput
-                                                        label=""
-                                                        name={`items[${idx}].qty`}
-                                                        value={item.qty}
-                                                        baseUoms={baseUoms}
-                                                        required
-                                                        error={errors[`items.${idx}.qty`]}
-                                                        onChange={(e) => updateItem(idx, "qty", Number(e.target.value))}
-                                                    />
-                                                </td>
-                                            <td className="master-data-cell">
-                                                <input className="form-control form-control-sm" type="number" min={0} step={0.01} value={item.unitPrice} onChange={(e) => updateItem(idx, "unitPrice", Number(e.target.value))} />
+                    <div className="w-full overflow-x-auto border border-gray-200 rounded-lg">
+                        <table className="w-full text-left border-collapse text-sm whitespace-nowrap">
+                            <thead className="bg-gray-50 border-b border-gray-200 text-gray-600">
+                                <tr>
+                                    <th className="p-3 font-semibold w-12 text-center">#</th>
+                                    <th className="p-3 font-semibold min-w-[200px]">PRODUCT / DESCRIPTION</th>
+                                    <th className="p-3 font-semibold w-32">QUANTITY / UOM</th>
+                                    <th className="p-3 font-semibold w-32">UNIT PRICE (₹)</th>
+                                    <th className="p-3 font-semibold w-32">TAX %</th>
+                                    <th className="p-3 font-semibold w-32 text-right">NET (₹)</th>
+                                    <th className="p-3 font-semibold w-16 text-center">ACTION</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-200 bg-white">
+                                {items.map((item, idx) => {
+                                    const itemRawMaterial = rawMaterials.find(
+                                        (rm) => String(rm.rawMaterialId) === String(item.productId)
+                                    );
+                                    const fallbackUoms = (activeUOMs || []).map((u: any) => u.uomName).join(",");
+                                    const baseUoms = itemRawMaterial?.baseUom || fallbackUoms;
+
+                                    return (
+                                        <tr key={idx} className="hover:bg-slate-50 transition-colors">
+                                            <td className="p-3 text-center text-gray-500">{idx + 1}</td>
+                                            <td className="p-3">
+                                                <input
+                                                    className="w-full border-gray-300 rounded p-2 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none border"
+                                                    value={item.description}
+                                                    onChange={(e) => updateItem(idx, "description", e.target.value)}
+                                                    placeholder="Product name"
+                                                />
                                             </td>
-                                            <td className="master-data-cell">
+                                            <td className="p-3">
+                                                <QuantityInput
+                                                    label=""
+                                                    name={`items[${idx}].qty`}
+                                                    value={item.qty}
+                                                    baseUoms={baseUoms}
+                                                    required
+                                                    error={errors[`items.${idx}.qty`]}
+                                                    onChange={(e) => updateItem(idx, "qty", Number(e.target.value))}
+                                                />
+                                            </td>
+                                            <td className="p-3">
+                                                <input className="w-full border-gray-300 rounded p-2 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none border" type="number" min={0} step={0.01} value={item.unitPrice} onChange={(e) => updateItem(idx, "unitPrice", Number(e.target.value))} />
+                                            </td>
+                                            <td className="p-3">
                                                 <SelectInput
                                                     label=""
                                                     hideLabel={true}
@@ -830,152 +732,110 @@ const InvoiceDetailPage: React.FC = () => {
                                                 />
                                             </td>
 
-                                            <td className="master-data-cell text-end fw-semibold">₹{item.netAmount.toFixed(2)}</td>
-                                             <td className="master-data-cell text-center">
-                                                 <CustomButton text="" icon={FaTrash} type="button" variant="danger" size="sm" onClick={() => removeItem(idx)} />
-                                             </td>
+                                            <td className="p-3 text-right font-semibold text-gray-700">₹{item.netAmount.toFixed(2)}</td>
+                                            <td className="p-3 text-center">
+                                                <button type="button" onClick={() => removeItem(idx)} className="text-red-500 hover:text-red-700 p-2 rounded-full hover:bg-red-50 transition-colors" title="Remove Item">
+                                                    <FaTrash />
+                                                </button>
+                                            </td>
                                         </tr>
                                     );
                                 })}
-                                    {items.length === 0 && (
-                                        <tr><td colSpan={9} className="text-center text-muted py-4">No items added</td></tr>
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
+                                {items.length === 0 && (
+                                    <tr><td colSpan={7} className="text-center text-gray-500 py-8">No items added</td></tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
 
-                        {/* ── Summary ── */}
-                        <Row className="justify-content-end mt-4">
-                            <Col lg={5} md={7}>
-                                <div style={{
-                                    borderRadius: "var(--radius-md)",
-                                    border: "1px solid var(--color-border)",
-                                    overflow: "hidden",
-                                    boxShadow: "var(--shadow-md)",
-                                }}>
-                                    {/* Summary header */}
-                                    <div style={{ background: "var(--color-primary)", padding: "10px 16px" }}>
-                                        <span style={{ color: "#fff", fontWeight: 700, fontSize: "0.85rem", letterSpacing: "0.04em", textTransform: "uppercase" }}>Order Summary</span>
-                                    </div>
-                                    <div className="p-3" style={{ background: "var(--color-bg)" }}>
-                                        <div className="d-flex justify-content-between mb-2" style={{ fontSize: "0.875rem" }}>
-                                            <span style={{ color: "var(--color-text-secondary)" }}>Subtotal</span>
-                                            <span className="fw-semibold">₹{subtotal.toFixed(2)}</span>
-                                        </div>
-                                        <div className="d-flex justify-content-between align-items-center mb-2" style={{ fontSize: "0.875rem" }}>
-                                            <span style={{ color: "var(--color-text-secondary)" }}>Discount</span>
-                                            <div className="d-flex align-items-center gap-2">
-                                                <select
-                                                    className="form-select form-select-sm"
-                                                    value={form.discountType}
-                                                    onChange={(e) => setForm((p) => ({ ...p, discountType: e.target.value as any }))}
-                                                    style={{ width: "65px" }}
-                                                >
-                                                    <option value="flat">flat</option>
-                                                    <option value="percent">%</option>
-                                                </select>
-                                                <input type="number" min={0} step={0.01} value={form.discountValue}
-                                                    onChange={(e) => setForm((p) => ({ ...p, discountValue: Number(e.target.value) }))}
-                                                    className="form-control form-control-sm" style={{ width: "80px" }}
-                                                />
-                                            </div>
-                                        </div>
-                                        <div className="d-flex justify-content-between align-items-center mb-2" style={{ fontSize: "0.875rem" }}>
-                                            <span style={{ color: "var(--color-text-secondary)" }}>Rounding</span>
-                                            <div className="d-flex align-items-center gap-2">
-                                                <div className="d-flex align-items-center gap-1">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setRoundingSign("+")}
-                                                        style={{
-                                                            padding: "2px 8px",
-                                                            border: "1px solid var(--color-border)",
-                                                            borderRadius: "4px 0 0 4px",
-                                                            background: roundingSign === "+" ? "var(--color-primary, #047857)" : "var(--color-bg, #f9fafb)",
-                                                            color: roundingSign === "+" ? "#fff" : "var(--color-text-secondary)",
-                                                            fontSize: "0.8rem",
-                                                            fontWeight: 600,
-                                                            cursor: "pointer",
-                                                        }}
-                                                    >
-                                                        +
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setRoundingSign("-")}
-                                                        style={{
-                                                            padding: "2px 8px",
-                                                            border: "1px solid var(--color-border)",
-                                                            borderLeft: "none",
-                                                            borderRadius: "0 4px 4px 0",
-                                                            background: roundingSign === "-" ? "var(--color-danger, #ef4444)" : "var(--color-bg, #f9fafb)",
-                                                            color: roundingSign === "-" ? "#fff" : "var(--color-text-secondary)",
-                                                            fontSize: "0.8rem",
-                                                            fontWeight: 600,
-                                                            cursor: "pointer",
-                                                        }}
-                                                    >
-                                                        -
-                                                    </button>
-                                                </div>
-                                                <span className="text-muted small">
-                                                    {roundingSign === "+" ? "+" : "-"}{Number(form.roundingAdjust || 0).toFixed(2)}
-                                                </span>
-                                                <input type="number" min={0} step={0.01} value={form.roundingAdjust}
-                                                    onChange={(e) => setForm((p) => ({ ...p, roundingAdjust: Math.abs(Number(e.target.value)) }))}
-                                                    className="form-control form-control-sm" style={{ width: "80px" }}
-                                                    placeholder="0.00"
-                                                />
-                                            </div>
-                                        </div>
-                                        <div className="d-flex justify-content-between mb-2" style={{ fontSize: "0.875rem" }}>
-                                            <span style={{ color: "var(--color-text-secondary)" }}>Total Tax</span>
-                                            <span className="fw-semibold" style={{ color: "var(--color-success)" }}>₹{totalTax.toFixed(2)}</span>
-                                        </div>
-                                    </div>
-                                    {/* Grand total footer */}
-                                    <div className="d-flex justify-content-between align-items-center px-3 py-3" style={{ background: "var(--color-primary)", borderTop: "2px solid var(--color-secondary)" }}>
-                                        <span style={{ color: "#fff", fontWeight: 700, fontSize: "1rem" }}>Grand Total</span>
-                                        <span style={{ color: "var(--color-secondary)", fontWeight: 800, fontSize: "1.15rem" }}>₹{grandTotal.toFixed(2)}</span>
+                    {/* Summary section */}
+                    <div className="flex flex-col md:flex-row justify-end mt-6">
+                        <div className="w-full md:w-1/2 lg:w-1/3 border border-gray-200 rounded-lg overflow-hidden shadow-sm">
+                            <div className="bg-slate-50 px-4 py-3 border-b border-gray-200 font-semibold text-gray-700">Order Summary</div>
+                            <div className="p-4 space-y-3 bg-white">
+                                <div className="flex justify-between text-sm text-gray-600">
+                                    <span>Subtotal</span>
+                                    <span className="font-semibold text-gray-800">₹{subtotal.toFixed(2)}</span>
+                                </div>
+                                <div className="flex justify-between items-center text-sm text-gray-600">
+                                    <span>Discount</span>
+                                    <div className="flex items-center gap-2">
+                                        <select
+                                            className="border border-gray-300 rounded p-1 text-sm outline-none w-16"
+                                            value={form.discountType}
+                                            onChange={(e) => setForm((p) => ({ ...p, discountType: e.target.value as any }))}
+                                        >
+                                            <option value="flat">flat</option>
+                                            <option value="percent">%</option>
+                                        </select>
+                                        <input type="number" min={0} step={0.01} value={form.discountValue}
+                                            onChange={(e) => setForm((p) => ({ ...p, discountValue: Number(e.target.value) }))}
+                                            className="border border-gray-300 rounded p-1 text-sm outline-none w-20 text-right"
+                                        />
                                     </div>
                                 </div>
-                            </Col>
-                        </Row>
-                    </Section>
+                                <div className="flex justify-between items-center text-sm text-gray-600">
+                                    <span>Rounding</span>
+                                    <div className="flex items-center gap-2">
+                                        <div className="flex items-center">
+                                            <button
+                                                type="button"
+                                                onClick={() => setRoundingSign("+")}
+                                                className={`px-2 py-1 border border-gray-300 rounded-l text-xs font-semibold ${roundingSign === "+" ? "bg-blue-600 text-white border-blue-600" : "bg-gray-50 text-gray-600"}`}
+                                            >
+                                                +
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setRoundingSign("-")}
+                                                className={`px-2 py-1 border border-gray-300 border-l-0 rounded-r text-xs font-semibold ${roundingSign === "-" ? "bg-red-500 text-white border-red-500" : "bg-gray-50 text-gray-600"}`}
+                                            >
+                                                -
+                                            </button>
+                                        </div>
+                                        <input type="number" min={0} step={0.01} value={form.roundingAdjust}
+                                            onChange={(e) => setForm((p) => ({ ...p, roundingAdjust: Math.abs(Number(e.target.value)) }))}
+                                            className="border border-gray-300 rounded p-1 text-sm outline-none w-20 text-right"
+                                            placeholder="0.00"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="flex justify-between text-sm text-gray-600">
+                                    <span>Total Tax</span>
+                                    <span className="font-semibold text-green-600">₹{totalTax.toFixed(2)}</span>
+                                </div>
+                            </div>
+                            <div className="bg-slate-50 px-4 py-3 border-t border-gray-200 flex justify-between items-center">
+                                <span className="font-bold text-gray-800">Grand Total</span>
+                                <span className="font-extrabold text-blue-600 text-lg">₹{grandTotal.toFixed(2)}</span>
+                            </div>
+                        </div>
+                    </div>
 
-                    {/* ── Payment Details ── */}
-                    <Section title="Payment Details" icon={<FaCreditCard />}>
-                        <Row className="g-3 align-items-end">
-                            <Col lg={3} md={6}>
-                                <label className="form-label" style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--color-text-secondary)" }}>Payment Status</label>
-                                <div className="d-flex gap-2">
+                    {/* Payment Details */}
+                    <div className="mt-6">
+                        <h6 className="text-lg font-semibold text-gray-800 mb-4">Payment Details</h6>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                            <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-2">Payment Status</label>
+                                <div className="flex gap-2">
                                     {[
-                                        { label: "Paid", color: "var(--color-success)", bg: "#f0fdf4" },
-                                        { label: "Unpaid", color: "var(--color-danger)", bg: "#fef2f2" },
-                                        { label: "Partial", color: "var(--color-secondary)", bg: "#fdf6ee" },
-                                    ].map(({ label, color, bg }) => (
+                                        { label: "Paid", color: "text-green-700", border: "border-green-500", bg: "bg-green-50" },
+                                        { label: "Unpaid", color: "text-red-700", border: "border-red-500", bg: "bg-red-50" },
+                                        { label: "Partial", color: "text-orange-700", border: "border-orange-500", bg: "bg-orange-50" },
+                                    ].map(({ label, color, border, bg }) => (
                                         <button
                                             key={label}
                                             type="button"
                                             onClick={() => setForm((p) => ({ ...p, paymentStatus: label }))}
-                                            style={{
-                                                padding: "5px 14px",
-                                                borderRadius: "20px",
-                                                border: `2px solid ${form.paymentStatus === label ? color : "var(--color-border)"}`,
-                                                background: form.paymentStatus === label ? bg : "transparent",
-                                                color: form.paymentStatus === label ? color : "var(--color-text-secondary)",
-                                                fontWeight: form.paymentStatus === label ? 700 : 500,
-                                                fontSize: "0.8rem",
-                                                cursor: "pointer",
-                                                transition: "all 0.2s ease",
-                                            }}
+                                            className={`px-3 py-1.5 rounded-full text-xs font-semibold border-2 transition-colors ${form.paymentStatus === label ? `${color} ${border} ${bg}` : "border-gray-200 text-gray-500 hover:bg-gray-50"}`}
                                         >
                                             {label}
                                         </button>
                                     ))}
                                 </div>
-                            </Col>
-                            <Col lg={3} md={6}>
+                            </div>
+                            <div>
                                 <SelectInput
                                     label="Payment Method"
                                     name="paymentMethod"
@@ -991,18 +851,18 @@ const InvoiceDetailPage: React.FC = () => {
                                     ]}
                                     onChange={handleChange}
                                 />
-                            </Col>
-                            <Col lg={3} md={6}>
+                            </div>
+                            <div>
                                 <TextInput label="Reference Number / UTR" name="referenceNumber" value={form.referenceNumber} onChange={handleChange} placeholder="Transaction reference" />
-                            </Col>
-                            <Col lg={3} md={6}>
-                                <TextInput label="Payment Date" name="paymentDate" type="date" value={form.paymentDate} onChange={handleChange} />
-                            </Col>
-                        </Row>
-                    </Section>
+                            </div>
+                            <div>
+                                <DateInput label="Payment Date" name="paymentDate" value={form.paymentDate} onChange={(val) => setForm(p => ({ ...p, paymentDate: val }))} />
+                            </div>
+                        </div>
+                    </div>
 
-                    {/* ── Actions ── */}
-                    <div className="form-actions d-flex justify-content-end gap-3 mt-4" style={{ borderTop: "2px solid var(--color-border)", paddingTop: "1.5rem" }}>
+                    {/* Actions */}
+                    <div className="flex flex-wrap justify-end gap-3 mt-8 pt-4 border-t border-gray-200">
                         <CustomButton text="Cancel" type="button" onClick={() => navigate("/invoice")} />
                         <CustomButton
                             text={saving ? "Saving…" : "Create Bill & Update Stock"}
@@ -1011,7 +871,7 @@ const InvoiceDetailPage: React.FC = () => {
                         />
                     </div>
                 </form>
-            </Container>
+            </div>
         </div>
     );
 };

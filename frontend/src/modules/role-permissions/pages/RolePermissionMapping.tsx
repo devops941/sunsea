@@ -1,9 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Container, Row, Col, Spinner, Card, Form, Accordion, Badge } from "react-bootstrap";
-import { FaCheckSquare, FaSquare, FaUserShield, FaSave, FaSlidersH, FaShieldAlt } from "react-icons/fa";
+import { FaCheckSquare, FaSquare, FaSlidersH, FaShieldAlt, FaSpinner, FaCube, FaShoppingCart, FaBoxOpen, FaWarehouse, FaCogs, FaUsersCog, FaChartBar } from "react-icons/fa";
 import { toast } from "react-toastify";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
-import CustomButton from "../../../components/ui/Button/Button";
 import { useRoles } from "../../../hooks/useRoles";
 import { usePermissions } from "../../../hooks/usePermissions";
 
@@ -12,36 +10,43 @@ const MODULE_GROUPS = [
     {
         id: "sales",
         groupName: "Sales & Customers",
+        icon: <FaShoppingCart />,
         modules: ["sales-orders", "customers"]
     },
     {
         id: "purchase",
         groupName: "Purchase & Suppliers",
+        icon: <FaBoxOpen />,
         modules: ["purchase-order-approvals", "supplier", "suppliers", "supplierpricelist"]
     },
     {
         id: "products",
-        groupName: "Products & Materials Catalog",
+        groupName: "Products & Catalog",
+        icon: <FaCube />,
         modules: ["products", "categories", "sub-categories", "colors", "sizes", "uoms", "product-pricing", "product-images", "raw_materials"]
     },
     {
         id: "inventory",
-        groupName: "Inventory & Warehouses",
+        groupName: "Inventory & Storage",
+        icon: <FaWarehouse />,
         modules: ["raw_material_stocks", "finished_goods_stocks", "stores", "storage-stores", "store-types", "locations"]
     },
     {
         id: "production",
         groupName: "Production & Machines",
+        icon: <FaCogs />,
         modules: ["machines", "shifts"]
     },
     {
         id: "admin",
-        groupName: "System Administration & HR",
+        groupName: "System Admin & HR",
+        icon: <FaUsersCog />,
         modules: ["users", "roles", "permissions", "role-permissions", "employees", "departments", "profile"]
     },
     {
         id: "reports",
         groupName: "Analytics & Reports",
+        icon: <FaChartBar />,
         modules: ["reports"]
     }
 ];
@@ -97,6 +102,7 @@ const RolePermissionMapping: React.FC = () => {
     } = usePermissions();
 
     const [selectedRoleId, setSelectedRoleId] = useState<string>("");
+    const [activeTabId, setActiveTabId] = useState<string>("sales");
 
     useEffect(() => {
         loadRoles();
@@ -124,10 +130,7 @@ const RolePermissionMapping: React.FC = () => {
     // Group active database permissions by our user-friendly UI sections
     const groupedPermissions = useMemo(() => {
         return MODULE_GROUPS.map((group) => {
-            // Find all permissions matching module keys in this group
             const matchedPerms = permissions.filter((p) => group.modules.includes(p.module));
-
-            // Subgroup by module for detailed rows
             const subModules = group.modules.map(mod => {
                 const modPerms = matchedPerms.filter(p => p.module === mod);
                 return {
@@ -145,6 +148,8 @@ const RolePermissionMapping: React.FC = () => {
             };
         }).filter(g => g.totalCount > 0);
     }, [permissions, assignedPermissionIds]);
+
+    const activeGroup = groupedPermissions.find(g => g.id === activeTabId) || groupedPermissions[0];
 
     const handleRoleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
         setSelectedRoleId(e.target.value);
@@ -201,292 +206,195 @@ const RolePermissionMapping: React.FC = () => {
     }, [roles, selectedRoleId]);
 
     return (
-        <div className="inner-container py-4">
-            <style>{`
-                .role-perm-title {
-                    color: var(--color-primary) !important;
-                    font-family: 'head-font', sans-serif;
-                }
-                .role-perm-accordion.accordion {
-                    --bs-accordion-border-color: transparent;
-                    --bs-accordion-bg: transparent;
-                    gap: 12px;
-                    display: flex;
-                    flex-direction: column;
-                }
-                .role-perm-accordion .accordion-item {
-                    border-radius: 12px !important;
-                    border: 1px solid rgba(0,0,0,0.05) !important;
-                    background-color: var(--color-white);
-                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
-                    transition: all 0.2s ease-in-out;
-                    overflow: hidden;
-                }
-                .role-perm-accordion .accordion-item:hover {
-                    box-shadow: 0 6px 16px rgba(0, 52, 40, 0.08);
-                    border-color: rgba(0, 52, 40, 0.1) !important;
-                }
-                .role-perm-accordion .accordion-header button {
-                    font-family: 'head-font', sans-serif;
-                    font-size: 1rem !important;
-                    font-weight: 700 !important;
-                    color: var(--color-primary) !important;
-                    background-color: var(--color-white) !important;
-                    box-shadow: none !important;
-                    padding: 1rem 1.25rem;
-                    border-bottom: 1px solid transparent;
-                    transition: all 0.2s;
-                }
-                .role-perm-accordion .accordion-button:not(.collapsed) {
-                    background-color: rgba(0, 52, 40, 0.04) !important;
-                    color: var(--color-primary) !important;
-                    border-bottom: 1px solid rgba(0, 52, 40, 0.1) !important;
-                }
-                .role-perm-table {
-                    margin-bottom: 0 !important;
-                    border-collapse: separate;
-                    border-spacing: 0;
-                }
-                .role-perm-table thead {
-                    background: #f8f9fa !important;
-                }
-                .role-perm-table th {
-                    color: var(--color-primary) !important;
-                    font-family: 'head-font', sans-serif;
-                    font-weight: 700 !important;
-                    font-size: 12px !important;
-                    text-transform: uppercase;
-                    letter-spacing: 0.5px;
-                    border-bottom: 2px solid rgba(0,0,0,0.05) !important;
-                    padding: 14px 16px !important;
-                }
-                .role-perm-table td {
-                    padding: 14px 16px !important;
-                    border-bottom: 1px solid rgba(0,0,0,0.03) !important;
-                    font-size: 0.85rem !important;
-                    vertical-align: middle;
-                }
-                .role-perm-table tbody tr {
-                    transition: background-color 0.2s;
-                }
-                .role-perm-table tbody tr:hover {
-                    background-color: rgba(0, 52, 40, 0.02) !important;
-                }
-                .role-perm-badge-active {
-                    background-color: var(--color-secondary) !important;
-                    color: var(--color-white) !important;
-                    font-size: 0.85rem !important;
-                    font-weight: 600 !important;
-                    padding: 8px 16px !important;
-                    border-radius: 8px !important;
-                    border: none !important;
-                    box-shadow: 0 4px 10px rgba(203, 122, 33, 0.3);
-                }
-                .role-perm-badge-assigned {
-                    background-color: var(--color-primary) !important;
-                    font-size: 0.75rem !important;
-                    font-weight: 600 !important;
-                    color: var(--color-white) !important;
-                    border-radius: 6px;
-                    padding: 4px 10px;
-                }
-                .role-perm-table .form-check-input {
-                    cursor: pointer;
-                    width: 2.5em;
-                    height: 1.25em;
-                }
-                .role-perm-table .form-check-input:checked {
-                    background-color: var(--color-secondary) !important;
-                    border-color: var(--color-secondary) !important;
-                }
-                .role-perm-table .form-check-input:focus {
-                    border-color: var(--color-secondary-light) !important;
-                    box-shadow: 0 0 0 0.25rem rgba(203, 122, 33, 0.2) !important;
-                }
-                .role-perm-table .form-check-label {
-                    cursor: pointer;
-                    margin-top: 2px;
-                }
-                .role-perm-select-all {
-                    color: var(--color-secondary) !important;
-                    font-size: 0.85rem;
-                    font-weight: 600;
-                    cursor: pointer;
-                    transition: all 0.2s;
-                    user-select: none;
-                    background: rgba(203, 122, 33, 0.1);
-                    padding: 6px 12px;
-                    border-radius: 6px;
-                }
-                .role-perm-select-all:hover {
-                    background: rgba(203, 122, 33, 0.15);
-                    transform: translateY(-1px);
-                }
-            `}</style>
-            <Container fluid>
-                {/* HEADER SECTION */}
-                <div className="d-flex justify-content-between align-items-center mb-4 bg-white p-3 rounded shadow-sm border">
-                    <div>
-                        <h2 className="mb-1 fw-bold role-perm-title" style={{ fontSize: "1.6rem" }}>
-                            Role Permissions Mapping
-                        </h2>
-                        <div className="text-muted small">Administration / Security / Role Mappings</div>
+        <div className="w-full px-6 py-8 max-w-[1400px] mx-auto font-sans bg-gray-50/30 min-h-screen">
+            {/* HEADER SECTION */}
+            <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4">
+                <div>
+                    <h2 className="text-3xl font-extrabold text-gray-900 tracking-tight mb-2">
+                        Role Permissions Matrix
+                    </h2>
+                    <p className="text-gray-500 text-base max-w-2xl">
+                        Manage granular access controls across different modules. Select a role and configure their permissions using the interactive matrix.
+                    </p>
+                </div>
+                <div className="flex items-center gap-3 bg-white px-5 py-3 rounded-2xl shadow-sm border border-gray-100">
+                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                        <FaShieldAlt className="text-xl" />
                     </div>
                     <div>
-                        <Badge className="p-2 fs-6 role-perm-badge-active">
-                            <FaShieldAlt className="me-2" />
-                            {assignedPermissionIds.length} Active Permissions
-                        </Badge>
+                        <div className="text-sm text-gray-500 font-medium">Total Active</div>
+                        <div className="text-xl font-bold text-gray-900 leading-none">{assignedPermissionIds.length}</div>
                     </div>
                 </div>
+            </div>
 
-                {/* ROLE SELECTOR CARD */}
-                <Card className="mb-4 border-0 shadow-sm">
-                    <Card.Body className="p-4 bg-light rounded border">
-                        <Row className="align-items-center g-3">
-                            <Col md={4}>
-                                <SelectInput
-                                    label="Select Role to Map Permissions*"
-                                    name="roleSelector"
-                                    value={selectedRoleId}
-                                    options={roleOptions}
-                                    onChange={handleRoleChange}
-                                />
-                            </Col>
-                            <Col md={8}>
-                                <div className="p-3 bg-white rounded border d-flex align-items-center gap-3">
-                                    <FaSlidersH className="text-secondary fs-3" />
-                                    <div>
-                                        <h6 className="mb-1 fw-bold text-dark">Configuring permissions for role: <span className="text-primary">{selectedRoleName || "None"}</span></h6>
-                                        <p className="mb-0 text-muted small">
-                                            Select or deselect permission items below. Changes are saved automatically in real-time.
-                                        </p>
-                                    </div>
+            {/* ROLE SELECTOR CARD */}
+            <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-2 mb-8">
+                <div className="bg-gradient-to-r from-gray-50 to-white rounded-2xl p-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+                        <div className="lg:col-span-4">
+                            <SelectInput
+                                label="Target Role"
+                                name="roleSelector"
+                                value={selectedRoleId}
+                                options={roleOptions}
+                                onChange={handleRoleChange}
+                            />
+                        </div>
+                        <div className="lg:col-span-8">
+                            <div className="flex items-start gap-4">
+                                <div className="mt-1 p-3 bg-primary/5 text-primary rounded-xl shadow-sm">
+                                    <FaSlidersH className="text-2xl" />
                                 </div>
-                            </Col>
-                        </Row>
-                    </Card.Body>
-                </Card>
-
-                {/* PERMISSIONS MATRIX */}
-                {loading && permissions.length === 0 ? (
-                    <div className="text-center p-5">
-                        <Spinner animation="border" variant="primary" className="mb-2" />
-                        <div className="text-muted">Loading permission registry...</div>
+                                <div>
+                                    <h6 className="text-lg font-bold text-gray-900 mb-1">
+                                        Modifying Policy: <span className="text-primary">{selectedRoleName || "None"}</span>
+                                    </h6>
+                                    <p className="text-sm text-gray-500 leading-relaxed max-w-lg">
+                                        Changes applied below take effect immediately. Ensure you are editing the correct role before modifying access levels.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                ) : (
-                    <Accordion defaultActiveKey="0" className="shadow-sm role-perm-accordion">
-                        {groupedPermissions.map((group, grpIdx) => {
-                            const allGroupPerms = group.subModules.flatMap(sm => sm.permissions);
-                            const isAllSelected = allGroupPerms.every(p => assignedPermissionIds.includes(p.id));
+                </div>
+            </div>
 
+            {/* MAIN CONTENT AREA - SIDEBAR TABS & MATRIX */}
+            {loading && permissions.length === 0 ? (
+                <div className="flex flex-col items-center justify-center p-24 bg-white rounded-3xl border border-gray-100 shadow-sm">
+                    <FaSpinner className="animate-spin text-5xl text-primary mb-6" />
+                    <div className="text-gray-500 font-medium text-lg">Loading security policies...</div>
+                </div>
+            ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+                    
+                    {/* LEFT SIDEBAR - MODULE GROUPS */}
+                    <div className="lg:col-span-1 space-y-2">
+                        {groupedPermissions.map((group) => {
+                            const isActive = activeTabId === group.id;
+                            const isFullyAssigned = group.totalCount > 0 && group.assignedCount === group.totalCount;
+                            
                             return (
-                                <Accordion.Item eventKey={String(grpIdx)} key={group.id} className="border mb-3 rounded overflow-hidden">
-                                    <Accordion.Header className="bg-light">
-                                        <div className="d-flex align-items-center justify-content-between w-100 pe-3">
-                                            <div className="d-flex align-items-center gap-3">
-                                                <h5 className="mb-0 fw-bold text-dark" style={{ fontSize: "1rem" }}>
-                                                    {group.groupName}
-                                                </h5>
-                                                <Badge className="role-perm-badge-assigned">
-                                                    {group.assignedCount} / {group.totalCount} Assigned
-                                                </Badge>
-                                            </div>
-                                            <div
-                                                className="d-flex align-items-center gap-2 role-perm-select-all"
-                                                onClick={(e) => handleSelectAllInGroup(e, allGroupPerms)}
-                                            >
-                                                {isAllSelected ? <FaCheckSquare className="text-success" /> : <FaSquare />}
-                                                {isAllSelected ? "Deselect All" : "Select All Group"}
-                                            </div>
+                                <button
+                                    key={group.id}
+                                    onClick={() => setActiveTabId(group.id)}
+                                    className={`w-full flex items-center justify-between p-4 rounded-2xl transition-all duration-200 text-left border ${
+                                        isActive 
+                                            ? 'bg-primary border-primary text-white shadow-lg shadow-primary/20 scale-[1.02]' 
+                                            : 'bg-white border-transparent hover:border-gray-200 hover:bg-gray-50 text-gray-700 shadow-sm'
+                                    }`}
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <div className={`text-xl ${isActive ? 'text-white/90' : 'text-gray-400'}`}>
+                                            {group.icon}
                                         </div>
-                                    </Accordion.Header>
-                                    <Accordion.Body className="p-0">
-                                        <div className="table-responsive">
-                                            <table className="table table-hover table-striped mb-0 align-middle role-perm-table">
-                                                <thead className="table-light text-secondary small">
-                                                    <tr>
-                                                        <th style={{ width: "250px", paddingLeft: "1.5rem" }}>Sub-Module</th>
-                                                        <th>View (Read)</th>
-                                                        <th>Create (Add)</th>
-                                                        <th>Edit (Update)</th>
-                                                        <th>Delete (Remove)</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {group.subModules.map((sub) => {
-                                                        // Group sub-module permissions by action categories
-                                                        const viewPerm = sub.permissions.find(p => p.action === "view");
-                                                        const createPerm = sub.permissions.find(p => p.action === "create");
-                                                        const editPerm = sub.permissions.find(p => p.action === "edit");
-                                                        const deletePerm = sub.permissions.find(p => p.action === "delete");
-
-                                                        return (
-                                                            <tr key={sub.moduleKey}>
-                                                                <td className="fw-semibold text-dark" style={{ paddingLeft: "1.5rem" }}>
-                                                                    {sub.label}
-                                                                </td>
-                                                                <td>
-                                                                    {viewPerm ? (
-                                                                        <Form.Check 
-                                                                            type="switch"
-                                                                            id={`perm-${viewPerm.id}`}
-                                                                            checked={assignedPermissionIds.includes(viewPerm.id)}
-                                                                            onChange={() => handleTogglePermission(viewPerm.id)}
-                                                                            label={viewPerm.description || "View"}
-                                                                            className="small text-muted"
-                                                                        />
-                                                                    ) : <span className="text-muted small">-</span>}
-                                                                </td>
-                                                                <td>
-                                                                    {createPerm ? (
-                                                                        <Form.Check 
-                                                                            type="switch"
-                                                                            id={`perm-${createPerm.id}`}
-                                                                            checked={assignedPermissionIds.includes(createPerm.id)}
-                                                                            onChange={() => handleTogglePermission(createPerm.id)}
-                                                                            label={createPerm.description || "Create"}
-                                                                            className="small text-muted"
-                                                                        />
-                                                                    ) : <span className="text-muted small">-</span>}
-                                                                </td>
-                                                                <td>
-                                                                    {editPerm ? (
-                                                                        <Form.Check 
-                                                                            type="switch"
-                                                                            id={`perm-${editPerm.id}`}
-                                                                            checked={assignedPermissionIds.includes(editPerm.id)}
-                                                                            onChange={() => handleTogglePermission(editPerm.id)}
-                                                                            label={editPerm.description || "Edit"}
-                                                                            className="small text-muted"
-                                                                        />
-                                                                    ) : <span className="text-muted small">-</span>}
-                                                                </td>
-                                                                <td>
-                                                                    {deletePerm ? (
-                                                                        <Form.Check 
-                                                                            type="switch"
-                                                                            id={`perm-${deletePerm.id}`}
-                                                                            checked={assignedPermissionIds.includes(deletePerm.id)}
-                                                                            onChange={() => handleTogglePermission(deletePerm.id)}
-                                                                            label={deletePerm.description || "Delete"}
-                                                                            className="small text-muted"
-                                                                        />
-                                                                    ) : <span className="text-muted small">-</span>}
-                                                                </td>
-                                                            </tr>
-                                                        );
-                                                    })}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </Accordion.Body>
-                                </Accordion.Item>
+                                        <span className="font-semibold">{group.groupName}</span>
+                                    </div>
+                                    <div className={`text-xs font-bold px-2 py-1 rounded-lg ${
+                                        isActive 
+                                            ? 'bg-white/20 text-white' 
+                                            : isFullyAssigned 
+                                                ? 'bg-green-100 text-green-700' 
+                                                : group.assignedCount > 0 
+                                                    ? 'bg-secondary/10 text-secondary' 
+                                                    : 'bg-gray-100 text-gray-500'
+                                    }`}>
+                                        {group.assignedCount}/{group.totalCount}
+                                    </div>
+                                </button>
                             );
                         })}
-                    </Accordion>
-                )}
-            </Container>
+                    </div>
+
+                    {/* RIGHT AREA - PERMISSIONS MATRIX */}
+                    <div className="lg:col-span-3">
+                        {activeGroup && (
+                            <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden flex flex-col h-full animate-in fade-in slide-in-from-right-4 duration-300">
+                                {/* Matrix Header */}
+                                <div className="p-6 md:p-8 border-b border-gray-100 bg-gray-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                    <div className="flex items-center gap-4">
+                                        <div className="p-3 bg-white shadow-sm rounded-xl text-primary text-2xl">
+                                            {activeGroup.icon}
+                                        </div>
+                                        <div>
+                                            <h3 className="text-xl font-bold text-gray-900">{activeGroup.groupName}</h3>
+                                            <p className="text-sm text-gray-500 mt-1">Configure granular access for this module group.</p>
+                                        </div>
+                                    </div>
+                                    
+                                    <button
+                                        onClick={(e) => handleSelectAllInGroup(e, activeGroup.subModules.flatMap(sm => sm.permissions))}
+                                        className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm bg-white border border-gray-200 hover:border-gray-300 hover:bg-gray-50 text-gray-700 transition-all shadow-sm"
+                                    >
+                                        {activeGroup.subModules.flatMap(sm => sm.permissions).every(p => assignedPermissionIds.includes(p.id)) ? (
+                                            <><FaCheckSquare className="text-primary text-lg" /> Deselect All Group</>
+                                        ) : (
+                                            <><FaSquare className="text-gray-300 text-lg" /> Select All Group</>
+                                        )}
+                                    </button>
+                                </div>
+
+                                {/* Matrix Body */}
+                                <div className="p-0 overflow-x-auto flex-1">
+                                    <table className="w-full text-left border-collapse min-w-[750px]">
+                                        <thead>
+                                            <tr className="bg-white border-b-2 border-gray-100">
+                                                <th className="py-5 px-8 text-xs font-extrabold text-gray-400 uppercase tracking-widest w-[250px]">Entity</th>
+                                                <th className="py-5 px-6 text-xs font-extrabold text-gray-400 uppercase tracking-widest">Read</th>
+                                                <th className="py-5 px-6 text-xs font-extrabold text-gray-400 uppercase tracking-widest">Write</th>
+                                                <th className="py-5 px-6 text-xs font-extrabold text-gray-400 uppercase tracking-widest">Modify</th>
+                                                <th className="py-5 px-6 text-xs font-extrabold text-gray-400 uppercase tracking-widest">Remove</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-50">
+                                            {activeGroup.subModules.map((sub) => {
+                                                const viewPerm = sub.permissions.find(p => p.action === "view");
+                                                const createPerm = sub.permissions.find(p => p.action === "create");
+                                                const editPerm = sub.permissions.find(p => p.action === "edit");
+                                                const deletePerm = sub.permissions.find(p => p.action === "delete");
+
+                                                return (
+                                                    <tr key={sub.moduleKey} className="hover:bg-gray-50/80 transition-colors group">
+                                                        <td className="py-5 px-8">
+                                                            <div className="font-bold text-gray-900">{sub.label}</div>
+                                                            <div className="text-xs text-gray-400 font-medium mt-1 font-mono">{sub.moduleKey}</div>
+                                                        </td>
+                                                        {[
+                                                            { perm: viewPerm, color: "bg-blue-500", label: "Read" },
+                                                            { perm: createPerm, color: "bg-emerald-500", label: "Write" },
+                                                            { perm: editPerm, color: "bg-amber-500", label: "Modify" },
+                                                            { perm: deletePerm, color: "bg-rose-500", label: "Remove" }
+                                                        ].map((item, idx) => (
+                                                            <td key={idx} className="py-5 px-6">
+                                                                {item.perm ? (
+                                                                    <label className="relative inline-flex items-center cursor-pointer group/toggle">
+                                                                        <input 
+                                                                            type="checkbox" 
+                                                                            className="sr-only peer" 
+                                                                            checked={assignedPermissionIds.includes(item.perm.id)}
+                                                                            onChange={() => handleTogglePermission(item.perm!.id)} 
+                                                                        />
+                                                                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary shadow-inner"></div>
+                                                                    </label>
+                                                                ) : (
+                                                                    <div className="w-11 flex justify-center text-gray-300">
+                                                                        <div className="w-2 h-[2px] bg-gray-200 rounded"></div>
+                                                                    </div>
+                                                                )}
+                                                            </td>
+                                                        ))}
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

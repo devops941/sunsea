@@ -1,18 +1,20 @@
 // src/pages/sales/QuotationForm/QuotationReport.tsx
 import React, { useEffect, useState } from "react";
-import { Container, Row, Col, Spinner, Modal, Table } from "react-bootstrap";
-import { FaArrowLeft, FaCheck, FaTimes, FaUser, FaMapMarkerAlt, FaBoxOpen } from "react-icons/fa";
+import { FaArrowLeft, FaCheck, FaTimes, FaUser, FaMapMarkerAlt, FaBoxOpen, FaCalendarAlt, FaTruck, FaGlobe, FaFileAlt, FaCircleNotch, FaExclamationTriangle } from "react-icons/fa";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useSelector } from "react-redux";
 
 import CustomButton from "../../../components/ui/Button/Button";
+import BackButton from "../../../components/ui/BackButton/BackButton";
+import DetailBox from "../../../components/ui/DetailBox/DetailBox";
 import {
     salesOrderService,
     type SalesOrder,
     type MdApprovalDecisionDto,
 } from "../../../services/salesOrderService";
 import { getUnitPrice } from "../../../utils/pricingUtils";
+import CommonModal from "../../../components/ui/Modal/CommonModal";
 
 // ─── Formatting helpers ─────────────────────────────────────────────────
 const formatMoney = (val: string | number | null | undefined) => {
@@ -25,57 +27,10 @@ const formatDate = (val?: string | null) => {
     return new Date(val).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
 };
 
-
-
 const COLOR_TYPE_LABELS: Record<string, string> = {
     sc: "Single Color",
     mc: "Multi Color",
 };
-
-// ─── Small labeled value block ──────────────────────────────────────────
-const Field: React.FC<{ label: string; value: React.ReactNode }> = ({ label, value }) => (
-    <div className="mb-3">
-        <div
-            className="small text-uppercase"
-            style={{ fontSize: "0.72rem", letterSpacing: "0.05em", color: "var(--color-text-muted)", fontWeight: 600 }}
-        >
-            {label}
-        </div>
-        <div className="fw-semibold" style={{ color: "var(--color-text-primary)" }}>{value ?? "—"}</div>
-    </div>
-);
-
-// ─── Section wrapper ─────────────────────────────────────────────────────
-const Section: React.FC<{ title: string; icon?: React.ReactNode; children: React.ReactNode }> = ({ title, icon, children }) => (
-    <div
-        className="mb-4 p-4"
-        style={{
-            background: "var(--color-surface)",
-            borderRadius: "var(--radius-lg)",
-            border: "1px solid var(--color-border)",
-            boxShadow: "var(--shadow-sm)",
-        }}
-    >
-        <div className="d-flex align-items-center gap-2 mb-3 pb-2" style={{ borderBottom: "1px solid var(--color-border)" }}>
-            {icon && (
-                <span
-                    className="d-inline-flex align-items-center justify-content-center"
-                    style={{
-                        width: 32,
-                        height: 32,
-                        borderRadius: "var(--radius-sm)",
-                        background: "rgba(203, 122, 33, 0.1)",
-                        color: "var(--color-secondary)",
-                    }}
-                >
-                    {icon}
-                </span>
-            )}
-            <h6 className="mb-0 fw-bold" style={{ color: "var(--color-primary)", fontFamily: "var(--font-head)" }}>{title}</h6>
-        </div>
-        {children}
-    </div>
-);
 
 // ─── Component ────────────────────────────────────────────────────────────
 const QuotationReport: React.FC = () => {
@@ -90,9 +45,6 @@ const QuotationReport: React.FC = () => {
     const [reason, setReason] = useState("");
     const [actionLoading, setActionLoading] = useState(false);
 
-    // Always refetch from the server on load so this page reflects the
-    // current approval state — a stale location.state snapshot could
-    // still show PENDING_MD_APPROVAL after a decision was already made.
     useEffect(() => {
         const state = location.state as any;
         const load = async () => {
@@ -155,261 +107,222 @@ const QuotationReport: React.FC = () => {
 
     if (loading) {
         return (
-            <div className="inner-container">
-                <Container fluid className="text-center py-5">
-                    <Spinner animation="border" variant="primary" />
-                    <p className="mt-3">Loading data...</p>
-                </Container>
+            <div className="flex flex-col items-center justify-center py-20">
+                <FaCircleNotch className="animate-spin text-primary text-4xl mb-4" />
+                <p className="text-gray-500">Loading data...</p>
             </div>
         );
     }
 
     if (!order) {
         return (
-            <div className="inner-container">
-                <Container fluid className="py-5">
-                    <p className="text-muted">No quotation data found.</p>
-                </Container>
+            <div className="flex flex-col items-center justify-center py-20">
+                <p className="text-gray-500">No quotation data found.</p>
             </div>
         );
     }
 
     return (
-        <div className="inner-container">
-            <Container fluid>
+        <div className="w-full mx-auto">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
                 {/* ── Page Header ── */}
-                <div className="page-header">
-                    <Row className="align-items-center g-3">
-                        <Col lg={6} md={12}>
-                            <div className="page-header-info">
-                                <div className="d-flex align-items-center gap-3 flex-wrap">
-                                    <h2 className="page-title mb-0">{order.orderNo}</h2>
-                                </div>
-                                <div className="page-breadcrumb">Home / Sales / MD Approval / edit</div>
-                            </div>
-                        </Col>
-                        <Col lg={6} md={12}>
-                            <div className="page-header-actions d-flex justify-content-lg-end gap-2">
-                                <CustomButton
-                                    text="Back to List"
-                                    icon={FaArrowLeft}
-                                    onClick={() => navigate("/pending-quotations")}
-                                />
-                            </div>
-                        </Col>
-                    </Row>
+                <div className="px-6 py-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div>
+                            <h2 className="text-xl font-bold text-gray-800">
+                                {order.orderNo}
+                            </h2>
+                        </div>
+                        <div>
+                            <BackButton text="Back to List" />
+                        </div>
+                    </div>
                 </div>
 
-                {/* ── Rejection reason banner ── */}
-                {order.status === "MD_REJECTED" && (order as any).mdRejectionReason && (
-                    <div className="alert alert-danger mb-4">
-                        <strong>MD Rejected this order:</strong> {(order as any).mdRejectionReason}
-                    </div>
-                )}
-                {(order.status as string) === "CUSTOMER_REJECTED" && (order as any).customerRejectionReason && (
-                    <div className="alert alert-danger mb-4">
-                        <strong>Customer Rejected this order:</strong> {(order as any).customerRejectionReason}
-                    </div>
-                )}
-
-                <Row>
-                    {/* ── Left column: main details ── */}
-
-                    <Section title="Order Information">
-                        <Row>
-                            <Col md={4}><Field label="Quotation No" value={order.orderNo} /></Col>
-                            <Col md={4}><Field label="Quotation Date" value={formatDate(order.orderDate)} /></Col>
-                            <Col md={4}><Field label="Valid Until" value={formatDate(order.expectedCompletionDate)} /></Col>
-                            {order.remarks && <Col md={6}><Field label="Remarks" value={order.remarks} /></Col>}
-                            {order.internalNotes && <Col md={6}><Field label="Internal Notes" value={order.internalNotes} /></Col>}
-                        </Row>
-                    </Section>
-
-                    <Section title="Customer" icon={<FaUser />}>
-                        <Row>
-                            <Col md={4}><Field label="Name" value={order.customer?.displayName || order.customer?.firmName} /></Col>
-                            <Col md={4}><Field label="Type" value={order.customerType ? order.customerType.toLowerCase() : ""} /></Col>
-
-                        </Row>
-                    </Section>
-
-                    {order.mdApprovalReason && (
-                        <Section title="Credit Check Snapshot" icon={<FaUser />}>
-                            <Row>
-                                <Col md={3}>
-                                    <Field
-                                        label="Reason"
-                                        value={order.mdApprovalReason
-                                            .split(",")
-                                            .map((r) =>
-                                                r === "CREDIT_LIMIT_EXCEEDED"
-                                                    ? "Credit Limit Exceeded"
-                                                    : r === "OVERDUE_INVOICE"
-                                                    ? "Overdue Invoice"
-                                                    : r
-                                            )
-                                            .join(", ")}
-                                    />
-                                </Col>
-                                <Col md={3}>
-                                    <Field
-                                        label="Credit Limit"
-                                        value={formatMoney(order.creditCheckLimit)}
-                                    />
-                                </Col>
-                                <Col md={3}>
-                                    <Field
-                                        label="Outstanding Balance"
-                                        value={formatMoney(order.creditCheckOutstanding)}
-                                    />
-                                </Col>
-                                <Col md={3}>
-                                    <Field
-                                        label="Exceeded By"
-                                        value={formatMoney(order.creditCheckExceededBy)}
-                                    />
-                                </Col>
-                            </Row>
-                        </Section>
+                <div className="px-6 py-3 space-y-4">
+                    {/* ── Rejection reason banner ── */}
+                    {order.status === "MD_REJECTED" && (order as any).mdRejectionReason && (
+                        <div className="mb-4 bg-red-50 border-l-4 border-red-500 p-3 flex items-start gap-2">
+                            <FaExclamationTriangle className="text-red-500 mt-0.5 text-sm" />
+                            <div>
+                                <div className="text-red-800 font-semibold text-xs uppercase tracking-wide">MD Rejected this order</div>
+                                <p className="text-red-700 text-sm m-0">{(order as any).mdRejectionReason}</p>
+                            </div>
+                        </div>
+                    )}
+                    {(order.status as string) === "CUSTOMER_REJECTED" && (order as any).customerRejectionReason && (
+                        <div className="mb-4 bg-red-50 border-l-4 border-red-500 p-3 flex items-start gap-2">
+                            <FaExclamationTriangle className="text-red-500 mt-0.5 text-sm" />
+                            <div>
+                                <div className="text-red-800 font-semibold text-xs uppercase tracking-wide">Customer Rejected this order</div>
+                                <p className="text-red-700 text-sm m-0">{(order as any).customerRejectionReason}</p>
+                            </div>
+                        </div>
                     )}
 
-                    <Section title="Addresses" icon={<FaMapMarkerAlt />}>
-                        <Row>
-                            <Col md={6}>
-                                <div
-                                    className="small text-uppercase mb-2"
-                                    style={{ fontSize: "0.72rem", letterSpacing: "0.05em", color: "var(--color-text-muted)", fontWeight: 600 }}
-                                >
-                                    Billing Address
-                                </div>
-                                <div>{billing?.addressLine1}</div>
-                                <div>{billing?.city}, {billing?.state} — {billing?.pincode}</div>
-                            </Col>
-                            <Col md={6}>
-                                <div
-                                    className="small text-uppercase mb-2"
-                                    style={{ fontSize: "0.72rem", letterSpacing: "0.05em", color: "var(--color-text-muted)", fontWeight: 600 }}
-                                >
-                                    Shipping Address
-                                </div>
-                                <div>{shipping?.addressLine1}</div>
-                                <div>{shipping?.city}, {shipping?.state} — {shipping?.pincode}</div>
-                            </Col>
-                        </Row>
-                    </Section>
+                    {/* ── Order Info + Customer ── */}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 mb-4">
+                        <DetailBox label="Quotation No" value={order.orderNo} icon={<FaFileAlt />} />
+                        <DetailBox label="Customer" value={order.customer?.displayName || order.customer?.firmName} icon={<FaUser />} />
+                        <DetailBox label="Quotation Date" value={formatDate(order.orderDate)} icon={<FaCalendarAlt />} />
+                        <DetailBox label="Valid Until" value={formatDate(order.expectedCompletionDate)} icon={<FaCalendarAlt />} />
+                        <DetailBox label="Customer Type" value={order.customerType ? order.customerType.toLowerCase() : ""} icon={<FaUser />} />
+                    </div>
 
-                    <Section title="Items" icon={<FaBoxOpen />}>
-                        <div className="table-wrap">
-                            <Table hover className="master-data-table align-middle mb-0">
-                                <thead>
-                                    <tr>
-                                        <th>#</th>
-                                        <th>Product</th>
-                                        <th>Color</th>
-                                        <th className="text-end">Qty</th>
-                                        <th className="text-end">Unit Price</th>
-                                        <th className="text-end">Discount</th>
-                                        <th className="text-end">Taxable Value</th>
+                    {/* ── Billing ── */}
+                    <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2"><FaMapMarkerAlt className="text-blue-500" /> Billing</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+                        <DetailBox label="Address Line" value={billing.addressLine1} />
+                        <DetailBox label="State" value={billing.state} />
+                        <DetailBox label="City" value={billing.city} />
+                        <DetailBox label="Pincode" value={billing.pincode} />
+                    </div>
+
+                    {/* ── Shipping ── */}
+                    <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2"><FaMapMarkerAlt className="text-blue-500" /> Shipping</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+                        <DetailBox label="Address Line" value={shipping.addressLine1} />
+                        <DetailBox label="State" value={shipping.state} />
+                        <DetailBox label="City" value={shipping.city} />
+                        <DetailBox label="Pincode" value={shipping.pincode} />
+                    </div>
+
+                    {/* ── Items ── */}
+                    <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2"><FaBoxOpen className="text-blue-500" /> Quotation Items</h3>
+                    <div className="border border-gray-200 rounded-lg overflow-hidden mb-4">
+                        <table className="min-w-full text-sm">
+                            <thead>
+                                <tr className="bg-gray-50 border-b border-gray-200">
+                                    <th className="py-3 pl-4 pr-2 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wide w-8">#</th>
+                                    <th className="py-3 px-2 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wide">Product</th>
+                                    <th className="py-3 px-2 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wide">Color</th>
+                                    <th className="py-3 px-2 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wide">Qty</th>
+                                    <th className="py-3 px-2 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wide">Unit Price</th>
+                                    <th className="py-3 px-2 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wide">Discount</th>
+                                    <th className="py-3 px-2 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wide">Taxable</th>
+                                    {order.isInterState ? (
+                                        <th className="py-3 px-2 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wide">IGST</th>
+                                    ) : (
+                                        <>
+                                            <th className="py-3 px-2 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wide">CGST</th>
+                                            <th className="py-3 px-2 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wide">SGST</th>
+                                        </>
+                                    )}
+                                    <th className="py-3 pr-4 pl-2 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wide">Line Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {(order.items || []).map((item: any, idx: number) => (
+                                    <tr key={item.id || idx} className="border-b border-gray-100 last:border-b-0 bg-white">
+                                        <td className="py-3 pl-4 pr-2 text-gray-700">{idx + 1}</td>
+                                        <td className="py-3 px-2">
+                                            <div className="font-medium text-gray-900">{item.product?.productName || item.productId}</div>
+                                            <div className="text-gray-500 text-xs">{item.product?.productCode}</div>
+                                        </td>
+                                        <td className="py-3 px-2 text-gray-700">{COLOR_TYPE_LABELS[item.colorType] || item.colorType || "—"}</td>
+                                        <td className="py-3 px-2 text-right text-gray-900">{item.quantity}</td>
+                                        <td className="py-3 px-2 text-right text-gray-900">{formatMoney(getUnitPrice(item, order.customerType))}</td>
+                                        <td className="py-3 px-2 text-right text-gray-900">
+                                            {formatMoney(item.discountAmount)}
+                                            <div className="text-gray-500 text-xs">
+                                                ({item.discountType === "PERCENT" ? `${item.discountValue}%` : "flat"})
+                                            </div>
+                                        </td>
+                                        <td className="py-3 px-2 text-right text-gray-900">{formatMoney(item.taxableAmount || item.taxableValue)}</td>
+
                                         {order.isInterState ? (
-                                            <th className="text-end">IGST</th>
+                                            <td className="py-3 px-2 text-right text-gray-900">
+                                                {formatMoney(item.igstAmount || item.gstAmount || 0)}
+                                                <div className="text-gray-500 text-xs">({item.igstRate || item.gstRate || 0}%)</div>
+                                            </td>
                                         ) : (
                                             <>
-                                                <th className="text-end">CGST</th>
-                                                <th className="text-end">SGST</th>
+                                                <td className="py-3 px-2 text-right text-gray-900">
+                                                    {formatMoney(item.cgstAmount || (Number(item.gstAmount || 0) / 2))}
+                                                    <div className="text-gray-500 text-xs">({item.cgstRate || (Number(item.gstRate || 0) / 2)}%)</div>
+                                                </td>
+                                                <td className="py-3 px-2 text-right text-gray-900">
+                                                    {formatMoney(item.sgstAmount || (Number(item.gstAmount || 0) / 2))}
+                                                    <div className="text-gray-500 text-xs">({item.sgstRate || (Number(item.gstRate || 0) / 2)}%)</div>
+                                                </td>
                                             </>
                                         )}
-
-                                        <th className="text-end">Line Total</th>
+                                        <td className="py-3 pr-4 pl-2 text-right font-medium text-gray-900">{formatMoney(item.lineTotal)}</td>
                                     </tr>
-                                </thead>
-                                <tbody>
-                                    {(order.items || []).map((item: any, idx: number) => (
-                                        <tr key={item.id || idx} className="master-data-row">
-                                            <td className="master-data-cell">{idx + 1}</td>
-                                            <td className="master-data-cell">
-                                                <div className="fw-semibold">{item.product?.productName || item.productId}</div>
-                                                <div className="text-muted small">{item.product?.productCode}</div>
-                                            </td>
-                                            <td className="master-data-cell">{COLOR_TYPE_LABELS[item.colorType] || item.colorType || "—"}</td>
-                                            <td className="master-data-cell text-end">{item.quantity}</td>
-                                            <td className="master-data-cell text-end">{formatMoney(getUnitPrice(item, order.customerType))}</td>
-                                            <td className="master-data-cell text-end">
-                                                {formatMoney(item.discountAmount)}
-                                                <div className="text-muted small">
-                                                    ({item.discountType === "PERCENT" ? `${item.discountValue}%` : "flat"})
-                                                </div>
-                                            </td>
-                                            <td className="master-data-cell text-end">{formatMoney(item.taxableAmount || item.taxableValue)}</td>
-                                            {order.isInterState ? (
-                                                <td className="master-data-cell text-end">
-                                                    {formatMoney(item.igstAmount || item.gstAmount || 0)}
-                                                    <div className="text-muted small">({item.igstRate || item.gstRate || 0}%)</div>
-                                                </td>
-                                            ) : (
-                                                <>
-                                                    <td className="master-data-cell text-end">
-                                                        {formatMoney(item.cgstAmount || (Number(item.gstAmount || 0) / 2))}
-                                                        <div className="text-muted small">({item.cgstRate || (Number(item.gstRate || 0) / 2)}%)</div>
-                                                    </td>
-                                                    <td className="master-data-cell text-end">
-                                                        {formatMoney(item.sgstAmount || (Number(item.gstAmount || 0) / 2))}
-                                                        <div className="text-muted small">({item.sgstRate || (Number(item.gstRate || 0) / 2)}%)</div>
-                                                    </td>
-                                                </>
-                                            )}
-
-                                            <td className="master-data-cell text-end fw-bold">{formatMoney(item.lineTotal)}</td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </Table>
-                        </div>
-                    </Section>
-
-                    <Section title="Amount Summary">
-                        <Row>
-                            <Col md={6}>
-                                <div className="d-flex justify-content-between py-1">
-                                    <span className="text-muted">Subtotal</span>
-                                    <span>{formatMoney(order.subtotal)}</span>
-                                </div>
-                                {order.isInterState ? (
-                                    <div className="d-flex justify-content-between py-1 small text-success">
-                                        <span>IGST</span>
-                                        <span>+ {formatMoney(order.totalIgst || order.totalGst || 0)}</span>
-                                    </div>
-                                ) : (
-                                    <>
-                                        <div className="d-flex justify-content-between py-1 small text-success">
-                                            <span>CGST</span>
-                                            <span>+ {formatMoney(order.totalCgst || (Number(order.totalGst || 0) / 2))}</span>
-                                        </div>
-                                        <div className="d-flex justify-content-between py-1 small text-success">
-                                            <span>SGST</span>
-                                            <span>+ {formatMoney(order.totalSgst || (Number(order.totalGst || 0) / 2))}</span>
-                                        </div>
-                                    </>
+                                ))}
+                                {(!order.items || order.items.length === 0) && (
+                                    <tr>
+                                        <td colSpan={10} className="py-8 text-center text-gray-500 text-sm">
+                                            No items found.
+                                        </td>
+                                    </tr>
                                 )}
-                                <div className="d-flex justify-content-between py-1">
-                                    <span className="text-muted">Discount</span>
-                                    <span className="text-danger">− {formatMoney(order.totalDiscount)}</span>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {/* ── Summary totals ── */}
+                    {order.items && order.items.length > 0 && (
+                        <div className="flex justify-end mb-4">
+                            <div className="w-full max-w-sm border border-gray-200 rounded-lg p-4 bg-gray-50">
+                                <div className="space-y-1.5 text-sm">
+                                    <div className="flex justify-between">
+                                        <span className="text-gray-500">Subtotal</span>
+                                        <span className="text-gray-900">{formatMoney(order.subtotal)}</span>
+                                    </div>
+
+                                    {order.totalDiscount > 0 && (
+                                        <div className="flex justify-between">
+                                            <span className="text-gray-500">Discount</span>
+                                            <span className="text-red-600">- {formatMoney(order.totalDiscount)}</span>
+                                        </div>
+                                    )}
+
+                                    {order.isInterState ? (
+                                        <div className="flex justify-between">
+                                            <span className="text-gray-500">IGST</span>
+                                            <span className="text-gray-900">+ {formatMoney(order.totalIgst || order.totalGst || 0)}</span>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <div className="flex justify-between">
+                                                <span className="text-gray-500">CGST</span>
+                                                <span className="text-gray-900">+ {formatMoney(order.totalCgst || (Number(order.totalGst || 0) / 2))}</span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span className="text-gray-500">SGST</span>
+                                                <span className="text-gray-900">+ {formatMoney(order.totalSgst || (Number(order.totalGst || 0) / 2))}</span>
+                                            </div>
+                                        </>
+                                    )}
+
+                                    <div className="flex justify-between pt-2 border-t border-gray-300">
+                                        <span className="text-base font-bold text-gray-900">Net Amount</span>
+                                        <span className="text-base font-bold text-gray-900">{formatMoney(order.netAmount)}</span>
+                                    </div>
                                 </div>
-                                <hr style={{ borderColor: "var(--color-border)" }} />
-                                <div className="d-flex justify-content-between py-1">
-                                    <span className="fw-bold" style={{ color: "var(--color-primary)" }}>Net Amount</span>
-                                    <span className="fw-bold fs-5" style={{ color: "var(--color-secondary)" }}>{formatMoney(order.netAmount)}</span>
-                                </div>
-                            </Col>
-                        </Row>
-                    </Section>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ── Notes ── */}
+                    {(order.remarks || order.internalNotes) && (
+                        <>
+                            <h3 className="text-lg font-semibold text-gray-800 mb-4">Notes</h3>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+                                {order.remarks && <DetailBox label="Remarks" value={order.remarks} />}
+                                {order.internalNotes && <DetailBox label="Internal Notes" value={order.internalNotes} />}
+                            </div>
+                        </>
+                    )}
 
                     {/* ── Approve / Reject actions (only while pending MD approval) ── */}
                     {order.status === "PENDING_MD_APPROVAL" && (
-                        <div className="d-flex justify-content-end gap-3 mt-4 pt-3" style={{ borderTop: "1px solid var(--color-border)" }}>
+                        <div className="flex flex-wrap justify-end gap-3 mt-8 pt-4 border-t border-gray-200">
                             <CustomButton
                                 text="Reject"
                                 icon={FaTimes}
-                                className="btn-outline-danger"
+                                className="!bg-white !text-red-600 border border-red-600 hover:!bg-red-50"
                                 onClick={() => {
                                     setReason("");
                                     setActionMode("reject");
@@ -418,54 +331,50 @@ const QuotationReport: React.FC = () => {
                             <CustomButton
                                 text="Approve"
                                 icon={FaCheck}
-                                className="btn-success"
+                                className="!bg-green-600 !text-white hover:!bg-green-700"
                                 onClick={() => setActionMode("approve")}
                             />
                         </div>
                     )}
-
-                    {/* ── Right column: approval trail + totals ── */}
-
-                </Row>
-            </Container>
+                </div>
+            </div>
 
             {/* ── Confirmation Modal ── */}
-            <Modal show={actionMode !== null} onHide={() => setActionMode(null)} centered>
-                <Modal.Header closeButton>
-                    <Modal.Title style={{ color: "var(--color-primary)", fontFamily: "var(--font-head)" }}>
-                        {actionMode === "approve" ? "Approve Quotation" : "Reject Quotation"}
-                    </Modal.Title>
-                </Modal.Header>
-                <Modal.Body>
-                    {actionMode === "approve" ? (
-                        <p>Are you sure you want to approve this quotation?</p>
-                    ) : (
-                        <>
-                            <label htmlFor="rejection-reason" className="form-label">
-                                Enter the reason for rejection <span className="text-danger">*</span>
-                            </label>
-                            <textarea
-                                id="rejection-reason"
-                                className="form-control"
-                                rows={4}
-                                placeholder="Type your rejection reason here..."
-                                value={reason}
-                                onChange={(e) => setReason(e.target.value)}
-                                required
-                            />
-                        </>
-                    )}
-                </Modal.Body>
-                <Modal.Footer>
-                    <CustomButton text="Cancel" onClick={() => setActionMode(null)} disabled={actionLoading} />
-                    <CustomButton
-                        text={actionLoading ? "Processing..." : actionMode === "approve" ? "Confirm Approve" : "Confirm Reject"}
-                        className={actionMode === "approve" ? "btn-success" : "btn-danger"}
-                        onClick={handleConfirmAction}
-                        disabled={actionLoading || (actionMode === "reject" && !isRejectReasonValid)}
-                    />
-                </Modal.Footer>
-            </Modal>
+            <CommonModal
+                show={actionMode !== null}
+                onHide={() => setActionMode(null)}
+                title={actionMode === "approve" ? "Approve Quotation" : "Reject Quotation"}
+                footer={
+                    <>
+                        <CustomButton text="Cancel" onClick={() => setActionMode(null)} disabled={actionLoading} className="!bg-white !text-gray-700 border border-gray-300 hover:!bg-gray-50" />
+                        <CustomButton
+                            text={actionLoading ? "Processing..." : actionMode === "approve" ? "Confirm Approve" : "Confirm Reject"}
+                            className={actionMode === "approve" ? "!bg-green-600 !text-white hover:!bg-green-700" : "!bg-red-600 !text-white hover:!bg-red-700"}
+                            onClick={handleConfirmAction}
+                            disabled={actionLoading || (actionMode === "reject" && !isRejectReasonValid)}
+                        />
+                    </>
+                }
+            >
+                {actionMode === "approve" ? (
+                    <p className="text-gray-700">Are you sure you want to approve this quotation?</p>
+                ) : (
+                    <div className="flex flex-col">
+                        <label htmlFor="rejection-reason" className="text-gray-700 font-medium mb-2 text-sm">
+                            Enter the reason for rejection <span className="text-red-500">*</span>
+                        </label>
+                        <textarea
+                            id="rejection-reason"
+                            className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            rows={4}
+                            placeholder="Type your rejection reason here..."
+                            value={reason}
+                            onChange={(e) => setReason(e.target.value)}
+                            required
+                        />
+                    </div>
+                )}
+            </CommonModal>
         </div>
     );
 };

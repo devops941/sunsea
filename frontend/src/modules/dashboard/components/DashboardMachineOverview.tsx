@@ -1,5 +1,4 @@
 import React from 'react';
-import { Row, Col, Card, Badge } from 'react-bootstrap';
 import { FaCogs } from 'react-icons/fa';
 
 export interface DashboardMachineOverviewProps {
@@ -20,88 +19,73 @@ const DashboardMachineOverview: React.FC<DashboardMachineOverviewProps> = ({ mac
         switch (status.toUpperCase()) {
             case 'ACTIVE':
             case 'RUNNING':
-                return 'success';
+                return 'bg-green-100 text-green-800';
             case 'MAINTENANCE':
-                return 'warning';
+                return 'bg-yellow-100 text-yellow-800';
             case 'INACTIVE':
             case 'STOPPED':
-                return 'danger';
+                return 'bg-red-100 text-red-800';
             default:
-                return 'secondary';
+                return 'bg-gray-100 text-gray-800';
         }
     };
 
-    // const getStatusIcon = (status: string) => {
-    //     switch (status.toUpperCase()) {
-    //         case 'ACTIVE':
-    //         case 'RUNNING':
-    //             return <FaCheckCircle className="text-success" />;
-    //         case 'MAINTENANCE':
-    //             return <FaWrench className="text-warning" />;
-    //         case 'INACTIVE':
-    //         case 'STOPPED':
-    //             return <FaExclamationTriangle className="text-danger" />;
-    //         default:
-    //             return <FaCogs className="text-secondary" />;
-    //     }
-    // };
-
     return (
-        <Card className="border-0 shadow-sm rounded-3 mb-4">
-            <Card.Body className="p-4">
-                <h5 className="fw-bold mb-4">Machine Overview</h5>
+        <div className="bg-white border-0 shadow-sm rounded-xl mb-6">
+            <div className="p-6">
+                <h5 className="font-bold text-gray-900 mb-6 text-lg">Machine Overview</h5>
 
-                <Row className="g-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
                     {machines.slice(0, 8).map((machine, idx) => (
-                        <Col xl={3} lg={4} md={6} sm={12} key={machine.id || idx}>
-                            <Card className="h-100 border bg-light bg-opacity-50">
-                                <Card.Body className="p-3">
-                                    <div className="d-flex justify-content-between align-items-start mb-3">
+                        <div key={machine.id || idx}>
+                            <div className="h-full border border-gray-200 bg-gray-50 bg-opacity-50 rounded-lg flex flex-col">
+                                <div className="p-4 flex-1 flex flex-col">
+                                    <div className="flex justify-between items-start mb-4">
                                         <div>
-                                            <h6 className="fw-bold mb-1 text-truncate" style={{ maxWidth: '150px' }} title={machine.name}>
+                                            <h6 className="font-bold text-gray-900 mb-1 truncate" style={{ maxWidth: '150px' }} title={machine.name}>
                                                 {machine.name}
                                             </h6>
-                                            <small className="text-muted font-monospace">{machine.code}</small>
+                                            <small className="text-gray-500 font-mono">{machine.code}</small>
                                         </div>
-                                        <Badge bg={getStatusColor(machine.status)} className="px-2 py-1">
+                                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(machine.status)}`}>
                                             {machine.status}
-                                        </Badge>
+                                        </span>
                                     </div>
 
-                                    <div className="d-flex align-items-center gap-2 mb-3">
-                                        <span className="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25">
+                                    <div className="flex items-center gap-2 mb-4">
+                                        <span className="inline-block px-2 py-1 text-xs font-medium bg-gray-100 text-gray-600 border border-gray-200 rounded">
                                             {machine.technology || 'N/A'}
                                         </span>
                                     </div>
 
-                                    <div className="border-top pt-3 mt-auto">
-                                        <Row className="g-2 text-center">
-                                            <Col xs={6}>
-                                                <div className="small text-muted mb-1">Weekly Qty</div>
-                                                <div className="fw-bold text-dark">{machine.weeklyPlannedQty.toLocaleString()}</div>
-                                            </Col>
-                                            <Col xs={6} className="border-start">
-                                                <div className="small text-muted mb-1">Scheduled Jobs</div>
-                                                <div className="fw-bold text-dark">{machine.scheduledJobs}</div>
-                                            </Col>
-                                        </Row>
+                                    <div className="border-t border-gray-200 pt-4 mt-auto">
+                                        <div className="grid grid-cols-2 text-center">
+                                            <div>
+                                                <div className="text-xs text-gray-500 mb-1">Weekly Qty</div>
+                                                <div className="font-bold text-gray-900">{machine.weeklyPlannedQty.toLocaleString()}</div>
+                                            </div>
+                                            <div className="border-l border-gray-200">
+                                                <div className="text-xs text-gray-500 mb-1">Scheduled Jobs</div>
+                                                <div className="font-bold text-gray-900">{machine.scheduledJobs}</div>
+                                            </div>
+                                        </div>
                                     </div>
-                                </Card.Body>
-                            </Card>
-                        </Col>
+                                </div>
+                            </div>
+                        </div>
                     ))}
 
                     {machines.length === 0 && (
-                        <Col xs={12}>
-                            <div className="text-center py-5 text-muted">
-                                <FaCogs size={48} className="mb-3 opacity-25" />
+                        <div className="col-span-full">
+                            <div className="text-center py-10 text-gray-500">
+                                <FaCogs size={48} className="mb-4 opacity-25 mx-auto" />
                                 <p>No machines found</p>
                             </div>
-                        </Col>
+                        </div>
                     )}
-                </Row>
-            </Card.Body>
-        </Card>
+                </div>
+            </div>
+        </div>
     );
 };
 

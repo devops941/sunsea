@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import { Container, Row, Col } from "react-bootstrap";
 import { FaSave, FaEraser, FaArrowLeft } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -38,9 +37,10 @@ const StoreTypeCreate: React.FC = () => {
         fetchNextCode();
     }, []);
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const target = e.target;
-        const { name, value, type } = target;
+        const { name, value } = target;
+        const type = (target as any).type;
 
         const checked =
             type === "checkbox"
@@ -133,9 +133,7 @@ const StoreTypeCreate: React.FC = () => {
 
         try {
             await dispatch(createStoreType(formData)).unwrap();
-
             toast.success("Store Type created successfully!");
-
             navigate("/store-types");
         } catch (err: any) {
             toast.error(err || "Failed to create store type");
@@ -143,32 +141,22 @@ const StoreTypeCreate: React.FC = () => {
             setIsSubmitting(false);
         }
     };
+    
     return (
-        <div className="inner-container">
-            <Container fluid>
-                <div className="page-header">
-                    <Row className="align-items-center g-3">
-                        <Col lg={6} md={12}>
-                            <div className="page-header-info">
-                                <h2 className="page-title">Create Store Type</h2>
-                                <div className="page-breadcrumb">Home / Settings / Store Types / Create</div>
-                            </div>
-                        </Col>
-                        <Col lg={6} md={12}>
-                            <div className="page-header-actions">
-                                <CustomButton
-                                    text="Back to List"
-                                    icon={FaArrowLeft}
-                                    onClick={() => navigate("/store-types")}
-                                />
-                            </div>
-                        </Col>
-                    </Row>
-                </div>
+        <div className="p-4 md:p-6 min-h-screen bg-slate-50">
+            <div className="max-w-7xl mx-auto space-y-3">
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200">
+                    <div className="p-6 border-b border-slate-200 flex items-center justify-between">
+                        <h2 className="text-2xl font-bold text-slate-800">Create Store Type</h2>
+                        <CustomButton
+                            text="Back to List"
+                            icon={FaArrowLeft}
+                            onClick={() => navigate("/store-types")}
+                        />
+                    </div>
 
-                <form onSubmit={handleSubmit} className="form-inner">
-                    <Row className="g-3">
-                        <Col md={6}>
+                    <form onSubmit={handleSubmit} className="p-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             <TextInput
                                 label="Store Type Code"
                                 name="code"
@@ -178,8 +166,6 @@ const StoreTypeCreate: React.FC = () => {
                                 onChange={handleChange}
                                 disabled
                             />
-                        </Col>
-                        <Col md={6}>
                             <TextInput
                                 label="Store Type Name"
                                 name="name"
@@ -189,8 +175,6 @@ const StoreTypeCreate: React.FC = () => {
                                 error={errors.name}
                                 onChange={handleChange}
                             />
-                        </Col>
-                        <Col md={12}>
                             <TextInput
                                 label="Description"
                                 name="description"
@@ -200,8 +184,6 @@ const StoreTypeCreate: React.FC = () => {
                                 onChange={handleChange}
                                 required
                             />
-                        </Col>
-                        <Col md={6}>
                             <SelectInput
                                 label="Status"
                                 name="isActive"
@@ -217,17 +199,16 @@ const StoreTypeCreate: React.FC = () => {
                                     }))
                                 }
                             />
-                        </Col>
-                    </Row>
+                        </div>
 
-                    <div className="form-actions d-flex justify-content-end gap-3 mt-4">
-                        <CustomButton
-                            text="Clear"
-                            icon={FaEraser}
-                            onClick={handleClear}
-                            disabled={isSubmitting}
-                        />
-                        <div className="ms-2">
+                        <div className="flex justify-end gap-3 pt-6 mt-6 border-t border-slate-200">
+                            <CustomButton
+                                text="Clear"
+                                icon={FaEraser}
+                                onClick={handleClear}
+                                disabled={isSubmitting}
+                                type="button"
+                            />
                             <CustomButton
                                 text={isSubmitting ? "Saving..." : "Save Store Type"}
                                 icon={FaSave}
@@ -235,9 +216,9 @@ const StoreTypeCreate: React.FC = () => {
                                 disabled={isSubmitting}
                             />
                         </div>
-                    </div>
-                </form>
-            </Container>
+                    </form>
+                </div>
+            </div>
         </div>
     );
 }

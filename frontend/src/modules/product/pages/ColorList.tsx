@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Container, Row, Col, Modal, Spinner } from "react-bootstrap";
-import { FaSearch, FaPlus, FaChevronLeft, FaChevronRight, FaSave, FaEraser } from "react-icons/fa";
+import { FaSearch, FaPlus, FaSave, FaEraser } from "react-icons/fa";
 import { toast } from "react-toastify";
 import ViewButton from "../../../components/ui/viewbutton/ViewButton";
 import EditButton from "../../../components/ui/EditButton/EditButton";
@@ -13,11 +12,11 @@ import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import { useColors } from "../../../hooks/useColors";
 import { colorService } from "../../../services/colorService";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
+import DataTable, { type DataTableColumn } from "../../../components/ui/table/DataTable";
+import CommonModal from "../../../components/ui/Modal/CommonModal";
 
 const ITEMS_PER_PAGE = 10;
 
-// ─── Compact color picker — rendered OUTSIDE the main component
-// so it never re-mounts on state change (fixes the auto-close bug)
 const ColorPickerField = ({
     label,
     colorValue,
@@ -36,13 +35,12 @@ const ColorPickerField = ({
                 alignItems: "center",
                 gap: "10px",
                 padding: "6px 12px",
-                border: `1.5px solid ${errorMsg ? "#dc3545" : "#dee2e6"}`,
+                border: `1.5px solid ${errorMsg ? "#dc3545" : "#e2e8f0"}`,
                 borderRadius: "8px",
                 background: "#fff",
                 height: "42px",
             }}
         >
-            {/* Native input — visible & full size so browser keeps picker open */}
             <input
                 type="color"
                 value={colorValue || "#000000"}
@@ -51,36 +49,34 @@ const ColorPickerField = ({
                     width: "28px",
                     height: "28px",
                     padding: "1px",
-                    border: "1.5px solid #dee2e6",
+                    border: "1.5px solid #e2e8f0",
                     borderRadius: "6px",
                     cursor: "pointer",
                     background: "none",
                     flexShrink: 0,
                 }}
             />
-            {/* Circle swatch */}
             <div
                 style={{
                     width: "18px",
                     height: "18px",
                     borderRadius: "50%",
-                    backgroundColor: colorValue || "#e9ecef",
-                    border: "1.5px solid #dee2e6",
+                    backgroundColor: colorValue || "#f8fafc",
+                    border: "1.5px solid #e2e8f0",
                     flexShrink: 0,
                 }}
             />
-            {/* Label + hex */}
             <div style={{ display: "flex", flexDirection: "column", lineHeight: 1.2 }}>
-                <span style={{ fontSize: "10px", color: "#adb5bd", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.4px" }}>
+                <span style={{ fontSize: "10px", color: "#94a3b8", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.4px" }}>
                     {label}
                 </span>
-                <span style={{ fontSize: "12px", fontFamily: "monospace", fontWeight: 700, color: "#343a40" }}>
+                <span style={{ fontSize: "12px", fontFamily: "monospace", fontWeight: 700, color: "#334155" }}>
                     {colorValue || "—"}
                 </span>
             </div>
         </div>
         {errorMsg && (
-            <div style={{ fontSize: "11px", color: "#dc3545", marginTop: "4px", paddingLeft: "2px" }}>
+            <div style={{ fontSize: "11px", color: "#ef4444", marginTop: "4px", paddingLeft: "2px" }}>
                 {errorMsg}
             </div>
         )}
@@ -96,14 +92,7 @@ const ColorList: React.FC = () => {
     const [showViewModal, setShowViewModal] = useState(false);
     const [editMode, setEditMode] = useState(false);
     const [selectedColor, setSelectedColor] = useState<any>(null);
-    const [errors, setErrors] = useState({
-        code: "",
-        name: "",
-        hexCode: "",
-        hexCode2: "",
-        type: "",
-    });
-
+    const [errors, setErrors] = useState({ code: "", name: "", hexCode: "", hexCode2: "", type: "" });
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [itemToDelete, setItemToDelete] = useState<number | null>(null);
 
@@ -119,7 +108,7 @@ const ColorList: React.FC = () => {
 
     useEffect(() => {
         loadColors("");
-    }, []);
+    }, [loadColors]);
 
     useEffect(() => {
         if (error) toast.error(error);
@@ -150,7 +139,6 @@ const ColorList: React.FC = () => {
     };
 
     const handleOpenEdit = useCallback((color: any) => {
-        console.log(color, "salk")
         setEditMode(true);
         setFormData({
             id: String(color.id),
@@ -246,235 +234,186 @@ const ColorList: React.FC = () => {
         setErrors({ code: "", name: "", hexCode: "", hexCode2: "", type: "" });
     };
 
-    const handleCloseFormModal = () => {
-        setShowFormModal(false);
-        setErrors({ code: "", name: "", hexCode: "", hexCode2: "", type: "" });
-    };
+    const columns: DataTableColumn<any>[] = [
+        { header: "#", render: (_, index) => startIndex + index + 1, width: "60px", align: "center" },
+        { header: "Code", accessor: "code" },
+        { header: "Name", accessor: "name" },
+        {
+            header: "Color",
+            render: (color) => (
+                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                    {color.hexCode && (
+                        <div title={color.hexCode} style={{ width: "18px", height: "18px", borderRadius: "50%", backgroundColor: color.hexCode, border: "1px solid #ccc", flexShrink: 0 }} />
+                    )}
+                    {color.hexCode2 && (
+                        <div title={color.hexCode2} style={{ width: "18px", height: "18px", borderRadius: "50%", backgroundColor: color.hexCode2, border: "1px solid #ccc", flexShrink: 0 }} />
+                    )}
+                    <span style={{ fontSize: "12px", color: "#555", fontFamily: "monospace" }}>
+                        {color.hexCode}{color.hexCode2 ? ` / ${color.hexCode2}` : ""}
+                    </span>
+                </div>
+            )
+        },
+        { header: "Status", render: (color) => <StatusBadge status={color.status} />, align: "center" },
+        {
+            header: "Actions",
+            render: (color) => (
+                <div className="flex items-center gap-2 justify-end">
+                    <ViewButton onClick={() => handleOpenView(color)} />
+                    <EditButton onClick={() => handleOpenEdit(color)} />
+                    <DeleteButton onClick={() => triggerDelete(color.id)} />
+                </div>
+            ),
+            align: "right"
+        }
+    ];
 
     return (
-        <div className="inner-container">
-            <Container fluid>
-                {/* Page Header */}
-                <div className="page-header">
-                    <Row className="align-items-center g-3">
-                        <Col lg={6} md={12}>
-                            <div className="page-header-info">
-                                <h2 className="page-title">Color Management</h2>
-                                <div className="page-breadcrumb">Home / Product Master / Colors</div>
+        <div className="p-4 md:p-6 min-h-screen bg-slate-50">
+            <div className="max-w-7xl mx-auto">
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                    {/* Page Header */}
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-6 border-b border-slate-200">
+                        <div>
+                            <h2 className="text-2xl font-bold text-slate-800">Color Management</h2>
+                        </div>
+                        <div className="flex items-center gap-3 w-full md:w-auto">
+                            <div className="relative w-full md:w-64">
+                                <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                <input
+                                    type="text"
+                                    className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                                    placeholder="Search colors..."
+                                    value={searchTerm}
+                                    onChange={handleSearch}
+                                />
                             </div>
-                        </Col>
-                        <Col lg={6} md={12}>
-                            <div className="page-header-actions">
-                                <div className="page-search-wrap">
-                                    <FaSearch className="page-search-icon" />
-                                    <input
-                                        type="text"
-                                        className="page-search-input"
-                                        placeholder="Search by code or name..."
-                                        value={searchTerm}
-                                        onChange={handleSearch}
-                                    />
-                                </div>
-                                <CustomButton text="Add Color" icon={FaPlus} onClick={handleOpenAdd} />
-                            </div>
-                        </Col>
-                    </Row>
-                </div>
-
-                {/* Colors Table */}
-                <div className="master-table-body table-wrap">
-                    <div className="master-table-body">
-                        {loading && colors.length === 0 ? (
-                            <div className="text-center p-5">
-                                <Spinner animation="border" variant="primary" />
-                            </div>
-                        ) : (
-                            <table className="master-data-table">
-                                <thead>
-                                    <tr>
-                                        <th style={{ width: "60px" }}>#</th>
-                                        <th>Code</th>
-                                        <th>Name</th>
-                                        <th>Color</th>
-                                        <th>Status</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {paginatedColors.length > 0 ? (
-                                        paginatedColors.map((color: any, index: number) => (
-                                            <tr key={color.id} className="master-data-row">
-                                                <td className="master-data-cell">{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</td>
-                                                <td className="master-data-cell">{color.code}</td>
-                                                <td className="master-data-cell">{color.name}</td>
-                                                <td className="master-data-cell">
-                                                    <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                                                        {color.hexCode && (
-                                                            <div title={color.hexCode} style={{ width: "18px", height: "18px", borderRadius: "50%", backgroundColor: color.hexCode, border: "1px solid #ccc", flexShrink: 0 }} />
-                                                        )}
-                                                        {color.hexCode2 && (
-                                                            <div title={color.hexCode2} style={{ width: "18px", height: "18px", borderRadius: "50%", backgroundColor: color.hexCode2, border: "1px solid #ccc", flexShrink: 0 }} />
-                                                        )}
-                                                        <span style={{ fontSize: "12px", color: "#555", fontFamily: "monospace" }}>
-                                                            {color.hexCode}{color.hexCode2 ? ` / ${color.hexCode2}` : ""}
-                                                        </span>
-                                                    </div>
-                                                </td>
-                                                <td className="master-data-cell">
-                                                    <StatusBadge status={color.status} />
-                                                </td>
-                                                <td className="master-data-cell">
-                                                    <div className="table-action-group">
-                                                        <ViewButton onClick={() => handleOpenView(color)} />
-                                                        <EditButton onClick={() => handleOpenEdit(color)} />
-                                                        <DeleteButton onClick={() => triggerDelete(color.id)} />
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        ))
-                                    ) : (
-                                        <tr>
-                                            <td colSpan={6} className="text-center p-4">No colors found.</td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                            </table>
-                        )}
-
-                        {/* Pagination */}
-                        {totalPages > 1 && (
-                            <div className="pagination-wrap">
-                                <button className="pagination-btn" disabled={currentPage === 1} onClick={() => setCurrentPage(prev => prev - 1)}>
-                                    <FaChevronLeft />
-                                </button>
-                                <div className="pagination-info">Page {currentPage} of {totalPages}</div>
-                                <button className="pagination-btn" disabled={currentPage === totalPages} onClick={() => setCurrentPage(prev => prev + 1)}>
-                                    <FaChevronRight />
-                                </button>
-                            </div>
-                        )}
+                            <CustomButton text="Add Color" icon={FaPlus} onClick={handleOpenAdd} />
+                        </div>
                     </div>
+
+                    {/* Colors Table */}
+                    {loading && colors.length === 0 ? (
+                        <div className="flex justify-center items-center h-64">
+                            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"></div>
+                        </div>
+                    ) : (
+                        <DataTable
+                            columns={columns}
+                            data={paginatedColors}
+                            rowKey={(row) => row.id}
+                            emptyMessage="No colors found."
+                            pagination={totalPages > 1 ? {
+                                currentPage,
+                                totalPages,
+                                onPageChange: setCurrentPage
+                            } : undefined}
+                        />
+                    )}
                 </div>
 
-                {/* Add / Edit Modal */}
-                <Modal show={showFormModal} onHide={handleCloseFormModal} centered>
-                    <Modal.Header closeButton>
-                        <Modal.Title>{editMode ? "Edit Color" : "Add New Color"}</Modal.Title>
-                    </Modal.Header>
-                    <form onSubmit={handleSubmit}>
-                        <Modal.Body>
-                            <Row className="g-3">
-                                <Col md={12}>
-                                    <TextInput
-                                        label="Color Code"
-                                        name="code"
-                                        value={formData.code}
-                                        placeholder="e.g. BLK"
-                                        required
-                                        onChange={handleChange}
-                                        disabled
-                                        error={errors.code}
-                                    />
-                                </Col>
+                {/* Add/Edit Modal */}
+                <CommonModal
+                    show={showFormModal}
+                    onHide={() => setShowFormModal(false)}
+                    title={editMode ? "Edit Color" : "Add New Color"}
+                    overflowVisible={true}
+                    footer={
+                        <div className="flex items-center justify-end gap-2 w-full">
+                            <CustomButton text="Clear" icon={FaEraser} onClick={handleClear} />
+                            <CustomButton text={editMode ? "Update" : "Save"} icon={FaSave} onClick={handleSubmit} disabled={loading} />
+                        </div>
+                    }
+                >
+                    <form onSubmit={handleSubmit} className="space-y-4 p-2">
+                        <div className="grid grid-cols-1 gap-4">
+                            <TextInput
+                                label="Color Code"
+                                name="code"
+                                value={formData.code}
+                                placeholder="e.g. BLK"
+                                required
+                                onChange={handleChange}
+                                disabled
+                                error={errors.code}
+                            />
+                            <TextInput
+                                label="Color Name"
+                                name="name"
+                                value={formData.name}
+                                placeholder="e.g. Black"
+                                required
+                                onChange={handleChange}
+                                error={errors.name}
+                            />
+                            <SelectInput
+                                label="Color Type"
+                                name="type"
+                                value={formData.type}
+                                options={[
+                                    { value: "sc", label: "Single Color" },
+                                    { value: "mc", label: "Multi Color" },
+                                ]}
+                                onChange={handleChange}
+                                error={errors.type}
+                                defaultOptionLabel="Select color type"
+                            />
 
-                                <Col md={12}>
-                                    <TextInput
-                                        label="Color Name"
-                                        name="name"
-                                        value={formData.name}
-                                        placeholder="e.g. Black"
-                                        required
-                                        onChange={handleChange}
-                                        error={errors.name}
-                                    />
-                                </Col>
-
-                                <Col md={12}>
-                                    <SelectInput
-                                        label="Color Type"
-                                        name="type"
-                                        value={formData.type}
-                                        options={[
-                                            { value: "sc", label: "Single Color" },
-                                            { value: "mc", label: "Multi Color" },
-                                        ]}
-                                        onChange={handleChange}
-                                        error={errors.type}
-                                        defaultOptionLabel="Select color type"
-                                    />
-                                </Col>
-
-                                {/* Color picker(s) — side by side in one row */}
-                                {formData.type && (
-                                    <Col md={12}>
-                                        <label className="form-label fw-semibold" style={{ marginBottom: "8px", display: "block", fontSize: "14px" }}>
-                                            {formData.type === "mc" ? "Select Colors" : "Select Color"}
-                                        </label>
-
-                                        <div style={{ display: "flex", gap: "10px" }}>
-                                            {/* Color 1 — always shown */}
+                            {/* Color picker(s) */}
+                            {formData.type && (
+                                <div>
+                                    <label className="block text-sm font-semibold text-slate-700 mb-2">
+                                        {formData.type === "mc" ? "Select Colors" : "Select Color"}
+                                    </label>
+                                    <div style={{ display: "flex", gap: "10px" }}>
+                                        <ColorPickerField
+                                            label={formData.type === "mc" ? "Color 1" : "Color"}
+                                            colorValue={formData.hexCode}
+                                            onChange={(hex) => {
+                                                setFormData(prev => ({ ...prev, hexCode: hex }));
+                                                setErrors(prev => ({ ...prev, hexCode: "" }));
+                                            }}
+                                            errorMsg={errors.hexCode}
+                                        />
+                                        {formData.type === "mc" && (
                                             <ColorPickerField
-                                                label={formData.type === "mc" ? "Color 1" : "Color"}
-                                                colorValue={formData.hexCode}
+                                                label="Color 2"
+                                                colorValue={formData.hexCode2}
                                                 onChange={(hex) => {
-                                                    setFormData(prev => ({ ...prev, hexCode: hex }));
-                                                    setErrors(prev => ({ ...prev, hexCode: "" }));
+                                                    setFormData(prev => ({ ...prev, hexCode2: hex }));
+                                                    setErrors(prev => ({ ...prev, hexCode2: "" }));
                                                 }}
-                                                errorMsg={errors.hexCode}
-                                            />
-
-                                            {/* Color 2 — only for multi color */}
-                                            {formData.type === "mc" && (
-                                                <ColorPickerField
-                                                    label="Color 2"
-                                                    colorValue={formData.hexCode2}
-                                                    onChange={(hex) => {
-                                                        setFormData(prev => ({ ...prev, hexCode2: hex }));
-                                                        setErrors(prev => ({ ...prev, hexCode2: "" }));
-                                                    }}
-                                                    errorMsg={errors.hexCode2}
-                                                />
-                                            )}
-                                        </div>
-
-                                        {/* Gradient preview strip — only when both colors picked */}
-                                        {formData.type === "mc" && formData.hexCode && formData.hexCode2 && (
-                                            <div
-                                                style={{
-                                                    marginTop: "10px",
-                                                    height: "6px",
-                                                    borderRadius: "999px",
-                                                    background: `linear-gradient(to right, ${formData.hexCode}, ${formData.hexCode2})`,
-                                                }}
+                                                errorMsg={errors.hexCode2}
                                             />
                                         )}
-                                    </Col>
-                                )}
+                                    </div>
+                                    {formData.type === "mc" && formData.hexCode && formData.hexCode2 && (
+                                        <div
+                                            style={{
+                                                marginTop: "10px",
+                                                height: "6px",
+                                                borderRadius: "999px",
+                                                background: `linear-gradient(to right, ${formData.hexCode}, ${formData.hexCode2})`,
+                                            }}
+                                        />
+                                    )}
+                                </div>
+                            )}
 
-                                <Col md={12}>
-                                    <SelectInput
-                                        label="Status"
-                                        name="status"
-                                        value={formData.status}
-                                        options={[
-                                            { value: "ACTIVE", label: "Active" },
-                                            { value: "INACTIVE", label: "Inactive" },
-                                        ]}
-                                        onChange={handleChange}
-                                    />
-                                </Col>
-                            </Row>
-                        </Modal.Body>
-                        <Modal.Footer>
-                            <CustomButton text="Clear" icon={FaEraser} onClick={handleClear} />
-                            <div className="ms-2">
-                                <CustomButton text={editMode ? "Update" : "Save"} icon={FaSave} type="submit" disabled={loading} />
-                            </div>
-                        </Modal.Footer>
+                            <SelectInput
+                                label="Status"
+                                name="status"
+                                value={formData.status}
+                                options={[
+                                    { value: "ACTIVE", label: "Active" },
+                                    { value: "INACTIVE", label: "Inactive" },
+                                ]}
+                                onChange={handleChange}
+                            />
+                        </div>
                     </form>
-                </Modal>
+                </CommonModal>
 
-                {/* View Modal */}
                 <CommonViewModal
                     show={showViewModal}
                     onHide={() => setShowViewModal(false)}
@@ -482,41 +421,36 @@ const ColorList: React.FC = () => {
                     avatarText={selectedColor ? selectedColor.name.charAt(0).toUpperCase() : ""}
                     headerTitle={selectedColor ? selectedColor.name : ""}
                     headerSubtitle={selectedColor ? `Code: ${selectedColor.code}` : ""}
-                    sections={
-                        selectedColor
-                            ? [{
-                                fields: [
-                                    { label: "Color Name", value: selectedColor.name },
-                                    { label: "Color Code", value: selectedColor.code },
-                                    { label: "Color Type", value: selectedColor.type === "mc" ? "Multi Color" : "Single Color" },
-                                    {
-                                        label: "Color 1",
-                                        value: selectedColor.hexCode ? (
-                                            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                                                <div style={{ width: "18px", height: "18px", borderRadius: "50%", backgroundColor: selectedColor.hexCode, border: "1px solid #ccc" }} />
-                                                {selectedColor.hexCode}
-                                            </div>
-                                        ) : "N/A",
-                                    },
-                                    ...(selectedColor.type === "mc" ? [{
-                                        label: "Color 2",
-                                        value: selectedColor.hexCode2 ? (
-                                            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                                                <div style={{ width: "18px", height: "18px", borderRadius: "50%", backgroundColor: selectedColor.hexCode2, border: "1px solid #ccc" }} />
-                                                {selectedColor.hexCode2}
-                                            </div>
-                                        ) : "N/A",
-                                    }] : []),
-                                    { label: "Status", value: selectedColor.status },
-                                    { label: "Created Date", value: new Date(selectedColor.createdAt).toLocaleString() },
-                                    { label: "Updated Date", value: new Date(selectedColor.updatedAt).toLocaleString() },
-                                ],
-                            }]
-                            : []
-                    }
+                    sections={selectedColor ? [{
+                        fields: [
+                            { label: "Color Name", value: selectedColor.name },
+                            { label: "Color Code", value: selectedColor.code },
+                            { label: "Color Type", value: selectedColor.type === "mc" ? "Multi Color" : "Single Color" },
+                            {
+                                label: "Color 1",
+                                value: selectedColor.hexCode ? (
+                                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                        <div style={{ width: "18px", height: "18px", borderRadius: "50%", backgroundColor: selectedColor.hexCode, border: "1px solid #ccc" }} />
+                                        {selectedColor.hexCode}
+                                    </div>
+                                ) : "N/A",
+                            },
+                            ...(selectedColor.type === "mc" ? [{
+                                label: "Color 2",
+                                value: selectedColor.hexCode2 ? (
+                                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                        <div style={{ width: "18px", height: "18px", borderRadius: "50%", backgroundColor: selectedColor.hexCode2, border: "1px solid #ccc" }} />
+                                        {selectedColor.hexCode2}
+                                    </div>
+                                ) : "N/A",
+                            }] : []),
+                            { label: "Status", value: <StatusBadge status={selectedColor.status} /> },
+                            { label: "Created Date", value: new Date(selectedColor.createdAt).toLocaleString() },
+                            { label: "Updated Date", value: new Date(selectedColor.updatedAt).toLocaleString() },
+                        ],
+                    }] : []}
                 />
 
-                {/* Delete Confirm Modal */}
                 <CommonConfirmModal
                     show={showDeleteModal}
                     onHide={() => setShowDeleteModal(false)}
@@ -526,7 +460,7 @@ const ColorList: React.FC = () => {
                     confirmText="Delete"
                     confirmVariant="danger"
                 />
-            </Container>
+            </div>
         </div>
     );
 };

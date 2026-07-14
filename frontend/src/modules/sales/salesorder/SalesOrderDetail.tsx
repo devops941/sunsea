@@ -1,11 +1,12 @@
 // src/pages/sales/SalesOrderDetail/SalesOrderDetail.tsx
 import React, { useEffect, useState } from "react";
-import { Container, Row, Col, Spinner, Table } from "react-bootstrap";
-import { FaArrowLeft, FaUser, FaMapMarkerAlt, FaBoxOpen, FaCheckCircle } from "react-icons/fa";
+import { FaArrowLeft, FaUser, FaMapMarkerAlt, FaBoxOpen, FaCheckCircle, FaCircleNotch, FaExclamationTriangle, FaFileAlt, FaCalendarAlt, FaTruck, FaGlobe, FaInfoCircle } from "react-icons/fa";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 
 import CustomButton from "../../../components/ui/Button/Button";
+import BackButton from "../../../components/ui/BackButton/BackButton";
+import DetailBox from "../../../components/ui/DetailBox/DetailBox";
 import { salesOrderService, type SalesOrder } from "../../../services/salesOrderService";
 import { getUnitPrice } from "../../../utils/pricingUtils";
 
@@ -30,7 +31,7 @@ const COLOR_TYPE_LABELS: Record<string, string> = {
     mc: "Multi Color",
 };
 
-// ─── Status → pill modifier map (uses .status-pill--active/--inactive/--hold from theme.css) ──
+// ─── Status → pill modifier map ──
 const STATUS_MODIFIER: Record<string, "active" | "inactive" | "hold"> = {
     DRAFT: "hold",
     CONFIRMED: "active",
@@ -54,60 +55,22 @@ const PRODUCTION_MODIFIER: Record<string, "active" | "inactive" | "hold"> = {
     COMPLETED: "active",
 };
 
+const getBadgeColor = (status: string | null | undefined, modifierMap: Record<string, "active" | "inactive" | "hold">) => {
+    const modifier = modifierMap[status || ""] || "hold";
+    if (modifier === "active") return "bg-green-100 text-green-800 border-green-200";
+    if (modifier === "inactive") return "bg-red-100 text-red-800 border-red-200";
+    return "bg-yellow-100 text-yellow-800 border-yellow-200";
+};
+
 const StatusPill: React.FC<{ status?: string | null; modifierMap: Record<string, "active" | "inactive" | "hold"> }> = ({ status, modifierMap }) => {
-    if (!status) return <span className="status-pill">—</span>;
-    const modifier = modifierMap[status] || "hold";
+    if (!status) return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 border border-gray-200">—</span>;
     return (
-        <span className={`status-pill status-pill--${modifier}`}>
+        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${getBadgeColor(status, modifierMap)}`}>
             {status.replace(/_/g, " ")}
         </span>
     );
 };
 
-// ─── Small labeled value block ──────────────────────────────────────────
-const Field: React.FC<{ label: string; value: React.ReactNode }> = ({ label, value }) => (
-    <div className="mb-3">
-        <div
-            className="small text-uppercase"
-            style={{ fontSize: "0.72rem", letterSpacing: "0.05em", color: "var(--color-text-muted)", fontWeight: 600 }}
-        >
-            {label}
-        </div>
-        <div className="fw-semibold" style={{ color: "var(--color-text-primary)" }}>{value ?? "—"}</div>
-    </div>
-);
-
-// ─── Section wrapper ─────────────────────────────────────────────────────
-const Section: React.FC<{ title: string; icon?: React.ReactNode; children: React.ReactNode }> = ({ title, icon, children }) => (
-    <div
-        className="mb-4 p-4"
-        style={{
-            background: "var(--color-surface)",
-            borderRadius: "var(--radius-lg)",
-            border: "1px solid var(--color-border)",
-            boxShadow: "var(--shadow-sm)",
-        }}
-    >
-        <div className="d-flex align-items-center gap-2 mb-3 pb-2" style={{ borderBottom: "1px solid var(--color-border)" }}>
-            {icon && (
-                <span
-                    className="d-inline-flex align-items-center justify-content-center"
-                    style={{
-                        width: 32,
-                        height: 32,
-                        borderRadius: "var(--radius-sm)",
-                        background: "rgba(203, 122, 33, 0.1)",
-                        color: "var(--color-secondary)",
-                    }}
-                >
-                    {icon}
-                </span>
-            )}
-            <h6 className="mb-0 fw-bold" style={{ color: "var(--color-primary)", fontFamily: "var(--font-head)" }}>{title}</h6>
-        </div>
-        {children}
-    </div>
-);
 
 // ─── Component ─────────────────────────────────────────────────────────
 const SalesOrderDetail: React.FC = () => {
@@ -118,9 +81,6 @@ const SalesOrderDetail: React.FC = () => {
     const [order, setOrder] = useState<SalesOrder | null>((location.state as SalesOrder) || null);
     const [loading, setLoading] = useState(!location.state);
 
-    // Always refetch on mount (or when id changes) so the page reflects
-    // the latest server state — e.g. after an MD approval/rejection that
-    // happened elsewhere, a stale `location.state` snapshot won't show it.
     useEffect(() => {
         const id = idParam ? Number(idParam) : (location.state as SalesOrder)?.id;
         if (!id) {
@@ -147,268 +107,273 @@ const SalesOrderDetail: React.FC = () => {
 
     if (loading || !order) {
         return (
-            <div className="inner-container">
-                <Container fluid className="text-center py-5">
-                    <Spinner animation="border" variant="primary" />
-                    <p className="mt-3">Loading order details...</p>
-                </Container>
+            <div className="flex flex-col items-center justify-center py-20">
+                <FaCircleNotch className="animate-spin text-primary text-4xl mb-4" />
+                <p className="text-gray-500">Loading order details...</p>
             </div>
         );
     }
     return (
-        <div className="inner-container">
-            <Container fluid>
+        <div className="w-full mx-auto">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
                 {/* ── Page Header ── */}
-                <div className="page-header">
-                    <Row className="align-items-center g-3">
-                        <Col lg={6} md={12}>
-                            <div className="page-header-info">
-                                <div className="d-flex align-items-center gap-3 flex-wrap">
-                                    <h2 className="page-title mb-0">{order.orderNo}</h2>
-                                    <StatusPill status={order.status} modifierMap={STATUS_MODIFIER} />
-                                </div>
-                                <div className="page-breadcrumb">Home / Sales / Sales Orders / view</div>
-                            </div>
-                        </Col>
-                        <Col lg={6} md={12}>
-                            <div className="page-header-actions d-flex justify-content-lg-end gap-2">
-                                <CustomButton
-                                    text="Back to List"
-                                    icon={FaArrowLeft}
-                                    onClick={() => navigate("/quatation-order")}
-                                />
-                            </div>
-                        </Col>
-                    </Row>
+                <div className="px-6 py-4 border-b border-gray-200 bg-gray-50/50">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div className="flex items-center gap-3 flex-wrap">
+                            <h2 className="text-xl font-bold text-gray-800 m-0">
+                                {order.orderNo}
+                            </h2>
+                            <StatusPill status={order.status} modifierMap={STATUS_MODIFIER} />
+                        </div>
+                        <div>
+                            <BackButton text="Back to List" />
+                        </div>
+                    </div>
                 </div>
 
-                {/* ── Rejection reason banner ── */}
-                {order.status === "MD_REJECTED" && order.mdRejectionReason && (
-                    <div className="alert alert-danger mb-4">
-                        <strong>MD Rejected this order:</strong> {order.mdRejectionReason}
-                    </div>
-                )}
-                {order.status === "CUSTOMER_REJECTED" && order.customerRejectionReason && (
-                    <div className="alert alert-danger mb-4">
-                        <strong>Customer Rejected this order:</strong> {order.customerRejectionReason}
-                    </div>
-                )}
+                <div className="px-6 py-4 space-y-6">
+                    {/* ── Rejection reason banner ── */}
+                    {order.status === "MD_REJECTED" && order.mdRejectionReason && (
+                        <div className="mb-4 bg-red-50 border-l-4 border-red-500 p-3 flex items-start gap-2 rounded-r-lg">
+                            <FaExclamationTriangle className="text-red-500 mt-0.5 text-sm" />
+                            <div>
+                                <div className="text-red-800 font-semibold text-xs uppercase tracking-wide">MD Rejected this order</div>
+                                <p className="text-red-700 text-sm m-0">{order.mdRejectionReason}</p>
+                            </div>
+                        </div>
+                    )}
+                    {order.status === "CUSTOMER_REJECTED" && order.customerRejectionReason && (
+                        <div className="mb-4 bg-red-50 border-l-4 border-red-500 p-3 flex items-start gap-2 rounded-r-lg">
+                            <FaExclamationTriangle className="text-red-500 mt-0.5 text-sm" />
+                            <div>
+                                <div className="text-red-800 font-semibold text-xs uppercase tracking-wide">Customer Rejected this order</div>
+                                <p className="text-red-700 text-sm m-0">{order.customerRejectionReason}</p>
+                            </div>
+                        </div>
+                    )}
 
-                <Row>
-                    {/* ── Left column: main details ── */}
-                    <Col lg={8}>
-                        <Section title="Order Information">
-                            <Row>
-                                <Col md={4}><Field label="Order No" value={order.orderNo} /></Col>
-                                <Col md={4}><Field label="Order Date" value={formatDate(order.orderDate)} /></Col>
-                                <Col md={4}><Field label="Expected Completion" value={formatDate(order.expectedCompletionDate)} /></Col>
-                                <Col md={4}><Field label="Order Type" value={order.orderType} /></Col>
-                                <Col md={4}><Field label="Dispatch Type" value={order.dispatchType} /></Col>
-                                <Col md={4}>
-                                    <Field
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        {/* ── Left column: main details ── */}
+                        <div className="lg:col-span-2 space-y-6">
+
+                            {/* ── Order Info ── */}
+                            <div>
+                                <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                                    <FaFileAlt className="text-blue-500" /> Order Information
+                                </h3>
+                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-4">
+                                    <DetailBox label="Order No" value={order.orderNo} icon={<FaFileAlt />} />
+                                    <DetailBox label="Order Date" value={formatDate(order.orderDate)} icon={<FaCalendarAlt />} />
+                                    <DetailBox label="Expected Completion" value={formatDate(order.expectedCompletionDate)} icon={<FaCalendarAlt />} />
+                                    <DetailBox label="Order Type" value={order.orderType} icon={<FaGlobe />} />
+                                    <DetailBox label="Dispatch Type" value={order.dispatchType} icon={<FaTruck />} />
+                                    <DetailBox
                                         label="Production Status"
-                                        value={<StatusPill status={(order as any).productionStatus} modifierMap={PRODUCTION_MODIFIER} />}
+                                        icon={<FaInfoCircle />}
+                                        value={<div className="mt-1"><StatusPill status={(order as any).productionStatus} modifierMap={PRODUCTION_MODIFIER} /></div>}
                                     />
-                                </Col>
-                                {order.remarks && <Col md={6}><Field label="Remarks" value={order.remarks} /></Col>}
-                                {order.internalNotes && <Col md={6}><Field label="Internal Notes" value={order.internalNotes} /></Col>}
-                            </Row>
-                        </Section>
+                                    {order.remarks && <DetailBox label="Remarks" value={order.remarks} />}
+                                    {order.internalNotes && <DetailBox label="Internal Notes" value={order.internalNotes} />}
+                                </div>
+                            </div>
 
-                        <Section title="Customer" icon={<FaUser />}>
-                            <Row>
-                                <Col md={4}> <Field label="Name" value={order.customer?.displayName || order.customer?.firmName} /></Col>
-                                <Col md={4}> <Field label="Type" value={order.customerType ? order.customerType.toLowerCase() : ''} /></Col>
-                            </Row>
-                        </Section>
+                            {/* ── Customer ── */}
+                            <div className="pt-4 border-t border-gray-100">
+                                <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                                    <FaUser className="text-blue-500" /> Customer
+                                </h3>
+                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                                    <DetailBox label="Name" value={order.customer?.displayName || order.customer?.firmName} />
+                                    <DetailBox label="Type" value={order.customerType ? order.customerType.toLowerCase() : ''} />
+                                </div>
+                            </div>
 
-                        <Section title="Addresses" icon={<FaMapMarkerAlt />}>
-                            <Row>
-                                <Col md={6}>
-                                    <div
-                                        className="small text-uppercase mb-2"
-                                        style={{ fontSize: "0.72rem", letterSpacing: "0.05em", color: "var(--color-text-muted)", fontWeight: 600 }}
-                                    >
-                                        Billing Address
+                            {/* ── Addresses ── */}
+                            <div className="pt-4 border-t border-gray-100">
+                                <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                                    <FaMapMarkerAlt className="text-blue-500" /> Addresses
+                                </h3>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div>
+                                        <div className="text-[11px] font-bold text-gray-500 uppercase tracking-wide mb-1">Billing Address</div>
+                                        <div className="text-sm text-gray-900">{order.billingAddressLine1}</div>
+                                        <div className="text-sm text-gray-900">{order.billingCity}, {order.billingState} — {order.billingPincode}</div>
                                     </div>
-                                    <div>{order.billingAddressLine1}</div>
-                                    <div>{order.billingCity}, {order.billingState} — {order.billingPincode}</div>
-                                </Col>
-                                <Col md={6}>
-                                    <div
-                                        className="small text-uppercase mb-2"
-                                        style={{ fontSize: "0.72rem", letterSpacing: "0.05em", color: "var(--color-text-muted)", fontWeight: 600 }}
-                                    >
-                                        Shipping Address{" "}
-
+                                    <div>
+                                        <div className="text-[11px] font-bold text-gray-500 uppercase tracking-wide mb-1">Shipping Address</div>
+                                        {order.shippingAddressLine1 ? (
+                                            <>
+                                                <div className="text-sm text-gray-900">{order.shippingAddressLine1}</div>
+                                                <div className="text-sm text-gray-900">{order.shippingCity}, {order.shippingState} — {order.shippingPincode}</div>
+                                            </>
+                                        ) : (
+                                            <div className="text-sm text-gray-500 italic">Same as Billing Address</div>
+                                        )}
                                     </div>
-                                    {order.shippingAddressLine1 ? (
-                                        <>
-                                            <div>{order.shippingAddressLine1}</div>
-                                            <div>{order.shippingCity}, {order.shippingState} — {order.shippingPincode}</div>
-                                        </>
-                                    ) : (
-                                        <div>Same as Billing Address</div>
-                                    )}
-                                </Col>
-                            </Row>
-                        </Section>
+                                </div>
+                            </div>
 
-                        <Section title="Items" icon={<FaBoxOpen />}>
-                            <div className="table-wrap">
-                                <Table hover className="master-data-table align-middle mb-0">
-                                    <thead>
-                                        <tr>
-                                            <th>#</th>
-                                            <th>Product</th>
-                                            <th>Color</th>
-                                            <th className="text-end">Qty</th>
-                                            <th className="text-end">Unit Price</th>
-
-
-                                            {order.isInterState ? (
-                                                <th className="text-end">IGST</th>
-                                            ) : (
-                                                <>
-                                                    <th className="text-end">CGST</th>
-                                                    <th className="text-end">SGST</th>
-                                                </>
-                                            )}
-
-                                            <th className="text-end">Line Total</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {order.items?.map((item: any, idx: number) => (
-                                            <tr key={item.id} className="master-data-row">
-                                                <td className="master-data-cell">{idx + 1}</td>
-                                                <td className="master-data-cell">
-                                                    <div className="fw-semibold">{item.product?.productName}</div>
-                                                    <div className="text-muted small">{item.product?.productCode}</div>
-                                                </td>
-                                                <td className="master-data-cell">{COLOR_TYPE_LABELS[item.colorType] || item.colorType || "—"}</td>
-                                                <td className="master-data-cell text-end">{item.quantity}</td>
-                                                <td className="master-data-cell text-end">{formatMoney(getUnitPrice(item, order.customerType))}</td>
-
-
+                            {/* ── Items ── */}
+                            <div className="pt-4 border-t border-gray-100">
+                                <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                                    <FaBoxOpen className="text-blue-500" /> Order Items
+                                </h3>
+                                <div className="border border-gray-200 rounded-lg overflow-hidden">
+                                    <table className="min-w-full text-sm">
+                                        <thead>
+                                            <tr className="bg-gray-50 border-b border-gray-200">
+                                                <th className="py-3 pl-4 pr-2 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wide w-8">#</th>
+                                                <th className="py-3 px-2 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wide">Product</th>
+                                                <th className="py-3 px-2 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wide">Color</th>
+                                                <th className="py-3 px-2 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wide">Qty</th>
+                                                <th className="py-3 px-2 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wide">Unit Price</th>
                                                 {order.isInterState ? (
-                                                    <td className="master-data-cell text-end">
-                                                        {formatMoney(item.igstAmount || item.gstAmount || 0)}
-                                                        <div className="text-muted small">({item.igstRate || item.gstRate || 0}%)</div>
-                                                    </td>
+                                                    <th className="py-3 px-2 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wide">IGST</th>
                                                 ) : (
                                                     <>
-                                                        <td className="master-data-cell text-end">
-                                                            {formatMoney(item.cgstAmount || (Number(item.gstAmount || 0) / 2))}
-                                                            <div className="text-muted small">({item.cgstRate || (Number(item.gstRate || 0) / 2)}%)</div>
-                                                        </td>
-                                                        <td className="master-data-cell text-end">
-                                                            {formatMoney(item.sgstAmount || (Number(item.gstAmount || 0) / 2))}
-                                                            <div className="text-muted small">({item.sgstRate || (Number(item.gstRate || 0) / 2)}%)</div>
-                                                        </td>
+                                                        <th className="py-3 px-2 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wide">CGST</th>
+                                                        <th className="py-3 px-2 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wide">SGST</th>
                                                     </>
                                                 )}
-
-                                                <td className="master-data-cell text-end fw-bold">{formatMoney(item.lineTotal)}</td>
+                                                <th className="py-3 pr-4 pl-2 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wide">Line Total</th>
                                             </tr>
-                                        ))}
-                                    </tbody>
-                                </Table>
-                            </div>
-                        </Section>
-                    </Col>
+                                        </thead>
+                                        <tbody>
+                                            {order.items?.map((item: any, idx: number) => (
+                                                <tr key={item.id} className="border-b border-gray-100 last:border-b-0 bg-white">
+                                                    <td className="py-3 pl-4 pr-2 text-gray-700">{idx + 1}</td>
+                                                    <td className="py-3 px-2">
+                                                        <div className="font-medium text-gray-900">{item.product?.productName}</div>
+                                                        <div className="text-gray-500 text-xs">{item.product?.productCode}</div>
+                                                    </td>
+                                                    <td className="py-3 px-2 text-gray-700">{COLOR_TYPE_LABELS[item.colorType] || item.colorType || "—"}</td>
+                                                    <td className="py-3 px-2 text-right text-gray-900">{item.quantity}</td>
+                                                    <td className="py-3 px-2 text-right text-gray-900">{formatMoney(getUnitPrice(item, order.customerType))}</td>
 
-                    {/* ── Right column: approval trail + totals ── */}
-                    <Col lg={4}>
-                        <Section title="Approval Status" icon={<FaCheckCircle />}>
-                            <div className="mb-4">
-                                <div className="d-flex justify-content-between align-items-center mb-2">
-                                    <span
-                                        className="small text-uppercase"
-                                        style={{ fontSize: "0.72rem", letterSpacing: "0.05em", color: "var(--color-text-muted)", fontWeight: 600 }}
-                                    >
-                                        MD Approval
-                                    </span>
-                                    <StatusPill status={order.mdApprovalStatus} modifierMap={APPROVAL_MODIFIER} />
-                                </div>
-                                {order.mdApprovedAt && (
-                                    <div className="text-muted small">Decided on {formatDateTime(order.mdApprovedAt)}</div>
-                                )}
-                                {order.mdRejectionReason && (
-                                    <div className="text-danger small mt-1">Reason: {order.mdRejectionReason}</div>
-                                )}
-                            </div>
+                                                    {order.isInterState ? (
+                                                        <td className="py-3 px-2 text-right text-gray-900">
+                                                            {formatMoney(item.igstAmount || item.gstAmount || 0)}
+                                                            <div className="text-gray-500 text-xs">({item.igstRate || item.gstRate || 0}%)</div>
+                                                        </td>
+                                                    ) : (
+                                                        <>
+                                                            <td className="py-3 px-2 text-right text-gray-900">
+                                                                {formatMoney(item.cgstAmount || (Number(item.gstAmount || 0) / 2))}
+                                                                <div className="text-gray-500 text-xs">({item.cgstRate || (Number(item.gstRate || 0) / 2)}%)</div>
+                                                            </td>
+                                                            <td className="py-3 px-2 text-right text-gray-900">
+                                                                {formatMoney(item.sgstAmount || (Number(item.gstAmount || 0) / 2))}
+                                                                <div className="text-gray-500 text-xs">({item.sgstRate || (Number(item.gstRate || 0) / 2)}%)</div>
+                                                            </td>
+                                                        </>
+                                                    )}
 
-                            <div>
-                                <div className="d-flex justify-content-between align-items-center mb-2">
-                                    <span
-                                        className="small text-uppercase"
-                                        style={{ fontSize: "0.72rem", letterSpacing: "0.05em", color: "var(--color-text-muted)", fontWeight: 600 }}
-                                    >
-                                        Customer Approval
-                                    </span>
-                                    <StatusPill status={order.customerApprovalStatus} modifierMap={APPROVAL_MODIFIER} />
+                                                    <td className="py-3 pr-4 pl-2 text-right font-medium text-gray-900">{formatMoney(item.lineTotal)}</td>
+                                                </tr>
+                                            ))}
+                                            {(!order.items || order.items.length === 0) && (
+                                                <tr>
+                                                    <td colSpan={10} className="py-8 text-center text-gray-500 text-sm">
+                                                        No items found.
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                    </table>
                                 </div>
-                                {order.customerApprovedAt && (
-                                    <div className="text-muted small">Decided on {formatDateTime(order.customerApprovedAt)}</div>
-                                )}
-                                {order.customerRejectionReason && (
-                                    <div className="text-danger small mt-1">Reason: {order.customerRejectionReason}</div>
-                                )}
                             </div>
-                        </Section>
+                        </div>
 
-                        <Section title="Amount Summary">
-                            <div className="d-flex justify-content-between py-1">
-                                <span className="text-muted">Subtotal</span>
-                                <span>{formatMoney(order.subtotal)}</span>
-                            </div>
-                            {order.isInterState ? (
-                                <div className="d-flex justify-content-between py-1 small text-success">
-                                    <span>IGST</span>
-                                    <span>+ {formatMoney(order.totalIgst || order.totalGst || 0)}</span>
-                                </div>
-                            ) : (
-                                <>
-                                    <div className="d-flex justify-content-between py-1 small text-success">
-                                        <span>CGST</span>
-                                        <span>+ {formatMoney(order.totalCgst || (Number(order.totalGst || 0) / 2))}</span>
+                        {/* ── Right column: approval trail + totals ── */}
+                        <div className="space-y-6">
+
+                            {/* ── Approval Status ── */}
+                            <div className="bg-gray-50 rounded-lg p-5 border border-gray-200">
+                                <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                                    <FaCheckCircle className="text-blue-500" /> Approval Status
+                                </h3>
+
+                                <div className="mb-4">
+                                    <div className="flex justify-between items-center mb-1">
+                                        <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">MD Approval</span>
+                                        <StatusPill status={order.mdApprovalStatus} modifierMap={APPROVAL_MODIFIER} />
                                     </div>
-                                    <div className="d-flex justify-content-between py-1 small text-success">
-                                        <span>SGST</span>
-                                        <span>+ {formatMoney(order.totalSgst || (Number(order.totalGst || 0) / 2))}</span>
-                                    </div>
-                                </>
-                            )}
-
-                            {Number(order.totalDiscount) !== 0 && (
-                                <div className="d-flex justify-content-between py-1">
-                                    <span className="text-muted">Discount</span>
-                                    <span className="text-danger">− {formatMoney(order.totalDiscount)}</span>
+                                    {order.mdApprovedAt && (
+                                        <div className="text-gray-500 text-xs">Decided on {formatDateTime(order.mdApprovedAt)}</div>
+                                    )}
+                                    {order.mdRejectionReason && (
+                                        <div className="text-red-500 text-xs mt-1">Reason: {order.mdRejectionReason}</div>
+                                    )}
                                 </div>
-                            )}
-                            {/* <div className="d-flex justify-content-between py-1">
-                                <span className="text-muted">GST</span>
-                                <span>+ {formatMoney(order.totalGst)}</span>
-                            </div>
-                            <div className="d-flex justify-content-between py-1">
-                                <span className="text-muted">Cess</span>
-                                <span>+ {formatMoney(order.totalCess)}</span>
-                            </div> */}
-                            <hr style={{ borderColor: "var(--color-border)" }} />
-                            <div className="d-flex justify-content-between py-1">
-                                <span className="fw-bold" style={{ color: "var(--color-primary)" }}>Net Amount</span>
-                                <span className="fw-bold fs-5" style={{ color: "var(--color-secondary)" }}>{formatMoney(order.netAmount)}</span>
-                            </div>
-                        </Section>
 
-                        <Section title="Meta">
-                            <Field label="Created On" value={formatDateTime((order as any).createdAt)} />
-                            <Field label="Last Updated" value={formatDateTime((order as any).updatedAt)} />
-                        </Section>
-                    </Col>
-                </Row>
-            </Container>
+                                <div className="pt-3 border-t border-gray-200">
+                                    <div className="flex justify-between items-center mb-1">
+                                        <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">Customer Approval</span>
+                                        <StatusPill status={order.customerApprovalStatus} modifierMap={APPROVAL_MODIFIER} />
+                                    </div>
+                                    {order.customerApprovedAt && (
+                                        <div className="text-gray-500 text-xs">Decided on {formatDateTime(order.customerApprovedAt)}</div>
+                                    )}
+                                    {order.customerRejectionReason && (
+                                        <div className="text-red-500 text-xs mt-1">Reason: {order.customerRejectionReason}</div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* ── Amount Summary ── */}
+                            <div className="bg-white rounded-lg p-5 border border-gray-200 shadow-sm">
+                                <h3 className="text-lg font-semibold text-gray-800 mb-4">Amount Summary</h3>
+                                <div className="space-y-2 text-sm">
+                                    <div className="flex justify-between">
+                                        <span className="text-gray-500">Subtotal</span>
+                                        <span className="text-gray-900">{formatMoney(order.subtotal)}</span>
+                                    </div>
+
+                                    {order.isInterState ? (
+                                        <div className="flex justify-between text-green-700">
+                                            <span>IGST</span>
+                                            <span>+ {formatMoney(order.totalIgst || order.totalGst || 0)}</span>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <div className="flex justify-between text-green-700">
+                                                <span>CGST</span>
+                                                <span>+ {formatMoney(order.totalCgst || (Number(order.totalGst || 0) / 2))}</span>
+                                            </div>
+                                            <div className="flex justify-between text-green-700">
+                                                <span>SGST</span>
+                                                <span>+ {formatMoney(order.totalSgst || (Number(order.totalGst || 0) / 2))}</span>
+                                            </div>
+                                        </>
+                                    )}
+
+                                    {Number(order.totalDiscount) !== 0 && (
+                                        <div className="flex justify-between text-red-600">
+                                            <span>Discount</span>
+                                            <span>− {formatMoney(order.totalDiscount)}</span>
+                                        </div>
+                                    )}
+
+                                    <div className="flex justify-between pt-3 mt-3 border-t border-gray-200">
+                                        <span className="font-bold text-gray-800">Net Amount</span>
+                                        <span className="font-bold text-lg text-blue-600">{formatMoney(order.netAmount)}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* ── Meta ── */}
+                            <div className="bg-gray-50 rounded-lg p-5 border border-gray-200">
+                                <h3 className="text-sm font-semibold text-gray-800 mb-3">System Info</h3>
+                                <div className="space-y-3">
+                                    <DetailBox label="Created On" value={formatDateTime((order as any).createdAt)} />
+                                    <DetailBox label="Last Updated" value={formatDateTime((order as any).updatedAt)} />
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     );
 };

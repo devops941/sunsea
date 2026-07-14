@@ -13,7 +13,7 @@ const App: React.FC = () => {
 
   if (!isInitialized) {
     return (
-      <div className="d-flex flex-column align-items-center justify-content-center min-vh-100" style={{ backgroundColor: '#f4f7f9' }}>
+      <div className="flex flex-col items-center justify-center min-h-screen bg-[#f4f7f9]">
         <div className="custom-pulse-loader">S</div>
         <div className="custom-loader-text">SUNSEA ERP</div>
       </div>

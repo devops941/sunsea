@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import { Container, Row, Col } from "react-bootstrap";
 import { FaSave, FaArrowLeft, FaPlus } from "react-icons/fa";
 import { useNavigate, useLocation } from "react-router-dom";
 import { z } from "zod";
@@ -193,36 +192,27 @@ const BillOfMaterialEdit: React.FC = () => {
     };
 
     return (
-        <div className="inner-container">
-            <Container fluid>
-                <div className="page-header">
-                    <Row className="align-items-center g-3">
-                        <Col lg={6} md={12}>
-                            <div className="page-header-info">
-                                <div className="page-breadcrumb">
-                                    Production / Bill Of Materials / Edit
-                                </div>
-                                <h2 className="page-title">
-                                    Edit Bill Of Material
-                                </h2>
-                            </div>
-                        </Col>
-                        <Col lg={6} md={12}>
-                            <div className="page-header-actions justify-content-end">
-                                <CustomButton
-                                    text="Back to List"
-                                    icon={FaArrowLeft}
-                                    onClick={() => navigate("/bill-of-materials")}
-                                />
-                            </div>
-                        </Col>
-                    </Row>
+        <div className="p-4 md:p-6 bg-gray-50 min-h-screen">
+            <div className="w-full max-w-7xl mx-auto space-y-6">
+                <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                    <div>
+                        <h2 className="text-xl font-bold text-gray-800">
+                            Edit Bill Of Material
+                        </h2>
+                    </div>
+                    <div>
+                        <CustomButton
+                            text="Back to List"
+                            icon={FaArrowLeft}
+                            onClick={() => navigate("/bill-of-materials")}
+                        />
+                    </div>
                 </div>
 
-                <div className="form-inner">
-                    <form onSubmit={handleSubmit}>
-                        <Row className="mb-4">
-                            <Col lg={4} md={6}>
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                    <form onSubmit={handleSubmit} className="space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            <div className="lg:col-span-1">
                                 <TextInput
                                     label="BOM ID"
                                     name="id"
@@ -231,8 +221,8 @@ const BillOfMaterialEdit: React.FC = () => {
                                     disabled
                                     onChange={() => { }}
                                 />
-                            </Col>
-                            <Col lg={8} md={6}>
+                            </div>
+                            <div className="lg:col-span-2">
                                 <SelectInput
                                     label="PRODUCT"
                                     name="productId"
@@ -249,8 +239,8 @@ const BillOfMaterialEdit: React.FC = () => {
                                     ]}
                                     onChange={handleItemChange}
                                 />
-                            </Col>
-                            <Col lg={12}>
+                            </div>
+                            <div className="col-span-1 md:col-span-2 lg:col-span-3">
                                 <TextInput
                                     label="REMARKS"
                                     name="remarks"
@@ -259,12 +249,12 @@ const BillOfMaterialEdit: React.FC = () => {
                                     placeholder="Enter remarks (Optional)"
                                     onChange={handleItemChange}
                                 />
-                            </Col>
-                        </Row>
+                            </div>
+                        </div>
 
-                        <div className="form-section">
-                            <div className="d-flex justify-content-between align-items-center mb-3">
-                                <h5 className="form-title mb-0">
+                        <div className="mt-8 pt-6 border-t border-gray-100">
+                            <div className="flex justify-between items-center mb-6">
+                                <h5 className="text-lg font-semibold text-gray-800 m-0">
                                     Raw Material Details
                                 </h5>
                                 <CustomButton
@@ -275,80 +265,78 @@ const BillOfMaterialEdit: React.FC = () => {
                                 />
                             </div>
 
-                            {formData.items.map((item, index) => {
-                                const selectedRawMaterialIds = formData.items.map(i => i.rawMaterialId).filter(Boolean);
-                                return (
-                                    <Row key={index} className="align-items-end mb-3">
-                                        <Col lg={4} md={12}>
-                                            <SelectInput
-                                                label="RAW MATERIAL"
-                                                name="rawMaterialId"
-                                                value={item.rawMaterialId}
-                                                error={errors[`items.${index}.rawMaterialId`]}
-                                                required
-                                                options={[
-                                                    { value: "", label: "Select Raw Material" },
-                                                    ...rawMaterials.map(rm => ({
-                                                        value: rm.rawMaterialId,
-                                                        label: `${rm.materialName} (${rm.rawMaterialId})`,
-                                                        disabled: selectedRawMaterialIds.includes(rm.rawMaterialId) && item.rawMaterialId !== rm.rawMaterialId
-                                                    }))
-                                                ]}
-                                                onChange={(e) => handleRowChange(index, "rawMaterialId", e.target.value)}
-                                            />
-                                        </Col>
-                                        <Col lg={3} md={12}>
-                                            <TextInput
-                                                label="REQUIRED QUANTITY"
-                                                name="requiredQuantity"
-                                                type="number"
-                                                value={item.requiredQuantity}
-                                                error={errors[`items.${index}.requiredQuantity`]}
-                                                placeholder="Enter Quantity"
-                                                required
-                                                onChange={(e) => handleRowChange(index, "requiredQuantity", e.target.value)}
-                                            />
-                                        </Col>
-                                        <Col lg={3} md={12}>
-                                            <SelectInput
-                                                label="UOM"
-                                                name="uom"
-                                                value={item.uom}
-                                                error={errors[`items.${index}.uom`]}
-                                                required
-                                                options={[
-                                                    { value: "", label: "Select UOM" },
-                                                    ...uoms.map(u => ({
-                                                        value: u.code,
-                                                        label: u.name
-                                                    }))
-                                                ]}
-                                                onChange={(e) => handleRowChange(index, "uom", e.target.value)}
-                                            />
-                                        </Col>
-                                        <Col lg={2} md={12} className="justify-content-center align-items-center">
-                                            <DeleteButton onClick={() => removeRow(index)} />
-                                        </Col>
-                                    </Row>
-                                );
-                            })}
+                            <div className="space-y-4">
+                                {formData.items.map((item, index) => {
+                                    const selectedRawMaterialIds = formData.items.map(i => i.rawMaterialId).filter(Boolean);
+                                    return (
+                                        <div key={index} className="flex flex-wrap items-end gap-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                                            <div className="flex-1 min-w-[200px]">
+                                                <SelectInput
+                                                    label="RAW MATERIAL"
+                                                    name="rawMaterialId"
+                                                    value={item.rawMaterialId}
+                                                    error={errors[`items.${index}.rawMaterialId`]}
+                                                    required
+                                                    options={[
+                                                        { value: "", label: "Select Raw Material" },
+                                                        ...rawMaterials.map(rm => ({
+                                                            value: rm.rawMaterialId,
+                                                            label: `${rm.materialName} (${rm.rawMaterialId})`,
+                                                            disabled: selectedRawMaterialIds.includes(rm.rawMaterialId) && item.rawMaterialId !== rm.rawMaterialId
+                                                        }))
+                                                    ]}
+                                                    onChange={(e) => handleRowChange(index, "rawMaterialId", e.target.value)}
+                                                />
+                                            </div>
+                                            <div className="w-full sm:w-[150px]">
+                                                <TextInput
+                                                    label="REQUIRED QUANTITY"
+                                                    name="requiredQuantity"
+                                                    type="number"
+                                                    value={item.requiredQuantity}
+                                                    error={errors[`items.${index}.requiredQuantity`]}
+                                                    placeholder="Enter Quantity"
+                                                    required
+                                                    onChange={(e) => handleRowChange(index, "requiredQuantity", e.target.value)}
+                                                />
+                                            </div>
+                                            <div className="w-full sm:w-[150px]">
+                                                <SelectInput
+                                                    label="UOM"
+                                                    name="uom"
+                                                    value={item.uom}
+                                                    error={errors[`items.${index}.uom`]}
+                                                    required
+                                                    options={[
+                                                        { value: "", label: "Select UOM" },
+                                                        ...uoms.map(u => ({
+                                                            value: u.code,
+                                                            label: u.name
+                                                        }))
+                                                    ]}
+                                                    onChange={(e) => handleRowChange(index, "uom", e.target.value)}
+                                                />
+                                            </div>
+                                            <div className="w-full sm:w-auto flex justify-center pb-1">
+                                                <DeleteButton onClick={() => removeRow(index)} />
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
                         </div>
 
-                        <Row className="mt-4">
-                            <Col lg={12}>
-                                <div className="form-actions d-flex justify-content-end">
-                                    <Button
-                                        text={isLoading ? "Updating..." : "Update Bill Of Material"}
-                                        icon={FaSave}
-                                        type="submit"
-                                        disabled={isLoading}
-                                    />
-                                </div>
-                            </Col>
-                        </Row>
+                        <div className="mt-8 pt-6 border-t border-gray-100 flex justify-end">
+                            <Button
+                                text={isLoading ? "Updating..." : "Update Bill Of Material"}
+                                icon={FaSave}
+                                type="submit"
+                                disabled={isLoading}
+                            />
+                        </div>
                     </form>
                 </div>
-            </Container>
+            </div>
         </div>
     );
 };

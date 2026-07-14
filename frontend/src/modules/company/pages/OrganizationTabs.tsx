@@ -26,14 +26,15 @@ const OrganizationTabs: React.FC = () => {
         "/settings/gst-taxes": "gst",
         "/whatsapp": "whatsapp",
         "/settings/invoice": "invoice",
-        "/departments": "departments"
+        "/departments": "departments",
+        "/settings/company": "companySettings",
     };
 
     const keyToPath: Record<string, string> = {
         "profile": "/company/view",
         "roles": "/roles",
         "permissions": "/role-permissions",
-        "settings": "/settings/company",
+        "companySettings": "/settings/company",
         "gst": "/settings/gst-taxes",
         "whatsapp": "/whatsapp",
         "invoice": "/settings/invoice",
@@ -47,7 +48,7 @@ const OrganizationTabs: React.FC = () => {
         { key: "roles", label: "Roles", icon: <FaUserTag />, content: <RoleList /> },
         { key: "departments", label: "Departments", icon: <FaBuilding />, content: <DepartmentList /> },
         { key: "permissions", label: "Permissions", icon: <FaUserShield />, content: <RolePermissionMapping /> },
-        { key: "settings", label: "Company Settings", icon: <FaCogs />, content: <CompanySettings /> },
+        { key: "companySettings", label: "Company Settings", icon: <FaCogs />, content: <CompanySettings /> },
         { key: "gst", label: "GST Tax Rates", icon: <FaPercent />, content: <GstTaxList /> },
         { key: "whatsapp", label: "Whatsapp", icon: <FaWhatsapp />, content: <WhatsappSettings /> },
         { key: "invoice", label: "Invoice", icon: <FaFileInvoice />, content: <SalesInvoiceCreate /> }

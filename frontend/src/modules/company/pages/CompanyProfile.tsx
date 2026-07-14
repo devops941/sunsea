@@ -7,7 +7,6 @@ import { fetchCompany } from '../../../features/company/companySlice';
 import CustomButton from '../../../components/ui/Button/Button';
 import { StatusBadge } from '../../../components/ui/StatusBadge/Badge';
 import Logo from '../../../assets/images/sun-sea.webp';
-import './CompanyProfile.css';
 
 const CompanyProfile: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
@@ -21,161 +20,172 @@ const CompanyProfile: React.FC = () => {
     dispatch(fetchCompany());
   }, [dispatch]);
 
-  if (loading || !company) return <div className="text-center p-5 mt-5 fw-bold text-primary">Loading company profile...</div>;
+  if (loading || !company) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin  h-10 w-10 border-b-2 border-indigo-600"></div>
+        <span className="ml-3 text-indigo-600 font-medium">Loading company profile...</span>
+      </div>
+    );
+  }
 
   return (
-    <div className="cp-wrapper">
-      <div className="cp-card">
+    <div className="p-4 md:p-6 min-h-screen bg-gradient-to-br from-indigo-50 via-white to-blue-50">
+      <div className="max-w-5xl mx-auto bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden transition-all duration-300 hover:shadow-md">
 
         {/* HEADER */}
-        <div className="cp-header">
-          <div className="cp-header-left">
-            <div className="cp-logo" style={{ overflow: 'hidden', padding: '5px' }}>
-              <img src={company.logoUrl || Logo} alt="Company Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+        <div className="bg-gradient-to-r from-indigo-600 via-blue-600 to-blue-500 px-6 py-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+          <div className="flex items-center gap-5">
+            <div className="w-16 h-16 md:w-20 md:h-20 bg-white rounded-xl shadow-md border-2 border-white/20 flex items-center justify-center p-2 shrink-0 overflow-hidden">
+              <img src={company.logoUrl || Logo} alt="Company Logo" className="w-full h-full object-contain" />
             </div>
-            <div className="cp-company-title">
-              <h2 className="cp-company-name">{company.legalName || company.companyName || "Your Company"}</h2>
-              <span className="cp-company-type">
-                <FaBuilding style={{ marginRight: '6px' }} />
-                Enterprise Company Profile
-              </span>
+            <div>
+              <h2 className="text-2xl md:text-3xl font-extrabold text-white tracking-tight drop-shadow-sm">
+                {company.legalName || company.companyName || "Your Company"}
+              </h2>
+              <div className="flex items-center gap-2 mt-1 text-sm font-medium text-blue-100">
+                <FaBuilding className="text-blue-200" />
+                <span>Enterprise Company Profile</span>
+              </div>
             </div>
           </div>
-          <div className="cp-header-right">
-            <div className="cp-code-status">
-              <span className="cp-company-code me-3">
-                <FaHashtag style={{ marginRight: '6px' }} />
-                {company.companyCode || "-"}
-              </span>
-              <StatusBadge status={company.isActive ? "ACTIVE" : "INACTIVE"} />
+          <div className="flex items-center gap-4 bg-white/10 backdrop-blur-md px-4 py-2 rounded-xl shadow-sm border border-white/20">
+            <div className="flex items-center gap-2 text-white font-medium">
+              <FaHashtag className="text-blue-200" />
+              <span>{company.companyCode || "-"}</span>
             </div>
+            <div className="w-px h-5 bg-white/30"></div>
+            <div className="bg-white rounded-full"><StatusBadge status={company.isActive ? "ACTIVE" : "INACTIVE"} /></div>
           </div>
         </div>
 
         {/* BODY */}
-        <div className="cp-body">
+        <div className="p-6 space-y-8">
+
           {/* General */}
-          <div className="cp-section">
-            <div className="cp-section-title">
-              <FaBuilding /> General Information
-            </div>
-            <div className="cp-grid">
-              <div className="cp-info-item">
-                <span className="cp-info-label">Legal Name</span>
-                <span className="cp-info-value">{company.legalName || company.companyName || "-"}</span>
+          <section>
+            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 border-b border-slate-100 pb-2 mb-4">
+              <FaBuilding className="text-indigo-400" />
+              General Information
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="flex flex-col space-y-1 p-3 bg-slate-50 rounded-xl border border-slate-100/50">
+                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Legal Name</span>
+                <span className="text-sm font-bold text-slate-800">{company.legalName || company.companyName || "-"}</span>
               </div>
-           
-              <div className="cp-info-item">
-                <span className="cp-info-label">Company Code</span>
-                <span className="cp-info-value">{company.companyCode || "-"}</span>
+              <div className="flex flex-col space-y-1 p-3 bg-slate-50 rounded-xl border border-slate-100/50">
+                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Company Code</span>
+                <span className="text-sm font-bold text-slate-800">{company.companyCode || "-"}</span>
               </div>
             </div>
-          </div>
+          </section>
 
           {/* Registration */}
-          <div className="cp-section">
-            <div className="cp-section-title">
-              <FaFileInvoiceDollar /> Registration Details
-            </div>
-            <div className="cp-grid">
-              <div className="cp-info-item">
-                <span className="cp-info-label">GSTIN</span>
-                <span className="cp-info-value">{company.gstin || "-"}</span>
+          <section>
+            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 border-b border-slate-100 pb-2 mb-4">
+              <FaFileInvoiceDollar className="text-emerald-400" />
+              Registration Details
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="flex flex-col space-y-1 p-3 bg-slate-50 rounded-xl border border-slate-100/50">
+                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">GSTIN</span>
+                <span className="text-sm font-bold text-slate-800 tracking-wide">{company.gstin || "-"}</span>
               </div>
-              <div className="cp-info-item">
-                <span className="cp-info-label">Currency</span>
-                <span className="cp-info-value" style={{ fontWeight: 600 }}>
-                  {company.currencyCode || "INR"}
-                </span>
+              <div className="flex flex-col space-y-1 p-3 bg-emerald-50/50 rounded-xl border border-emerald-100/50">
+                <span className="text-xs font-semibold text-emerald-600/70 uppercase tracking-wider">Currency</span>
+                <span className="text-sm font-bold text-emerald-700">{company.currencyCode || "INR"}</span>
               </div>
             </div>
-          </div>
+          </section>
 
           {/* Address */}
-          <div className="cp-section">
-            <div className="cp-section-title">
-              <FaBuilding /> Address Information
+          <section>
+            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 border-b border-slate-100 pb-2 mb-4">
+              <FaBuilding className="text-amber-400" />
+              Address Information
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="flex flex-col space-y-1 p-3 bg-slate-50 rounded-xl border border-slate-100/50 lg:col-span-2">
+                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Address Line 1</span>
+                <span className="text-sm font-bold text-slate-800">{company.addressLine1 || "-"}</span>
+              </div>
+              <div className="flex flex-col space-y-1 p-3 bg-slate-50 rounded-xl border border-slate-100/50 lg:col-span-2">
+                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Address Line 2</span>
+                <span className="text-sm font-bold text-slate-800">{company.addressLine2 || "-"}</span>
+              </div>
+              <div className="flex flex-col space-y-1 p-3 bg-slate-50 rounded-xl border border-slate-100/50">
+                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">City</span>
+                <span className="text-sm font-bold text-slate-800">{company.city || "-"}</span>
+              </div>
+              <div className="flex flex-col space-y-1 p-3 bg-slate-50 rounded-xl border border-slate-100/50">
+                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">State</span>
+                <span className="text-sm font-bold text-slate-800">{company.state || "-"}</span>
+              </div>
+              <div className="flex flex-col space-y-1 p-3 bg-slate-50 rounded-xl border border-slate-100/50">
+                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Zipcode</span>
+                <span className="text-sm font-bold text-slate-800">{company.zipcode || "-"}</span>
+              </div>
+              <div className="flex flex-col space-y-1 p-3 bg-slate-50 rounded-xl border border-slate-100/50">
+                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Country</span>
+                <span className="text-sm font-bold text-slate-800">{company.country || "-"}</span>
+              </div>
             </div>
-            <div className="cp-grid">
-              <div className="cp-info-item">
-                <span className="cp-info-label">Address Line 1</span>
-                <span className="cp-info-value">{company.addressLine1 || "-"}</span>
-              </div>
-              <div className="cp-info-item">
-                <span className="cp-info-label">Address Line 2</span>
-                <span className="cp-info-value">{company.addressLine2 || "-"}</span>
-              </div>
-              <div className="cp-info-item">
-                <span className="cp-info-label">City</span>
-                <span className="cp-info-value">{company.city || "-"}</span>
-              </div>
-              <div className="cp-info-item">
-                <span className="cp-info-label">State</span>
-                <span className="cp-info-value">{company.state || "-"}</span>
-              </div>
-              <div className="cp-info-item">
-                <span className="cp-info-label">Zipcode</span>
-                <span className="cp-info-value">{company.zipcode || "-"}</span>
-              </div>
-              <div className="cp-info-item">
-                <span className="cp-info-label">Country</span>
-                <span className="cp-info-value">{company.country || "-"}</span>
-              </div>
-            </div>
-          </div>
+          </section>
 
           {/* Contact */}
-          <div className="cp-section">
-            <div className="cp-section-title">
-              <FaPhone /> Contact Information
-            </div>
-            <div className="cp-grid">
-              <div className="cp-info-item">
-                <span className="cp-info-label">Phone</span>
-                <span className="cp-info-value">{company.phone || "-"}</span>
+          <section>
+            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 border-b border-slate-100 pb-2 mb-4">
+              <FaPhone className="text-blue-400" />
+              Contact Information
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="flex flex-col space-y-1 p-3 bg-slate-50 rounded-xl border border-slate-100/50">
+                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Phone</span>
+                <span className="text-sm font-bold text-slate-800">{company.phone || "-"}</span>
               </div>
-              {/* <div className="cp-info-item">
-                <span className="cp-info-label">Mobile</span>
-                <span className="cp-info-value">{company.mobile || "-"}</span>
-              </div> */}
-              <div className="cp-info-item">
-                <span className="cp-info-label">Email</span>
-                <span className="cp-info-value">{company.email || "-"}</span>
+              <div className="flex flex-col space-y-1 p-3 bg-slate-50 rounded-xl border border-slate-100/50">
+                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Email</span>
+                <span className="text-sm font-bold text-slate-800">{company.email || "-"}</span>
               </div>
-              {/* <div className="cp-info-item">
-                <span className="cp-info-label">Website</span>
-                <span className="cp-info-value">{company.website || "-"}</span>
-              </div> */}
             </div>
-          </div>
+          </section>
 
           {/* System */}
-          <div className="cp-section">
-            <div className="cp-section-title">
-              <FaServer /> System Information
-            </div>
-            <div className="cp-grid">
-              <div className="cp-info-item" style={{ gridColumn: '1 / -1' }}>
-                <span className="cp-info-label">Logo Image</span>
-                <span className="cp-info-value mt-2 d-block">
-                  {company.logoUrl ? (
-                    <img src={company.logoUrl} alt="Company Logo" style={{ maxWidth: '200px', maxHeight: '100px', objectFit: 'contain', border: '1px solid #eee', padding: '5px', borderRadius: '4px' }} />
-                  ) : (
-                    "No Logo Uploaded"
-                  )}
-                </span>
+          <section>
+            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 border-b border-slate-100 pb-2 mb-4">
+              <FaServer className="text-purple-400" />
+              System Information
+            </h3>
+            <div className="grid grid-cols-1 gap-4">
+              <div className="flex flex-col space-y-3 p-4 bg-slate-50 rounded-xl border border-slate-100/50">
+                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Logo Image</span>
+                {company.logoUrl ? (
+                  <div className="bg-white p-2 border border-slate-200 rounded-lg shadow-sm inline-block w-max">
+                    <img
+                      src={company.logoUrl}
+                      alt="Company Logo"
+                      className="max-w-[150px] max-h-[80px] object-contain"
+                    />
+                  </div>
+                ) : (
+                  <span className="text-sm text-slate-400 italic">No Logo Uploaded</span>
+                )}
               </div>
             </div>
-          </div>
+          </section>
 
         </div>
 
         {/* FOOTER */}
-        <div className="cp-footer">
-          {canEdit && (
-            <CustomButton text="Edit Company Profile" icon={FaEdit} onClick={() => navigate('/company/edit')} />
-          )}
-        </div>
+        {canEdit && (
+          <div className="px-6 py-4 bg-slate-50/80 border-t border-slate-100 flex justify-end">
+            <CustomButton
+              text="Edit Company Profile"
+              icon={FaEdit}
+              onClick={() => navigate('/company/edit')}
+            />
+          </div>
+        )}
       </div>
     </div>
   );

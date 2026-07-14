@@ -22,7 +22,8 @@ export const uomService = {
   },
   fetchAllActive: async () => {
     const response = await apiClient.get(config.product.getActiveUom);
-    return response.data.data; // adjust if fetchAll unwraps the response differently
+    const list = response.data?.data || response.data;
+    return Array.isArray(list) ? list : [];
   },
 
   fetchById: async (id: number): Promise<UOM> => {

@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import { Container, Row, Col, Spinner, Badge } from "react-bootstrap";
 import {
   FaSearch,
   FaPlus,
@@ -15,6 +14,8 @@ import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
 import { fetchStockAdjustments } from "../../../features/stock-adjustments/stockAdjustmentSlice";
 
 import CustomButton from "../../../components/ui/Button/Button";
+import DataTable from "../../../components/ui/table/DataTable";
+import SearchInput from "../../../components/ui/SearchInput/SearchInput";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import ViewButton from "../../../components/ui/viewbutton/ViewButton";
@@ -88,10 +89,23 @@ const StockAdjustmentList: React.FC = () => {
 
 
 
+  const getTypeBadgeClass = (type: string) => {
+    switch(ADJUSTMENT_TYPE_BADGE[type]) {
+      case "primary": return "bg-blue-100 text-blue-800";
+      case "info": return "bg-cyan-100 text-cyan-800";
+      case "success": return "bg-green-100 text-green-800";
+      case "warning": return "bg-yellow-100 text-yellow-800";
+      case "danger": return "bg-red-100 text-red-800";
+      case "dark": return "bg-gray-800 text-gray-100";
+      case "light": return "bg-gray-100 text-gray-800";
+      default: return "bg-gray-100 text-gray-800";
+    }
+  };
+
   const getTypeBadge = (type: string) => (
-    <Badge bg={ADJUSTMENT_TYPE_BADGE[type] || "secondary"} style={{ fontSize: "0.75rem" }}>
+    <span className={`px-2.5 py-1 rounded-full text-[11px] font-semibold tracking-wider ${getTypeBadgeClass(type)}`}>
       {ADJUSTMENT_TYPE_LABELS[type] || type}
-    </Badge>
+    </span>
   );
 
   const totalPages = meta?.totalPages || Math.ceil((data?.length || 0) / ITEMS_PER_PAGE);
@@ -106,265 +120,209 @@ const StockAdjustmentList: React.FC = () => {
   };
 
   return (
-    <div className="inner-container">
-      <Container fluid>
-        {/* PAGE HEADER */}
-        <div className="page-header">
-          <Row className="align-items-center g-3">
-            <Col lg={4} md={12}>
-              <div className="page-header-info">
-                <h2 className="page-title">Stock Adjustments</h2>
-                <div className="page-breadcrumb">
-                  Home / Inventory & Warehouse / Stock Adjustments
-                </div>
-              </div>
-            </Col>
-            <Col lg={8} md={12}>
-              <div className="page-header-actions">
-                {/* Status Filter */}
-                <div className="page-search-wrap me-2" style={{ minWidth: "160px" }}>
-                  <SelectInput
-                    label="Filter Status"
-                    hideLabel
-                    name="statusFilter"
-                    value={status}
-                    options={[
-                      { label: "All Statuses", value: "" },
-                      { label: "Draft", value: "DRAFT" },
-                      { label: "Pending Approval", value: "PENDING_APPROVAL" },
-                      { label: "Approved", value: "APPROVED" },
-                      { label: "Rejected", value: "REJECTED" },
-                    ]}
-                    onChange={(e) => {
-                      setStatus(e.target.value);
-                      setCurrentPage(1);
-                    }}
-                  />
-                </div>
-
-                {/* Type Filter */}
-                <div className="page-search-wrap me-2" style={{ minWidth: "200px" }}>
-                  <SelectInput
-                    label="Adjustment Type"
-                    hideLabel
-                    name="typeFilter"
-                    value={adjustmentType}
-                    options={[
-                      { label: "All Types", value: "" },
-                      { label: "Production Material Issue", value: "PRODUCTION_MATERIAL_ISSUE" },
-                      { label: "Production Material Return", value: "PRODUCTION_MATERIAL_RETURN" },
-                      { label: "Stock Increase", value: "STOCK_INCREASE" },
-                      { label: "Stock Decrease", value: "STOCK_DECREASE" },
-                      { label: "Damage", value: "DAMAGE" },
-                      { label: "Scrap", value: "SCRAP" },
-                      { label: "Opening Stock", value: "OPENING_STOCK" },
-                      { label: "Manual Correction", value: "MANUAL_CORRECTION" },
-                      { label: "Other", value: "OTHER" },
-                    ]}
-                    onChange={(e) => {
-                      setAdjustmentType(e.target.value);
-                      setCurrentPage(1);
-                    }}
-                  />
-                </div>
-
-                {/* Advanced Filters Toggle */}
-                <button
-                  className={`btn btn-sm me-2 ${showFilters ? "btn-primary" : "btn-outline-secondary"}`}
-                  onClick={() => setShowFilters(!showFilters)}
-                  title="Date Filters"
-                >
-                  <FaFilter />
-                </button>
-
-                {/* Search */}
-                <div className="page-search-wrap me-2">
-                  <FaSearch className="page-search-icon" />
-                  <input
-                    type="text"
-                    className="page-search-input"
-                    placeholder="Search by No, Reason, PO..."
-                    value={searchTerm}
-                    onChange={(e) => {
-                      setSearchTerm(e.target.value);
-                      setCurrentPage(1);
-                    }}
-                  />
-                </div>
-
-                <CustomButton
-                  text="New Adjustment"
-                  icon={FaPlus}
-                  onClick={() => navigate("/inventory/stock-adjustments/create")}
-                />
-              </div>
-            </Col>
-          </Row>
-
-          {/* Advanced Date Filters */}
-          {showFilters && (
-            <Row className="mt-3 g-2 align-items-center">
-              <Col xs="auto">
-                <label className="form-label text-muted small mb-1">Date From</label>
-                <input
-                  type="date"
-                  className="form-control form-control-sm"
-                  value={dateFrom}
-                  onChange={(e) => { setDateFrom(e.target.value); setCurrentPage(1); }}
-                />
-              </Col>
-              <Col xs="auto">
-                <label className="form-label text-muted small mb-1">Date To</label>
-                <input
-                  type="date"
-                  className="form-control form-control-sm"
-                  value={dateTo}
-                  onChange={(e) => { setDateTo(e.target.value); setCurrentPage(1); }}
-                />
-              </Col>
-              <Col xs="auto" className="mt-3">
-                <button
-                  className="btn btn-sm btn-outline-secondary"
-                  onClick={clearFilters}
-                >
-                  Clear All
-                </button>
-              </Col>
-            </Row>
-          )}
-        </div>
-
-        <div className="page-content">
-          <div className="master-table-body table-wrap">
-            <table className="master-data-table">
-              <thead>
-                <tr>
-                  <th>ADJUSTMENT NO</th>
-                  <th>TYPE</th>
-                  <th>PRODUCTION ORDER</th>
-                  <th>PRODUCT</th>
-                  <th>DATE</th>
-                  <th>ITEMS</th>
-                  <th>REASON</th>
-                  <th>CREATED BY</th>
-                  <th>STATUS</th>
-                  <th>ACTIONS</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr>
-                    <td colSpan={10} className="text-center py-4">
-                      <Spinner animation="border" variant="primary" size="sm" className="me-2" />
-                      Loading...
-                    </td>
-                  </tr>
-                ) : data.length > 0 ? (
-                  data.map((adj: any) => (
-                    <tr key={adj.id} className="master-data-row">
-                      <td className="master-data-cell fw-semibold">{adj.adjustmentNumber}</td>
-                      <td className="master-data-cell">{getTypeBadge(adj.adjustmentType || "STOCK_INCREASE")}</td>
-                      <td className="master-data-cell">
-                        {adj.productionOrderId ? (
-                          <span className="text-primary fw-semibold">{adj.productionOrderId}</span>
-                        ) : (
-                          <span className="text-muted">—</span>
-                        )}
-                      </td>
-                      <td className="master-data-cell">
-                        {adj.productionOrder?.productItem?.productName ? (
-                          <div>
-                            <div className="fw-semibold" style={{ fontSize: "0.85rem" }}>
-                              {adj.productionOrder.productItem.productName}
-                            </div>
-                            <div className="text-muted" style={{ fontSize: "0.75rem" }}>
-                              {adj.productionOrder.productItem.productCode}
-                            </div>
-                          </div>
-                        ) : (
-                          <span className="text-muted">—</span>
-                        )}
-                      </td>
-                      <td className="master-data-cell">{formatDate(adj.adjustmentDate)}</td>
-                      <td className="master-data-cell">
-                        <Badge bg="light" text="dark" className="border">
-                          {adj.items?.length || 0} item{(adj.items?.length || 0) !== 1 ? "s" : ""}
-                        </Badge>
-                      </td>
-                      <td className="master-data-cell">
-                        <span
-                          title={adj.reason}
-                          style={{
-                            maxWidth: 150,
-                            display: "inline-block",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            whiteSpace: "nowrap",
-                          }}
-                        >
-                          {adj.reason || "—"}
-                        </span>
-                      </td>
-                      <td className="master-data-cell text-muted small">{adj.createdBy || "—"}</td>
-                      <td className="master-data-cell">
-                        <StatusBadge status={adj.status} />
-                      </td>
-                      <td className="master-data-cell">
-                        <ViewButton
-                          onClick={() =>
-                            navigate(`/inventory/stock-adjustments/view/${adj.id}`)
-                          }
-                        />
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={10} className="text-center py-4 text-muted">
-                      No stock adjustments found.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+    <div className="p-4 md:p-6 min-h-screen bg-slate-50">
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        {/* Page Header */}
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-slate-200">
+          <div>
+            <h2 className="text-2xl font-bold text-slate-800">Stock Adjustments</h2>
           </div>
 
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="pagination-wrapper mt-3">
-              <span className="pagination-info">
-                Page {currentPage} of {totalPages}
-                {meta?.total ? ` · ${meta.total} total` : ""}
-              </span>
-              <div className="pagination-controls">
-                <button
-                  className="page-btn"
-                  disabled={currentPage === 1}
-                  onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
-                >
-                  <FaChevronLeft />
-                </button>
-                {[...Array(Math.min(totalPages, 7))].map((_, i) => (
-                  <button
-                    key={i}
-                    className={`page-btn ${currentPage === i + 1 ? "active" : ""}`}
-                    onClick={() => setCurrentPage(i + 1)}
-                  >
-                    {i + 1}
-                  </button>
-                ))}
-                <button
-                  className="page-btn"
-                  disabled={currentPage === totalPages}
-                  onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
-                >
-                  <FaChevronRight />
-                </button>
-              </div>
+          <div className="flex flex-wrap items-center gap-3 relative w-full lg:w-auto">
+            {/* Status Filter */}
+            <div className="w-40">
+              <SelectInput
+                label="Filter Status"
+                hideLabel
+                noMargin
+                name="statusFilter"
+                value={status}
+                options={[
+                  { label: "All Statuses", value: "" },
+                  { label: "Draft", value: "DRAFT" },
+                  { label: "Pending Approval", value: "PENDING_APPROVAL" },
+                  { label: "Approved", value: "APPROVED" },
+                  { label: "Rejected", value: "REJECTED" },
+                ]}
+                onChange={(e) => {
+                  setStatus(e.target.value);
+                  setCurrentPage(1);
+                }}
+              />
             </div>
-          )}
+
+            {/* Type Filter */}
+            <div className="w-52">
+              <SelectInput
+                label="Adjustment Type"
+                hideLabel
+                noMargin
+                name="typeFilter"
+                value={adjustmentType}
+                options={[
+                  { label: "All Types", value: "" },
+                  { label: "Production Material Issue", value: "PRODUCTION_MATERIAL_ISSUE" },
+                  { label: "Production Material Return", value: "PRODUCTION_MATERIAL_RETURN" },
+                  { label: "Stock Increase", value: "STOCK_INCREASE" },
+                  { label: "Stock Decrease", value: "STOCK_DECREASE" },
+                  { label: "Damage", value: "DAMAGE" },
+                  { label: "Scrap", value: "SCRAP" },
+                  { label: "Opening Stock", value: "OPENING_STOCK" },
+                  { label: "Manual Correction", value: "MANUAL_CORRECTION" },
+                  { label: "Other", value: "OTHER" },
+                ]}
+                onChange={(e) => {
+                  setAdjustmentType(e.target.value);
+                  setCurrentPage(1);
+                }}
+              />
+            </div>
+
+            {/* Advanced Filters Toggle */}
+            <button
+              className={`p-2 rounded-lg border transition-colors ${showFilters ? 'bg-blue-50 border-blue-200 text-blue-600' : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'}`}
+              onClick={() => setShowFilters(!showFilters)}
+              title="Date Filters"
+            >
+              <FaFilter size={18} />
+            </button>
+
+            {/* Search */}
+            <SearchInput
+              value={searchTerm}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setCurrentPage(1);
+              }}
+              placeholder="Search by No, Reason, PO..."
+            />
+
+            <CustomButton
+              text="New Adjustment"
+              icon={FaPlus}
+              onClick={() => navigate("/inventory/stock-adjustments/create")}
+            />
+          </div>
         </div>
-      </Container>
+
+        {/* Advanced Date Filters */}
+        {showFilters && (
+          <div className="p-4 bg-slate-50 border-b border-slate-200 flex flex-wrap items-end gap-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Date From</label>
+              <input
+                type="date"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                value={dateFrom}
+                onChange={(e) => { setDateFrom(e.target.value); setCurrentPage(1); }}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Date To</label>
+              <input
+                type="date"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                value={dateTo}
+                onChange={(e) => { setDateTo(e.target.value); setCurrentPage(1); }}
+              />
+            </div>
+            <div>
+              <button
+                className="px-4 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
+                onClick={clearFilters}
+              >
+                Clear Filters
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Table */}
+        <DataTable
+          data={data || []}
+          rowKey={(item) => item.id}
+          loading={loading}
+          emptyMessage="No stock adjustments found."
+          pagination={{
+            currentPage,
+            totalPages,
+            onPageChange: (page) => setCurrentPage(page),
+          }}
+          columns={[
+            {
+              header: "ADJUSTMENT NO",
+              accessor: "adjustmentNumber",
+              render: (item) => <span className="font-semibold text-slate-700">{item.adjustmentNumber}</span>
+            },
+            {
+              header: "TYPE",
+              render: (item) => getTypeBadge(item.adjustmentType || "STOCK_INCREASE")
+            },
+            {
+              header: "PRODUCTION ORDER",
+              render: (item) => item.productionOrderId ? (
+                <span className="text-blue-600 font-semibold">{item.productionOrderId}</span>
+              ) : (
+                <span className="text-slate-400">—</span>
+              )
+            },
+            {
+              header: "PRODUCT",
+              render: (item) => item.productionOrder?.productItem?.productName ? (
+                <div>
+                  <div className="font-semibold text-sm text-slate-800">
+                    {item.productionOrder.productItem.productName}
+                  </div>
+                  <div className="text-xs text-slate-500">
+                    {item.productionOrder.productItem.productCode}
+                  </div>
+                </div>
+              ) : (
+                <span className="text-slate-400">—</span>
+              )
+            },
+            {
+              header: "DATE",
+              render: (item) => formatDate(item.adjustmentDate)
+            },
+            {
+              header: "ITEMS",
+              render: (item) => (
+                <span className="px-2 py-1 bg-slate-100 text-slate-600 rounded text-xs font-semibold border border-slate-200">
+                  {item.items?.length || 0} item{(item.items?.length || 0) !== 1 ? "s" : ""}
+                </span>
+              )
+            },
+            {
+              header: "REASON",
+              render: (item) => (
+                <span
+                  title={item.reason}
+                  className="inline-block max-w-[150px] overflow-hidden text-ellipsis whitespace-nowrap text-slate-600"
+                >
+                  {item.reason || "—"}
+                </span>
+              )
+            },
+            {
+              header: "CREATED BY",
+              render: (item) => <span className="text-slate-500 text-sm">{item.createdBy || "—"}</span>
+            },
+            {
+              header: "STATUS",
+              render: (item) => <StatusBadge status={item.status} />
+            },
+            {
+              header: "ACTIONS",
+              render: (item) => (
+                <div className="flex items-center gap-2">
+                  <ViewButton onClick={() => navigate(`/inventory/stock-adjustments/view/${item.id}`)} />
+                </div>
+              )
+            },
+          ]}
+        />
+      </div>
     </div>
   );
 };

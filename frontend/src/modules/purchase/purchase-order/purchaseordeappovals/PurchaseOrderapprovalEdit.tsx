@@ -1,35 +1,61 @@
 import React, { useState, useEffect } from "react";
 import { useSelector } from "react-redux";
-import { Container, Row, Col, Table, Spinner, Modal } from "react-bootstrap";
-import { FaInfoCircle, FaUser, FaMapMarkerAlt, FaBoxOpen, FaCheck, FaTimes, FaArrowLeft } from "react-icons/fa";
+import { 
+    FaInfoCircle, FaUser, FaMapMarkerAlt, FaBoxOpen, FaCheck, FaTimes, 
+    FaArrowLeft, FaCheckCircle, FaExclamationTriangle, FaFileAlt, 
+    FaCalendarAlt, FaCircleNotch 
+} from "react-icons/fa";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
+import { Modal } from "react-bootstrap";
 
 import CustomButton from "../../../../components/ui/Button/Button";
+import BackButton from "../../../../components/ui/BackButton/BackButton";
+import DetailBox from "../../../../components/ui/DetailBox/DetailBox";
+import CommonConfirmModal from "../../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import { purchaseOrderService } from "../../../../services/purchaseOrderService";
 import { useSuppliers } from "../../../../hooks/useSuppliers";
-import Section from "../../../../components/ui/Section/Section";
 import { useUsers } from "../../../../hooks/useUsers";
 
-// ============================================================
-// SIMPLE READ-ONLY FIELD DISPLAY
-// ============================================================
-const ViewField: React.FC<{ label: string; value?: React.ReactNode }> = ({ label, value }) => (
-    <div className="mb-3">
-        <div className="text-muted" style={{ fontSize: "0.8rem" }}>{label}</div>
-        <div className="fw-semibold">{value || value === 0 ? value : "—"}</div>
-    </div>
-);
+// ─── Formatting helpers ─────────────────────────────────────────────────
+const formatMoney = (val: string | number | null | undefined) => {
+    const n = Number(val ?? 0);
+    return `₹${n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+};
 
-const statusBadgeClass = (status: string) => {
-    switch (status) {
-        case "APPROVED": return "success";
-        case "PENDING": return "warning";
-        case "REJECTED": return "danger";
-        case "CANCELLED": return "secondary";
-        case "COMPLETED": return "info";
-        default: return "dark"; // DRAFT
-    }
+const formatDate = (val: string | null | undefined) => {
+    if (!val) return "—";
+    return new Date(val).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+};
+
+const formatDateTime = (val: string | null | undefined) => {
+    if (!val) return "—";
+    return new Date(val).toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+};
+
+const STATUS_MODIFIER: Record<string, "active" | "inactive" | "hold"> = {
+    DRAFT: "hold",
+    OPEN: "active",
+    PENDING: "hold",
+    REJECTED: "inactive",
+    CANCELLED: "inactive",
+    COMPLETED: "active",
+};
+
+const getBadgeColor = (status: string | null | undefined, modifierMap: Record<string, "active" | "inactive" | "hold">) => {
+    const modifier = modifierMap[status || ""] || "hold";
+    if (modifier === "active") return "bg-green-100 text-green-800 border-green-200";
+    if (modifier === "inactive") return "bg-red-100 text-red-800 border-red-200";
+    return "bg-yellow-100 text-yellow-800 border-yellow-200";
+};
+
+const StatusPill: React.FC<{ status?: string | null; modifierMap: Record<string, "active" | "inactive" | "hold"> }> = ({ status, modifierMap }) => {
+    if (!status) return <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 border border-gray-200">—</span>;
+    return (
+        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${getBadgeColor(status, modifierMap)}`}>
+            {status.replace(/_/g, " ")}
+        </span>
+    );
 };
 
 const PurchaseOrderViewPage: React.FC = () => {
@@ -80,33 +106,6 @@ const PurchaseOrderViewPage: React.FC = () => {
         };
     }, [id, location.state]);
 
-    if (loading) {
-        return (
-            <div className="inner-container d-flex justify-content-center align-items-center" style={{ minHeight: "300px" }}>
-                <Spinner animation="border" />
-            </div>
-        );
-    }
-
-    if (!po) {
-        return (
-            <div className="inner-container">
-                <Container fluid>
-                    <div className="text-center text-muted py-5">Purchase order not found.</div>
-                </Container>
-            </div>
-        );
-    }
-
-    const supplier = suppliers.find((s) => String(s.id) === String(po.supplierId));
-    const createdByUser = users.find((u: any) => u.userId === po.createdBy);
-    const isInterState = companyState && supplier?.billingState
-        ? companyState.toLowerCase().trim() !== supplier.billingState.toLowerCase().trim()
-        : false;
-
-    // ============================================================
-    // APPROVE / REJECT (unified handler)
-    // ============================================================
     const handleConfirmAction = async () => {
         if (!po?.id) return;
 
@@ -134,267 +133,301 @@ const PurchaseOrderViewPage: React.FC = () => {
         }
     };
 
-    // ============================================================
-    // UI
-    // ============================================================
+    if (loading || !po) {
+        return (
+            <div className="flex flex-col items-center justify-center py-20">
+                <FaCircleNotch className="animate-spin text-primary text-4xl mb-4" />
+                <p className="text-gray-500">{loading ? "Loading order details..." : "Purchase order not found."}</p>
+            </div>
+        );
+    }
+
+    const supplier = suppliers.find((s) => String(s.id) === String(po.supplierId));
+    const createdByUser = users.find((u: any) => u.userId === po.createdBy);
+    const isInterState = companyState && supplier?.billingState
+        ? companyState.toLowerCase().trim() !== supplier.billingState.toLowerCase().trim()
+        : false;
+
     return (
-        <div className="inner-container">
-            <Container fluid>
-                <div className="page-header">
-                    <Row className="align-items-center g-3">
-                        <Col lg={6} md={12}>
-                            <div className="page-header-info">
-                                <h2 className="page-title">Purchase Order — {po.poNumber}</h2>
-                                <div className="page-breadcrumb">Home / Purchase / Purchase Orders / View</div>
-                            </div>
-                        </Col>
-                        <Col lg={6} md={12} className="text-lg-end">
-                            <span className={`badge bg-${statusBadgeClass(po.status)}`} style={{ fontSize: "0.9rem" }}>
-                                {po.status}
-                            </span>
-                        </Col>
-                    </Row>
+        <div className="w-full mx-auto">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+                {/* ── Page Header ── */}
+                <div className="px-6 py-4 border-b border-gray-200 bg-gray-50/50">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div className="flex items-center gap-3 flex-wrap">
+                            <h2 className="text-xl font-bold text-gray-800 m-0">
+                                {po.poNumber}
+                            </h2>
+                            <StatusPill status={po.status} modifierMap={STATUS_MODIFIER} />
+                        </div>
+                        <div>
+                            <BackButton text="Back to List" onClick={() => navigate("/purchase-order-approvals")} />
+                        </div>
+                    </div>
                 </div>
 
-                {/* ── Order Information ── */}
-                <Section title="Order Information" icon={<FaInfoCircle />}>
-                    <Row>
-                        <Col lg={3} md={6}><ViewField label="PO Number" value={po.poNumber} /></Col>
-                        <Col lg={3} md={6}><ViewField label="PO Date" value={po.poDate ? po.poDate.split("T")[0] : ""} /></Col>
-                        <Col lg={3} md={6}><ViewField label="Expected Delivery Date" value={po.expectedDeliveryDate ? po.expectedDeliveryDate.split("T")[0] : ""} /></Col>
-                        <Col lg={3} md={6}><ViewField label="Created By" value={createdByUser?.username} /></Col>
-                    </Row>
+                <div className="px-6 py-4 space-y-6">
+                    {/* ── Rejection reason banner ── */}
                     {po.status === "REJECTED" && po.rejectReason && (
-                        <Row>
-                            <Col lg={12}>
-                                <div className="alert alert-danger mb-0">
-                                    <strong>Rejection Reason:</strong> {po.rejectReason}
-                                </div>
-                            </Col>
-                        </Row>
+                        <div className="mb-4 bg-red-50 border-l-4 border-red-500 p-3 flex items-start gap-2 rounded-r-lg">
+                            <FaExclamationTriangle className="text-red-500 mt-0.5 text-sm" />
+                            <div>
+                                <div className="text-red-800 font-semibold text-xs uppercase tracking-wide">Order Rejected</div>
+                                <p className="text-red-700 text-sm m-0">{po.rejectReason}</p>
+                            </div>
+                        </div>
                     )}
-                </Section>
 
-                {/* ── Supplier & Store ── */}
-                <Section title="Supplier & Store" icon={<FaUser />}>
-                    <Row>
-                        <Col lg={6} md={12}>
-                            <ViewField
-                                label="Supplier"
-                                value={supplier ? `${supplier.supplierCode} - ${supplier.legalName || supplier.displayName || ""}` : po.supplierId}
-                            />
-                        </Col>
-                        <Col lg={6} md={12}>
-                            <ViewField
-                                label="Store"
-                                value={po.store?.storeName || po.storeId || "—"}
-                            />
-                        </Col>
-                    </Row>
-                </Section>
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        {/* ── Left column: main details ── */}
+                        <div className="lg:col-span-2 space-y-6">
 
-                {/* ── Addresses ── */}
-                <Section title="Billing & Shipping Address" icon={<FaMapMarkerAlt />}>
-                    <Row>
-                        <Col lg={6}>
-                            <h6 className="mb-3">Billing Address</h6>
-                            <ViewField label="Address Line" value={po.billingAddressLine1} />
-                            <Row>
-                                <Col md={4}><ViewField label="City" value={po.billingCity} /></Col>
-                                <Col md={4}><ViewField label="State" value={po.billingState} /></Col>
-                                <Col md={4}><ViewField label="Pincode" value={po.billingPincode} /></Col>
-                            </Row>
-                        </Col>
-                        <Col lg={6}>
-                            <h6 className="mb-3">Shipping Address</h6>
-                            <ViewField label="Address Line" value={po.shippingAddressLine1} />
-                            <Row>
-                                <Col md={4}><ViewField label="City" value={po.shippingCity} /></Col>
-                                <Col md={4}><ViewField label="State" value={po.shippingState} /></Col>
-                                <Col md={4}><ViewField label="Pincode" value={po.shippingPincode} /></Col>
-                            </Row>
-                        </Col>
-                    </Row>
-                </Section>
-
-                {/* ── Items ── */}
-                <Section title="Items" icon={<FaBoxOpen />}>
-                    <div className="table-responsive">
-                        <Table bordered hover>
-                            <thead>
-                                <tr>
-                                    <th>S.No</th>
-                                    <th>Product</th>
-                                    <th>UOM</th>
-                                    <th>Quantity</th>
-                                    <th>Unit Price</th>
-                                    <th>Tax %</th>
-                                    <th>Taxable (₹)</th>
-                                    {isInterState ? (
-                                        <th>IGST (₹)</th>
-                                    ) : (
-                                        <>
-                                            <th>CGST (₹)</th>
-                                            <th>SGST (₹)</th>
-                                        </>
-                                    )}
-                                    <th>Line Total</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {(po.items || []).map((item: any, index: number) => (
-                                    <tr key={index}>
-                                        <td>{index + 1}</td>
-                                        <td>{item.product?.productName || item.productId}</td>
-                                        <td>{item.uom}</td>
-                                        <td>{item.quantity}</td>
-                                        <td>₹{Number(item.unitPrice).toFixed(2)}</td>
-                                        <td>{item.tax || 0}%</td>
-                                        <td>₹{Number(item.taxableAmount || 0).toFixed(2)}</td>
-                                        {isInterState ? (
-                                            <td>₹{Number(item.igstAmount || 0).toFixed(2)}</td>
-                                        ) : (
-                                            <>
-                                                <td>₹{Number(item.cgstAmount || 0).toFixed(2)}</td>
-                                                <td>₹{Number(item.sgstAmount || 0).toFixed(2)}</td>
-                                            </>
-                                        )}
-                                        <td>₹{Number(item.lineTotal).toFixed(2)}</td>
-                                    </tr>
-                                ))}
-                                {(!po.items || po.items.length === 0) && (
-                                    <tr>
-                                        <td colSpan={isInterState ? 9 : 10} className="text-center">No items</td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </Table>
-                    </div>
-                </Section>
-
-                {/* ── Remarks + Summary ── */}
-                <Section title="Notes & Summary">
-                    <Row>
-                        <Col lg={6}>
-                            <ViewField label="Remarks" value={po.remarks} />
-                        </Col>
-                        <Col lg={{ span: 5, offset: 1 }}>
-                            <div
-                                className="p-3"
-                                style={{
-                                    background: "var(--color-bg, #f8f9fa)",
-                                    borderRadius: "var(--radius-md, 8px)",
-                                    border: "1px solid var(--color-border)",
-                                }}
-                            >
-                                <h6 className="mb-3 fw-bold" style={{ color: "var(--color-primary)" }}>Order Summary</h6>
-                                <div className="d-flex justify-content-between mb-2">
-                                    <span>Subtotal:</span>
-                                    <span>₹{Number(po.subtotal).toFixed(2)}</span>
-                                </div>
-                                <div className="d-flex justify-content-between mb-2 text-danger small">
-                                    <span>Discount:</span>
-                                    <span>-₹{Number(po.totalDiscount || 0).toFixed(2)}</span>
-                                </div>
-                                {isInterState ? (
-                                    <div className="d-flex justify-content-between mb-2 text-success small">
-                                        <span>Total IGST:</span>
-                                        <span>+₹{Number(po.totalIgst || 0).toFixed(2)}</span>
-                                    </div>
-                                ) : (
-                                    <>
-                                        <div className="d-flex justify-content-between mb-2 text-success small">
-                                            <span>Total CGST:</span>
-                                            <span>+₹{Number(po.totalCgst || 0).toFixed(2)}</span>
-                                        </div>
-                                        <div className="d-flex justify-content-between mb-2 text-success small">
-                                            <span>Total SGST:</span>
-                                            <span>+₹{Number(po.totalSgst || 0).toFixed(2)}</span>
-                                        </div>
-                                    </>
-                                )}
-                                <div className="d-flex justify-content-between mb-2 text-success fw-bold">
-                                    <span>Total Tax:</span>
-                                    <span>+₹{Number(po.totalTax).toFixed(2)}</span>
-                                </div>
-                                <hr />
-                                <div className="d-flex justify-content-between fw-bold">
-                                    <span>Net Amount:</span>
-                                    <span>₹{Number(po.netAmount).toFixed(2)}</span>
+                            {/* ── Order Info ── */}
+                            <div>
+                                <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                                    <FaFileAlt className="text-blue-500" /> Order Information
+                                </h3>
+                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-4">
+                                    <DetailBox label="PO Number" value={po.poNumber} icon={<FaFileAlt />} />
+                                    <DetailBox label="PO Date" value={formatDate(po.poDate)} icon={<FaCalendarAlt />} />
+                                    <DetailBox label="Expected Delivery" value={formatDate(po.expectedDeliveryDate)} icon={<FaCalendarAlt />} />
+                                    <DetailBox label="Created By" value={createdByUser?.username || "—"} icon={<FaUser />} />
+                                    <DetailBox label="Store" value={po.store?.storeName || po.storeId || "—"} icon={<FaInfoCircle />} />
+                                    {po.remarks && <DetailBox label="Remarks" value={po.remarks} />}
                                 </div>
                             </div>
-                        </Col>
-                    </Row>
-                </Section>
 
-                {/* ── Actions ── */}
-                <div
-                    className="form-actions d-flex justify-content-end gap-3 mt-4"
-                    style={{ borderTop: "1px solid var(--color-border)", paddingTop: "1.5rem" }}
-                >
-                    <CustomButton
-                        text="Back"
-                        icon={FaArrowLeft}
-                        onClick={() => navigate("/purchase-order-approvals")}
-                        type="button"
-                    />
+                            {/* ── Supplier ── */}
+                            <div className="pt-4 border-t border-gray-100">
+                                <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                                    <FaUser className="text-blue-500" /> Supplier
+                                </h3>
+                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                                    <DetailBox 
+                                        label="Name" 
+                                        value={supplier ? `${supplier.supplierCode} - ${supplier.legalName || supplier.displayName || ""}` : po.supplierId} 
+                                    />
+                                </div>
+                            </div>
 
-                    {po.status === "PENDING" && (
-                        <>
-                            <CustomButton
-                                text="Approve"
-                                icon={FaCheck}
-                                onClick={() => setActionMode("approve")}
-                                type="button"
-                            />
-                            <CustomButton
-                                text="Reject"
-                                icon={FaTimes}
-                                onClick={() => setActionMode("reject")}
-                                type="button"
-                            />
-                        </>
-                    )}
+                            {/* ── Addresses ── */}
+                            <div className="pt-4 border-t border-gray-100">
+                                <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                                    <FaMapMarkerAlt className="text-blue-500" /> Addresses
+                                </h3>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div>
+                                        <div className="text-[11px] font-bold text-gray-500 uppercase tracking-wide mb-1">Billing Address</div>
+                                        <div className="text-sm text-gray-900">{po.billingAddressLine1 || "—"}</div>
+                                        {(po.billingCity || po.billingState || po.billingPincode) && (
+                                            <div className="text-sm text-gray-900">{po.billingCity}, {po.billingState} — {po.billingPincode}</div>
+                                        )}
+                                    </div>
+                                    <div>
+                                        <div className="text-[11px] font-bold text-gray-500 uppercase tracking-wide mb-1">Shipping Address</div>
+                                        {po.shippingAddressLine1 ? (
+                                            <>
+                                                <div className="text-sm text-gray-900">{po.shippingAddressLine1}</div>
+                                                <div className="text-sm text-gray-900">{po.shippingCity}, {po.shippingState} — {po.shippingPincode}</div>
+                                            </>
+                                        ) : (
+                                            <div className="text-sm text-gray-500 italic">Same as Billing Address</div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* ── Items ── */}
+                            <div className="pt-4 border-t border-gray-100">
+                                <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                                    <FaBoxOpen className="text-blue-500" /> Order Items
+                                </h3>
+                                <div className="border border-gray-200 rounded-lg overflow-hidden">
+                                    <table className="min-w-full text-sm">
+                                        <thead>
+                                            <tr className="bg-gray-50 border-b border-gray-200">
+                                                <th className="py-3 pl-4 pr-2 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wide w-8">#</th>
+                                                <th className="py-3 px-2 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wide">Product</th>
+                                                <th className="py-3 px-2 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wide">UOM</th>
+                                                <th className="py-3 px-2 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wide">Qty</th>
+                                                <th className="py-3 px-2 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wide">Unit Price</th>
+                                                {isInterState ? (
+                                                    <th className="py-3 px-2 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wide">IGST</th>
+                                                ) : (
+                                                    <>
+                                                        <th className="py-3 px-2 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wide">CGST</th>
+                                                        <th className="py-3 px-2 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wide">SGST</th>
+                                                    </>
+                                                )}
+                                                <th className="py-3 pr-4 pl-2 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wide">Line Total</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {(po.items || []).map((item: any, idx: number) => (
+                                                <tr key={idx} className="border-b border-gray-100 last:border-b-0 bg-white">
+                                                    <td className="py-3 pl-4 pr-2 text-gray-700">{idx + 1}</td>
+                                                    <td className="py-3 px-2">
+                                                        <div className="font-medium text-gray-900">{item.product?.productName || item.productId}</div>
+                                                    </td>
+                                                    <td className="py-3 px-2 text-gray-700">{item.uom || "—"}</td>
+                                                    <td className="py-3 px-2 text-right text-gray-900">{item.quantity}</td>
+                                                    <td className="py-3 px-2 text-right text-gray-900">{formatMoney(item.unitPrice)}</td>
+                                                    
+                                                    {isInterState ? (
+                                                        <td className="py-3 px-2 text-right text-gray-900">
+                                                            {formatMoney(item.igstAmount || 0)}
+                                                            <div className="text-gray-500 text-xs">({item.tax || 0}%)</div>
+                                                        </td>
+                                                    ) : (
+                                                        <>
+                                                            <td className="py-3 px-2 text-right text-gray-900">
+                                                                {formatMoney(item.cgstAmount || 0)}
+                                                                <div className="text-gray-500 text-xs">({Number(item.tax || 0) / 2}%)</div>
+                                                            </td>
+                                                            <td className="py-3 px-2 text-right text-gray-900">
+                                                                {formatMoney(item.sgstAmount || 0)}
+                                                                <div className="text-gray-500 text-xs">({Number(item.tax || 0) / 2}%)</div>
+                                                            </td>
+                                                        </>
+                                                    )}
+
+                                                    <td className="py-3 pr-4 pl-2 text-right font-medium text-gray-900">{formatMoney(item.lineTotal)}</td>
+                                                </tr>
+                                            ))}
+                                            {(!po.items || po.items.length === 0) && (
+                                                <tr>
+                                                    <td colSpan={10} className="py-8 text-center text-gray-500 text-sm">
+                                                        No items found.
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* ── Right column: approval actions + totals ── */}
+                        <div className="space-y-6">
+
+                            {/* ── Approval Actions ── */}
+                            {po.status === "PENDING" && (
+                                <div className="bg-blue-50 rounded-lg p-5 border border-blue-100">
+                                    <h3 className="text-lg font-semibold text-blue-900 mb-4 flex items-center gap-2">
+                                        <FaCheckCircle className="text-blue-500" /> Action Required
+                                    </h3>
+                                    <p className="text-sm text-blue-800 mb-4">
+                                        This purchase order is pending approval. Please review the details and approve or reject it.
+                                    </p>
+                                    <div className="flex gap-3">
+                                        <CustomButton
+                                            text="Approve"
+                                            icon={FaCheck}
+                                            onClick={() => setActionMode("approve")}
+                                            type="button"
+                                            className="w-full justify-center bg-green-600 hover:bg-green-700 text-white"
+                                        />
+                                        <CustomButton
+                                            text="Reject"
+                                            icon={FaTimes}
+                                            onClick={() => setActionMode("reject")}
+                                            type="button"
+                                            className="w-full justify-center bg-red-600 hover:bg-red-700 text-white"
+                                        />
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* ── Amount Summary ── */}
+                            <div className="bg-white rounded-lg p-5 border border-gray-200 shadow-sm">
+                                <h3 className="text-lg font-semibold text-gray-800 mb-4">Amount Summary</h3>
+                                <div className="space-y-2 text-sm">
+                                    <div className="flex justify-between">
+                                        <span className="text-gray-500">Subtotal</span>
+                                        <span className="text-gray-900">{formatMoney(po.subtotal)}</span>
+                                    </div>
+
+                                    {isInterState ? (
+                                        <div className="flex justify-between text-green-700">
+                                            <span>IGST</span>
+                                            <span>+ {formatMoney(po.totalIgst || 0)}</span>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <div className="flex justify-between text-green-700">
+                                                <span>CGST</span>
+                                                <span>+ {formatMoney(po.totalCgst || 0)}</span>
+                                            </div>
+                                            <div className="flex justify-between text-green-700">
+                                                <span>SGST</span>
+                                                <span>+ {formatMoney(po.totalSgst || 0)}</span>
+                                            </div>
+                                        </>
+                                    )}
+
+                                    <div className="flex justify-between text-green-700 font-medium pt-1">
+                                        <span>Total Tax</span>
+                                        <span>+ {formatMoney(po.totalTax)}</span>
+                                    </div>
+
+                                    {Number(po.totalDiscount) !== 0 && (
+                                        <div className="flex justify-between text-red-600 pt-1 border-t border-gray-100 mt-2">
+                                            <span>Discount</span>
+                                            <span>− {formatMoney(po.totalDiscount)}</span>
+                                        </div>
+                                    )}
+
+                                    <div className="flex justify-between pt-3 mt-3 border-t border-gray-200">
+                                        <span className="font-bold text-gray-800">Net Amount</span>
+                                        <span className="font-bold text-lg text-blue-600">{formatMoney(po.netAmount)}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* ── Meta ── */}
+                            <div className="bg-gray-50 rounded-lg p-5 border border-gray-200">
+                                <h3 className="text-sm font-semibold text-gray-800 mb-3">System Info</h3>
+                                <div className="space-y-3">
+                                    <DetailBox label="Created On" value={formatDateTime(po.createdAt)} />
+                                    <DetailBox label="Last Updated" value={formatDateTime(po.updatedAt)} />
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
                 </div>
 
                 {/* ── Approve / Reject Modal ── */}
-                <Modal show={actionMode !== null} onHide={() => setActionMode(null)} centered>
-                    <Modal.Header closeButton>
-                        <Modal.Title style={{ color: "var(--color-primary)", fontFamily: "var(--font-head)" }}>
-                            {actionMode === "approve" ? "Approve Purchase Order" : "Reject Purchase Order"}
-                        </Modal.Title>
-                    </Modal.Header>
-                    <Modal.Body>
-                        {actionMode === "approve" ? (
-                            <p>Are you sure you want to approve this purchase order?</p>
+                <CommonConfirmModal
+                    show={actionMode !== null}
+                    onHide={() => setActionMode(null)}
+                    onConfirm={handleConfirmAction}
+                    title={actionMode === "approve" ? "Approve Purchase Order" : "Reject Purchase Order"}
+                    message={
+                        actionMode === "approve" ? (
+                            "Are you sure you want to approve this purchase order?"
                         ) : (
-                            <>
-                                <label htmlFor="rejection-reason" className="form-label">
-                                    Enter the reason for rejection <span className="text-danger">*</span>
+                            <div className="text-left mt-2">
+                                <label htmlFor="rejection-reason" className="block text-sm font-medium text-gray-700 mb-2">
+                                    Enter the reason for rejection <span className="text-red-500">*</span>
                                 </label>
                                 <textarea
                                     id="rejection-reason"
-                                    className="form-control"
+                                    className="w-full border border-gray-300 rounded-md p-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                     rows={4}
                                     placeholder="Type your rejection reason here..."
                                     value={reason}
                                     onChange={(e) => setReason(e.target.value)}
                                     required
                                 />
-                            </>
-                        )}
-                    </Modal.Body>
-                    <Modal.Footer>
-                        <CustomButton text="Cancel" onClick={() => setActionMode(null)} disabled={actionLoading} />
-                        <CustomButton
-                            text={actionLoading ? "Processing..." : actionMode === "approve" ? "Confirm Approve" : "Confirm Reject"}
-                            className={actionMode === "approve" ? "btn-success" : "btn-danger"}
-                            onClick={handleConfirmAction}
-                            disabled={actionLoading || (actionMode === "reject" && !isRejectReasonValid)}
-                        />
-                    </Modal.Footer>
-                </Modal>
-            </Container>
+                            </div>
+                        )
+                    }
+                    confirmText={actionLoading ? "Processing..." : actionMode === "approve" ? "Confirm Approve" : "Confirm Reject"}
+                    confirmVariant={actionMode === "approve" ? "primary" : "danger"}
+                    confirmDisabled={actionLoading || (actionMode === "reject" && !isRejectReasonValid)}
+                />
+            </div>
         </div>
     );
 };

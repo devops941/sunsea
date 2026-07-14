@@ -1,8 +1,6 @@
 import React, { useState } from 'react';
 import PhoneInput, { isValidPhoneNumber } from 'react-phone-number-input';
-import { Form } from 'react-bootstrap';
 import 'react-phone-number-input/style.css';
-import './PhoneInput.css';
 
 export const validatePhoneNumber = (value: string | undefined, required: boolean = true): string | null => {
     if (!value || value.trim() === '') {
@@ -62,29 +60,73 @@ const IndiaPhoneInput: React.FC<IndiaPhoneInputProps> = ({
     const displayError = error || localError;
 
     return (
-        <Form.Group className="text-input-group mb-0">
+        <div className="mb-[18px] group w-full">
             {label && (
-                <Form.Label className="text-input-label">
+                <label
+                    htmlFor={name}
+                    className={`
+                        flex items-center gap-[6px] mb-2
+                        text-xs font-bold uppercase
+                        tracking-[0.5px]
+                        transition-colors duration-250
+                        ${displayError ? "text-red-500" : "text-slate-500"}
+                        group-focus-within:text-primary
+                    `}
+                >
                     <span>{label}</span>
-                    {required && <span className="required-star">*</span>}
-                </Form.Label>
+                    {required && <span className="text-[#e53935] ml-0.5">*</span>}
+                </label>
             )}
 
-            <PhoneInput
-                international={false}
-                countryCallingCodeEditable={false}
-                defaultCountry="IN"
-                countries={["IN"]}
-                addInternationalOption={false}
-                placeholder={placeholder}
-                value={value || ''}
-                onChange={handleOnChange}
-                onBlur={handleBlur}
-                className={displayError ? 'PhoneInput--error' : ''}
-            />
+            <div className="relative">
+                <PhoneInput
+                    international={false}
+                    countryCallingCodeEditable={false}
+                    defaultCountry="IN"
+                    countries={["IN"]}
+                    addInternationalOption={false}
+                    placeholder={placeholder}
+                    value={value || ''}
+                    onChange={handleOnChange}
+                    onBlur={handleBlur}
+                    className={`
+                        w-full h-[35px] px-4 flex items-center
+                        border rounded-[10px] outline-none
+                        text-[15px] font-medium
+                        transition-all duration-250 bg-white
+                        ${displayError
+                            ? "border-red-500 focus-within:border-red-500 focus-within:ring-4 focus-within:ring-red-500/15"
+                            : "border-slate-300  hover:border-slate-400 focus-within:border-primary focus-within:ring-4 focus-within:ring-primary/15"
+                        }
+                    `}
+                />
+                <style>{`
+                    .PhoneInputInput, .PhoneInput input {
+                        border: none !important;
+                        outline: none !important;
+                        background: transparent !important;
+                        height: 100% !important;
+                        color: #1f2937 !important;
+                        font-weight: 500 !important;
+                        box-shadow: none !important;
+                    }
+                    .PhoneInputInput::placeholder, .PhoneInput input::placeholder {
+                        color: #9ca3af !important;
+                    }
+                    .PhoneInputInput:focus, .PhoneInput input:focus {
+                        border: none !important;
+                        box-shadow: none !important;
+                        outline: none !important;
+                    }
+                `}</style>
+            </div>
 
-            {displayError && <div className="text-danger mt-2">{displayError}</div>}
-        </Form.Group>
+            {displayError && (
+                <div className="text-[#dc3545] text-sm font-medium mt-1">
+                    {displayError}
+                </div>
+            )}
+        </div>
     );
 };
 

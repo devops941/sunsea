@@ -402,7 +402,7 @@ const DailyMachinePlanning: React.FC = () => {
             <Col lg={5} md={12}>
               <div className="page-header-info">
                 <h2 className="page-title">Daily Machine Planning</h2>
-                <div className="page-breadcrumb">Home / Production / Daily Planning</div>
+                
               </div>
             </Col>
             <Col lg={7} md={12}>

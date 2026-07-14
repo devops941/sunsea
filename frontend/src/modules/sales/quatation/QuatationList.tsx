@@ -1,7 +1,5 @@
 import React, { useState, useCallback, useEffect } from "react";
-import { Container, Row, Col, Spinner } from "react-bootstrap";
-import { FaSearch, FaChevronLeft, FaChevronRight } from "react-icons/fa";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 
 import ViewButton from "../../../components/ui/viewbutton/ViewButton";
@@ -10,16 +8,19 @@ import CommonViewModal from "../../../components/ui/CommonViewModal/CommonViewMo
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import { salesOrderService, type SalesOrder, type SalesOrderStatus } from "../../../services/salesOrderService";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
+import DataTable from "../../../components/ui/table/DataTable";
+import SearchInput from "../../../components/ui/SearchInput/SearchInput";
 
 const ITEMS_PER_PAGE = 10;
-
-
 
 const QuotationList: React.FC = () => {
     const navigate = useNavigate();
     const [data, setData] = useState<SalesOrder[]>([]);
     const [loading, setLoading] = useState(false);
-    const [searchTerm, setSearchTerm] = useState("");
+    const location = useLocation();
+    const searchParams = new URLSearchParams(location.search);
+    const initialSearch = searchParams.get("search") || "";
+    const [searchTerm, setSearchTerm] = useState(initialSearch);
     const [currentPage, setCurrentPage] = useState(1);
     const [total, setTotal] = useState(0);
 
@@ -29,9 +30,7 @@ const QuotationList: React.FC = () => {
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [itemToDelete, setItemToDelete] = useState<number | null>(null);
 
-
-
-    // ─── Fetch only PENDING_MD_APPROVAL orders ────────────────────────────
+    // ─── Fetch only CONFIRMED and MD_REJECTED orders ────────────────────────────
     const fetchOrders = useCallback(async () => {
         setLoading(true);
         try {
@@ -40,11 +39,10 @@ const QuotationList: React.FC = () => {
                 pageSize: ITEMS_PER_PAGE,
                 search: searchTerm || undefined,
                 status: ['CONFIRMED', 'MD_REJECTED'] as SalesOrderStatus[],
-
             });
 
             setData(response.data || []);
-            setTotal(response.total || 0);
+            setTotal((response.total ?? 0) / 10);
         } catch (error: any) {
             console.error("❌ Fetch error:", error);
             toast.error(error?.response?.data?.message || "Failed to fetch orders");
@@ -55,7 +53,10 @@ const QuotationList: React.FC = () => {
     }, [currentPage, searchTerm]);
 
     useEffect(() => {
-        fetchOrders();
+        const timer = setTimeout(() => {
+            fetchOrders();
+        }, 500);
+        return () => clearTimeout(timer);
     }, [fetchOrders]);
 
     const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -65,7 +66,6 @@ const QuotationList: React.FC = () => {
 
     const handleDeleteConfirm = async () => {
         if (itemToDelete === null) return;
-
         try {
             await salesOrderService.delete(itemToDelete);
             toast.success("Sales order deleted successfully!");
@@ -78,9 +78,10 @@ const QuotationList: React.FC = () => {
         }
     };
 
-
-
-
+    // const triggerDelete = useCallback((id: number) => {
+    //     setItemToDelete(id);
+    //     setShowDeleteModal(true);
+    // }, []);
 
     const formatDate = (dateStr: string) => {
         if (!dateStr) return "N/A";
@@ -91,14 +92,10 @@ const QuotationList: React.FC = () => {
     const formatCurrency = (amount: number) =>
         `₹${(amount ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`;
 
-    const totalPages = Math.ceil(total / ITEMS_PER_PAGE);
-
     const handleOpenView = useCallback((item: SalesOrder) => {
         setSelectedItem(item);
         setShowViewModal(true);
     }, []);
-
-
 
     const handleOpenEdit = useCallback(
         (item: SalesOrder) => {
@@ -108,120 +105,61 @@ const QuotationList: React.FC = () => {
     );
 
     return (
-        <div className="inner-container">
-            <Container fluid>
-                {/* Page Header */}
-                <div className="page-header">
-                    <Row className="align-items-center g-3">
-                        <Col lg={6} md={12}>
-                            <div className="page-header-info">
-                                <h2 className="page-title">Qutation List</h2>
-                                <div className="page-breadcrumb">Home / Quotation / Qutation List</div>
-                            </div>
-                        </Col>
-                        <Col lg={6} md={12}>
-                            <div className="page-header-actions">
-                                <div className="page-search-wrap">
-                                    <FaSearch className="page-search-icon" />
-                                    <input
-                                        type="text"
-                                        className="page-search-input"
-                                        placeholder="Search orders..."
-                                        value={searchTerm}
-                                        onChange={handleSearch}
-                                    />
-                                </div>
-                                {/* <CustomButton text="Add Quotation order" icon={FaPlus} onClick={handleOpenAdd} /> */}
-                            </div>
-                        </Col>
-                    </Row>
+        <div>
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            {/* Page Header */}
+            <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-slate-200">
+                <div>
+                    <h2 className="text-2xl font-bold text-slate-800">Quotation List</h2>
                 </div>
-
-                {/* Table */}
-                <div className="master-table-body table-wrap">
-                    <div className="master-table-body">
-                        <table className="master-data-table">
-                            <thead>
-                                <tr>
-                                    <th style={{ width: "60px" }}>#</th>
-                                    <th>ORDER NO</th>
-                                    <th>ORDER DATE</th>
-                                    <th>CUSTOMER</th>
-                                    <th>NET AMOUNT</th>
-                                    <th>STATUS</th>
-                                    <th>ACTIONS</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {loading ? (
-                                    <tr>
-                                        <td colSpan={7} className="text-center p-4">
-                                            <Spinner animation="border" size="sm" className="me-2" />
-                                            Loading orders...
-                                        </td>
-                                    </tr>
-                                ) : data.length > 0 ? (
-                                    data.map((item, index) => (
-                                        <tr key={item.id} className="master-data-row">
-                                            <td className="master-data-cell">
-                                                {(currentPage - 1) * ITEMS_PER_PAGE + index + 1}
-                                            </td>
-                                            <td className="master-data-cell">{item.orderNo}</td>
-                                            <td className="master-data-cell">{formatDate(item.orderDate)}</td>
-                                            <td className="master-data-cell">
-                                                {item.customer?.displayName || item.customer?.firmName || "N/A"}
-                                            </td>
-                                            <td className="master-data-cell">
-                                                {formatCurrency(item.netAmount)}
-                                            </td>
-                                            <td className="master-data-cell">
-                                                <StatusBadge status={item.status ?? ""} />
-                                            </td>
-                                            <td className="master-data-cell">
-                                                <div className="table-action-group">
-                                                    <ViewButton onClick={() => handleOpenView(item)} />
-                                                    <EditButton onClick={() => handleOpenEdit(item)} />
-                                                    {/* <DeleteButton onClick={() => triggerDelete(item.id)} /> */}
-
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))
-                                ) : (
-                                    <tr>
-                                        <td colSpan={7} className="text-center p-4">
-                                            No orders pending for quatation.
-                                        </td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
-
-                        {totalPages > 1 && (
-                            <div className="pagination-wrap">
-                                <button
-                                    className="pagination-btn"
-                                    disabled={currentPage === 1}
-                                    onClick={() => setCurrentPage((prev) => prev - 1)}
-                                >
-                                    <FaChevronLeft />
-                                </button>
-                                <div className="pagination-info">
-                                    Page {currentPage} of {totalPages}
-                                </div>
-                                <button
-                                    className="pagination-btn"
-                                    disabled={currentPage === totalPages}
-                                    onClick={() => setCurrentPage((prev) => prev + 1)}
-                                >
-                                    <FaChevronRight />
-                                </button>
-                            </div>
-                        )}
-                    </div>
+                <div className="flex flex-wrap items-center gap-3 relative w-full lg:w-auto">
+                    <SearchInput
+                        value={searchTerm}
+                        onChange={handleSearch}
+                        placeholder="Search orders..."
+                    />
                 </div>
+            </div>
 
-                {/* View Modal – unchanged */}
+            {/* Table */}
+            <DataTable
+                data={data}
+                rowKey={(item) => item.id}
+                loading={loading}
+                emptyMessage="No orders pending for quotation."
+                    pagination={{
+                        currentPage,
+                        totalPages: total,
+                        onPageChange: (page) => setCurrentPage(page),
+                    }}
+                    columns={[
+                        {
+                            header: "#",
+                            width: "60px",
+                            render: (_item, index) => (currentPage - 1) * ITEMS_PER_PAGE + index + 1,
+                        },
+                        { header: "ORDER NO", accessor: "orderNo" },
+                        { header: "ORDER DATE", render: (item) => formatDate(item.orderDate) },
+                        {
+                            header: "CUSTOMER",
+                            render: (item) => item.customer?.displayName || item.customer?.firmName || "N/A",
+                        },
+                        { header: "NET AMOUNT", render: (item) => formatCurrency(item.netAmount) },
+                        { header: "STATUS", render: (item) => <StatusBadge status={item.status} /> },
+                        {
+                            header: "ACTIONS",
+                            render: (item) => (
+                                <div className="flex items-center gap-2">
+                                    <ViewButton onClick={() => handleOpenView(item)} />
+                                    <EditButton onClick={() => handleOpenEdit(item)} />
+                                    {/* <DeleteButton onClick={() => triggerDelete(item.id)} /> */}
+                                </div>
+                            ),
+                        },
+                    ]}
+                />
+
+                {/* View Modal */}
                 <CommonViewModal
                     show={showViewModal}
                     onHide={() => setShowViewModal(false)}
@@ -326,7 +264,7 @@ const QuotationList: React.FC = () => {
                     confirmText="Delete"
                     confirmVariant="danger"
                 />
-            </Container>
+            </div>
         </div>
     );
 };

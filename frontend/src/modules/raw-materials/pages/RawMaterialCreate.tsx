@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Container, Row, Col } from "react-bootstrap";
 import { FaSave, FaEraser, FaArrowLeft } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -346,46 +345,33 @@ const RawMaterialCreate: React.FC = () => {
     };
 
     return (
-        <div className="inner-container">
-            <Container fluid>
-                <div className="page-header">
-                    <Row className="align-items-center g-3">
-                        <Col lg={6} md={12}>
-                            <div className="page-header-info">
-                                <h2 className="page-title">Create Raw Material</h2>
-                                <div className="page-breadcrumb">Home / Inventory & Warehouse / Raw Materials / Create</div>
-                            </div>
-                        </Col>
-                        <Col lg={6} md={12}>
-                            <div className="page-header-actions">
-                                <CustomButton
-                                    text="Back to List"
-                                    icon={FaArrowLeft}
-                                    onClick={() => navigate("/raw-materials")}
-                                />
-                            </div>
-                        </Col>
-                    </Row>
+        <div className="w-full mx-auto">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+                <div className="px-6 py-4 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <h2 className="text-xl font-bold text-gray-800">
+                        Create Raw Material
+                    </h2>
+                    <CustomButton
+                        text="Back to List"
+                        icon={FaArrowLeft}
+                        onClick={() => navigate("/raw-materials")}
+                    />
                 </div>
 
-                <form onSubmit={handleSubmit} className="form-inner" noValidate>
+                <form onSubmit={handleSubmit} className="px-6 py-4 space-y-8" noValidate>
                     {/* Basic Information */}
-                    <Row className="mb-4">
-                        <h2 className="form-title">Basic Information</h2>
-
-                        <Col lg={4} md={6}>
+                    <div>
+                        <h6 className="text-base font-semibold text-gray-800 mb-4 border-b border-gray-100 pb-2">Basic Information</h6>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                             <TextInput
                                 label="Raw Material ID"
                                 name="rawMaterialId"
                                 value={formData.rawMaterialId}
-                                disabled
+                                disabled={true}
                                 required
                                 error={errors.rawMaterialId}
                                 onChange={handleChange}
                             />
-                        </Col>
-
-                        <Col lg={4} md={6}>
                             <TextInput
                                 label="Material Name"
                                 name="materialName"
@@ -394,9 +380,6 @@ const RawMaterialCreate: React.FC = () => {
                                 error={errors.materialName}
                                 onChange={handleChange}
                             />
-                        </Col>
-
-                        <Col lg={4} md={6}>
                             <SelectInput
                                 label="Store"
                                 name="storeId"
@@ -412,9 +395,6 @@ const RawMaterialCreate: React.FC = () => {
                                 error={errors.storeId}
                                 onChange={handleChange}
                             />
-                        </Col>
-
-                        <Col lg={4} md={6}>
                             <SelectInput
                                 label="Raw Material Category"
                                 name="categoryId"
@@ -430,9 +410,6 @@ const RawMaterialCreate: React.FC = () => {
                                 error={errors.categoryId}
                                 onChange={handleChange}
                             />
-                        </Col>
-
-                        <Col lg={4} md={6}>
                             <UOMSelect
                                 name="baseUom"
                                 label="Base UOM"
@@ -454,9 +431,6 @@ const RawMaterialCreate: React.FC = () => {
                                 }}
                                 error={errors.baseUom}
                             />
-                        </Col>
-
-                        <Col lg={4} md={6}>
                             <TextInput
                                 label="HSN Code"
                                 name="hsnCode"
@@ -465,9 +439,6 @@ const RawMaterialCreate: React.FC = () => {
                                 error={errors.hsnCode}
                                 onChange={handleChange}
                             />
-                        </Col>
-
-                        <Col lg={4} md={6}>
                             <SelectInput
                                 label="Status"
                                 name="status"
@@ -480,14 +451,13 @@ const RawMaterialCreate: React.FC = () => {
                                 error={errors.status}
                                 onChange={handleChange}
                             />
-                        </Col>
-                    </Row>
+                        </div>
+                    </div>
 
                     {/* Stock Information */}
-                    <Row className="mb-4">
-                        <h2 className="form-title">Stock Information</h2>
-
-                        <Col lg={4} md={6}>
+                    <div>
+                        <h6 className="text-base font-semibold text-gray-800 mb-4 border-b border-gray-100 pb-2">Stock Information</h6>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                             <QuantityInput
                                 label="Opening Stock"
                                 name="onHandQty"
@@ -497,9 +467,6 @@ const RawMaterialCreate: React.FC = () => {
                                 error={errors.onHandQty}
                                 onChange={handleChange}
                             />
-                        </Col>
-
-                        <Col lg={4} md={6}>
                             <QuantityInput
                                 label="Minimum Stock"
                                 name="minimumStock"
@@ -509,9 +476,6 @@ const RawMaterialCreate: React.FC = () => {
                                 error={errors.minimumStock}
                                 onChange={handleChange}
                             />
-                        </Col>
-
-                        <Col lg={4} md={6}>
                             <QuantityInput
                                 label="Reorder Level"
                                 name="reorderLevel"
@@ -521,9 +485,6 @@ const RawMaterialCreate: React.FC = () => {
                                 error={errors.reorderLevel}
                                 onChange={handleChange}
                             />
-                        </Col>
-
-                        <Col lg={4} md={6}>
                             <TextInput
                                 type="number"
                                 label="Delivery Days"
@@ -533,14 +494,13 @@ const RawMaterialCreate: React.FC = () => {
                                 error={errors.leadTimeDays}
                                 onChange={handleChange}
                             />
-                        </Col>
-                    </Row>
+                        </div>
+                    </div>
 
                     {/* Pricing & Value */}
-                    <Row className="mb-4">
-                        <h2 className="form-title">Pricing & Value</h2>
-
-                        <Col lg={4} md={6}>
+                    <div>
+                        <h6 className="text-base font-semibold text-gray-800 mb-4 border-b border-gray-100 pb-2">Pricing & Value</h6>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                             <TextInput
                                 type="number"
                                 label="Average Cost"
@@ -550,9 +510,6 @@ const RawMaterialCreate: React.FC = () => {
                                 error={errors.avgCost}
                                 onChange={handleChange}
                             />
-                        </Col>
-
-                        <Col lg={4} md={6}>
                             <TextInput
                                 type="number"
                                 label="Unit Price"
@@ -562,8 +519,6 @@ const RawMaterialCreate: React.FC = () => {
                                 error={errors.unitPrice}
                                 onChange={handleChange}
                             />
-                        </Col>
-                        <Col lg={4} md={6}>
                             <SelectInput
                                 label="GST TYPE (%)"
                                 name="gstTaxRateId"
@@ -574,14 +529,13 @@ const RawMaterialCreate: React.FC = () => {
                                 error={errors.gstTaxRateId}
                                 disabled={gstLoading}
                             />
-                        </Col>
-                    </Row>
+                        </div>
+                    </div>
 
                     {/* Other Details */}
-                    <Row className="mb-4">
-                        <h2 className="form-title">Other Details</h2>
-
-                        <Col lg={4} md={6}>
+                    <div>
+                        <h6 className="text-base font-semibold text-gray-800 mb-4 border-b border-gray-100 pb-2">Other Details</h6>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                             <TextInput
                                 label="Remarks"
                                 name="remarks"
@@ -590,19 +544,15 @@ const RawMaterialCreate: React.FC = () => {
                                 error={errors.remarks}
                                 onChange={handleChange}
                             />
-                        </Col>
-                    </Row>
+                        </div>
+                    </div>
 
-                    <Row className="mt-4">
-                        <Col lg={12}>
-                            <div className="form-actions d-flex justify-content-end gap-3">
-                                <CustomButton text="Clear" icon={FaEraser} onClick={handleClear} disabled={isSubmitting} />
-                                <CustomButton text={isSubmitting ? "Saving..." : "Save Material"} icon={FaSave} type="submit" disabled={isSubmitting} />
-                            </div>
-                        </Col>
-                    </Row>
+                    <div className="flex justify-end gap-3 pt-4 border-t border-gray-100 mt-6">
+                        <CustomButton text="Clear" icon={FaEraser} onClick={handleClear} disabled={isSubmitting} />
+                        <CustomButton text={isSubmitting ? "Saving..." : "Save Material"} icon={FaSave} type="submit" disabled={isSubmitting} />
+                    </div>
                 </form>
-            </Container>
+            </div>
         </div>
     );
 };

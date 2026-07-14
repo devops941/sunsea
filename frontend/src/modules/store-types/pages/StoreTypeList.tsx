@@ -1,6 +1,5 @@
 import React, { useState, useCallback, useEffect } from "react";
-import { Container, Row, Col, Spinner } from "react-bootstrap";
-import { FaSearch, FaPlus, FaChevronLeft, FaChevronRight } from "react-icons/fa";
+import { FaSearch, FaPlus } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 
@@ -14,7 +13,7 @@ import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
 import CustomButton from "../../../components/ui/Button/Button";
 import CommonViewModal from "../../../components/ui/CommonViewModal/CommonViewModal";
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
-import StatusBadge from "../../../components/ui/StatusBadge/Badge";
+import DataTable from "../../../components/ui/table/DataTable";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -58,9 +57,6 @@ const StoreTypeList: React.FC = () => {
         setCurrentPage(1);
     };
 
-
-
-
     const handleOpenView = useCallback((item: StoreType) => {
         setSelectedItem(item);
         setShowViewModal(true);
@@ -98,109 +94,85 @@ const StoreTypeList: React.FC = () => {
             toast.error(error);
         }
     }, [error]);
+    
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
 
     return (
-        <div className="inner-container">
-            <Container fluid>
-                <div className="page-header">
-                    <Row className="align-items-center g-3">
-                        <Col lg={6} md={12}>
-                            <div className="page-header-info">
-                                <h2 className="page-title">Store Type Management</h2>
-                                <div className="page-breadcrumb">Home / Settings / Store Types</div>
-                            </div>
-                        </Col>
-                        <Col lg={6} md={12}>
-                            <div className="page-header-actions">
-                                <div className="page-search-wrap">
-                                    <FaSearch className="page-search-icon" />
-                                    <input
-                                        type="text"
-                                        className="page-search-input"
-                                        placeholder="Search types..."
-                                        value={searchTerm}
-                                        onChange={handleSearch}
-                                    />
-                                </div>
-                                <CustomButton
-                                    text="Add Type"
-                                    icon={FaPlus}
-                                    onClick={handleOpenAdd}
+        <div className="p-4 md:p-6 min-h-screen bg-slate-50">
+            <div className="max-w-7xl mx-auto">
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                    {/* Page Header */}
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-6 border-b border-slate-200">
+                        <div>
+                            <h2 className="text-2xl font-bold text-slate-800">Store Type Management</h2>
+                        </div>
+                        <div className="flex items-center gap-3 w-full md:w-auto">
+                            <div className="relative w-full md:w-64">
+                                <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                <input
+                                    type="text"
+                                    className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                                    placeholder="Search types..."
+                                    value={searchTerm}
+                                    onChange={handleSearch}
                                 />
                             </div>
-                        </Col>
-                    </Row>
-                </div>
-
-                <div className="master-table-body table-wrap">
-                    <div className="master-table-body">
-                        <table className="master-data-table">
-                            <thead>
-                                <tr>
-                                    <th style={{ width: "60px" }}>#</th>
-                                    <th>CODE</th>
-                                    <th>NAME</th>
-                                    <th>DESCRIPTION</th>
-                                    <th>STATUS</th>
-                                    <th>ACTIONS</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {loading ? (
-                                    <tr>
-                                        <td colSpan={6} className="text-center p-4">
-                                            <Spinner animation="border" variant="primary" />
-                                        </td>
-                                    </tr>
-                                ) : data.length > 0 ? (
-                                    data.map((item, index) => (
-                                        <tr key={item.id} className="master-data-row">
-                                            <td className="master-data-cell">{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</td>
-                                            <td className="master-data-cell">{item.code}</td>
-                                            <td className="master-data-cell">{item.name}</td>
-                                            <td className="master-data-cell">{item.description || "N/A"}</td>
-                                            <td className="master-data-cell">
-                                                <StatusBadge status={item.isActive ? "ACTIVE" : "INACTIVE"} />
-                                            </td>
-                                            <td className="master-data-cell">
-                                                <div className="table-action-group">
-                                                    <ViewButton onClick={() => handleOpenView(item)} />
-                                                    <EditButton onClick={() => handleOpenEdit(item)} />
-                                                    <DeleteButton onClick={() => triggerDelete(item.id)} />
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))
-                                ) : (
-                                    <tr>
-                                        <td colSpan={6} className="text-center p-4">No store types found.</td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
-
-                        {totalPages > 1 && (
-                            <div className="pagination-wrap">
-                                <button
-                                    className="pagination-btn"
-                                    disabled={currentPage === 1}
-                                    onClick={() => setCurrentPage(prev => prev - 1)}
-                                >
-                                    <FaChevronLeft />
-                                </button>
-                                <div className="pagination-info">
-                                    Page {currentPage} of {totalPages}
-                                </div>
-                                <button
-                                    className="pagination-btn"
-                                    disabled={currentPage === totalPages}
-                                    onClick={() => setCurrentPage(prev => prev + 1)}
-                                >
-                                    <FaChevronRight />
-                                </button>
-                            </div>
-                        )}
+                            <CustomButton
+                                text="Add Type"
+                                icon={FaPlus}
+                                onClick={handleOpenAdd}
+                            />
+                        </div>
                     </div>
+
+                    {/* Table */}
+                    {loading && data.length === 0 ? (
+                        <div className="flex justify-center items-center h-64">
+                            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"></div>
+                        </div>
+                    ) : (
+                        <DataTable
+                            data={data}
+                            rowKey={(item) => item.id}
+                            emptyMessage="No store types found."
+                            pagination={
+                                totalPages > 1
+                                    ? {
+                                        currentPage,
+                                        totalPages,
+                                        onPageChange: setCurrentPage,
+                                    }
+                                    : undefined
+                            }
+                            columns={[
+                                { header: "#", width: "60px", render: (_item, index) => startIndex + index + 1, align: "center" },
+                                { header: "CODE", accessor: "code" },
+                                { header: "NAME", accessor: "name" },
+                                { header: "DESCRIPTION", render: (item) => item.description || "N/A" },
+                                {
+                                    header: "STATUS", render: (item) => (
+                                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${item.isActive
+                                                ? "bg-green-100 text-green-700 border border-green-200"
+                                                : "bg-red-100 text-red-700 border border-red-200"
+                                            }`}>
+                                            {item.isActive ? "ACTIVE" : "INACTIVE"}
+                                        </span>
+                                    )
+                                },
+                                {
+                                    header: "ACTIONS",
+                                    render: (item) => (
+                                        <div className="flex items-center gap-2">
+                                            <ViewButton onClick={() => handleOpenView(item)} />
+                                            <EditButton onClick={() => handleOpenEdit(item)} />
+                                            <DeleteButton onClick={() => triggerDelete(item.id)} />
+                                        </div>
+                                    ),
+                                    align: "right"
+                                },
+                            ]}
+                        />
+                    )}
                 </div>
 
                 <CommonViewModal
@@ -236,7 +208,7 @@ const StoreTypeList: React.FC = () => {
                     confirmText="Delete"
                     confirmVariant="danger"
                 />
-            </Container>
+            </div>
         </div>
     );
 };

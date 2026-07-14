@@ -1,22 +1,19 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Container, Row, Col, Spinner, Modal } from "react-bootstrap";
-import {
-  FaSearch,
-  FaPlus,
-  FaChevronLeft,
-  FaChevronRight,
-  FaEye,
-  FaDownload,
-} from "react-icons/fa";
+import { Modal } from "react-bootstrap";
+import { FaPlus, FaFilePdf } from "react-icons/fa";
 import { toast } from "react-toastify";
 
+import DataTable from "../../components/ui/table/DataTable";
+import SearchInput from "../../components/ui/SearchInput/SearchInput";
 import ViewButton from "../../components/ui/viewbutton/ViewButton";
 import EditButton from "../../components/ui/EditButton/EditButton";
 import DeleteButton from "../../components/ui/DeleteButton/DeleteButton";
-import CustomButton from "../../components/ui/custombutton/CustomButton";
+import CustomButton from "../../components/ui/Button/Button";
 import CommonConfirmModal from "../../components/ui/CommonConfirmModal/CommonConfirmModal";
+import CommonViewModal from "../../components/ui/CommonViewModal/CommonViewModal";
 import ExpensesCreate from "./Expensescreate";
 import { useExpenses } from "../../hooks/useExpenses";
+import CommonModal from "../../components/ui/Modal/CommonModal";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -38,11 +35,9 @@ interface Expense {
 const ExpensesList: React.FC = () => {
   const { expenses, loading, error, loadExpenses, removeExpense } = useExpenses();
 
-  // Page views: "list" | "create" | "edit"
   const [viewMode, setViewMode] = useState<"list" | "create" | "edit">("list");
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
 
-  // Search & Filter State
   const [searchTerm, setSearchTerm] = useState("");
   const [filterCategory, setFilterCategory] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
@@ -52,7 +47,6 @@ const ExpensesList: React.FC = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [expenseToDelete, setExpenseToDelete] = useState<string | null>(null);
 
-  // Fetch expenses with search term debounce
   useEffect(() => {
     const timer = setTimeout(() => {
       loadExpenses(searchTerm);
@@ -60,7 +54,6 @@ const ExpensesList: React.FC = () => {
     return () => clearTimeout(timer);
   }, [searchTerm, loadExpenses]);
 
-  // Error toast observer
   useEffect(() => {
     if (error) {
       toast.error(error);
@@ -113,22 +106,19 @@ const ExpensesList: React.FC = () => {
     setSelectedExpense(null);
   };
 
-  // Filter Logic (Category and Status filters are done on filtered list)
   const filteredExpenses = (expenses || []).filter((exp) => {
     const matchesCategory = filterCategory ? exp.expenseCategory === filterCategory : true;
     const matchesStatus = filterStatus ? exp.status === filterStatus : true;
     return matchesCategory && matchesStatus;
   });
 
-  const totalPages = Math.ceil(filteredExpenses.length / ITEMS_PER_PAGE);
+  const totalPages = Math.ceil(filteredExpenses.length / ITEMS_PER_PAGE) || 1;
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
   const paginatedExpenses = filteredExpenses.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
-  // Categories list extracted from data
   const categories = Array.from(new Set((expenses || []).map((e) => e.expenseCategory)));
   const statuses = ["Draft", "Pending", "Approved", "Rejected"];
 
-  // Helper to format date strings cleanly
   const formatDateString = (isoString: string) => {
     if (!isoString) return "N/A";
     try {
@@ -143,335 +133,234 @@ const ExpensesList: React.FC = () => {
     }
   };
 
-  if (viewMode === "create") {
-    return <ExpensesCreate onSaveComplete={handleSaveComplete} onCancel={handleCancel} />;
-  }
-
-  if (viewMode === "edit" && selectedExpense) {
+  if (viewMode === "create" || (viewMode === "edit" && selectedExpense)) {
     return (
       <ExpensesCreate
         onSaveComplete={handleSaveComplete}
         onCancel={handleCancel}
-        initialData={selectedExpense}
+        initialData={viewMode === "edit" ? selectedExpense : undefined}
       />
     );
   }
 
   return (
-    <div className="inner-container">
-      <Container fluid>
+    <div>
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
         {/* Page Header */}
-        <div className="page-header">
-          <Row className="align-items-center g-3">
-            <Col lg={4} md={12}>
-              <div className="page-header-info">
-                <h2 className="page-title">Expense Management</h2>
-                <div className="page-breadcrumb">Home / Purchases / Expenses</div>
-              </div>
-            </Col>
-            <Col lg={8} md={12}>
-              <div className="page-header-actions d-flex flex-wrap gap-2 justify-content-lg-end">
-                <div className="page-search-wrap">
-                  <FaSearch className="page-search-icon" />
-                  <input
-                    type="text"
-                    className="page-search-input"
-                    placeholder="Search expenses..."
-                    value={searchTerm}
-                    onChange={handleSearch}
-                  />
-                </div>
-
-                <div className="d-flex gap-2 align-items-center">
-                  <select
-                    className="form-select select-input-control"
-                    style={{ width: "160px", padding: "6px 12px", borderRadius: "8px", fontSize: "0.9rem" }}
-                    value={filterCategory}
-                    onChange={(e) => {
-                      setFilterCategory(e.target.value);
-                      setCurrentPage(1);
-                    }}
-                  >
-                    <option value="">All Categories</option>
-                    {categories.map((cat, idx) => (
-                      <option key={idx} value={cat}>
-                        {cat}
-                      </option>
-                    ))}
-                  </select>
-
-                  <select
-                    className="form-select select-input-control"
-                    style={{ width: "140px", padding: "6px 12px", borderRadius: "8px", fontSize: "0.9rem" }}
-                    value={filterStatus}
-                    onChange={(e) => {
-                      setFilterStatus(e.target.value);
-                      setCurrentPage(1);
-                    }}
-                  >
-                    <option value="">All Statuses</option>
-                    {statuses.map((stat, idx) => (
-                      <option key={idx} value={stat}>
-                        {stat === "Pending" ? "Pending Approval" : stat}
-                      </option>
-                    ))}
-                  </select>
-
-                  <CustomButton
-                    text="Add Expense"
-                    icon={FaPlus}
-                    onClick={() => setViewMode("create")}
-                    variant="primary"
-                  />
-                </div>
-              </div>
-            </Col>
-          </Row>
-        </div>
-
-        {/* View Table */}
-        <div className="master-table-body table-wrap">
-          <div className="master-table-body">
-            {loading && filteredExpenses.length === 0 ? (
-              <div className="text-center p-5">
-                <Spinner animation="border" variant="primary" />
-              </div>
-            ) : (
-              <table className="master-data-table">
-                <thead>
-                  <tr>
-                    <th style={{ width: "60px" }}>#</th>
-                    <th>EXPENSE NUMBER</th>
-                    <th>CATEGORY</th>
-                    <th>DATE</th>
-                    <th>EXPENSE</th>
-                    <th className="text-end">AMOUNT</th>
-                    <th>SUPPLIER</th>
-                    <th>PAYMENT METHOD</th>
-                    <th>STATUS</th>
-                    <th>ACTIONS</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {paginatedExpenses.length > 0 ? (
-                    paginatedExpenses.map((exp, index) => (
-                      <tr key={exp.id} className="master-data-row">
-                        <td className="master-data-cell">
-                          {(currentPage - 1) * ITEMS_PER_PAGE + index + 1}
-                        </td>
-
-                        <td className="master-data-cell">{exp.expenseNumber}</td>
-
-                        <td className="master-data-cell">
-                          <span className="badge bg-light text-dark p-2 border">{exp.expenseCategory}</span>
-                        </td>
-
-                        <td className="master-data-cell">{formatDateString(exp.date)}</td>
-
-                        <td className="master-data-cell">{exp.expense}</td>
-
-                        <td className="master-data-cell text-end fw-semibold text-primary">
-                          ₹{parseFloat(exp.amount).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                        </td>
-
-                        <td className="master-data-cell">
-                          {exp.supplier?.legalName || exp.supplier || "N/A"}
-                        </td>
-
-                        <td className="master-data-cell">{exp.paymentMethod}</td>
-
-                        <td className="master-data-cell">
-                          <span
-                            className={`status-pill status-pill--${
-                              exp.status === "Approved"
-                                ? "active"
-                                : exp.status === "Pending"
-                                ? "pending"
-                                : exp.status === "Rejected"
-                                ? "inactive"
-                                : "draft"
-                            }`}
-                            style={{
-                              backgroundColor:
-                                exp.status === "Pending"
-                                  ? "#fff3cd"
-                                  : exp.status === "Draft"
-                                  ? "#e2e3e5"
-                                  : undefined,
-                              color:
-                                exp.status === "Pending"
-                                  ? "#856404"
-                                  : exp.status === "Draft"
-                                  ? "#383d41"
-                                  : undefined,
-                              border:
-                                exp.status === "Pending"
-                                  ? "1px solid #ffeeba"
-                                  : exp.status === "Draft"
-                                  ? "1px solid #d6d8db"
-                                  : undefined,
-                            }}
-                          >
-                            {exp.status === "Pending" ? "Pending Approval" : exp.status}
-                          </span>
-                        </td>
-
-                        <td className="master-data-cell">
-                          <div className="table-action-group">
-                            <ViewButton onClick={() => handleView(exp)} />
-                            <EditButton onClick={() => handleEdit(exp)} />
-                            <DeleteButton onClick={() => triggerDelete(exp.id)} />
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={10} className="text-center p-4">
-                        No expenses found.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            )}
-
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="pagination-wrap">
-                <button
-                  className="pagination-btn"
-                  disabled={currentPage === 1}
-                  onClick={() => setCurrentPage(currentPage - 1)}
-                >
-                  <FaChevronLeft />
-                </button>
-                <div className="pagination-info">
-                  Page {currentPage} of {totalPages}
-                </div>
-                <button
-                  className="pagination-btn"
-                  disabled={currentPage === totalPages}
-                  onClick={() => setCurrentPage(currentPage + 1)}
-                >
-                  <FaChevronRight />
-                </button>
-              </div>
-            )}
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-slate-200">
+          <div>
+            <h2 className="text-2xl font-bold text-slate-800">Expense Management</h2>
+          </div>
+          <div className="flex flex-wrap items-center gap-3 relative w-full lg:w-auto">
+            <SearchInput
+              value={searchTerm}
+              onChange={handleSearch}
+              placeholder="Search expenses..."
+            />
+            <select
+              className="border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-500"
+              value={filterCategory}
+              onChange={(e) => {
+                setFilterCategory(e.target.value);
+                setCurrentPage(1);
+              }}
+            >
+              <option value="">All Categories</option>
+              {categories.map((cat, idx) => (
+                <option key={idx} value={cat}>
+                  {cat}
+                </option>
+              ))}
+            </select>
+            <select
+              className="border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-500"
+              value={filterStatus}
+              onChange={(e) => {
+                setFilterStatus(e.target.value);
+                setCurrentPage(1);
+              }}
+            >
+              <option value="">All Statuses</option>
+              {statuses.map((stat, idx) => (
+                <option key={idx} value={stat}>
+                  {stat === "Pending" ? "Pending Approval" : stat}
+                </option>
+              ))}
+            </select>
+            <CustomButton
+              text="Add Expense"
+              icon={FaPlus}
+              onClick={() => setViewMode("create")}
+            />
           </div>
         </div>
 
+        {/* Table */}
+        <DataTable
+          data={paginatedExpenses}
+          rowKey={(item) => item.id}
+          loading={loading}
+          emptyMessage="No expenses found."
+          pagination={{
+            currentPage,
+            totalPages,
+            onPageChange: (page) => setCurrentPage(page),
+          }}
+          columns={[
+            {
+              header: "#",
+              width: "60px",
+              render: (_item, index) => (currentPage - 1) * ITEMS_PER_PAGE + index + 1,
+            },
+            { header: "EXPENSE NUMBER", accessor: "expenseNumber" },
+            {
+              header: "CATEGORY",
+              render: (item) => (
+                <span className="bg-slate-100 text-slate-700 px-2 py-1 rounded text-xs border border-slate-200">
+                  {item.expenseCategory}
+                </span>
+              ),
+            },
+            { header: "DATE", render: (item) => formatDateString(item.date) },
+            { header: "EXPENSE", accessor: "expense" },
+            {
+              header: "AMOUNT",
+              render: (item) => (
+                <span className="font-semibold text-blue-600">
+                  ₹{parseFloat(item.amount).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                </span>
+              ),
+            },
+            {
+              header: "SUPPLIER",
+              render: (item) => item.supplier?.legalName || item.supplier || "N/A",
+            },
+            { header: "PAYMENT METHOD", accessor: "paymentMethod" },
+            {
+              header: "STATUS",
+              render: (item) => {
+                let badgeClass = "bg-slate-100 text-slate-800 border-slate-200";
+                if (item.status === "Approved") badgeClass = "bg-green-50 text-green-700 border-green-200";
+                else if (item.status === "Pending") badgeClass = "bg-yellow-50 text-yellow-700 border-yellow-200";
+                else if (item.status === "Rejected") badgeClass = "bg-red-50 text-red-700 border-red-200";
+
+                return (
+                  <span className={`px-2 py-1 rounded-full text-xs font-semibold border ${badgeClass}`}>
+                    {item.status === "Pending" ? "Pending Approval" : item.status}
+                  </span>
+                );
+              },
+            },
+            {
+              header: "ACTIONS",
+              render: (item) => (
+                <div className="flex items-center gap-2">
+                  <ViewButton onClick={() => handleView(item)} />
+                  <EditButton onClick={() => handleEdit(item)} />
+                  <DeleteButton onClick={() => triggerDelete(item.id)} />
+                </div>
+              ),
+            },
+          ]}
+        />
+
         {/* View Modal */}
-        <Modal
+        <CommonViewModal
           show={showViewModal}
           onHide={() => setShowViewModal(false)}
-          size="lg"
-          centered
-          className="expense-view-modal"
-        >
-          <Modal.Header closeButton style={{ background: "#f8f9fa", borderBottom: "1px solid #e9ecef" }}>
-            <Modal.Title className="fw-bold text-dark d-flex align-items-center gap-2">
-              <FaEye className="text-primary" />
-              <span>Expense Details: {selectedExpense?.expenseNumber}</span>
-            </Modal.Title>
-          </Modal.Header>
-          <Modal.Body className="p-4">
-            {selectedExpense && (
-              <div className="expense-details-grid">
-                <Row className="g-4">
-                  <Col md={6}>
-                    <div className="mb-3">
-                      <span className="text-muted d-block small">Expense Number</span>
-                      <strong className="fs-5">{selectedExpense.expenseNumber}</strong>
-                    </div>
-                    <div className="mb-3">
-                      <span className="text-muted d-block small">Category</span>
-                      <span className="badge bg-light text-dark border p-2 mt-1">
-                        {selectedExpense.expenseCategory}
-                      </span>
-                    </div>
-                    <div className="mb-3">
-                      <span className="text-muted d-block small">Expense Date</span>
-                      <strong>{formatDateString(selectedExpense.date)}</strong>
-                    </div>
-                    <div className="mb-3">
-                      <span className="text-muted d-block small">Expense Name</span>
-                      <strong>{selectedExpense.expense}</strong>
-                    </div>
-                    <div className="mb-3">
-                      <span className="text-muted d-block small">Amount</span>
-                      <strong className="fs-5 text-primary">
-                        ₹{parseFloat(selectedExpense.amount).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                      </strong>
-                    </div>
-                  </Col>
-                  <Col md={6}>
-                    <div className="mb-3">
-                      <span className="text-muted d-block small">Supplier</span>
-                      <strong>{selectedExpense.supplier?.legalName || selectedExpense.supplier || "N/A"}</strong>
-                    </div>
-                    <div className="mb-3">
-                      <span className="text-muted d-block small">Payment Method</span>
-                      <strong>{selectedExpense.paymentMethod}</strong>
-                    </div>
-                    <div className="mb-3">
-                      <span className="text-muted d-block small">Status</span>
-                      <span
-                        className={`status-pill status-pill--${
-                          selectedExpense.status === "Approved"
-                            ? "active"
-                            : selectedExpense.status === "Pending"
-                            ? "pending"
-                            : selectedExpense.status === "Rejected"
-                            ? "inactive"
-                            : "draft"
-                        } mt-1 d-inline-block`}
-                      >
-                        {selectedExpense.status === "Pending" ? "Pending Approval" : selectedExpense.status}
-                      </span>
-                    </div>
-                    <div className="mb-3">
-                      <span className="text-muted d-block small">Receipt / Invoice</span>
-                      {selectedExpense.receiptInvoice ? (
-                        <div className="d-flex align-items-center gap-2 mt-1">
-                          <span className="text-success small fw-semibold">
-                            {selectedExpense.receiptInvoice}
-                          </span>
-                          <CustomButton
-                            text="Download"
-                            icon={FaEye}
-                            size="sm"
-                            onClick={() => toast.info(`Downloading file: ${selectedExpense.receiptInvoice}`)}
-                            variant="dark"
-                          />
+          modalTitle="Expense Details"
+          avatarText={selectedExpense ? selectedExpense.expenseNumber.charAt(0).toUpperCase() : ""}
+          headerTitle={selectedExpense ? selectedExpense.expenseNumber : ""}
+          headerSubtitle={selectedExpense ? `Category: ${selectedExpense.expenseCategory}` : ""}
+          sections={
+            selectedExpense
+              ? [
+                {
+                  fields: [
+                    { label: "Expense Number", value: selectedExpense.expenseNumber },
+                    { label: "Category", value: selectedExpense.expenseCategory },
+                    { label: "Expense Date", value: formatDateString(selectedExpense.date) },
+                    { label: "Expense Name", value: selectedExpense.expense },
+                  ],
+                },
+                {
+                  fields: [
+                    {
+                      label: "Amount",
+                      value: `₹${parseFloat(selectedExpense.amount).toLocaleString("en-IN", {
+                        minimumFractionDigits: 2,
+                      })}`,
+                    },
+                    { label: "Supplier", value: selectedExpense.supplier?.legalName || selectedExpense.supplier || "N/A" },
+                    { label: "Payment Method", value: selectedExpense.paymentMethod },
+                    { label: "Status", value: selectedExpense.status === "Pending" ? "Pending Approval" : selectedExpense.status },
+                  ],
+                },
+                {
+                  title: "Additional Information",
+                  fields: [
+                    { label: "Description", value: selectedExpense.description || "N/A" },
+                    { label: "Internal Notes", value: selectedExpense.notes || "N/A" },
+                  ],
+                },
+                {
+                  title: "Attachment",
+                  fields: [
+                    {
+                      label: "Receipt / Invoice",
+                      value: selectedExpense.receiptInvoice ? (
+                        <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "4px" }}>
+                          {selectedExpense.receiptInvoice.toLowerCase().endsWith(".pdf") ? (
+                            <a
+                              href={selectedExpense.receiptInvoice}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="btn btn-outline-primary btn-sm"
+                              style={{ display: "inline-flex", alignItems: "center", gap: "6px", width: "fit-content" }}
+                            >
+                              <FaFilePdf /> View PDF Document
+                            </a>
+                          ) : (
+                            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                              <img
+                                src={selectedExpense.receiptInvoice}
+                                alt="Receipt Copy"
+                                style={{
+                                  maxWidth: "100%",
+                                  maxHeight: "300px",
+                                  objectFit: "contain",
+                                  border: "1px solid var(--color-border)",
+                                  borderRadius: "6px",
+                                }}
+                                onError={(e: any) => {
+                                  e.target.style.display = 'none';
+                                  e.target.nextSibling.style.display = 'block';
+                                }}
+                              />
+                              <a
+                                href={selectedExpense.receiptInvoice}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="btn btn-link btn-sm text-decoration-none p-0 text-start"
+                                style={{ width: "fit-content" }}
+                              >
+                                Open in New Tab
+                              </a>
+                            </div>
+                          )}
                         </div>
                       ) : (
-                        <span className="text-muted">No attachment</span>
-                      )}
-                    </div>
-                  </Col>
-                  <Col md={12}>
-                    <hr className="my-2" />
-                    <div className="mb-3">
-                      <span className="text-muted d-block small">Description</span>
-                      <p className="bg-light p-3 rounded border text-secondary" style={{ whiteSpace: "pre-wrap" }}>
-                        {selectedExpense.description || "No description provided."}
-                      </p>
-                    </div>
-                    <div className="mb-0">
-                      <span className="text-muted d-block small">Internal Notes</span>
-                      <p className="bg-light p-3 rounded border text-secondary" style={{ whiteSpace: "pre-wrap" }}>
-                        {selectedExpense.notes || "No internal notes."}
-                      </p>
-                    </div>
-                  </Col>
-                </Row>
-              </div>
-            )}
-          </Modal.Body>
-        </Modal>
+                        "No attachment"
+                      ),
+                    },
+                  ],
+                },
+              ]
+              : []
+          }
+        />
 
-        {/* Delete Confirm Modal */}
+        {/* Delete Modal */}
         <CommonConfirmModal
           show={showDeleteModal}
           onHide={() => setShowDeleteModal(false)}
@@ -481,7 +370,9 @@ const ExpensesList: React.FC = () => {
           confirmText="Delete"
           confirmVariant="danger"
         />
-      </Container>
+
+
+      </div>
     </div>
   );
 };

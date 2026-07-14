@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Container, Row, Col, Spinner } from "react-bootstrap";
 import { FaSearch, FaChevronLeft, FaChevronRight } from "react-icons/fa";
 import { toast } from "react-toastify";
 
@@ -8,6 +7,8 @@ import { fetchFinishedGoodsStocks } from "../../../features/finished-goods-stock
 
 
 import ViewButton from "../../../components/ui/viewbutton/ViewButton";
+import DataTable from "../../../components/ui/table/DataTable";
+import SearchInput from "../../../components/ui/SearchInput/SearchInput";
 import ExportCSVButton from "../../../components/ui/ExportCSVButton/ExportCSVButton";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import CommonViewModal from "../../../components/ui/CommonViewModal/CommonViewModal";
@@ -83,130 +84,91 @@ const FinishedStockList: React.FC = () => {
     };
 
     return (
-        <div className="inner-container">
-            <Container fluid>
+        <div className="p-4 md:p-6 min-h-screen bg-slate-50">
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                 {/* Page Header */}
-                <div className="page-header">
-                    <Row className="align-items-center g-3">
-                        <Col lg={6} md={12}>
-                            <div className="page-header-info">
-                                <h2 className="page-title">Finished Goods Stock</h2>
-                                <div className="page-breadcrumb">Home / Inventory & Warehouse / Finished Goods Stock</div>
-                            </div>
-                        </Col>
-                        <Col lg={6} md={12}>
-                            <div className="page-header-actions d-flex justify-content-end align-items-center gap-2">
-                                
-                                {/* <div style={{ minWidth: "200px" }}>
-                                    <SelectInput
-                                        label="Select Store"
-                                        hideLabel
-                                        name="storeFilter"
-                                        value={storeId}
-                                        options={[
-                                            { label: "All Stores", value: "" },
-                                            ...stores.map(s => ({
-                                                label: s.storeName,
-                                                value: s.storeId
-                                            }))
-                                        ]}
-                                        onChange={(e) => {
-                                            setStoreId(e.target.value);
-                                            setCurrentPage(1);
-                                        }}
-                                    />
-                                </div> */}
-  
-                                <div className="page-search-wrap">
-                                    <FaSearch className="page-search-icon" />
-                                    <input
-                                        type="text"
-                                        className="page-search-input"
-                                        placeholder="Search stock..."
-                                        value={searchTerm}
-                                        onChange={handleSearch}
-                                    />
-                                </div>
-                                <div className="me-2">
-                                    <ExportCSVButton
-                                        data={data || []}
-                                        columns={exportColumns}
-                                        filename="finished_goods_stock.csv"
-                                    />
-                                </div>
-                            </div>
-                        </Col>
-                    </Row>
+                <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-slate-200">
+                    <div>
+                        <h2 className="text-2xl font-bold text-slate-800">Finished Goods Stock</h2>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-3 relative w-full lg:w-auto">
+                        <SearchInput
+                            value={searchTerm}
+                            onChange={handleSearch}
+                            placeholder="Search stock..."
+                        />
+                        <ExportCSVButton
+                            data={data || []}
+                            columns={exportColumns}
+                            filename="finished_goods_stock.csv"
+                        />
+                    </div>
                 </div>
 
                 {/* Table */}
-                <div className="master-table-body table-wrap">
-                    {loading ? (
-                        <div className="d-flex justify-content-center align-items-center p-5">
-                            <Spinner animation="border" variant="primary" />
-                        </div>
-                    ) : (
-                        <div className="master-table-body">
-                            <table className="master-data-table">
-                                <thead>
-                                    <tr>
-                                        <th style={{ width: "60px" }}>#</th>
-                                        <th>PRODUCT CODE</th>
-                                        <th>PRODUCT NAME</th>
-                                        <th>CATEGORY</th>
-                                        <th>COLOR</th>
-                                        <th>SIZE</th>
-                                        <th>STORE / LOCATION</th>
-                                        <th>PHYSICAL STOCK</th>
-                                        <th>ACTIONS</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {paginatedData.length > 0 ? (
-                                        paginatedData.map((item, index) => (
-                                            <tr key={`${item.storeId}-${item.productItemId}`} className="master-data-row">
-                                                <td className="master-data-cell">{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</td>
-                                                <td className="master-data-cell">{item.product?.productCode || "N/A"}</td>
-                                                <td className="master-data-cell fw-medium">{item.product?.productName || "N/A"}</td>
-                                                <td className="master-data-cell">{item.product?.category?.categoryName || "N/A"}</td>
-                                                <td className="master-data-cell">{item.product?.colors?.map((c: any) => c.color?.colorName).join(", ") || "N/A"}</td>
-                                                <td className="master-data-cell">{item.product?.size?.sizeName ? `${item.product.size.sizeName} (${item.product.size.sizeCode})` : "N/A"}</td>
-                                                <td className="master-data-cell">{item.store?.storeName || "N/A"}</td>
-                                                <td className="master-data-cell fw-bold">
-                                                    <StatusBadge 
-                                                        status={(Number(item.onHandQty) || 0) < (Number(item.product?.minimumQty) || 0) || (Number(item.onHandQty) || 0) <= 0 ? "danger" : "success"} 
-                                                        customText={`${item.onHandQty} ${formatUom(item.product?.uom?.uomCode)}`} 
-                                                    />
-                                                </td>
-                                                <td className="master-data-cell">
-                                                    <div className="table-action-group">
-                                                        <ViewButton onClick={() => handleOpenView(item)} />
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        ))
-                                    ) : (
-                                        <tr>
-                                            <td colSpan={9} className="text-center p-4">No finished goods stock found.</td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                            </table>
-
-                            {totalPages > 1 && (
-                                <div className="pagination-wrap">
-                                    <button className="pagination-btn" disabled={currentPage === 1} onClick={() => setCurrentPage(prev => prev - 1)}>
-                                        <FaChevronLeft />
-                                    </button>
-                                    <div className="pagination-info">Page {currentPage} of {totalPages}</div>
-                                    <button className="pagination-btn" disabled={currentPage === totalPages} onClick={() => setCurrentPage(prev => prev + 1)}>
-                                        <FaChevronRight />
-                                    </button>
+                <DataTable
+                    data={paginatedData || []}
+                    rowKey={(item) => `${item.storeId}-${item.productItemId}`}
+                    loading={loading}
+                    emptyMessage="No finished goods stock found."
+                    pagination={{
+                        currentPage,
+                        totalPages,
+                        onPageChange: (page) => setCurrentPage(page)
+                    }}
+                    columns={[
+                        {
+                            header: "#",
+                            render: (_, index) => <span className="text-slate-500">{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</span>
+                        },
+                        {
+                            header: "PRODUCT CODE",
+                            accessor: "product.productCode",
+                            render: (item) => <span className="font-mono text-slate-600">{item.product?.productCode || "N/A"}</span>
+                        },
+                        {
+                            header: "PRODUCT NAME",
+                            accessor: "product.productName",
+                            render: (item) => <span className="font-semibold text-slate-800">{item.product?.productName || "N/A"}</span>
+                        },
+                        {
+                            header: "CATEGORY",
+                            accessor: "product.category.categoryName",
+                            render: (item) => <span className="text-slate-600">{item.product?.category?.categoryName || "N/A"}</span>
+                        },
+                        {
+                            header: "COLOR",
+                            render: (item) => <span className="text-slate-600">{item.product?.colors?.map((c: any) => c.color?.colorName).join(", ") || "N/A"}</span>
+                        },
+                        {
+                            header: "SIZE",
+                            render: (item) => <span className="text-slate-600">{item.product?.size?.sizeName ? `${item.product.size.sizeName} (${item.product.size.sizeCode})` : "N/A"}</span>
+                        },
+                        {
+                            header: "STORE / LOCATION",
+                            accessor: "store.storeName",
+                            render: (item) => <span className="font-medium text-slate-700">{item.store?.storeName || "N/A"}</span>
+                        },
+                        {
+                            header: "PHYSICAL STOCK",
+                            render: (item) => (
+                                <StatusBadge 
+                                    status={(Number(item.onHandQty) || 0) < (Number(item.product?.minimumQty) || 0) || (Number(item.onHandQty) || 0) <= 0 ? "danger" : "success"} 
+                                    customText={`${item.onHandQty} ${formatUom(item.product?.uom?.uomCode)}`} 
+                                />
+                            )
+                        },
+                        {
+                            header: "ACTIONS",
+                            render: (item) => (
+                                <div className="flex items-center gap-2">
+                                    <ViewButton onClick={() => handleOpenView(item)} />
                                 </div>
-                            )}
-                        </div>
-                    )}
-                </div>
+                            )
+                        }
+                    ]}
+                />
 
                 {/* View Modal */}
                 <CommonViewModal
@@ -238,7 +200,7 @@ const FinishedStockList: React.FC = () => {
                         }
                     ] : []}
                 />
-            </Container>
+            </div>
         </div>
     );
 };

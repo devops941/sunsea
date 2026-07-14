@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from "react";
-import { Container, Row, Col } from "react-bootstrap";
-import { FaWhatsapp, FaSave, FaEraser } from "react-icons/fa";
+import { FaWhatsapp, FaSave, FaEraser, FaKey } from "react-icons/fa";
 import { toast } from "react-toastify";
 import apiClient from "../../api/apiClient";
 import TextInput from "../../components/form/TextInput/TextInput";
-import CustomButton from "../../components/ui/custombutton/CustomButton";
+import CustomButton from "../../components/ui/Button/Button";
 import IndiaPhoneInput from "../../components/ui/PhoneInput/PhoneInput";
+import BackButton from "../../components/ui/BackButton/BackButton";
 
 interface WhatsappConfigForm {
     phoneNumberId: string;
@@ -49,7 +49,7 @@ const WhatsappCreatePage: React.FC = () => {
         fetchConfig();
     }, []);
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
         setFormData((prev) => ({ ...prev, [name]: value }));
         if (errors[name]) {
@@ -78,9 +78,6 @@ const WhatsappCreatePage: React.FC = () => {
         if (!formData.wabaId.trim()) {
             newErrors.wabaId = "WABA ID is required";
         }
-        // if (!formData.businessPhone.trim()) {
-        //     newErrors.businessPhone = "Business phone number is required";
-        // }
         if (!formData.accessToken.trim()) {
             newErrors.accessToken = "Access Token is required";
         }
@@ -133,91 +130,88 @@ const WhatsappCreatePage: React.FC = () => {
     };
 
     return (
-        <div className="inner-container">
-            <Container fluid>
-                <div className="page-header">
-                    <Row className="align-items-center g-3">
-                        <Col lg={6} md={12}>
-                            <div className="page-header-info">
-                                <h2 className="page-title">
-                                    {isEditing ? "Edit WhatsApp Configuration" : "WhatsApp Business Configuration"}
-                                </h2>
-                                <div className="page-breadcrumb">
-                                    {isEditing
-                                        ? "Home / Settings / WhatsApp Config (Edit)"
-                                        : "Home / Settings / WhatsApp Config (New)"}
-                                </div>
-                            </div>
-                        </Col>
-                    </Row>
+        <div className="w-full mx-auto">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+                {/* Page Header */}
+                <div className="px-6 py-4 border-b border-gray-100">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div>
+                            <h2 className="text-xl font-bold text-gray-800">
+                                {isEditing ? "Edit WhatsApp Configuration" : "WhatsApp Business Configuration"}
+                            </h2>
+                        </div>
+
+                    </div>
                 </div>
 
-                <form onSubmit={handleSubmit} className="form-inner">
-                    <Row className="mb-4">
-                        <h2 className="form-title">
-                            <FaWhatsapp className="me-2 text-success" /> API Setup Credentials
-                        </h2>
+                <form onSubmit={handleSubmit} className="px-6 py-4 space-y-6" noValidate>
+                    {/* API Setup Credentials */}
+                    <div>
+                        <h6 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                            <FaWhatsapp className="text-green-500" /> API Setup Credentials
+                        </h6>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <div>
+                                <TextInput
+                                    label="Phone Number ID"
+                                    name="phoneNumberId"
+                                    value={formData.phoneNumberId}
+                                    placeholder="e.g. 109876543212345"
+                                    required
+                                    onChange={handleChange as any}
+                                    error={errors.phoneNumberId}
+                                />
+                            </div>
+                            <div>
+                                <TextInput
+                                    label="WABA ID"
+                                    name="wabaId"
+                                    value={formData.wabaId}
+                                    placeholder="e.g. 987654321098765"
+                                    required
+                                    onChange={handleChange as any}
+                                    error={errors.wabaId}
+                                />
+                            </div>
+                            <div>
+                                <IndiaPhoneInput
+                                    label="Business Phone Number"
+                                    name="businessPhone"
+                                    value={formData.businessPhone}
+                                    placeholder="e.g. 919876543210"
+                                    required
+                                    onChange={handleChange as any}
+                                    error={errors.businessPhone}
+                                />
+                            </div>
+                        </div>
+                    </div>
 
-                        <Col lg={4} md={6}>
-                            <TextInput
-                                label="Phone Number ID"
-                                name="phoneNumberId"
-                                value={formData.phoneNumberId}
-                                placeholder="e.g. 109876543212345"
-                                required
-                                onChange={handleChange}
-                                error={errors.phoneNumberId}
-                            />
-                        </Col>
+                    {/* Security & Credentials */}
+                    <div>
+                        <h6 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                            <FaKey className="text-gray-500 text-sm" /> Security & Credentials
+                        </h6>
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                            <div className="lg:col-span-2 xl:col-span-1">
+                                <TextInput
+                                    label="Access Token"
+                                    name="accessToken"
+                                    value={formData.accessToken}
+                                    placeholder="Paste your Meta Permanent or Temporary Access Token here..."
+                                    required
+                                    onChange={handleChange as any}
+                                    onFocus={handleTokenFocus}
+                                    error={errors.accessToken}
 
-                        <Col lg={4} md={6}>
-                            <TextInput
-                                label="WABA ID (WhatsApp Business Account ID)"
-                                name="wabaId"
-                                value={formData.wabaId}
-                                placeholder="e.g. 987654321098765"
-                                required
-                                onChange={handleChange}
-                                error={errors.wabaId}
-                            />
-                        </Col>
 
-                        <Col lg={4} md={6}>
-                            <IndiaPhoneInput
-                                label="Business Phone Number"
-                                name="businessPhone"
-                                value={formData.businessPhone}
-                                placeholder="e.g. 919876543210"
-                                required
-                                onChange={handleChange}
-                                error={errors.businessPhone}
-                            />
-                        </Col>
-                    </Row>
+                                />
+                            </div>
+                        </div>
+                    </div>
 
-                    <Row className="mb-4">
-                        <h2 className="form-title">Security & Credentials</h2>
-                        <Col lg={8}>
-                            <TextInput
-                                label="Access Token"
-                                name="accessToken"
-                                value={formData.accessToken}
-                                placeholder="Paste your Meta Permanent or Temporary Access Token here..."
-                                required
-                                onChange={handleChange}
-                                onFocus={handleTokenFocus}
-                                error={errors.accessToken}
-                                as="textarea"
-                                rows={4}
-                            />
-                            {/* <span className="text-muted mt-2 d-inline-block" style={{ fontSize: "0.85rem" }}>
-                                Use a permanent token (System User token) for production. Temporary tokens expire in 24 hours.
-                            </span> */}
-                        </Col>
-                    </Row>
-
-                    <div className="form-actions d-flex justify-content-end gap-3 mt-4">
-                        <CustomButton text="Clear" icon={FaEraser} onClick={handleClear} type="button" variant="outline" />
+                    <div className="flex flex-wrap justify-end gap-3 mt-8 pt-4 border-t border-gray-200">
+                        <CustomButton text="Clear" icon={FaEraser} onClick={handleClear} type="button" />
                         <CustomButton
                             text={saving ? "Saving..." : isEditing ? "Update Configuration" : "Save Configuration"}
                             icon={FaSave}
@@ -226,7 +220,7 @@ const WhatsappCreatePage: React.FC = () => {
                         />
                     </div>
                 </form>
-            </Container>
+            </div>
         </div>
     );
 };

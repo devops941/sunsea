@@ -50,7 +50,7 @@ const Subcategorycreate: React.FC = () => {
                     <Row className="align-items-center g-3">
                         <Col lg={6} md={12}>
                             <div className="page-header-info">
-                                <div className="page-breadcrumb"> Settings / Sub Category / Add </div>
+                                
                                 <h2 className="page-title "> Add New Sub Category </h2>
                             </div>
                         </Col>

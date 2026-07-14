@@ -358,7 +358,7 @@ const ShiftExecutionBoard: React.FC = () => {
             <Col lg={6} md={12}>
               <div className="page-header-info">
                 <h2 className="page-title">Operator Shift Execution Console</h2>
-                <div className="page-breadcrumb">Home / Production / Shift Execution</div>
+                
               </div>
             </Col>
             <Col lg={6} md={12} className="text-lg-end">

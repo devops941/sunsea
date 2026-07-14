@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { Container, Row, Col, Spinner } from "react-bootstrap";
-import { FaSearch, FaPlus, FaChevronLeft, FaChevronRight } from "react-icons/fa";
+import { FaPlus, FaSearch } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useSelector } from "react-redux";
@@ -14,6 +13,10 @@ import PurchaseOrderViewModal from "../components/PurchaseOrderViewModal";
 import { usePurchaseOrders } from "../../../../hooks/usePurchaseOrder";
 import { hasPermission } from "../../../../utils/permission";
 import type { PurchaseOrder, PurchaseOrderStatus } from "../../../../features/purchaseOrder/types";
+import DataTable from "../../../../components/ui/table/DataTable";
+import SearchInput from "../../../../components/ui/SearchInput/SearchInput";
+import StatusBadge from "../../../../components/ui/StatusBadge/Badge";
+import FilterPopover from "../../../../components/ui/FilterPopover/FilterPopover";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -36,18 +39,13 @@ const PurchaseOrderListPage: React.FC = () => {
   // Get user from Redux
   const user = useSelector((state: any) => state?.auth?.user);
 
-
-
-
   // TEMPORARY: Force show button for testing
-  // Change this to true to ALWAYS show the Create button
-  const FORCE_SHOW_BUTTON = true; // ← SET THIS TO true TO SHOW BUTTON
+  const FORCE_SHOW_BUTTON = true;
 
   // Real permission check
   const canCreate = FORCE_SHOW_BUTTON || hasPermission("purchase_orders.create") || user?.role === "admin";
   const canEdit = FORCE_SHOW_BUTTON || hasPermission("purchase_orders.edit") || user?.role === "admin";
   const canDelete = FORCE_SHOW_BUTTON || hasPermission("purchase_orders.delete") || user?.role === "admin";
-
 
   const {
     purchaseOrders,
@@ -62,8 +60,16 @@ const PurchaseOrderListPage: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<PurchaseOrderStatus | "">("");
+  const [draftStatusFilter, setDraftStatusFilter] = useState<PurchaseOrderStatus | "">("");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+  const [draftFromDate, setDraftFromDate] = useState("");
+  const [draftToDate, setDraftToDate] = useState("");
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [poToDelete, setPoToDelete] = useState<string | number | null>(null);
+
+  const hasActiveFilters = !!(statusFilter || fromDate || toDate);
+  const activeFilterCount = [statusFilter, fromDate, toDate].filter(Boolean).length;
 
   useEffect(() => {
     loadPurchaseOrders();
@@ -78,9 +84,27 @@ const PurchaseOrderListPage: React.FC = () => {
     setCurrentPage(1);
   };
 
-  const handleStatusFilter = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setStatusFilter(e.target.value as PurchaseOrderStatus | "");
+  const handleApplyFilters = () => {
+    setStatusFilter(draftStatusFilter);
+    setFromDate(draftFromDate);
+    setToDate(draftToDate);
     setCurrentPage(1);
+  };
+
+  const handleClearFilters = () => {
+    setDraftStatusFilter("");
+    setDraftFromDate("");
+    setDraftToDate("");
+    setStatusFilter("");
+    setFromDate("");
+    setToDate("");
+    setCurrentPage(1);
+  };
+
+  const handleOpenFilter = () => {
+    setDraftStatusFilter(statusFilter);
+    setDraftFromDate(fromDate);
+    setDraftToDate(toDate);
   };
 
   const handleView = useCallback((po: PurchaseOrder) => {
@@ -129,173 +153,164 @@ const PurchaseOrderListPage: React.FC = () => {
 
       const matchesStatus = statusFilter === "" || po.status === statusFilter;
 
-      return matchesSearch && matchesStatus;
+      let matchesDate = true;
+      if (fromDate || toDate) {
+        const poDate = po.poDate ? po.poDate.split("T")[0] : "";
+        if (poDate) {
+          if (fromDate && poDate < fromDate) matchesDate = false;
+          if (toDate && poDate > toDate) matchesDate = false;
+        } else {
+          matchesDate = false; // Exclude if no date and filters are active
+        }
+      }
+
+      return matchesSearch && matchesStatus && matchesDate;
     });
-  }, [purchaseOrders, searchTerm, statusFilter]);
+  }, [purchaseOrders, searchTerm, statusFilter, fromDate, toDate]);
 
   const totalPages = Math.ceil(filteredPOs.length / ITEMS_PER_PAGE);
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
   const paginatedPOs = filteredPOs.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
-  const getStatusBadgeClass = (status: PurchaseOrderStatus) =>
-    `badge bg-${STATUS_COLORS[status] || "secondary"}`;
-
   return (
-    <div className="inner-container">
-      <Container fluid>
+    <div className="w-full">
+      <div className="w-full">
         {/* Page Header */}
-        <div className="page-header">
-          <Row className="align-items-center g-3">
-            <Col lg={6} md={12}>
-              <div className="page-header-info">
-                <h2 className="page-title">Purchase Orders</h2>
-                <div className="page-breadcrumb">Home / Purchase / Purchase Orders</div>
+        <div className="mb-6 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+          <div>
+            <h2 className="text-3xl font-bold text-primary">Purchase Orders</h2>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3 relative w-full lg:w-auto">
+            <FilterPopover
+              activeFilterCount={activeFilterCount}
+              hasActiveFilters={hasActiveFilters}
+              onApply={handleApplyFilters}
+              onClear={handleClearFilters}
+              onOpen={handleOpenFilter}
+            >
+              <div className="mb-3">
+                <label className="block mb-1 text-[11px] uppercase tracking-wider text-gray-500 font-semibold">
+                  From Date
+                </label>
+                <input
+                  type="date"
+                  className="w-full border border-gray-200 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                  value={draftFromDate}
+                  max={draftToDate || undefined}
+                  onChange={(e) => setDraftFromDate(e.target.value)}
+                />
               </div>
-            </Col>
-            <Col lg={6} md={12}>
-              <div className="page-header-actions">
-                <div className="page-filter-wrap" style={{ minWidth: "150px" }}>
+
+                <div className="mb-3">
+                  <label className="block mb-1 text-[11px] uppercase tracking-wider text-gray-500 font-semibold">
+                    To Date
+                  </label>
+                  <input
+                    type="date"
+                    className="w-full border border-gray-200 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                    value={draftToDate}
+                    min={draftFromDate || undefined}
+                    onChange={(e) => setDraftToDate(e.target.value)}
+                  />
+                </div>
+
+                <div className="mb-4">
+                  <label className="block mb-1 text-[11px] uppercase tracking-wider text-gray-500 font-semibold">
+                    Status
+                  </label>
                   <select
-                    className="form-select"
-                    value={statusFilter}
-                    onChange={handleStatusFilter}
+                    className="w-full border border-gray-200 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary bg-white"
+                    value={draftStatusFilter}
+                    onChange={(e) => setDraftStatusFilter(e.target.value as PurchaseOrderStatus | "")}
                   >
                     <option value="">All Status</option>
                     <option value="DRAFT">Draft</option>
                     <option value="PENDING">Pending</option>
                     <option value="APPROVED">Approved</option>
-                    <option value="OPEN">Open</option>
-                    <option value="PARTIALLY_RECEIVED">Partially Received</option>
-                    <option value="CLOSED">Closed</option>
                     <option value="REJECTED">Rejected</option>
                     <option value="COMPLETED">Completed</option>
                     <option value="CANCELLED">Cancelled</option>
                   </select>
                 </div>
-                <div className="page-search-wrap">
-                  <FaSearch className="page-search-icon" />
-                  <input
-                    type="text"
-                    className="page-search-input"
-                    placeholder="Search by PO # or Supplier..."
-                    value={searchTerm}
-                    onChange={handleSearch}
-                  />
-                </div>
+              </FilterPopover>
 
-                {/* ✅ CREATE BUTTON - With debug text */}
-                {canCreate ? (
-                  <CustomButton
-                    text="Create PO"
-                    icon={FaPlus}
-                    onClick={() => navigate("/purchase-orders/create")}
-                  />
-                ) : (
-                  // Debug: Show if button is hidden
-                  <span style={{ color: 'red', fontSize: '12px' }}>
-                    ⚠️ Create button hidden (canCreate = false)
-                  </span>
-                )}
-              </div>
-            </Col>
-          </Row>
-        </div>
+              <SearchInput
+                value={searchTerm}
+                onChange={handleSearch}
+                placeholder="Search by PO # or Supplier..."
+              />
+              {canCreate ? (
+                <CustomButton
+                  text="Create PO"
+                  icon={FaPlus}
+                  onClick={() => navigate("/purchase-orders/create")}
+                />
+              ) : (
+                <span className="text-red-500 text-xs">
+                  ⚠️ Create button hidden
+                </span>
+              )}
+          </div>
+        </div >
 
         {/* Table */}
-        <div className="master-table-body table-wrap">
-          <div className="master-table-body">
-            {loading && (purchaseOrders?.length ?? 0) === 0 ? (
-              <div className="text-center p-5">
-                <Spinner animation="border" variant="primary" />
-              </div>
-            ) : (
-              <table className="master-data-table">
-                <thead>
-                  <tr>
-                    <th style={{ width: "60px" }}>#</th>
-                    <th>PO NUMBER</th>
-                    <th>PO DATE</th>
-                    <th>SUPPLIER</th>
-                    <th>NET AMOUNT</th>
-                    <th>STATUS</th>
-                    <th>ACTIONS</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {paginatedPOs.length > 0 ? (
-                    paginatedPOs.map((po, index) => (
-                      <tr key={po.id} className="master-data-row">
-                        <td className="master-data-cell">
-                          {(currentPage - 1) * ITEMS_PER_PAGE + index + 1}
-                        </td>
-                        <td className="master-data-cell">
-                          <strong>{po.poNumber || "-"}</strong>
-                        </td>
-                        <td className="master-data-cell">
-                          {po.poDate ? new Date(po.poDate).toLocaleDateString() : "-"}
-                        </td>
-                        <td className="master-data-cell">
-                          {po.supplier?.supplierName || "N/A"}
-                        </td>
-                        <td className="master-data-cell">
-                          ₹{(po.netAmount ?? 0).toLocaleString()}
-                        </td>
-                        <td className="master-data-cell">
-                          <span className={getStatusBadgeClass(po.status)}>
-                            {po.status}
-                          </span>
-                        </td>
-                        <td className="master-data-cell">
-                          <div className="table-action-group">
-                            <ViewButton onClick={() => handleView(po)} />
-                            {canEdit && po.status !== "COMPLETED" && po.status !== "CANCELLED" && (
-                              <EditButton onClick={() => handleEdit(po)} />
-                            )}
-                            {canDelete && po.status === "DRAFT" && (
-                              <DeleteButton onClick={() => triggerDelete(po.id)} />
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={7} className="text-center p-4">
-                        No purchase orders found.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            )}
-
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="pagination-wrap">
-                <button
-                  className="pagination-btn"
-                  disabled={currentPage === 1}
-                  onClick={() => setCurrentPage(currentPage - 1)}
-                >
-                  <FaChevronLeft />
-                </button>
-                <div className="pagination-info">
-                  Page {currentPage} of {totalPages}
-                </div>
-                <button
-                  className="pagination-btn"
-                  disabled={currentPage === totalPages}
-                  onClick={() => setCurrentPage(currentPage + 1)}
-                >
-                  <FaChevronRight />
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
+        < DataTable
+          data={paginatedPOs}
+          rowKey={(item) => item.id}
+          loading={loading && (purchaseOrders?.length ?? 0) === 0}
+          emptyMessage="No purchase orders found."
+          pagination={{
+            currentPage,
+            totalPages: totalPages,
+            onPageChange: (page) => setCurrentPage(page),
+          }}
+          columns={
+            [
+              {
+                header: "#",
+                width: "60px",
+                render: (_item, index) => (currentPage - 1) * ITEMS_PER_PAGE + index + 1,
+              },
+              {
+                header: "PO NUMBER",
+                render: (item) => <span className="font-semibold text-gray-800">{item.poNumber || "-"}</span>,
+              },
+              {
+                header: "PO DATE",
+                render: (item) => item.poDate ? new Date(item.poDate).toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" }) : "-",
+              },
+              {
+                header: "SUPPLIER",
+                render: (item) => item.supplier?.supplierName || "N/A",
+              },
+              {
+                header: "NET AMOUNT",
+                render: (item) => `₹${(item.netAmount ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+              },
+              {
+                header: "STATUS",
+                render: (item) => <StatusBadge status={item.status} />,
+              },
+              {
+                header: "ACTIONS",
+                render: (item) => (
+                  <div className="flex items-center gap-2">
+                    <ViewButton onClick={() => handleView(item)} />
+                    {canEdit && item.status !== "COMPLETED" && item.status !== "CANCELLED" && (
+                      <EditButton onClick={() => handleEdit(item)} />
+                    )}
+                    {canDelete && item.status === "DRAFT" && (
+                      <DeleteButton onClick={() => triggerDelete(item.id)} />
+                    )}
+                  </div>
+                ),
+              },
+            ]}
+        />
 
         {/* Modals */}
-        <PurchaseOrderViewModal
+        < PurchaseOrderViewModal
           show={showViewModal}
           onHide={() => setShowViewModal(false)}
           purchaseOrder={selectedPO}
@@ -310,8 +325,8 @@ const PurchaseOrderListPage: React.FC = () => {
           confirmText="Delete"
           confirmVariant="danger"
         />
-      </Container>
-    </div>
+      </div >
+    </div >
   );
 };
 

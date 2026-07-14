@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useState, useCallback } from "react";
-import { Container, Row, Col } from "react-bootstrap";
 import { FaSave, FaEraser, FaArrowLeft, FaPlus } from "react-icons/fa";
 import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
@@ -300,12 +299,12 @@ const RawMaterialRowInner: React.FC<RawMaterialRowInnerProps> = React.memo(({
                                 error={errors?.rawMaterialId?.message}
                             />
                             {loading && (
-                                <div className="text-muted small mt-1">
+                                <div className="text-slate-500 text-sm mt-1">
                                     Fetching raw materials…
                                 </div>
                             )}
                             {showEmpty && (
-                                <div className="text-danger small mt-1">
+                                <div className="text-red-500 text-sm mt-1">
                                     No Raw Materials available in this Store.
                                 </div>
                             )}
@@ -397,9 +396,9 @@ const ProductRawMaterialsSection: React.FC<ProductRawMaterialsSectionProps> = Re
     });
 
     return (
-        <Col md={12} className="mt-3">
-            <div className="d-flex justify-content-between align-items-center mb-2">
-                <h6 className="section-title border-bottom-0 ">
+        <div className="md:col-span-12 mt-3">
+            <div className="flex justify-between items-center mb-2">
+                <h6 className="text-lg font-bold text-slate-800 mb-6">
                     Manual Raw Materials ({productName || `Product ${productIndex + 1}`})
                 </h6>
                 <CustomButton
@@ -420,29 +419,29 @@ const ProductRawMaterialsSection: React.FC<ProductRawMaterialsSectionProps> = Re
             </div>
 
             {fields.length === 0 ? (
-                <div className="text-muted text-center p-3 border rounded bg-light">
+                <div className="text-slate-500 text-center p-3 border rounded bg-light">
                     No raw materials added. Click 'Add Material Row' to include materials.
                 </div>
             ) : (
-                <div className="master-table-body table-wrap mt-2 mb-2">
-                    <table className="master-data-table">
-                        <thead>
+                <div className="overflow-x-auto mt-2 mb-2">
+                    <table className="w-full text-left text-sm text-slate-600">
+                        <thead className="bg-slate-50 border-b border-slate-200 text-slate-700">
                             <tr>
                                 <th>
                                     STORE{" "}
-                                    <span className="text-danger">
+                                    <span className="text-red-500">
                                         *
                                     </span>
                                 </th>
                                 <th>
                                     RAW MATERIAL{" "}
-                                    <span className="text-danger">
+                                    <span className="text-red-500">
                                         *
                                     </span>
                                 </th>
                                 <th>
                                     REQUIRED QTY & UOM{" "}
-                                    <span className="text-danger">
+                                    <span className="text-red-500">
                                         *
                                     </span>
                                 </th>
@@ -450,7 +449,7 @@ const ProductRawMaterialsSection: React.FC<ProductRawMaterialsSectionProps> = Re
                                 <th />
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody className="divide-y divide-slate-100">
                             {fields.map((item, index) => (
                                 <RawMaterialRowInner
                                     key={item.id}
@@ -479,7 +478,7 @@ const ProductRawMaterialsSection: React.FC<ProductRawMaterialsSectionProps> = Re
                     </table>
                 </div>
             )}
-        </Col>
+        </div>
     );
 });
 
@@ -712,7 +711,7 @@ const ProductionOrderCreate: React.FC = () => {
             watchProducts.forEach((prod, pIdx) => {
                 if (!prod.productItemId) return;
                 const targetQty = Number(prod.targetQty) || 0;
-                
+
                 // Do not auto-calculate or add raw materials until a target quantity is entered
                 if (targetQty === 0) return;
 
@@ -722,12 +721,12 @@ const ProductionOrderCreate: React.FC = () => {
 
                 // Create a state key based on product ID and quantities
                 const currentStateKey = `${prod.productItemId}-${targetQty}-${damageQty}`;
-                
+
                 // If the state key hasn't changed, skip recalculation (allows manual edits to requiredQty)
                 if (lastCalculatedProductStates.current[pIdx] === currentStateKey) {
                     return;
                 }
-                
+
                 // Update the ref to the current state
                 lastCalculatedProductStates.current[pIdx] = currentStateKey;
 
@@ -994,39 +993,24 @@ const ProductionOrderCreate: React.FC = () => {
 
     // ── Render ──────────────────────────────────────────────────────────────
     return (
-        <div className="inner-container">
-            <Container fluid>
+        <div className="p-4 md:p-6 min-h-screen bg-slate-50">
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200">
                 {/* Page Header */}
-                <div className="page-header">
-                    <Row className="align-items-center g-3">
-                        <Col lg={6} md={12}>
-                            <div className="page-header-info">
-                                <h2 className="page-title">
-                                    {isEditMode
-                                        ? "Edit Production Order"
-                                        : "Create Production Order"}
-                                </h2>
-                                <div className="page-breadcrumb">
-                                    Home / Production / Orders /{" "}
-                                    {isEditMode ? "Edit" : "Create"}
-                                    {isEditMode && orderId && (
-                                        <span className="ms-2 text-muted">
-                                            (ID: {orderId})
-                                        </span>
-                                    )}
-                                </div>
-                            </div>
-                        </Col>
-                        <Col lg={6} md={12}>
-                            <div className="page-header-actions">
-                                <CustomButton
-                                    text="Back to List"
-                                    icon={FaArrowLeft}
-                                    onClick={() => navigate("/production-orders")}
-                                />
-                            </div>
-                        </Col>
-                    </Row>
+                <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-slate-200">
+                    <div>
+                        <h2 className="text-2xl font-bold text-slate-800">
+                            {isEditMode
+                                ? "Edit Production Order"
+                                : "Create Production Order"}
+                        </h2>
+                    </div>
+                    <div>
+                        <CustomButton
+                            text="Back to List"
+                            icon={FaArrowLeft}
+                            onClick={() => navigate("/production-orders")}
+                        />
+                    </div>
                 </div>
 
                 <form
@@ -1034,81 +1018,81 @@ const ProductionOrderCreate: React.FC = () => {
                     className="form-inner"
                     noValidate
                 >
-                    <Row className="g-3">
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
 
                         {/* ── 1. Source Information ─────────────────────────── */}
                         {watchSalesOrderId && (
                             <>
-                                <Col md={12}>
-                                    <h6 className="section-title border-bottom-0 ">
+                                <div className="md:col-span-12">
+                                    <h6 className="text-lg font-bold text-slate-800 mb-6">
                                         1. Selected Sales Order
                                     </h6>
-                                    <div className="p-3 border rounded" style={{ backgroundColor: "rgba(203, 122, 33, 0.08)" }}>
+                                    <div className="p-0" >
                                         {isFetchingSalesOrder ? (
-                                            <div className="text-muted">
+                                            <div className="text-slate-500">
                                                 Fetching Sales Order details…
                                             </div>
                                         ) : selectedSalesOrder ? (
-                                            <Row>
-                                                <Col md={3}>
-                                                    <div className="text-muted small">
+                                            <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+                                                <div className="md:col-span-3">
+                                                    <div className="text-slate-500 text-sm">
                                                         Sales Order No
                                                     </div>
-                                                    <div className="fw-bold">
+                                                    <div className="font-bold text-slate-800">
                                                         {selectedSalesOrder.orderNo || "-"}
                                                     </div>
-                                                </Col>
-                                                <Col md={3}>
-                                                    <div className="text-muted small">
+                                                </div>
+                                                <div className="md:col-span-3">
+                                                    <div className="text-slate-500 text-sm">
                                                         Customer
                                                     </div>
-                                                    <div className="fw-bold">
+                                                    <div className="font-bold text-slate-800">
                                                         {selectedSalesOrder.customer
                                                             ?.firmName || "-"}
                                                     </div>
-                                                </Col>
-                                                <Col md={3}>
-                                                    <div className="text-muted small">
+                                                </div>
+                                                <div className="md:col-span-3">
+                                                    <div className="text-slate-500 text-sm">
                                                         Order Date
                                                     </div>
-                                                    <div className="fw-bold">
+                                                    <div className="font-bold text-slate-800">
                                                         {selectedSalesOrder.orderDate
                                                             ? new Date(
                                                                 selectedSalesOrder.orderDate
                                                             ).toLocaleDateString("en-IN")
                                                             : "-"}
                                                     </div>
-                                                </Col>
-                                                <Col md={3}>
-                                                    <div className="text-muted small">
+                                                </div>
+                                                <div className="md:col-span-3">
+                                                    <div className="text-slate-500 text-sm">
                                                         Due Date
                                                     </div>
-                                                    <div className="fw-bold">
+                                                    <div className="font-bold text-slate-800">
                                                         {selectedSalesOrder.expectedCompletionDate
                                                             ? new Date(
                                                                 selectedSalesOrder.expectedCompletionDate
                                                             ).toLocaleDateString("en-IN")
                                                             : "-"}
                                                     </div>
-                                                </Col>
-                                            </Row>
+                                                </div>
+                                            </div>
                                         ) : (
-                                            <div className="text-danger">
+                                            <div className="text-red-500">
                                                 No Sales Order selected. Please navigate
                                                 from Approved Sales Orders.
                                             </div>
                                         )}
                                     </div>
-                                </Col>
+                                </div>
                                 {/* ── Sales Order Items read-only table ───────────── */}
                                 {selectedSalesOrderItems.length > 0 && (
-                                    <Col md={12} className="mt-3 mb-3">
-                                        <h6 className="fw-semibold mb-3">
+                                    <div className="md:col-span-12 mt-3 mb-3">
+                                        <h6 className="font-semibold text-slate-800 mb-3">
                                             Sales Order Items
                                         </h6>
-                                        <div className="master-table-body table-wrap mt-2 mb-4">
-                                            <table className="master-data-table">
-                                                <thead>
+                                        <div className="overflow-x-auto mt-2 mb-4">
+                                            <table className="w-full text-left text-sm text-slate-600">
+                                                <thead className="bg-slate-50 border-b border-slate-200 text-slate-700">
                                                     <tr>
                                                         <th style={{ width: 60 }}>#</th>
                                                         <th>PRODUCT NAME</th>
@@ -1118,7 +1102,7 @@ const ProductionOrderCreate: React.FC = () => {
                                                         <th>UOM</th>
                                                     </tr>
                                                 </thead>
-                                                <tbody>
+                                                <tbody className="divide-y divide-slate-100">
                                                     {selectedSalesOrderItems.map(
                                                         (item, i) => (
                                                             <tr
@@ -1154,13 +1138,13 @@ const ProductionOrderCreate: React.FC = () => {
                                                 </tbody>
                                             </table>
                                         </div>
-                                    </Col>
+                                    </div>
                                 )}
                             </>
                         )}
-                        <Col md={12}>
-                            <div className="d-flex justify-content-between align-items-center mb-3">
-                                <h6 className="mb-0 border-bottom-0 section-title">
+                        <div className="md:col-span-12 p-4 md:p-6">
+                            <div className="flex justify-between items-center mb-3">
+                                <h6 className="mb-0 border-b border-slate-200 pb-3-0 section-title ">
                                     {watchSalesOrderId ? "2. Production Item Details" : "1. Direct Production Item Details"}
                                 </h6>
                                 {!watchSalesOrderId && (
@@ -1172,17 +1156,17 @@ const ProductionOrderCreate: React.FC = () => {
                                     />
                                 )}
                             </div>
-                            <div className="p-3 border rounded">
+                            <div className="p-0">
                                 {productFields.map((prodItem, index) => (
                                     <div key={prodItem.id} className={index > 0 ? "mt-4 pt-4 border-top" : ""}>
-                                        <div className="d-flex justify-content-between align-items-center mb-2">
-                                            <span className=" section-title border-bottom-0 ">Product {index + 1}</span>
+                                        <div className="flex justify-between items-center mb-2">
+                                            <span className=" section-title border-b border-slate-200 pb-3-0 ">Product {index + 1}</span>
                                             {!watchSalesOrderId && productFields.length > 1 && (
                                                 <DeleteButton onClick={() => removeProduct(index)} />
                                             )}
                                         </div>
-                                        <Row className="g-3">
-                                            <Col md={5}>
+                                        <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+                                            <div className="md:col-span-5">
                                                 <Controller
                                                     name={`products.${index}.productItemId` as const}
                                                     control={control}
@@ -1215,8 +1199,8 @@ const ProductionOrderCreate: React.FC = () => {
                                                         />
                                                     )}
                                                 />
-                                            </Col>
-                                            <Col md={3}>
+                                            </div>
+                                            <div className="md:col-span-3">
                                                 <Controller
                                                     name={`products.${index}.targetQty` as const}
                                                     control={control}
@@ -1235,8 +1219,8 @@ const ProductionOrderCreate: React.FC = () => {
                                                         />
                                                     )}
                                                 />
-                                            </Col>
-                                            <Col md={2}>
+                                            </div>
+                                            <div className="md:col-span-2">
                                                 <Controller
                                                     name={`products.${index}.colorType` as const}
                                                     control={control}
@@ -1255,8 +1239,8 @@ const ProductionOrderCreate: React.FC = () => {
                                                         />
                                                     )}
                                                 />
-                                            </Col>
-                                            <Col md={2}>
+                                            </div>
+                                            <div className="md:col-span-2">
                                                 <Controller
                                                     name={`products.${index}.uom` as const}
                                                     control={control}
@@ -1280,7 +1264,7 @@ const ProductionOrderCreate: React.FC = () => {
                                                         />
                                                     )}
                                                 />
-                                            </Col>
+                                            </div>
                                             <ProductRawMaterialsSection
                                                 productIndex={index}
                                                 productName={products.find(p => p.id?.toString() === watchProducts?.[index]?.productItemId)?.productName}
@@ -1294,11 +1278,11 @@ const ProductionOrderCreate: React.FC = () => {
                                                 fetchRawMaterialsForStore={fetchRawMaterialsForStore}
                                                 setValue={setValue}
                                             />
-                                        </Row>
+                                        </div>
                                     </div>
                                 ))}
-                                <Row className="g-3 mt-2">
-                                    <Col md={3}>
+                                <div className="grid grid-cols-1 md:grid-cols-12 gap-4 mt-2">
+                                    <div className="md:col-span-3">
                                         <Controller
                                             name="orderDate"
                                             control={control}
@@ -1314,8 +1298,8 @@ const ProductionOrderCreate: React.FC = () => {
                                                 />
                                             )}
                                         />
-                                    </Col>
-                                    <Col md={3}>
+                                    </div>
+                                    <div className="md:col-span-3">
                                         <Controller
                                             name="dueDate"
                                             control={control}
@@ -1331,8 +1315,8 @@ const ProductionOrderCreate: React.FC = () => {
                                                 />
                                             )}
                                         />
-                                    </Col>
-                                    <Col md={3}>
+                                    </div>
+                                    <div className="md:col-span-3">
                                         <Controller
                                             name="priority"
                                             control={control}
@@ -1350,8 +1334,8 @@ const ProductionOrderCreate: React.FC = () => {
                                                 />
                                             )}
                                         />
-                                    </Col>
-                                    <Col md={3}>
+                                    </div>
+                                    <div className="md:col-span-3">
                                         <Controller
                                             name="orderType"
                                             control={control}
@@ -1369,23 +1353,19 @@ const ProductionOrderCreate: React.FC = () => {
                                                 />
                                             )}
                                         />
-                                    </Col>
-                                </Row>
+                                    </div>
+                                </div>
                             </div>
-                        </Col>
-                        <Col md={12}>
-                            <hr />
-                        </Col>
+                        </div>
+
 
                         {/* ── 2. General Details ──────────────────────────── */}
-                        <Col md={12}>
-                            <hr />
-                            <h6 className="section-title border-bottom-0 ">
+                        <div className="md:col-span-12 p-4 md:p-6">
+
+                            <h6 className="text-lg font-bold text-slate-800 mb-6">
                                 2. General Details
                             </h6>
-                        </Col>
 
-                        <Col md={6}>
                             <Controller
                                 name="productionOrderId"
                                 control={control}
@@ -1402,13 +1382,7 @@ const ProductionOrderCreate: React.FC = () => {
                                     />
                                 )}
                             />
-                        </Col>
 
-
-
-
-                        {/* ── Remarks ──────────────────────────────────────── */}
-                        <Col md={12} className="mt-3">
                             <Controller
                                 name="remarks"
                                 control={control}
@@ -1423,11 +1397,11 @@ const ProductionOrderCreate: React.FC = () => {
                                     />
                                 )}
                             />
-                        </Col>
-                    </Row>
+                        </div>
+                    </div>
 
                     {/* ── Form Actions ──────────────────────────────────────── */}
-                    <div className="form-actions d-flex justify-content-end gap-3 mt-4 pt-3 border-top">
+                    <div className="form-actions flex justify-end gap-3 mt-4 pt-3 border-t border-slate-200">
                         <CustomButton
                             text="Clear Form"
                             icon={FaEraser}
@@ -1437,15 +1411,15 @@ const ProductionOrderCreate: React.FC = () => {
                             }}
                             disabled={isSubmitting}
                         />
-                        <div className="ms-2">
+                        <div className="ml-2">
                             <CustomButton
                                 text={isSubmitting ? "Saving..." : "Save as Draft"}
                                 onClick={handleSubmit((data) => onSubmit({ ...data, status: "DRAFT" }))}
                                 disabled={isSubmitting}
-                                className="btn-secondary"
+                                className="bg-slate-500 hover:bg-slate-600 text-white"
                             />
                         </div>
-                        <div className="ms-2">
+                        <div className="ml-2">
                             <Button
                                 text={
                                     isSubmitting
@@ -1464,7 +1438,7 @@ const ProductionOrderCreate: React.FC = () => {
                         </div>
                     </div>
                 </form>
-            </Container>
+            </div>
         </div >
     );
 };

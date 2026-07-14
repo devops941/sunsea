@@ -7,8 +7,6 @@ import { injectStore } from './api/apiClient';
 
 import App from './App';
 
-// Bootstrap
-import 'bootstrap/dist/css/bootstrap.min.css';
 
 // Custom CSS
 import './assets/css/style.css';

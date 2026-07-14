@@ -288,7 +288,7 @@ const WeeklyMachineScheduleEdit: React.FC = () => {
                     <Row className="align-items-center g-3">
                         <Col lg={6}>
                             <h2 className="page-title">Edit Weekly Assignment</h2>
-                            <div className="page-breadcrumb">Weekly Schedules / Edit / {targetPoId}</div>
+                            
                         </Col>
                         <Col lg={6} className="text-end">
                             <CustomButton text="Back to List" icon={FaArrowLeft} onClick={() => navigate("/weekly-machine-schedules")} />
