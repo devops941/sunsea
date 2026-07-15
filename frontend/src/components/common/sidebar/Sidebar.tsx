@@ -28,7 +28,7 @@ const Sidebar = () => {
   const isMenuActive = useCallback((menu: any) => {
     // Check main path
     if (menu.path && location.pathname.startsWith(menu.path)) return true;
-    
+
     // Check activePaths array if it exists (for flat menus with multiple related paths)
     if (menu.activePaths && Array.isArray(menu.activePaths)) {
       if (menu.activePaths.some((p: string) => location.pathname.startsWith(p))) return true;
@@ -38,7 +38,7 @@ const Sidebar = () => {
     if (menu.children) {
       return menu.children.some((child: any) => {
         if (child.path && location.pathname.startsWith(child.path)) return true;
-        
+
         if (child.activePaths && Array.isArray(child.activePaths)) {
           if (child.activePaths.some((p: string) => location.pathname.startsWith(p))) return true;
         }
@@ -111,7 +111,7 @@ const Sidebar = () => {
 
   return (
     <aside
-      className={`h-screen bg-[#ffffff] shadow-md text-gray-700 relative overflow-visible flex flex-col transition-[width] duration-300 ease-in-out z-50  ${activeCollapsed ? "w-[80px]" : "w-[240px]"}`}
+      className={`h-screen bg-[#ffffff] text-[#2A3547] relative overflow-visible flex flex-col transition-[width] duration-300 ease-in-out z-50 border-r border-black/10  ${activeCollapsed ? "w-[80px]" : "w-[260px]"}`}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
@@ -140,23 +140,23 @@ const Sidebar = () => {
         )}
       </div>
 
-      <div className="flex-1 px-3 py-4 overflow-y-auto overflow-x-hidden [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:bg-black/20 [&::-webkit-scrollbar-thumb]:rounded-full">
+      <div className="flex-1 px-5 py-4 overflow-y-auto overflow-x-hidden [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:bg-black/20 [&::-webkit-scrollbar-thumb]:rounded-full">
         {filteredSidebarItems.map((menu) => {
           const Icon = menu.icon;
 
           // ── Flat top-level item (no children) → render as a direct link ──
           if (!menu.children && menu.path) {
             return (
-              <div key={menu.title} className="relative mb-2">
+              <div key={menu.title} className="relative mb-2.5">
                 <NavLink
                   to={menu.path}
                   className={({ isActive }) =>
-                    `w-full border-none outline-none cursor-pointer p-[10px_6px] rounded-sm flex items-center justify-between transition-all duration-300 hover:bg-gray-100 ${isActive ? "!bg-primary !text-white font-semibold" : "bg-transparent text-gray-700"} ${activeCollapsed ? "justify-center p-[14px]" : ""}`
+                    `w-full border-none outline-none cursor-pointer p-[10px_15px] rounded-sm flex items-center justify-between transition-all duration-300 hover:bg-gray-100 ${isActive ? "!bg-gradient-to-r !from-blue-400 !to-primary !text-white font-semibold" : "bg-transparent text-[#2A3547]"} ${activeCollapsed ? "justify-center p-[14px]" : ""}`
                   }
                 >
                   {({ isActive }) => (
-                    <div className={`flex items-center text-[clamp(13px,0.9vw,14px)] font-medium ${activeCollapsed ? "justify-center gap-0" : "gap-3"} ${isActive ? "!text-white" : ""}`}>
-                      <Icon className={`min-w-[18px] text-[18px] ${isActive ? "!text-white" : ""}`} />
+                    <div className={`flex items-center text-[15px] font-normal leading-[1.334rem] ${activeCollapsed ? "justify-center gap-0" : "gap-4"} ${isActive ? "!text-white" : ""}`}>
+                      <Icon className={`min-w-[20px] text-[20px] ${isActive ? "!text-white" : ""}`} />
                       {!activeCollapsed && <span className={isActive ? "!text-white" : ""}>{menu.title}</span>}
                     </div>
                   )}
@@ -176,11 +176,11 @@ const Sidebar = () => {
               onMouseLeave={() => setHoveredMenu(null)}
             >
               <button
-                className={`w-full border-none outline-none cursor-pointer p-[14px_6px] rounded-xl flex items-center justify-between transition-all duration-300 hover:bg-gray-100 ${isMenuActive(menu) ? "!bg-primary !text-white font-semibold" : "bg-transparent text-gray-700"} ${activeCollapsed ? "justify-center p-[14px]" : ""}`}
+                className={`w-full border-none outline-none cursor-pointer p-[14px_6px] rounded-xl flex items-center justify-between transition-all duration-300 hover:bg-gray-100 ${isMenuActive(menu) ? "!bg-gradient-to-r !from-blue-400 !to-primary !text-white font-semibold" : "bg-transparent text-[#2A3547]"} ${activeCollapsed ? "justify-center p-[14px]" : ""}`}
                 onClick={() => toggleMenu(menu.title)}
               >
-                <div className={`flex items-center text-[clamp(13px,0.9vw,14px)] font-medium ${activeCollapsed ? "justify-center gap-0" : "gap-3"} ${isMenuActive(menu) ? "!text-white" : ""}`}>
-                  <Icon className={`min-w-[18px] text-[18px] ${isMenuActive(menu) ? "!text-white" : ""}`} />
+                <div className={`flex items-center text-[15px] font-normal leading-[1.334rem] ${activeCollapsed ? "justify-center gap-0" : "gap-4"} ${isMenuActive(menu) ? "!text-white" : ""}`}>
+                  <Icon className={`min-w-[20px] text-[20px] ${isMenuActive(menu) ? "!text-white" : ""}`} />
                   {!activeCollapsed && <span className={isMenuActive(menu) ? "!text-white" : ""}>{menu.title}</span>}
                 </div>
 
@@ -195,7 +195,7 @@ const Sidebar = () => {
                       {subMenu.children ? (
                         <>
                           {/* Parent Child */}
-                          <div className="no-underline text-gray-700 px-3 py-2.5 rounded-lg text-sm font-semibold cursor-default">
+                          <div className="no-underline text-[#2A3547] px-3 py-2.5 rounded-lg text-[15px] font-normal leading-[1.334rem] cursor-default">
                             {subMenu.title}
                           </div>
 
@@ -206,7 +206,7 @@ const Sidebar = () => {
                                 key={child.path}
                                 to={child.path}
                                 className={({ isActive }) =>
-                                  `no-underline px-3 py-2.5 rounded-lg text-sm transition-all duration-300 hover:bg-gray-100 flex items-center gap-2 pl-5 ${isActive ? "!bg-primary !text-white font-semibold" : "text-gray-700"}`
+                                  `no-underline px-3 py-2.5 rounded-lg text-[15px] font-normal leading-[1.334rem] transition-all duration-300 hover:bg-gray-100 flex items-center gap-3 pl-5 ${isActive ? "!bg-gradient-to-r !from-blue-400 !to-primary !text-white font-semibold" : "text-[#2A3547]"}`
                                 }
                               >
                                 <FaCircle size={6} />
@@ -221,7 +221,7 @@ const Sidebar = () => {
                             key={subMenu.path}
                             to={subMenu.path}
                             className={({ isActive }) =>
-                              `no-underline px-3 py-2.5 rounded-lg text-sm transition-all duration-300 hover:bg-gray-100 ${isActive ? "!bg-primary !text-white font-semibold" : "text-gray-700"}`
+                              `no-underline px-3 py-2.5 rounded-lg text-[15px] font-normal leading-[1.334rem] transition-all duration-300 hover:bg-gray-100 ${isActive ? "!bg-gradient-to-r !from-blue-400 !to-primary !text-white font-semibold" : "text-[#2A3547]"}`
                             }
                           >
                             {subMenu.title}
@@ -235,12 +235,12 @@ const Sidebar = () => {
 
               {activeCollapsed && hoveredMenu === menu.title && (
                 <div className="absolute top-0 left-[72px] w-[240px] bg-white rounded-xl overflow-hidden ">
-                  <div className="px-4 py-3.5 bg-white text-gray-700 font-semibold border-b border-black/10">{menu.title}</div>
+                  <div className="px-4 py-3.5 bg-white text-[#2A3547] font-semibold border-b border-black/10 text-[15px] leading-[1.334rem]">{menu.title}</div>
                   {menu.children?.map((subMenu) => (
                     <React.Fragment key={subMenu.title}>
                       {subMenu.children ? (
                         <>
-                          <div className="block px-4 py-3 no-underline text-gray-700 font-semibold mt-1">
+                          <div className="block px-4 py-3 no-underline text-[#2A3547] font-semibold mt-1 text-[15px] leading-[1.334rem]">
                             {subMenu.title}
                           </div>
 
@@ -250,7 +250,7 @@ const Sidebar = () => {
                                 key={child.path}
                                 to={child.path}
                                 className={({ isActive }) =>
-                                  `block px-4 py-3 no-underline transition-all duration-300 hover:bg-gray-100 pl-8 ${isActive ? "!bg-primary !text-white font-semibold" : "text-gray-700"}`
+                                  `block px-4 py-3 no-underline transition-all duration-300 hover:bg-gray-100 pl-8 text-[15px] font-normal leading-[1.334rem] ${isActive ? "!bg-gradient-to-r !from-blue-400 !to-primary !text-white font-semibold" : "text-[#2A3547]"}`
                                 }
                               >
                                 {child.title}
@@ -264,7 +264,7 @@ const Sidebar = () => {
                             key={subMenu.path}
                             to={subMenu.path}
                             className={({ isActive }) =>
-                              `block px-4 py-3 no-underline transition-all duration-300 hover:bg-gray-100 ${isActive ? "!bg-primary !text-white font-semibold" : "text-gray-700"}`
+                              `block px-4 py-3 no-underline transition-all duration-300 hover:bg-gray-100 text-[15px] font-normal leading-[1.334rem] ${isActive ? "!bg-gradient-to-r !from-blue-400 !to-primary !text-white font-semibold" : "text-[#2A3547]"}`
                             }
                           >
                             {subMenu.title}

@@ -1,21 +1,21 @@
 import type { SidebarItem } from "./sidebar.types";
 import {
-  FaTachometerAlt,
-  FaShoppingCart,
-  FaShoppingBag,
-  FaWarehouse,
-  FaIndustry,
-  FaChartBar,
-  FaCog,
-  FaBoxes,
-  FaUsersCog
-} from "react-icons/fa";
+  FiPieChart,
+  FiShoppingCart,
+  FiShoppingBag,
+  FiBox,
+  FiTool,
+  FiBarChart2,
+  FiSettings,
+  FiMapPin,
+  FiUsers
+} from "react-icons/fi";
 
 export const sidebarItems: SidebarItem[] = [
   // 1. Dashboard / Overview
   {
     title: "Dashboard",
-    icon: FaTachometerAlt,
+    icon: FiPieChart,
     path: "/dashboard",
   },
 
@@ -23,24 +23,24 @@ export const sidebarItems: SidebarItem[] = [
   // 2. Core Business Flow (Sales -> Purchase -> Inventory -> Production)
   {
     title: "Sales",
-    icon: FaShoppingCart,
+    icon: FiShoppingCart,
     path: "/sales-order",
     permission: "sales-orders.view",
   },
   {
     title: "Purchase",
-    icon: FaShoppingBag,
+    icon: FiShoppingBag,
     path: "/purchase-orders",
   },
   {
     title: "Inventory",
-    icon: FaWarehouse,
+    icon: FiBox,
     path: "/stock",
     permission: "raw_material_stocks.view",
   },
   {
     title: "Production",
-    icon: FaIndustry,
+    icon: FiTool,
     path: "/approved-sales-orders",
   },
 
@@ -54,14 +54,14 @@ export const sidebarItems: SidebarItem[] = [
   // },
   {
     title: "Store & Locations",
-    icon: FaWarehouse,
+    icon: FiMapPin,
     path: "/storage-stores",
     activePaths: ["/storage-stores", "/store-types", "/locations"],
     permission: "storage_stores.view",
   },
   {
     title: "HR & Organization",
-    icon: FaUsersCog,
+    icon: FiUsers,
     path: "/employees",
     activePaths: ["/employees", "/customers", "/suppliers", "/machines", "/raw-materials", "/raw-material-categories", "/products", "/categories", "/uoms", "/colours", "/sizes", "/shifts"],
     permission: "employees.view",
@@ -70,13 +70,13 @@ export const sidebarItems: SidebarItem[] = [
   // 4. Analytics & Administration
   {
     title: "Reports",
-    icon: FaChartBar,
+    icon: FiBarChart2,
     path: "/reports/sales",
     permission: "reports.view",
   },
   {
     title: "Administration",
-    icon: FaCog,
+    icon: FiSettings,
     path: "/company/view",
   }
 ];

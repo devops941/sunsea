@@ -66,6 +66,7 @@ const FilterPopover: React.FC<FilterPopoverProps> = ({
     <div ref={filterBtnRef} className="relative">
       <CustomButton
         text={activeFilterCount > 0 ? `Filters (${activeFilterCount})` : "Filters"}
+        variant="secondary"
         icon={FaFilter}
         onClick={handleToggle}
         className={hasActiveFilters ? "!bg-green-600 hover:!bg-green-700 !text-white !border-green-600" : ""}

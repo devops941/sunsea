@@ -189,7 +189,7 @@ const StorageStoreList: React.FC = () => {
                                             <DeleteButton onClick={() => triggerDelete(item.storeId)} />
                                         </div>
                                     ),
-                                    align: "right"
+
                                 },
                             ]}
                         />

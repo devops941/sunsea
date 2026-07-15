@@ -107,12 +107,12 @@ function DataTable<T>({
         >
           <div role="table" className="text-sm" style={outerGridStyle}>
             {/* Header row */}
-            <div role="row" style={rowStyle} className="bg-blue-50">
+            <div role="row" style={rowStyle} className="bg-[#E5EAEF]">
               {columns.map((col, i) => (
                 <div
                   key={i}
                   role="columnheader"
-                  className={`flex items-center px-3 py-3 sm:px-4 sm:py-3.5 font-semibold text-[11px] sm:text-xs tracking-wide uppercase text-primary whitespace-nowrap ${alignClass[col.align ?? "left"]}`}
+                  className={`flex items-center px-3 py-3 sm:px-4 sm:py-3.5 font-semibold text-[11px] sm:text-xs tracking-wide uppercase text-[#2A3547] whitespace-nowrap ${alignClass[col.align ?? "left"]}`}
                 >
                   {col.header}
                 </div>

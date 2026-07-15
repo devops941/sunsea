@@ -675,17 +675,17 @@ const InvoiceDetailPage: React.FC = () => {
                         <CustomButton text="Add Item" icon={FaPlus} type="button" onClick={addItem} />
                     </div>
 
-                    <div className="w-full overflow-x-auto border border-gray-200 rounded-lg">
-                        <table className="w-full text-left border-collapse text-sm whitespace-nowrap">
+                    <div className="w-full border border-gray-200 rounded-lg overflow-visible">
+                        <table className="w-full text-left border-collapse text-sm">
                             <thead className="bg-gray-50 border-b border-gray-200 text-gray-600">
                                 <tr>
-                                    <th className="p-3 font-semibold w-12 text-center">#</th>
-                                    <th className="p-3 font-semibold min-w-[200px]">PRODUCT / DESCRIPTION</th>
-                                    <th className="p-3 font-semibold w-32">QUANTITY / UOM</th>
-                                    <th className="p-3 font-semibold w-32">UNIT PRICE (₹)</th>
-                                    <th className="p-3 font-semibold w-32">TAX %</th>
-                                    <th className="p-3 font-semibold w-32 text-right">NET (₹)</th>
-                                    <th className="p-3 font-semibold w-16 text-center">ACTION</th>
+                                    <th className="p-2 font-semibold w-10 text-center">#</th>
+                                    <th className="p-2 font-semibold w-full min-w-[150px]">PRODUCT / DESCRIPTION</th>
+                                    <th className="p-2 font-semibold w-44">QUANTITY / UOM</th>
+                                    <th className="p-2 font-semibold w-28">UNIT PRICE (₹)</th>
+                                    <th className="p-2 font-semibold w-24">TAX %</th>
+                                    <th className="p-2 font-semibold w-28 text-right">NET (₹)</th>
+                                    <th className="p-2 font-semibold w-12 text-center">ACTION</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-200 bg-white">
@@ -698,18 +698,19 @@ const InvoiceDetailPage: React.FC = () => {
 
                                     return (
                                         <tr key={idx} className="hover:bg-slate-50 transition-colors">
-                                            <td className="p-3 text-center text-gray-500">{idx + 1}</td>
-                                            <td className="p-3">
+                                            <td className="p-2 text-center text-gray-500">{idx + 1}</td>
+                                            <td className="p-2">
                                                 <input
-                                                    className="w-full border-gray-300 rounded p-2 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none border"
+                                                    className="w-full border-gray-300 rounded px-2 py-1.5 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none border"
                                                     value={item.description}
                                                     onChange={(e) => updateItem(idx, "description", e.target.value)}
                                                     placeholder="Product name"
                                                 />
                                             </td>
-                                            <td className="p-3">
+                                            <td className="p-2">
                                                 <QuantityInput
                                                     label=""
+                                                    hideLabel={true}
                                                     name={`items[${idx}].qty`}
                                                     value={item.qty}
                                                     baseUoms={baseUoms}
@@ -718,10 +719,10 @@ const InvoiceDetailPage: React.FC = () => {
                                                     onChange={(e) => updateItem(idx, "qty", Number(e.target.value))}
                                                 />
                                             </td>
-                                            <td className="p-3">
-                                                <input className="w-full border-gray-300 rounded p-2 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none border" type="number" min={0} step={0.01} value={item.unitPrice} onChange={(e) => updateItem(idx, "unitPrice", Number(e.target.value))} />
+                                            <td className="p-2">
+                                                <input className="w-full border-gray-300 rounded px-2 py-1.5 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none border" type="number" min={0} step={0.01} value={item.unitPrice} onChange={(e) => updateItem(idx, "unitPrice", Number(e.target.value))} />
                                             </td>
-                                            <td className="p-3">
+                                            <td className="p-2">
                                                 <SelectInput
                                                     label=""
                                                     hideLabel={true}
@@ -732,10 +733,10 @@ const InvoiceDetailPage: React.FC = () => {
                                                 />
                                             </td>
 
-                                            <td className="p-3 text-right font-semibold text-gray-700">₹{item.netAmount.toFixed(2)}</td>
-                                            <td className="p-3 text-center">
-                                                <button type="button" onClick={() => removeItem(idx)} className="text-red-500 hover:text-red-700 p-2 rounded-full hover:bg-red-50 transition-colors" title="Remove Item">
-                                                    <FaTrash />
+                                            <td className="p-2 text-right font-semibold text-gray-700">₹{item.netAmount.toFixed(2)}</td>
+                                            <td className="p-2 text-center">
+                                                <button type="button" onClick={() => removeItem(idx)} className="text-red-500 hover:text-red-700 p-1.5 rounded-full hover:bg-red-50 transition-colors" title="Remove Item">
+                                                    <FaTrash size={14} />
                                                 </button>
                                             </td>
                                         </tr>

@@ -40,7 +40,7 @@
 ================================ */
 :root {
     /* Brand Colors */
-    --color-primary: #0D47A1;
+    --color-primary: #5D87FF;
     --color-primary-light: #FEE2E2;
 
     --color-secondary: #1A1C1E;
@@ -67,15 +67,11 @@
     --color-black: #000000;
     --color-white: #FFFFFF;
 
-    /* Sidebar */
-    --sidebar-bg: #FFFFFF;
-    --sidebar-active: var(--color-primary);
-    --sidebar-hover: #f3f4f6;
-    --sidebar-text: #374151;
+
 
     /* Fonts */
-    --font-head: 'head-font', sans-serif;
-    --font-body: 'body-font', sans-serif;
+    --font-head: 'Plus Jakarta Sans', sans-serif;
+    --font-body: 'Plus Jakarta Sans', sans-serif;
 
     /* Radius */
     --radius-sm: 6px;
@@ -231,18 +227,7 @@ ul {
 
 
 
-.sidebar {
-    width: 270px !important;
-    height: 100vh;
 
-    background: var(--sidebar-bg);
-    color: var(--sidebar-text);
-    position: relative;
-    overflow: visible;
-    display: flex;
-    flex-direction: column;
-    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
 
 
 
@@ -482,7 +467,7 @@ ul {
     padding: 14px;
     background: #ffffff;
     /* border: 1px solid #e8edf2; */
-    border-radius: 16px;
+
     /* box-shadow:
         0 2px 8px rgba(15, 23, 42, 0.04); */
     min-height: calc(100vh - 120px);

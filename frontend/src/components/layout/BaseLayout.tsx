@@ -42,7 +42,7 @@ const BaseLayout = () => {
           onProfileClick={() => navigate('/profile')}
         />
 
-        <main className="flex-1 p-2 min-w-0 overflow-y-auto">
+        <main className="flex-1 min-w-0 overflow-y-auto">
           <Outlet />
         </main>
 
