@@ -51,8 +51,24 @@ class FinishedGoodsStockService {
     });
   }
 
-  async findAll() {
+  async findAll(query?: { storeId?: string; search?: string }) {
+    const whereClause: any = {};
+
+    if (query?.storeId) {
+      whereClause.storeId = query.storeId;
+    }
+
+    if (query?.search) {
+      whereClause.product = {
+        OR: [
+          { productName: { contains: query.search, mode: 'insensitive' } },
+          { productCode: { contains: query.search, mode: 'insensitive' } },
+        ],
+      };
+    }
+
     return prisma.finishedGoodsStock.findMany({
+      where: whereClause,
       include: {
         store: true,
         product: {

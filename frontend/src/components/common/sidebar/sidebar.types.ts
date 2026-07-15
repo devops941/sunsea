@@ -5,6 +5,7 @@ export interface SidebarSubItem {
 
   // Leaf menu-ku mattum path irukkum
   path?: string;
+  activePaths?: string[]; // Add this to allow matching multiple paths for active state
 
   icon?: IconType;
 
@@ -18,6 +19,7 @@ export interface SidebarItem {
   title: string;
 
   path?: string;
+  activePaths?: string[]; // Add this to allow matching multiple paths for active state
 
   icon: IconType;
 

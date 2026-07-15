@@ -29,8 +29,34 @@ export const createDepartmentService =
   };
 
 export const getAllDepartmentsService =
-  async () => {
-    return prisma.department.findMany({
+  async (page?: number, limit?: number, search?: string) => {
+    const where: any = {};
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: "insensitive" } },
+        { description: { contains: search, mode: "insensitive" } },
+      ];
+    }
+
+    if (page !== undefined && limit !== undefined) {
+      const skip = (page - 1) * limit;
+      const [departments, total] = await Promise.all([
+        prisma.department.findMany({
+          where,
+          include: {
+            _count: { select: { employees: true } },
+          },
+          skip,
+          take: limit,
+          orderBy: { createdAt: "desc" },
+        }),
+        prisma.department.count({ where }),
+      ]);
+      return { departments, total };
+    }
+
+    const departments = await prisma.department.findMany({
+      where,
       include: {
         _count: {
           select: { employees: true }
@@ -40,6 +66,7 @@ export const getAllDepartmentsService =
         createdAt: "desc",
       },
     });
+    return { departments, total: departments.length };
   };
 
 export const deleteDepartmentService =

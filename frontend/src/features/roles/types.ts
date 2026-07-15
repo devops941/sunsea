@@ -22,6 +22,7 @@ export type UpdateRoleDto = Partial<CreateRoleDto>;
 
 export interface RoleState {
   data: Role[];
+  total: number;
   loading: boolean;
   error: string | null;
 }

@@ -17,9 +17,10 @@ import type { UpdateCompanyDto } from '../../../features/company/types';
 const CompanySettings: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const isEditMode = location.pathname.includes('edit');
   const dispatch = useDispatch<AppDispatch>();
   const { data: company, loading } = useSelector((state: RootState) => state.company);
+  
+  const isEditMode = location.pathname.includes('edit') || location.pathname.includes('settings') || !!(company && company.isOnboarded);
 
   const [formData, setFormData] = useState<UpdateCompanyDto>({});
   const [errors, setErrors] = useState<any>({});
@@ -162,7 +163,7 @@ const CompanySettings: React.FC = () => {
                     ]} />
                   </div>
                   <div className="md:col-span-3">
-                    <ImageUpload label="Company Logo" name="logoUrl" onChange={handleChange as any} />
+                    <ImageUpload label="Company Logo" name="logoUrl" currentImageUrl={formData.logoUrl} onChange={handleChange as any} />
                   </div>
                 </div>
               </div>
@@ -205,6 +206,7 @@ const CompanySettings: React.FC = () => {
                       cityValue={formData.city || ""}
                       onCityChange={handleCityChange}
                       cityError={errors.city}
+                      required
                     />
                   </div>
                   <div>
@@ -283,9 +285,9 @@ const CompanySettings: React.FC = () => {
               <div>
                 <TextInput label="Company Code" name="companyCode" value={formData.companyCode || ""} onChange={handleChange} placeholder="Auto Generated" disabled error={errors.companyCode} />
               </div>
-              <div>
+              {/* <div>
                 <TextInput label="Short Name" name="shortName" value={formData.shortName || ""} onChange={handleChange} placeholder="Enter Short Name" />
-              </div>
+              </div> */}
               <div>
                 <SelectInput label="Currency Code" name="currencyCode" value={formData.currencyCode || "INR"} onChange={handleChange as any} required disabled={isEditMode} options={[
                   { value: "INR", label: "INR - Indian Rupee" }
@@ -330,13 +332,15 @@ const CompanySettings: React.FC = () => {
                   cityValue={formData.city || ""}
                   onCityChange={handleCityChange}
                   cityError={errors.city}
+                  disabled={isEditMode}
+                  required  
                 />
               </div>
               <div>
                 <TextInput label="Zipcode" name="zipcode" value={formData.zipcode || ""} onChange={handleChange} placeholder="Enter Zipcode" required error={errors.zipcode} />
               </div>
               <div>
-                <TextInput label="Country" name="country" value={formData.country || ""} onChange={handleChange} placeholder="Enter Country" required error={errors.country} />
+                <TextInput label="Country" name="country" value={formData.country || ""} onChange={handleChange} placeholder="Enter Country" required disabled={isEditMode} error={errors.country} />
               </div>
             </div>
           </div>
@@ -363,9 +367,9 @@ const CompanySettings: React.FC = () => {
                   error={errors.phone}
                 />
               </div>
-              <div>
+              {/* <div>
                 <TextInput label="Mobile Number" name="mobile" value={formData.mobile || ""} onChange={handleChange} placeholder="Enter Mobile" />
-              </div>
+              </div> */}
               <div className="md:col-span-3 lg:col-span-1">
                 <TextInput label="Website" name="website" value={formData.website || ""} onChange={handleChange} placeholder="Enter Website (e.g. www.example.com)" />
               </div>
@@ -379,7 +383,7 @@ const CompanySettings: React.FC = () => {
             </h6>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 items-center">
               <div>
-                <ImageUpload label="Company Logo" name="logoUrl" onChange={handleChange as any} />
+                <ImageUpload label="Company Logo" name="logoUrl" currentImageUrl={formData.logoUrl} onChange={handleChange as any} />
               </div>
               <div>
                 <div className="flex items-center gap-3">

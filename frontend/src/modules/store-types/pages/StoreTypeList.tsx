@@ -28,6 +28,7 @@ const StoreTypeList: React.FC = () => {
         totalPages,
     } = useAppSelector(state => state.storeTypes);
 
+
     const [searchTerm, setSearchTerm] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
 
@@ -43,6 +44,7 @@ const StoreTypeList: React.FC = () => {
                 fetchStoreTypes({
                     search: searchTerm,
                     page: currentPage,
+                    limit: ITEMS_PER_PAGE,
                     sortBy: "code",
                     sortOrder: "asc",
                 })
@@ -81,7 +83,8 @@ const StoreTypeList: React.FC = () => {
                 await dispatch(deleteStoreType(itemToDelete)).unwrap();
                 toast.success("Store Type deleted successfully!");
             } catch (err: any) {
-                toast.error(err || "Failed to delete store type");
+                const errorMessage = typeof err === 'string' ? err : err?.message || "Failed to delete store type";
+                toast.error(errorMessage);
             } finally {
                 setShowDeleteModal(false);
                 setItemToDelete(null);
@@ -164,8 +167,8 @@ const StoreTypeList: React.FC = () => {
                                     render: (item) => (
                                         <div className="flex items-center gap-2">
                                             <ViewButton onClick={() => handleOpenView(item)} />
-                                            <EditButton onClick={() => handleOpenEdit(item)} disabled={(item as any)._count?.stores > 0} disabledMessage="Cannot edit this store type because it is associated with stores." />
-                                            <DeleteButton onClick={() => triggerDelete(item.id)} disabled={(item as any)._count?.stores > 0} disabledMessage="Cannot delete this store type because it is associated with stores." />
+                                            <EditButton onClick={() => handleOpenEdit(item)} />
+                                            <DeleteButton onClick={() => triggerDelete(item.id)} />
                                         </div>
                                     ),
                                     align: "right"

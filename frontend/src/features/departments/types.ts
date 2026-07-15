@@ -18,6 +18,7 @@ export type UpdateDepartmentDto = Partial<CreateDepartmentDto>;
 
 export interface DepartmentState {
   data: Department[];
+  total: number;
   loading: boolean;
   error: string | null;
 }

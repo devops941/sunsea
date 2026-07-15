@@ -44,13 +44,8 @@ export const sidebarItems: SidebarItem[] = [
     path: "/approved-sales-orders",
   },
 
-  // 3. Master Data Management
-  {
-    title: "Product Master",
-    icon: FaBoxes,
-    path: "/products",
-    permission: "products.view",
-  },
+
+
   // {
   //   title: "Raw Material Master",
   //   icon: FaDatabase,
@@ -61,12 +56,14 @@ export const sidebarItems: SidebarItem[] = [
     title: "Store & Locations",
     icon: FaWarehouse,
     path: "/storage-stores",
+    activePaths: ["/storage-stores", "/store-types", "/locations"],
     permission: "storage_stores.view",
   },
   {
     title: "HR & Organization",
     icon: FaUsersCog,
     path: "/employees",
+    activePaths: ["/employees", "/customers", "/suppliers", "/machines", "/raw-materials", "/raw-material-categories", "/products", "/categories", "/uoms", "/colours", "/sizes", "/shifts"],
     permission: "employees.view",
   },
 

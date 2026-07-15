@@ -5,10 +5,10 @@ import type { CreateRoleDto, UpdateRoleDto } from "../features/roles/types";
 
 export const useRoles = () => {
   const dispatch = useAppDispatch();
-  const { data: roles, loading, error } = useAppSelector((state) => state.roles);
+  const { data: roles, total, loading, error } = useAppSelector((state) => state.roles);
 
-  const loadRoles = useCallback(() => {
-    dispatch(fetchRoles());
+  const loadRoles = useCallback((page?: number, limit?: number, search?: string) => {
+    dispatch(fetchRoles({ page, limit, search }));
   }, [dispatch]);
 
   const addRole = useCallback(
@@ -34,6 +34,7 @@ export const useRoles = () => {
 
   return {
     roles,
+    total,
     loading,
     error,
     loadRoles,

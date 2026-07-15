@@ -19,6 +19,7 @@ interface SelectInputProps {
   icon?: React.ReactNode;
   disabled?: boolean;
   noMargin?: boolean;
+  searchable?: boolean;
   onChange: (event: React.ChangeEvent<HTMLSelectElement>) => void;
 }
 
@@ -34,9 +35,11 @@ const SelectInput: React.FC<SelectInputProps> = ({
   icon,
   disabled,
   noMargin = false,
+  searchable = false,
   onChange,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Handle click outside to close
@@ -48,6 +51,8 @@ const SelectInput: React.FC<SelectInputProps> = ({
     };
     if (isOpen) {
       document.addEventListener("mousedown", handleClickOutside);
+    } else {
+      setSearchTerm(""); // reset search on close
     }
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isOpen]);
@@ -67,11 +72,15 @@ const SelectInput: React.FC<SelectInputProps> = ({
   const selectedOption = options.find((o) => o.value === value);
   const displayLabel = selectedOption ? selectedOption.label : defaultOptionLabel || "Select an option";
 
+  const filteredOptions = searchable
+    ? options.filter((opt) => opt.label.toLowerCase().includes(searchTerm.toLowerCase()))
+    : options;
+
   return (
-    <div className={`${noMargin ? "" : "mb-[18px] "}group flex flex-col w-full`} ref={dropdownRef}>
+    <div className={`${noMargin ? "" : "mb-4.5 "}group flex flex-col w-full`} ref={dropdownRef}>
       {!hideLabel && (
         <label className={`
-          flex items-center gap-[6px] mb-2
+          flex items-center gap-1.5 mb-2
           text-xs font-bold uppercase
           tracking-[0.5px]
           transition-colors duration-250
@@ -107,8 +116,8 @@ const SelectInput: React.FC<SelectInputProps> = ({
           disabled={disabled}
           onClick={() => !disabled && setIsOpen(!isOpen)}
           className={`
-            w-full h-[35px] pl-4 pr-10
-            border rounded-[10px] outline-none
+            w-full h-8.75 pl-4 pr-10
+            border rounded-md outline-none
             text-[15px] font-medium flex items-center justify-between
             transition-all duration-250 text-left
             ${value ? "text-[#1f2937]" : "text-[#9ca3af]"}
@@ -128,36 +137,58 @@ const SelectInput: React.FC<SelectInputProps> = ({
 
         {/* Custom Dropdown Menu */}
         {isOpen && (
-          <div className="absolute z-50 w-full mt-1 bg-white border border-gray-100 rounded-lg shadow-lg max-h-60 overflow-y-auto py-1 animate-in fade-in zoom-in-95 duration-100">
-            {defaultOptionLabel && (
-              <div
-                onClick={() => handleSelect("")}
-                className={`
-                  px-4 py-2.5 text-sm cursor-pointer
-                  transition-colors duration-150
-                  ${!value ? "bg-blue-50 text-primary font-semibold" : "text-gray-500 hover:bg-gray-50"}
-                `}
-              >
-                {defaultOptionLabel}
+          <div className="absolute z-50 w-full mt-1 bg-white border border-gray-100 rounded-lg shadow-lg max-h-60 flex flex-col py-1 animate-in fade-in zoom-in-95 duration-100">
+            {searchable && (
+              <div className="p-2 border-b border-gray-100 sticky top-0 bg-white z-10 shrink-0">
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Search..."
+                  autoFocus
+                  className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-sm outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all"
+                  onClick={(e) => e.stopPropagation()}
+                />
               </div>
             )}
-            {options.map((option, index) => (
-              <div
-                key={index}
-                onClick={() => handleSelect(option.value, option.disabled)}
-                className={`
+
+            <div className="overflow-y-auto">
+              {defaultOptionLabel && !searchTerm && (
+                <div
+                  onClick={() => handleSelect("")}
+                  className={`
+                    px-4 py-2.5 text-sm cursor-pointer
+                    transition-colors duration-150
+                    ${!value ? "bg-blue-50 text-primary font-semibold" : "text-gray-500 hover:bg-gray-50"}
+                  `}
+                >
+                  {defaultOptionLabel}
+                </div>
+              )}
+              {filteredOptions.length === 0 ? (
+                <div className="px-4 py-3 text-sm text-gray-400 text-center">
+                  No results found
+                </div>
+              ) : (
+                filteredOptions.map((option, index) => (
+                  <div
+                    key={index}
+                    onClick={() => handleSelect(option.value, option.disabled)}
+                    className={`
                   px-4 py-2.5 text-sm cursor-pointer
                   transition-colors duration-150
                   ${option.disabled ? "opacity-50 cursor-not-allowed text-gray-400" : ""}
                   ${value === option.value
-                    ? "bg-primary/10 text-primary font-semibold"
-                    : "text-gray-700 hover:bg-gray-50"
-                  }
+                        ? "bg-primary/10 text-primary font-semibold"
+                        : "text-gray-700 hover:bg-gray-50"
+                      }
                 `}
-              >
-                {option.label}
-              </div>
-            ))}
+                  >
+                    {option.label}
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         )}
       </div>

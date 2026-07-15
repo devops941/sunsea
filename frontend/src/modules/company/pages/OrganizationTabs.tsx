@@ -32,13 +32,13 @@ const OrganizationTabs: React.FC = () => {
 
     const keyToPath: Record<string, string> = {
         "profile": "/company/view",
+        "companySettings": "/settings/company",
         "roles": "/roles",
         "permissions": "/role-permissions",
-        "companySettings": "/settings/company",
+        "departments": "/departments",
         "gst": "/settings/gst-taxes",
         "whatsapp": "/whatsapp",
-        "invoice": "/settings/invoice",
-        "departments": "/departments"
+        "invoice": "/settings/invoice"
     };
 
     const activeTab = pathToKey[location.pathname] || "profile";

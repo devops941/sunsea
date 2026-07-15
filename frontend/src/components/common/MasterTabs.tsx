@@ -21,22 +21,22 @@ const MasterTabs: React.FC = () => {
     const pathToKey: Record<string, string> = {
         "/customers": "customers",
         "/suppliers": "suppliers",
-        
+
         "/products": "products",
         "/categories": "products",
         "/uoms": "products",
         "/colours": "products",
         "/sizes": "products",
-        
+
         "/raw-materials": "raw_materials",
         "/raw-material-categories": "raw_materials",
-        
+
         "/store-types": "stores",
         "/storage-stores": "stores",
         "/locations": "stores",
-        
+
         "/machines": "machines",
-        
+
         "/employees": "hr",
         "/departments": "hr",
         "/shifts": "hr"

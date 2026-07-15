@@ -1,6 +1,4 @@
 import React, { useState, useEffect } from "react";
-import { FaSearch, FaChevronLeft, FaChevronRight, FaPlus } from "react-icons/fa";
-import { useNavigate } from "react-router-dom";
 
 import { toast } from "react-toastify";
 
@@ -10,52 +8,30 @@ import ViewButton from "../../../components/ui/viewbutton/ViewButton";
 import DataTable from "../../../components/ui/table/DataTable";
 import SearchInput from "../../../components/ui/SearchInput/SearchInput";
 import ExportCSVButton from "../../../components/ui/ExportCSVButton/ExportCSVButton";
-import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import { storeService } from "../../../services/storeService";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import CommonViewModal from "../../../components/ui/CommonViewModal/CommonViewModal";
-import CustomButton from "../../../components/ui/Button/Button";
-import EditButton from "../../../components/ui/EditButton/EditButton";
-import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
-import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
-import { rawMaterialService } from "../../../services/rawMaterialService";
 
 const ITEMS_PER_PAGE = 10;
 
-const StockList: React.FC = () => {
+interface StockListProps {
+    storeId?: string;
+}
+
+const StockList: React.FC<StockListProps> = ({ storeId: propStoreId }) => {
     const dispatch = useAppDispatch();
-    const navigate = useNavigate();
 
     const { data, loading, error } = useAppSelector((state) => state.rawMaterialStocks);
 
     const [searchTerm, setSearchTerm] = useState("");
     const [debouncedSearch, setDebouncedSearch] = useState("");
-    const [storeId, setStoreId] = useState("");
+    const [internalStoreId] = useState("");
     const [stores, setStores] = useState<any[]>([]);
+
+    const activeStoreId = propStoreId !== undefined ? propStoreId : internalStoreId;
     const [currentPage, setCurrentPage] = useState(1);
     const [showView, setShowView] = useState(false);
     const [selectedItem, setSelectedItem] = useState<any>(null);
-    const [showDeleteModal, setShowDeleteModal] = useState(false);
-    const [itemToDelete, setItemToDelete] = useState<string | null>(null);
-
-    const handleDeleteClick = (rawMaterialId: string) => {
-        setItemToDelete(rawMaterialId);
-        setShowDeleteModal(true);
-    };
-
-    const confirmDelete = async () => {
-        if (!itemToDelete) return;
-        try {
-            await rawMaterialService.delete(itemToDelete);
-            toast.success("Raw material deleted successfully.");
-            dispatch(fetchRawMaterialStocks({ search: debouncedSearch, storeId }));
-        } catch (err: any) {
-            toast.error(err?.response?.data?.message || err?.message || "Cannot delete raw material. It might be in use.");
-        } finally {
-            setShowDeleteModal(false);
-            setItemToDelete(null);
-        }
-    };
 
     // Fetch stores for dropdown
     useEffect(() => {
@@ -78,8 +54,8 @@ const StockList: React.FC = () => {
 
     // Fetch stocks based on search and storeId
     useEffect(() => {
-        dispatch(fetchRawMaterialStocks({ search: debouncedSearch, storeId }));
-    }, [dispatch, debouncedSearch, storeId]);
+        dispatch(fetchRawMaterialStocks({ search: debouncedSearch, storeId: activeStoreId }));
+    }, [dispatch, debouncedSearch, activeStoreId]);
 
     useEffect(() => {
         if (error) {
@@ -131,7 +107,9 @@ const StockList: React.FC = () => {
                 {/* Page Header */}
                 <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-slate-200">
                     <div>
-                        <h2 className="text-2xl font-bold text-slate-800">Stock Ledger Management</h2>
+                        <h2 className="text-2xl font-bold text-slate-800">
+                            {stores.find((s) => s.storeId === activeStoreId)?.storeName || "Stock Ledger Management"}
+                        </h2>
                     </div>
 
                     <div className="flex flex-wrap items-center gap-3 relative w-full lg:w-auto">
@@ -145,11 +123,11 @@ const StockList: React.FC = () => {
                             columns={exportColumns}
                             filename="stock_ledger_balances.csv"
                         />
-                        <CustomButton
+                        {/* <CustomButton
                             text="Add Raw Material"
                             icon={FaPlus}
                             onClick={() => navigate("/raw-materials/create")}
-                        />
+                        /> */}
                     </div>
                 </div>
 
@@ -252,8 +230,6 @@ const StockList: React.FC = () => {
                                             setShowView(true);
                                         }}
                                     />
-                                    <EditButton onClick={() => navigate(`/raw-materials/edit/${item.rawMaterialId}`)} />
-                                    <DeleteButton onClick={() => handleDeleteClick(item.rawMaterialId)} />
                                 </div>
                             )
                         }
@@ -289,19 +265,6 @@ const StockList: React.FC = () => {
                         ]
                     }
                 ] : []}
-            />
-
-            <CommonConfirmModal
-                show={showDeleteModal}
-                onHide={() => {
-                    setShowDeleteModal(false);
-                    setItemToDelete(null);
-                }}
-                onConfirm={confirmDelete}
-                title="Delete Raw Material"
-                bodyText="Are you sure you want to delete this Raw Material? This action cannot be undone."
-                confirmText="Delete"
-                confirmVariant="danger"
             />
         </div>
     );

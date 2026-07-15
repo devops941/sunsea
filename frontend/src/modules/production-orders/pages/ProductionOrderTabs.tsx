@@ -11,7 +11,7 @@ import WastageList from "../../production-wastage/pages/WastageList";
 import WeeklyMachineScheduleList from "../../weekly-machine-schedules/pages/WeeklyMachineScheduleList";
 import DailyProductionPlanningPage from "../../daily-machine-planning/pages/DailyProductionPlanningPage";
 import HourlyWorkReportList from "../../hourly-work-reports/pages/HourlyWorkReportList";
-import OeeDashboard from "../../dashboard/pages/OeeDashboard";
+// import OeeDashboard from "../../dashboard/pages/OeeDashboard";
 
 const ProductionOrderTabs: React.FC = () => {
     const location = useLocation();
@@ -48,7 +48,7 @@ const ProductionOrderTabs: React.FC = () => {
         { key: "daily", label: "Daily Planning", icon: <FaCalendarDay />, content: <DailyProductionPlanningPage /> },
         { key: "hourly", label: "Hourly Production", icon: <FaClock />, content: <HourlyWorkReportList /> },
         { key: "wastage", label: "Production Wastage", icon: <FaTrashAlt />, content: <WastageList /> },
-        { key: "oee", label: "OEE Dashboard", icon: <FaChartBar />, content: <OeeDashboard /> }
+        // { key: "oee", label: "OEE Dashboard", icon: <FaChartBar />, content: <OeeDashboard /> }
     ];
 
     const handleTabChange = (key: string) => {

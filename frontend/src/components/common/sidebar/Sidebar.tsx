@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from "react";
-import { NavLink, useNavigate } from "react-router-dom";
+import { NavLink, useNavigate, useLocation } from "react-router-dom";
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
 import { logoutUser } from "../../../features/auth/authSlice";
 import React from "react";
@@ -21,8 +21,42 @@ const Sidebar = () => {
   const [isHovered, setIsHovered] = useState(false);
   const [hoveredMenu, setHoveredMenu] = useState<string | null>(null);
 
-  // Accordion behavior: only one menu open at a time. null = all collapsed.
   const [openMenu, setOpenMenu] = useState<string | null>("Dashboard");
+
+  const location = useLocation();
+
+  const isMenuActive = useCallback((menu: any) => {
+    // Check main path
+    if (menu.path && location.pathname.startsWith(menu.path)) return true;
+    
+    // Check activePaths array if it exists (for flat menus with multiple related paths)
+    if (menu.activePaths && Array.isArray(menu.activePaths)) {
+      if (menu.activePaths.some((p: string) => location.pathname.startsWith(p))) return true;
+    }
+
+    // Check nested children
+    if (menu.children) {
+      return menu.children.some((child: any) => {
+        if (child.path && location.pathname.startsWith(child.path)) return true;
+        
+        if (child.activePaths && Array.isArray(child.activePaths)) {
+          if (child.activePaths.some((p: string) => location.pathname.startsWith(p))) return true;
+        }
+
+        if (child.children) {
+          return child.children.some((subChild: any) => {
+            if (subChild.path && location.pathname.startsWith(subChild.path)) return true;
+            if (subChild.activePaths && Array.isArray(subChild.activePaths)) {
+              if (subChild.activePaths.some((p: string) => location.pathname.startsWith(p))) return true;
+            }
+            return false;
+          });
+        }
+        return false;
+      });
+    }
+    return false;
+  }, [location.pathname]);
 
   const activeCollapsed = isCollapsed && !isHovered;
 
@@ -142,16 +176,16 @@ const Sidebar = () => {
               onMouseLeave={() => setHoveredMenu(null)}
             >
               <button
-                className={`w-full border-none outline-none cursor-pointer bg-transparent text-gray-700 p-[14px_6px] rounded-xl flex items-center justify-between transition-all duration-300 hover:bg-gray-100 ${activeCollapsed ? "justify-center p-[14px]" : ""}`}
+                className={`w-full border-none outline-none cursor-pointer p-[14px_6px] rounded-xl flex items-center justify-between transition-all duration-300 hover:bg-gray-100 ${isMenuActive(menu) ? "!bg-primary !text-white font-semibold" : "bg-transparent text-gray-700"} ${activeCollapsed ? "justify-center p-[14px]" : ""}`}
                 onClick={() => toggleMenu(menu.title)}
               >
-                <div className={`flex items-center text-[clamp(13px,0.9vw,14px)] font-medium ${activeCollapsed ? "justify-center gap-0" : "gap-3"}`}>
-                  <Icon className="min-w-[18px] text-[18px]" />
-                  {!activeCollapsed && <span>{menu.title}</span>}
+                <div className={`flex items-center text-[clamp(13px,0.9vw,14px)] font-medium ${activeCollapsed ? "justify-center gap-0" : "gap-3"} ${isMenuActive(menu) ? "!text-white" : ""}`}>
+                  <Icon className={`min-w-[18px] text-[18px] ${isMenuActive(menu) ? "!text-white" : ""}`} />
+                  {!activeCollapsed && <span className={isMenuActive(menu) ? "!text-white" : ""}>{menu.title}</span>}
                 </div>
 
                 {!activeCollapsed &&
-                  (isOpen ? <FaChevronDown className="min-w-[14px] text-[14px]" /> : <FaChevronRight className="min-w-[14px] text-[14px]" />)}
+                  (isOpen ? <FaChevronDown className={`min-w-[14px] text-[14px] ${isMenuActive(menu) ? "!text-white" : ""}`} /> : <FaChevronRight className={`min-w-[14px] text-[14px] ${isMenuActive(menu) ? "!text-white" : ""}`} />)}
               </button>
 
               {!activeCollapsed && isOpen && (

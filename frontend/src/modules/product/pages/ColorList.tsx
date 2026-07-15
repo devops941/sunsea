@@ -142,13 +142,13 @@ const ColorList: React.FC = () => {
         setEditMode(true);
         setFormData({
             id: String(color.id),
-            // CLR-002 fix: use correct API field names colorCode/colorName
-            code: color.colorCode,
-            name: color.colorName,
+            // Revert to correct mapped frontend fields
+            code: color.code,
+            name: color.name,
             hexCode: color.hexCode || "",
             hexCode2: color.hexCode2 || "",
             type: color.colorType || "",
-            status: color.isActive ? "ACTIVE" : "INACTIVE",
+            status: color.status,
         });
         setErrors({ code: "", name: "", hexCode: "", hexCode2: "", type: "" });
         setShowFormModal(true);
@@ -209,14 +209,13 @@ const ColorList: React.FC = () => {
         e.preventDefault();
         if (!validateForm()) return;
         try {
-            // CLR-003 fix: use correct API field names colorCode/colorName/colorType
-            const payload = {
-                colorCode: formData.code,
-                colorName: formData.name,
+            const payload: any = {
+                code: formData.code,
+                name: formData.name,
                 hexCode: formData.hexCode,
                 hexCode2: formData.type === "mc" ? formData.hexCode2 : undefined,
                 colorType: formData.type,
-                isActive: formData.status === "ACTIVE",
+                status: formData.status,
             };
             if (editMode) {
                 await editColor(Number(formData.id), payload);
@@ -238,9 +237,9 @@ const ColorList: React.FC = () => {
 
     const columns: DataTableColumn<any>[] = [
         { header: "#", render: (_, index) => startIndex + index + 1, width: "60px", align: "center" },
-        // CLR-002 fix: use correct API field names
-        { header: "Code", render: (color) => color.colorCode },
-        { header: "Name", render: (color) => color.colorName },
+        // Revert to correct mapped frontend fields
+        { header: "Code", render: (color) => color.code },
+        { header: "Name", render: (color) => color.name },
         {
             header: "Color",
             render: (color) => (
@@ -257,7 +256,7 @@ const ColorList: React.FC = () => {
                 </div>
             )
         },
-        { header: "Status", render: (color) => <StatusBadge status={color.isActive ? "ACTIVE" : "INACTIVE"} />, align: "center" },
+        { header: "Status", render: (color) => <StatusBadge status={color.status} />, align: "center" },
         {
             header: "Actions",
             render: (color) => (

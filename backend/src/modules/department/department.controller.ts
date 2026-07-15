@@ -41,19 +41,26 @@ export const createDepartment =
 export const getAllDepartments =
   asyncHandler(
     async (
-      _req: Request,
+      req: Request,
       res: Response
     ) => {
+      const page = req.query.page ? Number(req.query.page) : undefined;
+      const limit = req.query.limit ? Number(req.query.limit) : undefined;
+      const search = req.query.search ? String(req.query.search) : undefined;
 
-      const departments =
-        await getAllDepartmentsService();
+      const { departments, total } =
+        await getAllDepartmentsService(page, limit, search);
 
-      return res.status(200).json(
-        new ApiResponse(
-          "Departments fetched successfully",
-          departments
-        )
-      );
+      return res.status(200).json({
+        success: true,
+        message: "Departments fetched successfully",
+        data: departments,
+        meta: {
+          total,
+          page: page || 1,
+          limit: limit || total,
+        }
+      });
     }
   );
 

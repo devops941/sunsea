@@ -15,7 +15,6 @@ const ITEMS_PER_PAGE = 10;
 const GstTaxList: React.FC = () => {
     const dispatch = useAppDispatch();
     const { data, loading, totalPages } = useAppSelector((state) => state.gst);
-
     const [searchTerm, setSearchTerm] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
 
@@ -89,7 +88,8 @@ const GstTaxList: React.FC = () => {
             loadGstTaxes();
         } catch (err: any) {
             console.error(err);
-            toast.error(err || "Failed to save GST tax rate");
+            const errorMessage = typeof err === 'string' ? err : err?.message || err || "Failed to save GST tax rate";
+            toast.error(errorMessage);
             throw err; // keeps modal open on failure — see GstTaxModal's submit handler
         }
     };

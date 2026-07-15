@@ -17,15 +17,23 @@ export const createRole = async (
 };
 
 export const getAllRoles = async (
-  _req: Request,
+  req: Request,
   res: Response
 ) => {
-  const roles =
-    await roleService.getAllRoles();
+  const page = req.query.page ? Number(req.query.page) : undefined;
+  const limit = req.query.limit ? Number(req.query.limit) : undefined;
+  const search = req.query.search ? String(req.query.search) : undefined;
+
+  const { roles, total } = await roleService.getAllRoles(page, limit, search);
 
   return res.status(200).json({
     success: true,
     data: roles,
+    meta: {
+      total,
+      page: page || 1,
+      limit: limit || total,
+    }
   });
 };
 

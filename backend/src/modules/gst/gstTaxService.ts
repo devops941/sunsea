@@ -4,6 +4,19 @@ import { CreateGstTaxInput, UpdateGstTaxInput, GstTaxQueryInput } from "./gstTax
 
 class GstTaxService {
     async create(data: CreateGstTaxInput, userId?: string) {
+        const nameExists = await prisma.gstTaxRate.findFirst({
+            where: { taxName: data.taxName }
+        });
+        if (nameExists) {
+            throw new ApiError(409, "A GST tax with this name already exists");
+        }
+
+        const rateExists = await prisma.gstTaxRate.findFirst({
+            where: { taxRate: Number(data.taxRate) }
+        });
+        if (rateExists) {
+            throw new ApiError(409, `A GST tax with the rate ${data.taxRate}% already exists`);
+        }
         return prisma.gstTaxRate.create({
             data: {
                 taxName: data.taxName,
@@ -50,6 +63,30 @@ class GstTaxService {
 
     async update(gstTaxId: string, data: UpdateGstTaxInput) {
         await this.findById(gstTaxId); // throws 404 if missing
+
+        if (data.taxName) {
+            const existingName = await prisma.gstTaxRate.findFirst({
+                where: {
+                    id: { not: gstTaxId },
+                    taxName: data.taxName
+                }
+            });
+            if (existingName) {
+                throw new ApiError(409, "A GST tax with this name already exists");
+            }
+        }
+
+        if (data.taxRate !== undefined) {
+            const existingRate = await prisma.gstTaxRate.findFirst({
+                where: {
+                    id: { not: gstTaxId },
+                    taxRate: Number(data.taxRate)
+                }
+            });
+            if (existingRate) {
+                throw new ApiError(409, `A GST tax with the rate ${data.taxRate}% already exists`);
+            }
+        }
 
         return prisma.gstTaxRate.update({
             where: { id: gstTaxId },

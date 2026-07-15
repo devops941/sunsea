@@ -30,11 +30,11 @@ const CompanyProfile: React.FC = () => {
   }
 
   return (
-    <div className="p-4 md:p-6 min-h-screen bg-gradient-to-br from-indigo-50 via-white to-blue-50">
+    <div className="p-4 md:p-6 min-h-screen bg-linear-to-br from-indigo-50 via-white to-blue-50">
       <div className="max-w-5xl mx-auto bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden transition-all duration-300 hover:shadow-md">
 
         {/* HEADER */}
-        <div className="bg-gradient-to-r from-indigo-600 via-blue-600 to-blue-500 px-6 py-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+        <div className="bg-linear-to-r from-indigo-600 via-blue-600 to-blue-500 px-6 py-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
           <div className="flex items-center gap-5">
             <div className="w-16 h-16 md:w-20 md:h-20 bg-white rounded-xl shadow-md border-2 border-white/20 flex items-center justify-center p-2 shrink-0 overflow-hidden">
               <img src={company.logoUrl || Logo} alt="Company Logo" className="w-full h-full object-contain" />
@@ -164,7 +164,7 @@ const CompanyProfile: React.FC = () => {
                     <img
                       src={company.logoUrl}
                       alt="Company Logo"
-                      className="max-w-[150px] max-h-[80px] object-contain"
+                      className="max-w-37.5 max-h-20 object-contain"
                     />
                   </div>
                 ) : (

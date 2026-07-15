@@ -48,7 +48,13 @@ export const gstTaxService = {
         totalPages: number;
     }> => {
         const response = await apiClient.get(config.gstTax.getAllGstTax, { params });
-        return response.data?.data || response.data;
+        return {
+            data: response.data?.data || response.data,
+            total: response.data?.meta?.total || 0,
+            page: response.data?.meta?.page || 1,
+            pageSize: response.data?.meta?.limit || 10,
+            totalPages: response.data?.meta?.totalPages || 1,
+        };
     },
 
     // ─── 2️⃣ GET METHOD - Fetch Single GST Tax by ID ──────────
