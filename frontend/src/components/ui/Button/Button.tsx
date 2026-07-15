@@ -20,9 +20,9 @@ const sizeClasses: Record<NonNullable<CustomButtonProps["size"]>, { container: s
 };
 
 const variantClasses: Record<NonNullable<CustomButtonProps["variant"]>, string> = {
-  primary: "bg-[#374151] hover:bg-[#1f2937] text-white",
-  secondary: "bg-gray-200 hover:bg-gray-300 text-gray-900",
-  danger: "bg-[#cc1616] hover:bg-red-700 text-white",
+  primary: "bg-[#5D87FF] hover:bg-[#4570F5] text-white",
+  secondary: "bg-[#13DEB9] hover:bg-[#10C8A7] text-white",
+  danger: "bg-[#FA896B] hover:[##F56C4C] text-white",
 };
 
 const Button = ({

@@ -12,10 +12,10 @@ interface BackButtonProps {
   className?: string;
 }
 
-const BackButton: React.FC<BackButtonProps> = ({ 
-  to, 
-  text = "Back", 
-  className = "" 
+const BackButton: React.FC<BackButtonProps> = ({
+  to,
+  text = "Back",
+  className = ""
 }) => {
   const navigate = useNavigate();
 
@@ -29,6 +29,7 @@ const BackButton: React.FC<BackButtonProps> = ({
 
   return (
     <CustomButton
+      variant='danger'
       text={text}
       icon={FaArrowLeft}
       onClick={handleBack}

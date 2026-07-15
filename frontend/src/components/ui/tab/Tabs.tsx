@@ -74,12 +74,12 @@ const Tabs: React.FC<TabsProps> = ({
 
         // default primary — matches the sidebar's active-item look:
         // solid color fill + white bold text when active, plain gray box when not
-        return `flex items-center gap-2 whitespace-nowrap rounded-md px-5 py-2.5
-            text-sm font-semibold transition-all duration-200
+        return `flex items-center gap-2 whitespace-nowrap rounded-sm px-5 py-2.5
+            text-[15px] leading-[1.334rem] transition-all duration-300
             disabled:opacity-45 disabled:cursor-not-allowed
             ${isActive
-                ? "bg-primary text-white font-bold shadow-sm shadow-red-600/20"
-                : "bg-gray-100 text-gray-500 hover:text-blue-600 hover:bg-gray-200"
+                ? "bg-gradient-to-r from-blue-400 to-primary text-white font-semibold shadow-sm "
+                : "bg-gray-100 text-[#2A3547] hover:bg-gray-200 font-normal"
             }`;
     };
 

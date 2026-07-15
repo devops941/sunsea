@@ -734,7 +734,7 @@ const SalesOrderForm: React.FC = () => {
 
                     <div className="flex justify-between items-center mb-4">
                         <span className="text-lg font-semibold text-gray-800">Order Items</span>
-                        <CustomButton text="Add Item" icon={FaPlus} onClick={() => append({ productCode: "", quantity: "", colorType: "" })} />
+                        <CustomButton text="Add Item" variant="secondary" icon={FaPlus} onClick={() => append({ productCode: "", quantity: "", colorType: "" })} />
                     </div>
                     {errors.items?.root && <Err message={errors.items.root.message} />}
 
@@ -786,8 +786,8 @@ const SalesOrderForm: React.FC = () => {
 
                     {/* ── Form Actions ── */}
                     <div className="flex flex-wrap justify-end gap-3 mt-8 pt-4 border-t border-gray-200">
-                        <CustomButton text="Clear" icon={FaEraser} onClick={() => reset(defaultValues)} disabled={isSubmitting} />
-                        <CustomButton text={isSubmitting ? "Saving..." : "Save Order"} icon={isSubmitting ? undefined : FaSave} type="button" onClick={handleSubmit((data) => onSubmit(data, "draft"))} disabled={isSubmitting} />
+                        <CustomButton text="Clear" variant="danger" icon={FaEraser} onClick={() => reset(defaultValues)} disabled={isSubmitting} />
+                        <CustomButton variant="secondary" text={isSubmitting ? "Saving..." : "Save Order"} icon={isSubmitting ? undefined : FaSave} type="button" onClick={handleSubmit((data) => onSubmit(data, "draft"))} disabled={isSubmitting} />
                         <CustomButton text={isSubmitting ? "Sending..." : "Send to Quotation"} icon={isSubmitting ? undefined : FaPaperPlane} type="button" onClick={handleSubmit((data) => onSubmit(data, "quotation"))} disabled={isSubmitting} />
                     </div>
                 </form>
