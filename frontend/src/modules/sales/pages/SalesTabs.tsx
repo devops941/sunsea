@@ -51,7 +51,7 @@ const SalesTabs: React.FC = () => {
     };
 
     return (
-        <div className="p-4 md:p-6 min-h-screen bg-white">
+        <div className="p-4 md:p-6  bg-white">
             <div className=" space-y-6">
                 <Tabs tabs={tabs} activeKey={activeTab} onChange={handleTabChange} align="left" />
             </div>

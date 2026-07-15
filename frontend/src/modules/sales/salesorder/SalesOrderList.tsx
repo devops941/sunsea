@@ -105,11 +105,11 @@ const SalesOrderList: React.FC = () => {
     return (
         <div>
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-            {/* Page Header */}
-            <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-slate-200">
-                <div>
-                    <h2 className="text-2xl font-bold text-slate-800">Draft Orders List</h2>
-                </div>
+                {/* Page Header */}
+                <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-slate-200">
+                    <div>
+                        <h2 className="text-2xl font-bold text-slate-800">Draft Orders List</h2>
+                    </div>
 
                     <div className="flex flex-wrap items-center gap-3 relative w-full lg:w-auto">
                         <SearchInput
@@ -134,7 +134,7 @@ const SalesOrderList: React.FC = () => {
                     columns={[
                         {
                             header: "#",
-                            width: "60px",
+
                             render: (_item, index) => (currentPage - 1) * ITEMS_PER_PAGE + index + 1,
                         },
                         { header: "ORDER NO", accessor: "orderNo" },
@@ -147,7 +147,7 @@ const SalesOrderList: React.FC = () => {
                         {
                             header: "ACTIONS",
                             render: (item) => (
-                                <div className="flex items-center gap-2">
+                                <div className="flex justify-end items-center gap-2">
                                     <ViewButton onClick={() => handleOpenView(item)} />
                                     <EditButton onClick={() => handleOpenEdit(item)} />
                                     <DeleteButton onClick={() => triggerDelete(item.id)} />

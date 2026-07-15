@@ -174,11 +174,11 @@ const PurchaseOrderListPage: React.FC = () => {
 
   return (
     <div className="w-full">
-      <div className="w-full">
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
         {/* Page Header */}
-        <div className="mb-6 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-slate-200">
           <div>
-            <h2 className="text-3xl font-bold text-primary">Purchase Orders</h2>
+            <h2 className="text-2xl font-bold text-slate-800">Purchase Orders</h2>
           </div>
 
           <div className="flex flex-wrap items-center gap-3 relative w-full lg:w-auto">
@@ -202,55 +202,55 @@ const PurchaseOrderListPage: React.FC = () => {
                 />
               </div>
 
-                <div className="mb-3">
-                  <label className="block mb-1 text-[11px] uppercase tracking-wider text-gray-500 font-semibold">
-                    To Date
-                  </label>
-                  <input
-                    type="date"
-                    className="w-full border border-gray-200 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
-                    value={draftToDate}
-                    min={draftFromDate || undefined}
-                    onChange={(e) => setDraftToDate(e.target.value)}
-                  />
-                </div>
-
-                <div className="mb-4">
-                  <label className="block mb-1 text-[11px] uppercase tracking-wider text-gray-500 font-semibold">
-                    Status
-                  </label>
-                  <select
-                    className="w-full border border-gray-200 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary bg-white"
-                    value={draftStatusFilter}
-                    onChange={(e) => setDraftStatusFilter(e.target.value as PurchaseOrderStatus | "")}
-                  >
-                    <option value="">All Status</option>
-                    <option value="DRAFT">Draft</option>
-                    <option value="PENDING">Pending</option>
-                    <option value="APPROVED">Approved</option>
-                    <option value="REJECTED">Rejected</option>
-                    <option value="COMPLETED">Completed</option>
-                    <option value="CANCELLED">Cancelled</option>
-                  </select>
-                </div>
-              </FilterPopover>
-
-              <SearchInput
-                value={searchTerm}
-                onChange={handleSearch}
-                placeholder="Search by PO # or Supplier..."
-              />
-              {canCreate ? (
-                <CustomButton
-                  text="Create PO"
-                  icon={FaPlus}
-                  onClick={() => navigate("/purchase-orders/create")}
+              <div className="mb-3">
+                <label className="block mb-1 text-[11px] uppercase tracking-wider text-gray-500 font-semibold">
+                  To Date
+                </label>
+                <input
+                  type="date"
+                  className="w-full border border-gray-200 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                  value={draftToDate}
+                  min={draftFromDate || undefined}
+                  onChange={(e) => setDraftToDate(e.target.value)}
                 />
-              ) : (
-                <span className="text-red-500 text-xs">
-                  ⚠️ Create button hidden
-                </span>
-              )}
+              </div>
+
+              <div className="mb-4">
+                <label className="block mb-1 text-[11px] uppercase tracking-wider text-gray-500 font-semibold">
+                  Status
+                </label>
+                <select
+                  className="w-full border border-gray-200 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary bg-white"
+                  value={draftStatusFilter}
+                  onChange={(e) => setDraftStatusFilter(e.target.value as PurchaseOrderStatus | "")}
+                >
+                  <option value="">All Status</option>
+                  <option value="DRAFT">Draft</option>
+                  <option value="PENDING">Pending</option>
+                  <option value="APPROVED">Approved</option>
+                  <option value="REJECTED">Rejected</option>
+                  <option value="COMPLETED">Completed</option>
+                  <option value="CANCELLED">Cancelled</option>
+                </select>
+              </div>
+            </FilterPopover>
+
+            <SearchInput
+              value={searchTerm}
+              onChange={handleSearch}
+              placeholder="Search by PO # or Supplier..."
+            />
+            {canCreate ? (
+              <CustomButton
+                text="Create PO"
+                icon={FaPlus}
+                onClick={() => navigate("/purchase-orders/create")}
+              />
+            ) : (
+              <span className="text-red-500 text-xs">
+                ⚠️ Create button hidden
+              </span>
+            )}
           </div>
         </div >
 

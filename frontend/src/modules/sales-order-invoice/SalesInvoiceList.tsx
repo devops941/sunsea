@@ -1,6 +1,5 @@
 import React, { useState, useCallback, useEffect } from "react";
-import { Container, Row, Col } from "react-bootstrap";
-import { FaSearch, FaChevronLeft, FaChevronRight, FaPlus, FaTrash, FaEye } from "react-icons/fa";
+import { FaPlus, FaTrash, FaEye } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useSelector } from "react-redux";
@@ -8,10 +7,12 @@ import { useSelector } from "react-redux";
 import CommonViewModal from "../../components/ui/CommonViewModal/CommonViewModal";
 import CommonConfirmModal from "../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import { salesInvoiceService } from "../../services/salesInvoiceService";
-import CustomButton from "../../components/ui/custombutton/CustomButton";
+import CustomButton from "../../components/ui/Button/Button";
 import ViewButton from "../../components/ui/viewbutton/ViewButton";
 import DeleteButton from "../../components/ui/DeleteButton/DeleteButton";
 import StatusBadge from "../../components/ui/StatusBadge/Badge";
+import DataTable, { type DataTableColumn } from "../../components/ui/table/DataTable";
+import SearchInput from "../../components/ui/SearchInput/SearchInput";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -94,208 +95,170 @@ const SalesInvoiceList: React.FC = () => {
         }
     };
 
-    return (
-        <div className="inner-container">
-            <Container fluid>
-                {/* Page Header */}
-                <div className="page-header">
-                    <Row className="align-items-center g-3">
-                        <Col lg={6} md={12}>
-                            <div className="page-header-info">
-                                <h2 className="page-title">Sales Invoice List</h2>
-                                <div className="page-breadcrumb">Home / Sales / Invoice List</div>
-                            </div>
-                        </Col>
-                        <Col lg={6} md={12}>
-                            <div className="page-header-actions">
-                                <div className="page-search-wrap">
-                                    <FaSearch className="page-search-icon" />
-                                    <input
-                                        type="text"
-                                        className="page-search-input"
-                                        placeholder="Search invoices..."
-                                        value={searchTerm}
-                                        onChange={handleSearch}
-                                    />
-                                </div>
-                                <CustomButton
-                                    text="Create Invoice"
-                                    icon={FaPlus}
-                                    onClick={() => navigate("/sales-invoices/create")}
-                                />
-                            </div>
-                        </Col>
-                    </Row>
+    const columns: DataTableColumn<any>[] = [
+        {
+            header: "#",
+            width: "60px",
+            render: (_item, index) => (currentPage - 1) * ITEMS_PER_PAGE + index + 1,
+        },
+        {
+            header: "INVOICE NO",
+            render: (item) => <span className="font-semibold text-slate-800">{item.invoiceNo}</span>,
+        },
+        {
+            header: "INVOICE DATE",
+            render: (item) => <span className="text-slate-600">{formatDate(item.invoiceDate)}</span>,
+        },
+        {
+            header: "DUE DATE",
+            render: (item) => <span className="text-slate-600">{formatDate(item.dueDate)}</span>,
+        },
+        {
+            header: "CUSTOMER",
+            render: (item) => <span className="font-medium text-slate-700">{item.customer?.displayName || item.customer?.firmName || "N/A"}</span>,
+        },
+        {
+            header: "SUB TOTAL",
+            render: (item) => <span className="font-semibold text-slate-700">{formatCurrency(item.subTotal)}</span>,
+        },
+        {
+            header: "TAX AMOUNT",
+            render: (item) => <span className="font-medium text-slate-400">{formatCurrency(item.taxTotal)}</span>,
+        },
+        {
+            header: "NET AMOUNT",
+            render: (item) => <span className="font-bold text-emerald-600">{formatCurrency(item.grandTotal)}</span>,
+        },
+        {
+            header: "STATUS",
+            render: (item) => <StatusBadge status={item.status} />,
+        },
+        {
+            header: "ACTIONS",
+            align: "right",
+            width: "120px",
+            render: (item) => (
+                <div className="flex justify-end gap-2">
+                    <ViewButton onClick={() => handleOpenView(item)} />
+                    <DeleteButton onClick={() => {
+                        setItemToDelete(item.id);
+                        setShowDeleteModal(true);
+                    }} />
                 </div>
+            ),
+        },
+    ];
 
-                {/* Table */}
-                <div className="master-table-body table-wrap">
-                    <div className="master-table-body">
-                        <table className="master-data-table">
-                            <thead>
-                                <tr>
-                                    <th style={{ width: "60px" }}>#</th>
-                                    <th>INVOICE NO</th>
-                                    <th>INVOICE DATE</th>
-                                    <th>DUE DATE</th>
-                                    <th>CUSTOMER</th>
-                                    <th>SUB TOTAL</th>
-                                    <th>TAX AMOUNT</th>
-                                    <th>NET AMOUNT</th>
-                                    <th>STATUS</th>
-                                    <th>ACTIONS</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {loading ? (
-                                    <tr>
-                                        <td colSpan={10} className="text-center p-4">
-                                            <div className="animate-spin rounded-full border-b-2 border-indigo-600 h-4 w-4 border-b-2 mr-2"></div>
-                                            Loading invoices...
-                                        </td>
-                                    </tr>
-                                ) : data.length > 0 ? (
-                                    data.map((item, index) => (
-                                        <tr key={item.id} className="master-data-row">
-                                            <td className="master-data-cell">
-                                                {(currentPage - 1) * ITEMS_PER_PAGE + index + 1}
-                                            </td>
-                                            <td className="master-data-cell fw-semibold">{item.invoiceNo}</td>
-                                            <td className="master-data-cell">{formatDate(item.invoiceDate)}</td>
-                                            <td className="master-data-cell">{formatDate(item.dueDate)}</td>
-                                            <td className="master-data-cell">
-                                                {item.customer?.displayName || item.customer?.firmName || "N/A"}
-                                            </td>
-                                            <td className="master-data-cell fw-semibold">
-                                                {formatCurrency(item.subTotal)}
-                                            </td>
-                                            <td className="master-data-cell fw-semibold text-muted">
-                                                {formatCurrency(item.taxTotal)}
-                                            </td>
-                                            <td className="master-data-cell fw-semibold text-success">
-                                                {formatCurrency(item.grandTotal)}
-                                            </td>
-                                            <td className="master-data-cell">
-                                                <StatusBadge status={item.status} />
-                                            </td>
-                                            <td className="master-data-cell">
-                                                <div className="table-action-group d-flex gap-2">
-                                                    <ViewButton onClick={() => handleOpenView(item)} />
-                                                    <DeleteButton onClick={() => {
-                                                        setItemToDelete(item.id);
-                                                        setShowDeleteModal(true);
-                                                    }} />
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))
-                                ) : (
-                                    <tr>
-                                        <td colSpan={10} className="text-center p-4">
-                                            No invoices found.
-                                        </td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
+    return (
+        <div>
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                {/* Page Header */}
+                <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-slate-200">
+                    <div>
+                        <h2 className="text-2xl font-bold text-slate-800">Sales Invoice List</h2>
+                    </div>
 
-                        {totalPages > 1 && (
-                            <div className="pagination-wrap">
-                                <button
-                                    className="pagination-btn"
-                                    disabled={currentPage === 1}
-                                    onClick={() => setCurrentPage((prev) => prev - 1)}
-                                >
-                                    <FaChevronLeft />
-                                </button>
-                                <div className="pagination-info">
-                                    Page {currentPage} of {totalPages}
-                                </div>
-                                <button
-                                    className="pagination-btn"
-                                    disabled={currentPage === totalPages}
-                                    onClick={() => setCurrentPage((prev) => prev + 1)}
-                                >
-                                    <FaChevronRight />
-                                </button>
-                            </div>
-                        )}
+                    <div className="flex flex-wrap items-center gap-3 relative w-full lg:w-auto">
+                        <SearchInput
+                            value={searchTerm}
+                            onChange={handleSearch}
+                            placeholder="Search invoices..."
+                        />
+                        <CustomButton
+                            text="Create Invoice"
+                            icon={FaPlus}
+                            onClick={() => navigate("/sales-invoices/create")}
+                        />
                     </div>
                 </div>
 
-                {/* View Modal */}
-                <CommonViewModal
-                    show={showViewModal}
-                    onHide={() => setShowViewModal(false)}
-                    modalTitle="Sales Invoice details"
-                    avatarText={selectedItem ? selectedItem.invoiceNo.charAt(0).toUpperCase() : ""}
-                    headerTitle={selectedItem ? selectedItem.invoiceNo : ""}
-                    headerSubtitle={
-                        selectedItem ? `Customer: ${selectedItem.customer?.displayName || selectedItem.customer?.firmName || "N/A"}` : ""
-                    }
-                    sections={
-                        selectedItem
-                            ? [
-                                {
-                                    fields: [
-                                        { label: "Invoice No", value: selectedItem.invoiceNo },
-                                        { label: "Invoice Date", value: formatDate(selectedItem.invoiceDate) },
-                                        { label: "Due Date", value: formatDate(selectedItem.dueDate) },
-                                    ],
-                                },
-                                {
-                                    title: "Billing & Shipping Details",
-                                    fields: [
-                                        {
-                                            label: "Billing address",
-                                            value: [
-                                                selectedItem.customer?.billingAddressLine1,
-                                                selectedItem.customer?.billingCity,
-                                                selectedItem.customer?.billingState,
-                                                selectedItem.customer?.billingPincode,
-                                            ]
-                                                .filter(Boolean)
-                                                .join(", ") || "N/A",
-                                        },
-                                        {
-                                            label: "Shipping address",
-                                            value: [
-                                                selectedItem.customer?.shippingAddressLine1,
-                                                selectedItem.customer?.shippingCity,
-                                                selectedItem.customer?.shippingState,
-                                                selectedItem.customer?.shippingPincode,
-                                            ]
-                                                .filter(Boolean)
-                                                .join(", ") || "N/A",
-                                        },
-                                    ],
-                                },
-                                {
-                                    title: "Invoice Summary",
-                                    fields: [
-                                        { label: "Total items", value: String(selectedItem.items?.length ?? 0) },
-                                        { label: "Subtotal", value: formatCurrency(selectedItem.subTotal) },
-                                        { label: "Total tax", value: formatCurrency(selectedItem.taxTotal) },
-                                        { label: "Grand Total", value: formatCurrency(selectedItem.grandTotal) },
-                                        { label: "Notes", value: selectedItem.notes || "N/A" },
-                                    ],
-                                },
-                            ]
-                            : []
-                    }
+                {/* Table */}
+                <DataTable
+                    columns={columns}
+                    data={data}
+                    rowKey={(item) => item.id}
+                    loading={loading}
+                    emptyMessage="No invoices found."
+                    pagination={{
+                        currentPage,
+                        totalPages,
+                        onPageChange: setCurrentPage,
+                    }}
                 />
+            </div>
 
-                {/* Delete Confirmation Modal */}
-                <CommonConfirmModal
-                    show={showDeleteModal}
-                    onHide={() => setShowDeleteModal(false)}
-                    onConfirm={handleDeleteConfirm}
-                    title="Delete Invoice"
-                    message="Are you sure you want to delete this invoice? This action cannot be undone."
-                    confirmText="Delete"
-                    confirmVariant="danger"
-                />
-            </Container>
+            {/* View Modal */}
+            <CommonViewModal
+                show={showViewModal}
+                onHide={() => setShowViewModal(false)}
+                modalTitle="Sales Invoice details"
+                avatarText={selectedItem ? selectedItem.invoiceNo.charAt(0).toUpperCase() : ""}
+                headerTitle={selectedItem ? selectedItem.invoiceNo : ""}
+                headerSubtitle={
+                    selectedItem ? `Customer: ${selectedItem.customer?.displayName || selectedItem.customer?.firmName || "N/A"}` : ""
+                }
+                sections={
+                    selectedItem
+                        ? [
+                            {
+                                fields: [
+                                    { label: "Invoice No", value: selectedItem.invoiceNo },
+                                    { label: "Invoice Date", value: formatDate(selectedItem.invoiceDate) },
+                                    { label: "Due Date", value: formatDate(selectedItem.dueDate) },
+                                ],
+                            },
+                            {
+                                title: "Billing & Shipping Details",
+                                fields: [
+                                    {
+                                        label: "Billing address",
+                                        value: [
+                                            selectedItem.customer?.billingAddressLine1,
+                                            selectedItem.customer?.billingCity,
+                                            selectedItem.customer?.billingState,
+                                            selectedItem.customer?.billingPincode,
+                                        ]
+                                            .filter(Boolean)
+                                            .join(", ") || "N/A",
+                                    },
+                                    {
+                                        label: "Shipping address",
+                                        value: [
+                                            selectedItem.customer?.shippingAddressLine1,
+                                            selectedItem.customer?.shippingCity,
+                                            selectedItem.customer?.shippingState,
+                                            selectedItem.customer?.shippingPincode,
+                                        ]
+                                            .filter(Boolean)
+                                            .join(", ") || "N/A",
+                                    },
+                                ],
+                            },
+                            {
+                                title: "Invoice Summary",
+                                fields: [
+                                    { label: "Total items", value: String(selectedItem.items?.length ?? 0) },
+                                    { label: "Subtotal", value: formatCurrency(selectedItem.subTotal) },
+                                    { label: "Total tax", value: formatCurrency(selectedItem.taxTotal) },
+                                    { label: "Grand Total", value: formatCurrency(selectedItem.grandTotal) },
+                                    { label: "Notes", value: selectedItem.notes || "N/A" },
+                                ],
+                            },
+                        ]
+                        : []
+                }
+            />
+
+            {/* Delete Confirmation Modal */}
+            <CommonConfirmModal
+                show={showDeleteModal}
+                onHide={() => setShowDeleteModal(false)}
+                onConfirm={handleDeleteConfirm}
+                title="Delete Invoice"
+                message="Are you sure you want to delete this invoice? This action cannot be undone."
+                confirmText="Delete"
+                confirmVariant="danger"
+            />
         </div>
     );
 };

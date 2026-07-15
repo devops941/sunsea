@@ -562,23 +562,22 @@ const StockAdjustmentForm: React.FC = () => {
           {isPMI && selectedPO && pmiItems.length > 0 && (
             <div className="pt-2 border-t border-gray-100 mt-4">
               <h6 className="text-base font-semibold text-gray-800 mb-3">3. Raw Materials to Issue</h6>
-              <div className="border border-slate-200 rounded-xl">
-                <div>
-                  <table className="w-full text-left text-sm whitespace-nowrap">
-                    <thead className="bg-slate-50 text-slate-600">
-                      <tr>
-                        <th className="px-4 py-3 font-semibold border-b border-slate-200">RM CODE</th>
-                        <th className="px-4 py-3 font-semibold border-b border-slate-200">MATERIAL NAME</th>
-                        <th className="px-4 py-3 font-semibold border-b border-slate-200 text-right">REQUIRED QTY</th>
-                        <th className="px-4 py-3 font-semibold border-b border-slate-200 text-right">RESERVED QTY</th>
-                        <th className="px-4 py-3 font-semibold border-b border-slate-200 text-right">ALREADY ISSUED</th>
-                        <th className="px-4 py-3 font-semibold border-b border-slate-200 text-right">REMAINING</th>
-                        <th className="px-4 py-3 font-semibold border-b border-slate-200 text-right">AVAILABLE STOCK</th>
-                        <th className="px-4 py-3 font-semibold border-b border-slate-200">UOM</th>
-                        <th className="px-4 py-3 font-semibold border-b border-slate-200 min-w-[200px]">STORE*</th>
-                        <th className="px-4 py-3 font-semibold border-b border-slate-200 min-w-[150px]">ISSUE QTY*</th>
-                        <th className="px-4 py-3 font-semibold border-b border-slate-200 min-w-[180px]">REMARKS</th>
-                      </tr>
+              <div className="rounded-xl border border-slate-200 bg-white [&_.mb-\[18px\]]:!mb-0 [&_.select-input-group]:!mb-0 overflow-visible">
+                <table className="min-w-full divide-y divide-slate-200">
+                  <thead className="bg-slate-50/80">
+                    <tr>
+                      <th className="px-3 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200">RM CODE</th>
+                      <th className="px-3 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200">MATERIAL NAME</th>
+                      <th className="px-3 py-3 text-right text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200">REQUIRED QTY</th>
+                      <th className="px-3 py-3 text-right text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200">RESERVED QTY</th>
+                      <th className="px-3 py-3 text-right text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200">ALREADY ISSUED</th>
+                      <th className="px-3 py-3 text-right text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200">REMAINING</th>
+                      <th className="px-3 py-3 text-right text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200">AVAILABLE STOCK</th>
+                      <th className="px-3 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200">UOM</th>
+                      <th className="px-3 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200 min-w-[200px]">STORE*</th>
+                      <th className="px-3 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200 min-w-[150px]">ISSUE QTY*</th>
+                      <th className="px-3 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200 min-w-[180px]">REMARKS</th>
+                    </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {pmiItems.map((item, index) => {
@@ -640,7 +639,6 @@ const StockAdjustmentForm: React.FC = () => {
                       })}
                     </tbody>
                   </table>
-                </div>
               </div>
             </div>
           )}
@@ -656,20 +654,19 @@ const StockAdjustmentForm: React.FC = () => {
                   onClick={addItem}
                 />
               </div>
-              <div className="border border-slate-200 rounded-xl">
-                <div>
-                  <table className="w-full text-left text-sm whitespace-nowrap">
-                    <thead className="bg-slate-50 text-slate-600">
-                      <tr>
-                        <th className="px-4 py-3 font-semibold border-b border-slate-200 min-w-[150px]">ITEM TYPE</th>
-                        <th className="px-4 py-3 font-semibold border-b border-slate-200 min-w-[200px]">ITEM SELECTION</th>
-                        <th className="px-4 py-3 font-semibold border-b border-slate-200 min-w-[200px]">STORE</th>
-                        <th className="px-4 py-3 font-semibold border-b border-slate-200 text-right w-24">CURRENT QTY</th>
-                        <th className="px-4 py-3 font-semibold border-b border-slate-200 text-right w-32">ADJUSTED QTY</th>
-                        <th className="px-4 py-3 font-semibold border-b border-slate-200 text-center w-24">DIFF</th>
-                        <th className="px-4 py-3 font-semibold border-b border-slate-200 min-w-[150px]">REMARKS</th>
-                        <th className="px-4 py-3 font-semibold border-b border-slate-200 text-center w-16">ACTION</th>
-                      </tr>
+              <div className="rounded-xl border border-slate-200 bg-white [&_.mb-\[18px\]]:!mb-0 [&_.select-input-group]:!mb-0 overflow-visible">
+                <table className="min-w-full divide-y divide-slate-200">
+                  <thead className="bg-slate-50/80">
+                    <tr>
+                      <th className="px-3 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200 min-w-[150px]">ITEM TYPE</th>
+                      <th className="px-3 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200 min-w-[200px]">ITEM SELECTION</th>
+                      <th className="px-3 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200 min-w-[200px]">STORE</th>
+                      <th className="px-3 py-3 text-right text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200 w-24">CURRENT QTY</th>
+                      <th className="px-3 py-3 text-right text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200 w-32">ADJUSTED QTY</th>
+                      <th className="px-3 py-3 text-center text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200 w-24">DIFF</th>
+                      <th className="px-3 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200 min-w-[150px]">REMARKS</th>
+                      <th className="px-3 py-3 text-center text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200 w-16">ACTION</th>
+                    </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {formData.items.length > 0 ? (
@@ -813,7 +810,6 @@ const StockAdjustmentForm: React.FC = () => {
                       )}
                     </tbody>
                   </table>
-                </div>
               </div>
             </div>
           )}
