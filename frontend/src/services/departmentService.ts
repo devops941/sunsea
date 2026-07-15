@@ -3,9 +3,12 @@ import config from "../api/config";
 import type { Department, CreateDepartmentDto, UpdateDepartmentDto } from "../features/departments/types";
 
 export const departmentService = {
-  fetchAll: async (): Promise<Department[]> => {
-    const response = await apiClient.get(config.department.base);
-    return response.data?.data || response.data;
+  fetchAll: async (options?: { page?: number; limit?: number; search?: string }): Promise<{ data: Department[]; total: number }> => {
+    const response = await apiClient.get(config.department.base, { params: options });
+    return {
+      data: response.data?.data || response.data,
+      total: response.data?.meta?.total || (response.data?.data || response.data).length,
+    };
   },
 
   create: async (data: CreateDepartmentDto): Promise<Department> => {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { FaSearch, FaPlus, FaTags } from "react-icons/fa";
+import { FaSearch, FaPlus } from "react-icons/fa";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 
@@ -7,6 +7,7 @@ import ViewButton from "../../../components/ui/viewbutton/ViewButton";
 import EditButton from "../../../components/ui/EditButton/EditButton";
 import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
 import CustomButton from "../../../components/ui/Button/Button";
+import PricingButton from "../../../components/ui/PricingButton/PricingButton";
 import SupplierViewModal from "../components/SupplierViewModal";
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import { useSuppliers } from "../../../hooks/useSuppliers";
@@ -176,14 +177,7 @@ const SupplierList: React.FC = () => {
                                             <ViewButton onClick={() => handleOpenView(supplier)} />
                                             {canEditSupplier && <EditButton onClick={() => handleEdit(supplier)} />}
                                             {canViewPricing && (
-                                                <button
-                                                    type="button"
-                                                    className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
-                                                    title="View / revise raw material pricing"
-                                                    onClick={() => handleViewPricing(supplier)}
-                                                >
-                                                    <FaTags />
-                                                </button>
+                                                <PricingButton onClick={() => handleViewPricing(supplier)} />
                                             )}
                                             {canDeleteSupplier && <DeleteButton onClick={() => triggerDelete(supplier.id)} />}
                                         </div>

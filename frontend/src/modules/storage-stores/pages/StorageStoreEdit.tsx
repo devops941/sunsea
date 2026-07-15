@@ -111,10 +111,19 @@ const StorageStoreEdit: React.FC = () => {
                 ? (e.target as HTMLInputElement).checked
                 : undefined;
 
-        setFormData(prev => ({
-            ...prev,
-            [name]: type === "checkbox" ? checked : value
-        }));
+        setFormData(prev => {
+            const updated = {
+                ...prev,
+                [name]: type === "checkbox" ? checked : value
+            };
+
+            // Keep status and isActive in sync
+            if (name === "status") {
+                updated.isActive = value === "Active";
+            }
+
+            return updated;
+        });
 
         if (errors[name]) {
             setErrors(prev => ({
@@ -268,13 +277,13 @@ const StorageStoreEdit: React.FC = () => {
                                 onChange={handleChange}
                             />
                             
-                            <TextInput
+                            {/* <TextInput
                                 label="GST Place"
                                 name="gstPlace"
                                 value={formData.gstPlace}
                                 placeholder="e.g. Maharashtra"
                                 onChange={handleChange}
-                            />
+                            /> */}
                             <div className="flex items-center gap-2 mt-8 h-[42px]">
                                 <input
                                     type="checkbox"
@@ -289,19 +298,7 @@ const StorageStoreEdit: React.FC = () => {
                                 </label>
                             </div>
                             
-                            <div className="flex items-center gap-2 mt-8 h-[42px]">
-                                <input
-                                    type="checkbox"
-                                    id="isActive"
-                                    name="isActive"
-                                    checked={formData.isActive}
-                                    onChange={handleChange}
-                                    className="w-4 h-4 text-indigo-600 bg-white border-slate-300 rounded focus:ring-indigo-500 cursor-pointer"
-                                />
-                                <label htmlFor="isActive" className="text-sm font-medium text-slate-700 cursor-pointer">
-                                    Is Active
-                                </label>
-                            </div>
+                            
                         </div>
 
                         <div className="flex justify-end gap-3 pt-6 mt-6 border-t border-slate-200">

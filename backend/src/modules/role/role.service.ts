@@ -12,12 +12,36 @@ export const createRole = async (
   });
 };
 
-export const getAllRoles = async () => {
-  return prisma.role.findMany({
+export const getAllRoles = async (page?: number, limit?: number, search?: string) => {
+  const where: any = {};
+  if (search) {
+    where.OR = [
+      { code: { contains: search, mode: "insensitive" } },
+      { name: { contains: search, mode: "insensitive" } },
+    ];
+  }
+
+  if (page !== undefined && limit !== undefined) {
+    const skip = (page - 1) * limit;
+    const [roles, total] = await Promise.all([
+      prisma.role.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.role.count({ where }),
+    ]);
+    return { roles, total };
+  }
+
+  const roles = await prisma.role.findMany({
+    where,
     orderBy: {
       createdAt: "desc",
     },
   });
+  return { roles, total: roles.length };
 };
 
 export const getRoleById = async (

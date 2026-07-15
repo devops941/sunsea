@@ -8,7 +8,8 @@ export const createColorSchema = z.object({
     colorCode: z
       .string()
       .min(2, "Color Code is required")
-      .max(20),
+      .max(20)
+      .optional(),
 
     colorName: z
       .string()

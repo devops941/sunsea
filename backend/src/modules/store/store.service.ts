@@ -163,19 +163,28 @@ class StoreService {
   async update(storeId: string, data: UpdateStoreInput, userId?: string) {
     const existingStore = await this.findById(storeId);
 
-    const rawMaterialCount = await prisma.rawMaterial.count({
-      where: { storeId },
-    });
+    // If the user is trying to deactivate the store, check for positive stock
+    if (data.isActive === false || data.status === "Inactive") {
+      const activeRawMaterialStock = await prisma.rawMaterial.findFirst({
+        where: { 
+          storeId,
+          onHandQty: { gt: 0 }
+        },
+      });
 
-    const finishedGoodsCount = await prisma.finishedGoodsStock.count({
-      where: { storeId },
-    });
+      const activeFinishedGoodsStock = await prisma.finishedGoodsStock.findFirst({
+        where: { 
+          storeId,
+          onHandQty: { gt: 0 }
+        },
+      });
 
-    if (rawMaterialCount > 0 || finishedGoodsCount > 0) {
-      throw new ApiError(
-        400,
-        "Cannot update this store because it is already assigned to stock."
-      );
+      if (activeRawMaterialStock || activeFinishedGoodsStock) {
+        throw new ApiError(
+          400,
+          "Cannot deactivate this store because it contains active physical stock (on-hand quantity > 0)."
+        );
+      }
     }
 
     return prisma.store.update({

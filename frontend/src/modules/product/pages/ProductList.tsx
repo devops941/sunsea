@@ -91,20 +91,32 @@ const ProductList: React.FC = () => {
         { header: "#", render: (_, index) => startIndex + index + 1, width: "60px", align: "center" },
         { header: "Product Code", accessor: "productCode" },
         { header: "Product Name", accessor: "productName" },
-        { 
-            header: "UOM", 
-            render: (product) => {
-                const code = product.uom?.code || product.uom?.uomCode;
-                return code?.toLowerCase() === 'ea' ? 'pcs' : (code || "N/A");
-            }
-        },
         { header: "Category", render: (product) => product.category?.name || product.category?.categoryName || "N/A" },
-        { header: "Size", render: (product) => product.size?.sizeCode ? product.size?.sizeCode : "-" },
+        { header: "Size", render: (product) => product.size?.sizeName || product.size?.sizeCode || "-" },
+        { 
+            header: "Color", 
+            render: (product) => product.colors?.length > 0 
+                ? product.colors.map((c: any) => c.color?.colorName).join(", ") 
+                : "N/A" 
+        },
         { 
             header: "Weight", 
             render: (product) => product.weightPerPiece != null 
                 ? (Number(product.weightPerPiece) < 1 ? `${Number(product.weightPerPiece) * 1000} g` : `${product.weightPerPiece} kg`) 
                 : "-"
+        },
+        { 
+            header: "Stock (Min)", 
+            render: (product) => {
+                const totalStock = product.finishedGoodsStocks?.reduce((acc: number, stock: any) => acc + (Number(stock.onHandQty) || 0), 0) || 0;
+                const minQty = product.minimumQty || 0;
+                return (
+                    <div className="flex flex-col items-center">
+                        <span className="font-semibold text-slate-800">{totalStock}</span>
+                        <span className="text-xs text-slate-500">Min: {minQty}</span>
+                    </div>
+                );
+            }
         },
         { header: "Status", render: (product) => <StatusBadge status={product.isActive ? "ACTIVE" : "INACTIVE"} />, align: "center" },
         {
@@ -176,10 +188,12 @@ const ProductList: React.FC = () => {
                             fields: [
                                 { label: "Product Name", value: selectedProduct.productName },
                                 { label: "Product Code", value: selectedProduct.productCode },
-                                { label: "UOM", value: (() => {
-                                    const code = selectedProduct.uom?.code || selectedProduct.uom?.uomCode;
-                                    return code?.toLowerCase() === 'ea' ? 'pcs' : (code || "N/A");
-                                })() },
+                                {
+                                    label: "UOM", value: (() => {
+                                        const code = selectedProduct.uom?.code || selectedProduct.uom?.uomCode;
+                                        return code?.toLowerCase() === 'ea' ? 'pcs' : (code || "N/A");
+                                    })()
+                                },
                                 { label: "Category", value: selectedProduct.category?.name || selectedProduct.category?.categoryName || "N/A" },
                                 { label: "Class", value: selectedProduct.subCategory?.name || selectedProduct.subCategory?.subCategoryName || "N/A" },
                                 { label: "MRP", value: selectedProduct.pricing?.length > 0 && selectedProduct.pricing[0].mrp != null ? `₹${selectedProduct.pricing[0].mrp}` : "N/A" },

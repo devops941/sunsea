@@ -12,8 +12,12 @@ class FinishedGoodsStockController {
     );
   });
 
-  findAll = asyncHandler(async (_req: Request, res: Response) => {
-    const stocks = await finishedGoodsStockService.findAll();
+  findAll = asyncHandler(async (req: Request, res: Response) => {
+    const { storeId, search } = req.query;
+    const stocks = await finishedGoodsStockService.findAll({
+      storeId: storeId as string,
+      search: search as string,
+    });
 
     return res.status(200).json(
       new ApiResponse("Finished Goods Stocks fetched successfully", stocks)

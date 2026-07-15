@@ -3,9 +3,12 @@ import config from "../api/config";
 import type { Role, CreateRoleDto, UpdateRoleDto } from "../features/roles/types";
 
 export const roleService = {
-  fetchAll: async (): Promise<Role[]> => {
-    const response = await apiClient.get(config.role.base);
-    return response.data?.data || response.data;
+  fetchAll: async (options?: { page?: number; limit?: number; search?: string }): Promise<{ data: Role[]; total: number }> => {
+    const response = await apiClient.get(config.role.base, { params: options });
+    return {
+      data: response.data?.data || response.data,
+      total: response.data?.meta?.total || (response.data?.data || response.data).length,
+    };
   },
 
   create: async (data: CreateRoleDto): Promise<Role> => {

@@ -22,11 +22,27 @@ class SupplierService {
 
     const { addresses, userId, materialPrices, ...supplierData } = data;
 
+    const isAdmin = userId.startsWith("admin_");
+
+    // When admin creates a supplier, we need a valid userId for the FK constraint
+    // since admins are in a separate table and createdBy references the User table
+    let createdByUserId = userId;
+    if (isAdmin) {
+      const fallbackUser = await prisma.user.findFirst({
+        where: { status: "active" },
+        select: { userId: true },
+      });
+      if (!fallbackUser) {
+        throw new ApiError(500, "No active user found in the system to attribute this record to");
+      }
+      createdByUserId = fallbackUser.userId;
+    }
+
     const insertData: Prisma.SupplierCreateInput = {
       ...supplierData,
       bankAccount: supplierData.bankAccount as any,
       minOrderQty: supplierData.minOrderQty !== undefined && supplierData.minOrderQty !== null ? new Prisma.Decimal(supplierData.minOrderQty) : undefined,
-      createdByUser: { connect: { userId } },
+      createdByUser: { connect: { userId: createdByUserId } },
       addresses: addresses && addresses.length > 0
         ? {
           create: addresses.map((addr) => ({

@@ -3,9 +3,9 @@ import type { PayloadAction } from "@reduxjs/toolkit";
 import { roleService } from "../../services/roleService";
 import type { Role, RoleState, CreateRoleDto, UpdateRoleDto } from "./types";
 
-export const fetchRoles = createAsyncThunk("roles/fetchAll", async (_, { rejectWithValue }) => {
+export const fetchRoles = createAsyncThunk("roles/fetchAll", async (options: { page?: number; limit?: number; search?: string }, { rejectWithValue }) => {
   try {
-    return await roleService.fetchAll();
+    return await roleService.fetchAll(options);
   } catch (error: any) {
     return rejectWithValue(error.response?.data?.message || "Failed to fetch roles");
   }
@@ -38,6 +38,7 @@ export const deleteRole = createAsyncThunk("roles/delete", async (id: number, { 
 
 const initialState: RoleState = {
   data: [],
+  total: 0,
   loading: false,
   error: null,
 };
@@ -52,9 +53,10 @@ const roleSlice = createSlice({
         state.loading = true;
         state.error = null;
       })
-      .addCase(fetchRoles.fulfilled, (state, action: PayloadAction<Role[]>) => {
+      .addCase(fetchRoles.fulfilled, (state, action: PayloadAction<{ data: Role[]; total: number }>) => {
         state.loading = false;
-        state.data = action.payload;
+        state.data = action.payload.data;
+        state.total = action.payload.total;
       })
       .addCase(fetchRoles.rejected, (state, action) => {
         state.loading = false;

@@ -17,13 +17,18 @@ import type {
 import { departmentService } from "../../services/departmentService";
 
 
-export const fetchDepartments = createAsyncThunk("departments/fetchAll", async (_, { rejectWithValue }) => {
-  try {
-    return await departmentService.fetchAll();
-  } catch (error: any) {
-    return rejectWithValue(error.response?.data?.message || "Failed to fetch departments");
+export const fetchDepartments = createAsyncThunk(
+  "departments/fetchAll",
+  async (options: { page?: number; limit?: number; search?: string } | void, { rejectWithValue }) => {
+    try {
+      return await departmentService.fetchAll(options || undefined);
+    } catch (error: any) {
+      return rejectWithValue(
+        error.response?.data?.message || "Failed to fetch departments"
+      );
+    }
   }
-});
+);
 
 export const createDepartment = createAsyncThunk("departments/create", async (data: CreateDepartmentDto, { rejectWithValue }) => {
   try {
@@ -52,6 +57,7 @@ export const deleteDepartment = createAsyncThunk("departments/delete", async (id
 
 const initialState: DepartmentState = {
   data: [],
+  total: 0,
   loading: false,
   error: null,
 };
@@ -66,11 +72,14 @@ const departmentSlice = createSlice({
         state.loading = true;
         state.error = null;
       })
-      .addCase(fetchDepartments.fulfilled, (state, action: PayloadAction<Department[]>) => {
-        state.loading = false;
-        state.data = action.payload;
-      })
-      .addCase(fetchDepartments.rejected, (state, action) => {
+      .addCase(
+        fetchDepartments.fulfilled,
+        (state, action: PayloadAction<{ data: Department[]; total: number }>) => {
+          state.loading = false;
+          state.data = action.payload.data;
+          state.total = action.payload.total;
+        }
+      ).addCase(fetchDepartments.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload as string;
       })

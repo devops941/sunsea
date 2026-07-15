@@ -14,11 +14,19 @@ class GstTaxController {
     });
 
     findAll = asyncHandler(async (req: Request, res: Response) => {
-        const gstTaxes = await gstTaxService.findAll(req.query as any);
+        const { data, total, page, pageSize } = await gstTaxService.findAll(req.query as any);
 
-        return res.status(200).json(
-            new ApiResponse("GST Taxes fetched successfully", gstTaxes)
-        );
+        return res.status(200).json({
+            success: true,
+            message: "GST Taxes fetched successfully",
+            data,
+            meta: {
+                total,
+                page,
+                limit: pageSize,
+                totalPages: Math.ceil(total / pageSize)
+            }
+        });
     });
 
     findById = asyncHandler(async (req: Request, res: Response) => {

@@ -5,7 +5,7 @@ import apiClient from "../../api/apiClient";
 import TextInput from "../../components/form/TextInput/TextInput";
 import CustomButton from "../../components/ui/Button/Button";
 import IndiaPhoneInput from "../../components/ui/PhoneInput/PhoneInput";
-import BackButton from "../../components/ui/BackButton/BackButton";
+// import BackButton from "../../components/ui/BackButton/BackButton";
 
 interface WhatsappConfigForm {
     phoneNumberId: string;
@@ -148,7 +148,8 @@ const WhatsappCreatePage: React.FC = () => {
                     {/* API Setup Credentials */}
                     <div>
                         <h6 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                            <FaWhatsapp className="text-green-500" /> API Setup Credentials
+                            {/* <FaWhatsapp className="text-green-500" />  */}
+                            API Setup Credentials
                         </h6>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             <div>
@@ -190,7 +191,8 @@ const WhatsappCreatePage: React.FC = () => {
                     {/* Security & Credentials */}
                     <div>
                         <h6 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                            <FaKey className="text-gray-500 text-sm" /> Security & Credentials
+                            {/* <FaKey className="text-gray-500 text-sm" />  */}
+                            Security & Credentials
                         </h6>
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                             <div className="lg:col-span-2 xl:col-span-1">

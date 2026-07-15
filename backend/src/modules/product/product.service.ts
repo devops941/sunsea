@@ -236,6 +236,7 @@ class ProductService {
         colors: { include: { color: true } }, // ✅ was: color: true
         size: true,
         images: true,
+        finishedGoodsStocks: true,
       },
       orderBy: {
         createdAt: "desc",

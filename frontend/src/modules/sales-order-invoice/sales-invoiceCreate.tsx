@@ -53,6 +53,21 @@ const SalesInvoiceCreate: React.FC = () => {
 
     // ---- Load existing settings ----
     useEffect(() => {
+        const initDefaultDatesLocal = () => {
+            setFormData((prev) => {
+                const defaultStartStr = prev.autoFinancialYear
+                    ? getAutoFinancialYearStart()
+                    : `${new Date().getFullYear()}-04-01`;
+                const defaultEndStr = calculateEndDate(defaultStartStr);
+                return {
+                    ...prev,
+                    financialYearStart: defaultStartStr,
+                    financialYearEnd: defaultEndStr,
+                };
+            });
+        };
+
+        setLoading(true);
         invoiceSettingsService
             .getConfig()
             .then((data) => {
@@ -81,12 +96,12 @@ const SalesInvoiceCreate: React.FC = () => {
                         formatTemplate: data.formatTemplate || "{PREFIX}-{FY}-{SEQ}",
                     });
                 } else {
-                    initDefaultDates();
+                    initDefaultDatesLocal();
                 }
             })
             .catch((err) => {
                 console.error("Failed to load invoice settings:", err);
-                initDefaultDates();
+                initDefaultDatesLocal();
             })
             .finally(() => setLoading(false));
     }, []);
@@ -99,22 +114,7 @@ const SalesInvoiceCreate: React.FC = () => {
                 setFormData((prev) => ({ ...prev, financialYearEnd: endStr }));
             }
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [formData.financialYearStart]);
-
-    const initDefaultDates = () => {
-        const defaultStartStr = formData.autoFinancialYear
-            ? getAutoFinancialYearStart()
-            : `${new Date().getFullYear()}-04-01`;
-
-        const defaultEndStr = calculateEndDate(defaultStartStr);
-
-        setFormData((prev) => ({
-            ...prev,
-            financialYearStart: defaultStartStr,
-            financialYearEnd: defaultEndStr,
-        }));
-    };
 
     // ---- Handlers ----
 
@@ -213,9 +213,10 @@ const SalesInvoiceCreate: React.FC = () => {
                     {/* 1. Invoice Numbering */}
                     <div>
                         <h6 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                            <FaHashtag className="text-blue-500" /> Invoice Numbering
+                            {/* <FaHashtag className="text-blue-500" /> */}
+                            Invoice Numbering
                         </h6>
-                        <p className="text-sm text-gray-500 mb-4 mt-[-10px]">Configure how invoice numbers are generated</p>
+                        <p className="text-sm text-gray-500 mb-4 -mt-2.5">Configure how invoice numbers are generated</p>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             <div>
                                 <TextInput
@@ -258,9 +259,10 @@ const SalesInvoiceCreate: React.FC = () => {
                     {/* 2. Financial Year */}
                     <div>
                         <h6 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                            <FaCalendarAlt className="text-orange-500" /> Financial Year
+                            {/* <FaCalendarAlt className="text-orange-500" /> */}
+                            Financial Year
                         </h6>
-                        <p className="text-sm text-gray-500 mb-4 mt-[-10px]">Configure financial year for invoice numbering</p>
+                        <p className="text-sm text-gray-500 mb-4 -mt-2.5">Configure financial year for invoice numbering</p>
 
                         <div className="mb-4 flex items-center justify-between bg-gray-50 p-3 rounded-md border border-gray-100">
                             <div>
@@ -274,7 +276,7 @@ const SalesInvoiceCreate: React.FC = () => {
                             <div>
                                 <label className="relative inline-flex items-center cursor-pointer">
                                     <input type="checkbox" name="autoFinancialYear" className="sr-only peer" checked={formData.autoFinancialYear} onChange={handleChange as any} />
-                                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
                                 </label>
                             </div>
                         </div>
@@ -314,9 +316,10 @@ const SalesInvoiceCreate: React.FC = () => {
                     {/* 3. Invoice Format */}
                     <div>
                         <h6 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                            <FaFileInvoice className="text-purple-500" /> Invoice Format
+                            {/* <FaFileInvoice className="text-purple-500" /> */}
+                            Invoice Format
                         </h6>
-                        <p className="text-sm text-gray-500 mb-4 mt-[-10px]">Auto-generated invoice number format based on your settings</p>
+                        <p className="text-sm text-gray-500 mb-4 -mt-2.5">Auto-generated invoice number format based on your settings</p>
 
                         <div className="grid grid-cols-1 gap-4">
                             <div>

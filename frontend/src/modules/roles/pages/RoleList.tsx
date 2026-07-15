@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { FaSearch, FaPlus, FaSave, FaEraser } from "react-icons/fa";
 import { toast } from "react-toastify";
 import ViewButton from "../../../components/ui/viewbutton/ViewButton";
@@ -10,7 +10,7 @@ import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import CommonViewModal from "../../../components/ui/CommonViewModal/CommonViewModal";
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import { useRoles } from "../../../hooks/useRoles";
-import { useAppSelector } from "../../../hooks/reduxHooks";
+// import { useAppSelector } from "../../../hooks/reduxHooks";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import DataTable, { type DataTableColumn } from "../../../components/ui/table/DataTable";
 import CommonModal from "../../../components/ui/Modal/CommonModal";
@@ -18,10 +18,12 @@ import CommonModal from "../../../components/ui/Modal/CommonModal";
 const ITEMS_PER_PAGE = 10;
 
 const RoleList: React.FC = () => {
-    const { roles, loading, error, loadRoles, addRole, editRole, removeRole } = useRoles();
-    const { user } = useAppSelector((state) => state.auth);
+    const { roles, total, loading, error, loadRoles, addRole, editRole, removeRole } = useRoles();
+       console.log("fs",roles)
+    // const { user } = useAppSelector((state) => state.auth);
 
     const [searchTerm, setSearchTerm] = useState("");
+    const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
     const [showFormModal, setShowFormModal] = useState(false);
     const [showViewModal, setShowViewModal] = useState(false);
@@ -43,9 +45,18 @@ const RoleList: React.FC = () => {
         status: "active",
     });
 
+    // Debounce search term
     useEffect(() => {
-        loadRoles();
-    }, [loadRoles]);
+        const handler = setTimeout(() => {
+            setDebouncedSearchTerm(searchTerm);
+        }, 500);
+        return () => clearTimeout(handler);
+    }, [searchTerm]);
+
+    // Fetch data when page or search term changes
+    useEffect(() => {
+        loadRoles(currentPage, ITEMS_PER_PAGE, debouncedSearchTerm);
+    }, [loadRoles, currentPage, debouncedSearchTerm]);
 
     useEffect(() => {
         if (error) {
@@ -58,23 +69,34 @@ const RoleList: React.FC = () => {
         setCurrentPage(1);
     };
 
-    const filteredRoles = useMemo(() => {
-        return roles.filter(role =>
-            (role.code && role.code.toLowerCase().includes(searchTerm.toLowerCase())) ||
-            role.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (role.description && role.description.toLowerCase().includes(searchTerm.toLowerCase()))
-        );
-    }, [roles, searchTerm]);
-
-    const totalPages = Math.ceil(filteredRoles.length / ITEMS_PER_PAGE);
+    const totalPages = Math.ceil((total || 0) / ITEMS_PER_PAGE);
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-    const paginatedRoles = filteredRoles.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+    const paginatedRoles = roles; // Data is already paginated by backend
 
     const handleOpenAdd = () => {
         setEditMode(false);
+        
+        // Generate sequential code (e.g., ROLE_001)
+        const roleCodes = roles
+            .map((r: any) => r.code)
+            .filter((code: string) => code && code.startsWith("ROLE_"));
+            
+        let nextNumber = 1;
+        if (roleCodes.length > 0) {
+            const numbers = roleCodes.map((code: string) => {
+                const parts = code.split("_");
+                return parts.length > 1 ? parseInt(parts[1], 10) : 0;
+            }).filter((num: number) => !isNaN(num));
+            
+            if (numbers.length > 0) {
+                nextNumber = Math.max(...numbers) + 1;
+            }
+        }
+        const nextCode = `ROLE_${nextNumber.toString().padStart(3, '0')}`;
+
         setFormData({
             id: "",
-            code: "",
+            code: nextCode,
             name: "",
             description: "",
             status: "active",
@@ -110,7 +132,8 @@ const RoleList: React.FC = () => {
                 await removeRole(roleToDelete);
                 toast.success("Role deleted successfully!");
             } catch (err: any) {
-                toast.error(err.message || "Failed to delete role");
+                const errorMessage = typeof err === 'string' ? err : (err?.message || "Failed to delete role");
+                toast.error(errorMessage);
             } finally {
                 setShowDeleteModal(false);
                 setRoleToDelete(null);
@@ -155,7 +178,8 @@ const RoleList: React.FC = () => {
             setShowFormModal(true);
             setTimeout(() => setShowFormModal(false), 10);
         } catch (err: any) {
-            toast.error(err.message || "Operation failed");
+            const errorMessage = typeof err === 'string' ? err : (err?.message || "Operation failed");
+            toast.error(errorMessage);
         }
     };
 
@@ -257,14 +281,14 @@ const RoleList: React.FC = () => {
                     <form id="roleForm" onSubmit={handleSubmit} className="space-y-4 p-2">
                         <div className="grid grid-cols-1 gap-4">
                             <TextInput
-                                label="Role Code"
+                                label="Role Code (Auto Generated)"
                                 name="code"
                                 value={formData.code}
-                                placeholder="e.g. ROLE_ADMIN"
+                                placeholder="Auto Generated"
                                 required
                                 error={formErrors.code}
                                 onChange={handleChange}
-                                disabled={editMode && formData.code === "ROLE_ADMIN"}
+                                disabled
                             />
                             <TextInput
                                 label="Role Name"

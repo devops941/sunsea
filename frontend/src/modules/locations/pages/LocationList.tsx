@@ -17,6 +17,7 @@ import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import DataTable from "../../../components/ui/table/DataTable";
 
 const ITEMS_PER_PAGE = 10;
+
 const locationTypeOptions = [
     { label: "All Types", value: "" },
     { label: "Store", value: "Store" },
@@ -87,7 +88,8 @@ const LocationList: React.FC = () => {
                 await dispatch(deleteLocation(itemToDelete)).unwrap();
                 toast.success("Location deleted successfully!");
             } catch (err: any) {
-                toast.error(err || "Failed to delete location");
+                const errorMessage = typeof err === 'string' ? err : err?.message || "Failed to delete location";
+                toast.error(errorMessage);
             } finally {
                 setShowDeleteModal(false);
                 setItemToDelete(null);

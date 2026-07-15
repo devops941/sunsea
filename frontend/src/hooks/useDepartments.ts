@@ -5,10 +5,10 @@ import type { CreateDepartmentDto, UpdateDepartmentDto } from "../features/depar
 
 export const useDepartments = () => {
   const dispatch = useAppDispatch();
-  const { data: departments, loading, error } = useAppSelector((state) => state.departments);
+  const { data: departments, total, loading, error } = useAppSelector((state) => state.departments);
 
-  const loadDepartments = useCallback(() => {
-    dispatch(fetchDepartments());
+  const loadDepartments = useCallback((page?: number, limit?: number, search?: string) => {
+    dispatch(fetchDepartments({ page, limit, search }));
   }, [dispatch]);
 
   const addDepartment = useCallback(
@@ -34,6 +34,7 @@ export const useDepartments = () => {
 
   return {
     departments,
+    total,
     loading,
     error,
     loadDepartments,

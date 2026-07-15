@@ -56,7 +56,7 @@ const StorageStoreList: React.FC = () => {
 
         return () => clearTimeout(timer);
     }, [dispatch, searchTerm, storeType, currentPage]);
-    
+
     const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
         setSearchTerm(e.target.value);
         setCurrentPage(1);
@@ -64,7 +64,7 @@ const StorageStoreList: React.FC = () => {
 
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
     const paginatedData = data;
-    
+
     const handleOpenView = useCallback((item: Store) => {
         setSelectedItem(item);
         setShowViewModal(true);
@@ -89,7 +89,8 @@ const StorageStoreList: React.FC = () => {
                 await dispatch(deleteStore(itemToDelete)).unwrap();
                 toast.success("Store deleted successfully!");
             } catch (err: any) {
-                toast.error(err || "Failed to delete store");
+                const errorMessage = typeof err === 'string' ? err : err?.message || "Failed to delete store";
+                toast.error(errorMessage);
             } finally {
                 setShowDeleteModal(false);
                 setItemToDelete(null);
@@ -168,13 +169,12 @@ const StorageStoreList: React.FC = () => {
                                 { header: "LOCATION", render: (item) => (item as any).location?.locationName ?? "N/A" },
                                 { header: "STORE TYPE", render: (item) => item.storeTypeRef?.name || "N/A" },
                                 { header: "INCHARGE", render: (item) => item.incharge?.fullName || "N/A" },
-                                { header: "COST METHOD", render: (item) => item.costMethod || "N/A" },
-                                { header: "GST PLACE", render: (item) => item.gstPlace || "N/A" },
+                                { header: "GST PLACE", render: (item) => item.gstPlace || (item as any).location?.state || "N/A" },
                                 {
                                     header: "STATUS", render: (item) => (
                                         <span className={`px-3 py-1 rounded-full text-xs font-semibold ${item.isActive
-                                                ? "bg-green-100 text-green-700 border border-green-200"
-                                                : "bg-red-100 text-red-700 border border-red-200"
+                                            ? "bg-green-100 text-green-700 border border-green-200"
+                                            : "bg-red-100 text-red-700 border border-red-200"
                                             }`}>
                                             {item.isActive ? "ACTIVE" : "INACTIVE"}
                                         </span>

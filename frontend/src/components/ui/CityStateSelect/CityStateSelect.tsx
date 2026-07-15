@@ -108,6 +108,7 @@ const CityStateSelect: React.FC<CityStateSelectProps> = ({
                     options={stateOptions}
                     onChange={handleStateSelect}
                     required={required}
+                    searchable={true}
                 // icon={<FaMapMarkerAlt />}
                 />
                 {stateError && <div className="text-red-500 text-sm mt-1">{stateError}</div>}
@@ -122,6 +123,7 @@ const CityStateSelect: React.FC<CityStateSelectProps> = ({
                     onChange={handleCitySelect}
                     disabled={!stateValue}
                     required={required}
+                    searchable={true}
                 // icon={<FaMapMarkerAlt />}
                 />
                 {cityError && <div className="text-red-500 text-sm mt-1">{cityError}</div>}

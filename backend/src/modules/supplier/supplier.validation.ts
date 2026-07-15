@@ -29,7 +29,7 @@ const supplierAddressInputSchema = z.object({
  */
 export const createSupplierSchema = z.object({
   body: z.object({
-    companyId: z.string().uuid("Company ID must be a valid UUID"),
+    companyId: z.string().uuid("Company ID must be a valid UUID").optional().or(z.literal("")),
     supplierCode: z.string().min(1, "Supplier code is required").max(20),
     legalName: z.string().min(1, "Legal name is required").max(160),
     displayName: z.string().max(80).optional().nullable(),

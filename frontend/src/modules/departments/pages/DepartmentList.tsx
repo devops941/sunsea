@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect,useCallback } from "react";
 import { FaSearch, FaPlus, FaSave, FaEraser } from "react-icons/fa";
 import { toast } from "react-toastify";
 import ViewButton from "../../../components/ui/viewbutton/ViewButton";
@@ -16,12 +16,13 @@ import CommonModal from "../../../components/ui/Modal/CommonModal";
 const ITEMS_PER_PAGE = 10;
 
 const DepartmentList: React.FC = () => {
-    const { departments, loading, error, loadDepartments, addDepartment, editDepartment, removeDepartment } = useDepartments();
+    const { departments, total, loading, error, loadDepartments, addDepartment, editDepartment, removeDepartment } = useDepartments();
     const canCreateDepartment = hasPermission("departments.create");
     const canEditDepartment = hasPermission("departments.edit");
     const canDeleteDepartment = hasPermission("departments.delete");
 
     const [searchTerm, setSearchTerm] = useState("");
+    const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
     const [showFormModal, setShowFormModal] = useState(false);
     const [showViewModal, setShowViewModal] = useState(false);
@@ -65,8 +66,15 @@ const DepartmentList: React.FC = () => {
     });
 
     useEffect(() => {
-        loadDepartments();
-    }, [loadDepartments]);
+        const handler = setTimeout(() => {
+            setDebouncedSearchTerm(searchTerm);
+        }, 500);
+        return () => clearTimeout(handler);
+    }, [searchTerm]);
+
+    useEffect(() => {
+        loadDepartments(currentPage, ITEMS_PER_PAGE, debouncedSearchTerm);
+    }, [loadDepartments, currentPage, debouncedSearchTerm]);
 
     useEffect(() => {
         if (error) {
@@ -79,15 +87,9 @@ const DepartmentList: React.FC = () => {
         setCurrentPage(1);
     };
 
-    const filteredDepts = useMemo(() => {
-        return departments.filter(d =>
-            d.name.toLowerCase().includes(searchTerm.toLowerCase())
-        );
-    }, [departments, searchTerm]);
-
-    const totalPages = Math.ceil(filteredDepts.length / ITEMS_PER_PAGE);
+    const totalPages = Math.ceil((total || 0) / ITEMS_PER_PAGE);
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-    const paginatedDepts = filteredDepts.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+    const paginatedDepts = departments;
 
     const handleOpenAdd = () => {
         setEditMode(false);
@@ -123,7 +125,8 @@ const DepartmentList: React.FC = () => {
                 await removeDepartment(deptToDelete);
                 toast.success("Department deleted successfully!");
             } catch (err: any) {
-                toast.error(err.message || "Failed to delete department");
+                const errorMessage = typeof err === 'string' ? err : err?.message || "Failed to delete department";
+                toast.error(errorMessage);
             } finally {
                 setShowDeleteModal(false);
                 setDeptToDelete(null);
@@ -161,7 +164,8 @@ const DepartmentList: React.FC = () => {
             setShowFormModal(false);
             setFormErrors({});
         } catch (err: any) {
-            toast.error(err.message || "Operation failed");
+            const errorMessage = typeof err === 'string' ? err : err?.message || "Operation failed";
+            toast.error(errorMessage);
         }
     };
 

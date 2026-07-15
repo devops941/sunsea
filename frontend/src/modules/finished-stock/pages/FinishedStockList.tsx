@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { FaSearch, FaChevronLeft, FaChevronRight } from "react-icons/fa";
 import { toast } from "react-toastify";
 
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
@@ -22,13 +21,17 @@ const formatUom = (uomCode: string | undefined) => {
 
 const ITEMS_PER_PAGE = 10;
 
-const FinishedStockList: React.FC = () => {
+interface FinishedStockListProps {
+    storeId?: string;
+}
+
+const FinishedStockList: React.FC<FinishedStockListProps> = ({ storeId: propStoreId }) => {
     const dispatch = useAppDispatch();
     const { data, loading, error } = useAppSelector((state) => state.finishedGoodsStocks);
 
     const [searchTerm, setSearchTerm] = useState("");
     const [debouncedSearch, setDebouncedSearch] = useState("");
-    const storeId = "";
+    const activeStoreId = propStoreId || "";
     const [currentPage, setCurrentPage] = useState(1);
     const [showViewModal, setShowViewModal] = useState(false);
     const [selectedItem, setSelectedItem] = useState<any>(null);
@@ -43,8 +46,8 @@ const FinishedStockList: React.FC = () => {
 
     // Fetch stocks based on search and storeId
     useEffect(() => {
-        dispatch(fetchFinishedGoodsStocks({ storeId, search: debouncedSearch }));
-    }, [dispatch, storeId, debouncedSearch]);
+        dispatch(fetchFinishedGoodsStocks({ storeId: activeStoreId, search: debouncedSearch }));
+    }, [dispatch, activeStoreId, debouncedSearch]);
 
     useEffect(() => {
         if (error) {
@@ -124,17 +127,14 @@ const FinishedStockList: React.FC = () => {
                         },
                         {
                             header: "PRODUCT CODE",
-                            accessor: "product.productCode",
                             render: (item) => <span className="font-mono text-slate-600">{item.product?.productCode || "N/A"}</span>
                         },
                         {
                             header: "PRODUCT NAME",
-                            accessor: "product.productName",
                             render: (item) => <span className="font-semibold text-slate-800">{item.product?.productName || "N/A"}</span>
                         },
                         {
                             header: "CATEGORY",
-                            accessor: "product.category.categoryName",
                             render: (item) => <span className="text-slate-600">{item.product?.category?.categoryName || "N/A"}</span>
                         },
                         {
@@ -147,16 +147,27 @@ const FinishedStockList: React.FC = () => {
                         },
                         {
                             header: "STORE / LOCATION",
-                            accessor: "store.storeName",
                             render: (item) => <span className="font-medium text-slate-700">{item.store?.storeName || "N/A"}</span>
                         },
                         {
                             header: "PHYSICAL STOCK",
                             render: (item) => (
-                                <StatusBadge 
-                                    status={(Number(item.onHandQty) || 0) < (Number(item.product?.minimumQty) || 0) || (Number(item.onHandQty) || 0) <= 0 ? "danger" : "success"} 
-                                    customText={`${item.onHandQty} ${formatUom(item.product?.uom?.uomCode)}`} 
-                                />
+                                <div className="flex flex-col">
+                                    <StatusBadge 
+                                        status={(Number(item.onHandQty) || 0) < (Number((item.product as any)?.minimumQty) || 0) || (Number(item.onHandQty) || 0) <= 0 ? "danger" : "success"} 
+                                        customText={`${item.onHandQty} ${formatUom(item.product?.uom?.uomCode)}`} 
+                                    />
+                                    <span className="text-xs text-slate-500 mt-1">Min: {(item.product as any)?.minimumQty || "0"} | Max: {(item.product as any)?.maximumQty || "0"}</span>
+                                </div>
+                            )
+                        },
+                        {
+                            header: "DETAILS",
+                            render: (item) => (
+                                <div className="flex flex-col text-xs text-slate-600">
+                                    <span>Weight: {item.product?.weightPerPiece ? `${item.product.weightPerPiece} kg` : "N/A"}</span>
+                                    <span>Size/Dim: {item.product?.dimensions || "N/A"}</span>
+                                </div>
                             )
                         },
                         {
@@ -187,12 +198,15 @@ const FinishedStockList: React.FC = () => {
                                 { label: "Color", value: selectedItem.product?.colors?.map((c: any) => c.color?.colorName).join(", ") || "N/A" },
                                 { label: "Size", value: selectedItem.product?.size?.sizeName ? `${selectedItem.product.size.sizeName} (${selectedItem.product.size.sizeCode})` : "N/A" },
                                 { label: "Store / Location", value: selectedItem.store?.storeName || "N/A" },
+                                { label: "HSN Code", value: selectedItem.product?.hsnCode || "N/A" },
                             ]
                         },
                         {
                             title: "Stock Information",
                             fields: [
                                 { label: "Physical Stock (On Hand)", value: `${selectedItem.onHandQty} ${formatUom(selectedItem.product?.uom?.uomCode)}` },
+                                { label: "Minimum Quantity limit", value: `${(selectedItem.product as any)?.minimumQty || "0"} ${formatUom(selectedItem.product?.uom?.uomCode)}` },
+                                { label: "Maximum Quantity limit", value: `${(selectedItem.product as any)?.maximumQty || "0"} ${formatUom(selectedItem.product?.uom?.uomCode)}` },
                                 { label: "Weight Per Piece", value: selectedItem.product?.weightPerPiece != null ? `${selectedItem.product.weightPerPiece} kg` : "N/A" },
                                 { label: "Dimensions (L×B×H)", value: selectedItem.product?.dimensions || "N/A" },
                                 { label: "Last Updated", value: formatDate(selectedItem.updatedAt) },

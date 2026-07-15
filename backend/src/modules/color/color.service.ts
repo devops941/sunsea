@@ -11,6 +11,9 @@ class ColorService {
   async create(
     data: CreateColorInput
   ) {
+    if (!data.colorCode) {
+      data.colorCode = await this.getNextColorId();
+    }
     const existing =
       await prisma.color.findFirst({
         where: {
