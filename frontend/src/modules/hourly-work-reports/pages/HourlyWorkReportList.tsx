@@ -13,6 +13,8 @@ import ViewButton from "../../../components/ui/viewbutton/ViewButton";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import TextInput from "../../../components/form/TextInput/TextInput";
+import SearchInput from "../../../components/ui/SearchInput/SearchInput";
+import DataTable, { type DataTableColumn } from "../../../components/ui/table/DataTable";
 
 const ITEMS_PER_PAGE = 20;
 
@@ -206,8 +208,222 @@ const HourlyWorkReportList: React.FC = () => {
         setShowViewModal(true);
     };
 
+    const columns: DataTableColumn<any>[] = useMemo(() => [
+        {
+            header: "",
+            width: "40px",
+            align: "center",
+            render: (group) => {
+                const isExpanded = !!expandedGroups[group.key];
+                return isExpanded ? <FaChevronUp className="text-slate-400" /> : <FaChevronDown className="text-slate-400" />;
+            }
+        },
+        {
+            header: "DATE",
+            render: (group) => <span className="font-medium text-slate-500">{new Date(group.productionDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
+        },
+        {
+            header: "MACHINE",
+            render: (group) => <span className="font-bold">{group.machineName}</span>
+        },
+        {
+            header: "SHIFT",
+            render: (group) => <StatusBadge status="UNKNOWN" customText={group.shiftName} customColor={{ bg: '#f8f9fa', text: '#212529' }} />
+        },
+        {
+            header: "PO ID",
+            render: (group) => <span className="font-semibold">{group.productionOrderId}</span>
+        },
+        {
+            header: "PRODUCT",
+            render: (group) => <div className="max-w-[200px] overflow-hidden text-ellipsis whitespace-nowrap">{group.productName}</div>
+        },
+        {
+            header: "HOURS LOGGED",
+            render: (group) => {
+                const isActiveNoEntry = group.weeklyProgramStatus === "IN_PROGRESS" && group.hours.length === 0;
+                if (isActiveNoEntry) {
+                    return <span style={{ color: "#16a34a", fontWeight: 700, fontSize: "12px" }}>● Running</span>;
+                }
+                return <span className="font-bold text-teal-700">{group.hours.length} {group.hours.length === 1 ? "Hour" : "Hours"}</span>;
+            }
+        },
+        {
+            header: "TARGET",
+            render: (group) => <span className="font-bold text-slate-800">{group.plannedQty} <span className="text-xs text-slate-500 font-normal">{group.uom}</span></span>
+        },
+        {
+            header: "TOTAL PRODUCED",
+            render: (group) => {
+                const isActiveNoEntry = group.weeklyProgramStatus === "IN_PROGRESS" && group.hours.length === 0;
+                if (isActiveNoEntry) {
+                    return <span className="text-slate-400">— pcs</span>;
+                }
+                return <span className="font-bold text-emerald-600">{group.totalQtyProduced} <span className="text-xs text-slate-500 font-normal">{group.uom}</span></span>;
+            }
+        },
+        {
+            header: "REJECT / SCRAP",
+            render: (group) => (
+                <>
+                    <span className="text-red-500 text-xs font-semibold">R: {group.totalRejectQty}</span> <span className="text-slate-300 mx-1">|</span> <span className="text-amber-500 text-xs font-semibold">S: {group.totalScrapQty}</span>
+                </>
+            )
+        },
+        {
+            header: "DOWNTIME",
+            render: (group) => <span className="text-slate-400">{group.totalDowntime > 0 ? `${group.totalDowntime} Mins` : "-"}</span>
+        },
+        {
+            header: "ACTIONS",
+            align: "right",
+            width: "150px",
+            render: (group) => {
+                return (
+                    <div className="text-right" onClick={(e) => e.stopPropagation()}>
+                        {group.hours.length >= group.shiftTotalHours ? (
+                            <div className="flex flex-col items-end justify-center gap-1">
+                                <div className="flex items-center justify-end gap-2">
+                                    {group.totalQtyProduced >= group.plannedQty || group.hours.length >= group.shiftTotalHours || group.weeklyProgramStatus === 'COMPLETED' ? (
+                                        <span className="font-bold text-xs text-green-600">
+                                            Completed
+                                        </span>
+                                    ) : (
+                                        <span className="font-bold text-xs text-red-600">
+                                            On Hold
+                                        </span>
+                                    )}
+                                    <ViewButton onClick={() => handleView(group)} />
+                                </div>
+                                {group.totalQtyProduced < group.plannedQty ? (
+                                    <span className="text-red-600 font-bold text-[10px]">
+                                        Pending: {group.plannedQty - group.totalQtyProduced} {group.uom}
+                                    </span>
+                                ) : group.totalQtyProduced > group.plannedQty ? (
+                                    <span className="text-green-600 font-bold text-[10px]">
+                                        Extra: +{group.totalQtyProduced - group.plannedQty} {group.uom}
+                                    </span>
+                                ) : null}
+                            </div>
+                        ) : (
+                            <CustomButton
+                                text="Add Hourly"
+                                size="sm"
+                                onClick={() => handleAddHourly(group)}
+                            />
+                        )}
+                    </div>
+                );
+            }
+        }
+    ], [expandedGroups]);
+
+    const renderSubRow = useCallback((group: any) => {
+        const isExpanded = !!expandedGroups[group.key];
+        if (!isExpanded) return null;
+
+        return (
+            <div className="bg-slate-50 p-4 border-b border-slate-200">
+                <div className="rounded-2xl p-5 border border-slate-200 bg-white shadow-sm">
+                    {/* SHIFT SUMMARY DASHBOARD */}
+                    <div className="flex items-center justify-between mb-5">
+                        <h6 className="font-bold mb-0 text-slate-800 tracking-wide text-sm uppercase">
+                            SHIFT SUMMARY DASHBOARD
+                        </h6>
+                        {group.hours.length < group.shiftTotalHours && (
+                            <button onClick={() => handleAddHourly(group)} className="font-bold rounded-full px-5 py-2 shadow-sm text-white text-sm" style={{ background: "linear-gradient(45deg, var(--color-primary), #005f4b)", border: "none" }}>
+                                + Log Next Hour (H{group.hours.length + 1})
+                            </button>
+                        )}
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                        <div className="p-4 rounded-xl border border-slate-100 bg-slate-50/50 text-center">
+                            <div className="text-slate-500 text-[11px] font-bold mb-1 uppercase tracking-wider">Efficiency (OEE)</div>
+                            <h3 className="mb-0 font-bold text-slate-800 text-2xl">
+                                {group.plannedQty > 0 ? ((group.totalQtyProduced / group.plannedQty) * 100).toFixed(1) : 0}%
+                            </h3>
+                        </div>
+                        <div className="p-4 rounded-xl border border-slate-100 bg-slate-50/50 text-center">
+                            <div className="text-slate-500 text-[11px] font-bold mb-1 uppercase tracking-wider">Total Produced</div>
+                            <h3 className="mb-0 font-bold text-emerald-600 text-2xl">
+                                {group.totalQtyProduced}
+                            </h3>
+                        </div>
+                        <div className="p-4 rounded-xl border border-slate-100 bg-slate-50/50 text-center">
+                            <div className="text-slate-500 text-[11px] font-bold mb-1 uppercase tracking-wider">Scrap Rate</div>
+                            <h3 className="mb-0 font-bold text-amber-500 text-2xl">
+                                {group.totalQtyProduced > 0 ? ((group.totalScrapQty / group.totalQtyProduced) * 100).toFixed(1) : 0}%
+                            </h3>
+                        </div>
+                        <div className="p-4 rounded-xl border border-slate-100 bg-slate-50/50 text-center">
+                            <div className="text-slate-500 text-[11px] font-bold mb-1 uppercase tracking-wider">Total Downtime</div>
+                            <h3 className="mb-0 font-bold text-red-500 text-2xl">
+                                {group.totalDowntime > 0 ? `${group.totalDowntime} min` : "0 min"}
+                            </h3>
+                        </div>
+                    </div>
+
+                    {/* TIMELINE */}
+                    <h6 className="font-bold mb-4 text-slate-500 uppercase tracking-wide text-xs">Hourly Timeline</h6>
+                    {group.hours.length === 0 ? (
+                        <div className="text-center text-slate-400 p-6 border border-dashed border-slate-200 rounded-xl bg-slate-50">
+                            No hours logged yet for this shift. Click "Log Next Hour" to start.
+                        </div>
+                    ) : (
+                        <div className="flex flex-col gap-3">
+                            {group.hours.map((h: any) => {
+                                const hasIssues = h.scrapQty > 0 || h.downtime > 0 || h.rejectQty > 0;
+                                return (
+                                    <div key={h.hourlyProductionId} className="flex items-center p-4 rounded-xl border relative" style={{ background: hasIssues ? "#fff5f5" : "#f8f9fa", borderColor: hasIssues ? "#ffc9c9" : "#dee2e6" }}>
+                                        {hasIssues && <div className="absolute left-0 top-0 bottom-0 rounded-l-xl w-1.5 bg-red-500"></div>}
+                                        {!hasIssues && <div className="absolute left-0 top-0 bottom-0 rounded-l-xl w-1.5 bg-emerald-500"></div>}
+                                        <div className="mr-6 text-center ml-3 min-w-[60px]">
+                                            <div className="font-bold text-slate-400 text-[10px] uppercase mb-1 tracking-wider">Hour</div>
+                                            <h4 className="mb-0 font-bold font-mono text-slate-800 text-2xl">{h.hourIndex}</h4>
+                                        </div>
+                                        <div className="flex-grow grid grid-cols-5 items-center gap-4">
+                                            <div>
+                                                <div className="text-[11px] font-bold tracking-wide uppercase text-slate-500 mb-1">Produced</div>
+                                                <div className="font-bold text-emerald-600 text-xl">{h.qtyProduced} <span className="text-xs text-slate-400">{group.uom}</span></div>
+                                            </div>
+                                            <div>
+                                                <div className="text-[11px] font-bold tracking-wide uppercase text-slate-500 mb-1">Reject</div>
+                                                <div className={h.rejectQty > 0 ? "font-bold text-red-500 text-lg" : "text-slate-400 text-lg"}>{h.rejectQty || 0}</div>
+                                            </div>
+                                            <div>
+                                                <div className="text-[11px] font-bold tracking-wide uppercase text-slate-500 mb-1">Scrap</div>
+                                                <div className={h.scrapQty > 0 ? "font-bold text-amber-500 text-lg" : "text-slate-400 text-lg"}>{h.scrapQty || 0}</div>
+                                            </div>
+                                            <div>
+                                                <div className="text-[11px] font-bold tracking-wide uppercase text-slate-500 mb-1">Downtime</div>
+                                                <div className={h.downtime > 0 ? "font-bold text-red-500 text-lg" : "text-slate-400 text-lg"}>
+                                                    {h.downtime > 0 ? `${h.downtime} min` : "—"}
+                                                    {h.downtimeReason && <div className="text-[10px] font-normal text-slate-500 leading-tight mt-0.5">{h.downtimeReason}</div>}
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <div className="text-[11px] font-bold tracking-wide uppercase text-slate-500 mb-1">Operator</div>
+                                                <div className="text-slate-800 text-sm font-medium truncate max-w-[120px]" title={h.operatorId}>{h.operatorId || "—"}</div>
+                                            </div>
+                                        </div>
+                                        <div className="ml-4 flex gap-2">
+                                            <EditButton onClick={() => handleOpenEdit(h)} />
+                                            {user?.roleId === "ROLE_ADMIN" && (
+                                                <DeleteButton onClick={() => triggerDelete(h.hourlyProductionId?.toString())} />
+                                            )}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
+    }, [expandedGroups, handleAddHourly, handleOpenEdit, triggerDelete, user?.roleId]);
+
     return (
-        <div className="p-4 md:p-6 min-h-screen bg-white">
+        <div>
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                 {/* Page Header */}
                 <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-slate-200">
@@ -215,8 +431,7 @@ const HourlyWorkReportList: React.FC = () => {
                         <h2 className="text-2xl font-bold text-slate-800">Hourly Production Logs</h2>
                     </div>
                     <div className="flex flex-wrap items-center gap-3">
-                        <TextInput
-                            name="search"
+                        <SearchInput
                             value={searchTerm}
                             onChange={handleSearch}
                             placeholder="Search by PO, Product, Machine..."
@@ -231,256 +446,30 @@ const HourlyWorkReportList: React.FC = () => {
                 </div>
 
                 {/* Table */}
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left text-sm">
-                        <thead className="bg-slate-50 text-slate-600 border-b border-slate-200">
-                            <tr>
-                                <th className="px-4 py-3 font-semibold w-10"></th>
-                                <th className="px-4 py-3 font-semibold">DATE</th>
-                                <th className="px-4 py-3 font-semibold">MACHINE</th>
-                                <th className="px-4 py-3 font-semibold">SHIFT</th>
-                                <th className="px-4 py-3 font-semibold">PO ID</th>
-                                <th className="px-4 py-3 font-semibold">PRODUCT</th>
-                                <th className="px-4 py-3 font-semibold">HOURS LOGGED</th>
-                                <th className="px-4 py-3 font-semibold">TARGET</th>
-                                <th className="px-4 py-3 font-semibold">TOTAL PRODUCED</th>
-                                <th className="px-4 py-3 font-semibold">REJECT / SCRAP</th>
-                                <th className="px-4 py-3 font-semibold">DOWNTIME</th>
-                                <th className="px-4 py-3 font-semibold text-right w-36">ACTIONS</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                            {loading ? (
-                                <tr>
-                                    <td colSpan={12} className="text-center p-4">
-
-                                    </td>
-                                </tr>
-                            ) : paginatedData.length > 0 ? (
-                                paginatedData.map((group) => {
-                                    const isExpanded = !!expandedGroups[group.key];
-                                    const isActiveNoEntry = group.weeklyProgramStatus === "IN_PROGRESS" && group.hours.length === 0;
-                                    return (
-                                        <React.Fragment key={group.key}>
-                                            <tr
-                                                className="hover:bg-slate-50/50 transition-colors"
-                                                style={{
-                                                    cursor: "pointer",
-                                                    ...(isActiveNoEntry ? {
-                                                        background: "linear-gradient(90deg, #f0fdf4 0%, #fff 100%)",
-                                                        borderLeft: "4px solid #16a34a"
-                                                    } : {})
-                                                }}
-                                                onClick={() => toggleGroup(group.key)}
-                                            >
-                                                <td className="px-4 py-3 text-center">
-                                                    {isExpanded ? <FaChevronUp className="text-muted" /> : <FaChevronDown className="text-muted" />}
-                                                </td>
-                                                <td className="px-4 py-3 font-medium text-slate-500">
-                                                    {new Date(group.productionDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                                                </td>
-                                                <td className="px-4 py-3 font-bold">
-                                                    {group.machineName}
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    <StatusBadge status="UNKNOWN" customText={group.shiftName} customColor={{ bg: '#f8f9fa', text: '#212529' }} />
-                                                </td>
-                                                <td className="px-4 py-3 font-semibold">
-                                                    {group.productionOrderId}
-                                                </td>
-                                                <td className="px-4 py-3 max-w-[200px] overflow-hidden text-ellipsis whitespace-nowrap">
-                                                    {group.productName}
-                                                </td>
-                                                <td className="px-4 py-3 font-bold text-teal-700">
-                                                    {isActiveNoEntry ? (
-                                                        <span style={{ color: "#16a34a", fontWeight: 700, fontSize: "12px" }}>
-                                                            ● Running
-                                                        </span>
-                                                    ) : (
-                                                        <>{group.hours.length} {group.hours.length === 1 ? "Hour" : "Hours"}</>
-                                                    )}
-                                                </td>
-                                                <td className="px-4 py-3 font-bold text-slate-800">
-                                                    {group.plannedQty} <span className="small text-muted">{group.uom}</span>
-                                                </td>
-                                                <td className="px-4 py-3 font-bold text-emerald-600">
-                                                    {isActiveNoEntry ? (
-                                                        <span className="text-muted">— pcs</span>
-                                                    ) : (
-                                                        <>{group.totalQtyProduced} <span className="small text-muted">{group.uom}</span></>
-                                                    )}
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    <span className="text-danger small fw-semibold">R: {group.totalRejectQty}</span> | <span className="text-warning small fw-semibold">S: {group.totalScrapQty}</span>
-                                                </td>
-                                                <td className="px-4 py-3 text-slate-400">
-                                                    {group.totalDowntime > 0 ? `${group.totalDowntime} Mins` : "-"}
-                                                </td>
-                                                <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
-                                                    {group.hours.length >= group.shiftTotalHours ? (
-                                                        <div className="d-flex flex-column align-items-end justify-content-center gap-1">
-                                                            <div className="d-flex align-items-center justify-content-end gap-2">
-                                                                {group.totalQtyProduced >= group.plannedQty || group.hours.length >= group.shiftTotalHours || group.weeklyProgramStatus === 'COMPLETED' ? (
-                                                                    <span className="fw-bold small text-success">
-                                                                        Completed
-                                                                    </span>
-                                                                ) : (
-                                                                    <span className="fw-bold small text-danger">
-                                                                        On Hold
-                                                                    </span>
-                                                                )}
-                                                                <ViewButton onClick={() => handleView(group)} />
-                                                            </div>
-                                                            {group.totalQtyProduced < group.plannedQty ? (
-                                                                <span className="text-danger fw-bold" style={{ fontSize: '10px' }}>
-                                                                    Pending: {group.plannedQty - group.totalQtyProduced} {group.uom}
-                                                                </span>
-                                                            ) : group.totalQtyProduced > group.plannedQty ? (
-                                                                <span className="text-success fw-bold" style={{ fontSize: '10px' }}>
-                                                                    Extra: +{group.totalQtyProduced - group.plannedQty} {group.uom}
-                                                                </span>
-                                                            ) : null}
-                                                        </div>
-                                                    ) : (
-                                                        <CustomButton
-                                                            text="Add Hourly"
-                                                            size="sm"
-                                                            onClick={() => handleAddHourly(group)}
-                                                        />
-                                                    )}
-                                                </td>
-                                            </tr>
-                                            {isExpanded && (
-                                                <tr>
-                                                    <td colSpan={12} className="bg-light p-3" onClick={(e) => e.stopPropagation()}>
-                                                        <div className="rounded-3 p-4 border bg-white shadow-sm">
-                                                            {/* SHIFT SUMMARY DASHBOARD */}
-                                                            <div className="d-flex align-items-center justify-content-between mb-4">
-                                                                <h6 className="fw-bold mb-0" style={{ color: "var(--color-primary)", letterSpacing: "0.5px" }}>
-                                                                    SHIFT SUMMARY DASHBOARD
-                                                                </h6>
-                                                                {group.hours.length < group.shiftTotalHours && (
-                                                                    <Button variant="primary" size="sm" onClick={() => handleAddHourly(group)} className="fw-bold rounded-pill px-4 shadow-sm" style={{ background: "linear-gradient(45deg, var(--color-primary), #005f4b)", border: "none" }}>
-                                                                        + Log Next Hour (H{group.hours.length + 1})
-                                                                    </Button>
-                                                                )}
-                                                            </div>
-                                                            <div className="row g-3 mb-4">
-                                                                <div className="col-md-3">
-                                                                    <div className="p-3 rounded-3 border bg-light text-center">
-                                                                        <div className="text-muted small fw-bold mb-1 text-uppercase">Efficiency (OEE)</div>
-                                                                        <h3 className="mb-0 fw-bold" style={{ color: "var(--color-primary)" }}>
-                                                                            {group.plannedQty > 0 ? ((group.totalQtyProduced / group.plannedQty) * 100).toFixed(1) : 0}%
-                                                                        </h3>
-                                                                    </div>
-                                                                </div>
-                                                                <div className="col-md-3">
-                                                                    <div className="p-3 rounded-3 border bg-light text-center">
-                                                                        <div className="text-muted small fw-bold mb-1 text-uppercase">Total Produced</div>
-                                                                        <h3 className="mb-0 fw-bold text-success">
-                                                                            {group.totalQtyProduced}
-                                                                        </h3>
-                                                                    </div>
-                                                                </div>
-                                                                <div className="col-md-3">
-                                                                    <div className="p-3 rounded-3 border bg-light text-center">
-                                                                        <div className="text-muted small fw-bold mb-1 text-uppercase">Scrap Rate</div>
-                                                                        <h3 className="mb-0 fw-bold text-warning">
-                                                                            {group.totalQtyProduced > 0 ? ((group.totalScrapQty / group.totalQtyProduced) * 100).toFixed(1) : 0}%
-                                                                        </h3>
-                                                                    </div>
-                                                                </div>
-                                                                <div className="col-md-3">
-                                                                    <div className="p-3 rounded-3 border bg-light text-center">
-                                                                        <div className="text-muted small fw-bold mb-1 text-uppercase">Total Downtime</div>
-                                                                        <h3 className="mb-0 fw-bold text-danger">
-                                                                            {group.totalDowntime > 0 ? `${group.totalDowntime} min` : "0 min"}
-                                                                        </h3>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-
-                                                            {/* TIMELINE */}
-                                                            <h6 className="fw-bold mb-3 text-secondary text-uppercase" style={{ fontSize: "12px", letterSpacing: "0.5px" }}>Hourly Timeline</h6>
-                                                            {group.hours.length === 0 ? (
-                                                                <div className="text-center text-muted p-4 border rounded-3 bg-light" style={{ borderStyle: "dashed !important" }}>
-                                                                    No hours logged yet for this shift. Click "Log Next Hour" to start.
-                                                                </div>
-                                                            ) : (
-                                                                <div className="d-flex flex-column gap-2">
-                                                                    {group.hours.map((h: any) => {
-                                                                        const hasIssues = h.scrapQty > 0 || h.downtime > 0 || h.rejectQty > 0;
-                                                                        return (
-                                                                            <div key={h.hourlyProductionId} className="d-flex align-items-center p-3 rounded-3 border position-relative" style={{ background: hasIssues ? "#fff5f5" : "#f8f9fa", borderColor: hasIssues ? "#ffc9c9" : "#dee2e6" }}>
-                                                                                {hasIssues && <div className="position-absolute start-0 top-0 bottom-0 rounded-start" style={{ width: "4px", background: "#ef4444" }}></div>}
-                                                                                {!hasIssues && <div className="position-absolute start-0 top-0 bottom-0 rounded-start" style={{ width: "4px", background: "#10b981" }}></div>}
-                                                                                <div className="me-4 text-center ms-2" style={{ minWidth: "60px" }}>
-                                                                                    <div className="fw-bold text-muted small text-uppercase mb-1">Hour</div>
-                                                                                    <h4 className="mb-0 fw-bold font-monospace" style={{ color: "var(--color-primary)" }}>{h.hourIndex}</h4>
-                                                                                </div>
-                                                                                <div className="flex-grow-1 row align-items-center">
-                                                                                    <div className="col-3">
-                                                                                        <div className="small text-muted mb-1">Produced</div>
-                                                                                        <div className="fw-bold text-success fs-5">{h.qtyProduced} <span className="small fs-6 text-muted">{group.uom}</span></div>
-                                                                                    </div>
-                                                                                    <div className="col-2">
-                                                                                        <div className="small text-muted mb-1">Reject</div>
-                                                                                        <div className={h.rejectQty > 0 ? "fw-bold text-danger" : "text-muted"}>{h.rejectQty || 0}</div>
-                                                                                    </div>
-                                                                                    <div className="col-2">
-                                                                                        <div className="small text-muted mb-1">Scrap</div>
-                                                                                        <div className={h.scrapQty > 0 ? "fw-bold text-warning" : "text-muted"}>{h.scrapQty || 0}</div>
-                                                                                    </div>
-                                                                                    <div className="col-3">
-                                                                                        <div className="small text-muted mb-1">Downtime</div>
-                                                                                        <div className={h.downtime > 0 ? "fw-bold text-danger" : "text-muted"}>
-                                                                                            {h.downtime > 0 ? `${h.downtime} min` : "—"}
-                                                                                            {h.downtimeReason && <div className="small fw-normal text-muted" style={{ fontSize: "10px", lineHeight: 1.1 }}>{h.downtimeReason}</div>}
-                                                                                        </div>
-                                                                                    </div>
-                                                                                    <div className="col-2">
-                                                                                        <div className="small text-muted mb-1">Operator</div>
-                                                                                        <div className="text-dark small text-truncate" title={h.operatorId}>{h.operatorId || "—"}</div>
-                                                                                    </div>
-                                                                                </div>
-                                                                                <div className="ms-3 d-flex gap-2">
-                                                                                    <EditButton onClick={() => handleOpenEdit(h)} />
-                                                                                    {user?.roleId === "ROLE_ADMIN" && (
-                                                                                        <DeleteButton onClick={() => triggerDelete(h.hourlyProductionId?.toString())} />
-                                                                                    )}
-                                                                                </div>
-                                                                            </div>
-                                                                        );
-                                                                    })}
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            )}
-                                        </React.Fragment>
-                                    );
-                                })
-                            ) : (
-                                <tr>
-                                    <td colSpan={11} className="text-center p-4">No hourly reports found.</td>
-                                </tr>
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-
-                {totalPages > 1 && (
-                    <div className="flex items-center justify-center gap-2 py-4 border-t border-slate-200">
-                        <button className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-40" disabled={currentPage === 1} onClick={() => setCurrentPage(prev => prev - 1)}>
-                            <svg className="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
-                        </button>
-                        <span className="text-sm text-slate-600">Page {currentPage} of {totalPages}</span>
-                        <button className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-40" disabled={currentPage === totalPages} onClick={() => setCurrentPage(prev => prev + 1)}>
-                            <svg className="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-                        </button>
-                    </div>
-                )}
+                <DataTable
+                    columns={columns}
+                    data={paginatedData}
+                    rowKey={(group) => group.key}
+                    loading={loading}
+                    emptyMessage="No hourly reports found."
+                    onRowClick={(group) => toggleGroup(group.key)}
+                    renderSubRow={renderSubRow}
+                    getRowStyle={(group) => {
+                        const isActiveNoEntry = group.weeklyProgramStatus === "IN_PROGRESS" && group.hours.length === 0;
+                        if (isActiveNoEntry) {
+                            return {
+                                background: "linear-gradient(90deg, #f0fdf4 0%, #fff 100%)",
+                                borderLeft: "4px solid #16a34a"
+                            };
+                        }
+                        return {};
+                    }}
+                    pagination={{
+                        currentPage,
+                        totalPages,
+                        onPageChange: setCurrentPage
+                    }}
+                />
             </div>
 
             <CommonConfirmModal

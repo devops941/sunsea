@@ -16,9 +16,12 @@ import { dailyPlanService } from "../../../services/dailyPlanService";
 import { oeeService } from "../../../services/oeeService";
 
 import TextInput from "../../../components/form/TextInput/TextInput";
+import SelectInput from "../../../components/form/SelectInput/SelectInput";
+import TextArea from "../../../components/form/TextArea/TextArea";
 
 import CustomButton from "../../../components/ui/Button/Button";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
+import BackButton from "../../../components/ui/BackButton/BackButton";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
 const formatLocalDateString = (d: Date) => {
@@ -321,12 +324,12 @@ const DailyPlanCreate: React.FC = () => {
         if (!errors[path]) errors[path] = issue.message;
       });
       setFormErrors(errors);
-        return;
+      return;
     }
 
     if (!isEdit && overCapacity) {
       setFormErrors({ plannedQty: `Cannot exceed weekly remaining capacity (${remainingQty} pcs)` });
-        return;
+      return;
     }
 
     setFormErrors({});
@@ -373,172 +376,144 @@ const DailyPlanCreate: React.FC = () => {
 
   // ── Render ───────────────────────────────────────────────────────────────
   return (
-    <div className="p-4 md:p-6 min-h-screen bg-white">
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200">
-        {/* Page Header */}
-        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-slate-200">
-          <div>
-            <h2 className="text-2xl font-bold text-slate-800">
-              {isEdit ? "Edit Daily Production Plan" : "New Daily Production Plan"}
-            </h2>
-            <p className="text-sm text-slate-500 mt-1">Home / Production / Daily Planning / {isEdit ? "Edit" : "Create"}</p>
-          </div>
-          <CustomButton
-            text="Back to Daily Planning"
-            icon={FaArrowLeft}
-            onClick={() => navigate("/daily-machine-planning")}
-          />
+
+    <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-sm border border-slate-200">
+      {/* Page Header */}
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 p-6 border-b border-slate-200">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-800">
+            {isEdit ? "Edit Daily Production Plan" : "New Daily Production Plan"}
+          </h2>
         </div>
+        <BackButton
+          text="Back to Daily Planning"
 
-        {submitError && (
-          <div className="mx-6 mt-4 p-4 rounded-xl bg-red-50 border border-red-200 flex items-center gap-3">
-            <FaExclamationTriangle className="text-red-500" size={20} />
-            <div>
-              <p className="font-bold text-red-700 text-sm">Failed to Save Plan</p>
-              <p className="text-red-600 text-xs">{submitError}</p>
-            </div>
+        />
+      </div>
+
+      {submitError && (
+        <div className="mx-6  p-4 rounded-xl bg-red-50 border border-red-200 flex items-center gap-3">
+          <FaExclamationTriangle className="text-red-500" size={20} />
+          <div>
+            <p className="font-bold text-red-700 text-sm">Failed to Save Plan</p>
+            <p className="text-red-600 text-xs">{submitError}</p>
           </div>
-        )}
+        </div>
+      )}
 
-        <form onSubmit={handleSubmit} className="p-6">
-          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-            {/* ─── LEFT: Form Sections ─── */}
-            <div className="xl:col-span-2 space-y-6">
 
-              {/* Section 1: Weekly Program */}
-              <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-                <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-2">
-                  <FaCalendarAlt className="text-teal-600" />
-                  <h6 className="font-bold text-slate-800">Step 1 — Select Weekly Program</h6>
-                </div>
-                <div className="p-5">
+      <div className="flex flex-col gap-6">
+        {/* ─── Form Sections ─── */}
+        <div className="w-full">
+
+          {/* Section 1: Weekly Program */}
+
+          <div className="px-5 py-4  flex items-center gap-2">
+
+            <h6 className="font-bold text-lg text-slate-800">Step 1 — Select Weekly Program</h6>
+          </div>
+          <div className="px-5">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+              <SelectInput
+                label="Weekly Program"
+                required
+                disabled={isEdit || !!(location.state as any)?.weeklyProgramId}
+                value={weeklyProgramId}
+                onChange={(e: any) => setWeeklyProgramId(e.target.value)}
+                error={formErrors.weeklyProgramId}
+                defaultOptionLabel="— Select Weekly Program —"
+                options={weeklyPrograms.map((wp: any) => ({
+                  value: wp.weeklyProgramId,
+                  label: `${wp.weeklyProgramId}  — ${wp.productionOrder?.productItem?.productName} ${wp._isBacklog ? "⚠️ [PENDING FROM PREVIOUS WEEK]" : ""}`
+                }))}
+              />
+            </div>
+
+            {/* Auto-filled info banner */}
+            {selectedWeeklyProg && (
+
+              <div className="rounded-xl p-4  bg-green-50 border border-green-200">
+                <div className="grid grid-cols-2 xl:grid-cols-6 gap-4">
                   <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
-                      Weekly Program <span className="text-red-500">*</span>
-                    </label>
-                    {loadingWeekly ? (
-                      <div className="flex items-center gap-2 py-2 text-slate-500 text-sm">
-                        <div className="inline-block w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin"></div> Loading weekly programs...
-                      </div>
-                    ) : (
-                      <>
-                        <select
-                          className="w-full h-11 px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-100 disabled:text-slate-500"
-                          required
-                          disabled={isEdit || !!(location.state as any)?.weeklyProgramId}
-                          value={weeklyProgramId}
-                          onChange={(e) => setWeeklyProgramId(e.target.value)}
-                        >
-                          <option value="">— Select Weekly Program —</option>
-                          {weeklyPrograms.map((wp: any) => (
-                            <option key={wp.weeklyProgramId} value={wp.weeklyProgramId}>
-                              {wp.weeklyProgramId} — {wp.productionOrderId} — {wp.productionOrder?.productItem?.productName} (Planned: {wp.plannedQty} pcs) {wp._isBacklog ? "⚠️ [PENDING FROM PREVIOUS WEEK]" : ""}
-                            </option>
-                          ))}
-                        </select>
-                        {formErrors.weeklyProgramId && <div className="text-red-500 text-xs mt-1">{formErrors.weeklyProgramId}</div>}
-                      </>
-                    )}
+                    <div className="text-slate-500 text-xs font-bold uppercase mb-1">Production Order</div>
+                    <div className="font-bold text-slate-800">{selectedWeeklyProg.productionOrderId}</div>
                   </div>
 
-                  {/* Auto-filled info banner */}
-                  {selectedWeeklyProg && (
-                    <div className="mt-4">
-                      <div className="rounded-xl p-4 mt-4 bg-green-50 border border-green-200">
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                          <div>
-                            <div className="text-slate-500 text-xs font-bold uppercase mb-1">Production Order</div>
-                            <div className="font-bold text-slate-800">{selectedWeeklyProg.productionOrderId}</div>
-                          </div>
-                          <div>
-                            <div className="text-slate-500 text-xs font-bold uppercase mb-1">Product</div>
-                            <div className="font-semibold text-slate-800 text-sm">
-                              {selectedWeeklyProg.productionOrder?.productItem?.productName || "—"}
-                            </div>
-                          </div>
-                          <div>
-                            <div className="text-slate-500 text-xs font-bold uppercase mb-1">Weekly Target</div>
-                            <div className="font-bold text-slate-800">{selectedWeeklyProg.plannedQty} pcs</div>
-                          </div>
-                          <div>
-                            <div className="text-slate-500 text-xs font-bold uppercase mb-1">Remaining Capacity</div>
-                            {loadingRemaining ? (
-                              <div className="inline-block w-4 h-4 border-2 border-green-400 border-t-transparent rounded-full animate-spin"></div>
-                            ) : (
-                              <div className={`font-bold ${remainingQty === 0 ? "text-red-600" : "text-green-600"}`}>
-                                {remainingQty !== null ? `${remainingQty} pcs` : "—"}
-                              </div>
-                            )}
-                          </div>
-                          <div>
-                            <div className="text-slate-500 text-xs font-bold uppercase mb-1">Week</div>
-                            <div className="text-sm font-medium text-slate-700">
-                              {selectedWeeklyProg.weekStartDate?.split("T")[0]} → {selectedWeeklyProg.weekEndDate?.split("T")[0]}
-                            </div>
-                          </div>
-                          <div>
-                            <div className="text-slate-500 text-xs font-bold uppercase mb-1">PO Status</div>
-                            <StatusBadge status={selectedWeeklyProg.productionOrder?.status || selectedWeeklyProg.status} />
-                          </div>
-                          <div>
-                            <div className="text-slate-500 text-xs font-bold uppercase mb-1">PO Target Qty</div>
-                            <div className="font-bold text-slate-800">{selectedWeeklyProg.productionOrder?.targetQty || "—"} pcs</div>
-                          </div>
-                          <div>
-                            <div className="text-slate-500 text-xs font-bold uppercase mb-1">Produced So Far</div>
-                            <div className="font-bold text-slate-800">{selectedWeeklyProg.productionOrder?.producedQty || 0} pcs</div>
-                          </div>
-                        </div>
+                  <div>
+                    <div className="text-slate-500 text-xs font-bold uppercase mb-1">Weekly Target</div>
+                    <div className="font-bold text-slate-800">{selectedWeeklyProg.plannedQty} pcs</div>
+                  </div>
+                  <div>
+                    <div className="text-slate-500 text-xs font-bold uppercase mb-1">Remaining Capacity</div>
+                    {loadingRemaining ? (
+                      <div className="inline-block w-4 h-4 border-2 border-green-400 border-t-transparent rounded-full animate-spin"></div>
+                    ) : (
+                      <div className={`font-bold ${remainingQty === 0 ? "text-red-600" : "text-green-600"}`}>
+                        {remainingQty !== null ? `${remainingQty} pcs` : "—"}
                       </div>
+                    )}
+                  </div>
+                  <div>
+                    <div className="text-slate-500 text-xs font-bold uppercase mb-1">Week</div>
+                    <div className="text-sm font-medium text-slate-700">
+                      {selectedWeeklyProg.weekStartDate?.split("T")[0]} → {selectedWeeklyProg.weekEndDate?.split("T")[0]}
                     </div>
-                  )}
+                  </div>
+
+                  <div>
+                    <div className="text-slate-500 text-xs font-bold uppercase mb-1">PO Target Qty</div>
+                    <div className="font-bold text-slate-800">{selectedWeeklyProg.productionOrder?.targetQty || "—"} pcs</div>
+                  </div>
+                  <div>
+                    <div className="text-slate-500 text-xs font-bold uppercase mb-1">Produced So Far</div>
+                    <div className="font-bold text-slate-800">{selectedWeeklyProg.productionOrder?.producedQty || 0} pcs</div>
+                  </div>
                 </div>
               </div>
 
-              {/* Section 2: Schedule */}
-              <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-                <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-2">
-                  <FaIndustry className="text-teal-600" />
-                  <h6 className="font-bold text-slate-800">Step 2 — Schedule Details</h6>
+            )}
+          </div>
+
+
+          {/* Section 2: Schedule */}
+          <div className="bg-white">
+            <div className="px-5 py-4  flex items-center gap-2">
+
+              <h6 className="font-bold text-lg text-slate-800">Step 2 — Schedule Details</h6>
+            </div>
+            <div className="px-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {/* Production Date */}
+                <div>
+                  <TextInput
+                    label="Production Date *"
+                    name="productionDate"
+                    type="date"
+                    required
+                    value={productionDate}
+                    error={formErrors.productionDate}
+                    onChange={(e) => setProductionDate(e.target.value)}
+                  />
                 </div>
-                <div className="p-5">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Production Date */}
-                    <div>
-                      <TextInput
-                        label="Production Date *"
-                        name="productionDate"
-                        type="date"
-                        required
-                        value={productionDate}
-                        error={formErrors.productionDate}
-                        onChange={(e) => setProductionDate(e.target.value)}
-                      />
-                    </div>
 
-                    {/* Machine */}
-                    <div>
-                      <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
-                        Machine <span className="text-red-500">*</span>
-                      </label>
-                      <select
-                        className="w-full h-11 px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        required
-                        value={machineId}
-                        onChange={(e) => setMachineId(e.target.value)}
-                      >
-                        <option value="">— Select Machine —</option>
-                        {allowedMachines.map((m: any) => (
-                          <option key={m.machineId} value={m.machineId}>
-                            {m.machineName} ({m.machineId})
-                          </option>
-                        ))}
-                      </select>
-                      {formErrors.machineId && <div className="text-red-500 text-xs mt-1">{formErrors.machineId}</div>}
-                    </div>
+                {/* Machine */}
+                <div>
+                  <SelectInput
+                    label="Machine"
+                    required
+                    value={machineId}
+                    onChange={(e: any) => setMachineId(e.target.value)}
+                    error={formErrors.machineId}
+                    defaultOptionLabel="— Select Machine —"
+                    options={allowedMachines.map((m: any) => ({
+                      value: m.machineId,
+                      label: `${m.machineName} (${m.machineId})`
+                    }))}
+                  />
+                </div>
 
-                    {/* ─── Machine OEE Panel ─────────────────────────────────── */}
-                    {machineId && (
+                {/* ─── Machine OEE Panel ─────────────────────────────────── */}
+                {/* {machineId && (
                       <div className="md:col-span-2">
                         {loadingOee ? (
                           <div className="flex items-center gap-2 py-2 text-slate-500 text-sm">
@@ -596,34 +571,30 @@ const DailyPlanCreate: React.FC = () => {
                           </div>
                         ) : null}
                       </div>
-                    )}
+                    )} */}
 
-                    {/* Shift */}
-                    <div>
-                      <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
-                        Shift <span className="text-red-500">*</span>
-                      </label>
-                      <select
-                        className="w-full h-11 px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        required
-                        value={shiftId}
-                        onChange={(e) => setShiftId(e.target.value)}
-                      >
-                        <option value="">— Select Shift —</option>
-                        {shifts.map((s: any) => {
-                          const remainingHrs = remainingShiftsHours[s.shiftCode] ?? computeShiftHours(s.startTime, s.endTime);
-                          const isFullyScheduled = remainingHrs === 0;
-                          return (
-                            <option key={s.shiftCode} value={s.shiftCode} disabled={isFullyScheduled}>
-                              {s.shiftName} ({s.startTime} – {s.endTime}){isFullyScheduled ? " — Fully Scheduled" : ` — ${remainingHrs} hrs remaining`}
-                            </option>
-                          );
-                        })}
-                      </select>
-                      {formErrors.shiftId && <div className="text-red-500 text-xs mt-1">{formErrors.shiftId}</div>}
+                {/* Shift */}
+                <div>
+                  <SelectInput
+                    label="Shift"
+                    required
+                    value={shiftId}
+                    onChange={(e: any) => setShiftId(e.target.value)}
+                    error={formErrors.shiftId}
+                    defaultOptionLabel="— Select Shift —"
+                    options={shifts.map((s: any) => {
+                      const remainingHrs = remainingShiftsHours[s.shiftCode] ?? computeShiftHours(s.startTime, s.endTime);
+                      const isFullyScheduled = remainingHrs === 0;
+                      return {
+                        value: s.shiftCode,
+                        label: `${s.shiftName} (${s.startTime} – ${s.endTime})${isFullyScheduled ? " — Fully Scheduled" : ` — ${remainingHrs} hrs remaining`}`,
+                        disabled: isFullyScheduled
+                      };
+                    })}
+                  />
 
-                      {/* Shift hours info */}
-                      {selectedShiftInfo && (
+                  {/* Shift hours info */}
+                  {/* {selectedShiftInfo && (
                         <div className="mt-2 flex items-center gap-2 text-slate-500 text-xs">
                           <FaClock size={12} />
                           {selectedShiftInfo.startTime} → {selectedShiftInfo.endTime} &nbsp;|&nbsp;
@@ -631,250 +602,138 @@ const DailyPlanCreate: React.FC = () => {
                             {computeShiftHours(selectedShiftInfo.startTime, selectedShiftInfo.endTime)} hrs auto-filled
                           </strong>
                         </div>
-                      )}
-                    </div>
+                      )} */}
+                </div>
 
-                    {/* Status (only for edit) */}
-                    {isEdit && (
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Status</label>
-                        <select
-                          className="w-full h-11 px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          value={status}
-                          onChange={(e) => setStatus(e.target.value)}
-                        >
-                          <option value="DRAFT">Draft</option>
-                          <option value="PLANNED">Planned</option>
-                          <option value="APPROVED">Approved</option>
-                          <option value="IN_PROGRESS">In Progress</option>
-                          <option value="COMPLETED">Completed</option>
-                          <option value="CANCELLED">Cancelled</option>
-                        </select>
-                      </div>
-                    )}
+                {/* Status (only for edit) */}
+                {isEdit && (
+                  <div>
+                    <SelectInput
+                      label="Status"
+                      value={status}
+                      onChange={(e: any) => setStatus(e.target.value)}
+                      options={[
+                        { value: "DRAFT", label: "Draft" },
+                        { value: "PLANNED", label: "Planned" },
+                        { value: "APPROVED", label: "Approved" },
+                        { value: "IN_PROGRESS", label: "In Progress" },
+                        { value: "COMPLETED", label: "Completed" },
+                        { value: "CANCELLED", label: "Cancelled" }
+                      ]}
+                    />
                   </div>
-                </div>
-              </div>
-
-              {/* Section 3: Quantity & Hours */}
-              <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-                <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-2">
-                  <FaBoxes className="text-teal-600" />
-                  <h6 className="font-bold text-slate-800">Step 3 — Quantity & Time</h6>
-                </div>
-                <div className="p-5">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {/* Planned Qty */}
-                    <div>
-                      <TextInput
-                        label="Planned Quantity (pcs) *"
-                        name="plannedQty"
-                        type="number"
-                        required
-                        value={plannedQty}
-                        error={formErrors.plannedQty}
-                        placeholder={remainingQty !== null ? `Max: ${remainingQty}` : "e.g. 500"}
-                        onChange={(e) => setPlannedQty(e.target.value)}
-                      />
-                      {overCapacity && (
-                        <div className="text-danger small mt-1">
-                          <FaExclamationTriangle className="me-1" />
-                          Exceeds weekly remaining capacity ({remainingQty} pcs)
-                        </div>
-                      )}
-                      {remainingQty !== null && !overCapacity && Number(plannedQty) > 0 && (
-                        <div className="text-muted small mt-1">
-                          Remaining after this plan: {remainingQty - Number(plannedQty)} pcs
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Planned Hours — auto-filled from shift */}
-                    <div>
-                      <TextInput
-                        label="Planned Hours"
-                        name="plannedHours"
-                        type="number"
-                        value={plannedHours}
-                        error={formErrors.plannedHours}
-                        placeholder="Auto-filled from shift"
-                        onChange={(e) => setPlannedHours(e.target.value)}
-                      />
-                      <div className="text-muted small mt-1">
-                        <FaClock size={11} className="me-1" />
-                        Auto-filled based on selected shift
-                      </div>
-                    </div>
-
-                    {/* Priority — auto-filled from PO */}
-                    <div>
-                      <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
-                        Priority
-                        {selectedWeeklyProg?.productionOrder?.priority && (
-                          <span className="ml-2 text-green-600 font-normal text-[10px] inline-flex items-center">
-                            <FaCheckCircle className="mr-1" />auto from PO
-                          </span>
-                        )}
-                      </label>
-                      <select
-                        className="w-full h-11 px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        value={priority}
-                        onChange={(e) => setPriority(e.target.value)}
-                      >
-                        <option value="LOW">LOW</option>
-                        <option value="MEDIUM">MEDIUM</option>
-                        <option value="HIGH">HIGH</option>
-                        <option value="URGENT">URGENT</option>
-                      </select>
-                    </div>
-
-                    {/* Remarks */}
-                    <div className="md:col-span-2">
-                      <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Remarks</label>
-                      <textarea
-                        className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                        rows={3}
-                        value={remarks}
-                        onChange={(e) => setRemarks(e.target.value)}
-                        placeholder="Optional notes for this daily production plan..."
-                      />
-                    </div>
-                  </div>
-                </div>
+                )}
               </div>
             </div>
+          </div>
 
-            {/* ─── RIGHT: Summary Card ─── */}
-            <div className="xl:col-span-1">
-              <div className="bg-white rounded-xl border border-slate-200 overflow-hidden sticky top-20">
-                <div className="px-5 py-4" style={{ background: "var(--color-primary, #003428)" }}>
-                  <h6 className="font-bold text-white flex items-center gap-2">
-                    <FaInfoCircle /> Plan Summary
-                  </h6>
+          {/* Section 3: Quantity & Hours */}
+          <div className="bg-white ">
+            <div className="px-5 py-4  flex items-center gap-2">
+
+              <h6 className="font-bold text-lg text-slate-800">Step 3 — Quantity & Time</h6>
+            </div>
+            <div className="px-5">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* Planned Qty */}
+                <div>
+                  <TextInput
+                    label="Planned Quantity (pcs) *"
+                    name="plannedQty"
+                    type="number"
+                    required
+                    value={plannedQty}
+                    error={formErrors.plannedQty}
+                    placeholder={remainingQty !== null ? `Max: ${remainingQty}` : "e.g. 500"}
+                    onChange={(e) => setPlannedQty(e.target.value)}
+                  />
+                  {overCapacity && (
+                    <div className="text-red-500 text-xs  flex items-center">
+                      <FaExclamationTriangle className="mr-1" />
+                      Exceeds weekly remaining capacity ({remainingQty} pcs)
+                    </div>
+                  )}
+                  {remainingQty !== null && !overCapacity && Number(plannedQty) > 0 && (
+                    <div className="text-slate-500 text-xs ">
+                      Remaining after this plan: {remainingQty - Number(plannedQty)} pcs
+                    </div>
+                  )}
                 </div>
-                <div className="p-5">
-                  <div className="flex flex-col gap-4">
 
-                    {/* Weekly Program */}
-                    <div className="flex justify-between border-b border-slate-100 pb-3">
-                      <span className="text-muted small fw-bold text-uppercase">Weekly Program</span>
-                      <span className="fw-semibold text-end" style={{ maxWidth: "60%", fontSize: "13px" }}>
-                        {weeklyProgramId || <span className="text-muted">Not selected</span>}
-                      </span>
-                    </div>
-
-                    {/* Production Order */}
-                    {selectedWeeklyProg && (
-                      <div className="flex justify-between border-b border-slate-100 pb-3">
-                        <span className="text-muted small fw-bold text-uppercase">Production Order</span>
-                        <div className="text-end">
-                          <div className="fw-semibold" style={{ fontSize: "13px" }}>{selectedWeeklyProg.productionOrderId}</div>
-                          <div className="text-muted" style={{ fontSize: "11px" }}>
-                            {selectedWeeklyProg.productionOrder?.productItem?.productName}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Date */}
-                    <div className="flex justify-between border-b border-slate-100 pb-3">
-                      <span className="text-muted small fw-bold text-uppercase">Date</span>
-                      <span className="fw-semibold" style={{ fontSize: "13px" }}>
-                        {productionDate || <span className="text-muted">Not set</span>}
-                      </span>
-                    </div>
-
-                    {/* Machine */}
-                    <div className="flex justify-between border-b border-slate-100 pb-3">
-                      <span className="text-muted small fw-bold text-uppercase">Machine</span>
-                      <span className="fw-semibold" style={{ fontSize: "13px" }}>
-                        {machineId ? allowedMachines.find((m: any) => m.machineId === machineId)?.machineName || machineId : <span className="text-muted">Not selected</span>}
-                      </span>
-                    </div>
-
-                    {/* Shift */}
-                    <div className="flex justify-between border-b border-slate-100 pb-3">
-                      <span className="text-muted small fw-bold text-uppercase">Shift</span>
-                      <div className="text-end">
-                        <div className="fw-semibold" style={{ fontSize: "13px" }}>
-                          {shiftId ? shifts.find((s: any) => s.shiftCode === shiftId)?.shiftName || shiftId : <span className="text-muted">Not selected</span>}
-                        </div>
-                        {selectedShiftInfo && (
-                          <div className="text-muted" style={{ fontSize: "11px" }}>
-                            {selectedShiftInfo.startTime} – {selectedShiftInfo.endTime}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Planned Qty */}
-                    <div className="flex justify-between border-b border-slate-100 pb-3">
-                      <span className="text-muted small fw-bold text-uppercase">Planned Qty</span>
-                      <span className={`fw-bold ${overCapacity ? "text-danger" : "text-dark"}`} style={{ fontSize: "16px" }}>
-                        {plannedQty ? `${Number(plannedQty).toLocaleString()} pcs` : <span className="text-muted fw-normal">—</span>}
-                      </span>
-                    </div>
-
-                    {/* Planned Hours */}
-                    <div className="flex justify-between border-b border-slate-100 pb-3">
-                      <span className="text-muted small fw-bold text-uppercase">Planned Hours</span>
-                      <span className="fw-semibold" style={{ fontSize: "13px" }}>
-                        {plannedHours ? `${plannedHours} hrs` : "—"}
-                      </span>
-                    </div>
-
-                    {/* Priority */}
-                    <div className="flex justify-between border-b border-slate-100 pb-3">
-                      <span className="text-muted small fw-bold text-uppercase">Priority</span>
-                      <StatusBadge status={priority || "MEDIUM"} />
-                    </div>
-
-                    {/* Capacity Warning */}
-                    {overCapacity && (
-                      <div className="py-2 px-3 rounded text-red-800 bg-red-100 border border-red-200 text-xs flex items-center">
-                        <FaExclamationTriangle className="mr-2" />
-                        Planned qty exceeds the remaining capacity of <strong className="ml-1">{remainingQty} pcs</strong>.
-                      </div>
-                    )}
-
-                    {remainingQty === 0 && !overCapacity && (
-                      <div className="py-2 px-3 rounded text-amber-800 bg-amber-100 border border-amber-200 text-xs">
-                        No remaining capacity on this weekly program.
-                      </div>
-                    )}
+                {/* Planned Hours — auto-filled from shift */}
+                <div>
+                  <TextInput
+                    label="Planned Hours"
+                    name="plannedHours"
+                    type="number"
+                    value={plannedHours}
+                    error={formErrors.plannedHours}
+                    placeholder="Auto-filled from shift"
+                    onChange={(e) => setPlannedHours(e.target.value)}
+                  />
+                  <div className="text-slate-500 text-xs flex items-center">
+                    <FaClock size={11} className="mr-1" />
+                    Auto-filled based on selected shift
                   </div>
                 </div>
 
-                {/* Save Button */}
-                <div className="px-5 py-4 border-t border-slate-100">
-                  <div className="flex flex-col gap-2">
-                    <button
-                      type="submit"
-                      className="w-full flex justify-center items-center py-2.5 rounded-lg text-white font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                      style={{ backgroundColor: "var(--color-primary, #003428)" }}
-                      disabled={isSubmitting}
-                    >
-                      {isSubmitting ? (
-                        <><div className="inline-block w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin"></div>Saving...</>
-                      ) : (
-                        <><FaSave className="mr-2" />{isEdit ? "Update Plan" : "Create Daily Plan"}</>
-                      )}
-                    </button>
-                    <button
-                      type="button"
-                      className="w-full flex justify-center items-center py-2.5 rounded-lg text-slate-700 bg-slate-100 hover:bg-slate-200 font-semibold transition-colors"
-                      onClick={() => navigate("/daily-machine-planning")}
-                    >
-                      <FaArrowLeft className="mr-2" />Cancel
-                    </button>
-                  </div>
+                {/* Priority — auto-filled from PO */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
+                    Priority
+                    {selectedWeeklyProg?.productionOrder?.priority && (
+                      <span className="ml-2 text-green-600 font-normal text-[10px] inline-flex items-center">
+                        <FaCheckCircle className="mr-1" />auto from PO
+                      </span>
+                    )}
+                  </label>
+                  <SelectInput
+                    hideLabel
+                    value={priority}
+                    onChange={(e: any) => setPriority(e.target.value)}
+                    options={[
+                      { value: "LOW", label: "LOW" },
+                      { value: "MEDIUM", label: "MEDIUM" },
+                      { value: "HIGH", label: "HIGH" },
+                      { value: "URGENT", label: "URGENT" }
+                    ]}
+                  />
+                </div>
+
+                {/* Remarks */}
+                <div className="md:col-span-2 lg:col-span-1">
+                  <TextArea
+                    label="Remarks"
+                    name="remarks"
+                    rows={3}
+                    value={remarks}
+                    onChange={(e: any) => setRemarks(e.target.value)}
+                    placeholder="Optional notes for this daily production plan..."
+                  />
                 </div>
               </div>
             </div>
           </div>
-        </form>
+        </div>
+
+        {/* ─── Action Buttons ─── */}
+        <div className="flex justify-end items-center gap-3 px-6 py-5 border-t border-slate-200">
+          <CustomButton
+            text="Cancel"
+
+            onClick={() => navigate("/daily-machine-planning")}
+          />
+          <CustomButton
+            text={isSubmitting ? "Saving..." : (isEdit ? "Update Plan" : "Create Plan")}
+            icon={isSubmitting ? undefined : FaSave}
+            type="submit"
+            disabled={isSubmitting}
+          />
+        </div>
       </div>
-    </div>
+
+    </form>
+
   );
 };
 

@@ -185,7 +185,7 @@ const AppRoutes = () => {
             {/* ========================================================================= */}
             <Route index element={<Dashboard />} />
             <Route path="/dashboard" element={<Dashboard />} />
-            
+
             <Route path="/company/edit" element={<CompanySettings />} />
             <Route path="/company/view" element={<OrganizationTabs />} />
             <Route path="/settings/company" element={<OrganizationTabs />} />

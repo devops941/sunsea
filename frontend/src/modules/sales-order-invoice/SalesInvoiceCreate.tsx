@@ -1,13 +1,12 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Row, Col, Form } from "react-bootstrap";
-import { FaSave, FaPlus, FaTrash, FaFileInvoiceDollar } from "react-icons/fa";
+import { FaSave, FaPlus, FaTrash, FaFileInvoiceDollar, FaChevronLeft } from "react-icons/fa";
 import { toast } from "react-toastify";
 
 import TextInput from "../../components/form/TextInput/TextInput";
 import SelectInput from "../../components/form/SelectInput/SelectInput";
-import CustomButton from "../../components/ui/custombutton/CustomButton";
-import Section from "../../components/ui/Section/Section";
+import CustomButton from "../../components/ui/Button/Button";
+import BackButton from "../../components/ui/BackButton/BackButton";
 import { invoiceSettingsService } from "../../services/invoiceSettingsService";
 import { customerService } from "../../services/customerService";
 import { productService } from "../../services/productService";
@@ -156,7 +155,7 @@ const SalesInvoiceForm: React.FC = () => {
   const [notes, setNotes] = useState("");
   const [lines, setLines] = useState<InvoiceLineItem[]>([emptyLine()]);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  
+
   const [salesOrders, setSalesOrders] = useState<any[]>([]);
   const [selectedSalesOrderId, setSelectedSalesOrderId] = useState("");
 
@@ -188,7 +187,7 @@ const SalesInvoiceForm: React.FC = () => {
         setAllOrders(ordersList);
 
         const salesOrdersList = salesOrdersResponse?.data || salesOrdersResponse || [];
-        
+
         // Map Finished Goods Stock to onHandQty by productItemId
         const fgList: any[] = Array.isArray(fgStockResponse) ? fgStockResponse : (fgStockResponse as any).data || [];
         const fgStockMap = new Map<string, number>();
@@ -265,10 +264,10 @@ const SalesInvoiceForm: React.FC = () => {
           const qty = Number(item.quantity || item.qty || 1);
           const totalTaxable = Number(item.taxableAmount || item.lineSubtotal || 0);
           const rate = qty > 0 ? (totalTaxable / qty) : Number(item.b2b || item.b2c || item.mrp || 0);
-          const taxPercent = Number(item.igstRate) > 0 
-            ? Number(item.igstRate) 
+          const taxPercent = Number(item.igstRate) > 0
+            ? Number(item.igstRate)
             : (Number(item.cgstRate || 0) + Number(item.sgstRate || 0));
-          
+
           const amount = qty * rate;
           const taxAmount = (amount * taxPercent) / 100;
           const total = amount + taxAmount;
@@ -397,194 +396,251 @@ const SalesInvoiceForm: React.FC = () => {
   }
 
   return (
-    <Form onSubmit={handleSubmit}>
-      <Section title="Sales Invoice" icon={<FaFileInvoiceDollar />}>
-        <p className="text-muted small mb-4">
-          Invoice No: <strong>{previewInvoiceNo || "Auto-generated on save"}</strong>
-        </p>
+    <div className="max-w-7xl mx-auto pb-12">
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
 
-        <Row className="g-3">
-          <Col md={4}>
-            <SelectInput
-              label="Customer"
-              name="customerId"
-              required
-              value={customerId}
-              error={errors.customerId}
-              options={customers.map((c) => ({ label: c.name, value: c.id }))}
-              defaultOptionLabel="Select customer"
-              onChange={(e) => {
-                const newCustId = e.target.value;
-                setCustomerId(newCustId);
-                // Clear selected sales order if it doesn't match the new customer
-                if (selectedSalesOrderId) {
-                  const selectedOrder = salesOrders.find(
-                    (o) => o.id.toString() === selectedSalesOrderId || o.orderNo === selectedSalesOrderId
-                  );
-                  if (selectedOrder) {
-                    const orderCustId = (selectedOrder.customerId || selectedOrder.customer?.id)?.toString();
-                    if (orderCustId !== newCustId) {
-                      setSelectedSalesOrderId("");
-                      setLines([emptyLine()]);
-                    }
-                  }
-                }
-              }}
-            />
-          </Col>
-          <Col md={4}>
-            <SelectInput
-              label="Sales Order (Optional)"
-              name="selectedSalesOrderId"
-              value={selectedSalesOrderId}
-              disabled={!customerId}
-              options={salesOrders
-                .filter((so) => so.customerId?.toString() === customerId || so.customer?.id?.toString() === customerId)
-                .map((so) => {
-                  const orderDateStr = so.orderDate || so.createdAt;
-                  const formattedDate = orderDateStr 
-                    ? new Date(orderDateStr).toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" })
-                    : "N/A";
-                  const formattedAmount = `₹${Number(so.netAmount || so.grandTotal || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`;
-                  const labelStr = `${so.orderNo} — ${formattedDate} — ${formattedAmount}`;
-                  return { label: labelStr, value: so.id.toString() };
-                })}
-              defaultOptionLabel={customerId ? "-- Select Sales Order --" : "-- Select Customer First --"}
-              onChange={(e) => handleSalesOrderChange(e.target.value)}
-            />
-          </Col>
-          <Col md={4}>
-            <TextInput
-              label="Invoice Date"
-              name="invoiceDate"
-              type="date"
-              value={invoiceDate}
-              onChange={(e) => setInvoiceDate(e.target.value)}
-              required
-              error={errors.invoiceDate}
-            />
-          </Col>
-          <Col md={4}>
-            <TextInput
-              label="Due Date"
-              name="dueDate"
-              type="date"
-              value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
-            />
-          </Col>
-        </Row>
-      </Section>
-
-      <Section title="Items" icon={<FaFileInvoiceDollar />}>
-        {errors.lines && <div className="text-danger small mb-2">{errors.lines}</div>}
-        <div className="master-table-body table-wrap">
-          <table className="master-data-table">
-            <thead>
-              <tr>
-                <th style={{ minWidth: 200 }}>Item</th>
-                <th style={{ width: 90 }}>Qty</th>
-                <th style={{ width: 110 }}>Rate</th>
-                <th style={{ width: 90 }}>Tax %</th>
-                <th style={{ width: 110 }}>Amount</th>
-                <th style={{ width: 110 }}>Total</th>
-                <th style={{ width: 50 }}></th>
-              </tr>
-            </thead>
-            <tbody>
-              {lines.map((line) => (
-                <tr key={line.id} className="master-data-row">
-                  <td className="master-data-cell">
-                    <SelectInput
-                      label=""
-                      name="itemId"
-                      value={line.itemId}
-                      options={items.map((i) => ({ label: i.name, value: i.id }))}
-                      defaultOptionLabel="Select item"
-                      onChange={(e) => updateLine(line.id, "itemId", e.target.value)}
-                    />
-                  </td>
-                  <td className="master-data-cell">
-                    <TextInput
-                      name="qty"
-                      type="number"
-                      value={String(line.qty)}
-                      onChange={(e) => updateLine(line.id, "qty", Number(e.target.value))}
-                    />
-                  </td>
-                  <td className="master-data-cell">
-                    <TextInput
-                      name="rate"
-                      type="number"
-                      value={String(line.rate)}
-                      onChange={(e) => updateLine(line.id, "rate", Number(e.target.value))}
-                    />
-                  </td>
-                  <td className="master-data-cell">
-                    <TextInput
-                      name="taxPercent"
-                      type="number"
-                      value={String(line.taxPercent)}
-                      onChange={(e) => updateLine(line.id, "taxPercent", Number(e.target.value))}
-                    />
-                  </td>
-                  <td className="master-data-cell">
-                    <TextInput
-                      name="amount"
-                      type="number"
-                      value={String(line.amount)}
-                      onChange={(e) => updateLine(line.id, "amount", Number(e.target.value))}
-                    />
-                  </td>
-                  <td className="master-data-cell text-end align-middle fw-bold">{line.total.toFixed(2)}</td>
-                  <td className="master-data-cell text-center align-middle">
-                    <FaTrash
-                      role="button"
-                      className="text-danger"
-                      onClick={() => removeLine(line.id)}
-                    />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        <CustomButton text="Add Item" icon={FaPlus} type="button" variant="outline" onClick={addLine} />
-
-        <div className="d-flex justify-content-end mt-4">
-          <div style={{ minWidth: 280 }}>
-            <div className="d-flex justify-content-between small mb-1">
-              <span className="text-muted">Sub Total</span>
-              <span>{totals.subTotal.toFixed(2)}</span>
-            </div>
-            <div className="d-flex justify-content-between small mb-1">
-              <span className="text-muted">Tax Total</span>
-              <span>{totals.taxTotal.toFixed(2)}</span>
-            </div>
-            <hr className="my-2" />
-            <div className="d-flex justify-content-between fw-bold fs-5">
-              <span>Grand Total</span>
-              <span>{totals.grandTotal.toFixed(2)}</span>
-            </div>
+        {/* Page Header */}
+        <div className="px-6 py-5 border-b border-slate-200 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h2 className="text-xl font-bold text-slate-800">Create Sales Invoice</h2>
+            <p className="text-sm text-slate-500 mt-1">
+              Invoice No: <span className="font-semibold text-slate-700">{previewInvoiceNo || "Auto-generated on save"}</span>
+            </p>
+          </div>
+          <div>
+            <BackButton text="Back to List" />
           </div>
         </div>
-      </Section>
 
-      <Section title="Notes" icon={<FaFileInvoiceDollar />}>
-        <Form.Control
-          as="textarea"
-          rows={3}
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          placeholder="Optional notes for this invoice"
-        />
-      </Section>
+        <form onSubmit={handleSubmit} className="p-6 space-y-8">
 
-      <div className="d-flex justify-content-end mt-4 mb-3">
-        <CustomButton text="Create Invoice" icon={FaSave} type="submit" loading={saving} variant="primary" />
+          {/* Main Details */}
+          <div>
+            <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 flex items-center gap-2">
+              <FaFileInvoiceDollar className="text-slate-400" />
+              Invoice Details
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <SelectInput
+                label="Customer"
+                name="customerId"
+                required
+                value={customerId}
+                error={errors.customerId}
+                options={customers.map((c) => ({ label: c.name, value: c.id }))}
+                defaultOptionLabel="Select customer"
+                onChange={(e) => {
+                  const newCustId = e.target.value;
+                  setCustomerId(newCustId);
+                  // Clear selected sales order if it doesn't match the new customer
+                  if (selectedSalesOrderId) {
+                    const selectedOrder = salesOrders.find(
+                      (o) => o.id.toString() === selectedSalesOrderId || o.orderNo === selectedSalesOrderId
+                    );
+                    if (selectedOrder) {
+                      const orderCustId = (selectedOrder.customerId || selectedOrder.customer?.id)?.toString();
+                      if (orderCustId !== newCustId) {
+                        setSelectedSalesOrderId("");
+                        setLines([emptyLine()]);
+                      }
+                    }
+                  }
+                }}
+              />
+              <SelectInput
+                label="Sales Order (Optional)"
+                name="selectedSalesOrderId"
+                value={selectedSalesOrderId}
+                disabled={!customerId}
+                options={salesOrders
+                  .filter((so) => so.customerId?.toString() === customerId || so.customer?.id?.toString() === customerId)
+                  .map((so) => {
+                    const orderDateStr = so.orderDate || so.createdAt;
+                    const formattedDate = orderDateStr
+                      ? new Date(orderDateStr).toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" })
+                      : "N/A";
+                    const formattedAmount = `₹${Number(so.netAmount || so.grandTotal || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`;
+                    const labelStr = `${so.orderNo} — ${formattedDate} — ${formattedAmount}`;
+                    return { label: labelStr, value: so.id.toString() };
+                  })}
+                defaultOptionLabel={customerId ? "-- Select Sales Order --" : "-- Select Customer First --"}
+                onChange={(e) => handleSalesOrderChange(e.target.value)}
+              />
+              <TextInput
+                label="Invoice Date"
+                name="invoiceDate"
+                type="date"
+                value={invoiceDate}
+                onChange={(e) => setInvoiceDate(e.target.value)}
+                required
+                error={errors.invoiceDate}
+              />
+              <TextInput
+                label="Due Date"
+                name="dueDate"
+                type="date"
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <hr className="border-slate-100" />
+
+          {/* Items Table */}
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                <FaFileInvoiceDollar className="text-slate-400" />
+                Line Items
+              </h3>
+              <button
+                type="button"
+                onClick={addLine}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-semibold rounded-md transition-colors focus:outline-none"
+              >
+                <FaPlus /> Add Item
+              </button>
+            </div>
+
+            {errors.lines && <div className="text-red-500 text-sm mb-3 bg-red-50 p-2 rounded-md border border-red-100">{errors.lines}</div>}
+
+            <div className="overflow-y-visible rounded-xl border border-slate-200">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-slate-50 border-b border-slate-200">
+                  <tr>
+                    <th className="px-4 py-3 font-semibold text-slate-600 w-1/3">Item</th>
+                    <th className="px-4 py-3 font-semibold text-slate-600 w-24">Qty</th>
+                    <th className="px-4 py-3 font-semibold text-slate-600 w-32">Rate</th>
+                    <th className="px-4 py-3 font-semibold text-slate-600 w-24">Tax %</th>
+                    <th className="px-4 py-3 font-semibold text-slate-600 w-32">Amount</th>
+                    <th className="px-4 py-3 font-semibold text-slate-600 w-32 text-right">Total</th>
+                    <th className="px-4 py-3 font-semibold text-slate-600 w-12 text-center"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {lines.map((line) => (
+                    <tr key={line.id} className="bg-white hover:bg-slate-50/50 transition-colors">
+                      <td className="px-4 py-2">
+                        <SelectInput
+                          label=""
+                          name="itemId"
+                          value={line.itemId}
+                          options={items.map((i) => ({ label: i.name, value: i.id }))}
+                          defaultOptionLabel="Select item"
+                          onChange={(e) => updateLine(line.id, "itemId", e.target.value)}
+                        />
+                      </td>
+                      <td className="px-4 py-2">
+                        <TextInput
+                          label=""
+                          name="qty"
+                          type="number"
+                          value={String(line.qty)}
+                          onChange={(e) => updateLine(line.id, "qty", Number(e.target.value))}
+                        />
+                      </td>
+                      <td className="px-4 py-2">
+                        <TextInput
+                          label=""
+                          name="rate"
+                          type="number"
+                          value={String(line.rate)}
+                          onChange={(e) => updateLine(line.id, "rate", Number(e.target.value))}
+                        />
+                      </td>
+                      <td className="px-4 py-2">
+                        <TextInput
+                          label=""
+                          name="taxPercent"
+                          type="number"
+                          value={String(line.taxPercent)}
+                          onChange={(e) => updateLine(line.id, "taxPercent", Number(e.target.value))}
+                        />
+                      </td>
+                      <td className="px-4 py-2">
+                        <TextInput
+                          label=""
+                          name="amount"
+                          type="number"
+                          value={String(line.amount)}
+                          onChange={(e) => updateLine(line.id, "amount", Number(e.target.value))}
+                        />
+                      </td>
+                      <td className="px-4 py-2 text-right align-middle font-bold text-slate-700">
+                        ₹{line.total.toFixed(2)}
+                      </td>
+                      <td className="px-4 py-2 text-center align-middle">
+                        <button
+                          type="button"
+                          onClick={() => removeLine(line.id)}
+                          className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors focus:outline-none"
+                        >
+                          <FaTrash size={14} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="flex justify-end mt-6">
+              <div className="w-full max-w-sm bg-slate-50 rounded-xl p-5 border border-slate-200">
+                <div className="flex justify-between items-center text-sm mb-3">
+                  <span className="text-slate-500 font-medium">Sub Total</span>
+                  <span className="font-semibold text-slate-700">₹{totals.subTotal.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between items-center text-sm mb-4">
+                  <span className="text-slate-500 font-medium">Tax Total</span>
+                  <span className="font-semibold text-slate-700">₹{totals.taxTotal.toFixed(2)}</span>
+                </div>
+                <div className="pt-3 border-t border-slate-200">
+                  <div className="flex justify-between items-center">
+                    <span className="font-bold text-slate-800">Grand Total</span>
+                    <span className="text-xl font-bold text-emerald-600">₹{totals.grandTotal.toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <hr className="border-slate-100" />
+
+          {/* Notes */}
+          <div>
+            <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-3">
+              Notes & Remarks
+            </h3>
+            <textarea
+              rows={3}
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Optional notes for this invoice..."
+              className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-slate-400 focus:ring focus:ring-slate-200 focus:ring-opacity-50 transition-colors text-sm resize-none"
+            />
+          </div>
+
+          {/* Actions */}
+          <div className="flex justify-end pt-4 gap-3">
+            <CustomButton
+              text="Cancel"
+              type="button"
+
+              onClick={() => navigate(-1)}
+            />
+            <CustomButton
+              text="Create Invoice"
+              icon={FaSave}
+              type="submit"
+
+              variant="primary"
+            />
+          </div>
+
+        </form>
       </div>
-    </Form>
+    </div>
   );
 };
 

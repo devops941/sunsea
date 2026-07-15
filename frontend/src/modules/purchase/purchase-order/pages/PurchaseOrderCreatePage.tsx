@@ -885,14 +885,14 @@ const PurchaseOrderCreatePage: React.FC = () => {
                       <td className="px-3 py-2 whitespace-nowrap text-sm font-medium text-slate-400 text-center">{index + 1}</td>
                       <td className="px-3 py-2 whitespace-nowrap"><SelectInput label="" name={`items[${index}].productId`} value={item.productId ? String(item.productId) : ""} options={[{ value: "", label: "-- Select Material --" }, ...productOptions]} onChange={(e) => handleItemProductChange(index, e.target.value)} error={errors[`items.${index}.productId`]} hideLabel /></td>
                       <td className="px-3 py-2 whitespace-nowrap align-top">
-                        <QuantityInput 
-                          name={`items[${index}].quantity`} 
-                          value={item.quantity} 
+                        <QuantityInput
+                          name={`items[${index}].quantity`}
+                          value={item.quantity}
                           baseUoms={[item.uom || "KG", ...uomOptions.map(o => o.value).filter(v => v !== (item.uom || "KG"))].join(",")}
-                          onChange={(e) => handleItemChange(index, "quantity", Number(e.target.value))} 
-                          error={errors[`items.${index}.quantity`]} 
-                          step="0.01" 
-                          hideLabel 
+                          onChange={(e) => handleItemChange(index, "quantity", Number(e.target.value))}
+                          error={errors[`items.${index}.quantity`]}
+                          step="0.01"
+                          hideLabel
                         />
                       </td>
                       <td className="px-3 py-2 whitespace-nowrap"><TextInput label="" name={`items[${index}].unitPrice`} type="number" value={String(item.unitPrice)} onChange={(e) => handleItemChange(index, "unitPrice", Number(e.target.value))} error={errors[`items.${index}.unitPrice`]} min={0} step={0.01} placeholder="0.00" disabled /></td>

@@ -14,14 +14,15 @@ import { fetchShifts } from "../../../features/shifts/shiftSlice";
 import { fetchDailyPlans, updateDailyPlan, deleteDailyPlan } from "../../../features/daily-plans/dailyPlanSlice";
 import apiClient from "../../../api/apiClient";
 import config from "../../../api/config";
-
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import CustomButton from "../../../components/ui/Button/Button";
+import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import IconButton from "../../../components/ui/IconButton/IconButton";
 import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
 import ViewButton from "../../../components/ui/viewbutton/ViewButton";
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import CustomProgressBar from "../../../components/common/CustomProgressBar";
+import DataTable, { type DataTableColumn } from "../../../components/ui/table/DataTable";
 import { oeeService } from "../../../services/oeeService";
 
 // ---------- helpers ----------
@@ -199,18 +200,18 @@ const DailyProductionPlanningPage: React.FC = () => {
     }
   };
 
-  const handleCancelPlan = async (plan: any) => {
-    try {
-      await dispatch(updateDailyPlan({
-        id: plan.dailyPlanId,
-        data: { status: "CANCELLED" }
-      })).unwrap();
-      toast.success("Daily Plan cancelled.");
-      loadDailyPlans();
-    } catch (err: any) {
-      toast.error(err || "Failed to cancel plan");
-    }
-  };
+  // const handleCancelPlan = async (plan: any) => {
+  //   try {
+  //     await dispatch(updateDailyPlan({
+  //       id: plan.dailyPlanId,
+  //       data: { status: "CANCELLED" }
+  //     })).unwrap();
+  //     toast.success("Daily Plan cancelled.");
+  //     loadDailyPlans();
+  //   } catch (err: any) {
+  //     toast.error(err || "Failed to cancel plan");
+  //   }
+  // };
 
   const handleStopProductionClick = (plan: any) => {
     setStopPlan(plan);
@@ -325,6 +326,194 @@ const DailyProductionPlanningPage: React.FC = () => {
   // ──────────────────────────────────────────────────────────────
   // Render
   // ──────────────────────────────────────────────────────────────
+
+  const columns: DataTableColumn<any>[] = [
+    {
+      header: "#",
+      width: "50px",
+      render: (_row: any, idx: number) => <span className="text-slate-500">{idx + 1}</span>
+    },
+    {
+      header: "PRODUCTION ORDER",
+      width: "220px",
+      render: (plan: any) => (
+        <div>
+          <div className="font-semibold text-slate-800">{plan.productionOrderId}</div>
+          <div className="text-slate-500 text-xs mt-1 line-clamp-1" title={plan.productionOrder?.productItem?.productName || ""}>
+            {plan.productionOrder?.productItem?.productName || "—"}
+          </div>
+        </div>
+      )
+    },
+    {
+      header: "MACHINE / SHIFT",
+      render: (plan: any) => (
+        <div>
+          <div className="font-semibold text-slate-700 flex items-center">
+            <FaIndustry className="mr-2 text-slate-400" />
+            {plan.machine?.machineName || plan.machineId || "—"}
+          </div>
+          <div className="flex items-center gap-2 mt-1.5">
+            <span className="bg-slate-100 text-slate-600 border border-slate-200 px-2 py-0.5 rounded text-[10px] font-medium">
+              {plan.shift?.shiftName || plan.shiftId || "—"}
+            </span>
+            {(plan.shift?.startTime && plan.shift?.endTime) && (
+              <span className="text-slate-500 text-[10px]">
+                {plan.shift.startTime.slice(0, 5)} - {plan.shift.endTime.slice(0, 5)}
+              </span>
+            )}
+          </div>
+        </div>
+      )
+    },
+    {
+      header: "PLANNED QTY",
+      render: (plan: any) => {
+        const plannedQty = Number(plan.plannedQty || 0);
+        return (
+          <div className="font-medium text-slate-700">
+            <div>{plannedQty.toLocaleString()} pcs</div>
+            {plan.plannedHours && (
+              <div className="text-slate-500 text-xs mt-0.5">{plan.plannedHours} hrs</div>
+            )}
+          </div>
+        );
+      }
+    },
+    {
+      header: "PROGRESS",
+      width: "180px",
+      render: (plan: any) => {
+        const plannedQty = Number(plan.plannedQty || 0);
+        const producedQty = Array.isArray(plan.hourlyProductions)
+          ? plan.hourlyProductions.reduce((sum: number, h: any) => sum + Number(h.qtyProduced || 0), 0)
+          : 0;
+        const progressPercent = Math.min(100, plannedQty > 0 ? Math.round((producedQty / plannedQty) * 100) : 0);
+        const pendingQty = plannedQty > producedQty ? plannedQty - producedQty : 0;
+        return (
+          <div>
+            <div className="mb-1">
+              <CustomProgressBar progressPercent={progressPercent} />
+            </div>
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-slate-500">{producedQty} / {plannedQty} pcs</span>
+              {producedQty > plannedQty ? (
+                <span className="bg-emerald-100 text-emerald-700 border border-emerald-200 py-0.5 px-2 rounded text-[9px] font-bold">
+                  +{producedQty - plannedQty} Over
+                </span>
+              ) : pendingQty > 0 ? (
+                <span className="bg-rose-100 text-rose-700 border border-rose-200 py-0.5 px-2 rounded text-[9px] font-bold">
+                  {pendingQty} Pending
+                </span>
+              ) : null}
+            </div>
+          </div>
+        );
+      }
+    },
+    {
+      header: "PRIORITY",
+      render: (plan: any) => (
+        <StatusBadge status={plan.priority || "MEDIUM"} />
+      )
+    },
+    {
+      header: "STATUS",
+      render: (plan: any) => {
+        const plannedQty = Number(plan.plannedQty || 0);
+        const producedQty = Array.isArray(plan.hourlyProductions)
+          ? plan.hourlyProductions.reduce((sum: number, h: any) => sum + Number(h.qtyProduced || 0), 0)
+          : 0;
+        return (
+          <div className="flex items-center gap-2">
+            <StatusBadge status={plan.status === "COMPLETED" && producedQty < plannedQty ? "SHORT_CLOSED" : plan.status} />
+            {(plan.status === "STOPPED" || plan.status === "CANCELLED") && plan.remarks && (
+              <div className="group relative flex items-center justify-center cursor-pointer">
+                <FaInfoCircle className="text-rose-500 text-[15px] opacity-85 hover:opacity-100 transition-opacity" />
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-slate-800 text-white text-xs rounded-md opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10 text-center shadow-lg">
+                  <span className="font-bold text-amber-400 block mb-1 text-left">Reason:</span>
+                  <div className="text-left">
+                    {plan.remarks.includes("Stopped:") || plan.remarks.includes("Cancelled:")
+                      ? plan.remarks.split("|").pop()?.replace("Stopped:", "")?.replace("Cancelled:", "").trim()
+                      : plan.remarks}
+                  </div>
+                  <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800"></div>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      }
+    },
+    {
+      header: "ACTIONS",
+      width: "180px",
+
+      render: (plan: any) => {
+        const plannedQty = Number(plan.plannedQty || 0);
+        const producedQty = Array.isArray(plan.hourlyProductions)
+          ? plan.hourlyProductions.reduce((sum: number, h: any) => sum + Number(h.qtyProduced || 0), 0)
+          : 0;
+        const pendingQty = plannedQty > producedQty ? plannedQty - producedQty : 0;
+        const nextStatus = STATUS_FLOW[plan.status]?.next;
+        const canAdvance = !!nextStatus && plan.status !== "COMPLETED" && plan.status !== "CANCELLED";
+        const canLog = plan.status === "IN_PROGRESS";
+
+        const forwardedToPlan = filteredPlans.find((p: any) => p.remarks?.includes(`Carried forward from Daily Plan ${plan.dailyPlanId}`));
+        const canCarryForward = plan.status === "COMPLETED" && pendingQty > 0 && !forwardedToPlan;
+
+        return (
+          <div className="flex items-center justify-end gap-1" onClick={e => e.stopPropagation()}>
+            <ViewButton onClick={() => { setViewPlan(plan); setShowViewModal(true); }} />
+            {canLog && (
+              <IconButton
+                variant="primary"
+                title="Log Hourly Production"
+                icon={FaClipboardList}
+                onClick={() => handleLogHourly(plan)}
+              />
+            )}
+            {canAdvance && (
+              <IconButton
+                variant="success"
+                title={NEXT_ACTION_LABELS[plan.status] || `Move to ${nextStatus}`}
+                icon={NEXT_ACTION_ICONS[plan.status] || FaArrowRight}
+                onClick={() => handleStatusAdvance(plan, producedQty)}
+              />
+            )}
+            {plan.status === "IN_PROGRESS" && (
+              <IconButton
+                variant="danger"
+                title="Stop Production"
+                icon={FaStop}
+                onClick={() => handleStopProductionClick(plan)}
+              />
+            )}
+            {(plan.status === "DRAFT" || plan.status === "PLANNED") && (
+              <IconButton
+                variant="info"
+                title="Edit Plan"
+                icon={FaEdit}
+                onClick={() => openEditForm(plan)}
+              />
+            )}
+            {canCarryForward && (
+              <IconButton
+                variant="warning"
+                title={`Carry Forward ${pendingQty} pcs`}
+                icon={FaShare}
+                onClick={() => handleCarryForward(plan, pendingQty)}
+              />
+            )}
+            {(plan.status === "DRAFT" || plan.status === "CANCELLED") && (
+              <DeleteButton onClick={() => { setDeletePlanId(plan.dailyPlanId); setShowDeleteModal(true); }} />
+            )}
+          </div>
+        );
+      }
+    }
+  ];
+
   const allowedMachines = useMemo(() =>
     (machines || []).filter((m: any) => m.machineId !== "MAC-001")
     , [machines]);
@@ -342,55 +531,65 @@ const DailyProductionPlanningPage: React.FC = () => {
               </div>
             </div>
             <div className="flex-1 w-full lg:w-auto">
-              <div className="flex flex-wrap items-center lg:justify-end gap-3">
-                {/* Date Filter */}
-                <div className="w-40">
-                  <input
-                    type="date"
-                    className="w-full h-10 px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    value={filterDate}
-                    onChange={(e) => setFilterDate(e.target.value)}
+              <div className="flex flex-col items-end gap-3">
+                {/* Filters Row */}
+                <div className="flex flex-wrap items-center justify-end gap-3">
+                  {/* Date Filter */}
+                  <div className="w-40">
+                    <input
+                      type="date"
+                      className="w-full h-[35px] px-3 py-1 text-sm border border-slate-300 rounded-[10px] focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/15 transition-all duration-200"
+                      value={filterDate}
+                      onChange={(e) => setFilterDate(e.target.value)}
+                    />
+                  </div>
+
+                  {/* Machine Filter */}
+                  <div className="w-48">
+                    <SelectInput
+                      hideLabel
+                      noMargin
+                      name="filterMachine"
+                      value={filterMachine}
+                      onChange={(e: any) => setFilterMachine(e.target.value)}
+                      defaultOptionLabel="All Machines"
+                      options={allowedMachines.map((m: any) => ({
+                        value: m.machineId,
+                        label: m.machineName
+                      }))}
+                    />
+                  </div>
+
+                  {/* Status Filter */}
+                  <div className="w-40">
+                    <SelectInput
+                      hideLabel
+                      noMargin
+                      name="filterStatus"
+                      value={filterStatus}
+                      onChange={(e: any) => setFilterStatus(e.target.value)}
+                      defaultOptionLabel="All Status"
+                      options={Object.keys(STATUS_FLOW).map(s => ({
+                        value: s,
+                        label: STATUS_FLOW[s].label
+                      }))}
+                    />
+                  </div>
+                </div>
+
+                {/* Buttons Row */}
+                <div className="flex items-center gap-3">
+                  <CustomButton
+                    text="New Production Order"
+                    icon={FaPlus}
+                    onClick={() => navigate("/production-orders/create")}
+                  />
+                  <CustomButton
+                    text="New Daily Plan"
+                    icon={FaPlus}
+                    onClick={openCreateForm}
                   />
                 </div>
-
-                {/* Machine Filter */}
-                <div className="w-40">
-                  <select
-                    className="w-full h-10 px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    value={filterMachine}
-                    onChange={(e) => setFilterMachine(e.target.value)}
-                  >
-                    <option value="">All Machines</option>
-                    {allowedMachines.map((m: any) => (
-                      <option key={m.machineId} value={m.machineId}>{m.machineName}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Status Filter */}
-                <div className="w-36">
-                  <select
-                    className="w-full h-10 px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    value={filterStatus}
-                    onChange={(e) => setFilterStatus(e.target.value)}
-                  >
-                    <option value="">All Status</option>
-                    {Object.keys(STATUS_FLOW).map(s => (
-                      <option key={s} value={s}>{STATUS_FLOW[s].label}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <CustomButton
-                  text="New Production Order"
-                  icon={FaPlus}
-                  onClick={() => navigate("/production-orders/create")}
-                />
-                <CustomButton
-                  text="New Daily Plan"
-                  icon={FaPlus}
-                  onClick={openCreateForm}
-                />
               </div>
             </div>
           </div>
@@ -419,283 +618,21 @@ const DailyProductionPlanningPage: React.FC = () => {
         {/* Daily Plans Table */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 mb-6 overflow-hidden">
           <div className="p-0">
-            {loading ? (
-              <div className="text-center py-10">
-                <div className="inline-block w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-                <p className="mt-3 text-slate-500">Loading daily plans...</p>
-              </div>
-            ) : filteredPlans.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm border-collapse">
-                  <thead className="bg-blue-50 text-primary border-b border-slate-200 uppercase tracking-wide text-xs">
-                    <tr>
-                      <th className="px-4 py-3.5 font-semibold w-[50px]">#</th>
-                      <th className="px-4 py-3.5 font-semibold">PLAN ID</th>
-                      <th className="px-4 py-3.5 font-semibold">PRODUCTION ORDER</th>
-                      <th className="px-4 py-3.5 font-semibold">DATE</th>
-                      <th className="px-4 py-3.5 font-semibold">MACHINE / SHIFT</th>
-                      <th className="px-4 py-3.5 font-semibold">PLANNED QTY</th>
-                      <th className="px-4 py-3.5 font-semibold w-[180px]">PROGRESS</th>
-                      <th className="px-4 py-3.5 font-semibold">PRIORITY</th>
-                      <th className="px-4 py-3.5 font-semibold">STATUS</th>
-                      <th className="px-4 py-3.5 font-semibold w-[180px] text-right">ACTIONS</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {filteredPlans.map((plan: any, idx: number) => {
-                      const plannedQty = Number(plan.plannedQty || 0);
-                      const producedQty = Array.isArray(plan.hourlyProductions)
-                        ? plan.hourlyProductions.reduce((sum: number, h: any) => sum + Number(h.qtyProduced || 0), 0)
-                        : 0;
-                      const progressPercent = Math.min(100, plannedQty > 0 ? Math.round((producedQty / plannedQty) * 100) : 0);
-                      const nextStatus = STATUS_FLOW[plan.status]?.next;
-                      const canAdvance = !!nextStatus && plan.status !== "COMPLETED" && plan.status !== "CANCELLED";
-                      const canLog = plan.status === "IN_PROGRESS";
-
-                      const pendingQty = plannedQty > producedQty ? plannedQty - producedQty : 0;
-                      const forwardedToPlan = filteredPlans.find((p: any) => p.remarks?.includes(`Carried forward from Daily Plan ${plan.dailyPlanId}`));
-                      const forwardedFromMatch = plan.remarks?.match(/Carried forward from Daily Plan ([\w-]+)/i);
-                      const forwardedFromPlanId = forwardedFromMatch ? forwardedFromMatch[1] : null;
-
-                      const canCarryForward = plan.status === "COMPLETED" && pendingQty > 0 && !forwardedToPlan;
-
-                      return (
-                        <React.Fragment key={plan.dailyPlanId}>
-                          <tr className={`border-b border-slate-100 hover:bg-slate-50 transition-colors ${expandedRow === plan.dailyPlanId ? "bg-blue-50/50" : ""}`} style={{ cursor: "pointer" }} onClick={() => toggleExpandRow(plan.dailyPlanId)}>
-                            <td className="px-4 py-3 text-slate-500">{idx + 1}</td>
-                            <td className="px-4 py-3 font-bold font-mono">
-                              <div>{plan.dailyPlanId}</div>
-                              {forwardedToPlan && (
-                                <div className="mt-1 flex items-center gap-1 text-[11px] text-purple-600 font-semibold">
-                                  <span>↪</span> Fwd to {forwardedToPlan.dailyPlanId}
-                                </div>
-                              )}
-                              {forwardedFromPlanId && (
-                                <div className="mt-1 flex items-center gap-1 text-[11px] text-blue-500 font-semibold">
-                                  <span className="text-[14px] leading-none">↳</span> Fwd from {forwardedFromPlanId}
-                                </div>
-                              )}
-                            </td>
-                            <td className="px-4 py-3">
-                              <div className="font-semibold text-slate-800">{plan.productionOrderId}</div>
-                              <div className="text-slate-500 text-xs mt-1 line-clamp-1" title={plan.productionOrder?.productItem?.productName || ""}>
-                                {plan.productionOrder?.productItem?.productName || "—"}
-                              </div>
-                            </td>
-                            <td className="px-4 py-3">
-                              <div className="font-medium text-slate-700">{plan.productionDate?.split("T")[0] || "—"}</div>
-                            </td>
-                            <td className="px-4 py-3">
-                              <div className="font-semibold text-slate-700 flex items-center">
-                                <FaIndustry className="mr-2 text-slate-400" />
-                                {plan.machine?.machineName || plan.machineId || "—"}
-                              </div>
-                              <div className="flex items-center gap-2 mt-1.5">
-                                <span className="bg-slate-100 text-slate-600 border border-slate-200 px-2 py-0.5 rounded text-[10px] font-medium">
-                                  {plan.shift?.shiftName || plan.shiftId || "—"}
-                                </span>
-                                {(plan.shift?.startTime && plan.shift?.endTime) && (
-                                  <span className="text-slate-500 text-[10px]">
-                                    {plan.shift.startTime.slice(0, 5)} - {plan.shift.endTime.slice(0, 5)}
-                                  </span>
-                                )}
-                              </div>
-                            </td>
-                            <td className="px-4 py-3 font-medium text-slate-700">
-                              <div>{plannedQty.toLocaleString()} pcs</div>
-                              {plan.plannedHours && (
-                                <div className="text-slate-500 text-xs mt-0.5">{plan.plannedHours} hrs</div>
-                              )}
-                            </td>
-                            <td className="px-4 py-3">
-                              <div className="mb-1">
-                                <CustomProgressBar progressPercent={progressPercent} />
-                              </div>
-                              <div className="flex items-center justify-between text-xs">
-                                <span className="text-slate-500">{producedQty} / {plannedQty} pcs</span>
-                                {producedQty > plannedQty ? (
-                                  <span className="bg-emerald-100 text-emerald-700 border border-emerald-200 py-0.5 px-2 rounded text-[9px] font-bold">
-                                    +{producedQty - plannedQty} Over
-                                  </span>
-                                ) : pendingQty > 0 ? (
-                                  <span className="bg-rose-100 text-rose-700 border border-rose-200 py-0.5 px-2 rounded text-[9px] font-bold">
-                                    {pendingQty} Pending
-                                  </span>
-                                ) : null}
-                              </div>
-                            </td>
-                            <td className="px-4 py-3">
-                              <StatusBadge status={plan.priority || "MEDIUM"} />
-                            </td>
-                            <td className="px-4 py-3">
-                              <div className="flex items-center gap-2">
-                                <StatusBadge status={plan.status === "COMPLETED" && producedQty < plannedQty ? "SHORT_CLOSED" : plan.status} />
-                                {(plan.status === "STOPPED" || plan.status === "CANCELLED") && plan.remarks && (
-                                  <div className="group relative flex items-center justify-center cursor-pointer">
-                                    <FaInfoCircle className="text-rose-500 text-[15px] opacity-85 hover:opacity-100 transition-opacity" />
-                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-slate-800 text-white text-xs rounded-md opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10 text-center shadow-lg">
-                                      <span className="font-bold text-amber-400 block mb-1 text-left">Reason:</span>
-                                      <div className="text-left">
-                                        {plan.remarks.includes("Stopped:") || plan.remarks.includes("Cancelled:")
-                                          ? plan.remarks.split("|").pop()?.replace("Stopped:", "")?.replace("Cancelled:", "").trim()
-                                          : plan.remarks}
-                                      </div>
-                                      <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800"></div>
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            </td>
-                            <td className="px-4 py-3 text-right">
-                              <div className="flex items-center justify-end gap-1" onClick={e => e.stopPropagation()}>
-                                {/* View */}
-                                <ViewButton onClick={() => { setViewPlan(plan); setShowViewModal(true); }} />
-
-                                {/* Log Hourly (only if APPROVED or IN_PROGRESS) */}
-                                {canLog && (
-                                  <IconButton
-                                    variant="primary"
-                                    title="Log Hourly Production"
-                                    icon={FaClipboardList}
-                                    onClick={() => handleLogHourly(plan)}
-                                  />
-                                )}
-
-                                {/* Advance Status */}
-                                {canAdvance && (
-                                  <IconButton
-                                    variant="success"
-                                    title={NEXT_ACTION_LABELS[plan.status] || `Move to ${nextStatus}`}
-                                    icon={NEXT_ACTION_ICONS[plan.status] || FaArrowRight}
-                                    onClick={() => handleStatusAdvance(plan, producedQty)}
-                                  />
-                                )}
-
-                                {/* Stop Production (only if IN_PROGRESS) */}
-                                {plan.status === "IN_PROGRESS" && (
-                                  <IconButton
-                                    variant="danger"
-                                    title="Stop Production"
-                                    icon={FaStop}
-                                    onClick={() => handleStopProductionClick(plan)}
-                                  />
-                                )}
-
-                                {/* Edit (only DRAFT or PLANNED) */}
-                                {(plan.status === "DRAFT" || plan.status === "PLANNED") && (
-                                  <IconButton
-                                    variant="info"
-                                    title="Edit Plan"
-                                    icon={FaEdit}
-                                    onClick={() => openEditForm(plan)}
-                                  />
-                                )}
-
-                                {/* Cancel (only if not started: DRAFT, PLANNED) */}
-                                {["DRAFT", "PLANNED"].includes(plan.status) && (
-                                  <IconButton
-                                    variant="warning"
-                                    title="Cancel Plan"
-                                    icon={FaBan}
-                                    onClick={() => handleCancelPlan(plan)}
-                                  />
-                                )}
-
-                                {/* Carry Forward */}
-                                {canCarryForward && (
-                                  <IconButton
-                                    variant="warning"
-                                    title={`Carry Forward ${pendingQty} pcs`}
-                                    icon={FaShare}
-                                    onClick={() => handleCarryForward(plan, pendingQty)}
-                                  />
-                                )}
-
-                                {/* Delete (only DRAFT or CANCELLED) */}
-                                {(plan.status === "DRAFT" || plan.status === "CANCELLED") && (
-                                  <DeleteButton onClick={() => { setDeletePlanId(plan.dailyPlanId); setShowDeleteModal(true); }} />
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                          {expandedRow === plan.dailyPlanId && (
-                            <tr className="bg-white border-b border-slate-200">
-                              <td colSpan={10} className="p-0">
-                                <div className="px-6 py-4 shadow-inner bg-white/50">
-                                  <div className="flex items-center justify-between mb-4">
-                                    <h6 className="font-bold text-xs text-primary uppercase tracking-wider mb-0">
-                                      Hourly Production Breakdown
-                                    </h6>
-                                    {canLog && (
-                                      <button
-                                        className="text-xs font-semibold px-3 py-1.5 border border-primary text-primary rounded-md hover:bg-primary hover:text-white transition-colors"
-                                        onClick={() => handleLogHourly(plan)}
-                                      >
-                                        + Log Hour
-                                      </button>
-                                    )}
-                                  </div>
-                                  {(!plan.hourlyProductions || plan.hourlyProductions.length === 0) ? (
-                                    <div className="text-center text-slate-500 p-4 border border-slate-200 rounded-lg bg-white text-sm">
-                                      No hourly entries recorded yet for this plan.
-                                    </div>
-                                  ) : (
-                                    <div className="rounded-lg border border-slate-200 overflow-hidden bg-white">
-                                      <table className="w-full text-sm text-center">
-                                        <thead className="bg-slate-50 text-slate-500 border-b border-slate-200">
-                                          <tr>
-                                            <th className="px-3 py-2 font-semibold">Hour</th>
-                                            <th className="px-3 py-2 font-semibold">Produced</th>
-                                            <th className="px-3 py-2 font-semibold">Reject</th>
-                                            <th className="px-3 py-2 font-semibold">Scrap</th>
-                                            <th className="px-3 py-2 font-semibold">Downtime</th>
-                                            <th className="px-3 py-2 font-semibold">Operator</th>
-                                          </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-slate-100">
-                                          {plan.hourlyProductions.sort((a: any, b: any) => Number(a.hourIndex) - Number(b.hourIndex)).map((h: any) => (
-                                            <tr key={h.hourlyProductionId} className="hover:bg-slate-50">
-                                              <td className="px-3 py-2 font-bold font-mono text-slate-500">H{h.hourIndex}</td>
-                                              <td className="px-3 py-2 font-bold text-emerald-600">{h.qtyProduced}</td>
-                                              <td className={`px-3 py-2 ${h.rejectQty > 0 ? "text-rose-600 font-medium" : "text-slate-400"}`}>{h.rejectQty || 0}</td>
-                                              <td className={`px-3 py-2 ${h.scrapQty > 0 ? "text-amber-500 font-medium" : "text-slate-400"}`}>{h.scrapQty || 0}</td>
-                                              <td className={`px-3 py-2 ${h.downtime > 0 ? "text-rose-600 font-medium" : "text-slate-400"}`}>{h.downtime > 0 ? `${h.downtime} min` : "—"}</td>
-                                              <td className="px-3 py-2 text-slate-500">{h.operator?.name || h.operatorId || "—"}</td>
-                                            </tr>
-                                          ))}
-                                        </tbody>
-                                        <tfoot className="bg-white font-bold text-slate-700 border-t border-slate-200">
-                                          <tr>
-                                            <td className="px-3 py-2">Total</td>
-                                            <td className="px-3 py-2 text-emerald-600">{producedQty}</td>
-                                            <td className="px-3 py-2 text-rose-600">{plan.hourlyProductions.reduce((s: number, h: any) => s + Number(h.rejectQty || 0), 0)}</td>
-                                            <td className="px-3 py-2 text-amber-500">{plan.hourlyProductions.reduce((s: number, h: any) => s + Number(h.scrapQty || 0), 0)}</td>
-                                            <td className="px-3 py-2 text-rose-600">{(() => { const t = plan.hourlyProductions.reduce((s: number, h: any) => s + Number(h.downtime || 0), 0); return t > 0 ? `${t} min` : "—"; })()}</td>
-                                            <td className="px-3 py-2"></td>
-                                          </tr>
-                                        </tfoot>
-                                      </table>
-                                    </div>
-                                  )}
-                                </div>
-                              </td>
-                            </tr>
-                          )}
-                        </React.Fragment>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="text-center py-12">
-                <FaCalendarAlt className="text-slate-300 mx-auto mb-3" size={32} />
-                <h5 className="text-slate-500 mb-1 font-semibold">No daily plans found</h5>
-                <p className="text-slate-400 text-sm mb-0">
-                  Click "New Daily Plan" to schedule a production run for today.
-                </p>
-              </div>
-            )}
+            <DataTable
+              columns={columns}
+              data={filteredPlans}
+              rowKey={(row) => row.dailyPlanId}
+              loading={loading}
+              emptyMessage={
+                <div className="text-center py-12">
+                  <FaCalendarAlt className="text-slate-300 mx-auto mb-3" size={32} />
+                  <h5 className="text-slate-500 mb-1 font-semibold">No daily plans found</h5>
+                  <p className="text-slate-400 text-sm mb-0">
+                    Click "New Daily Plan" to schedule a production run for today.
+                  </p>
+                </div>
+              }
+            />
           </div>
         </div>
 

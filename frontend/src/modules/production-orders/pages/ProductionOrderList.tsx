@@ -321,9 +321,9 @@ const ProductionOrderList: React.FC = () => {
                 const rawMaterials = item.productionOrders?.flatMap((po: any) => po.draftRawMaterials || []) || [];
                 const visibleRMs = rawMaterials.slice(0, 2);
                 const hiddenRMs = rawMaterials.slice(2);
-                
+
                 if (rawMaterials.length === 0) return <span className="text-slate-500">N/A</span>;
-                
+
                 return (
                     <div className="flex flex-wrap gap-1 items-center">
                         {visibleRMs.map((rm: any, rmIdx: number) => {
@@ -385,7 +385,7 @@ const ProductionOrderList: React.FC = () => {
         {
             header: "ACTIONS",
             render: (item: any) => (
-                <div className="flex items-center gap-2 justify-end">
+                <div className="flex items-center gap-2 justify-start">
                     {item.status === "PENDING_PLANNING" && (
                         <IconButton
                             variant="success"
