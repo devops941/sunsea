@@ -1,21 +1,22 @@
 import type { SidebarItem } from "./sidebar.types";
 import {
-  FiPieChart,
-  FiShoppingCart,
-  FiShoppingBag,
-  FiBox,
-  FiTool,
-  FiBarChart2,
-  FiSettings,
-  FiMapPin,
-  FiUsers
-} from "react-icons/fi";
+  FaTachometerAlt,
+  FaShoppingCart,
+  FaShoppingBag,
+  FaWarehouse,
+  FaIndustry,
+  FaChartBar,
+  FaCog,
+  FaBoxes,
+  FaUsersCog,
+  FaDatabase
+} from "react-icons/fa";
 
 export const sidebarItems: SidebarItem[] = [
   // 1. Dashboard / Overview
   {
     title: "Dashboard",
-    icon: FiPieChart,
+    icon: FaTachometerAlt,
     path: "/dashboard",
   },
 
@@ -23,25 +24,37 @@ export const sidebarItems: SidebarItem[] = [
   // 2. Core Business Flow (Sales -> Purchase -> Inventory -> Production)
   {
     title: "Sales",
-    icon: FiShoppingCart,
+    icon: FaShoppingCart,
     path: "/sales-order",
     permission: "sales-orders.view",
   },
   {
     title: "Purchase",
-    icon: FiShoppingBag,
+    icon: FaShoppingBag,
     path: "/purchase-orders",
   },
   {
     title: "Inventory",
-    icon: FiBox,
+    icon: FaWarehouse,
     path: "/stock",
     permission: "raw_material_stocks.view",
   },
   {
     title: "Production",
-    icon: FiTool,
+    icon: FaIndustry,
     path: "/approved-sales-orders",
+    activePaths: [
+      "/approved-sales-orders",
+      "/production-orders",
+      "/allproduction-orders",
+      "/weekly-machine-schedules",
+      "/daily-machine-planning",
+      "/daily-production-plans",
+      "/hourly-work-reports",
+      "/production-wastages",
+      "/oee-dashboard",
+      "/production-dashboard",
+    ],
   },
 
 
@@ -54,29 +67,36 @@ export const sidebarItems: SidebarItem[] = [
   // },
   {
     title: "Store & Locations",
-    icon: FiMapPin,
+    icon: FaWarehouse,
     path: "/storage-stores",
     activePaths: ["/storage-stores", "/store-types", "/locations"],
     permission: "storage_stores.view",
   },
   {
     title: "HR & Organization",
-    icon: FiUsers,
+    icon: FaUsersCog,
     path: "/employees",
-    activePaths: ["/employees", "/customers", "/suppliers", "/machines", "/raw-materials", "/raw-material-categories", "/products", "/categories", "/uoms", "/colours", "/sizes", "/shifts"],
+    activePaths: ["/employees", "/customers", "/suppliers", "/machines", "/shifts"],
     permission: "employees.view",
+  },
+  {
+    title: "Product Setup",
+    icon: FaDatabase,
+    path: "/products",
+    activePaths: ["/products", "/categories", "/uoms", "/colours", "/sizes", "/raw-materials", "/raw-material-categories"],
+    permission: "products.view",
   },
 
   // 4. Analytics & Administration
   {
     title: "Reports",
-    icon: FiBarChart2,
+    icon: FaChartBar,
     path: "/reports/sales",
     permission: "reports.view",
   },
   {
     title: "Administration",
-    icon: FiSettings,
+    icon: FaCog,
     path: "/company/view",
   }
 ];

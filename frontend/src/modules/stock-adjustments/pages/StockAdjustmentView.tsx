@@ -1,17 +1,9 @@
-import React, { useEffect, useState } from "react";
+﻿import React, { useEffect, useState } from "react";
 import {
-  Container,
-  Row,
-  Col,
-  Table,
-  Badge,
-  Form,
-  Modal,
-  Button,
-  Card,
-  Alert,
-} from "react-bootstrap";
-import { FaArrowLeft, FaCheck, FaTimes, FaBoxes, FaEdit } from "react-icons/fa";
+  FaCheck, FaTimes, FaBoxes, FaEdit,
+  FaClipboardList, FaInfoCircle, FaExclamationTriangle,
+  FaCheckCircle, FaTimesCircle,
+} from "react-icons/fa";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
 
@@ -21,7 +13,9 @@ import {
   approveStockAdjustment,
   clearCurrent,
 } from "../../../features/stock-adjustments/stockAdjustmentSlice";
-import CustomButton from "../../../components/ui/custombutton/CustomButton";
+import CustomButton from "../../../components/ui/Button/Button";
+import BackButton from "../../../components/ui/BackButton/BackButton";
+import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import { formatDate } from "../../../utils/dateUtils";
 
 const ADJUSTMENT_TYPE_LABELS: Record<string, string> = {
@@ -36,17 +30,12 @@ const ADJUSTMENT_TYPE_LABELS: Record<string, string> = {
   OTHER: "Other",
 };
 
-const ADJUSTMENT_TYPE_BADGE: Record<string, string> = {
-  PRODUCTION_MATERIAL_ISSUE: "primary",
-  PRODUCTION_MATERIAL_RETURN: "info",
-  STOCK_INCREASE: "success",
-  STOCK_DECREASE: "warning",
-  DAMAGE: "danger",
-  SCRAP: "secondary",
-  OPENING_STOCK: "dark",
-  MANUAL_CORRECTION: "light",
-  OTHER: "secondary",
-};
+const InfoField = ({ label, value }: { label: string; value: React.ReactNode }) => (
+  <div>
+    <p className="text-[11px] uppercase tracking-wider text-slate-400 font-semibold mb-1">{label}</p>
+    <div className="text-sm font-semibold text-slate-700">{value || "—"}</div>
+  </div>
+);
 
 const StockAdjustmentView: React.FC = () => {
   const { id } = useParams();
@@ -57,441 +46,353 @@ const StockAdjustmentView: React.FC = () => {
     (state) => state.stockAdjustments
   );
 
-  const [showApproveModal, setShowApproveModal] = useState(false);
-  const [approveStatus, setApproveStatus] = useState<"APPROVED" | "REJECTED" | null>(null);
+  const [showModal, setShowModal] = useState(false);
+  const [modalAction, setModalAction] = useState<"APPROVED" | "REJECTED" | null>(null);
   const [reason, setReason] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (id) dispatch(fetchStockAdjustmentById(id));
     return () => { dispatch(clearCurrent()); };
   }, [dispatch, id]);
 
-  const handleApproveReject = async () => {
-    if (!id || !approveStatus) return;
+  const openModal = (action: "APPROVED" | "REJECTED") => {
+    setModalAction(action);
+    setReason("");
+    setShowModal(true);
+  };
+
+  const handleConfirm = async () => {
+    if (!id || !modalAction) return;
+    setIsSubmitting(true);
     try {
       await dispatch(
-        approveStockAdjustment({ id, status: approveStatus, reason })
+        approveStockAdjustment({ id, status: modalAction, reason })
       ).unwrap();
-      toast.success(`Stock Adjustment ${approveStatus.toLowerCase()} successfully`);
-      setShowApproveModal(false);
+      toast.success(`Stock Adjustment ${modalAction === "APPROVED" ? "approved" : "rejected"} successfully`);
+      setShowModal(false);
       dispatch(fetchStockAdjustmentById(id));
     } catch (err: any) {
       toast.error(err || "Failed to update status");
+    } finally {
+      setIsSubmitting(false);
     }
-  };
-
-  const openApproveModal = (status: "APPROVED" | "REJECTED") => {
-    setApproveStatus(status);
-    setReason("");
-    setShowApproveModal(true);
   };
 
   if (loading || !currentAdjustment) {
-    return <div className="text-center py-5">Loading...</div>;
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary" />
+      </div>
+    );
   }
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "DRAFT": return <Badge bg="secondary">Draft</Badge>;
-      case "PENDING_APPROVAL": return <Badge bg="warning">Pending Approval</Badge>;
-      case "APPROVED": return <Badge bg="success">Approved</Badge>;
-      case "REJECTED": return <Badge bg="danger">Rejected</Badge>;
-      default: return <Badge bg="secondary">{status}</Badge>;
-    }
-  };
 
   const isPMI = currentAdjustment.adjustmentType === "PRODUCTION_MATERIAL_ISSUE";
   const po = currentAdjustment.productionOrder;
+  const isApproved = currentAdjustment.status === "APPROVED";
+  const isRejected = currentAdjustment.status === "REJECTED";
+  const isPending = !isApproved && !isRejected;
 
   return (
-    <div className="inner-container">
-      <Container fluid>
-        {/* PAGE HEADER */}
-        <div className="page-header">
-          <Row className="align-items-center">
-            <Col>
-              <h2 className="page-title">Stock Adjustment Details</h2>
-
-            </Col>
-            <Col className="text-end">
+    <div className="p-4 md:p-6 min-h-screen bg-white">
+      <div className="w-full max-w-7xl mx-auto">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-6">
+          <div>
+            <h2 className="text-2xl font-bold text-slate-800">Stock Adjustment Details</h2>
+            <p className="text-slate-500 text-sm mt-0.5">
+              {currentAdjustment.adjustmentNumber} &middot; {ADJUSTMENT_TYPE_LABELS[currentAdjustment.adjustmentType] || currentAdjustment.adjustmentType}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            {currentAdjustment.status === "DRAFT" && (
               <CustomButton
-                text="Back"
+                text="Edit"
+                icon={FaEdit}
                 variant="secondary"
-                icon={FaArrowLeft}
-                onClick={() => navigate("/inventory/stock-adjustments")}
-                className="me-2"
+                onClick={() => navigate(`/inventory/stock-adjustments/edit/${currentAdjustment.id}`)}
               />
-              {currentAdjustment.status === "DRAFT" && (
-                <CustomButton
-                  text="Edit"
-                  icon={FaEdit}
-                  onClick={() =>
-                    navigate(
-                      `/inventory/stock-adjustments/edit/${currentAdjustment.id}`
-                    )
-                  }
-                />
-              )}
-            </Col>
-          </Row>
+            )}
+            <BackButton text="Back" to="/inventory/stock-adjustments" />
+          </div>
         </div>
 
-        <div className="page-content">
-          {/* ── ADJUSTMENT SUMMARY ── */}
-          <Card className="mb-4 border-0 shadow-sm">
-            <Card.Header className="bg-primary text-white py-3">
-              <h5 className="mb-0 fw-bold">Adjustment Information</h5>
-            </Card.Header>
-            <Card.Body>
-              <Row className="g-3">
-                <Col md={2}>
-                  <div className="info-group">
-                    <label className="text-muted small">Adjustment Number</label>
-                    <div className="fw-bold">{currentAdjustment.adjustmentNumber}</div>
-                  </div>
-                </Col>
-                <Col md={2}>
-                  <div className="info-group">
-                    <label className="text-muted small">Date</label>
-                    <div className="fw-bold">{formatDate(currentAdjustment.adjustmentDate)}</div>
-                  </div>
-                </Col>
-                <Col md={2}>
-                  <div className="info-group">
-                    <label className="text-muted small">Adjustment Type</label>
-                    <div>
-                      <Badge
-                        bg={
-                          ADJUSTMENT_TYPE_BADGE[currentAdjustment.adjustmentType] ||
-                          "secondary"
-                        }
-                      >
-                        {ADJUSTMENT_TYPE_LABELS[currentAdjustment.adjustmentType] ||
-                          currentAdjustment.adjustmentType}
-                      </Badge>
-                    </div>
-                  </div>
-                </Col>
-                <Col md={2}>
-                  <div className="info-group">
-                    <label className="text-muted small">Status</label>
-                    <div>{getStatusBadge(currentAdjustment.status)}</div>
-                  </div>
-                </Col>
-                <Col md={2}>
-                  <div className="info-group">
-                    <label className="text-muted small">Created By</label>
-                    <div className="fw-bold">{currentAdjustment.createdBy || "—"}</div>
-                  </div>
-                </Col>
-                <Col md={2}>
-                  <div className="info-group">
-                    <label className="text-muted small">Approved By</label>
-                    <div className="fw-bold">
-                      {currentAdjustment.approvedBy
-                        ? `${currentAdjustment.approvedBy} (${formatDate(currentAdjustment.approvedAt)})`
-                        : "—"}
-                    </div>
-                  </div>
-                </Col>
-                <Col md={12}>
-                  <div className="info-group">
-                    <label className="text-muted small">Reason</label>
-                    <div>{currentAdjustment.reason || "—"}</div>
-                  </div>
-                </Col>
-              </Row>
-            </Card.Body>
-          </Card>
+        {isApproved && isPMI && (
+          <div className="mb-5 rounded-xl bg-emerald-50 border border-emerald-200 p-4 flex items-start gap-3">
+            <FaCheckCircle className="text-emerald-500 mt-0.5 shrink-0" size={18} />
+            <div>
+              <p className="font-semibold text-emerald-800 text-sm">Material Issue Approved</p>
+              <p className="text-emerald-700 text-xs mt-0.5">
+                Production Order <strong>{currentAdjustment.productionOrderId}</strong> is now eligible to start production. Raw material stock has been deducted.
+              </p>
+            </div>
+          </div>
+        )}
 
-          {!isPMI && (
-            <Row className="mb-4">
-              <Col md={3}>
-                <div className="info-group">
-                  <label className="text-muted small">Source Document</label>
-                  <div className="fw-bold">{currentAdjustment.sourceDocument || "-"}</div>
-                </div>
-              </Col>
-              <Col md={3}>
-                <div className="info-group">
-                  <label className="text-muted small">Source Doc ID / Ref</label>
-                  <div className="fw-bold">{currentAdjustment.sourceDocId || "-"}</div>
-                </div>
-              </Col>
-              <Col md={3}>
-                <div className="info-group">
-                  <label className="text-muted small">Auto Generated</label>
-                  <div>
-                    {currentAdjustment.autoGenerated ? (
-                      <Badge bg="info">Auto-generated</Badge>
-                    ) : (
-                      "No"
-                    )}
-                  </div>
-                </div>
-              </Col>
-              <Col md={3}>
-                <div className="info-group">
-                  <label className="text-muted small">Adjustment Type</label>
-                  <div className="fw-bold">{currentAdjustment.type || "Adjustment"}</div>
-                </div>
-              </Col>
-            </Row>
-          )}
+        {currentAdjustment.status === "DRAFT" && isPMI && (
+          <div className="mb-5 rounded-xl bg-amber-50 border border-amber-200 p-4 flex items-start gap-3">
+            <FaInfoCircle className="text-amber-500 mt-0.5 shrink-0" size={18} />
+            <div>
+              <p className="font-semibold text-amber-800 text-sm">Draft — Pending Approval</p>
+              <p className="text-amber-700 text-xs mt-0.5">
+                This Material Issue is in <strong>Draft</strong> status. Approve it to deduct stock and allow Production Start.
+              </p>
+            </div>
+          </div>
+        )}
 
-          {/* ── PRODUCTION INFO CARD (PMI only) ── */}
-          {isPMI && po && (
-            <Card className="mb-4 border-0 shadow-sm">
-              <Card.Header
-                className="py-3 d-flex align-items-center gap-2"
-                style={{
-                  background: "linear-gradient(135deg, #1e3a5f, #2d6a9f)",
-                  color: "#fff",
-                }}
-              >
-                <FaBoxes />
-                <h5 className="mb-0 fw-bold">Production Order Information</h5>
-              </Card.Header>
-              <Card.Body>
-                <Row className="g-3">
-                  <Col md={2}>
-                    <label className="text-muted small">PO Number</label>
-                    <div className="fw-bold text-primary">
-                      {po.productionOrderId}
-                    </div>
-                  </Col>
-                  <Col md={3}>
-                    <label className="text-muted small">Product</label>
-                    <div className="fw-bold">
-                      {po.productItem?.productName || "—"}
-                    </div>
-                    <div className="text-muted small">
-                      {po.productItem?.productCode}
-                    </div>
-                  </Col>
-                  <Col md={2}>
-                    <label className="text-muted small">Planned Qty</label>
-                    <div className="fw-bold">
-                      {po.targetQty ? Number(po.targetQty).toLocaleString() : "—"}{" "}
-                      {po.uom}
-                    </div>
-                  </Col>
-                  <Col md={2}>
-                    <label className="text-muted small">Due Date</label>
-                    <div className="fw-bold">{formatDate(po.dueDate)}</div>
-                  </Col>
-                  <Col md={2}>
-                    <label className="text-muted small">Machine</label>
-                    <div className="fw-bold">
-                      {po.Machine?.machineName || po.machineMachineId || "—"}
-                    </div>
-                  </Col>
-                  <Col md={1}>
-                    <label className="text-muted small">PO Status</label>
-                    <div>
-                      <Badge bg="info" className="small">
-                        {po.status}
-                      </Badge>
-                    </div>
-                  </Col>
-                </Row>
-              </Card.Body>
-            </Card>
-          )}
-
-          {/* ── ITEMS TABLE ── */}
-          <Card className="border-0 shadow-sm mb-4">
-            <Card.Header className="bg-secondary text-white py-3">
-              <h5 className="mb-0 fw-bold">
-                {isPMI ? "Issued Materials" : "Adjustment Items"}
-              </h5>
-            </Card.Header>
-            <Card.Body className="p-0">
-              {isPMI ? (
-                /* PMI items with richer columns */
-                <Table bordered hover responsive className="mb-0">
-                  <thead className="table-dark">
-                    <tr>
-                      <th>RM Code</th>
-                      <th>Material Name</th>
-                      <th>Store</th>
-                      <th className="text-end">Stock Before</th>
-                      <th className="text-end">Stock After</th>
-                      <th className="text-end">Issued Qty</th>
-                      <th>Remarks</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {currentAdjustment.items?.map((item: any) => (
-                      <tr key={item.id}>
-                        <td>
-                          <code>{item.rawMaterialId}</code>
-                        </td>
-                        <td className="fw-semibold">
-                          {item.rawMaterial?.materialName || item.rawMaterialId}
-                        </td>
-                        <td>{item.store?.storeName || item.storeId}</td>
-                        <td className="text-end">{Number(item.currentQty).toFixed(3)}</td>
-                        <td className="text-end">{Number(item.adjustedQty).toFixed(3)}</td>
-                        <td className="text-end fw-bold text-danger">
-                          {Math.abs(Number(item.difference)).toFixed(3)}
-                        </td>
-                        <td>{item.remarks || "—"}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </Table>
-              ) : (
-                /* Regular adjustment items */
-                <Table bordered hover responsive className="mb-0">
-                  <thead className="bg-light">
-                    <tr>
-                      <th>Item Type</th>
-                      <th>Item Details</th>
-                      <th>Store</th>
-                      <th>Batch No</th>
-                      <th>Unit Cost</th>
-                      <th>Current Qty</th>
-                      <th>Adjusted Qty</th>
-                      <th>Difference</th>
-                      <th>Remarks</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {currentAdjustment.items?.map((item: any) => (
-                      <tr key={item.id}>
-                        <td>{item.itemType}</td>
-                        <td>
-                          {item.itemType === "RAW_MATERIAL"
-                            ? item.rawMaterial?.materialName
-                            : item.product?.productName}
-                          {" "}
-                          <small className="text-muted">
-                            (
-                            {item.itemType === "RAW_MATERIAL"
-                              ? item.rawMaterialId
-                              : item.product?.productCode}
-                            )
-                          </small>
-                        </td>
-                        <td>{item.store?.storeName}</td>
-                        <td>{item.batchNo || "-"}</td>
-                        <td>{item.unitCost !== null && item.unitCost !== undefined ? `₹${Number(item.unitCost).toFixed(2)}` : "-"}</td>
-                        <td>{Number(item.currentQty).toFixed(3)}</td>
-                        <td>{Number(item.adjustedQty).toFixed(3)}</td>
-                        <td
-                          className={
-                            Number(item.difference) > 0
-                              ? "text-success fw-bold"
-                              : Number(item.difference) < 0
-                                ? "text-danger fw-bold"
-                                : ""
-                          }
-                        >
-                          {Number(item.difference) > 0
-                            ? `+${Number(item.difference).toFixed(3)}`
-                            : Number(item.difference).toFixed(3)}
-                        </td>
-                        <td>{item.remarks || "—"}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </Table>
+        {isRejected && (
+          <div className="mb-5 rounded-xl bg-red-50 border border-red-200 p-4 flex items-start gap-3">
+            <FaTimesCircle className="text-red-500 mt-0.5 shrink-0" size={18} />
+            <div>
+              <p className="font-semibold text-red-800 text-sm">Adjustment Rejected</p>
+              {currentAdjustment.approvedBy && (
+                <p className="text-red-700 text-xs mt-0.5">
+                  Rejected by <strong>{currentAdjustment.approvedBy}</strong> on {formatDate(currentAdjustment.approvedAt)}.
+                </p>
               )}
-            </Card.Body>
-          </Card>
+            </div>
+          </div>
+        )}
 
-          {/* ── PMI PRODUCTION START NOTICE ── */}
-          {isPMI && currentAdjustment.status === "APPROVED" && (
-            <Alert variant="success" className="d-flex align-items-center gap-2 mb-4">
-              <FaCheck />
-              <span>
-                Material Issue <strong>approved</strong>. The Production Order{" "}
-                <strong>{currentAdjustment.productionOrderId}</strong> is now eligible to
-                start production.
-              </span>
-            </Alert>
-          )}
-
-          {isPMI && currentAdjustment.status === "DRAFT" && (
-            <Alert variant="warning" className="d-flex align-items-center gap-2 mb-4">
-              <span>
-                ⚠ This Material Issue is in <strong>Draft</strong> status. Approve it to
-                allow Production Start and deduct stock.
-              </span>
-            </Alert>
-          )}
-
-          {/* ── WORKFLOW ACTIONS ── */}
-          {currentAdjustment.status !== "APPROVED" &&
-            currentAdjustment.status !== "REJECTED" && (
-              <div className="mt-4 p-3 border rounded bg-light d-flex justify-content-between align-items-center">
-                <div>
-                  <strong>Workflow Actions</strong>
-                  <p className="text-muted mb-0 small">
-                    {isPMI
-                      ? "Approving this Material Issue will deduct raw material stock and enable Production Start."
-                      : "Review the items and approve or reject this adjustment."}
-                  </p>
-                </div>
-                <div>
-                  <CustomButton
-                    text="Reject"
-                    variant="danger"
-                    icon={FaTimes}
-                    className="me-2"
-                    onClick={() => openApproveModal("REJECTED")}
-                  />
-                  <CustomButton
-                    text="Approve"
-                    variant="success"
-                    icon={FaCheck}
-                    onClick={() => openApproveModal("APPROVED")}
-                  />
-                </div>
+        <div className="rounded-2xl border border-slate-200 shadow-sm mb-5 overflow-hidden">
+          <div className="flex items-center gap-3 px-5 py-4 bg-slate-50 border-b border-slate-200">
+            <div className="h-8 w-8 rounded-lg bg-indigo-100 flex items-center justify-center">
+              <FaClipboardList className="text-indigo-600" size={15} />
+            </div>
+            <h3 className="font-bold text-slate-700 text-base">Adjustment Information</h3>
+          </div>
+          <div className="p-5 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-5">
+            <InfoField label="Adjustment No." value={
+              <span className="font-mono text-primary text-sm">{currentAdjustment.adjustmentNumber}</span>
+            } />
+            <InfoField label="Date" value={formatDate(currentAdjustment.adjustmentDate)} />
+            <InfoField label="Type" value={
+              <StatusBadge status={currentAdjustment.adjustmentType}
+                customText={ADJUSTMENT_TYPE_LABELS[currentAdjustment.adjustmentType] || currentAdjustment.adjustmentType} />
+            } />
+            <InfoField label="Status" value={<StatusBadge status={currentAdjustment.status} />} />
+            <InfoField label="Created By" value={currentAdjustment.createdBy} />
+            <InfoField label="Approved By" value={
+              currentAdjustment.approvedBy
+                ? `${currentAdjustment.approvedBy} (${formatDate(currentAdjustment.approvedAt)})`
+                : null
+            } />
+            {currentAdjustment.reason && (
+              <div className="col-span-2 sm:col-span-3 lg:col-span-6">
+                <InfoField label="Reason / Notes" value={currentAdjustment.reason} />
               </div>
             )}
+          </div>
+          {!isPMI && (currentAdjustment.sourceDocument || currentAdjustment.sourceDocId) && (
+            <div className="px-5 pb-5 pt-2 grid grid-cols-2 sm:grid-cols-4 gap-5 border-t border-slate-100">
+              <InfoField label="Source Document" value={currentAdjustment.sourceDocument} />
+              <InfoField label="Source Doc Reference" value={currentAdjustment.sourceDocId} />
+              <InfoField label="Auto Generated" value={
+                currentAdjustment.autoGenerated
+                  ? <StatusBadge status="ACTIVE" customText="Auto-generated" />
+                  : "No"
+              } />
+            </div>
+          )}
         </div>
-      </Container>
 
-      {/* Approve / Reject Modal */}
-      <Modal show={showApproveModal} onHide={() => setShowApproveModal(false)} centered>
-        <Modal.Header closeButton>
-          <Modal.Title>
-            {approveStatus === "APPROVED" ? "Approve Adjustment" : "Reject Adjustment"}
-          </Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <p>
-            Are you sure you want to{" "}
-            <strong>{approveStatus?.toLowerCase()}</strong> this stock adjustment?
-            {approveStatus === "APPROVED" &&
-              (isPMI
-                ? " This will deduct the issued quantities from raw material stock and enable Production Start."
-                : " This will permanently update the stock levels.")}
-          </p>
-          <Form.Group>
-            <Form.Label>Reason / Remarks (Optional)</Form.Label>
-            <Form.Control
-              as="textarea"
-              rows={3}
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-            />
-          </Form.Group>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShowApproveModal(false)}>
-            Cancel
-          </Button>
-          <Button
-            variant={approveStatus === "APPROVED" ? "success" : "danger"}
-            onClick={handleApproveReject}
-          >
-            Confirm {approveStatus === "APPROVED" ? "Approval" : "Rejection"}
-          </Button>
-        </Modal.Footer>
-      </Modal>
+        {isPMI && po && (
+          <div className="rounded-2xl border border-slate-200 shadow-sm mb-5 overflow-hidden">
+            <div className="flex items-center gap-3 px-5 py-4 bg-slate-50 border-b border-slate-200">
+              <div className="h-8 w-8 rounded-lg bg-blue-100 flex items-center justify-center">
+                <FaBoxes className="text-blue-600" size={15} />
+              </div>
+              <h3 className="font-bold text-slate-700 text-base">Production Order Information</h3>
+            </div>
+            <div className="p-5 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-5">
+              <InfoField label="PO Number" value={
+                <span className="font-mono text-primary text-sm">{po.productionOrderId}</span>
+              } />
+              <InfoField label="Product" value={
+                <div>
+                  <div className="font-semibold text-slate-700 text-sm">{po.productItem?.productName || "—"}</div>
+                  {po.productItem?.productCode && (
+                    <div className="text-xs text-slate-400 font-mono">{po.productItem.productCode}</div>
+                  )}
+                </div>
+              } />
+              <InfoField label="Planned Qty" value={
+                po.targetQty ? `${Number(po.targetQty).toLocaleString()} ${po.uom || ""}` : "—"
+              } />
+              <InfoField label="Due Date" value={formatDate(po.dueDate)} />
+              <InfoField label="Machine" value={po.Machine?.machineName || po.machineMachineId} />
+              <InfoField label="PO Status" value={<StatusBadge status={po.status} />} />
+            </div>
+          </div>
+        )}
+
+        <div className="rounded-2xl border border-slate-200 shadow-sm mb-5 overflow-hidden">
+          <div className="flex items-center gap-3 px-5 py-4 bg-slate-50 border-b border-slate-200">
+            <div className="h-8 w-8 rounded-lg bg-emerald-100 flex items-center justify-center">
+              <FaClipboardList className="text-emerald-600" size={15} />
+            </div>
+            <h3 className="font-bold text-slate-700 text-base">
+              {isPMI ? "Issued Materials" : "Adjustment Items"}
+            </h3>
+            <span className="ml-auto text-xs font-semibold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full">
+              {currentAdjustment.items?.length || 0} item{currentAdjustment.items?.length !== 1 ? "s" : ""}
+            </span>
+          </div>
+          <div className="overflow-x-auto">
+            {isPMI ? (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-200">
+                    {["RM Code","Material Name","Store","Stock Before","Stock After","Issued Qty","Remarks"].map((h, i) => (
+                      <th key={h} className={`text-[11px] uppercase tracking-wider text-slate-500 font-semibold px-4 py-3 ${i >= 3 && i <= 5 ? "text-right" : "text-left"}`}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {currentAdjustment.items?.map((item: any, idx: number) => (
+                    <tr key={item.id || idx} className="hover:bg-slate-50/60 transition-colors">
+                      <td className="px-4 py-3">
+                        <code className="text-xs bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-mono">{item.rawMaterialId}</code>
+                      </td>
+                      <td className="px-4 py-3 font-semibold text-slate-700">{item.rawMaterial?.materialName || item.rawMaterialId}</td>
+                      <td className="px-4 py-3 text-slate-600">{item.store?.storeName || item.storeId}</td>
+                      <td className="px-4 py-3 text-right font-mono text-xs text-slate-600">{Number(item.currentQty).toFixed(3)}</td>
+                      <td className="px-4 py-3 text-right font-mono text-xs text-slate-600">{Number(item.adjustedQty).toFixed(3)}</td>
+                      <td className="px-4 py-3 text-right">
+                        <span className="font-bold text-red-600 font-mono text-xs">{Math.abs(Number(item.difference)).toFixed(3)}</span>
+                      </td>
+                      <td className="px-4 py-3 text-slate-500 text-xs">{item.remarks || "—"}</td>
+                    </tr>
+                  ))}
+                  {(!currentAdjustment.items || currentAdjustment.items.length === 0) && (
+                    <tr><td colSpan={7} className="text-center py-10 text-slate-400 text-sm">No items found</td></tr>
+                  )}
+                </tbody>
+              </table>
+            ) : (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-200">
+                    {["Item Type","Item Details","Store","Batch No","Unit Cost","Current Qty","Adjusted Qty","Difference","Remarks"].map((h, i) => (
+                      <th key={h} className={`text-[11px] uppercase tracking-wider text-slate-500 font-semibold px-4 py-3 ${i >= 4 && i <= 7 ? "text-right" : "text-left"}`}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {currentAdjustment.items?.map((item: any, idx: number) => {
+                    const diff = Number(item.difference);
+                    return (
+                      <tr key={item.id || idx} className="hover:bg-slate-50/60 transition-colors">
+                        <td className="px-4 py-3">
+                          <StatusBadge status={item.itemType} customText={item.itemType === "RAW_MATERIAL" ? "Raw Material" : "Product"} />
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="font-semibold text-slate-700">{item.itemType === "RAW_MATERIAL" ? item.rawMaterial?.materialName : item.product?.productName}</div>
+                          <div className="text-xs text-slate-400 font-mono mt-0.5">{item.itemType === "RAW_MATERIAL" ? item.rawMaterialId : item.product?.productCode}</div>
+                        </td>
+                        <td className="px-4 py-3 text-slate-600">{item.store?.storeName || "—"}</td>
+                        <td className="px-4 py-3 text-slate-600">{item.batchNo || "—"}</td>
+                        <td className="px-4 py-3 text-right font-mono text-xs text-slate-600">{item.unitCost != null ? `Rs.${Number(item.unitCost).toFixed(2)}` : "—"}</td>
+                        <td className="px-4 py-3 text-right font-mono text-xs text-slate-600">{Number(item.currentQty).toFixed(3)}</td>
+                        <td className="px-4 py-3 text-right font-mono text-xs text-slate-600">{Number(item.adjustedQty).toFixed(3)}</td>
+                        <td className="px-4 py-3 text-right">
+                          <span className={`font-bold font-mono text-xs ${diff > 0 ? "text-emerald-600" : diff < 0 ? "text-red-600" : "text-slate-500"}`}>
+                            {diff > 0 ? `+${diff.toFixed(3)}` : diff.toFixed(3)}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-slate-500 text-xs">{item.remarks || "—"}</td>
+                      </tr>
+                    );
+                  })}
+                  {(!currentAdjustment.items || currentAdjustment.items.length === 0) && (
+                    <tr><td colSpan={9} className="text-center py-10 text-slate-400 text-sm">No items found</td></tr>
+                  )}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+
+        {isPending && (
+          <div className="rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="flex items-center gap-3 px-5 py-4 bg-slate-50 border-b border-slate-200">
+              <div className="h-8 w-8 rounded-lg bg-amber-100 flex items-center justify-center">
+                <FaExclamationTriangle className="text-amber-600" size={14} />
+              </div>
+              <h3 className="font-bold text-slate-700 text-base">Workflow Actions</h3>
+            </div>
+            <div className="p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div>
+                <p className="font-semibold text-slate-700 text-sm mb-1">Review and Approve</p>
+                <p className="text-slate-500 text-xs">
+                  {isPMI
+                    ? "Approving this Material Issue will deduct raw material stock and enable Production Start."
+                    : "Review the items and approve or reject this stock adjustment."}
+                </p>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <CustomButton text="Reject" icon={FaTimes} variant="danger" onClick={() => openModal("REJECTED")} />
+                <CustomButton text="Approve" icon={FaCheck} variant="secondary" onClick={() => openModal("APPROVED")} />
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {showModal && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+            <div className={`px-6 py-4 border-b border-slate-200 flex items-center gap-3 ${modalAction === "APPROVED" ? "bg-emerald-50" : "bg-red-50"}`}>
+              <div className={`h-9 w-9 rounded-full flex items-center justify-center ${modalAction === "APPROVED" ? "bg-emerald-100" : "bg-red-100"}`}>
+                {modalAction === "APPROVED" ? <FaCheck className="text-emerald-600" size={15} /> : <FaTimes className="text-red-600" size={15} />}
+              </div>
+              <div>
+                <h4 className={`font-bold text-base ${modalAction === "APPROVED" ? "text-emerald-800" : "text-red-800"}`}>
+                  {modalAction === "APPROVED" ? "Approve Adjustment" : "Reject Adjustment"}
+                </h4>
+                <p className="text-xs text-slate-500 mt-0.5">{currentAdjustment.adjustmentNumber}</p>
+              </div>
+            </div>
+            <div className="p-6">
+              <p className="text-slate-600 text-sm mb-4">
+                Are you sure you want to <strong>{modalAction === "APPROVED" ? "approve" : "reject"}</strong> this stock adjustment?
+                {modalAction === "APPROVED" && (isPMI
+                  ? " This will deduct the issued quantities from raw material stock and enable Production Start."
+                  : " This will permanently update the stock levels.")}
+              </p>
+              <div>
+                <label className="block text-[11px] uppercase tracking-wider text-slate-500 font-semibold mb-1.5">
+                  Reason / Remarks <span className="normal-case font-normal text-slate-400">(optional)</span>
+                </label>
+                <textarea
+                  rows={3}
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  placeholder="Enter reason or remarks..."
+                  className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors resize-none placeholder:text-slate-300"
+                />
+              </div>
+            </div>
+            <div className="px-6 pb-6 flex items-center justify-end gap-2">
+              <CustomButton
+                text="Cancel"
+                icon={FaTimes}
+                variant="primary"
+                className="!bg-slate-100 !text-slate-700 hover:!bg-slate-200"
+                onClick={() => setShowModal(false)}
+                disabled={isSubmitting}
+              />
+              <CustomButton
+                text={modalAction === "APPROVED" ? "Confirm Approval" : "Confirm Rejection"}
+                icon={modalAction === "APPROVED" ? FaCheck : FaTimes}
+                variant={modalAction === "APPROVED" ? "secondary" : "danger"}
+                onClick={handleConfirm}
+                disabled={isSubmitting}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

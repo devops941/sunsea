@@ -59,6 +59,7 @@ export const errorMiddleware = (
       return;
     }
     if (err.code === "P2025") {
+      console.error("[Prisma P2025 Error]", err.meta, err.message);
       res.status(404).json({
         success: false,
         message: "Record not found.",

@@ -106,7 +106,7 @@ body {
     min-height: 100vh;
     font-family: var(--font-body);
     color: var(--color-text-primary);
-    background: var(--color-bg);
+    /* background: var(--color-bg); */
     overflow-x: hidden !important;
 }
 

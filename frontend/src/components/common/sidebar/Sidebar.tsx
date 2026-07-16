@@ -10,39 +10,29 @@ import {
 } from "react-icons/fa";
 import { FaCircle } from "react-icons/fa";
 import { FiPower, FiMenu, FiChevronsLeft, FiChevronsRight, FiLogOut } from "react-icons/fi";
-
 import Logo from "../../../assets/images/sun-sea.webp";
 import { sidebarItems } from "./sidebar.data";
-
 const Sidebar = () => {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
-
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [hoveredMenu, setHoveredMenu] = useState<string | null>(null);
-
   const [openMenu, setOpenMenu] = useState<string | null>("Dashboard");
-
   const location = useLocation();
-
   const isMenuActive = useCallback((menu: any) => {
     // Check main path
     if (menu.path && location.pathname.startsWith(menu.path)) return true;
-
     // Check activePaths array if it exists (for flat menus with multiple related paths)
     if (menu.activePaths && Array.isArray(menu.activePaths)) {
       if (menu.activePaths.some((p: string) => location.pathname.startsWith(p))) return true;
     }
-
     // Check nested children
     if (menu.children) {
       return menu.children.some((child: any) => {
         if (child.path && location.pathname.startsWith(child.path)) return true;
-
         if (child.activePaths && Array.isArray(child.activePaths)) {
           if (child.activePaths.some((p: string) => location.pathname.startsWith(p))) return true;
         }
-
         if (child.children) {
           return child.children.some((subChild: any) => {
             if (subChild.path && location.pathname.startsWith(subChild.path)) return true;
@@ -57,27 +47,19 @@ const Sidebar = () => {
     }
     return false;
   }, [location.pathname]);
-
   const activeCollapsed = isCollapsed;
-
   const toggleMenu = (menu: string) => {
     if (activeCollapsed) return;
-
     setOpenMenu((prev) => (prev === menu ? null : menu));
   };
-
   const { permissions, user } = useAppSelector((state) => state.auth);
-
   const { data: company } = useAppSelector((state) => state.company);
-
   const handleLogout = () => {
     dispatch(logoutUser());
     navigate("/login");
   };
-
   const hasPermission = useCallback((perm: string | undefined): boolean => {
     if (!perm) return true;
-
     if (
       user?.isSuperAdmin ||
       user?.roleId === "ROLE_ADMIN" ||
@@ -86,10 +68,8 @@ const Sidebar = () => {
     ) {
       return true;
     }
-
     return permissions.includes(perm);
   }, [permissions, user?.roleId]);
-
   const filteredSidebarItems = useMemo(() => {
     return sidebarItems
       .map((item) => {
@@ -109,7 +89,6 @@ const Sidebar = () => {
       })
       .filter((item): item is (typeof sidebarItems)[0] => item !== null);
   }, [hasPermission]);
-
   return (
     <aside
       className={`h-screen bg-[#ffffff] text-[#2A3547] relative overflow-visible flex flex-col transition-[width] duration-300 ease-in-out z-50 border-r border-black/10  ${activeCollapsed ? "w-[80px]" : "w-[260px]"}`}
@@ -124,7 +103,6 @@ const Sidebar = () => {
             className={`w-full h-full ${activeCollapsed ? "object-contain scale-150" : "object-contain object-left scale-110 ml-2"}`}
           />
         </div>
-
         <div
           className={`flex items-center justify-center cursor-pointer transition-all duration-200 hover:bg-gray-100 hover:text-primary text-[#2A3547] rounded-lg shrink-0 ${activeCollapsed ? "w-6 h-6" : "w-8 h-8"}`}
           title="Toggle Sidebar"
@@ -136,11 +114,9 @@ const Sidebar = () => {
           {isCollapsed ? <FiChevronsRight size={18} /> : <FiChevronsLeft size={20} />}
         </div>
       </div>
-
       <div className="flex-1 px-5 py-4 overflow-y-auto overflow-x-hidden [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:bg-black/20 [&::-webkit-scrollbar-thumb]:rounded-full">
         {filteredSidebarItems.map((menu) => {
           const Icon = menu.icon;
-
           // ── Flat top-level item (no children) → render as a direct link ──
           if (!menu.children && menu.path) {
             return (
@@ -161,10 +137,8 @@ const Sidebar = () => {
               </div>
             );
           }
-
           // ── Grouped item (has children) → existing dropdown/accordion behavior ──
           const isOpen = openMenu === menu.title;
-
           return (
             <div
               key={menu.title}
@@ -180,11 +154,9 @@ const Sidebar = () => {
                   <Icon className={`min-w-[20px] text-[20px] ${isMenuActive(menu) ? "!text-white" : ""}`} />
                   {!activeCollapsed && <span className={isMenuActive(menu) ? "!text-white" : ""}>{menu.title}</span>}
                 </div>
-
                 {!activeCollapsed &&
                   (isOpen ? <FaChevronDown className={`min-w-[14px] text-[14px] ${isMenuActive(menu) ? "!text-white" : ""}`} /> : <FaChevronRight className={`min-w-[14px] text-[14px] ${isMenuActive(menu) ? "!text-white" : ""}`} />)}
               </button>
-
               {!activeCollapsed && isOpen && (
                 <div className="mt-2 ml-3 pl-2 border-l-2 border-black/10 flex flex-col gap-1">
                   {menu.children?.map((subMenu) => (
@@ -195,7 +167,6 @@ const Sidebar = () => {
                           <div className="no-underline text-[#2A3547] px-3 py-2.5 rounded-lg text-[15px] font-normal leading-[1.334rem] cursor-default">
                             {subMenu.title}
                           </div>
-
                           {/* Child of Child */}
                           {subMenu.children.map((child) =>
                             child.path ? (
@@ -229,7 +200,6 @@ const Sidebar = () => {
                   ))}
                 </div>
               )}
-
               {activeCollapsed && hoveredMenu === menu.title && (
                 <div className="absolute top-0 left-[72px] w-[240px] bg-white rounded-xl overflow-hidden ">
                   <div className="px-4 py-3.5 bg-white text-[#2A3547] font-semibold border-b border-black/10 text-[15px] leading-[1.334rem]">{menu.title}</div>
@@ -240,7 +210,6 @@ const Sidebar = () => {
                           <div className="block px-4 py-3 no-underline text-[#2A3547] font-semibold mt-1 text-[15px] leading-[1.334rem]">
                             {subMenu.title}
                           </div>
-
                           {subMenu.children.map((child) =>
                             child.path ? (
                               <NavLink
@@ -276,7 +245,6 @@ const Sidebar = () => {
           );
         })}
       </div>
-
       <div className="p-4 mt-auto shrink-0">
         <div className={`flex items-center p-3 rounded-2xl bg-[#eef5fa] hover:bg-[#e4eff8] transition-colors border border-blue-100/50 ${activeCollapsed ? "justify-center" : "justify-between"}`}>
           {!activeCollapsed && (
@@ -308,5 +276,4 @@ const Sidebar = () => {
     </aside>
   );
 };
-
 export default Sidebar;

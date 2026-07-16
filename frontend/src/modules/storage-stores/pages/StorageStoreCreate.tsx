@@ -296,7 +296,7 @@ const StorageStoreCreate: React.FC = () => {
                                 onChange={handleChange}
                             /> */}
                             
-                            <div className="flex items-center gap-2 mt-8 h-[42px]">
+                            <div className="flex items-center gap-2 mt-8 h-10.5">
                                 <input
                                     type="checkbox"
                                     id="allowNegative"

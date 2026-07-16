@@ -66,14 +66,28 @@ class DailyPlanService {
 
     // 6. (Removed) Validation: Daily plan date must fall inside Weekly Plan date range
 
+    // 7. Carry-forward guard: a source plan can only be carried forward ONCE
+    if (data.carryForwardFromPlanId) {
+      const sourcePlan = await prisma.dailyProductionPlan.findUnique({
+        where: { dailyPlanId: data.carryForwardFromPlanId },
+        include: { carryForwardTo: { select: { dailyPlanId: true } } },
+      });
+      if (!sourcePlan) {
+        throw new ApiError(404, `Source plan ${data.carryForwardFromPlanId} not found`);
+      }
+      if (sourcePlan.carryForwardTo && sourcePlan.carryForwardTo.length > 0) {
+        throw new ApiError(409, `Plan ${data.carryForwardFromPlanId} has already been carried forward. Each plan can only be carried forward once.`);
+      }
+    }
+
     return prisma.$transaction(async (tx) => {
-      // 7. Validation: Machine must not already be planned for the same date, shift, and PO
+      // 8. Validation: Machine must not already be planned for the same date, shift, and PO
       const isAlreadyPlanned = await dailyPlanRepository.existsByDateMachineShift(prodDate, data.machineId, data.shiftId, data.productionOrderId);
       if (isAlreadyPlanned) {
         throw new ApiError(409, `Machine ${data.machineId} is already scheduled with production order ${data.productionOrderId} on shift ${data.shiftId} for date ${data.productionDate}`);
       }
 
-      // 8. (Removed) Validation: Planned quantity cannot exceed remaining Weekly quantity
+      // (Removed) Validation: Planned quantity cannot exceed remaining Weekly quantity
       // We allow exceeding the weekly target to support carry-forwards and extra production.
 
       const nextId = await this.generateNextDailyPlanId(tx);
@@ -91,6 +105,7 @@ class DailyPlanService {
           priority: data.priority ?? "MEDIUM",
           status: data.status ?? "DRAFT",
           remarks: data.remarks ?? null,
+          carryForwardFromPlanId: data.carryForwardFromPlanId ?? null,
           createdBy: userId,
         },
         tx

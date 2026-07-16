@@ -54,6 +54,12 @@ export const createDailyPlanSchema = z.object({
       .max(255)
       .optional()
       .nullable(),
+
+    carryForwardFromPlanId: z
+      .string()
+      .max(50)
+      .optional()
+      .nullable(),
   }),
 });
 
@@ -109,6 +115,12 @@ export const updateDailyPlanSchema = z.object({
     remarks: z
       .string()
       .max(255)
+      .optional()
+      .nullable(),
+
+    carryForwardFromPlanId: z
+      .string()
+      .max(50)
       .optional()
       .nullable(),
   }),

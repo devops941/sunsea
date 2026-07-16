@@ -68,6 +68,10 @@ const DailyPlanCreate: React.FC = () => {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
+  // ── Carry Forward ─────────────────────────────────────────────────────────
+  const [carryForwardFromPlanId, setCarryForwardFromPlanId] = useState<string | null>(null);
+  const [carryForwardFromInfo, setCarryForwardFromInfo] = useState<any>(null);
+
   // ── Auto-fill data ───────────────────────────────────────────────────────
   const [weeklyPrograms, setWeeklyPrograms] = useState<any[]>([]);
   const [loadingWeekly, setLoadingWeekly] = useState(false);
@@ -245,6 +249,10 @@ const DailyPlanCreate: React.FC = () => {
       if (s.weeklyProgramId) setWeeklyProgramId(s.weeklyProgramId);
       if (s.machineId) setMachineId(s.machineId);
       if (s.remarks) setRemarks(s.remarks);
+      if (s.carryForwardFromPlanId) {
+        setCarryForwardFromPlanId(s.carryForwardFromPlanId);
+        setCarryForwardFromInfo(s.carryForwardFromInfo || null);
+      }
     }
   }, [location.state, isEdit]);
 
@@ -348,6 +356,7 @@ const DailyPlanCreate: React.FC = () => {
         status,
         remarks: remarks.trim() || null,
         productionOrderId: selectedWeeklyProg?.productionOrderId,
+        carryForwardFromPlanId: carryForwardFromPlanId || null,
       };
 
       if (isEdit && editId) {
@@ -397,6 +406,22 @@ const DailyPlanCreate: React.FC = () => {
           <div>
             <p className="font-bold text-red-700 text-sm">Failed to Save Plan</p>
             <p className="text-red-600 text-xs">{submitError}</p>
+          </div>
+        </div>
+      )}
+
+      {/* ── Carry Forward Banner ──────────────────────────── */}
+      {carryForwardFromPlanId && (
+        <div className="mx-6 mt-4 p-4 rounded-xl bg-amber-50 border border-amber-200 flex items-center gap-3">
+          <FaArrowLeft className="text-amber-600 rotate-180" size={18} />
+          <div>
+            <p className="font-bold text-amber-800 text-sm">Carry Forward from {carryForwardFromPlanId}</p>
+            {carryForwardFromInfo && (
+              <p className="text-amber-700 text-xs">
+                {carryForwardFromInfo.shiftName || carryForwardFromInfo.shiftId} — {carryForwardFromInfo.productionDate ? new Date(carryForwardFromInfo.productionDate).toLocaleDateString() : ""}
+              </p>
+            )}
+            <p className="text-amber-600 text-xs mt-0.5">The remaining quantity from plan <strong>{carryForwardFromPlanId}</strong> has been pre-filled below.</p>
           </div>
         </div>
       )}

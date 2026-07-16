@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import Logo from "../../../assets/images/logo.png"
+import Logo from "../../../assets/images/sun-sea.webp";
 import { useNavigate, useLocation } from "react-router-dom";
 import { FaArrowRight, FaEye, FaEyeSlash } from "react-icons/fa";
 import { toast } from "react-toastify";

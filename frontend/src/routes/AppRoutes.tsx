@@ -44,6 +44,7 @@ const SubcategoryList = lazy(() => import("../modules/product/pages/SubCategoryL
 
 const StoreLocationTabs = lazy(() => import("../modules/storage-stores/pages/StoreLocationTabs"));
 const HROrganizationTabs = lazy(() => import("../modules/employee/pages/HROrganizationTabs"));
+const ProductMasterTabs = lazy(() => import("../modules/product/pages/ProductMasterTabs"));
 
 // Administration
 const UserList = lazy(() => import("../modules/users/pages/UserList"));
@@ -247,7 +248,7 @@ const AppRoutes = () => {
 
             {/* Products Management (RBAC guarded) */}
             <Route element={<ProtectedRoute permission="products.view" />}>
-              <Route path="/products" element={<HROrganizationTabs />} />
+              <Route path="/products" element={<ProductMasterTabs />} />
             </Route>
             {/* Products Create Route */}
             <Route element={<ProtectedRoute permission="products.create" />}>
@@ -260,7 +261,7 @@ const AppRoutes = () => {
 
             {/* Categories & Subcategories */}
             <Route element={<ProtectedRoute permission="categories.view" />}>
-              <Route path="/categories" element={<HROrganizationTabs />} />
+              <Route path="/categories" element={<ProductMasterTabs />} />
             </Route>
             {/* Sub Categories Route */}
             <Route element={<ProtectedRoute permission="sub-categories.view" />}>
@@ -289,15 +290,15 @@ const AppRoutes = () => {
             </Route>
             {/* Product Master Attributes */}
             <Route element={<ProtectedRoute permission="colors.view" />}>
-              <Route path="/colours" element={<HROrganizationTabs />} />
+              <Route path="/colours" element={<ProductMasterTabs />} />
             </Route>
             {/* Sizes Route */}
             <Route element={<ProtectedRoute permission="sizes.view" />}>
-              <Route path="/sizes" element={<HROrganizationTabs />} />
+              <Route path="/sizes" element={<ProductMasterTabs />} />
             </Route>
             {/* Uoms Route */}
             <Route element={<ProtectedRoute permission="uoms.view" />}>
-              <Route path="/uoms" element={<HROrganizationTabs />} />
+              <Route path="/uoms" element={<ProductMasterTabs />} />
             </Route>
 
             {/* Product Management Extras */}
@@ -380,11 +381,11 @@ const AppRoutes = () => {
 
             {/* Raw Materials */}
             <Route element={<ProtectedRoute permission="raw_materials.view" />}>
-              <Route path="/raw-materials" element={<HROrganizationTabs />} />
+              <Route path="/raw-materials" element={<ProductMasterTabs />} />
             </Route>
             {/* Raw Material Categories Route */}
             <Route element={<ProtectedRoute permission="raw_materials.view" />}>
-              <Route path="/raw-material-categories" element={<HROrganizationTabs />} />
+              <Route path="/raw-material-categories" element={<ProductMasterTabs />} />
             </Route>
             {/* Raw Materials Create Route */}
             <Route element={<ProtectedRoute permission="raw_materials.create" />}>
