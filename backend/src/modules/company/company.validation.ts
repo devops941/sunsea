@@ -24,6 +24,7 @@ export const updateCompanySchema = z.object({
   email: z.string().email("Invalid email format").max(120).or(z.literal("")).optional().nullable(),
   website: z.string().url("Invalid URL format").max(200).or(z.literal("")).optional().nullable(),
   logoUrl: z.string().optional().nullable(),
+  faviconUrl: z.string().optional().nullable(),
   addressLine1: z.string().max(255).optional().nullable(),
   addressLine2: z.string().max(255).optional().nullable(),
   city: z.string().max(100).optional().nullable(),

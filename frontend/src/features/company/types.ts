@@ -31,6 +31,7 @@ export interface Company {
   email?: string | null;
   website?: string | null;
   logoUrl?: string | null;
+  faviconUrl?: string | null;
   addressLine1?: string | null;
   addressLine2?: string | null;
   city?: string | null;
@@ -66,6 +67,7 @@ export interface UpdateCompanyDto {
   isActive?: boolean | null;
   businessPlaces?: Partial<BusinessPlace>[];
   logoFile?: File | null;
+  faviconFile?: File | null;
 }
 export interface CompanyState {
   data: Company | null;

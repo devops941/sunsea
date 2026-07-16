@@ -42,6 +42,7 @@ const CompanySettings: React.FC = () => {
         email: company.email || "",
         website: company.website || "",
         logoUrl: company.logoUrl || "",
+        faviconUrl: company.faviconUrl || "",
         addressLine1: company.addressLine1 || "",
         addressLine2: company.addressLine2 || "",
         city: company.city || "",
@@ -61,7 +62,7 @@ const CompanySettings: React.FC = () => {
     } else if (type === "file") {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (file) {
-        setFormData((prev) => ({ ...prev, logoFile: file }));
+        setFormData((prev) => ({ ...prev, [name]: file }));
         if (errors[name]) {
           setErrors((prev: any) => ({ ...prev, [name]: undefined }));
         }
@@ -111,6 +112,10 @@ const CompanySettings: React.FC = () => {
         if (key === "logoFile") {
           if (value) {
             submitData.append("logo", value);
+          }
+        } else if (key === "faviconFile") {
+          if (value) {
+            submitData.append("favicon", value);
           }
         } else if (key === "businessPlaces") {
           submitData.append(key, JSON.stringify(value));
@@ -163,7 +168,10 @@ const CompanySettings: React.FC = () => {
                     ]} />
                   </div>
                   <div className="md:col-span-3">
-                    <ImageUpload label="Company Logo" name="logoUrl" currentImageUrl={formData.logoUrl} onChange={handleChange as any} />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                      <ImageUpload label="Company Logo" name="logoFile" currentImageUrl={formData.logoUrl} onChange={handleChange as any} />
+                      <ImageUpload label="Favicon" name="faviconFile" currentImageUrl={formData.faviconUrl} onChange={handleChange as any} />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -382,8 +390,11 @@ const CompanySettings: React.FC = () => {
               <FaCogs className="text-gray-500 text-sm" /> System Information
             </h6>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 items-center">
-              <div>
-                <ImageUpload label="Company Logo" name="logoUrl" currentImageUrl={formData.logoUrl} onChange={handleChange as any} />
+              <div className="md:col-span-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  <ImageUpload label="Company Logo" name="logoFile" currentImageUrl={formData.logoUrl} onChange={handleChange as any} />
+                  <ImageUpload label="Favicon" name="faviconFile" currentImageUrl={formData.faviconUrl} onChange={handleChange as any} />
+                </div>
               </div>
               <div>
                 <div className="flex items-center gap-3">

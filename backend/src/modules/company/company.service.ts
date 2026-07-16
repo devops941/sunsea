@@ -45,7 +45,7 @@ class CompanyService {
   /**
    * Update the company and its business places
    */
-  async updateCompany(id: string, data: UpdateCompanyInput, userId: string, logoFile?: Express.Multer.File) {
+  async updateCompany(id: string, data: UpdateCompanyInput, userId: string, logoFile?: Express.Multer.File, faviconFile?: Express.Multer.File) {
     const existingCompany = await prisma.company.findUnique({
       where: { id },
     });
@@ -66,6 +66,19 @@ class CompanyService {
         fs.unlinkSync(logoFile.path);
       } catch (err) {
         console.error("Failed to delete temp file:", logoFile.path, err);
+      }
+    }
+
+    // Check if a new favicon file was uploaded
+    if (faviconFile) {
+      const fileName = `favicon_${Date.now()}${path.extname(faviconFile.originalname)}`;
+      companyData.faviconUrl = await uploadToImageKit(faviconFile.path, fileName, "/company-logos")
+
+      // Clean up the local temp file after upload
+      try {
+        fs.unlinkSync(faviconFile.path);
+      } catch (err) {
+        console.error("Failed to delete temp file:", faviconFile.path, err);
       }
     }
 
