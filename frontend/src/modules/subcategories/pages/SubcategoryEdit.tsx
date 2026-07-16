@@ -5,7 +5,7 @@ import { FaSave, FaEraser } from "react-icons/fa";
 import TextInput from "../../../components/form/TextInput/TextInput";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import Button from "../../../components/ui/Button/Button";
-import CustomButton from "../../../components/ui/custombutton/CustomButton";
+import CustomButton from "../../../components/ui/Button/Button";
 
 const SubcategoryEdit: React.FC = () => {
     const [formData, setFormData] = useState({

@@ -3,7 +3,7 @@ import { Container, Row, Col, Modal } from "react-bootstrap";
 import { FaSave, FaInfoCircle, FaUser, FaMapMarkerAlt, FaBoxOpen, FaArrowLeft, FaEraser } from "react-icons/fa";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
-import CustomButton from "../../../../components/ui/custombutton/CustomButton";
+import CustomButton from "../../../../components/ui/Button/Button";
 import { usePurchaseOrders } from "../../../../hooks/usePurchaseOrder";
 import { purchaseOrderService } from "../../../../services/purchaseOrderService";
 import { validatePurchaseOrder } from "../validations/purchaseOrderValidation";
@@ -15,7 +15,7 @@ import Section from "../../../../components/ui/Section/Section";
 import SelectInput from "../../../../components/form/SelectInput/SelectInput";
 
 
-// ─── Report-style read-only Field (matches QuotationForm / SalesOrderDetail) ──
+// â”€â”€â”€ Report-style read-only Field (matches QuotationForm / SalesOrderDetail) â”€â”€
 const Field: React.FC<{ label: string; value: React.ReactNode }> = ({ label, value }) => (
     <div className="mb-3">
         <div
@@ -24,11 +24,11 @@ const Field: React.FC<{ label: string; value: React.ReactNode }> = ({ label, val
         >
             {label}
         </div>
-        <div className="fw-semibold" style={{ color: "var(--color-text-primary)" }}>{value ?? "—"}</div>
+        <div className="fw-semibold" style={{ color: "var(--color-text-primary)" }}>{value ?? "â€”"}</div>
     </div>
 );
 
-// ─── Report-style Section wrapper (matches QuotationForm / SalesOrderDetail) ──
+// â”€â”€â”€ Report-style Section wrapper (matches QuotationForm / SalesOrderDetail) â”€â”€
 
 
 const initialFormData: PurchaseOrderFormData = {
@@ -228,7 +228,7 @@ const UpComingOrderDetailPage: React.FC = () => {
     return (
         <div className="inner-container">
             <Container fluid>
-                {/* Page Header — matches QuotationForm */}
+                {/* Page Header â€” matches QuotationForm */}
                 <div className="page-header">
                     <Row className="align-items-center g-3">
                         <Col lg={6} md={12}>
@@ -269,7 +269,7 @@ const UpComingOrderDetailPage: React.FC = () => {
                         </Row>
                     </Section>
 
-                    {/* ── Supplier & Store ── */}
+                    {/* â”€â”€ Supplier & Store â”€â”€ */}
                     <Section title="Supplier & Store" icon={<FaUser />}>
                         <Row>
                             <Col lg={6} md={12}>
@@ -281,7 +281,7 @@ const UpComingOrderDetailPage: React.FC = () => {
                             <Col lg={6} md={12}>
                                 <Field
                                     label="Store"
-                                    value={(location.state?.store?.storeName) || formData.storeId || "—"}
+                                    value={(location.state?.store?.storeName) || formData.storeId || "â€”"}
                                 />
                             </Col>
                         </Row>
@@ -298,8 +298,8 @@ const UpComingOrderDetailPage: React.FC = () => {
                                 >
                                     Billing Address
                                 </div>
-                                <div>{formData.billingAddressLine1 || "—"}</div>
-                                <div>{formData.billingCity}, {formData.billingState} — {formData.billingPincode}</div>
+                                <div>{formData.billingAddressLine1 || "â€”"}</div>
+                                <div>{formData.billingCity}, {formData.billingState} â€” {formData.billingPincode}</div>
                             </Col>
                             <Col md={6}>
                                 <div
@@ -309,8 +309,8 @@ const UpComingOrderDetailPage: React.FC = () => {
                                     Shipping Address{" "}
 
                                 </div>
-                                <div>{formData.shippingAddressLine1 || "—"}</div>
-                                <div>{formData.shippingCity}, {formData.shippingState} — {formData.shippingPincode}</div>
+                                <div>{formData.shippingAddressLine1 || "â€”"}</div>
+                                <div>{formData.shippingCity}, {formData.shippingState} â€” {formData.shippingPincode}</div>
                             </Col>
                         </Row>
                     </Section>
@@ -334,12 +334,12 @@ const UpComingOrderDetailPage: React.FC = () => {
                                         <tr key={index} className="master-data-row">
                                             <td className="master-data-cell">{index + 1}</td>
                                             <td className="master-data-cell">
-                                                < div className="fw-semibold">{rawMaterials.find((rm) => rm.rawMaterialId === item.productId)?.materialName || "—"}</div>
+                                                < div className="fw-semibold">{rawMaterials.find((rm) => rm.rawMaterialId === item.productId)?.materialName || "â€”"}</div>
                                                 <div className="text-muted small">{item.productId}</div>
                                             </td>
                                             <td className="master-data-cell d-flex">
-                                                < div className="fw-semibold">{item.quantity || "—"}</div>
-                                                < div className="fw-semibold ms-2">{item?.uom || "—"}</div>
+                                                < div className="fw-semibold">{item.quantity || "â€”"}</div>
+                                                < div className="fw-semibold ms-2">{item?.uom || "â€”"}</div>
                                             </td>
                                         </tr>
                                     ))}
@@ -353,7 +353,7 @@ const UpComingOrderDetailPage: React.FC = () => {
                         </div>
                     </Section>
 
-                    {/* ── Notes ── */}
+                    {/* â”€â”€ Notes â”€â”€ */}
                     <Section title="Notes">
                         <Row>
                             <Col lg={6}>
@@ -365,7 +365,7 @@ const UpComingOrderDetailPage: React.FC = () => {
                         </Row>
                     </Section>
 
-                    {/* ── Form Actions ── */}
+                    {/* â”€â”€ Form Actions â”€â”€ */}
                     <div
                         className="form-actions d-flex justify-content-end gap-3 mt-4"
                         style={{ borderTop: "1px solid var(--color-border)", paddingTop: "1.5rem" }}

@@ -1,6 +1,6 @@
 import React from "react";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
-import CustomButton from "../../../components/ui/custombutton/CustomButton";
+import CustomButton from "../../../components/ui/Button/Button";
 import CommonViewModal from "../../../components/ui/CommonViewModal/CommonViewModal";
 
 interface WastageViewModalProps {
@@ -35,7 +35,7 @@ const WastageViewModal: React.FC<WastageViewModalProps> = ({
       fields: [
         { label: "Wastage Type", value: <StatusBadge status={wastage.wastageType} /> },
         { label: "Logged Quantity", value: `${wastage.quantity} ${wastage.uom}` },
-        { label: "Estimated Value", value: `₹${wastage.estimatedValue ? Number(wastage.estimatedValue).toFixed(2) : "0.00"}` },
+        { label: "Estimated Value", value: `â‚¹${wastage.estimatedValue ? Number(wastage.estimatedValue).toFixed(2) : "0.00"}` },
         { label: "Raw Material Component", value: wastage.rawMaterial?.materialName || "N/A" },
       ]
     },

@@ -4,7 +4,7 @@ import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import TextInput from "../../../components/form/TextInput/TextInput";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
-import CustomButton from "../../../components/ui/custombutton/CustomButton";
+import CustomButton from "../../../components/ui/Button/Button";
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
 import { updateRawMaterial } from "../../../features/raw-materials/rawMaterialSlice";
 import { fetchStores } from "../../../features/stores/storeSlice";

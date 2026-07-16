@@ -8,6 +8,7 @@ interface TextInputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement
   placeholder?: string;
   required?: boolean;
   icon?: React.ReactNode;
+  trailingIcon?: React.ReactNode;
   step?: number | string;
   error?: string;
   disabled?: boolean;
@@ -26,6 +27,7 @@ const TextInput: React.FC<TextInputProps> = ({
   placeholder,
   required = false,
   icon,
+  trailingIcon,
   error,
   disabled = false,
   onChange,
@@ -132,9 +134,9 @@ const TextInput: React.FC<TextInputProps> = ({
             step={step}
             disabled={disabled}
             className={`
-              w-full h-[35px] px-4
+              w-full h-10 px-4
               border rounded-[10px] outline-none
-              text-[15px] font-medium
+              text-[15px] font-medium leading-normal
               transition-all duration-250
               placeholder-[#9ca3af]
               text-[#1f2937]
@@ -142,10 +144,17 @@ const TextInput: React.FC<TextInputProps> = ({
                 ? "border-red-500 bg-white focus:border-red-500 focus:ring-4 focus:ring-red-500/15"
                 : "border-slate-300 bg-white hover:border-slate-400 focus:border-primary focus:ring-4 focus:ring-primary/15"
               }
-             ${disabled ? "bg-[#E5E7EB] cursor-not-allowed text-[#6B7280]" : ""}
+              ${disabled ? "bg-[#E5E7EB] cursor-not-allowed text-[#6B7280]" : ""}
+              ${trailingIcon ? "pr-10" : ""}
             `}
             {...rest}
           />
+        )}
+        
+        {trailingIcon && (
+          <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center justify-center text-slate-400">
+            {trailingIcon}
+          </div>
         )}
       </div>
 

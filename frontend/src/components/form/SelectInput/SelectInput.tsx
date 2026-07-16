@@ -116,7 +116,7 @@ const SelectInput: React.FC<SelectInputProps> = ({
           disabled={disabled}
           onClick={() => !disabled && setIsOpen(!isOpen)}
           className={`
-            w-full h-8.75 pl-4 pr-10
+            w-full h-10 pl-4 pr-10
             border rounded-md outline-none
             text-[15px] font-medium flex items-center justify-between
             transition-all duration-250 text-left

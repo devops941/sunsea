@@ -3,7 +3,7 @@ import { Row, Col } from "react-bootstrap";
 import UOMSelect from "../components/form/SelectInput/UOMSelect";
 
 import { FiArrowRight } from "react-icons/fi";
-import CustomButton from "../components/ui/custombutton/CustomButton";
+import CustomButton from "../components/ui/Button/Button";
 
 import ViewButton from "../components/ui/viewbutton/ViewButton";
 import EditButton from "../components/ui/EditButton/EditButton";
@@ -414,7 +414,7 @@ const Login: React.FC = () => {
                 </td>
 
                 <td className="master-data-cell">
-                  Raw Polymer · HP
+                  Raw Polymer Â· HP
                 </td>
 
                 <td className="master-data-cell">
@@ -478,7 +478,7 @@ const Login: React.FC = () => {
                 </td>
 
                 <td className="master-data-cell">
-                  Raw Polymer · HP
+                  Raw Polymer Â· HP
                 </td>
 
                 <td className="master-data-cell">
@@ -542,7 +542,7 @@ const Login: React.FC = () => {
                 </td>
 
                 <td className="master-data-cell">
-                  Raw Polymer · HP
+                  Raw Polymer Â· HP
                 </td>
 
                 <td className="master-data-cell">
