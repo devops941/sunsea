@@ -25,6 +25,8 @@ app.use(
       "http://127.0.0.1:5173",
       "http://localhost:5174",
       "http://127.0.0.1:5174",
+      "https://sunsea-56iq.vercel.app",
+      "https://sunsea-gray.vercel.app",
     ],
     credentials: true,
     methods: [
