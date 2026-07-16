@@ -22,11 +22,7 @@ const envSchema = z.object({
     ),
 
   NODE_ENV: z
-    .enum([
-      "development",
-      "production",
-      "test",
-    ])
+    .string()
     .default("development"),
 
   PORT: z.string().optional(),
