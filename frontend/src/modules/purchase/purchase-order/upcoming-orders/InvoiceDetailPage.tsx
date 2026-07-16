@@ -10,6 +10,7 @@ import TextInput from "../../../../components/form/TextInput/TextInput";
 import QuantityInput from "../../../../components/form/QuantityInput/QuantityInput";
 import BackButton from "../../../../components/ui/BackButton/BackButton";
 import AddressForm from "../../../../components/form/AddressFrom/AddressFrom";
+import type { StateCityOption } from "../../../../components/ui/CityStateSelect/CityStateSelect";
 import DateInput from "../../../../components/form/DateInput/DateInput";
 import TextArea from "../../../../components/form/TextArea/TextArea";
 import { purchaseOrderService } from "../../../../services/purchaseOrderService";
@@ -549,7 +550,7 @@ const InvoiceDetailPage: React.FC = () => {
                             <TextInput label="Invoice No." name="invoiceNo" value={form.invoiceNo} onChange={handleChange} placeholder="Supplier invoice" required error={errors.invoiceNo} />
                         </div>
                         <div>
-                            <DateInput label="GRN Date" name="grnDate" value={form.grnDate} onChange={(val) => setForm(p => ({ ...p, grnDate: val }))} required />
+                            <DateInput label="GRN Date" name="grnDate" value={form.grnDate} onChange={(e) => setForm(p => ({ ...p, grnDate: e.target.value }))} required />
                             {errors.grnDate && <div className="text-red-500 text-sm mt-1">{errors.grnDate}</div>}
                         </div>
                         <div>
@@ -623,10 +624,10 @@ const InvoiceDetailPage: React.FC = () => {
                         <h6 className="text-lg font-semibold text-gray-800 mb-4">Receipt Details</h6>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
                             <div>
-                                <DateInput label="Receive Date" name="receiveDate" value={form.receiveDate} onChange={(val) => setForm(p => ({ ...p, receiveDate: val }))} />
+                                <DateInput label="Receive Date" name="receiveDate" value={form.receiveDate} onChange={(e) => setForm(p => ({ ...p, receiveDate: e.target.value }))} />
                             </div>
                             <div>
-                                <DateInput label="Bill Due Date" name="billDueDate" value={form.billDueDate} onChange={(val) => setForm(p => ({ ...p, billDueDate: val }))} />
+                                <DateInput label="Bill Due Date" name="billDueDate" value={form.billDueDate} onChange={(e) => setForm(p => ({ ...p, billDueDate: e.target.value }))} />
                             </div>
                             <div>
                                 <TextInput label="Challan No" name="challanNo" value={form.challanNo} onChange={handleChange} placeholder="Optional" />
@@ -665,7 +666,7 @@ const InvoiceDetailPage: React.FC = () => {
                     {/* Remarks */}
                     <div className="grid grid-cols-1 gap-6 mt-6">
                         <div>
-                            <TextArea label="Remarks (Optional)" name="remarks" value={form.remarks} placeholder="Additional notes..." rows={2} onChange={(val) => setForm(p => ({ ...p, remarks: val }))} />
+                            <TextArea label="Remarks (Optional)" name="remarks" value={form.remarks} placeholder="Additional notes..." rows={2} onChange={(e) => setForm(p => ({ ...p, remarks: e.target.value }))} />
                         </div>
                     </div>
 
@@ -857,7 +858,7 @@ const InvoiceDetailPage: React.FC = () => {
                                 <TextInput label="Reference Number / UTR" name="referenceNumber" value={form.referenceNumber} onChange={handleChange} placeholder="Transaction reference" />
                             </div>
                             <div>
-                                <DateInput label="Payment Date" name="paymentDate" value={form.paymentDate} onChange={(val) => setForm(p => ({ ...p, paymentDate: val }))} />
+                                <DateInput label="Payment Date" name="paymentDate" value={form.paymentDate} onChange={(e) => setForm(p => ({ ...p, paymentDate: e.target.value }))} />
                             </div>
                         </div>
                     </div>
