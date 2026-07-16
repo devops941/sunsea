@@ -5,7 +5,7 @@ import { toast } from "react-toastify";
 import {
   FaPlus, FaPlay, FaStop, FaClipboardList, FaCalendarAlt, FaIndustry,
   FaCheckCircle, FaEdit, FaInfoCircle,
-  FaArrowRight, FaBan, FaShare, FaThumbsUp
+  FaArrowRight, FaShare, FaThumbsUp
 } from "react-icons/fa";
 
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
@@ -16,13 +16,13 @@ import apiClient from "../../../api/apiClient";
 import config from "../../../api/config";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import CustomButton from "../../../components/ui/Button/Button";
-import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import IconButton from "../../../components/ui/IconButton/IconButton";
 import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
 import ViewButton from "../../../components/ui/viewbutton/ViewButton";
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import CustomProgressBar from "../../../components/common/CustomProgressBar";
 import DataTable, { type DataTableColumn } from "../../../components/ui/table/DataTable";
+import FilterPopover from "../../../components/ui/FilterPopover/FilterPopover";
 import { oeeService } from "../../../services/oeeService";
 
 // ---------- helpers ----------
@@ -71,6 +71,35 @@ const DailyProductionPlanningPage: React.FC = () => {
   const [filterStatus, setFilterStatus] = useState("");
   const [filterMachine, setFilterMachine] = useState("");
 
+  // Draft filters for popover
+  const [draftFilterDate, setDraftFilterDate] = useState(formatLocalDateString(new Date()));
+  const [draftFilterStatus, setDraftFilterStatus] = useState("");
+  const [draftFilterMachine, setDraftFilterMachine] = useState("");
+
+  const hasActiveFilters = !!(filterDate || filterStatus || filterMachine);
+  const activeFilterCount = [filterDate, filterStatus, filterMachine].filter(Boolean).length;
+
+  const handleApplyFilters = () => {
+    setFilterDate(draftFilterDate);
+    setFilterStatus(draftFilterStatus);
+    setFilterMachine(draftFilterMachine);
+  };
+
+  const handleClearFilters = () => {
+    setDraftFilterDate("");
+    setDraftFilterStatus("");
+    setDraftFilterMachine("");
+    setFilterDate("");
+    setFilterStatus("");
+    setFilterMachine("");
+  };
+
+  const handleOpenFilter = () => {
+    setDraftFilterDate(filterDate);
+    setDraftFilterStatus(filterStatus);
+    setDraftFilterMachine(filterMachine);
+  };
+
   // View Modal
   const [showViewModal, setShowViewModal] = useState(false);
   const [viewPlan, setViewPlan] = useState<any>(null);
@@ -93,12 +122,6 @@ const DailyProductionPlanningPage: React.FC = () => {
   const [stopReason, setStopReason] = useState("");
   const [isStopping, setIsStopping] = useState(false);
 
-  // Expandable Row State
-  const [expandedRow, setExpandedRow] = useState<string | null>(null);
-
-  const toggleExpandRow = (planId: string) => {
-    setExpandedRow(prev => prev === planId ? null : planId);
-  };
 
 
   // ──────────────────────────────────────────────────────────────
@@ -260,7 +283,13 @@ const DailyProductionPlanningPage: React.FC = () => {
         weeklyProgramId: plan.weeklyProgramId,
         machineId: plan.machineId,
         plannedQty: pendingQty,
-        remarks: `Carried forward from Daily Plan ${plan.dailyPlanId}`
+        remarks: `Carried forward from Daily Plan ${plan.dailyPlanId}`,
+        carryForwardFromPlanId: plan.dailyPlanId,
+        carryForwardFromInfo: {
+          shiftId: plan.shiftId,
+          shiftName: plan.shift?.shiftName,
+          productionDate: plan.productionDate,
+        },
       }
     });
   };
@@ -376,6 +405,20 @@ const DailyProductionPlanningPage: React.FC = () => {
             {plan.plannedHours && (
               <div className="text-slate-500 text-xs mt-0.5">{plan.plannedHours} hrs</div>
             )}
+            {plan.carryForwardFromPlanId && (
+              <div className="mt-1 flex items-center gap-1">
+                <span className="bg-amber-100 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded text-[9px] font-bold whitespace-nowrap">
+                  ↩ From {plan.carryForwardFromPlanId}
+                </span>
+              </div>
+            )}
+            {Array.isArray(plan.carryForwardTo) && plan.carryForwardTo.length > 0 && (
+              <div className="mt-1 flex items-center gap-1">
+                <span className="bg-sky-100 text-sky-700 border border-sky-200 px-1.5 py-0.5 rounded text-[9px] font-bold whitespace-nowrap">
+                  ↪ To {plan.carryForwardTo[0].dailyPlanId}
+                </span>
+              </div>
+            )}
           </div>
         );
       }
@@ -459,8 +502,9 @@ const DailyProductionPlanningPage: React.FC = () => {
         const canAdvance = !!nextStatus && plan.status !== "COMPLETED" && plan.status !== "CANCELLED";
         const canLog = plan.status === "IN_PROGRESS";
 
-        const forwardedToPlan = filteredPlans.find((p: any) => p.remarks?.includes(`Carried forward from Daily Plan ${plan.dailyPlanId}`));
-        const canCarryForward = plan.status === "COMPLETED" && pendingQty > 0 && !forwardedToPlan;
+        // A plan can only be carried forward ONCE — check via the API-returned carryForwardTo array
+        const alreadyCarriedForward = Array.isArray(plan.carryForwardTo) && plan.carryForwardTo.length > 0;
+        const canCarryForward = (plan.status === "COMPLETED" || plan.status === "STOPPED") && pendingQty > 0 && !alreadyCarriedForward;
 
         return (
           <div className="flex items-center justify-end gap-1" onClick={e => e.stopPropagation()}>
@@ -522,94 +566,92 @@ const DailyProductionPlanningPage: React.FC = () => {
     <div className="p-4 md:p-6 min-h-screen bg-white">
       <div className="w-full">
         {/* Page Header */}
-        <div className="mb-6">
-          <div className="flex flex-col lg:flex-row items-start lg:items-start justify-between gap-4">
-            <div className="flex-1">
-              <div className="page-header-info">
-                <h2 className="text-2xl font-bold text-slate-800">Daily Production Planning</h2>
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 mb-6">
+          <div>
+            <h2 className="text-2xl font-bold text-slate-800">Daily Production Planning</h2>
+          </div>
 
+          <div className="flex flex-wrap items-center gap-3 relative w-full lg:w-auto">
+            <FilterPopover
+              activeFilterCount={activeFilterCount}
+              hasActiveFilters={hasActiveFilters}
+              onApply={handleApplyFilters}
+              onClear={handleClearFilters}
+              onOpen={handleOpenFilter}
+            >
+              <div className="mb-3">
+                <label className="block mb-1 text-[11px] uppercase tracking-wider text-gray-500 font-semibold">
+                  Date
+                </label>
+                <input
+                  type="date"
+                  className="w-full border border-gray-200 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                  value={draftFilterDate}
+                  onChange={(e) => setDraftFilterDate(e.target.value)}
+                />
               </div>
-            </div>
-            <div className="flex-1 w-full lg:w-auto">
-              <div className="flex flex-col items-end gap-3">
-                {/* Filters Row */}
-                <div className="flex flex-wrap items-center justify-end gap-3">
-                  {/* Date Filter */}
-                  <div className="w-40">
-                    <input
-                      type="date"
-                      className="w-full h-[35px] px-3 py-1 text-sm border border-slate-300 rounded-[10px] focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/15 transition-all duration-200"
-                      value={filterDate}
-                      onChange={(e) => setFilterDate(e.target.value)}
-                    />
-                  </div>
 
-                  {/* Machine Filter */}
-                  <div className="w-48">
-                    <SelectInput
-                      hideLabel
-                      noMargin
-                      name="filterMachine"
-                      value={filterMachine}
-                      onChange={(e: any) => setFilterMachine(e.target.value)}
-                      defaultOptionLabel="All Machines"
-                      options={allowedMachines.map((m: any) => ({
-                        value: m.machineId,
-                        label: m.machineName
-                      }))}
-                    />
-                  </div>
-
-                  {/* Status Filter */}
-                  <div className="w-40">
-                    <SelectInput
-                      hideLabel
-                      noMargin
-                      name="filterStatus"
-                      value={filterStatus}
-                      onChange={(e: any) => setFilterStatus(e.target.value)}
-                      defaultOptionLabel="All Status"
-                      options={Object.keys(STATUS_FLOW).map(s => ({
-                        value: s,
-                        label: STATUS_FLOW[s].label
-                      }))}
-                    />
-                  </div>
-                </div>
-
-                {/* Buttons Row */}
-                <div className="flex items-center gap-3">
-                  <CustomButton
-                    text="New Production Order"
-                    icon={FaPlus}
-                    onClick={() => navigate("/production-orders/create")}
-                  />
-                  <CustomButton
-                    text="New Daily Plan"
-                    icon={FaPlus}
-                    onClick={openCreateForm}
-                  />
-                </div>
+              <div className="mb-3">
+                <label className="block mb-1 text-[11px] uppercase tracking-wider text-gray-500 font-semibold">
+                  Machine
+                </label>
+                <select
+                  className="w-full border border-gray-200 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary bg-white"
+                  value={draftFilterMachine}
+                  onChange={(e) => setDraftFilterMachine(e.target.value)}
+                >
+                  <option value="">All Machines</option>
+                  {allowedMachines.map((m: any) => (
+                    <option key={m.machineId} value={m.machineId}>{m.machineName}</option>
+                  ))}
+                </select>
               </div>
-            </div>
+
+              <div className="mb-4">
+                <label className="block mb-1 text-[11px] uppercase tracking-wider text-gray-500 font-semibold">
+                  Status
+                </label>
+                <select
+                  className="w-full border border-gray-200 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary bg-white"
+                  value={draftFilterStatus}
+                  onChange={(e) => setDraftFilterStatus(e.target.value)}
+                >
+                  <option value="">All Status</option>
+                  {Object.keys(STATUS_FLOW).map(s => (
+                    <option key={s} value={s}>{STATUS_FLOW[s].label}</option>
+                  ))}
+                </select>
+              </div>
+            </FilterPopover>
+
+            <CustomButton
+              text="New Production Order"
+              icon={FaPlus}
+              onClick={() => navigate("/production-orders/create")}
+            />
+            <CustomButton
+              text="New Daily Plan"
+              icon={FaPlus}
+              onClick={openCreateForm}
+            />
           </div>
         </div>
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
           {[
-            { label: "Total Plans", value: stats.total, icon: FaCalendarAlt, colorClass: "text-blue-600", bgClass: "bg-blue-50" },
-            { label: "Approved", value: stats.approved, icon: FaCheckCircle, colorClass: "text-sky-600", bgClass: "bg-sky-50" },
-            { label: "In Progress", value: stats.running, icon: FaPlay, colorClass: "text-emerald-600", bgClass: "bg-emerald-50" },
-            { label: "Completed", value: stats.completed, icon: FaStop, colorClass: "text-teal-600", bgClass: "bg-teal-50" },
+            { label: "Total Plans", value: stats.total, icon: FaCalendarAlt, colorClass: "text-indigo-600", iconColor: "text-indigo-500", bgClass: "bg-indigo-50/80" },
+            { label: "Approved", value: stats.approved, icon: FaCheckCircle, colorClass: "text-amber-600", iconColor: "text-amber-500", bgClass: "bg-amber-50/80" },
+            { label: "In Progress", value: stats.running, icon: FaPlay, colorClass: "text-sky-600", iconColor: "text-sky-500", bgClass: "bg-sky-50/80" },
+            { label: "Completed", value: stats.completed, icon: FaStop, colorClass: "text-emerald-600", iconColor: "text-emerald-500", bgClass: "bg-emerald-50/80" },
           ].map((stat) => (
-            <div key={stat.label} className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex items-center">
-              <div className={`p-3 rounded-full ${stat.bgClass} ${stat.colorClass} mr-4`}>
-                <stat.icon size={20} />
+            <div key={stat.label} className={`rounded-2xl shadow-sm border border-slate-100/50 p-4 flex items-center justify-between transition-transform hover:-translate-y-1 cursor-default ${stat.bgClass}`}>
+              <div className={`${stat.iconColor}`}>
+                <stat.icon size={30} />
               </div>
-              <div>
-                <h6 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">{stat.label}</h6>
-                <h4 className="text-xl font-bold text-slate-800 m-0">{stat.value}</h4>
+              <div className="text-right">
+                <h6 className={`text-sm font-semibold mb-1 ${stat.colorClass}`}>{stat.label}</h6>
+                <h4 className={`text-3xl font-bold m-0 ${stat.colorClass}`}>{stat.value}</h4>
               </div>
             </div>
           ))}
@@ -755,7 +797,7 @@ const DailyProductionPlanningPage: React.FC = () => {
 
               {/* ─── OEE & Production Summary ─────────────────────────────── */}
               {viewPlanOeeSummary && (
-                <div className="mt-6 rounded-xl p-4 bg-gradient-to-br from-slate-800 to-blue-900 text-white shadow-lg">
+                <div className="mt-6 rounded-xl p-4 bg-linear-to-br from-slate-800 to-blue-900 text-white shadow-lg">
                   <div className="font-bold mb-4 text-[13px] tracking-wider uppercase opacity-90">
                     📊 Production OEE Summary
                   </div>

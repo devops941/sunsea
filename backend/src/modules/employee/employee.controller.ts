@@ -49,6 +49,34 @@ class EmployeeController {
 
       const { userId } = req.user;
 
+      const isAdmin = userId.startsWith("admin_");
+
+      if (isAdmin) {
+        const adminId = BigInt(userId.replace("admin_", ""));
+        const adminRecord = await prisma.admin.findUnique({
+          where: { id: adminId },
+        });
+
+        if (!adminRecord) {
+          throw new ApiError(404, "Admin record not found");
+        }
+
+        return res.status(200).json(
+          new ApiResponse("Profile fetched successfully", {
+            fullName: adminRecord.fullName,
+            empCode: "ADMIN",
+            department: { name: "System Administration" },
+            designation: { name: "Super Admin" },
+            dateOfJoining: adminRecord.createdAt,
+            createdAt: adminRecord.createdAt,
+            status: adminRecord.status,
+            mobile: adminRecord.phone,
+            email: adminRecord.email,
+            roles: [{ role: { name: "Super Admin" } }],
+          })
+        );
+      }
+
       const userRecord = await prisma.user.findUnique({
         where: { userId },
         select: { employeeId: true },

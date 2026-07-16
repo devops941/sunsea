@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { FaSave, FaPlus, FaTrash, FaFileInvoiceDollar, FaChevronLeft } from "react-icons/fa";
+import { FaSave, FaPlus, FaTrash, FaFileInvoiceDollar } from "react-icons/fa";
 import { toast } from "react-toastify";
 
 import TextInput from "../../components/form/TextInput/TextInput";
@@ -141,7 +141,6 @@ const calculateInvoiceNumber = (dateStr: string, settings: any, orders: any[]) =
 const SalesInvoiceForm: React.FC = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
 
   const [customers, setCustomers] = useState<CustomerOption[]>([]);
   const [items, setItems] = useState<ItemOption[]>([]);
@@ -170,7 +169,7 @@ const SalesInvoiceForm: React.FC = () => {
       finishedGoodsStockService.fetchAll().catch(() => []),
     ])
       .then(([customerList, productList, settings, ordersResponse, salesOrdersResponse, fgStockResponse]) => {
-        const customerOptions: CustomerOption[] = (customerList || []).map((c: any) => ({
+        const customerOptions: CustomerOption[] = (Array.isArray(customerList) ? customerList : (customerList as any)?.customers || []).map((c: any) => ({
           id: c.id,
           name: c.firmName || c.displayName || c.customerCode || "Unknown Customer",
         }));
@@ -396,7 +395,7 @@ const SalesInvoiceForm: React.FC = () => {
   }
 
   return (
-    <div className="max-w-7xl mx-auto pb-12">
+    <div className="mx-auto pb-12">
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
 
         {/* Page Header */}

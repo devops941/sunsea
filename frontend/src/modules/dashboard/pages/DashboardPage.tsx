@@ -292,12 +292,12 @@ const DashboardPage: React.FC = () => {
         {/* Welcome Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-6 gap-4">
           <div>
-            <h2 className="text-2xl sm:text-3xl font-bold mb-1 !text-primary">Manufacturing Command Center</h2>
+            <h2 className="text-2xl sm:text-3xl font-bold mb-1 text-primary!">Manufacturing Command Center</h2>
             <div className="text-gray-500 text-sm sm:text-base">Centralized overview of your entire ERP operations</div>
           </div>
           {anyLoading && (
             <div className="text-gray-500 text-sm flex items-center">
-              <svg className="animate-spin -ml-1 mr-2 h-4 w-4 !text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-primary!" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
@@ -310,32 +310,31 @@ const DashboardPage: React.FC = () => {
         <DashboardStatsGrid stats={stats} />
 
         <div className="grid grid-cols-1 gap-6 mb-6">
-          {/* 2. Production Overview */}
           <div className="col-span-1">
             <DashboardProductionOverview productionStats={productionStats} />
           </div>
         </div>
 
         {/* 3. Machine Overview */}
-        <DashboardMachineOverview machines={machineOverviewData} />
+        {/* <DashboardMachineOverview machines={machineOverviewData} /> */}
 
         {/* 4. Weekly Schedule Overview & 5. Today's Plan */}
-        <DashboardScheduleOverview
+        {/* <DashboardScheduleOverview
           weeklySummary={scheduleOverview.weeklySummary}
           todaysPlan={scheduleOverview.todaysPlan}
-        />
+        /> */}
 
         {/* 6 & 7. Status and Priority Distributions */}
-        <DashboardStatusPriority
+        {/* <DashboardStatusPriority
           statusDistribution={distribution.statusDistribution}
           priorityDistribution={distribution.priorityDistribution}
-        />
+        /> */}
 
         {/* 8. Recent Production Orders & 9. Recent Schedules */}
-        <DashboardRecentActivity
+        {/* <DashboardRecentActivity
           recentOrders={recentOrders}
           recentSchedules={recentSchedules}
-        />
+        /> */}
 
         {/* 12. Footer */}
         <DashboardFooter />

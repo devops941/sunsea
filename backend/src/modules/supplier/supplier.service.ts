@@ -9,7 +9,7 @@ import type {
 
 class SupplierService {
   async createSupplier(
-    data: CreateSupplierInput & { userId: string }
+    data: CreateSupplierInput & { userId: string; companyId: string }
   ) {
     const existingSupplier = await supplierRepository.findByCode(data.companyId, data.supplierCode);
 
@@ -171,6 +171,16 @@ class SupplierService {
 
     const { addresses, userId, materialPrices, ...supplierData } = data;
 
+    // Handle admin user fallback for updatedByUser relation
+    let updatedByUserId = userId;
+    if (userId && userId.startsWith("admin_")) {
+      const fallbackUser = await prisma.user.findFirst({
+        where: { status: "active" },
+        select: { userId: true },
+      });
+      updatedByUserId = fallbackUser ? fallbackUser.userId : undefined;
+    }
+
     return prisma.$transaction(async (tx) => {
       if (addresses !== undefined) {
         // Delete all old addresses
@@ -219,7 +229,7 @@ class SupplierService {
         ...supplierData,
         bankAccount: supplierData.bankAccount as any,
         minOrderQty: supplierData.minOrderQty !== undefined && supplierData.minOrderQty !== null ? new Prisma.Decimal(supplierData.minOrderQty) : undefined,
-        updatedByUser: userId ? { connect: { userId } } : undefined,
+        updatedByUser: updatedByUserId ? { connect: { userId: updatedByUserId } } : undefined,
       };
 
       return tx.supplier.update({

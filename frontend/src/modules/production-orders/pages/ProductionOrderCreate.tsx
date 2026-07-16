@@ -943,7 +943,7 @@ const ProductionOrderCreate: React.FC = () => {
                     })),
                 };
                 await productionOrderService.update(orderId, payload as any);
-                toast.success("Production Order updated successfully!");
+                toast.success(data.status === "DRAFT" ? "Production Order draft updated successfully!" : "Production Order updated successfully!");
             } else {
                 await Promise.all(data.products.map(async (prod, index) => {
                     const productRawMaterials = (prod.rawMaterials ?? []).map((rm) => ({
@@ -977,7 +977,7 @@ const ProductionOrderCreate: React.FC = () => {
                     };
                     return productionOrderService.create(payload as any);
                 }));
-                toast.success("Production Order(s) created successfully!");
+                toast.success(data.status === "DRAFT" ? "Production Order saved as draft successfully!" : "Production Order(s) created successfully!");
             }
 
             navigate("/production-orders");
@@ -1161,7 +1161,7 @@ const ProductionOrderCreate: React.FC = () => {
                                 {productFields.map((prodItem, index) => (
                                     <div key={prodItem.id} className={index > 0 ? "mt-4 pt-4 border-t border-slate-200" : ""}>
                                         <div className="flex justify-between items-center mb-4">
-                                            <h3 className="text-lg font-bold text-slate-800 border-b border-slate-200 pb-2 flex-grow">Product {index + 1}</h3>
+                                            <h3 className="text-lg font-bold text-slate-800 border-b border-slate-200 pb-2 grow">Product {index + 1}</h3>
                                             {!watchSalesOrderId && productFields.length > 1 && (
                                                 <DeleteButton onClick={() => removeProduct(index)} />
                                             )}
@@ -1402,7 +1402,7 @@ const ProductionOrderCreate: React.FC = () => {
                     </div>
 
                     {/* ── Form Actions ──────────────────────────────────────── */}
-                    <div className="form-actions flex justify-end gap-3 mt-4 pt-3 border-t border-slate-200">
+                    <div className="form-actions pb-4 pr-3 flex justify-end gap-3 mt-4 pt-3 border-t border-slate-200">
                         <CustomButton
                             text="Clear Form"
                             icon={FaEraser}
@@ -1432,7 +1432,7 @@ const ProductionOrderCreate: React.FC = () => {
                                             : "Create Production Order"
                                 }
                                 icon={isSubmitting ? undefined : FaSave}
-                                onClick={handleSubmit(onSubmit)}
+                                onClick={handleSubmit((data) => onSubmit({ ...data, status: data.status === "DRAFT" ? "PLANNED" : data.status }))}
                                 type="button"
                                 disabled={isSubmitting}
                             />

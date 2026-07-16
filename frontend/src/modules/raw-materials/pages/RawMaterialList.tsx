@@ -126,23 +126,22 @@ const RawMaterialList: React.FC = () => {
     };
 
     return (
-        <div className="inner-container">
-            <Container fluid>
-                <div className="page-header">
-                    <Row className="align-items-center g-3">
-                        <Col lg={4} md={12}>
-                            <div className="page-header-info">
-                                <h2 className="page-title">Raw Materials Management</h2>
-                                
-                            </div>
-                        </Col>
-                        <Col lg={8} md={12}>
-                            <div className="page-header-actions d-flex gap-3">
+        
+        <div className="p-4 md:p-6 min-h-screen bg-white">
+            <div className="">
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                    {/* Page Header */}
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-6 border-b border-slate-200">
+                        <div>
+                            <h2 className="text-2xl font-bold text-slate-800">Raw Materials Management</h2>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+    
                                 <div className="page-filter-wrap">
-                                    <Form.Select
+                                    <select
                                         value={storeFilter}
                                         onChange={handleStoreFilterChange}
-                                        className="page-filter-select"
+                                        className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
                                         style={{ minWidth: "120px" }}
                                     >
                                         <option value="">All Stores</option>
@@ -151,13 +150,13 @@ const RawMaterialList: React.FC = () => {
                                                 {store.storeName}
                                             </option>
                                         ))}
-                                    </Form.Select>
+                                    </select>
                                 </div>
-                                <div className="page-search-wrap">
-                                    <FaSearch className="page-search-icon" />
+                                <div className="relative w-full md:w-64">
+                                    <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                                     <input
                                         type="text"
-                                        className="page-search-input"
+                                        className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
                                         placeholder="Search materials..."
                                         value={searchTerm}
                                         onChange={handleSearch}
@@ -174,9 +173,7 @@ const RawMaterialList: React.FC = () => {
                                     onClick={handleOpenAdd}
                                 />
                             </div>
-                        </Col>
-                    </Row>
-                </div>
+                    </div>
 
                 <div className="master-table-body table-wrap">
                     <div className="master-table-body">
@@ -333,7 +330,8 @@ const RawMaterialList: React.FC = () => {
                     confirmText="Delete"
                     confirmVariant="danger"
                 />
-            </Container>
+            </div>
+            </div>
         </div>
     );
 };

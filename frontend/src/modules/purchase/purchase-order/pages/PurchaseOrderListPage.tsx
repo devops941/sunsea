@@ -182,6 +182,16 @@ const PurchaseOrderListPage: React.FC = () => {
           </div>
 
           <div className="flex flex-wrap items-center gap-3 relative w-full lg:w-auto">
+
+
+             <SearchInput
+              value={searchTerm}
+              onChange={handleSearch}
+              placeholder="Search by PO # or Supplier..."
+            />
+
+
+            
             <FilterPopover
               activeFilterCount={activeFilterCount}
               hasActiveFilters={hasActiveFilters}
@@ -235,11 +245,7 @@ const PurchaseOrderListPage: React.FC = () => {
               </div>
             </FilterPopover>
 
-            <SearchInput
-              value={searchTerm}
-              onChange={handleSearch}
-              placeholder="Search by PO # or Supplier..."
-            />
+           
             {canCreate ? (
               <CustomButton
                 text="Create PO"

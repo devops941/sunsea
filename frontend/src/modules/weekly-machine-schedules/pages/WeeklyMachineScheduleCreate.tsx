@@ -237,7 +237,7 @@ const WeeklyMachineScheduleCreate: React.FC = () => {
                     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 mb-6">
 
                         {selectedCount > 0 && (
-                            <div className="flex items-center gap-3 p-6 border-b border-slate-200">
+                            <div className="flex justify-end items-center gap-3 p-6 border-b border-slate-200">
                                 <span className="font-bold text-primary">{selectedCount} Selected</span>
                                 <CustomButton
                                     text={isSubmitting ? "Saving..." : "Confirm & Save Allocation"}

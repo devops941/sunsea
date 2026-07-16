@@ -996,21 +996,22 @@ model HourlyProduction {
 }
 
 model DailyProductionPlan {
-  dailyPlanId       String               @id @map("daily_plan_id") @db.VarChar(50)
-  weeklyProgramId   String               @map("weekly_program_id") @db.VarChar(20)
-  productionOrderId String               @map("production_order_id") @db.VarChar(20)
-  productionDate     DateTime             @map("production_date") @db.Date
-  machineId         String               @map("machine_id") @db.VarChar(20)
-  shiftId           String               @map("shift_id") @db.VarChar(20)
-  plannedQty        Decimal              @map("planned_qty") @db.Decimal(12, 3)
-  plannedHours      Decimal?             @map("planned_hours") @db.Decimal(10, 2)
-  priority          String               @default("MEDIUM") @db.VarChar(20)
-  status            String               @default("DRAFT") @db.VarChar(20)
-  remarks           String?              @db.VarChar(255)
-  createdAt         DateTime             @default(now()) @map("created_at")
-  updatedAt         DateTime             @updatedAt @map("updated_at")
-  createdBy         String?              @map("created_by") @db.VarChar(36)
-  updatedBy         String?              @map("updated_by") @db.VarChar(36)
+  dailyPlanId            String               @id @map("daily_plan_id") @db.VarChar(50)
+  weeklyProgramId        String               @map("weekly_program_id") @db.VarChar(20)
+  productionOrderId      String               @map("production_order_id") @db.VarChar(20)
+  productionDate         DateTime             @map("production_date") @db.Date
+  machineId              String               @map("machine_id") @db.VarChar(20)
+  shiftId                String               @map("shift_id") @db.VarChar(20)
+  plannedQty             Decimal              @map("planned_qty") @db.Decimal(12, 3)
+  plannedHours           Decimal?             @map("planned_hours") @db.Decimal(10, 2)
+  priority               String               @default("MEDIUM") @db.VarChar(20)
+  status                 String               @default("DRAFT") @db.VarChar(20)
+  remarks                String?              @db.VarChar(255)
+  carryForwardFromPlanId String?              @map("carry_forward_from_plan_id") @db.VarChar(50)
+  createdAt              DateTime             @default(now()) @map("created_at")
+  updatedAt              DateTime             @updatedAt @map("updated_at")
+  createdBy              String?              @map("created_by") @db.VarChar(36)
+  updatedBy              String?              @map("updated_by") @db.VarChar(36)
 
   weeklyMachineProgram WeeklyMachineProgram @relation(fields: [weeklyProgramId], references: [weeklyProgramId], onDelete: Cascade)
   productionOrder      ProductionOrder      @relation(fields: [productionOrderId], references: [productionOrderId], onDelete: Cascade)
@@ -1018,12 +1019,17 @@ model DailyProductionPlan {
   shift                Shift                @relation(fields: [shiftId], references: [shiftCode], onDelete: Cascade)
   hourlyProductions    HourlyProduction[]
 
+  // Self-relation: the plan this was carried forward FROM
+  carryForwardFrom DailyProductionPlan?  @relation("CarryForwardChain", fields: [carryForwardFromPlanId], references: [dailyPlanId], onDelete: SetNull)
+  carryForwardTo   DailyProductionPlan[] @relation("CarryForwardChain")
+
   @@index([weeklyProgramId])
   @@index([productionOrderId])
   @@index([machineId])
   @@index([shiftId])
   @@index([productionDate])
   @@index([status])
+  @@index([carryForwardFromPlanId])
   @@map("daily_production_plans")
 }
 

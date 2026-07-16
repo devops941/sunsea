@@ -12,7 +12,6 @@ import { fetchRawMaterials } from "../../../features/raw-materials/rawMaterialSl
 import { fetchActiveUOMs } from "../../../features/uoms/uomSlice";
 import TextInput from "../../../components/form/TextInput/TextInput";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
-import CustomButton from "../../../components/ui/custombutton/CustomButton";
 import { z } from "zod";
 
 const wastageSchema = z.object({
@@ -204,7 +203,7 @@ const WastageForm: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-white p-4 md:p-6">
-      <div className="max-w-7xl mx-auto">
+      <div className=" mx-auto">
         {/* Page Header */}
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6">
           <div>

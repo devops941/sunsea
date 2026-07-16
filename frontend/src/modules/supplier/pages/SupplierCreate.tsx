@@ -972,6 +972,7 @@ const SupplierCreate: React.FC = () => {
                                                 value={bank.bankHolderName}
                                                 onChange={(e) => handleBankChange(index, e)}
                                                 error={errors[`bankAccounts.${index}.bankHolderName`]}
+                                                required
                                             />
                                             <TextInput
                                                 label="Bank Name"
@@ -979,6 +980,8 @@ const SupplierCreate: React.FC = () => {
                                                 value={bank.bankName}
                                                 onChange={(e) => handleBankChange(index, e)}
                                                 error={errors[`bankAccounts.${index}.bankName`]}
+                                                required
+
                                             />
                                             <TextInput
                                                 label="Account Number"
@@ -986,6 +989,8 @@ const SupplierCreate: React.FC = () => {
                                                 value={bank.accountNumber}
                                                 onChange={(e) => handleBankChange(index, e)}
                                                 error={errors[`bankAccounts.${index}.accountNumber`]}
+                                                required
+
                                             />
                                             <TextInput
                                                 label="IFSC Code"
@@ -993,6 +998,8 @@ const SupplierCreate: React.FC = () => {
                                                 value={bank.ifscCode}
                                                 onChange={(e) => handleBankChange(index, e)}
                                                 error={errors[`bankAccounts.${index}.ifscCode`]}
+                                                required
+
                                             />
                                             <TextInput
                                                 label="Branch Name"
@@ -1000,6 +1007,8 @@ const SupplierCreate: React.FC = () => {
                                                 value={bank.branchName}
                                                 onChange={(e) => handleBankChange(index, e)}
                                                 error={errors[`bankAccounts.${index}.branchName`]}
+                                                required
+
                                             />
                                             <IndiaPhoneInput
                                                 label="GPay / PhonePe Number"
@@ -1008,6 +1017,8 @@ const SupplierCreate: React.FC = () => {
                                                 placeholder="9876543210"
                                                 onChange={(e) => handleBankChange(index, e as React.ChangeEvent<HTMLInputElement>)}
                                                 error={errors[`bankAccounts.${index}.upiMobileNumber`]}
+                                                required
+
                                             />
                                         </div>
                                     </div>
