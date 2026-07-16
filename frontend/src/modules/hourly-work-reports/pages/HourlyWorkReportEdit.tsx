@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Container, Row, Col, Card } from "../../../components/ui/BootstrapReplacements";
+import { Container, Row, Col, Card } from "react-bootstrap";
 import { FaSave, FaEraser, FaArrowLeft, FaCheckCircle } from "react-icons/fa";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -111,7 +111,7 @@ const HourlyWorkReportEdit: React.FC = () => {
                         <Col lg={6} md={12}>
                             <div className="page-header-info">
                                 <h2 className="page-title mb-1">Edit Hourly Production Log</h2>
-                                
+
                             </div>
                         </Col>
                         <Col lg={6} md={12}>
