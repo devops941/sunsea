@@ -6,7 +6,7 @@ import SelectInput from "../SelectInput/SelectInput";
 import TextInput from "../TextInput/TextInput";
 
 export interface OrderItemsTableProps {
-    control: Control<any>;
+    control: any;
     fields: any[];
     errors: FieldErrors<any>;
     productOptions: { value: string; label: string }[];

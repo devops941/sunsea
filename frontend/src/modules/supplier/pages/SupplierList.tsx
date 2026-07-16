@@ -179,7 +179,7 @@ const SupplierList: React.FC = () => {
                                             {canViewPricing && (
                                                 <PricingButton onClick={() => handleViewPricing(supplier)} />
                                             )}
-                                            {canDeleteSupplier && <DeleteButton onClick={() => triggerDelete(supplier.id)} />}
+                                            {canDeleteSupplier && <DeleteButton onClick={() => triggerDelete(String(supplier.id))} />}
                                         </div>
                                     ),
                                     align: "left"
