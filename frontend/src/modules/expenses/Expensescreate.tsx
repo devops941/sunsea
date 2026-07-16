@@ -399,11 +399,18 @@ const ExpensesCreate: React.FC<ExpensesCreateProps> = ({
           {/* Form Actions */}
           <div className="flex flex-wrap justify-end gap-3 mt-8 pt-4 border-t border-gray-200">
             <CustomButton
+              text="Cancel"
+              onClick={onCancel}
+              type="button"
+              variant="secondary"
+              disabled={saving}
+            />
+            <CustomButton
               text="Clear"
               icon={FaEraser}
               onClick={handleClear}
               type="button"
-              variant="outline"
+              variant="secondary"
               disabled={saving}
             />
             <CustomButton

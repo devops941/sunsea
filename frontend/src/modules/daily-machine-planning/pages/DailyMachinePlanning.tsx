@@ -192,7 +192,7 @@ const DailyMachinePlanning: React.FC = () => {
     try {
       const res = await productionOrderService.fetchAll({ limit: 1000 } as any);
       const list = res.data || res || [];
-      const poList = Array.isArray(list) ? list : (list.data || []);
+      const poList = Array.isArray(list) ? list : ((list as any).data || []);
       
       // Include orders that are not yet fully completed or cancelled
       const activeList = poList.filter((po: any) =>

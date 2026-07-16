@@ -269,7 +269,7 @@ const EmployeeCreatePage: React.FC = () => {
                 value={formData.mobile}
                 placeholder="Enter Mobile Number"
                 required={false}
-                onChange={handleChange}
+                onChange={(e) => handleChange(e as any)}
                 error={errors.mobile}
               />
 

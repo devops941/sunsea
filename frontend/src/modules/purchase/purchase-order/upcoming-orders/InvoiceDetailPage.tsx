@@ -195,7 +195,7 @@ const InvoiceDetailPage: React.FC = () => {
                     shippingPincode: po.shippingPincode || "",
                     gstNumber: fullSupplier?.gstin || "",
                     contactName: fullSupplier?.contactPerson || "",
-                    mobileNumber: fullSupplier?.mobile || fullSupplier?.phone || "",
+                    mobileNumber: fullSupplier?.mobile || (fullSupplier as any)?.phone || "",
                     email: fullSupplier?.email || "",
                     supplierAddress: [fullSupplier?.billingAddressLine1, fullSupplier?.billingCity, fullSupplier?.billingState].filter(Boolean).join(", "),
                 }));
@@ -578,10 +578,10 @@ const InvoiceDetailPage: React.FC = () => {
                                 onAddressChange={(val) => setForm((prev) => ({ ...prev, billingAddressLine1: val }))}
                                 addressError={errors.billingAddressLine1}
                                 stateValue={form.billingState}
-                                onStateChange={(val) => handleBillingStateChange({ name: val, isoCode: "" })}
+                                onStateChange={(val) => handleBillingStateChange({ id: 0, name: val, isoCode: "" })}
                                 stateError={errors.billingState}
                                 cityValue={form.billingCity}
-                                onCityChange={(val) => handleBillingCityChange({ name: val, isoCode: "" })}
+                                onCityChange={(val) => handleBillingCityChange({ id: 0, name: val, isoCode: "" })}
                                 cityError={errors.billingCity}
                                 pincodeValue={form.billingPincode}
                                 onPincodeChange={(val) => setForm((prev) => ({ ...prev, billingPincode: val }))}
@@ -611,10 +611,10 @@ const InvoiceDetailPage: React.FC = () => {
                                 onAddressChange={(val) => setForm((prev) => ({ ...prev, shippingAddressLine1: val }))}
                                 addressError={errors.shippingAddressLine1}
                                 stateValue={form.shippingState}
-                                onStateChange={(val) => handleShippingStateChange({ name: val, isoCode: "" })}
+                                onStateChange={(val) => handleShippingStateChange({ id: 0, name: val, isoCode: "" })}
                                 stateError={errors.shippingState}
                                 cityValue={form.shippingCity}
-                                onCityChange={(val) => handleShippingCityChange({ name: val, isoCode: "" })}
+                                onCityChange={(val) => handleShippingCityChange({ id: 0, name: val, isoCode: "" })}
                                 cityError={errors.shippingCity}
                                 pincodeValue={form.shippingPincode}
                                 onPincodeChange={(val) => setForm((prev) => ({ ...prev, shippingPincode: val }))}
