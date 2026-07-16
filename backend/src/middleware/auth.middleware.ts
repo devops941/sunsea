@@ -58,9 +58,16 @@ export const authMiddleware = async (
       );
     }
 
-    // Verify session is still active
+    const isAdmin = decoded.userId.startsWith("admin_");
+    
+    // Verify the specific session is still active
     const session = await prisma.userSession.findFirst({
       where: {
+        id: decoded.sessionId,
+        ...(isAdmin 
+          ? { adminId: BigInt(decoded.userId.replace("admin_", "")) }
+          : { userId: decoded.userId }
+        ),
         isActive: true,
         expiresAt: { gt: new Date() }
       }
@@ -71,9 +78,8 @@ export const authMiddleware = async (
         new ApiError(401, "Session expired or invalid")
       );
     }
-
-    const isAdmin = decoded.userId.startsWith("admin_");
     
+    // Verify user/admin account is still active
     if (isAdmin) {
       const adminId = BigInt(decoded.userId.replace("admin_", ""));
       const admin = await prisma.admin.findUnique({
