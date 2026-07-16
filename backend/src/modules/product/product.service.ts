@@ -514,7 +514,7 @@ class ProductService {
     await this.findById(id);
     const [salesCount, stockCount] = await Promise.all([
       prisma.salesOrderItem.count({ where: { productId: id } }),
-      prisma.finishedGoodsStock.count({ where: { productId: id } })
+      prisma.finishedGoodsStock.count({ where: { productItemId: id } })
     ]);
     if (salesCount > 0 || stockCount > 0) {
       throw new Error("Cannot delete product as it is referenced in sales orders or stock");

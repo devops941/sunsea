@@ -7,6 +7,7 @@ import CustomButton from "../../../../components/ui/Button/Button";
 
 import TextInput from "../../../../components/form/TextInput/TextInput";
 import SelectInput from "../../../../components/form/SelectInput/SelectInput";
+import DatePickerCalendar from "../../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 
 import QuantityInput from "../../../../components/form/QuantityInput/QuantityInput";
 import CityStateSelect from "../../../../components/ui/CityStateSelect/CityStateSelect";
@@ -26,9 +27,6 @@ import { useAppDispatch, useAppSelector } from "../../../../hooks/reduxHooks";
 import { fetchLocations } from "../../../../features/locations/locationSlice";
 import { selectActiveGstTaxes, fetchGstTaxes } from "../../../../features/gst/gstSlice";
 import { fetchStores } from "../../../../features/stores/storeSlice";
-
-// ─── Report-style Section wrapper (matches QuotationForm) ──────────────────
-
 
 const initialFormData = {
   poNumber: "",
@@ -797,12 +795,24 @@ const PurchaseOrderCreatePage: React.FC = () => {
               <TextInput label="PO Number" name="poNumber" value={formData.poNumber} onChange={handleChange} disabled />
             </div>
             <div>
-              <TextInput label="PO Date" name="poDate" type="date" value={formData.poDate} onChange={handleChange} required />
-              {errors.poDate && <div className="text-red-500 mt-1 text-sm">{errors.poDate}</div>}
+              <DatePickerCalendar
+                label="PO Date"
+                name="poDate"
+                value={formData.poDate}
+                onChange={handleChange}
+                required
+                error={errors.poDate}
+              />
             </div>
             <div>
-              <TextInput label="Expected Delivery Date" name="expectedDeliveryDate" type="date" value={formData.expectedDeliveryDate} onChange={handleChange} required />
-              {errors.expectedDeliveryDate && <div className="text-red-500 mt-1 text-sm">{errors.expectedDeliveryDate}</div>}
+              <DatePickerCalendar
+                label="Expected Delivery Date"
+                name="expectedDeliveryDate"
+                value={formData.expectedDeliveryDate}
+                onChange={handleChange}
+                required
+                error={errors.expectedDeliveryDate}
+              />
             </div>
             <div>
               <SelectInput label="Store" name="storeId" value={formData.storeId} options={[{ label: "-- Select Store --", value: "" }, ...(stores || []).filter((s: any) => s.isActive).map((s: any) => ({ label: s.storeName, value: s.storeId }))]} required error={errors.storeId} onChange={handleChange} />
@@ -880,6 +890,9 @@ const PurchaseOrderCreatePage: React.FC = () => {
                   const qty = Number(item.quantity) || 0;
                   const price = Number(item.unitPrice) || 0;
                   const taxableAmount = qty * price;
+                  const rawMaterial = rawMaterials.find(
+                    (rm) => String(rm.rawMaterialId) === String(item.productId)
+                  );
                   return (
                     <tr key={index} className="hover:bg-slate-50/50 transition-colors duration-200">
                       <td className="px-3 py-2 whitespace-nowrap text-sm font-medium text-slate-400 text-center">{index + 1}</td>
@@ -888,7 +901,7 @@ const PurchaseOrderCreatePage: React.FC = () => {
                         <QuantityInput
                           name={`items[${index}].quantity`}
                           value={item.quantity}
-                          baseUoms={[item.uom || "KG", ...uomOptions.map(o => o.value).filter(v => v !== (item.uom || "KG"))].join(",")}
+                          baseUoms={rawMaterial?.baseUom || item.uom || "KG"}
                           onChange={(e) => handleItemChange(index, "quantity", Number(e.target.value))}
                           error={errors[`items.${index}.quantity`]}
                           step="0.01"

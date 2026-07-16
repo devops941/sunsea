@@ -203,7 +203,7 @@ class GrnInvoiceService {
                     discountType,
                     discountValue,
                     roundingAdjust,
-                    
+
                     paymentStatus: data.paymentStatus || "Unpaid",
                     paymentMethod: data.paymentMethod || null,
                     referenceNumber: data.referenceNumber || null,
@@ -340,7 +340,7 @@ class GrnInvoiceService {
                     }
                 });
             }
-            
+
             // Update Purchase Order items receivedQty and recalculate PO status
             if (data.poId) {
                 const po = await tx.purchaseOrder.findUnique({
@@ -379,8 +379,8 @@ class GrnInvoiceService {
                 const newStatus = allFullyReceived
                     ? "CLOSED"
                     : hasPartialReceived
-                    ? "PARTIALLY_RECEIVED"
-                    : "OPEN";
+                        ? "PARTIALLY_RECEIVED"
+                        : "OPEN";
 
                 await tx.purchaseOrder.update({
                     where: { id: data.poId },
@@ -1136,8 +1136,8 @@ class GrnInvoiceService {
                     const newStatus = allFullyReceived
                         ? "CLOSED"
                         : hasPartialReceived
-                        ? "PARTIALLY_RECEIVED"
-                        : "OPEN";
+                            ? "PARTIALLY_RECEIVED"
+                            : "OPEN";
 
                     await tx.purchaseOrder.update({
                         where: { id: existing.poId },

@@ -13,8 +13,8 @@ import type {
     SupplierMaterialPrice,
 } from "../../../features/supplier/types";
 
-const fmtDate = (d: string | null) => (d ? new Date(d).toLocaleDateString("en-IN") : "â€”");
-const fmtMoney = (n: number) => (n > 0 ? `â‚¹${Number(n).toFixed(2)}` : "â€”");
+const fmtDate = (d: string | null) => (d ? new Date(d).toLocaleDateString("en-IN") : "—");
+const fmtMoney = (n: number) => (n > 0 ? `₹${Number(n).toFixed(2)}` : "—");
 const todayISO = () => new Date().toISOString().split("T")[0];
 
 const SupplierMaterialPricingList: React.FC = () => {
@@ -358,14 +358,14 @@ const SupplierMaterialPricingList: React.FC = () => {
                                 <p className="text-sm text-blue-800 leading-relaxed">
                                     Current price is <strong className="font-semibold">{fmtMoney(reviseTarget.price)}</strong> since{" "}
                                     <span className="font-medium">{fmtDate(reviseTarget.validFrom)}</span>. Setting a new price below will close the current
-                                    row and start a new one â€” the old price stays in history.
+                                    row and start a new one — the old price stays in history.
                                 </p>
                             </div>
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                                 <div>
                                     <TextInput
-                                        label="New Price (â‚¹)"
+                                        label="New Price (₹)"
                                         name="revisePrice"
                                         type="number"
                                         value={revisePrice}

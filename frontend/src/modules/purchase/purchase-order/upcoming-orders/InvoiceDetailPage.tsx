@@ -11,7 +11,7 @@ import QuantityInput from "../../../../components/form/QuantityInput/QuantityInp
 import BackButton from "../../../../components/ui/BackButton/BackButton";
 import AddressForm from "../../../../components/form/AddressFrom/AddressFrom";
 import type { StateCityOption } from "../../../../components/ui/CityStateSelect/CityStateSelect";
-import DateInput from "../../../../components/form/DateInput/DateInput";
+import DatePickerCalendar from "../../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 import TextArea from "../../../../components/form/TextArea/TextArea";
 import { purchaseOrderService } from "../../../../services/purchaseOrderService";
 import { grnInvoiceService } from "../../../../services/grnInvoiceService";
@@ -550,8 +550,14 @@ const InvoiceDetailPage: React.FC = () => {
                             <TextInput label="Invoice No." name="invoiceNo" value={form.invoiceNo} onChange={handleChange} placeholder="Supplier invoice" required error={errors.invoiceNo} />
                         </div>
                         <div>
-                            <DateInput label="GRN Date" name="grnDate" value={form.grnDate} onChange={(e) => setForm(p => ({ ...p, grnDate: e.target.value }))} required />
-                            {errors.grnDate && <div className="text-red-500 text-sm mt-1">{errors.grnDate}</div>}
+                            <DatePickerCalendar
+                                label="GRN Date"
+                                name="grnDate"
+                                value={form.grnDate}
+                                onChange={(e) => setForm(p => ({ ...p, grnDate: e.target.value }))}
+                                required
+                                error={errors.grnDate}
+                            />
                         </div>
                         <div>
                             <SelectInput label="Supplier" name="supplierId" value={form.supplierId} options={supplierOptions} onChange={handleChange} required disabled={isPOSelected} />
@@ -624,10 +630,20 @@ const InvoiceDetailPage: React.FC = () => {
                         <h6 className="text-lg font-semibold text-gray-800 mb-4">Receipt Details</h6>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
                             <div>
-                                <DateInput label="Receive Date" name="receiveDate" value={form.receiveDate} onChange={(e) => setForm(p => ({ ...p, receiveDate: e.target.value }))} />
+                                <DatePickerCalendar
+                                    label="Receive Date"
+                                    name="receiveDate"
+                                    value={form.receiveDate}
+                                    onChange={(e) => setForm(p => ({ ...p, receiveDate: e.target.value }))}
+                                />
                             </div>
                             <div>
-                                <DateInput label="Bill Due Date" name="billDueDate" value={form.billDueDate} onChange={(e) => setForm(p => ({ ...p, billDueDate: e.target.value }))} />
+                                <DatePickerCalendar
+                                    label="Bill Due Date"
+                                    name="billDueDate"
+                                    value={form.billDueDate}
+                                    onChange={(e) => setForm(p => ({ ...p, billDueDate: e.target.value }))}
+                                />
                             </div>
                             <div>
                                 <TextInput label="Challan No" name="challanNo" value={form.challanNo} onChange={handleChange} placeholder="Optional" />
@@ -859,7 +875,12 @@ const InvoiceDetailPage: React.FC = () => {
                                 <TextInput label="Reference Number / UTR" name="referenceNumber" value={form.referenceNumber} onChange={handleChange} placeholder="Transaction reference" />
                             </div>
                             <div>
-                                <DateInput label="Payment Date" name="paymentDate" value={form.paymentDate} onChange={(e) => setForm(p => ({ ...p, paymentDate: e.target.value }))} />
+                                <DatePickerCalendar
+                                    label="Payment Date"
+                                    name="paymentDate"
+                                    value={form.paymentDate}
+                                    onChange={(e) => setForm(p => ({ ...p, paymentDate: e.target.value }))}
+                                />
                             </div>
                         </div>
                     </div>

@@ -11,8 +11,9 @@ import DataTable from "../../../components/ui/table/DataTable";
 import SearchInput from "../../../components/ui/SearchInput/SearchInput";
 
 import IconButton from "../../../components/ui/IconButton/IconButton";
+import CommonViewModal from "../../../components/ui/CommonViewModal/CommonViewModal";
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
-import ProductionOrderViewModal from "../components/ProductionOrderViewModal";
+import { MaterialIssueModal } from "../components/MaterialIssueModal";
 import { productionOrderService } from "../../../services/productionOrderService";
 import type { ProductionOrder } from "../../../services/productionOrderService";
 import { rawMaterialService } from "../../../services/rawMaterialService";
@@ -32,6 +33,10 @@ const ProductionOrderList: React.FC = () => {
 
     const [showViewModal, setShowViewModal] = useState(false);
     const [selectedItem, setSelectedItem] = useState<ProductionOrder | null>(null);
+    const [fullOrder, setFullOrder] = useState<any>(null);
+    const [loadingDetails, setLoadingDetails] = useState(false);
+    const [showIssueModal, setShowIssueModal] = useState(false);
+    const [selectedProdForIssue, setSelectedProdForIssue] = useState<any>(null);
 
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [itemToDelete, setItemToDelete] = useState<string[]>([]);
@@ -50,6 +55,26 @@ const ProductionOrderList: React.FC = () => {
             setRawMaterialsMap(map);
         } catch (error) {
             console.error("Failed to fetch raw materials", error);
+        }
+    }, []);
+
+    const fetchOrderDetails = useCallback(async (id: string) => {
+        setLoadingDetails(true);
+        try {
+            const data = (await productionOrderService.getById(id)) as any;
+            if (data && data.products) {
+                data.products = data.products.map((p: any) => ({
+                    ...p,
+                    productionOrderId: data.productionOrderId,
+                    status: data.status
+                }));
+            }
+            setFullOrder(data);
+        } catch (err) {
+            console.error("❌ Failed to fetch PO details:", err);
+            toast.error("Failed to load production order details");
+        } finally {
+            setLoadingDetails(false);
         }
     }, []);
 
@@ -418,7 +443,9 @@ const ProductionOrderList: React.FC = () => {
                             icon={FaEye}
                             onClick={() => {
                                 setSelectedItem(item.primaryPO);
+                                setFullOrder(null);
                                 setShowViewModal(true);
+                                fetchOrderDetails(item.primaryPO.productionOrderId || item.primaryPO.id);
                             }}
                         />
                     )}
@@ -434,6 +461,153 @@ const ProductionOrderList: React.FC = () => {
             )
         }
     ];
+
+    const hasInsufficientStock = fullOrder?.products?.some((p: any) =>
+        p.rawMaterials?.some((rm: any) => {
+            const stockRm = rawMaterialsMap.get(rm.rawMaterialId?.toString());
+            const required = Number(rm.requiredQty || 0);
+            let available = stockRm 
+                ? Number(stockRm.onHandQty || 0) - Number(stockRm.reservedQty || 0) 
+                : Number(rm.availableStock || 0);
+            const isReservedStatus = ["RM_AVAILABLE", "READY_FOR_PLANNING", "SCHEDULED", "IN_PROGRESS", "IN PROGRESS"].includes(fullOrder?.status);
+            if (isReservedStatus && stockRm) {
+                available += required;
+            }
+            return rm.status ? rm.status === "INSUFFICIENT" : available < required;
+        })
+    );
+
+    const modalSections = selectedItem
+        ? [
+            {
+                title: "Order Information",
+                fields: [
+                    { label: "Order No", value: fullOrder?.productionOrderId || selectedItem.productionOrderId },
+                    { 
+                        label: "Sales Order No", 
+                        value: fullOrder?.salesOrderDetails?.orderNo || selectedItem.salesOrderDetails?.orderNo || selectedItem.sourceSalesOrderId || "Direct Order"
+                    },
+                    { 
+                        label: "Customer", 
+                        value: fullOrder?.salesOrderDetails?.customerName || selectedItem.salesOrderDetails?.customerName || "N/A (Direct)"
+                    },
+                    { label: "Priority", value: fullOrder?.priority || selectedItem.priority || "-" },
+                ],
+            },
+            {
+                title: "Schedule Details",
+                fields: [
+                    { label: "Order Date", value: formatDate(fullOrder?.orderDate || selectedItem.orderDate) },
+                    { label: "Due Date", value: formatDate(fullOrder?.dueDate || selectedItem.dueDate) },
+                    { label: "Order Type", value: fullOrder?.orderType || selectedItem.orderType || "-" },
+                    { 
+                        label: "Color Type", 
+                        value: (fullOrder?.colorType || selectedItem.colorType) === 'mc' ? 'MULTI COLOR' : 'SINGLE COLOR' 
+                    },
+                ],
+            },
+        ]
+        : [];
+
+    const modalCustomContent = (
+        <div>
+            {hasInsufficientStock && (
+                <div className="alert alert-danger d-flex align-items-center gap-2 mb-4 fw-medium" role="alert" style={{ borderRadius: '8px', fontSize: '14px' }}>
+                    <span>One or more required raw materials have insufficient stock. Please create a Raw Material Order before proceeding to Weekly Machine Assignment.</span>
+                </div>
+            )}
+
+            {loadingDetails ? (
+                <div className="text-center p-4">
+                    <div className="animate-spin rounded-full border-b-2 border-indigo-600 h-6 w-6 inline-block mr-2"></div> Loading details...
+                </div>
+            ) : (
+                fullOrder?.products?.map((prod: any, idx: number) => (
+                    <div key={idx} className="mt-4 border-t border-slate-200 pt-4">
+                        <h6 className="text-base font-bold text-slate-800 mb-3">Product {idx + 1}: {prod.productName} ({prod.productCode})</h6>
+                        
+                        <div className="grid grid-cols-3 gap-4 mb-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
+                            <div>
+                                <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Production Qty</div>
+                                <div className="text-sm font-bold text-slate-800 mt-1">{prod.quantity} {prod.uom?.toLowerCase() === 'ea' ? 'pcs' : prod.uom}</div>
+                            </div>
+                            <div>
+                                <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Weight Used</div>
+                                <div className="text-sm font-bold text-slate-800 mt-1">{Number(prod.weightPerPieceUsed || 0).toFixed(3)} KG</div>
+                            </div>
+                            <div>
+                                <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Unit (UOM)</div>
+                                <div className="text-sm font-bold text-slate-800 mt-1">{prod.uom?.toLowerCase() === 'ea' ? 'pcs' : prod.uom}</div>
+                            </div>
+                        </div>
+
+                        <div className="text-sm font-semibold text-slate-700 mb-2 mt-4">Required Raw Materials</div>
+                        <div className="w-full border border-slate-200 rounded-lg overflow-hidden mb-3">
+                            <table className="w-full text-left border-collapse text-sm">
+                                <thead className="bg-slate-50 border-b border-slate-200 text-slate-600">
+                                    <tr>
+                                        <th className="p-2 font-semibold">RAW MATERIAL CODE</th>
+                                        <th className="p-2 font-semibold">RAW MATERIAL NAME</th>
+                                        <th className="p-2 font-semibold text-right">REQUIRED QTY</th>
+                                        <th className="p-2 font-semibold text-right">AVAILABLE STOCK</th>
+                                        <th className="p-2 font-semibold text-center">STOCK STATUS</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-200 bg-white">
+                                    {prod.rawMaterials?.map((rm: any) => {
+                                        const stockRm = rawMaterialsMap.get(rm.rawMaterialId?.toString());
+                                        const required = Number(rm.requiredQty || 0);
+                                        let available = stockRm 
+                                            ? Number(stockRm.onHandQty || 0) - Number(stockRm.reservedQty || 0) 
+                                            : Number(rm.availableStock || 0);
+                                        const isReservedStatus = ["RM_AVAILABLE", "READY_FOR_PLANNING", "SCHEDULED", "IN_PROGRESS", "IN PROGRESS"].includes(fullOrder?.status);
+                                        if (isReservedStatus && stockRm) {
+                                            available += required;
+                                        }
+                                        const materialName = rm.materialName || stockRm?.materialName || rm.rawMaterialId;
+                                        const isAvailable = rm.status ? rm.status === "AVAILABLE" : available >= required;
+                                        
+                                        return (
+                                            <tr key={rm.rawMaterialId} className="hover:bg-slate-50 transition-colors">
+                                                <td className="p-2 font-semibold text-slate-700">{rm.rawMaterialId}</td>
+                                                <td className="p-2 text-slate-600">{materialName}</td>
+                                                <td className="p-2 text-right text-slate-700">{required.toFixed(2)} KG</td>
+                                                <td className="p-2 text-right text-slate-700">{available.toFixed(2)} KG</td>
+                                                <td className="p-2 text-center">
+                                                    <StatusBadge status={isAvailable ? "AVAILABLE" : "INSUFFICIENT"} />
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                    {(!prod.rawMaterials || prod.rawMaterials.length === 0) && (
+                                        <tr>
+                                            <td colSpan={5} className="text-center text-slate-500 p-4">
+                                                No raw materials defined for this product.
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                        {["RM_AVAILABLE", "READY_FOR_PLANNING", "SCHEDULED"].includes(prod.status || fullOrder?.status) && (
+                            <div className="flex justify-end mt-2">
+                                <button 
+                                    type="button"
+                                    onClick={() => {
+                                        setSelectedProdForIssue(prod);
+                                        setShowIssueModal(true);
+                                    }}
+                                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-1.5 rounded text-sm transition-colors"
+                                >
+                                    Issue Raw Materials
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                ))
+            )}
+        </div>
+    );
 
     return (
         <div>
@@ -474,12 +648,41 @@ const ProductionOrderList: React.FC = () => {
             </div>
 
             {/* VIEW PO MODAL */}
-            <ProductionOrderViewModal
+            <CommonViewModal
                 show={showViewModal}
-                onHide={() => setShowViewModal(false)}
-                order={selectedItem}
-                onSuccess={fetchCombinedData}
+                onHide={() => {
+                    setShowViewModal(false);
+                    setSelectedItem(null);
+                    setFullOrder(null);
+                }}
+                modalTitle="Production Order Details"
+                avatarText={selectedItem ? "PO" : ""}
+                headerTitle={selectedItem ? (fullOrder?.productionOrderId || selectedItem.productionOrderId) : ""}
+                headerSubtitle={selectedItem ? `Customer: ${fullOrder?.salesOrderDetails?.customerName || selectedItem.salesOrderDetails?.customerName || "Direct"}` : ""}
+                statusNode={selectedItem ? <StatusBadge status={fullOrder?.status || selectedItem.status} /> : undefined}
+                sections={modalSections}
+                customContent={modalCustomContent}
             />
+
+            {selectedProdForIssue && (
+                <MaterialIssueModal
+                    show={showIssueModal}
+                    onHide={() => {
+                        setShowIssueModal(false);
+                        setSelectedProdForIssue(null);
+                    }}
+                    productionOrderId={selectedProdForIssue.productionOrderId}
+                    rawMaterials={selectedProdForIssue.rawMaterials || []}
+                    rawMaterialsMap={rawMaterialsMap}
+                    defaultStoreId={fullOrder?.sourceStoreId}
+                    onSuccess={() => {
+                        if (selectedItem) {
+                            fetchOrderDetails(String(selectedItem.productionOrderId || selectedItem.id));
+                        }
+                        fetchCombinedData();
+                    }}
+                />
+            )}
 
             {/* DELETE PO MODAL */}
             <CommonConfirmModal

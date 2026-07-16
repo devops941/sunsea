@@ -127,7 +127,7 @@ const POMDApproval: React.FC = () => {
     };
 
     const formatCurrency = (amount: number) =>
-        `â‚¹${(amount ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`;
+        `₹${Number(amount ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`;
 
     const totalPages = Math.ceil(total / ITEMS_PER_PAGE);
 
