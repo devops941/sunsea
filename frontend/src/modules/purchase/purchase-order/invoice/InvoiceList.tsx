@@ -1,10 +1,9 @@
 import React, { useState, useCallback, useEffect } from "react";
-import { FaPlus, FaFilePdf } from "react-icons/fa";
+import { FaPlus } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useSelector } from "react-redux";
 
-import CommonViewModal from "../../../../components/ui/CommonViewModal/CommonViewModal";
 import CommonConfirmModal from "../../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import { grnInvoiceService } from "../../../../services/grnInvoiceService";
 import CustomButton from "../../../../components/ui/Button/Button";
@@ -15,17 +14,24 @@ import DeleteButton from "../../../../components/ui/DeleteButton/DeleteButton";
 
 const ITEMS_PER_PAGE = 10;
 
+// ─── Formatting helpers ─────────────────────────────────────────────────
+const formatMoney = (val: string | number | null | undefined) => {
+    const n = Number(val ?? 0);
+    return `₹${n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+};
+
+const formatDate = (val: string | null | undefined) => {
+    if (!val) return "—";
+    return new Date(val).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+};
+
 const InvoiceList: React.FC = () => {
     const navigate = useNavigate();
-    const user = useSelector((state: any) => state?.auth?.user);
     const [data, setData] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
     const [total, setTotal] = useState(0);
-
-    const [showViewModal, setShowViewModal] = useState(false);
-    const [selectedItem, setSelectedItem] = useState<any | null>(null);
 
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [itemToDelete, setItemToDelete] = useState<string | null>(null);
@@ -59,6 +65,11 @@ const InvoiceList: React.FC = () => {
         setCurrentPage(1);
     };
 
+    const handleDeleteClick = (id: string) => {
+        setItemToDelete(id);
+        setShowDeleteModal(true);
+    };
+
     const handleDeleteConfirm = async () => {
         if (itemToDelete === null) return;
 
@@ -74,26 +85,7 @@ const InvoiceList: React.FC = () => {
         }
     };
 
-    const formatDate = (dateStr: string) => {
-        if (!dateStr) return "N/A";
-        const d = new Date(dateStr);
-        return d.toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" });
-    };
-
-    const formatCurrency = (amount: number) =>
-        `₹${(amount ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`;
-
     const totalPages = Math.ceil(total / ITEMS_PER_PAGE);
-
-    const handleOpenView = async (item: any) => {
-        try {
-            const details = await grnInvoiceService.fetchById(item.id);
-            setSelectedItem(details);
-            setShowViewModal(true);
-        } catch (error) {
-            toast.error("Failed to load invoice details");
-        }
-    };
 
     return (
         <div>
@@ -101,8 +93,7 @@ const InvoiceList: React.FC = () => {
                 {/* Page Header */}
                 <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-slate-200">
                     <div>
-                        <h2 className="text-2xl font-bold text-slate-800">Invoice List</h2>
-
+                        <h2 className="text-2xl font-bold text-slate-800">Bill & Invoice List</h2>
                     </div>
                     <div className="flex flex-wrap items-center gap-3 relative w-full lg:w-auto">
                         <SearchInput
@@ -146,7 +137,7 @@ const InvoiceList: React.FC = () => {
                             header: "NET AMOUNT",
                             render: (item) => (
                                 <span className="font-semibold text-green-600">
-                                    {formatCurrency(item.netAmount)}
+                                    {formatMoney(item.netAmount)}
                                 </span>
                             ),
                         },
@@ -154,150 +145,25 @@ const InvoiceList: React.FC = () => {
                             header: "ACTIONS",
                             render: (item) => (
                                 <div className="flex items-center gap-2">
-                                    <ViewButton onClick={() => handleOpenView(item)} />
-                                    <DeleteButton onClick={() => {
-                                        setItemToDelete(item.id);
-                                        setShowDeleteModal(true);
-                                    }} />
+                                    <ViewButton onClick={() => navigate(`/invoice/details/${item.id}`)} />
+                                    <DeleteButton onClick={() => handleDeleteClick(item.id)} />
                                 </div>
                             ),
                         },
                     ]}
                 />
-
-                {/* View Modal */}
-                <CommonViewModal
-                    show={showViewModal}
-                    onHide={() => setShowViewModal(false)}
-                    modalTitle="GRN Invoice details"
-                    avatarText={selectedItem ? selectedItem.grnNumber.charAt(0).toUpperCase() : ""}
-                    headerTitle={selectedItem ? selectedItem.grnNumber : ""}
-                    headerSubtitle={
-                        selectedItem ? `Supplier: ${selectedItem.supplier?.displayName || selectedItem.supplier?.legalName || "N/A"}` : ""
-                    }
-                    sections={
-                        selectedItem
-                            ? [
-                                {
-                                    fields: [
-                                        { label: "GRN No", value: selectedItem.grnNumber },
-                                        { label: "Invoice No", value: selectedItem.invoiceNo },
-                                        { label: "GRN Date", value: formatDate(selectedItem.grnDate) },
-                                        { label: "Store", value: selectedItem.store?.storeName || "N/A" },
-                                    ],
-                                },
-                                {
-                                    title: "Address details",
-                                    fields: [
-                                        {
-                                            label: "Billing address",
-                                            value: [
-                                                selectedItem.billingAddressLine1,
-                                                selectedItem.billingCity,
-                                                selectedItem.billingState,
-                                                selectedItem.billingPincode,
-                                            ]
-                                                .filter(Boolean)
-                                                .join(", ") || "N/A",
-                                        },
-                                        {
-                                            label: "Shipping address",
-                                            value: selectedItem.sameAsBilling
-                                                ? "Same as billing"
-                                                : [
-                                                    selectedItem.shippingAddressLine1,
-                                                    selectedItem.shippingCity,
-                                                    selectedItem.shippingState,
-                                                    selectedItem.shippingPincode,
-                                                ]
-                                                    .filter(Boolean)
-                                                    .join(", ") || "N/A",
-                                        },
-                                    ],
-                                },
-                                {
-                                    title: "Invoice summary",
-                                    fields: [
-                                        { label: "Total items", value: String(selectedItem.items?.length ?? 0) },
-                                        { label: "Subtotal", value: formatCurrency(selectedItem.subtotal) },
-                                        { label: "Total discount", value: formatCurrency(selectedItem.totalDiscount) },
-                                        { label: "Total tax", value: formatCurrency(selectedItem.totalTax) },
-                                        { label: "Net amount", value: formatCurrency(selectedItem.netAmount) },
-                                        { label: "Payment Status", value: selectedItem.paymentStatus || "Unpaid" },
-                                        { label: "Remarks", value: selectedItem.remarks || "N/A" },
-                                    ],
-                                },
-                                {
-                                    title: "Attachment",
-                                    fields: [
-                                        {
-                                            label: "Invoice Copy",
-                                            value: selectedItem.invoiceImage ? (
-                                                <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "4px" }}>
-                                                    {selectedItem.invoiceImage.toLowerCase().endsWith(".pdf") ? (
-                                                        <a
-                                                            href={selectedItem.invoiceImage}
-                                                            target="_blank"
-                                                            rel="noreferrer"
-                                                            className="btn btn-outline-primary btn-sm"
-                                                            style={{ display: "inline-flex", alignItems: "center", gap: "6px", width: "fit-content" }}
-                                                        >
-                                                            <FaFilePdf /> View PDF Document
-                                                        </a>
-                                                    ) : (
-                                                        <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                                                            <img
-                                                                src={selectedItem.invoiceImage}
-                                                                alt="Invoice Copy"
-                                                                style={{
-                                                                    maxWidth: "100%",
-                                                                    maxHeight: "300px",
-                                                                    objectFit: "contain",
-                                                                    border: "1px solid var(--color-border)",
-                                                                    borderRadius: "6px"
-                                                                }}
-                                                            />
-                                                            <a
-                                                                href={selectedItem.invoiceImage}
-                                                                target="_blank"
-                                                                rel="noreferrer"
-                                                                className="btn btn-link btn-sm text-decoration-none p-0 text-start"
-                                                                style={{ width: "fit-content" }}
-                                                            >
-                                                                Open in New Tab
-                                                            </a>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            ) : (
-                                                "No file uploaded"
-                                            )
-                                        }
-                                    ]
-                                },
-                                {
-                                    title: "Timestamps",
-                                    fields: [
-                                        { label: "Created at", value: formatDate(selectedItem.createdAt) },
-                                        { label: "Last updated", value: formatDate(selectedItem.updatedAt) },
-                                    ],
-                                },
-                            ]
-                            : []
-                    }
-                />
-
-                {/* Delete Modal */}
-                <CommonConfirmModal
-                    show={showDeleteModal}
-                    onHide={() => setShowDeleteModal(false)}
-                    onConfirm={handleDeleteConfirm}
-                    title="Confirm delete"
-                    message="Are you sure you want to delete this GRN Invoice?"
-                    confirmText="Delete"
-                    confirmVariant="danger"
-                />
             </div>
+
+            {/* Delete Modal */}
+            <CommonConfirmModal
+                show={showDeleteModal}
+                onHide={() => setShowDeleteModal(false)}
+                onConfirm={handleDeleteConfirm}
+                title="Confirm delete"
+                message="Are you sure you want to delete this GRN Invoice?"
+                confirmText="Delete"
+                confirmVariant="danger"
+            />
         </div>
     );
 };

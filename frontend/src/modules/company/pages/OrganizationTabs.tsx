@@ -13,6 +13,7 @@ import WhatsappSettings from "../../whatsapp/WhatsappCreate";
 import SalesInvoiceCreate from "../../sales-order-invoice/sales-invoiceCreate";
 import DepartmentList from "../../departments/pages/DepartmentList";
 import { FaBuilding, FaUserTag, FaUserShield, FaCogs, FaPercent, FaWhatsapp, FaFileInvoice } from "react-icons/fa";
+import ProfilePage from "../../profile/ProfilePage";
 
 const OrganizationTabs: React.FC = () => {
     const location = useLocation();
@@ -44,7 +45,7 @@ const OrganizationTabs: React.FC = () => {
     const activeTab = pathToKey[location.pathname] || "profile";
 
     const tabs: TabItem[] = [
-        { key: "profile", label: "Company Profile", icon: <FaBuilding />, content: <CompanyProfile /> },
+        { key: "profile", label: "Profile", icon: <FaBuilding />, content: <ProfilePage /> },
         { key: "roles", label: "Roles", icon: <FaUserTag />, content: <RoleList /> },
         { key: "departments", label: "Departments", icon: <FaBuilding />, content: <DepartmentList /> },
         { key: "permissions", label: "Permissions", icon: <FaUserShield />, content: <RolePermissionMapping /> },

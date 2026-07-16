@@ -143,6 +143,7 @@ const BillOfMaterialEdit = lazy(() => import("../modules/bill-of-material/pages/
 
 const SalesOrderCreate = lazy(() => import("../modules/sales/salesorder/CreateOrder"));
 const SalesInvoiceView = lazy(() => import("../modules/sales-order-invoice/SalesInvoiceView"))
+const GrnInvoiceViewPage = lazy(() => import("../modules/purchase/purchase-order/invoice/GrnInvoiceViewPage"))
 
 const OrderDetails = lazy(() => import("../modules/sales/salesorder/SalesOrderDetail"))
 
@@ -667,6 +668,7 @@ const AppRoutes = () => {
 
               <Route path="/expenses" element={<PurchaseTabs />} />
               <Route path="/invoice" element={<PurchaseTabs />} />
+              <Route path="/invoice/details/:id" element={<GrnInvoiceViewPage />} />
             </Route>
             <Route element={<ProtectedRoute permission="reports.view" />}>
               <Route path="/invoice/create" element={<InvoiceDetail />} />
