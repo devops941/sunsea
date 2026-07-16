@@ -97,7 +97,7 @@ const SupplierList: React.FC = () => {
     const paginatedSuppliers = filteredSuppliers.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
     return (
-        <div className="p-4 md:p-6 min-h-screen bg-white">
+        <div >
             <div className="">
                 <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                     {/* Page Header */}
@@ -118,11 +118,11 @@ const SupplierList: React.FC = () => {
                             </div>
                             {/* BUG-SUP-009 fix: only show Add Supplier button to users with create permission */}
                             {canCreateSupplier && (
-                            <CustomButton
-                                text="Add Supplier"
-                                icon={FaPlus}
-                                onClick={() => navigate("/suppliers/create")}
-                            />
+                                <CustomButton
+                                    text="Add Supplier"
+                                    icon={FaPlus}
+                                    onClick={() => navigate("/suppliers/create")}
+                                />
                             )}
                         </div>
                     </div>
@@ -150,8 +150,8 @@ const SupplierList: React.FC = () => {
                                 { header: "#", width: "60px", render: (_item, index) => startIndex + index + 1, align: "center" },
                                 { header: "CODE", accessor: "supplierCode" },
                                 { header: "NAME", accessor: "legalName" },
-                                { header: "CITY", render: (supplier) => supplier.billingCity || "N/A" },
-                                { header: "GSTIN", render: (supplier) => supplier.gstin || "N/A" },
+                                // { header: "CITY", render: (supplier) => supplier.billingCity || "N/A" },
+                                // { header: "GSTIN", render: (supplier) => supplier.gstin || "N/A" },
                                 { header: "WHATSAPP", render: (supplier) => supplier.whatsapp || "N/A" },
                                 { header: "PAYMENT", accessor: "paymentTerms" },
                                 { header: "LEAD TIME", render: (supplier) => supplier.leadTimeDays !== null ? `${supplier.leadTimeDays} days` : "N/A" },
@@ -182,7 +182,7 @@ const SupplierList: React.FC = () => {
                                             {canDeleteSupplier && <DeleteButton onClick={() => triggerDelete(supplier.id)} />}
                                         </div>
                                     ),
-                                    align: "right"
+                                    align: "left"
                                 },
                             ]}
                         />

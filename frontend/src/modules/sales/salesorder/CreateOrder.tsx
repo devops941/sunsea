@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import { useSelector } from "react-redux";
 import { FaSave, FaEraser, FaArrowLeft, FaPlus, FaTrash, FaCalendarAlt, FaPaperPlane } from "react-icons/fa";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -12,8 +12,6 @@ import CustomButton from "../../../components/ui/Button/Button";
 import BackButton from "../../../components/ui/BackButton/BackButton";
 import TextArea from "../../../components/form/TextArea/TextArea";
 import DateInput from "../../../components/form/DateInput/DateInput";
-import CityStateSelect from "../../../components/ui/CityStateSelect/CityStateSelect";
-import type { StateCityOption } from "../../../components/ui/CityStateSelect/CityStateSelect";
 import AddressForm from "../../../components/form/AddressFrom/AddressFrom";
 import OrderItemsTable from "../../../components/form/OrderItemsTable/OrderItemsTable";
 import { useCustomers } from "../../../hooks/useCustomers";
@@ -206,8 +204,8 @@ const SalesOrderForm: React.FC = () => {
     const [blockingOrder, setBlockingOrder] = useState<{ id: number; orderNo: string } | null>(null);
     const [isBlocked, setIsBlocked] = useState(false);
 
-    const handleBillingStateChange = (stateData: StateCityOption) => {
-        setValue("billingState", stateData.name, { shouldValidate: true });
+    const handleBillingStateChange = (stateName: string) => {
+        setValue("billingState", stateName, { shouldValidate: true });
         setValue("billingCity", "", { shouldValidate: true });
     };
 
@@ -403,12 +401,37 @@ const SalesOrderForm: React.FC = () => {
         });
         return sum;
     }, [formItems, customerType, products]);
-
     const limitExceeded = useMemo(() => {
         if (!creditStatus) return false;
         const totalExposure = creditStatus.outstanding + proposedTotal;
         return totalExposure > creditStatus.creditLimit;
     }, [creditStatus, proposedTotal]);
+
+    const lastExceededRef = useRef<boolean>(false);
+    const lastCustomerIdRef = useRef<string | null>(null);
+
+    useEffect(() => {
+        if (!selectedCustomerId) {
+            lastExceededRef.current = false;
+            lastCustomerIdRef.current = null;
+            return;
+        }
+
+        if (selectedCustomerId !== lastCustomerIdRef.current) {
+            lastExceededRef.current = false;
+            lastCustomerIdRef.current = selectedCustomerId;
+        }
+
+        if (limitExceeded && !lastExceededRef.current && creditStatus) {
+            const availableCredit = creditStatus.creditLimit - creditStatus.outstanding;
+            toast.warning(
+                `Credit Limit Exceeded! Available Credit: ₹${availableCredit.toLocaleString("en-IN", { minimumFractionDigits: 2 })}. Outstanding: ₹${creditStatus.outstanding.toLocaleString("en-IN", { minimumFractionDigits: 2 })}.`
+            );
+            lastExceededRef.current = true;
+        } else if (!limitExceeded) {
+            lastExceededRef.current = false;
+        }
+    }, [limitExceeded, selectedCustomerId, creditStatus]);
 
     // ─── Auto‑generate order number ──────────────────────────────────
     useEffect(() => {
@@ -581,46 +604,15 @@ const SalesOrderForm: React.FC = () => {
                                 <SelectInput label="Customer" name={field.name} value={field.value} options={customerOptions} required onChange={field.onChange} defaultOptionLabel="Select Customer" disabled={isEditMode} />
                             )} />
                             <Err message={errors.customerId?.message} />
-                            {fetchingCredit && <div className="text-muted small mt-1">Fetching customer credit limit...</div>}
-                            {creditStatus && !fetchingCredit && (
-                                <div
-                                    className="p-3 mt-2"
-                                    style={{
-                                        background: "rgba(203, 122, 33, 0.05)",
-                                        border: "1px solid var(--color-border)",
-                                        borderRadius: "var(--radius-md)",
-                                        fontSize: "0.85rem",
-                                    }}
-                                >
-                                    <div className="d-flex justify-content-between mb-1">
-                                        <span className="text-muted">Credit Limit:</span>
-                                        <span className="fw-semibold">₹{creditStatus.creditLimit.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
-                                    </div>
-                                    <div className="d-flex justify-content-between mb-1">
-                                        <span className="text-muted">Outstanding Balance:</span>
-                                        <span className="fw-semibold text-danger">₹{creditStatus.outstanding.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
-                                    </div>
-                                    <div className="d-flex justify-content-between mb-1">
-                                        <span className="text-muted">Available Credit:</span>
-                                        <span className={`fw-semibold ${creditStatus.creditLimit - creditStatus.outstanding < 0 ? "text-danger" : "text-success"}`}>
-                                            ₹{(creditStatus.creditLimit - creditStatus.outstanding).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                                        </span>
-                                    </div>
-                                    {creditStatus.hasOverdue && (
-                                        <div className="text-danger fw-semibold mt-2 small">
-                                            ⚠️ Has Overdue Invoices
-                                        </div>
-                                    )}
-                                </div>
-                            )}
+
                             {isBlocked && blockingOrder && (
                                 <div
                                     className="alert alert-danger mt-2 mb-0 d-flex flex-column gap-2"
                                     style={{ borderRadius: "var(--radius-md)" }}
                                 >
-                                    <div className="fw-semibold">
+                                    <span className="fw-semibold text-red-400">
                                         ⚠️ This customer has a pending credit approval (Order #{blockingOrder.orderNo}) — new orders are blocked until it's resolved.
-                                    </div>
+                                    </span>
                                     <div>
                                         <CustomButton
                                             text="View Pending Order"
@@ -762,16 +754,7 @@ const SalesOrderForm: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* Credit limit exceeded warning banner */}
-                    {limitExceeded && (
-                        <div
-                            className="alert alert-warning d-flex align-items-center gap-2 mt-3"
-                            style={{ borderRadius: "var(--radius-md)" }}
-                        >
-                            <span>⚠️</span>
-                            <span>This order will require MD's attention for credit review (Credit Limit Exceeded).</span>
-                        </div>
-                    )}
+
 
                     {/* Credit block warning banner */}
                     {isBlocked && (

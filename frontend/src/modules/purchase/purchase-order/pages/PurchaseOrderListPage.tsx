@@ -178,20 +178,18 @@ const PurchaseOrderListPage: React.FC = () => {
         {/* Page Header */}
         <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-slate-200">
           <div>
-            <h2 className="text-2xl font-bold text-slate-800">Purchase Orders</h2>
+            <h2 className="text-2xl font-bold text-slate-800">Purchase Orders Management</h2>
           </div>
 
           <div className="flex flex-wrap items-center gap-3 relative w-full lg:w-auto">
 
-
-             <SearchInput
+            <SearchInput
               value={searchTerm}
               onChange={handleSearch}
               placeholder="Search by PO # or Supplier..."
             />
 
 
-            
             <FilterPopover
               activeFilterCount={activeFilterCount}
               hasActiveFilters={hasActiveFilters}
@@ -245,7 +243,7 @@ const PurchaseOrderListPage: React.FC = () => {
               </div>
             </FilterPopover>
 
-           
+
             {canCreate ? (
               <CustomButton
                 text="Create PO"

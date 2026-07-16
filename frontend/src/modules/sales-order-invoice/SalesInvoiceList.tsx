@@ -135,10 +135,9 @@ const SalesInvoiceList: React.FC = () => {
         },
         {
             header: "ACTIONS",
-            align: "right",
             width: "120px",
             render: (item) => (
-                <div className="flex justify-end gap-2">
+                <div className="flex justify-start gap-2">
                     <ViewButton onClick={() => handleOpenView(item)} />
                     <DeleteButton onClick={() => {
                         setItemToDelete(item.id);
@@ -146,6 +145,7 @@ const SalesInvoiceList: React.FC = () => {
                     }} />
                 </div>
             ),
+            align: "left"
         },
     ];
 

@@ -53,7 +53,7 @@ const ReportsTabs: React.FC = () => {
     };
 
     return (
-        <div className="inner-container py-3">
+        <div className="inner-container">
             <Container fluid>
                 <Tabs tabs={tabs} activeKey={activeTab} onChange={handleTabChange} align="left" ></Tabs>
             </Container>

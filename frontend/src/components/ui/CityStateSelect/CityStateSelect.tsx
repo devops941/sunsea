@@ -44,9 +44,13 @@ const CityStateSelect: React.FC<CityStateSelectProps> = ({
 
     // Load all India states once
     useEffect(() => {
-        GetState(INDIA_COUNTRY_ID).then((result: StateCityOption[]) => {
-            setStates(result);
-        });
+        GetState(INDIA_COUNTRY_ID)
+            .then((result: StateCityOption[]) => {
+                setStates(result);
+            })
+            .catch((err) => {
+                console.error("Failed to load states:", err);
+            });
     }, []);
 
     // When stateValue changes (or states load), resolve matching id and load its cities
@@ -57,9 +61,13 @@ const CityStateSelect: React.FC<CityStateSelectProps> = ({
         }
         const matched = states.find((s) => s.name === stateValue);
         if (matched) {
-            GetCity(INDIA_COUNTRY_ID, matched.id).then((result: StateCityOption[]) => {
-                setCities(result);
-            });
+            GetCity(INDIA_COUNTRY_ID, matched.id)
+                .then((result: StateCityOption[]) => {
+                    setCities(result);
+                })
+                .catch((err) => {
+                    console.error("Failed to load cities:", err);
+                });
         }
     }, [stateValue, states]);
 

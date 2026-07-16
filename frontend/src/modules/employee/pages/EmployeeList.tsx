@@ -91,16 +91,18 @@ const Employeelist: React.FC = () => {
     { header: "Employee Name", accessor: "fullName" },
     { header: "Mobile", render: (emp) => emp.mobile || "N/A" },
     { header: "Department", render: (emp) => emp.department?.name || "N/A" },
-    { header: "Status", render: (emp) => {
-      const statusMap: Record<string, string> = {
-        active: "ACTIVE",
-        inactive: "INACTIVE",
-        resigned: "RESIGNED",
-        terminated: "TERMINATED",
-      };
-      // BUG-EMP-009 fix: map all 4 statuses correctly instead of only active/inactive
-      return <StatusBadge status={statusMap[emp.status] ?? emp.status?.toUpperCase() ?? "INACTIVE"} />;
-    }, align: "center" },
+    {
+      header: "Status", render: (emp) => {
+        const statusMap: Record<string, string> = {
+          active: "ACTIVE",
+          inactive: "INACTIVE",
+          resigned: "RESIGNED",
+          terminated: "TERMINATED",
+        };
+        // BUG-EMP-009 fix: map all 4 statuses correctly instead of only active/inactive
+        return <StatusBadge status={statusMap[emp.status] ?? emp.status?.toUpperCase() ?? "INACTIVE"} />;
+      }, align: "center"
+    },
     {
       header: "Actions",
       render: (emp) => (
@@ -110,14 +112,13 @@ const Employeelist: React.FC = () => {
           {canDeleteEmployee && <DeleteButton onClick={() => triggerDelete(emp.id)} />}
         </div>
       ),
-      align: "right"
     }
   ];
 
   return (
-    <div className="p-4 md:p-6 min-h-screen bg-white">
+    <div>
       <div className="">
-        
+
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
           {/* Page Header */}
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-6 border-b border-slate-200">

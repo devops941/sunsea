@@ -186,12 +186,12 @@ const CategoryList: React.FC = () => {
                     <DeleteButton onClick={() => triggerDelete(cat.id)} />
                 </div>
             ),
-            align: "right"
+            align: "center"
         }
     ];
 
     return (
-        <div className="p-4 md:p-6 min-h-screen bg-white">
+        <div>
             <div className="">
                 <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                     {/* Page Header */}

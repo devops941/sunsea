@@ -21,14 +21,14 @@ const ITEMS_PER_PAGE = 10;
 const MachineList: React.FC = () => {
     const navigate = useNavigate();
     const dispatch = useAppDispatch();
-    
+
     const { data, loading, error } = useAppSelector((state) => state.machines);
 
     // BUG-MAC fix: permission guards for machine actions
     const canCreateMachine = hasPermission("machines.create");
     const canEditMachine = hasPermission("machines.edit");
     const canDeleteMachine = hasPermission("machines.delete");
-    
+
     const [searchTerm, setSearchTerm] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
 
@@ -133,7 +133,7 @@ const MachineList: React.FC = () => {
                         { header: "TECH TYPE", render: (item) => item.technologyType || "-" },
                         { header: "MACHINE TYPE", render: (item) => item.machineType || "-" },
                         { header: "CAPACITY", render: (item) => item.capacity || "-" },
-                        { header: "MACHINE STATUS", render: (item) => item.machineStatus || "-" },
+                        // { header: "MACHINE STATUS", render: (item) => item.machineStatus || "-" },
                         {
                             header: "ACTIVE STATUS",
                             render: (item) => <StatusBadge status={item.isActive ? "ACTIVE" : "INACTIVE"} />
@@ -147,6 +147,7 @@ const MachineList: React.FC = () => {
                                     {canDeleteMachine && <DeleteButton onClick={() => triggerDelete(item.machineId)} />}
                                 </div>
                             ),
+                            align: "left"
                         },
                     ]}
                 />

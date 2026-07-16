@@ -11,6 +11,8 @@ import { useDepartments } from "../../../hooks/useDepartments";
 
 import { useRoles } from "../../../hooks/useRoles";
 import { useSelector } from "react-redux";
+import IndiaPhoneInput from "../../../components/ui/PhoneInput/PhoneInput";
+import { validatePhoneNumber } from "../../../components/ui/PhoneInput/PhoneInput";
 
 const EmployeeEdit: React.FC = () => {
   const navigate = useNavigate();
@@ -63,9 +65,10 @@ const EmployeeEdit: React.FC = () => {
     }
 
     // BUG-EMP-001 fix: mobile is optional — only validate format if a value is entered
-    if (formData.mobile && formData.mobile.trim()) {
-      if (!/^\d{10}$/.test(formData.mobile.trim())) {
-        newErrors.mobile = "Enter a valid 10-digit mobile number";
+    if (formData.mobile) {
+      const mobileError = validatePhoneNumber(formData.mobile, true);
+      if (mobileError) {
+        newErrors.mobile = mobileError;
       }
     }
 
@@ -247,11 +250,12 @@ const EmployeeEdit: React.FC = () => {
                 error={errors.fullName}
               />
 
-              <TextInput
+              <IndiaPhoneInput
                 label="Phone Number"
                 name="mobile"
                 value={formData.mobile}
                 placeholder="Enter Mobile Number"
+                required={false}
                 onChange={handleChange as any}
                 error={errors.mobile}
               />

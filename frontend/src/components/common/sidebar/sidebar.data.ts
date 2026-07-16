@@ -20,10 +20,6 @@ export const sidebarItems: SidebarItem[] = [
     path: "/dashboard",
   },
 
-
-
-
-
   // 2. Core Business Flow (Sales -> Purchase -> Inventory -> Production)
   {
     title: "Sales",
@@ -48,19 +44,11 @@ export const sidebarItems: SidebarItem[] = [
     path: "/approved-sales-orders",
   },
 
-
-
-
-
-
-
-
-
   // {
-  //   title: "Raw Material Master",
-  //   icon: FaDatabase,
-  //   path: "/raw-materials",
-  //   permission: "raw_materials.view",
+  //   title: "Raw Material Master",
+  //   icon: FaDatabase,
+  //   path: "/raw-materials",
+  //   permission: "raw_materials.view",
   // },
   {
     title: "Store & Locations",

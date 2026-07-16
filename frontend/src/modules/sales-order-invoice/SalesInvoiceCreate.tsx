@@ -11,7 +11,7 @@ import { invoiceSettingsService } from "../../services/invoiceSettingsService";
 import { customerService } from "../../services/customerService";
 import { productService } from "../../services/productService";
 import { salesInvoiceService } from "../../services/salesInvoiceService";
-import { salesOrderService } from "../../services/salesOrderService";
+import { salesOrderService, type SalesOrderStatus } from "../../services/salesOrderService";
 import { finishedGoodsStockService } from "../../services/finishedGoodsStockService";
 
 // ---- Types ----
@@ -141,6 +141,7 @@ const calculateInvoiceNumber = (dateStr: string, settings: any, orders: any[]) =
 const SalesInvoiceForm: React.FC = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   const [customers, setCustomers] = useState<CustomerOption[]>([]);
   const [items, setItems] = useState<ItemOption[]>([]);
@@ -165,11 +166,14 @@ const SalesInvoiceForm: React.FC = () => {
       productService.fetchAll(),
       invoiceSettingsService.getConfig(),
       salesInvoiceService.fetchAll({ pageSize: 100 }).catch(() => ({ data: [] } as any)),
-      salesOrderService.fetchAll({ pageSize: 100 }).catch(() => ({ data: [] } as any)),
+      salesOrderService.fetchAll({ pageSize: 100, status: "IN_PRODUCTION" as SalesOrderStatus }).catch(() => ({ data: [] } as any)),
       finishedGoodsStockService.fetchAll().catch(() => []),
     ])
       .then(([customerList, productList, settings, ordersResponse, salesOrdersResponse, fgStockResponse]) => {
-        const customerOptions: CustomerOption[] = (Array.isArray(customerList) ? customerList : (customerList as any)?.customers || []).map((c: any) => ({
+        const customersArray = Array.isArray(customerList)
+          ? customerList
+          : (customerList as any)?.customers || [];
+        const customerOptions: CustomerOption[] = customersArray.map((c: any) => ({
           id: c.id,
           name: c.firmName || c.displayName || c.customerCode || "Unknown Customer",
         }));
@@ -198,25 +202,7 @@ const SalesInvoiceForm: React.FC = () => {
           }
         });
 
-        // Filter sales orders to only those that are fully available in stock
-        const filteredSalesOrders = salesOrdersList.filter((so: any) => {
-          let isAllAvailable = true;
-          if (so.items && so.items.length > 0) {
-            so.items.forEach((item: any) => {
-              const prodId = (item.productId || item.product?.id)?.toString();
-              const orderedQty = Number(item.quantity || 0);
-              const stockQty = fgStockMap.get(prodId) || 0;
-              if (stockQty < orderedQty) {
-                isAllAvailable = false;
-              }
-            });
-          } else {
-            isAllAvailable = false;
-          }
-          return isAllAvailable;
-        });
-
-        setSalesOrders(filteredSalesOrders);
+        setSalesOrders(salesOrdersList);
 
         if (settings) {
           setInvoiceSettings(settings);

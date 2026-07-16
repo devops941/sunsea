@@ -145,7 +145,7 @@ const QuotationList: React.FC = () => {
                             render: (item) => item.customer?.displayName || item.customer?.firmName || "N/A",
                         },
                         { header: "NET AMOUNT", render: (item) => formatCurrency(item.netAmount) },
-                        { header: "STATUS", render: (item) => <StatusBadge status={item.status} /> },
+                        { header: "STATUS", render: (item) => <StatusBadge status={item.status || "PENDING"} /> },
                         {
                             header: "ACTIONS",
                             render: (item) => (

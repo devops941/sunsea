@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import { FaSave, FaEraser, FaArrowLeft, FaUser, FaInfoCircle, FaMapMarkerAlt, FaFileInvoiceDollar, FaBuilding } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
-import CityStateSelect from "../../../components/ui/CityStateSelect/CityStateSelect";
 import type { StateCityOption } from "../../../components/ui/CityStateSelect/CityStateSelect";
 import TextInput from "../../../components/form/TextInput/TextInput";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
@@ -433,9 +432,6 @@ const CustomerCreatePage: React.FC = () => {
                 <div>
                   <TextInput label="GSTIN (15 CHAR)" name="gstin" value={formData.gstin} placeholder="33AABC1234D1Z5" onChange={handleChange} error={errors.gstin} />
                 </div>
-                <div>
-                  <TextInput label="Place Of Supply (State Code)" name="stateCode" value={formData.stateCode} placeholder="33" onChange={handleChange} error={errors.stateCode} />
-                </div>
               </div>
             </div>
 
@@ -530,7 +526,7 @@ const CustomerCreatePage: React.FC = () => {
               <h3 className="text-lg font-semibold text-slate-700 mb-2">Commercial Settings</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 <div>
-                  <TextInput label="Credit Limit ₹" name="creditLimit" type="number" value={formData.creditLimit} placeholder="300000" onChange={handleChange} preventNegative min={250000} error={errors.creditLimit} />
+                  <TextInput label="Credit Limit ₹" name="creditLimit" type="number" value={formData.creditLimit} placeholder="30000" onChange={handleChange} preventNegative min={25000} error={errors.creditLimit} />
                 </div>
                 <div>
                   <TextInput label="Credit Days (Net)" name="creditDays" value={formData.creditDays} onChange={handleChange} type="number" placeholder="30 days" preventNegative error={errors.creditDays} />

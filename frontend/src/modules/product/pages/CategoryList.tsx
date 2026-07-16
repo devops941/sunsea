@@ -146,7 +146,7 @@ const CategoryList: React.FC = () => {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!validateForm()) return;
-        
+
         try {
             const payload = {
                 code: formData.code,
@@ -183,13 +183,13 @@ const CategoryList: React.FC = () => {
                     <DeleteButton onClick={() => triggerDelete(cat.id)} />
                 </div>
             ),
-            align: "right"
+            align: "left"
         }
     ];
 
     return (
-        <div className="p-4 md:p-6 min-h-screen bg-white">
-            <div className="">
+        <div>
+            <div>
                 <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                     {/* Page Header */}
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-6 border-b border-slate-200">
