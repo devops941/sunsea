@@ -890,6 +890,9 @@ const PurchaseOrderCreatePage: React.FC = () => {
                   const qty = Number(item.quantity) || 0;
                   const price = Number(item.unitPrice) || 0;
                   const taxableAmount = qty * price;
+                  const rawMaterial = rawMaterials.find(
+                    (rm) => String(rm.rawMaterialId) === String(item.productId)
+                  );
                   return (
                     <tr key={index} className="hover:bg-slate-50/50 transition-colors duration-200">
                       <td className="px-3 py-2 whitespace-nowrap text-sm font-medium text-slate-400 text-center">{index + 1}</td>
@@ -898,7 +901,7 @@ const PurchaseOrderCreatePage: React.FC = () => {
                         <QuantityInput
                           name={`items[${index}].quantity`}
                           value={item.quantity}
-                          baseUoms={[item.uom || "KG", ...uomOptions.map(o => o.value).filter(v => v !== (item.uom || "KG"))].join(",")}
+                          baseUoms={rawMaterial?.baseUom || item.uom || "KG"}
                           onChange={(e) => handleItemChange(index, "quantity", Number(e.target.value))}
                           error={errors[`items.${index}.quantity`]}
                           step="0.01"

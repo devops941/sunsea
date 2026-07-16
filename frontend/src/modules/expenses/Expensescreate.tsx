@@ -307,7 +307,7 @@ const ExpensesCreate: React.FC<ExpensesCreateProps> = ({
               />
 
               <TextInput
-                label="Amount (â‚¹) *"
+                label="Amount (₹) *"
                 name="amount"
                 type="number"
                 value={formData.amount}

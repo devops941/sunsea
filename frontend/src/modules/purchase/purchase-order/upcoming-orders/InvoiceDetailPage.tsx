@@ -363,14 +363,6 @@ const InvoiceDetailPage: React.FC = () => {
         })),
     ], [gstTaxes, gstLoading]);
 
-    const productOptions = useMemo(() => [
-        { value: "", label: "-- Select Material --" },
-        ...(rawMaterials || []).map((rm: any) => ({
-            value: String(rm.rawMaterialId || ""),
-            label: `${rm.rawMaterialId || ""} - ${rm.materialName || ""}`,
-        })),
-    ], [rawMaterials]);
-
 
     // ── Item handlers ─────────────────────────────────────────────────────────────
     const addItem = () => setItems((prev) => [...prev, emptyItem()]);
@@ -383,21 +375,7 @@ const InvoiceDetailPage: React.FC = () => {
             updated[index] = { ...updated[index], [field]: value };
             const item = updated[index];
 
-            if (field === "productId") {
-                const itemRawMaterial = rawMaterials.find(
-                    (rm) => String(rm.rawMaterialId) === String(value)
-                );
-                if (itemRawMaterial) {
-                    updated[index].description = itemRawMaterial.materialName || "";
-                    const fallbackUoms = (activeUOMs || []).map((u: any) => u.uomName).join(",");
-                    const baseUoms = itemRawMaterial?.baseUom || fallbackUoms;
-                    const primaryUom = baseUoms.split(",")[0].trim();
-                    updated[index].uom = primaryUom;
-                    
-                    const defaultTaxRateObj = gstTaxes?.find((t: any) => String(t.id) === String(itemRawMaterial?.gstTaxRateId));
-                    updated[index].tax = defaultTaxRateObj ? Number(defaultTaxRateObj.taxRate) : 0;
-                }
-            } else if (!item.uom && item.productId) {
+            if (!item.uom) {
                 const itemRawMaterial = rawMaterials.find(
                     (rm) => String(rm.rawMaterialId) === String(item.productId)
                 );
@@ -739,24 +717,12 @@ const InvoiceDetailPage: React.FC = () => {
                                         <tr key={idx} className="hover:bg-slate-50 transition-colors">
                                             <td className="p-2 text-center text-gray-500 align-middle">{idx + 1}</td>
                                             <td className="p-2 align-middle">
-                                                {isPOSelected ? (
-                                                    <input
-                                                        className="w-full border-gray-300 rounded px-2.5 py-1.5 text-sm bg-gray-100 cursor-not-allowed outline-none border"
-                                                        value={item.description}
-                                                        disabled
-                                                    />
-                                                ) : (
-                                                    <SelectInput
-                                                        label=""
-                                                        hideLabel={true}
-                                                        noMargin={true}
-                                                        name={`items[${idx}].productId`}
-                                                        options={productOptions}
-                                                        value={item.productId}
-                                                        onChange={(e) => updateItem(idx, "productId", e.target.value)}
-                                                        required
-                                                    />
-                                                )}
+                                                <input
+                                                    className="w-full border-gray-300 rounded px-2.5 py-1.5 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none border"
+                                                    value={item.description}
+                                                    onChange={(e) => updateItem(idx, "description", e.target.value)}
+                                                    placeholder="Product name"
+                                                />
                                             </td>
                                             <td className="p-2 align-middle">
                                                 <QuantityInput

@@ -917,9 +917,9 @@ const PurchaseOrderEditPage: React.FC = () => {
                   <th className="px-3 py-3 text-center text-[11px] font-bold text-slate-500 uppercase tracking-widest w-12 border-b border-slate-200">#</th>
                   <th className="px-3 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200">RAW MATERIAL</th>
                   <th className="px-3 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200 min-w-[200px]">QTY & UOM</th>
-                  <th className="px-3 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200">UNIT PRICE (â‚¹)</th>
+                  <th className="px-3 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200">UNIT PRICE (₹)</th>
                   <th className="px-3 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200">TAX %</th>
-                  <th className="px-3 py-3 text-right text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200">TAXABLE (â‚¹)</th>
+                  <th className="px-3 py-3 text-right text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200">TAXABLE (₹)</th>
                   {!isLocked && (
                     <th className="px-3 py-3 text-center text-[11px] font-bold text-slate-500 uppercase tracking-widest w-16 border-b border-slate-200"></th>
                   )}
@@ -930,6 +930,9 @@ const PurchaseOrderEditPage: React.FC = () => {
                   const qty = Number(item.quantity) || 0;
                   const price = Number(item.unitPrice) || 0;
                   const taxableAmount = qty * price;
+                  const rawMaterial = rawMaterials.find(
+                    (rm) => String(rm.rawMaterialId) === String(item.productId)
+                  );
                   return (
                     <tr key={index} className="hover:bg-slate-50/50 transition-colors duration-200">
                       <td className="px-3 py-2 whitespace-nowrap text-sm font-medium text-slate-400 text-center">{index + 1}</td>
@@ -938,7 +941,7 @@ const PurchaseOrderEditPage: React.FC = () => {
                         <QuantityInput 
                           name={`items[${index}].quantity`} 
                           value={item.quantity} 
-                          baseUoms={[item.uom || "KG", ...uomOptions.map(o => o.value).filter(v => v !== (item.uom || "KG"))].join(",")}
+                          baseUoms={rawMaterial?.baseUom || item.uom || "KG"}
                           onChange={(e) => handleItemChange(index, "quantity", Number(e.target.value))} 
                           error={errors[`items.${index}.quantity`]} 
                           step="0.01" 
@@ -948,7 +951,7 @@ const PurchaseOrderEditPage: React.FC = () => {
                       </td>
                       <td className="px-3 py-2 whitespace-nowrap"><TextInput label="" name={`items[${index}].unitPrice`} type="number" value={String(item.unitPrice)} onChange={(e) => handleItemChange(index, "unitPrice", Number(e.target.value))} error={errors[`items.${index}.unitPrice`]} min={0} step={0.01} placeholder="0.00" disabled /></td>
                       <td className="px-3 py-2 whitespace-nowrap"><SelectInput label="" name={`items[${index}].tax`} options={gstOptions} value={String(item.tax || 0)} onChange={(e) => handleItemChange(index, "tax", Number(e.target.value))} hideLabel disabled={isLocked} /></td>
-                      <td className="px-3 py-2 whitespace-nowrap text-right font-medium text-slate-700">â‚¹{taxableAmount.toFixed(2)}</td>
+                      <td className="px-3 py-2 whitespace-nowrap text-right font-medium text-slate-700">₹{taxableAmount.toFixed(2)}</td>
                       {!isLocked && (
                         <td className="px-3 py-2 whitespace-nowrap text-center">
                           <button
@@ -976,7 +979,7 @@ const PurchaseOrderEditPage: React.FC = () => {
             <div>
               <div className="bg-gray-50 rounded-lg border border-gray-200 p-4">
                 <h6 className="mb-3 font-bold text-blue-600">Order Summary</h6>
-                <div className="flex justify-between mb-2"><span>Subtotal:</span><span>â‚¹{formData.subtotal.toFixed(2)}</span></div>
+                <div className="flex justify-between mb-2"><span>Subtotal:</span><span>₹{formData.subtotal.toFixed(2)}</span></div>
                 <div className="flex justify-between items-center mb-2 text-red-500 text-sm">
                   <span className="flex items-center gap-2">Discount:
                     <div className="w-24 [&_.mb-\[18px\]]:!mb-0 [&_.select-input-group]:!mb-0">
@@ -986,10 +989,10 @@ const PurchaseOrderEditPage: React.FC = () => {
                       <TextInput label="" name="discountValue" type="number" min={0} step={0.01} value={String(formData.discountValue || 0)} onChange={(e) => { setFormData(prev => { const newTotals = recalculateTotals(prev.items, prev.discountType, Number(e.target.value) || 0); return { ...prev, discountValue: Number(e.target.value) || 0, ...newTotals }; }); }} disabled={isLocked} />
                     </div>
                   </span>
-                  <span>-â‚¹{(formData.totalDiscount || 0).toFixed(2)}</span>
+                  <span>-₹{(formData.totalDiscount || 0).toFixed(2)}</span>
                 </div>
 
-                <div className="flex justify-between items-center mb-2 text-green-600 text-sm"><span>Total Tax:</span><span>â‚¹{formData.totalTax.toFixed(2)}</span></div>
+                <div className="flex justify-between items-center mb-2 text-green-600 text-sm"><span>Total Tax:</span><span>₹{formData.totalTax.toFixed(2)}</span></div>
 
                 <div className="flex justify-between items-center mb-2 text-gray-600 text-sm">
                   <span className="flex items-center gap-2">Round Off:
@@ -1001,18 +1004,18 @@ const PurchaseOrderEditPage: React.FC = () => {
                       <TextInput label="" name="roundingValue" type="number" min={0} step={0.01} value={String(roundingValue || 0)} onChange={(e) => { const val = Number(e.target.value) || 0; setRoundingValue(val); setFormData(prev => ({ ...prev, ...recalculateTotals(prev.items, prev.discountType, prev.discountValue, roundingSign, val) })); }} disabled={isLocked} />
                     </div>
                   </span>
-                  <span>{roundingSign === "+" ? "+" : "-"}â‚¹{(roundingValue || 0).toFixed(2)}</span>
+                  <span>{roundingSign === "+" ? "+" : "-"}₹{(roundingValue || 0).toFixed(2)}</span>
                 </div>
                 {isInterState ? (
-                  <div className="flex justify-between mb-2 text-green-600 text-sm"><span>Total IGST:</span><span>+â‚¹{(formData.totalIgst ?? 0).toFixed(2)}</span></div>
+                  <div className="flex justify-between mb-2 text-green-600 text-sm"><span>Total IGST:</span><span>+₹{(formData.totalIgst ?? 0).toFixed(2)}</span></div>
                 ) : (
                   <>
-                    <div className="flex justify-between mb-2 text-green-600 text-sm"><span>Total CGST:</span><span>+â‚¹{(formData.totalCgst ?? 0).toFixed(2)}</span></div>
-                    <div className="flex justify-between mb-2 text-green-600 text-sm"><span>Total SGST:</span><span>+â‚¹{(formData.totalSgst ?? 0).toFixed(2)}</span></div>
+                    <div className="flex justify-between mb-2 text-green-600 text-sm"><span>Total CGST:</span><span>+₹{(formData.totalCgst ?? 0).toFixed(2)}</span></div>
+                    <div className="flex justify-between mb-2 text-green-600 text-sm"><span>Total SGST:</span><span>+₹{(formData.totalSgst ?? 0).toFixed(2)}</span></div>
                   </>
                 )}
                 <hr className="my-2 border-gray-300" />
-                <div className="flex justify-between font-bold"><span>Net Amount:</span><span>â‚¹{formData.netAmount.toFixed(2)}</span></div>
+                <div className="flex justify-between font-bold"><span>Net Amount:</span><span>₹{formData.netAmount.toFixed(2)}</span></div>
               </div>
             </div>
           </div>
