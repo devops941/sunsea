@@ -422,9 +422,6 @@ const CustomerEditPage: React.FC = () => {
                 <div>
                   <TextInput label="GSTIN (15 CHAR)" name="gstin" value={formData.gstin} placeholder="33AABC1234D1Z5" onChange={handleChange} error={errors.gstin} />
                 </div>
-                <div>
-                  <TextInput label="Place Of Supply (State Code)" name="stateCode" value={formData.stateCode} placeholder="33" onChange={handleChange} error={errors.stateCode} />
-                </div>
               </div>
             </div>
 

@@ -97,12 +97,12 @@ const LocationList: React.FC = () => {
         }
     };
 
-    
+
 
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
 
     return (
-        <div className="p-4 md:p-6 min-h-screen bg-white">
+        <div>
             <div className="">
                 <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                     {/* Page Header */}
@@ -169,8 +169,8 @@ const LocationList: React.FC = () => {
                                 {
                                     header: "STATUS", render: (item) => (
                                         <span className={`px-3 py-1 rounded-full text-xs font-semibold ${item.isActive
-                                                ? "bg-green-100 text-green-700 border border-green-200"
-                                                : "bg-red-100 text-red-700 border border-red-200"
+                                            ? "bg-green-100 text-green-700 border border-green-200"
+                                            : "bg-red-100 text-red-700 border border-red-200"
                                             }`}>
                                             {item.isActive ? "ACTIVE" : "INACTIVE"}
                                         </span>
@@ -185,7 +185,7 @@ const LocationList: React.FC = () => {
                                             <DeleteButton onClick={() => triggerDelete(item.locationId)} />
                                         </div>
                                     ),
-                                    align: "right"
+                                    align: "left"
                                 },
                             ]}
                         />

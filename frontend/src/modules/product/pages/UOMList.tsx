@@ -18,9 +18,9 @@ const UOMList: React.FC = () => {
     // Filter units based on the search term
     const filteredUnits = units.filter(u => {
         const searchLower = searchTerm.toLowerCase();
-        return (u.code || '').toLowerCase().includes(searchLower) || 
-               (u.label || '').toLowerCase().includes(searchLower) ||
-               (u.category || '').toLowerCase().includes(searchLower);
+        return (u.code || '').toLowerCase().includes(searchLower) ||
+            (u.label || '').toLowerCase().includes(searchLower) ||
+            (u.category || '').toLowerCase().includes(searchLower);
     });
 
     const totalPages = Math.ceil(filteredUnits.length / ITEMS_PER_PAGE);
@@ -35,8 +35,8 @@ const UOMList: React.FC = () => {
     ];
 
     return (
-        <div className="p-4 md:p-6 min-h-screen bg-white">
-            <div className="">
+        <div>
+            <div>
                 <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                     {/* Page Header */}
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-6 border-b border-slate-200">

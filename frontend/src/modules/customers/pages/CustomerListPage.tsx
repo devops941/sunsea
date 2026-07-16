@@ -20,7 +20,7 @@ const CustomerListPage: React.FC = () => {
   // BUG-CUST-004 fix: destructure pagination metadata from hook
   const { customers, loading, error, totalPages, loadCustomers, removeCustomer } = useCustomers();
 
-  
+
   const canEditCustomer = hasPermission("customers.edit");
   const canDeleteCustomer = hasPermission("customers.delete");
 
@@ -93,7 +93,7 @@ const CustomerListPage: React.FC = () => {
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
 
   return (
-    <div className="p-4 md:p-6 min-h-screen bg-white">
+    <div>
       <div className="">
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
           {/* Page Header */}
@@ -123,7 +123,7 @@ const CustomerListPage: React.FC = () => {
           {/* View Table */}
           {loading && (customers ?? []).length === 0 ? (
             <div className="flex justify-center items-center h-64">
-                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"></div>
+              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"></div>
             </div>
           ) : (
             <DataTable
@@ -131,42 +131,42 @@ const CustomerListPage: React.FC = () => {
               rowKey={(customer) => customer.id}
               emptyMessage="No customers found."
               pagination={
-                  totalPages > 1
-                      ? {
-                            currentPage,
-                            totalPages,
-                            onPageChange: (page) => setCurrentPage(page),
-                        }
-                      : undefined
+                totalPages > 1
+                  ? {
+                    currentPage,
+                    totalPages,
+                    onPageChange: (page) => setCurrentPage(page),
+                  }
+                  : undefined
               }
               columns={[
-                  { header: "#", width: "60px", render: (_item, index) => startIndex + index + 1, align: "center" },
-                  { header: "CUSTOMER CODE", accessor: "customerCode" },
-                  { header: "FIRM NAME", accessor: "firmName" },
-                  { header: "MOBILE", render: (customer) => customer.mobile || "N/A" },
-                  // BUG-CUST-006 fix: renamed "GMAIL" to "EMAIL"
-                  { header: "EMAIL", render: (customer) => customer.email || "N/A" },
-                  { header: "GST TYPE", render: (customer) => customer.gstRegType || "N/A" },
-                  { header: "STATUS", render: (customer) => (
-                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                        customer.status === "Active"
-                            ? "bg-green-100 text-green-700 border border-green-200"
-                            : "bg-red-100 text-red-700 border border-red-200"
-                    }`}>
+                { header: "#", width: "60px", render: (_item, index) => startIndex + index + 1, align: "center" },
+                { header: "CUSTOMER CODE", accessor: "customerCode" },
+                { header: "FIRM NAME", accessor: "firmName" },
+                { header: "Shift Management", render: (customer) => customer.mobile || "N/A" },
+                // BUG-CUST-006 fix: renamed "GMAIL" to "EMAIL"
+                { header: "EMAIL", render: (customer) => customer.email || "N/A" },
+                {
+                  header: "STATUS", render: (customer) => (
+                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${customer.status === "Active"
+                        ? "bg-green-100 text-green-700 border border-green-200"
+                        : "bg-red-100 text-red-700 border border-red-200"
+                      }`}>
                       {customer.status}
                     </span>
-                  ) },
-                  {
-                      header: "ACTIONS",
-                      render: (customer) => (
-                          <div className="flex items-center gap-2">
-                              <ViewButton onClick={() => handleView(customer)} />
-                              {canEditCustomer && <EditButton onClick={() => handleEdit(customer)} />}
-                              {canDeleteCustomer && <DeleteButton onClick={() => triggerDelete(customer.id)} />}
-                          </div>
-                      ),
-                      align: "right"
-                  },
+                  ), align: "center"
+                },
+                {
+                  header: "ACTIONS",
+                  render: (customer) => (
+                    <div className="flex items-center gap-2">
+                      <ViewButton onClick={() => handleView(customer)} />
+                      {canEditCustomer && <EditButton onClick={() => handleEdit(customer)} />}
+                      {canDeleteCustomer && <DeleteButton onClick={() => triggerDelete(customer.id)} />}
+                    </div>
+                  ),
+                  align: "center"
+                },
               ]}
             />
           )}

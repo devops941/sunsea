@@ -185,7 +185,7 @@ const SizeList: React.FC = () => {
     ];
 
     return (
-        <div className="p-4 md:p-6 min-h-screen bg-white">
+        <div>
             <div className="">
                 <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                     {/* Page Header */}

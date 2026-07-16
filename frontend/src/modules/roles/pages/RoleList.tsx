@@ -19,7 +19,7 @@ const ITEMS_PER_PAGE = 10;
 
 const RoleList: React.FC = () => {
     const { roles, total, loading, error, loadRoles, addRole, editRole, removeRole } = useRoles();
-       console.log("fs",roles)
+    console.log("fs", roles)
     // const { user } = useAppSelector((state) => state.auth);
 
     const [searchTerm, setSearchTerm] = useState("");
@@ -75,19 +75,19 @@ const RoleList: React.FC = () => {
 
     const handleOpenAdd = () => {
         setEditMode(false);
-        
+
         // Generate sequential code (e.g., ROLE_001)
         const roleCodes = roles
             .map((r: any) => r.code)
             .filter((code: string) => code && code.startsWith("ROLE_"));
-            
+
         let nextNumber = 1;
         if (roleCodes.length > 0) {
             const numbers = roleCodes.map((code: string) => {
                 const parts = code.split("_");
                 return parts.length > 1 ? parseInt(parts[1], 10) : 0;
             }).filter((num: number) => !isNaN(num));
-            
+
             if (numbers.length > 0) {
                 nextNumber = Math.max(...numbers) + 1;
             }
@@ -189,8 +189,8 @@ const RoleList: React.FC = () => {
         { header: "Role Name", accessor: "name" },
         { header: "Description", accessor: "description" },
         { header: "Status", render: (role) => <StatusBadge status={role.status} />, align: "center" },
-        { 
-            header: "Actions", 
+        {
+            header: "Actions",
             render: (role) => (
                 <div className="flex items-center gap-2">
                     <ViewButton onClick={() => handleOpenView(role)} />
@@ -198,7 +198,7 @@ const RoleList: React.FC = () => {
                     <DeleteButton onClick={() => triggerDelete(role.id)} />
                 </div>
             ),
-            align: "right"
+            align: "left"
         }
     ];
 

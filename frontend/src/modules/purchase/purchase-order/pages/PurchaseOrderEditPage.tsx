@@ -95,17 +95,17 @@ const mapPOToFormData = (po: any): PurchaseOrderFormData => {
       productId: i.productId,
       product: i.product,
       uom: i.uom ?? "",
-      quantity: i.quantity ?? 0,
-      unitPrice: i.unitPrice ?? 0,
-      tax: i.tax ?? 0,
-      taxableAmount: i.taxableAmount ?? 0,
-      cgstRate: i.cgstRate ?? 0,
-      cgstAmount: i.cgstAmount ?? 0,
-      sgstRate: i.sgstRate ?? 0,
-      sgstAmount: i.sgstAmount ?? 0,
-      igstRate: i.igstRate ?? 0,
-      igstAmount: i.igstAmount ?? 0,
-      lineTotal: i.lineTotal ?? 0,
+      quantity: Number(i.quantity ?? 0),
+      unitPrice: Number(i.unitPrice ?? 0),
+      tax: Number(i.tax ?? 0),
+      taxableAmount: Number(i.taxableAmount ?? 0),
+      cgstRate: Number(i.cgstRate ?? 0),
+      cgstAmount: Number(i.cgstAmount ?? 0),
+      sgstRate: Number(i.sgstRate ?? 0),
+      sgstAmount: Number(i.sgstAmount ?? 0),
+      igstRate: Number(i.igstRate ?? 0),
+      igstAmount: Number(i.igstAmount ?? 0),
+      lineTotal: Number(i.lineTotal ?? 0),
     })) ?? [],
 
     subtotal: Number(po.subtotal ?? 0),
@@ -177,11 +177,17 @@ const PurchaseOrderEditPage: React.FC = () => {
   ], [activeUOMs]);
 
   const { users, loadUsers } = useUsers();
-  const createdOn = users.find(
-    (u: any) => u.userId === formData?.createdByOn
-  )?.username;
+  const createdOn = useMemo(() => {
+    if (!formData?.createdByOn) return "";
+    const foundUser = (users || []).find((u: any) => u.userId === formData.createdByOn);
+    if (foundUser) return foundUser.username;
+    if (formData.createdByOn.startsWith("admin_")) return "admin";
+    return formData.createdByOn; // fallback to raw string (could be username or uuid)
+  }, [users, formData?.createdByOn]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
+  const [poNotFound, setPoNotFound] = useState(false);
+  const [fetchError, setFetchError] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmittingForApproval, setIsSubmittingForApproval] = useState(false);
   const [roundingSign, setRoundingSign] = useState<"+" | "-">("+");
@@ -202,6 +208,8 @@ const PurchaseOrderEditPage: React.FC = () => {
     let mounted = true;
 
     const fetchData = async () => {
+      setFetchError(false);
+      setPoNotFound(false);
       try {
         const materials = await rawMaterialService.fetchAll();
 
@@ -209,20 +217,13 @@ const PurchaseOrderEditPage: React.FC = () => {
 
         setRawMaterials(materials ?? []);
 
-        if (location.state) {
-          const poData = mapPOToFormData(location.state);
-          setFormData(poData);
-          const initialRounding = Number(poData.netAmount) - (Number(poData.subtotal) - Number(poData.totalDiscount) + Number(poData.totalTax));
-          if (initialRounding < 0) {
-            setRoundingSign("-");
-            setRoundingValue(Math.abs(initialRounding));
-          } else {
-            setRoundingSign("+");
-            setRoundingValue(initialRounding);
-          }
-        } else if (id) {
+        if (id) {
           const po = await purchaseOrderService.fetchById(id);
           if (mounted) {
+            if (!po) {
+              setPoNotFound(true);
+              return;
+            }
             const poData = mapPOToFormData(po);
             setFormData(poData);
             const initialRounding = Number(poData.netAmount) - (Number(poData.subtotal) - Number(poData.totalDiscount) + Number(poData.totalTax));
@@ -234,9 +235,15 @@ const PurchaseOrderEditPage: React.FC = () => {
               setRoundingValue(initialRounding);
             }
           }
+        } else {
+          setPoNotFound(true);
         }
-      } catch {
-        toast.error("Failed to load purchase order");
+      } catch (err) {
+        console.error("Failed to fetch purchase order:", err);
+        if (mounted) {
+          setFetchError(true);
+          toast.error("Failed to load purchase order");
+        }
       } finally {
         if (mounted) setLoading(false);
       }
@@ -247,7 +254,7 @@ const PurchaseOrderEditPage: React.FC = () => {
     return () => {
       mounted = false;
     };
-  }, [id, location.state]);
+  }, [id]);
 
   // ============================================================
   // CALCULATE TOTALS
@@ -678,6 +685,11 @@ const PurchaseOrderEditPage: React.FC = () => {
   ) => {
     e.preventDefault();
 
+    if (isLocked) {
+      toast.error("This Purchase Order is in a read-only state and cannot be updated.");
+      return;
+    }
+
     const validationErrors = validatePurchaseOrder(formData);
     if (Object.keys(validationErrors).length > 0) {
       setErrors(validationErrors);
@@ -740,12 +752,35 @@ const PurchaseOrderEditPage: React.FC = () => {
   };
 
   // ============================================================
-  // LOADING UI
+  // LOADING & ERROR UI
   // ============================================================
   if (loading) {
     return (
       <div className="inner-container d-flex justify-content-center align-items-center" style={{ minHeight: "300px" }}>
         <div className="animate-spin rounded-full border-b-2 border-indigo-600 h-8 w-8"></div>
+      </div>
+    );
+  }
+
+  if (poNotFound) {
+    return (
+      <div className="w-full mx-auto p-6 bg-white rounded-lg shadow-sm border border-gray-200 text-center my-8 max-w-lg">
+        <h2 className="text-xl font-bold text-red-600 mb-2">Purchase Order Not Found</h2>
+        <p className="text-gray-600 mb-6">The purchase order you are trying to edit does not exist or has been deleted.</p>
+        <BackButton text="Back to Purchase Orders" />
+      </div>
+    );
+  }
+
+  if (fetchError) {
+    return (
+      <div className="w-full mx-auto p-6 bg-white rounded-lg shadow-sm border border-gray-200 text-center my-8 max-w-lg">
+        <h2 className="text-xl font-bold text-red-600 mb-2">Failed to Load Purchase Order</h2>
+        <p className="text-gray-600 mb-6">Something went wrong while retrieving the purchase order data.</p>
+        <div className="flex justify-center gap-4">
+          <BackButton text="Back" />
+          <CustomButton text="Retry" onClick={() => window.location.reload()} />
+        </div>
       </div>
     );
   }
@@ -779,7 +814,7 @@ const PurchaseOrderEditPage: React.FC = () => {
     { value: "CANCELLED", label: "Cancelled" },
   ];
 
-  const isLocked = formData.status !== "DRAFT" && formData.status !== "PENDING";
+  const isLocked = formData.status !== "DRAFT";
 
   // ============================================================
   // UI
@@ -794,6 +829,12 @@ const PurchaseOrderEditPage: React.FC = () => {
           </div>
         </div>
         <form className="px-6 py-3 space-y-4" noValidate>
+          {isLocked && (
+            <div className="mb-4 p-4 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg flex items-center gap-2 text-sm">
+              <span className="font-semibold">View Only Mode:</span>
+              This Purchase Order is in '{formData.status}' status and cannot be edited. Only Draft orders can be modified.
+            </div>
+          )}
           {/* Main Fields */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
             <div>
@@ -808,16 +849,16 @@ const PurchaseOrderEditPage: React.FC = () => {
               {errors.expectedDeliveryDate && <div className="text-red-500 mt-1 text-sm">{errors.expectedDeliveryDate}</div>}
             </div>
             <div>
-              <SelectInput label="Status" name="status" value={formData.status} options={statusOptions} onChange={handleChange} disabled={!isAdmin && formData.status !== "DRAFT" && formData.status !== "PENDING"} />
+              <SelectInput label="Status" name="status" value={formData.status} options={statusOptions} onChange={handleChange} disabled />
             </div>
             <div>
               <TextInput label="Created by-on" name="createdByOn" value={createdOn || ""} onChange={() => { }} disabled />
             </div>
             <div>
-              <SelectInput label="Store" name="storeId" value={formData.storeId || ""} options={[{ label: "-- Select Store --", value: "" }, ...(stores || []).filter((s: any) => s.isActive).map((s: any) => ({ label: s.storeName, value: s.storeId }))]} required error={errors.storeId} onChange={handleChange} disabled={formData.status !== "DRAFT"} />
+              <SelectInput label="Store" name="storeId" value={formData.storeId || ""} options={[{ label: "-- Select Store --", value: "" }, ...(stores || []).filter((s: any) => s.isActive).map((s: any) => ({ label: s.storeName, value: s.storeId }))]} required error={errors.storeId} onChange={handleChange} disabled={isLocked} />
             </div>
             <div>
-              <SelectInput label="Supplier" name="supplierId" value={formData.supplierId} options={[{ value: "", label: "-- Select Supplier --" }, ...supplierOptions]} onChange={handleChange} required disabled={formData.status !== "DRAFT"} />
+              <SelectInput label="Supplier" name="supplierId" value={String(formData.supplierId || "")} options={[{ value: "", label: "-- Select Supplier --" }, ...supplierOptions]} onChange={handleChange} required disabled={isLocked} />
               {errors.supplierId && <div className="text-red-500 mt-1 text-sm">{errors.supplierId}</div>}
             </div>
           </div>
@@ -939,10 +980,10 @@ const PurchaseOrderEditPage: React.FC = () => {
                 <div className="flex justify-between items-center mb-2 text-red-500 text-sm">
                   <span className="flex items-center gap-2">Discount:
                     <div className="w-24 [&_.mb-\[18px\]]:!mb-0 [&_.select-input-group]:!mb-0">
-                      <SelectInput label="" name="discountType" options={[{ value: "PERCENT", label: "%" }, { value: "FLAT", label: "Flat" }]} value={formData.discountType || "PERCENT"} onChange={(e) => { setFormData(prev => { const newTotals = recalculateTotals(prev.items, e.target.value as any, prev.discountValue); return { ...prev, discountType: e.target.value as any, ...newTotals }; }); }} disabled={formData.status !== "DRAFT"} hideLabel />
+                      <SelectInput label="" name="discountType" options={[{ value: "PERCENT", label: "%" }, { value: "FLAT", label: "Flat" }]} value={formData.discountType || "PERCENT"} onChange={(e) => { setFormData(prev => { const newTotals = recalculateTotals(prev.items, e.target.value as any, prev.discountValue); return { ...prev, discountType: e.target.value as any, ...newTotals }; }); }} disabled={isLocked} hideLabel />
                     </div>
                     <div className="w-24 [&_.mb-\[18px\]]:!mb-0">
-                      <TextInput label="" name="discountValue" type="number" min={0} step={0.01} value={String(formData.discountValue || 0)} onChange={(e) => { setFormData(prev => { const newTotals = recalculateTotals(prev.items, prev.discountType, Number(e.target.value) || 0); return { ...prev, discountValue: Number(e.target.value) || 0, ...newTotals }; }); }} disabled={formData.status !== "DRAFT"} />
+                      <TextInput label="" name="discountValue" type="number" min={0} step={0.01} value={String(formData.discountValue || 0)} onChange={(e) => { setFormData(prev => { const newTotals = recalculateTotals(prev.items, prev.discountType, Number(e.target.value) || 0); return { ...prev, discountValue: Number(e.target.value) || 0, ...newTotals }; }); }} disabled={isLocked} />
                     </div>
                   </span>
                   <span>-₹{(formData.totalDiscount || 0).toFixed(2)}</span>
@@ -976,10 +1017,12 @@ const PurchaseOrderEditPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex flex-wrap justify-end gap-3 mt-8 pt-4 border-t border-gray-200">
-            <CustomButton text={isSubmitting ? "Saving..." : "Save as Draft"} icon={isSubmitting ? undefined : FaSave} onClick={(e: any) => handleSubmit(e, "DRAFT")} type="button" disabled={isSubmitting || isSubmittingForApproval} />
-            <CustomButton text={isSubmittingForApproval ? "Submitting..." : "Submit for Approval"} icon={isSubmittingForApproval ? undefined : FaPaperPlane} onClick={(e: any) => handleSubmit(e, "PENDING")} type="button" disabled={isSubmitting || isSubmittingForApproval} className="btn-success" />
-          </div>
+          {!isLocked && (
+            <div className="flex flex-wrap justify-end gap-3 mt-8 pt-4 border-t border-gray-200">
+              <CustomButton text={isSubmitting ? "Saving..." : "Save as Draft"} icon={isSubmitting ? undefined : FaSave} onClick={(e: any) => handleSubmit(e, "DRAFT")} type="button" disabled={isSubmitting || isSubmittingForApproval} />
+              <CustomButton text={isSubmittingForApproval ? "Submitting..." : "Submit for Approval"} icon={isSubmittingForApproval ? undefined : FaPaperPlane} onClick={(e: any) => handleSubmit(e, "PENDING")} type="button" disabled={isSubmitting || isSubmittingForApproval} className="btn-success" />
+            </div>
+          )}
         </form>
       </div>
     </div>

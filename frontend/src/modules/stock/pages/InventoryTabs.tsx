@@ -14,7 +14,7 @@ const InventoryTabs: React.FC = () => {
     const location = useLocation();
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
-    
+
     const [stores, setStores] = useState<any[]>([]);
 
     useEffect(() => {
@@ -41,13 +41,13 @@ const InventoryTabs: React.FC = () => {
     };
 
     let activeTab = pathToKey[location.pathname];
-    
+
     // If we have a storeId query param, the active tab is that store.
     const urlStoreId = searchParams.get("storeId");
     if (urlStoreId) {
         activeTab = `store_${urlStoreId}`;
     }
-    
+
     // If no active tab is determined, default to the first store if available
     if (!activeTab && stores.length > 0) {
         activeTab = `store_${stores[0].storeId}`;
@@ -65,7 +65,7 @@ const InventoryTabs: React.FC = () => {
             storeTypeCode === "finished_goods" ||
             storeTypeName.includes("finished") ||
             storeName.includes("finished");
-        
+
         return {
             key: `store_${store.storeId}`,
             label: store.storeName,
@@ -97,7 +97,7 @@ const InventoryTabs: React.FC = () => {
     };
 
     return (
-        <div className="inner-container py-3">
+        <div className="inner-container">
             <Container fluid>
                 <Tabs tabs={tabs} activeKey={activeTab} onChange={handleTabChange} align="left" />
             </Container>

@@ -94,7 +94,7 @@ const ShiftList: React.FC = () => {
     const totalPages = Math.ceil(filteredData.length / ITEMS_PER_PAGE);
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
     const paginatedData = filteredData.slice(startIndex, startIndex + ITEMS_PER_PAGE);
-    
+
     const handleOpenView = useCallback((item: Shift) => {
         setSelectedItem(item);
         setShowViewModal(true);
@@ -128,9 +128,9 @@ const ShiftList: React.FC = () => {
     };
 
     return (
-        <div className="p-4 md:p-6 min-h-screen bg-white">
-            <div className="">
-                
+        <div>
+            <div>
+
                 <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                     {/* Page Header */}
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-6 border-b border-slate-200">
@@ -173,10 +173,10 @@ const ShiftList: React.FC = () => {
                             pagination={
                                 totalPages > 1
                                     ? {
-                                          currentPage,
-                                          totalPages,
-                                          onPageChange: (page) => setCurrentPage(page),
-                                      }
+                                        currentPage,
+                                        totalPages,
+                                        onPageChange: (page) => setCurrentPage(page),
+                                    }
                                     : undefined
                             }
                             columns={[
@@ -197,7 +197,7 @@ const ShiftList: React.FC = () => {
                                             {canDeleteShift && <DeleteButton onClick={() => triggerDelete(item.id)} />}
                                         </div>
                                     ),
-                                    align: "right"
+                                    align: "left"
                                 },
                             ]}
                         />

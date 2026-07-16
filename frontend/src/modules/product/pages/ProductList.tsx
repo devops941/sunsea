@@ -93,20 +93,20 @@ const ProductList: React.FC = () => {
         { header: "Product Name", accessor: "productName" },
         { header: "Category", render: (product) => product.category?.name || product.category?.categoryName || "N/A" },
         { header: "Size", render: (product) => product.size?.sizeName || product.size?.sizeCode || "-" },
-        { 
-            header: "Color", 
-            render: (product) => product.colors?.length > 0 
-                ? product.colors.map((c: any) => c.color?.colorName).join(", ") 
-                : "N/A" 
+        {
+            header: "Color",
+            render: (product) => product.colors?.length > 0
+                ? product.colors.map((c: any) => c.color?.colorName).join(", ")
+                : "N/A"
         },
-        { 
-            header: "Weight", 
-            render: (product) => product.weightPerPiece != null 
-                ? (Number(product.weightPerPiece) < 1 ? `${Number(product.weightPerPiece) * 1000} g` : `${product.weightPerPiece} kg`) 
+        {
+            header: "Weight",
+            render: (product) => product.weightPerPiece != null
+                ? (Number(product.weightPerPiece) < 1 ? `${Number(product.weightPerPiece) * 1000} g` : `${product.weightPerPiece} kg`)
                 : "-"
         },
-        { 
-            header: "Stock (Min)", 
+        {
+            header: "Stock (Min)",
             render: (product) => {
                 const totalStock = product.finishedGoodsStocks?.reduce((acc: number, stock: any) => acc + (Number(stock.onHandQty) || 0), 0) || 0;
                 const minQty = product.minimumQty || 0;
@@ -128,13 +128,13 @@ const ProductList: React.FC = () => {
                     <DeleteButton onClick={() => triggerDelete(product.id)} />
                 </div>
             ),
-            align: "right"
+            align: "left"
         }
     ];
 
     return (
-        <div className="p-4 md:p-6 min-h-screen bg-white">
-            <div className="">
+        <div>
+            <div>
                 <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                     {/* Page Header */}
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-6 border-b border-slate-200">

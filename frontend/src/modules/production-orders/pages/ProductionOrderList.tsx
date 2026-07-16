@@ -436,7 +436,7 @@ const ProductionOrderList: React.FC = () => {
     ];
 
     return (
-        <div className="p-4 md:p-6 min-h-screen bg-white">
+        <div>
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                 {/* Page Header */}
                 <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-slate-200">
@@ -448,6 +448,7 @@ const ProductionOrderList: React.FC = () => {
                             text="Weekly Scheduling"
                             icon={FaCalendarAlt}
                             onClick={() => navigate("/weekly-machine-schedules/create")}
+                            variant="secondary"
                         />
                         <CustomButton
                             text="Add Production Order"

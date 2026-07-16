@@ -182,7 +182,7 @@ const DepartmentList: React.FC = () => {
                     {canDeleteDepartment && (<DeleteButton onClick={() => triggerDelete(dept.id)} />)}
                 </div>
             ),
-            align: "right"
+            align: "left"
         }
     ];
 

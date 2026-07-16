@@ -1,5 +1,5 @@
 import React from "react";
-import { Container } from "react-bootstrap";
+import { Container } from "../../../components/ui/BootstrapReplacements";
 import { useLocation, useNavigate } from "react-router-dom";
 import { FaWarehouse, FaMapMarkerAlt, FaCogs } from "react-icons/fa";
 import Tabs from "../../../components/ui/tab/Tabs";

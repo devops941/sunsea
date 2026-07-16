@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { FaSave, FaEraser, FaArrowLeft } from "react-icons/fa";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -9,6 +9,7 @@ import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
 import { updateRawMaterial } from "../../../features/raw-materials/rawMaterialSlice";
 import { fetchStores } from "../../../features/stores/storeSlice";
 import { useRawMaterialCategories } from "../../../hooks/useRawMaterialCategories";
+import { fetchGstTaxes, selectActiveGstTaxes } from "../../../features/gst/gstSlice";
 import UOMSelect from "../../../components/form/SelectInput/UOMSelect";
 import QuantityInput from "../../../components/form/QuantityInput/QuantityInput";
 import { z } from "zod";
@@ -40,6 +41,7 @@ const initialFormState = {
     batchNo: "",
     onHandQty: "",
     reservedQty: "",
+    gstTaxRateId: "",
     avgCost: "",
     remarks: "",
     lastMovementAt: "",
@@ -221,9 +223,21 @@ const RawMaterialEdit: React.FC = () => {
     const { data: stores } = useAppSelector(state => state.stores);
     const { rawMaterialCategories, loadCategories } = useRawMaterialCategories();
 
+    const gstTaxes = useAppSelector(selectActiveGstTaxes);
+    const gstLoading = useAppSelector((state) => state.gst.loading);
+
+    const gstOptions = useMemo(() => [
+        { value: "", label: gstLoading ? "Loading GST rates..." : "-- Select GST Rate --" },
+        ...(gstTaxes || []).map((t: any) => ({
+            value: String(t.id),
+            label: `${t.taxName} (${t.taxRate}%)`,
+        })),
+    ], [gstTaxes, gstLoading]);
+
     useEffect(() => {
         dispatch(fetchStores(undefined));
         loadCategories();
+        dispatch(fetchGstTaxes({ status: "ACTIVE" }));
         if (locationState.state) {
             setFormData({
                 rawMaterialId: locationState.state.rawMaterialId,
@@ -258,6 +272,11 @@ const RawMaterialEdit: React.FC = () => {
                         ? String(locationState.state.reservedQty)
                         : "",
 
+                gstTaxRateId:
+                    locationState.state.gstTaxRateId != null
+                        ? String(locationState.state.gstTaxRateId)
+                        : "",
+
                 avgCost:
                     locationState.state.avgCost != null
                         ? String(locationState.state.avgCost)
@@ -289,6 +308,7 @@ const RawMaterialEdit: React.FC = () => {
                     batchNo: data.batchNo ?? "",
                     onHandQty: data.onHandQty != null ? String(data.onHandQty) : "",
                     reservedQty: data.reservedQty != null ? String(data.reservedQty) : "",
+                    gstTaxRateId: data.gstTaxRateId != null ? String(data.gstTaxRateId) : "",
                     avgCost: data.avgCost != null ? String(data.avgCost) : "",
                     remarks: data.remarks || "",
                     lastMovementAt: data.lastMovementAt ? data.lastMovementAt.substring(0, 16) : "",

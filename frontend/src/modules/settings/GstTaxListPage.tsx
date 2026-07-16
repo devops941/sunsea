@@ -101,8 +101,8 @@ const GstTaxList: React.FC = () => {
         { header: "Tax Name", accessor: "taxName" },
         { header: "Rate (%)", accessor: "taxRate" },
         { header: "Status", render: (tax) => <StatusBadge status={tax.status} />, align: "center" },
-        { 
-            header: "Actions", 
+        {
+            header: "Actions",
             render: (tax) => (
                 <div className="flex items-center gap-2">
                     <EditButton onClick={() => handleEditClick(tax)} />
@@ -113,7 +113,7 @@ const GstTaxList: React.FC = () => {
     ];
 
     return (
-        <div className="p-4 md:p-6 min-h-screen bg-white">
+        <div>
             <div className="">
                 <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                     {/* Page Header */}
