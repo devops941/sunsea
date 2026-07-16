@@ -2,8 +2,10 @@ import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { FaSave, FaPlus, FaTrash, FaFileInvoiceDollar } from "react-icons/fa";
 import { toast } from "react-toastify";
+import { useSelector, useDispatch } from "react-redux";
 
 import TextInput from "../../components/form/TextInput/TextInput";
+import { fetchCompany } from "../../features/company/companySlice";
 import SelectInput from "../../components/form/SelectInput/SelectInput";
 import CustomButton from "../../components/ui/Button/Button";
 import BackButton from "../../components/ui/BackButton/BackButton";
@@ -13,6 +15,7 @@ import { productService } from "../../services/productService";
 import { salesInvoiceService } from "../../services/salesInvoiceService";
 import { salesOrderService, type SalesOrderStatus } from "../../services/salesOrderService";
 import { finishedGoodsStockService } from "../../services/finishedGoodsStockService";
+import { gstTaxService } from "../../services/gstTaxService";
 
 // ---- Types ----
 interface InvoiceLineItem {
@@ -36,6 +39,7 @@ interface ItemOption {
   id: string;
   name: string;
   defaultRate: number;
+  gstRate: number;
 }
 
 const emptyLine = (): InvoiceLineItem => ({
@@ -140,10 +144,14 @@ const calculateInvoiceNumber = (dateStr: string, settings: any, orders: any[]) =
 
 const SalesInvoiceForm: React.FC = () => {
   const navigate = useNavigate();
+  const dispatch = useDispatch<any>();
+  const { data: company } = useSelector((state: any) => state.company);
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   const [customers, setCustomers] = useState<CustomerOption[]>([]);
+  const [customersRaw, setCustomersRaw] = useState<any[]>([]);
   const [items, setItems] = useState<ItemOption[]>([]);
   const [previewInvoiceNo, setPreviewInvoiceNo] = useState<string>("");
   const [invoiceSettings, setInvoiceSettings] = useState<any>(null);
@@ -158,6 +166,11 @@ const SalesInvoiceForm: React.FC = () => {
 
   const [salesOrders, setSalesOrders] = useState<any[]>([]);
   const [selectedSalesOrderId, setSelectedSalesOrderId] = useState("");
+  const [gstRates, setGstRates] = useState<any[]>([]);
+
+  useEffect(() => {
+    dispatch(fetchCompany());
+  }, [dispatch]);
 
   // ---- Load dropdown data + next invoice number preview ----
   useEffect(() => {
@@ -168,8 +181,9 @@ const SalesInvoiceForm: React.FC = () => {
       salesInvoiceService.fetchAll({ pageSize: 100 }).catch(() => ({ data: [] } as any)),
       salesOrderService.fetchAll({ pageSize: 100, status: "IN_PRODUCTION" as SalesOrderStatus }).catch(() => ({ data: [] } as any)),
       finishedGoodsStockService.fetchAll().catch(() => []),
+      gstTaxService.fetchAll().catch(() => ({ data: [] } as any)),
     ])
-      .then(([customerList, productList, settings, ordersResponse, salesOrdersResponse, fgStockResponse]) => {
+      .then(([customerList, productList, settings, ordersResponse, salesOrdersResponse, fgStockResponse, gstResponse]) => {
         const customersArray = Array.isArray(customerList)
           ? customerList
           : (customerList as any)?.customers || [];
@@ -178,11 +192,13 @@ const SalesInvoiceForm: React.FC = () => {
           name: c.firmName || c.displayName || c.customerCode || "Unknown Customer",
         }));
         setCustomers(customerOptions);
+        setCustomersRaw(customersArray);
 
         const itemOptions: ItemOption[] = (productList || []).map((p: any) => ({
           id: String(p.id),
           name: p.productName,
           defaultRate: Number(p.mrp) || Number(p.b2b) || 0,
+          gstRate: Number(p.gstRate) || 0,
         }));
         setItems(itemOptions);
 
@@ -203,6 +219,9 @@ const SalesInvoiceForm: React.FC = () => {
         });
 
         setSalesOrders(salesOrdersList);
+
+        const gstList = gstResponse?.data || [];
+        setGstRates(gstList);
 
         if (settings) {
           setInvoiceSettings(settings);
@@ -286,12 +305,13 @@ const SalesInvoiceForm: React.FC = () => {
         if (line.id !== id) return line;
         const updated = { ...line, [field]: value };
 
-        // If item selected, auto-fill name + default rate
+        // If item selected, auto-fill name + default rate + tax percent
         if (field === "itemId") {
           const selected = items.find((i) => i.id === value);
           if (selected) {
             updated.itemName = selected.name;
             updated.rate = selected.defaultRate ?? 0;
+            updated.taxPercent = selected.gstRate ?? 0;
             updated.amount = updated.qty * updated.rate;
           }
         } else if (field === "qty" || field === "rate") {
@@ -316,13 +336,31 @@ const SalesInvoiceForm: React.FC = () => {
     setLines((prev) => (prev.length > 1 ? prev.filter((l) => l.id !== id) : prev));
   };
 
+  const isInterState = useMemo(() => {
+    const selectedCustomer = customersRaw.find((c) => String(c.id) === customerId);
+    if (!company?.state || !selectedCustomer?.billingState) return false;
+    return company.state.toLowerCase().trim() !== selectedCustomer.billingState.toLowerCase().trim();
+  }, [company, customersRaw, customerId]);
+
   // ---- Totals ----
   const totals = useMemo(() => {
     const subTotal = lines.reduce((sum, l) => sum + l.amount, 0);
     const taxTotal = lines.reduce((sum, l) => sum + l.taxAmount, 0);
     const grandTotal = subTotal + taxTotal;
-    return { subTotal, taxTotal, grandTotal };
-  }, [lines]);
+
+    let cgst = 0;
+    let sgst = 0;
+    let igst = 0;
+
+    if (isInterState) {
+      igst = taxTotal;
+    } else {
+      cgst = taxTotal / 2;
+      sgst = taxTotal / 2;
+    }
+
+    return { subTotal, taxTotal, grandTotal, cgst, sgst, igst };
+  }, [lines, isInterState]);
 
   // ---- Validation ----
   const validate = (): boolean => {
@@ -494,18 +532,20 @@ const SalesInvoiceForm: React.FC = () => {
               <table className="w-full text-left text-sm">
                 <thead className="bg-slate-50 border-b border-slate-200">
                   <tr>
-                    <th className="px-4 py-3 font-semibold text-slate-600 w-1/3">Item</th>
-                    <th className="px-4 py-3 font-semibold text-slate-600 w-24">Qty</th>
-                    <th className="px-4 py-3 font-semibold text-slate-600 w-32">Rate</th>
-                    <th className="px-4 py-3 font-semibold text-slate-600 w-24">Tax %</th>
-                    <th className="px-4 py-3 font-semibold text-slate-600 w-32">Amount</th>
-                    <th className="px-4 py-3 font-semibold text-slate-600 w-32 text-right">Total</th>
+                    <th className="px-4 py-3 font-semibold text-slate-600 w-1/3 text-[11px] uppercase tracking-wider">Product</th>
+                    <th className="px-4 py-3 font-semibold text-slate-600 w-24 text-[11px] uppercase tracking-wider">Qty</th>
+                    <th className="px-4 py-3 font-semibold text-slate-600 w-32 text-[11px] uppercase tracking-wider">Unit Price</th>
+                    <th className="px-4 py-3 font-semibold text-slate-600 w-32 text-[11px] uppercase tracking-wider">Subtotal</th>
+                    <th className="px-4 py-3 font-semibold text-slate-600 w-40 text-[11px] uppercase tracking-wider">GST Rate</th>
+                    <th className="px-4 py-3 font-semibold text-slate-600 w-32 text-[11px] uppercase tracking-wider">GST Amt</th>
+                    <th className="px-4 py-3 font-semibold text-slate-600 w-32 text-[11px] uppercase tracking-wider text-right">Total</th>
                     <th className="px-4 py-3 font-semibold text-slate-600 w-12 text-center"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {lines.map((line) => (
                     <tr key={line.id} className="bg-white hover:bg-slate-50/50 transition-colors">
+                      {/* Product */}
                       <td className="px-4 py-2">
                         <SelectInput
                           label=""
@@ -516,6 +556,7 @@ const SalesInvoiceForm: React.FC = () => {
                           onChange={(e) => updateLine(line.id, "itemId", e.target.value)}
                         />
                       </td>
+                      {/* Qty */}
                       <td className="px-4 py-2">
                         <TextInput
                           label=""
@@ -525,6 +566,7 @@ const SalesInvoiceForm: React.FC = () => {
                           onChange={(e) => updateLine(line.id, "qty", Number(e.target.value))}
                         />
                       </td>
+                      {/* Unit Price */}
                       <td className="px-4 py-2">
                         <TextInput
                           label=""
@@ -534,24 +576,30 @@ const SalesInvoiceForm: React.FC = () => {
                           onChange={(e) => updateLine(line.id, "rate", Number(e.target.value))}
                         />
                       </td>
+                      {/* Subtotal */}
+                      <td className="px-4 py-2 align-middle font-medium text-slate-700">
+                        ₹{line.amount.toFixed(2)}
+                      </td>
+                      {/* GST Rate select dropdown */}
                       <td className="px-4 py-2">
-                        <TextInput
+                        <SelectInput
                           label=""
                           name="taxPercent"
-                          type="number"
                           value={String(line.taxPercent)}
+                          options={gstRates.map((g) => ({
+                            label: `${g.taxName} (${g.taxRate}%)`,
+                            value: String(g.taxRate),
+                          }))}
+                          defaultOptionLabel="Select GST"
                           onChange={(e) => updateLine(line.id, "taxPercent", Number(e.target.value))}
                         />
                       </td>
-                      <td className="px-4 py-2">
-                        <TextInput
-                          label=""
-                          name="amount"
-                          type="number"
-                          value={String(line.amount)}
-                          onChange={(e) => updateLine(line.id, "amount", Number(e.target.value))}
-                        />
+                      {/* GST Amt */}
+                      <td className="px-4 py-2 align-middle text-slate-700">
+                        <div className="font-semibold">₹{line.taxAmount.toFixed(2)}</div>
+                        <div className="text-gray-400 text-xs">({line.taxPercent}%)</div>
                       </td>
+                      {/* Total */}
                       <td className="px-4 py-2 text-right align-middle font-bold text-slate-700">
                         ₹{line.total.toFixed(2)}
                       </td>
@@ -569,17 +617,30 @@ const SalesInvoiceForm: React.FC = () => {
                 </tbody>
               </table>
             </div>
-
+            
             <div className="flex justify-end mt-6">
               <div className="w-full max-w-sm bg-slate-50 rounded-xl p-5 border border-slate-200">
                 <div className="flex justify-between items-center text-sm mb-3">
                   <span className="text-slate-500 font-medium">Sub Total</span>
                   <span className="font-semibold text-slate-700">₹{totals.subTotal.toFixed(2)}</span>
                 </div>
-                <div className="flex justify-between items-center text-sm mb-4">
-                  <span className="text-slate-500 font-medium">Tax Total</span>
-                  <span className="font-semibold text-slate-700">₹{totals.taxTotal.toFixed(2)}</span>
-                </div>
+                {isInterState ? (
+                  <div className="flex justify-between items-center text-sm mb-4">
+                    <span className="text-slate-500 font-medium">IGST Total</span>
+                    <span className="font-semibold text-slate-700">₹{totals.igst.toFixed(2)}</span>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex justify-between items-center text-sm mb-3">
+                      <span className="text-slate-500 font-medium">CGST Total</span>
+                      <span className="font-semibold text-slate-700">₹{totals.cgst.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-sm mb-4">
+                      <span className="text-slate-500 font-medium">SGST Total</span>
+                      <span className="font-semibold text-slate-700">₹{totals.sgst.toFixed(2)}</span>
+                    </div>
+                  </>
+                )}
                 <div className="pt-3 border-t border-slate-200">
                   <div className="flex justify-between items-center">
                     <span className="font-bold text-slate-800">Grand Total</span>

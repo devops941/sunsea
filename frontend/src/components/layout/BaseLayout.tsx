@@ -52,7 +52,7 @@ const BaseLayout = () => {
         <Navbar
           onMenuClick={() => setShowSidebar(true)}
           user={user}
-          onProfileClick={() => navigate('/profile')}
+          onProfileClick={() => navigate('/company/view')}
         />
 
         <main className="flex-1 min-w-0 overflow-y-auto">
