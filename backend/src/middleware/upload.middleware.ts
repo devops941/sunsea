@@ -5,10 +5,17 @@ import { Request } from "express";
 
 // Keep this OUTSIDE src/ (e.g. project root /uploads) so it survives a
 // TypeScript build step and isn't wiped when you redeploy compiled code.
-const UPLOAD_DIR = path.join(process.cwd(), "uploads", "products");
+const isVercel = process.env.VERCEL === "1" || process.env.VERCEL_ENV;
+const UPLOAD_DIR = isVercel
+    ? path.join("/tmp", "uploads", "products")
+    : path.join(process.cwd(), "uploads", "products");
 
-if (!fs.existsSync(UPLOAD_DIR)) {
-    fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+try {
+    if (!fs.existsSync(UPLOAD_DIR)) {
+        fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+    }
+} catch (error) {
+    console.error("❌ Could not create upload directory (read-only filesystem?):", error);
 }
 
 const storage = multer.diskStorage({
