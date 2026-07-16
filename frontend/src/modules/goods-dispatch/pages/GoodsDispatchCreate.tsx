@@ -1,0 +1,361 @@
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
+import { FaSave, FaArrowLeft, FaCheck, FaTrash, FaPlus } from "react-icons/fa";
+
+import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
+import {
+  createGoodsDispatch,
+  fetchEligibleOrders,
+} from "../../../features/goods-dispatch/goodsDispatchSlice";
+import { fetchStores } from "../../../features/stores/storeSlice";
+
+import CustomButton from "../../../components/ui/Button/Button";
+import TextInput from "../../../components/form/TextInput/TextInput";
+import SelectInput from "../../../components/form/SelectInput/SelectInput";
+import DataTable from "../../../components/ui/table/DataTable";
+import { formatDate } from "../../../utils/dateUtils";
+
+const GoodsDispatchCreate: React.FC = () => {
+  const navigate = useNavigate();
+  const dispatch = useAppDispatch();
+
+  const { eligibleOrders, loading } = useAppSelector((state) => state.goodsDispatch);
+  const { data: stores = [] } = useAppSelector((state) => state.stores);
+
+  const [searchPo, setSearchPo] = useState("");
+  const [selectedPOs, setSelectedPOs] = useState<any[]>([]);
+
+  const [formData, setFormData] = useState({
+    dispatchDate: new Date().toISOString().split("T")[0],
+    vehicleNumber: "",
+    driverName: "",
+    driverMobile: "",
+    transportName: "",
+    loadingTime: "",
+    remarks: "",
+    destinationStoreId: "",
+  });
+
+  useEffect(() => {
+    dispatch(fetchEligibleOrders({}));
+    dispatch(fetchStores({ limit: 100 }));
+  }, [dispatch]);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleSelectPO = (po: any) => {
+    if (selectedPOs.find((p) => p.productionOrderId === po.productionOrderId)) {
+      toast.warning("Production Order already selected");
+      return;
+    }
+    setSelectedPOs((prev) => [
+      ...prev,
+      {
+        ...po,
+        dispatchQty: po.pendingDispatchQty,
+        remarks: "",
+      },
+    ]);
+  };
+
+  const handleRemovePO = (productionOrderId: string) => {
+    setSelectedPOs((prev) => prev.filter((p) => p.productionOrderId !== productionOrderId));
+  };
+
+  const handleItemChange = (productionOrderId: string, field: string, value: any) => {
+    setSelectedPOs((prev) =>
+      prev.map((po) => {
+        if (po.productionOrderId === productionOrderId) {
+          if (field === "dispatchQty") {
+            const qty = Number(value);
+            if (qty > po.pendingDispatchQty) {
+              toast.error(`Quantity cannot exceed pending quantity (${po.pendingDispatchQty})`);
+              return { ...po, [field]: po.pendingDispatchQty };
+            }
+            if (qty < 0) return { ...po, [field]: 0 };
+          }
+          return { ...po, [field]: value };
+        }
+        return po;
+      })
+    );
+  };
+
+  const handleSubmit = async () => {
+    if (!formData.vehicleNumber || !formData.driverName) {
+      toast.error("Vehicle Number and Driver Name are required");
+      return;
+    }
+    if (selectedPOs.length === 0) {
+      toast.error("Please select at least one Production Order");
+      return;
+    }
+
+    const hasInvalidQty = selectedPOs.some((po) => !po.dispatchQty || po.dispatchQty <= 0);
+    if (hasInvalidQty) {
+      toast.error("All selected items must have a dispatch quantity greater than 0");
+      return;
+    }
+
+    try {
+      const payload = {
+        ...formData,
+        items: selectedPOs.map((po) => ({
+          productionOrderId: po.productionOrderId,
+          productItemId: po.productItem.id,
+          dispatchQty: Number(po.dispatchQty),
+          uom: po.uom,
+          remarks: po.remarks,
+        })),
+      };
+
+      await dispatch(createGoodsDispatch(payload)).unwrap();
+      toast.success("Goods Dispatch created successfully");
+      navigate("/production/goods-dispatch");
+    } catch (error: any) {
+      toast.error(error || "Failed to create goods dispatch");
+    }
+  };
+
+  const eligibleColumns = [
+    { header: "PO No", accessor: "productionOrderId" },
+    { header: "Product", accessor: "productItem", render: (item: any) => item.productItem?.productName },
+    { header: "Batch", accessor: "batchNo" },
+    { header: "Produced Qty", accessor: "producedQty", render: (item: any) => `${item.producedQty} ${item.uom}` },
+    {
+      header: "Pending Qty", accessor: "pendingDispatchQty", render: (item: any) => (
+        <span className="font-bold text-blue-600">{item.pendingDispatchQty} {item.uom}</span>
+      )
+    },
+    {
+      header: "Action",
+      accessor: "id",
+      render: (item: any) => (
+        <button
+          onClick={() => handleSelectPO(item)}
+          disabled={selectedPOs.some((p) => p.productionOrderId === item.productionOrderId)}
+          className="text-primary-600 hover:text-primary-800 disabled:text-gray-400 p-2 rounded-full hover:bg-primary-50 transition-colors"
+          title="Add to Dispatch"
+        >
+          <FaPlus />
+        </button>
+      ),
+    },
+  ];
+
+  const filteredEligibleOrders = eligibleOrders.filter(
+    (o) =>
+      o.productionOrderId.toLowerCase().includes(searchPo.toLowerCase()) ||
+      o.productItem?.productName.toLowerCase().includes(searchPo.toLowerCase()) ||
+      (o.batchNo && o.batchNo.toLowerCase().includes(searchPo.toLowerCase()))
+  );
+
+  return (
+    <div className="min-h-screen bg-white p-4 md:p-6">
+      {/* Page Header */}
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-800">
+            Create Goods Dispatch
+          </h2>
+          <div className="text-sm text-slate-500 mt-1">
+            Select completed production orders to dispatch to the warehouse
+          </div>
+        </div>
+        <div className="mt-4 md:mt-0 flex gap-2">
+          <button
+            type="button"
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 font-medium transition-colors"
+            onClick={() => navigate("/production/goods-dispatch")}
+          >
+            <FaArrowLeft /> Back to List
+          </button>
+          <button
+            type="button"
+            className="flex items-center gap-2 px-4 py-2 bg-[#5D87FF] text-white rounded-lg hover:bg-[#4570F5] font-medium transition-colors"
+            onClick={handleSubmit}
+            disabled={loading}
+          >
+            <FaSave /> {loading ? "Creating..." : "Create Dispatch"}
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left Column - Form & Selected Items */}
+        <div className="lg:col-span-2 space-y-6">
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="p-6">
+              <h3 className="text-lg font-bold text-slate-800 mb-4 border-b border-slate-100 pb-4">
+                1. Vehicle & Transport Details
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <TextInput
+                  label="Dispatch Date *"
+                  name="dispatchDate"
+                  type="date"
+                  value={formData.dispatchDate}
+                  onChange={handleInputChange}
+                  required
+                />
+                <TextInput
+                  label="Vehicle Number *"
+                  name="vehicleNumber"
+                  value={formData.vehicleNumber}
+                  onChange={handleInputChange}
+                  placeholder="e.g. TN-XX-XXXX"
+                  required
+                />
+                <TextInput
+                  label="Driver Name *"
+                  name="driverName"
+                  value={formData.driverName}
+                  onChange={handleInputChange}
+                  required
+                />
+                <TextInput
+                  label="Driver Mobile"
+                  name="driverMobile"
+                  value={formData.driverMobile}
+                  onChange={handleInputChange}
+                />
+                <TextInput
+                  label="Transport Name"
+                  name="transportName"
+                  value={formData.transportName}
+                  onChange={handleInputChange}
+                />
+                <TextInput
+                  label="Loading Time"
+                  name="loadingTime"
+                  type="time"
+                  value={formData.loadingTime}
+                  onChange={handleInputChange}
+                />
+                <div className="md:col-span-2">
+                  <SelectInput
+                    label="Destination Store (Optional)"
+                    name="destinationStoreId"
+                    value={formData.destinationStoreId}
+                    onChange={handleInputChange}
+                    options={[
+                      { value: "", label: "Select Store (defaults to PO store)" },
+                      ...stores.map((s) => ({ value: s.storeId, label: s.storeName })),
+                    ]}
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Remarks</label>
+                  <textarea
+                    name="remarks"
+                    value={formData.remarks}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                    rows={3}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-4 border-b border-slate-100 pb-4">
+                <h3 className="text-lg font-bold text-slate-800">2. Items to Dispatch</h3>
+                <span className="bg-[#5D87FF]/10 text-[#5D87FF] px-3 py-1 rounded-full text-sm font-medium">
+                  {selectedPOs.length} Items Selected
+                </span>
+              </div>
+
+              {selectedPOs.length === 0 ? (
+                <div className="text-center py-12 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+                  <p className="text-gray-500">No production orders selected.</p>
+                  <p className="text-sm text-gray-400 mt-1">Select orders from the panel on the right.</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">PO No</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Pending</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-32">Dispatch Qty</th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {selectedPOs.map((po) => (
+                        <tr key={po.productionOrderId} className="hover:bg-gray-50">
+                          <td className="px-4 py-3 text-sm text-gray-900 font-medium">{po.productionOrderId}</td>
+                          <td className="px-4 py-3 text-sm text-gray-500">{po.productItem?.productName}</td>
+                          <td className="px-4 py-3 text-sm text-gray-500">{po.pendingDispatchQty} {po.uom}</td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center">
+                              <input
+                                type="number"
+                                min="0.1"
+                                step="any"
+                                max={po.pendingDispatchQty}
+                                value={po.dispatchQty}
+                                onChange={(e) => handleItemChange(po.productionOrderId, "dispatchQty", e.target.value)}
+                                className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-primary-500 focus:border-primary-500"
+                              />
+                              <span className="ml-2 text-xs text-gray-500">{po.uom}</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <button
+                              onClick={() => handleRemovePO(po.productionOrderId)}
+                              className="text-red-500 hover:text-red-700 p-2 rounded-full hover:bg-red-50 transition-colors"
+                            >
+                              <FaTrash />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Right Column - PO Selection */}
+        <div className="lg:col-span-1">
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden h-full">
+            <div className="p-6 h-full flex flex-col">
+              <h3 className="text-lg font-bold text-slate-800 mb-4 border-b border-slate-100 pb-4">
+                Eligible Production Orders
+              </h3>
+              <div className="mb-4">
+                <TextInput
+                  label=""
+                  name="searchPo"
+                  value={searchPo}
+                  onChange={(e) => setSearchPo(e.target.value)}
+                  placeholder="Search PO, Product, Batch..."
+                />
+              </div>
+              <div className="overflow-hidden rounded-lg border border-slate-200 flex-1">
+                <DataTable
+                  columns={eligibleColumns}
+                  data={filteredEligibleOrders}
+                  loading={loading}
+                  rowKey={(item) => item.productionOrderId}
+                  emptyMessage="No eligible production orders found."
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+        export default GoodsDispatchCreate;

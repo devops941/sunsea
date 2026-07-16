@@ -591,6 +591,7 @@ model Product {
   StockAdjustmentItem       StockAdjustmentItem[]
   weeklyPrograms            WeeklyMachineProgram[]     @relation("ProductWeeklyPrograms")
   salesInvoiceItems         SalesInvoiceItem[]
+  goodsDispatchItems        GoodsDispatchItem[]
 
   @@index([categoryId])
   @@index([subCategoryId])
@@ -714,6 +715,7 @@ model Store {
   StockAdjustmentItem       StockAdjustmentItem[]
   storeLocations            StoreLocation[]
   grnInvoices               GrnInvoice[]
+  goodsDispatches           GoodsDispatch[]
   businessPlace             BusinessPlace?             @relation(fields: [businessPlaceId], references: [id])
   incharge                  Employee?                  @relation(fields: [inchargeId], references: [id])
   location                  Location?                  @relation(fields: [locationId], references: [locationId])
@@ -916,12 +918,61 @@ model ProductionOrder {
   weeklyMachinePrograms     WeeklyMachineProgram[]
   dailyProductionPlans      DailyProductionPlan[]
   stockAdjustments          StockAdjustment[]
+  goodsDispatchItems        GoodsDispatchItem[]
 
   @@index([orderDate])
   @@index([dueDate])
   @@index([productItemId])
   @@index([status])
   @@map("production_orders")
+}
+
+model GoodsDispatch {
+  id                 BigInt              @id @default(autoincrement())
+  dispatchNumber     String              @unique @map("dispatch_number") @db.VarChar(30)
+  dispatchDate       DateTime            @map("dispatch_date") @db.Date
+  vehicleNumber      String              @map("vehicle_number") @db.VarChar(30)
+  driverName         String              @map("driver_name") @db.VarChar(100)
+  driverMobile       String?             @map("driver_mobile") @db.VarChar(20)
+  transportName      String?             @map("transport_name") @db.VarChar(100)
+  loadingTime        String?             @map("loading_time") @db.VarChar(10)
+  remarks            String?             @db.VarChar(500)
+  status             String              @default("PENDING_GATE_APPROVAL") @db.VarChar(30)
+  gateApprovedBy     String?             @map("gate_approved_by") @db.VarChar(36)
+  gateApprovedAt     DateTime?           @map("gate_approved_at")
+  gateRemarks        String?             @map("gate_remarks") @db.VarChar(500)
+  storeReceivedBy    String?             @map("store_received_by") @db.VarChar(36)
+  storeReceivedAt    DateTime?           @map("store_received_at")
+  storeRemarks       String?             @map("store_remarks") @db.VarChar(500)
+  destinationStoreId String?             @map("destination_store_id") @db.VarChar(20)
+  createdBy          String?             @map("created_by") @db.VarChar(36)
+  updatedBy          String?             @map("updated_by") @db.VarChar(36)
+  createdAt          DateTime            @default(now()) @map("created_at")
+  updatedAt          DateTime            @updatedAt @map("updated_at")
+  items              GoodsDispatchItem[]
+  store              Store?              @relation(fields: [destinationStoreId], references: [storeId])
+
+  @@index([status])
+  @@index([dispatchDate])
+  @@map("goods_dispatches")
+}
+
+model GoodsDispatchItem {
+  id                BigInt          @id @default(autoincrement())
+  dispatchId        BigInt          @map("dispatch_id")
+  productionOrderId String          @map("production_order_id") @db.VarChar(20)
+  productItemId     BigInt          @map("product_item_id")
+  dispatchQty       Decimal         @map("dispatch_qty") @db.Decimal(14, 3)
+  uom               String          @db.VarChar(10)
+  receivedQty       Decimal?        @map("received_qty") @db.Decimal(14, 3)
+  remarks           String?         @db.VarChar(255)
+  dispatch          GoodsDispatch   @relation(fields: [dispatchId], references: [id], onDelete: Cascade)
+  productionOrder   ProductionOrder @relation(fields: [productionOrderId], references: [productionOrderId])
+  product           Product         @relation(fields: [productItemId], references: [id])
+
+  @@index([dispatchId])
+  @@index([productionOrderId])
+  @@map("goods_dispatch_items")
 }
 
 model WeeklyMachineProgram {

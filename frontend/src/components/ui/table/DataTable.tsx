@@ -39,6 +39,8 @@ interface DataTableProps<T> {
   rowClassName?: (row: T, index: number) => string;
   /** Optional inline styles for the row */
   getRowStyle?: (row: T, index: number) => React.CSSProperties;
+  /** Optional override for the default min-height classes */
+  minHeightClassName?: string;
 }
 
 const alignClass: Record<NonNullable<DataTableColumn<any>["align"]>, string> = {
@@ -64,6 +66,7 @@ function DataTable<T>({
   renderSubRow,
   rowClassName,
   getRowStyle,
+  minHeightClassName = TABLE_MIN_HEIGHT_CLASS,
 }: DataTableProps<T>) {
   // By using `minmax(max-content, 1fr)`:
   // 1. `max-content` ensures the column is always wide enough for its content without squishing/wrapping text.
@@ -100,7 +103,7 @@ function DataTable<T>({
         content size. If real data ever exceeds the min-height, the filler
         just shrinks to 0 and the table grows past it naturally.
       */}
-      <div className={`flex flex-col ${TABLE_MIN_HEIGHT_CLASS}`}>
+      <div className={`flex flex-col ${minHeightClassName}`}>
         <div
           className="w-full overflow-x-auto overscroll-x-contain"
           style={{ WebkitOverflowScrolling: "touch" }}

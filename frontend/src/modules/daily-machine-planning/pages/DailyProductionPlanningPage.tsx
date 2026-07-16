@@ -444,7 +444,8 @@ const DailyProductionPlanningPage: React.FC = () => {
                 <span className="bg-emerald-100 text-emerald-700 border border-emerald-200 py-0.5 px-2 rounded text-[9px] font-bold">
                   +{producedQty - plannedQty} Over
                 </span>
-              ) : pendingQty > 0 ? (
+              ) 
+              : pendingQty > 0 ? (
                 <span className="bg-rose-100 text-rose-700 border border-rose-200 py-0.5 px-2 rounded text-[9px] font-bold">
                   {pendingQty} Pending
                 </span>

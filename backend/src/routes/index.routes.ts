@@ -48,6 +48,7 @@ import expenseRoutes from "../modules/expense/expense.routes";
 import grnInvoiceRoutes from "../modules/grn-invoice/grn-invoice.routes";
 import salesInvoiceRoutes from "../modules/sales-invoice/sales-invoice.routes";
 import oeeRoutes from "../modules/oee/oee.routes";
+import goodsDispatchRoutes from "../modules/goods-dispatch/goods-dispatch.routes";
 
 const router = Router();
 
@@ -106,5 +107,6 @@ router.use("/expenses", expenseRoutes);
 router.use("/grn-invoices", grnInvoiceRoutes);
 router.use("/sales-invoices", salesInvoiceRoutes);
 router.use("/oee", oeeRoutes);
+router.use("/goods-dispatches", goodsDispatchRoutes);
 
 export default router;
