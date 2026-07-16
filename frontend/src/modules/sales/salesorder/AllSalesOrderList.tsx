@@ -54,7 +54,7 @@ const AllSalesOrderList: React.FC = () => {
             });
 
             setData(response.data || []);
-            setTotal((response.total ?? 0) / 10);
+            setTotal(Math.ceil((response.total ?? 0) / ITEMS_PER_PAGE));
         } catch (error: any) {
             console.error("❌ Fetch error:", error);
             toast.error(error?.response?.data?.message || "Failed to fetch orders");

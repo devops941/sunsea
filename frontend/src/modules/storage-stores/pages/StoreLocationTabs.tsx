@@ -1,5 +1,4 @@
 import React from "react";
-import { Container } from "react-bootstrap";
 import { useLocation, useNavigate } from "react-router-dom";
 import { FaWarehouse, FaMapMarkerAlt, FaCogs } from "react-icons/fa";
 import Tabs from "../../../components/ui/tab/Tabs";
@@ -43,9 +42,9 @@ const StoreLocationTabs: React.FC = () => {
 
     return (
         <div className="inner-container">
-            <Container fluid>
-                <Tabs tabs={tabs} activeKey={activeTab} onChange={handleTabChange} />
-            </Container>
+
+            <Tabs tabs={tabs} activeKey={activeTab} onChange={handleTabChange} />
+
         </div>
     );
 };

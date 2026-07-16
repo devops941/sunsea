@@ -242,12 +242,12 @@ const WeeklyMachineScheduleList: React.FC = () => {
                 {/* Table */}
                 <div className="overflow-x-auto">
                     <table className="w-full text-left text-sm">
-                        <thead className="bg-blue-50">
+                        <thead className="bg-[#E5EAEF]">
                             <tr>
-                                <th className="px-4 py-3.5 font-semibold text-xs tracking-wide uppercase text-primary w-10"></th>
-                                <th className="px-4 py-3.5 font-semibold text-xs tracking-wide uppercase text-primary">WEEK PERIOD</th>
-                                <th className="px-4 py-3.5 font-semibold text-xs tracking-wide uppercase text-primary">TOTAL PRODUCTION ORDERS</th>
-                                <th className="px-4 py-3.5 font-semibold text-xs tracking-wide uppercase text-primary">TOTAL WEEKLY QUANTITY</th>
+                                <th className="px-4 py-3.5 font-semibold text-xs tracking-wide uppercase  w-10"></th>
+                                <th className="px-4 py-3.5 font-semibold text-xs tracking-wide uppercase ">WEEK PERIOD</th>
+                                <th className="px-4 py-3.5 font-semibold text-xs tracking-wide uppercase ">TOTAL PRODUCTION ORDERS</th>
+                                <th className="px-4 py-3.5 font-semibold text-xs tracking-wide uppercase ">TOTAL WEEKLY QUANTITY</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
