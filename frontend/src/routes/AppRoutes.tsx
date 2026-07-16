@@ -137,6 +137,7 @@ const BillOfMaterialCreate = lazy(() => import("../modules/bill-of-material/page
 const BillOfMaterialEdit = lazy(() => import("../modules/bill-of-material/pages/BillOfMaterialEdit"));
 
 const SalesOrderCreate = lazy(() => import("../modules/sales/salesorder/CreateOrder"));
+const SalesInvoiceView = lazy(() => import("../modules/sales-order-invoice/SalesInvoiceView"))
 
 const OrderDetails = lazy(() => import("../modules/sales/salesorder/SalesOrderDetail"))
 
@@ -585,6 +586,9 @@ const AppRoutes = () => {
             {/* Sales Order Edit :Id Route */}
             <Route element={<ProtectedRoute permission="reports.view" />}>
               <Route path="/draft-order/edit/:id" element={<SalesOrderCreate />} />
+            </Route>
+            <Route element={<ProtectedRoute permission="reports.view" />}>
+              <Route path="/sales-invoices/details/:id" element={<SalesInvoiceView />} />
             </Route>
 
             {/* Quatation Order Route */}

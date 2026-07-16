@@ -86,13 +86,14 @@ const SalesInvoiceList: React.FC = () => {
     const totalPages = Math.ceil(total / ITEMS_PER_PAGE);
 
     const handleOpenView = async (item: any) => {
-        try {
-            const details = await salesInvoiceService.fetchById(item.id);
-            setSelectedItem(details);
-            setShowViewModal(true);
-        } catch (error) {
-            toast.error("Failed to load invoice details");
-        }
+        navigate(`/sales-invoices/details/${item.id}`);
+        // try {
+        //     const details = await salesInvoiceService.fetchById(item.id);
+        //     setSelectedItem(details);
+        //     setShowViewModal(true);
+        // } catch (error) {
+        //     toast.error("Failed to load invoice details");
+        // }
     };
 
     const columns: DataTableColumn<any>[] = [
