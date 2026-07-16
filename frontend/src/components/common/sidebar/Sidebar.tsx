@@ -9,6 +9,7 @@ import {
   FaSignOutAlt,
 } from "react-icons/fa";
 import { FaCircle } from "react-icons/fa";
+import { FiPower, FiMenu, FiChevronsLeft, FiChevronsRight, FiLogOut } from "react-icons/fi";
 
 import Logo from "../../../assets/images/sun-sea.webp";
 import { sidebarItems } from "./sidebar.data";
@@ -18,7 +19,6 @@ const Sidebar = () => {
   const navigate = useNavigate();
 
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [isHovered, setIsHovered] = useState(false);
   const [hoveredMenu, setHoveredMenu] = useState<string | null>(null);
 
   const [openMenu, setOpenMenu] = useState<string | null>("Dashboard");
@@ -58,7 +58,7 @@ const Sidebar = () => {
     return false;
   }, [location.pathname]);
 
-  const activeCollapsed = isCollapsed && !isHovered;
+  const activeCollapsed = isCollapsed;
 
   const toggleMenu = (menu: string) => {
     if (activeCollapsed) return;
@@ -67,6 +67,7 @@ const Sidebar = () => {
   };
 
   const { permissions, user } = useAppSelector((state) => state.auth);
+
   const { data: company } = useAppSelector((state) => state.company);
 
   const handleLogout = () => {
@@ -112,32 +113,28 @@ const Sidebar = () => {
   return (
     <aside
       className={`h-screen bg-[#ffffff] text-[#2A3547] relative overflow-visible flex flex-col transition-[width] duration-300 ease-in-out z-50 border-r border-black/10  ${activeCollapsed ? "w-[80px]" : "w-[260px]"}`}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
     >
       <div
-        className={`px-4 flex  shrink-0 h-[72px] ${activeCollapsed ? "flex-col items-center justify-center gap-1" : "items-center justify-between"}`}
+        className={`flex shrink-0 h-[72px] items-center ${activeCollapsed ? "justify-center gap-1" : "justify-between pl-4 pr-6"}`}
       >
-        <div className="w-10 h-10 rounded-xl overflow-hidden bg-transparent flex items-center justify-center shrink-0">
+        <div className={`overflow-hidden bg-transparent flex items-center ${activeCollapsed ? "w-11 h-11 rounded-xl justify-center shrink-0" : "flex-1 h-[56px] justify-start"}`}>
           <img
-            src={company?.logoUrl || Logo}
-            alt="Company Logo"
-            className="w-full h-full object-contain"
+            src={activeCollapsed ? (company?.faviconUrl || company?.logoUrl || Logo) : (company?.logoUrl || Logo)}
+            alt={activeCollapsed ? "Company Favicon" : "Company Logo"}
+            className={`w-full h-full ${activeCollapsed ? "object-contain scale-150" : "object-contain object-left scale-110 ml-2"}`}
           />
         </div>
 
-        {!activeCollapsed && (
-          <div
-            className="flex items-center justify-center w-[22px] h-[22px] rounded-full border-2 border-gray-400 cursor-pointer transition-all duration-200 hover:bg-red-50 hover:shadow-sm"
-            title="Toggle Sidebar"
-            onClick={(e) => {
-              e.preventDefault();
-              setIsCollapsed(!isCollapsed);
-            }}
-          >
-            <div className={`w-[10px] h-[10px] rounded-full bg-primary transition-transform duration-200 ${!isCollapsed ? 'scale-100' : 'scale-0'}`}></div>
-          </div>
-        )}
+        <div
+          className={`flex items-center justify-center cursor-pointer transition-all duration-200 hover:bg-gray-100 hover:text-primary text-[#2A3547] rounded-lg shrink-0 ${activeCollapsed ? "w-6 h-6" : "w-8 h-8"}`}
+          title="Toggle Sidebar"
+          onClick={(e) => {
+            e.preventDefault();
+            setIsCollapsed(!isCollapsed);
+          }}
+        >
+          {isCollapsed ? <FiChevronsRight size={18} /> : <FiChevronsLeft size={20} />}
+        </div>
       </div>
 
       <div className="flex-1 px-5 py-4 overflow-y-auto overflow-x-hidden [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:bg-black/20 [&::-webkit-scrollbar-thumb]:rounded-full">
@@ -280,14 +277,33 @@ const Sidebar = () => {
         })}
       </div>
 
-      <div className="p-4 border-t border-black/10 mt-auto shrink-0">
-        <button
-          className={`h-12 border-none outline-none cursor-pointer !rounded-xl bg-gradient-to-br from-red-600 to-red-700 text-white flex items-center justify-center gap-2.5 text-sm font-semibold transition-all duration-300 shadow-[0_4px_12px_rgba(220,38,38,0.25)] hover:-translate-y-[2px] hover:from-red-500 hover:to-red-600 hover:shadow-[0_8px_20px_rgba(220,38,38,0.35)] active:scale-95 ${activeCollapsed ? "w-12 mx-auto px-0" : "w-full"}`}
-          onClick={handleLogout}
-        >
-          <FaSignOutAlt className="text-[16px]" />
-          {!activeCollapsed && <span>Logout</span>}
-        </button>
+      <div className="p-4 mt-auto shrink-0">
+        <div className={`flex items-center p-3 rounded-2xl bg-[#eef5fa] hover:bg-[#e4eff8] transition-colors border border-blue-100/50 ${activeCollapsed ? "justify-center" : "justify-between"}`}>
+          {!activeCollapsed && (
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full overflow-hidden shrink-0 bg-white shadow-sm flex items-center justify-center text-primary font-bold text-lg border border-white/50">
+                {user?.profilePicture ? (
+                  <img src={user.profilePicture} alt="Profile" className="w-full h-full object-cover" />
+                ) : (
+                  user?.fullName
+                    ? user.fullName.split(" ").map((n: string) => n[0]).join("").substring(0, 2).toUpperCase()
+                    : "SA"
+                )}
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[15px] font-bold text-slate-800 leading-tight tracking-tight">{user?.fullName || "Super Admin"}</span>
+                <span className="text-[13px] text-slate-500 font-medium">{user?.designation || "Designer"}</span>
+              </div>
+            </div>
+          )}
+          <button
+            onClick={handleLogout}
+            className="text-primary hover:text-blue-700 hover:bg-blue-100/50 w-9 h-9 flex items-center justify-center rounded-full transition-colors"
+            title="Logout"
+          >
+            <FiLogOut size={20} strokeWidth={2.5} />
+          </button>
+        </div>
       </div>
     </aside>
   );

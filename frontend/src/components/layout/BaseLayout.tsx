@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 
 import { useAppSelector } from '../../hooks/reduxHooks';
@@ -10,6 +10,19 @@ const BaseLayout = () => {
   const [showSidebar, setShowSidebar] = useState(false);
   const navigate = useNavigate();
   const { user } = useAppSelector((state) => state.auth);
+  const { data: company } = useAppSelector((state) => state.company);
+
+  useEffect(() => {
+    if (company?.faviconUrl) {
+      let link: HTMLLinkElement | null = document.querySelector("link[rel~='icon']");
+      if (!link) {
+        link = document.createElement('link');
+        link.rel = 'icon';
+        document.head.appendChild(link);
+      }
+      link.href = company.faviconUrl;
+    }
+  }, [company?.faviconUrl]);
 
   return (
     <div className="flex h-screen overflow-hidden">

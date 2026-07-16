@@ -290,6 +290,7 @@ model Company {
   email          String?         @db.VarChar(120)
   website        String?         @db.VarChar(200)
   logoUrl        String?
+  faviconUrl     String?
   addressLine1   String?         @db.VarChar(255)
   addressLine2   String?         @db.VarChar(255)
   city           String?         @db.VarChar(100)

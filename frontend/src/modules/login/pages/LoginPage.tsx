@@ -1,20 +1,26 @@
-import { useState } from "react";
-import { Container, Row, Col, Form } from "react-bootstrap";
-import "./Login.css";
-import Logo from "../../../assets/images/sun-sea.webp"
+import { useState, useEffect } from "react";
+import Logo from "../../../assets/images/logo.png"
 import { useNavigate, useLocation } from "react-router-dom";
 import { FaArrowRight, FaEye, FaEyeSlash } from "react-icons/fa";
 import { toast } from "react-toastify";
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
 import { loginUser } from "../../../features/auth/authSlice";
+import { fetchCompany } from "../../../features/company/companySlice";
 
 const LoginPage = () => {
     const dispatch = useAppDispatch();
     const navigate = useNavigate();
     const location = useLocation();
-    
+
     const { isLoading: reduxLoading } = useAppSelector((state) => state.auth);
-    
+    const { data: company } = useAppSelector((state) => state.company);
+
+    useEffect(() => {
+        if (!company) {
+            dispatch(fetchCompany());
+        }
+    }, [dispatch, company]);
+
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [showPassword, setShowPassword] = useState(false);
@@ -36,14 +42,14 @@ const LoginPage = () => {
             setError("");
 
             const resultAction = await dispatch(loginUser({ email, password }));
-            
+
             if (loginUser.fulfilled.match(resultAction)) {
                 const user = resultAction.payload;
                 toast.success(`Welcome back, ${user?.fullName || "User"}`);
-                
+
                 const locationState = location.state as { from?: any } | null;
                 const fromPath = locationState?.from?.pathname || locationState?.from || "/dashboard";
-                
+
                 navigate(fromPath, { replace: true });
             } else {
                 const message = resultAction.payload as string || "Invalid email or password";
@@ -60,179 +66,114 @@ const LoginPage = () => {
     };
 
     return (
-        <div className="login-page">
+        <div className="min-h-screen flex items-center justify-center p-4 sm:p-8 bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200 relative overflow-hidden">
+            {/* Premium decorative background elements */}
+            <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
+                <div className="absolute -top-[20%] -left-[10%] w-[50%] h-[50%] rounded-full bg-primary/5 blur-[120px]"></div>
+                <div className="absolute bottom-[10%] -right-[10%] w-[40%] h-[40%] rounded-full bg-blue-400/10 blur-[100px]"></div>
+            </div>
 
-            <Container fluid className="p-0">
+            <div className="w-full max-w-[600px] bg-white/80 backdrop-blur-xl rounded-[2rem] overflow-hidden shadow-[0_20px_60px_-15px_rgba(0,0,0,0.1)] border border-white/60 relative z-10 p-10 sm:p-12">
 
-                <div className="login-wrapper">
-
-                    <Row className="g-0">
-
-                        {/* Left Section */}
-                        <Col lg={6} md={6} >
-                            <div className="login-left">
-
-
-                                <div className="login-brand">
-
-                                    <div className="brand-logo">
-                                        <img
-                                            src={Logo}
-                                            alt="Logo"
-                                            className="logo-img"
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <h5>SUN SEA</h5>
-                                        <span>
-                                            INDUSTRIES · MADURAI
-                                        </span>
-                                    </div>
-
-                                </div>
-
-                                <div className="login-left-content">
-
-                                    <h1>
-                                        Plastic Manufacturing,
-                                        <br />
-                                        <span>
-                                            Run Like Software.
-                                        </span>
-                                    </h1>
-
-                                    <p>
-                                        One ERP across Sales, Production,
-                                        Stores, Procurement, Finance —
-                                        with an offline-first mobile app
-                                        for field collection agents.
-                                    </p>
-
-
-
-                                </div>
-
-
-                            </div>
-
-
-
-
-
-                        </Col>
-
-                        {/* Right Section */}
-
-                        <Col lg={6} md={6} >
-                            <div className="login-right">
-                                <div className="login-form-wrap">
-
-                                    <h2 className="login-title">
-                                        Sign in to your workspace
-                                    </h2>
-
-                                    <p className="login-subtitle">
-                                        Enter your credentials to continue.
-                                    </p>
-
-                                    <Form onSubmit={handleLogin}>
-
-                                        {error && (
-                                            <div className="alert alert-danger py-2" role="alert">
-                                                {error}
-                                            </div>
-                                        )}
-
-                                        <Form.Group className="mb-3">
-
-                                            <Form.Label>
-                                                Username or Email
-                                            </Form.Label>
-
-                                            <Form.Control
-                                                type="text"
-                                                placeholder="Enter username or email"
-                                                value={email}
-                                                onChange={(e) => setEmail(e.target.value)}
-                                                disabled={loading}
-                                            />
-
-                                        </Form.Group>
-
-                                        <Form.Group className="mb-3">
-
-                                            <Form.Label>
-                                                Password
-                                            </Form.Label>
-
-                                            <div className="position-relative d-flex align-items-center">
-                                                <Form.Control
-                                                    type={showPassword ? "text" : "password"}
-                                                    placeholder="Enter password"
-                                                    value={password}
-                                                    onChange={(e) => setPassword(e.target.value)}
-                                                    disabled={loading}
-                                                    className="pe-5"
-                                                />
-                                                <button
-                                                    type="button"
-                                                    className="position-absolute border-0 bg-transparent text-muted d-flex align-items-center justify-content-center"
-                                                    style={{ right: "12px", zIndex: 10, cursor: "pointer", outline: "none" }}
-                                                    onClick={() => setShowPassword(!showPassword)}
-                                                    tabIndex={-1}
-                                                    title={showPassword ? "Hide password" : "Show password"}
-                                                >
-                                                    {showPassword ? <FaEyeSlash size={18} /> : <FaEye size={18} />}
-                                                </button>
-                                            </div>
-
-                                        </Form.Group>
-
-
-
-
-                                        <button
-                                            type="submit"
-                                            className="login-btn"
-                                            disabled={loading}
-                                        >
-                                            {loading ? (
-                                                <span className="d-flex align-items-center justify-content-center gap-2">
-                                                    <div className="animate-spin rounded-full border-b-2 border-indigo-600 h-4 w-4 border-b-2"></div>
-                                                    Signing In...
-                                                </span>
-                                            ) : (
-                                                <>
-                                                    <span>Sign In to ERP</span>
-                                                    <FaArrowRight className="login-btn-icon" />
-                                                </>
-                                            )}
-                                        </button>
-
-                                        <div className="text-center mt-3">
-                                            <button
-                                                type="button"
-                                                className="btn btn-link text-decoration-none text-muted"
-                                                onClick={() => navigate("/reset")}
-                                                disabled={loading}
-                                            >
-                                                Forgot Password?
-                                            </button>
-                                        </div>
-                                    </Form>
-
-                                </div>
-                            </div>
-
-                        </Col>
-
-                    </Row>
-
+                {/* Large Centered Logo */}
+                <div className="flex justify-center mb-10">
+                    <div className="w-64 sm:w-80 drop-shadow-2xl transition-transform hover:scale-105 duration-500">
+                        <img
+                            src={company?.logoUrl || Logo}
+                            alt="Company Logo"
+                            className="w-full h-auto object-contain"
+                        />
+                    </div>
                 </div>
 
-            </Container>
+                <div className="text-center mb-10">
+                    <h2 className="text-2xl sm:text-3xl font-black text-slate-800 tracking-tight mb-2">
+                        Welcome Back
+                    </h2>
+                    <p className="text-slate-500 text-sm font-medium">
+                        Sign in to access your workspace
+                    </p>
+                </div>
 
+                <form onSubmit={handleLogin} className="space-y-6">
+                    {error && (
+                        <div className="p-4 bg-red-50/80 text-red-600 text-sm rounded-2xl border border-red-100 font-medium flex items-center shadow-sm">
+                            <span className="mr-3 text-lg">⚠️</span> {error}
+                        </div>
+                    )}
+
+                    <div>
+                        <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-2 ml-1">
+                            Email Address
+                        </label>
+                        <input
+                            type="text"
+                            placeholder="Enter your email"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            disabled={loading}
+                            className="w-full px-5 py-4 rounded-2xl border-0 bg-slate-100/50 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:bg-white transition-all duration-300 font-medium shadow-inner"
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-2 ml-1">
+                            Password
+                        </label>
+                        <div className="relative">
+                            <input
+                                type={showPassword ? "text" : "password"}
+                                placeholder="Enter your password"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                disabled={loading}
+                                className="w-full px-5 py-4 pr-12 rounded-2xl border-0 bg-slate-100/50 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:bg-white transition-all duration-300 font-medium shadow-inner"
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setShowPassword(!showPassword)}
+                                disabled={loading}
+                                tabIndex={-1}
+                                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-primary focus:outline-none transition-colors p-2"
+                                title={showPassword ? "Hide password" : "Show password"}
+                            >
+                                {showPassword ? <FaEyeSlash size={18} /> : <FaEye size={18} />}
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="pt-2">
+                        <button
+                            type="submit"
+                            disabled={loading}
+                            className="w-full flex items-center justify-center gap-3 bg-primary hover:bg-blue-600 text-white font-bold py-4 px-6 rounded-2xl shadow-[0_8px_20px_-6px_rgba(var(--color-primary-rgb),0.5)] hover:shadow-[0_12px_25px_-6px_rgba(var(--color-primary-rgb),0.6)] hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-300 disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:translate-y-0"
+                        >
+                            {loading ? (
+                                <>
+                                    <div className="animate-spin rounded-full h-5 w-5 border-2 border-white/30 border-t-white"></div>
+                                    <span>Signing In...</span>
+                                </>
+                            ) : (
+                                <>
+                                    <span className="text-base tracking-wide">Sign In</span>
+                                    <FaArrowRight className="text-sm opacity-90" />
+                                </>
+                            )}
+                        </button>
+                    </div>
+
+                    <div className="text-center mt-8">
+                        <button
+                            type="button"
+                            onClick={() => navigate("/reset")}
+                            disabled={loading}
+                            className="text-sm font-semibold text-slate-500 hover:text-primary transition-colors focus:outline-none underline decoration-transparent hover:decoration-primary underline-offset-4"
+                        >
+                            Forgot your password?
+                        </button>
+                    </div>
+                </form>
+            </div>
         </div>
     );
 };
