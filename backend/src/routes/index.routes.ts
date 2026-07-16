@@ -109,4 +109,8 @@ router.use("/sales-invoices", salesInvoiceRoutes);
 router.use("/oee", oeeRoutes);
 router.use("/goods-dispatches", goodsDispatchRoutes);
 
+router.get("/", (req, res) => {
+    res.send("Hello Welcome to Sunsea ERP API");
+});
+
 export default router;

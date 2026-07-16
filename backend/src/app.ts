@@ -88,6 +88,9 @@ app.use(
   })
 );
 /** Application Routes*/
+app.get("/", (req, res) => {
+  res.send("Hello Welcome to Sunsea ERP API");
+});
 app.use("/api", apiRoutes);
 
 /** Route Not Found Handler*/
