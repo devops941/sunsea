@@ -75,10 +75,10 @@ const CategoryCreate: React.FC = () => {
     setIsSubmitting(true);
     try {
       await addCategory({
-        categoryCode: formData.categoryCode,
-        categoryName: formData.categoryName,
+        code: formData.categoryCode,
+        name: formData.categoryName,
         description: formData.description || undefined,
-        isActive: formData.isActive,
+        status: formData.isActive ? "ACTIVE" : "INACTIVE",
       });
       toast.success("Category created successfully!");
       navigate("/categories");

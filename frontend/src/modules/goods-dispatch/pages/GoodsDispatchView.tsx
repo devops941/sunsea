@@ -69,13 +69,7 @@ const GoodsDispatchView: React.FC = () => {
     }
   };
 
-  const getStatusVariant = (status: string) => {
-    if (status === "PENDING_GATE_APPROVAL") return "warning";
-    if (status === "PENDING_STORE_RECEIPT") return "info";
-    if (status === "WAREHOUSE_RECEIVED") return "success";
-    if (status.includes("REJECTED")) return "danger";
-    return "default";
-  };
+
 
 
 
@@ -92,7 +86,7 @@ const GoodsDispatchView: React.FC = () => {
           <div>
             <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
               {dispatchData.dispatchNumber}
-              <StatusBadge status={dispatchData.status} variant={getStatusVariant(dispatchData.status)} />
+              <StatusBadge status={dispatchData.status} />
             </h1>
             <p className="text-gray-500 mt-1">Dispatch Date: {formatDate(dispatchData.dispatchDate)}</p>
           </div>

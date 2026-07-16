@@ -14,6 +14,7 @@ import CustomButton from "../../../components/ui/Button/Button";
 import TextInput from "../../../components/form/TextInput/TextInput";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import DataTable from "../../../components/ui/table/DataTable";
+import type { DataTableColumn } from "../../../components/ui/table/DataTable";
 import { formatDate } from "../../../utils/dateUtils";
 
 const GoodsDispatchCreate: React.FC = () => {
@@ -48,55 +49,45 @@ const GoodsDispatchCreate: React.FC = () => {
   };
 
   const handleSelectPO = (po: any) => {
-    if (selectedPOs.find((p) => p.productionOrderId === po.productionOrderId)) {
-      toast.warning("Production Order already selected");
+    if (selectedPOs.some((p) => p.productionOrderId === po.productionOrderId)) {
+      toast.warning("This production order is already added");
       return;
     }
-    setSelectedPOs((prev) => [
-      ...prev,
-      {
-        ...po,
-        dispatchQty: po.pendingDispatchQty,
-        remarks: "",
-      },
-    ]);
+    setSelectedPOs((prev) => [...prev, { ...po, dispatchQty: po.pendingDispatchQty, remarks: "" }]);
   };
 
   const handleRemovePO = (productionOrderId: string) => {
     setSelectedPOs((prev) => prev.filter((p) => p.productionOrderId !== productionOrderId));
   };
 
-  const handleItemChange = (productionOrderId: string, field: string, value: any) => {
+  const handleQtyChange = (productionOrderId: string, val: string, maxQty: number) => {
+    const num = Number(val);
+    if (num > maxQty) {
+      toast.warning(`Dispatch quantity cannot exceed pending quantity of ${maxQty}`);
+      return;
+    }
     setSelectedPOs((prev) =>
-      prev.map((po) => {
-        if (po.productionOrderId === productionOrderId) {
-          if (field === "dispatchQty") {
-            const qty = Number(value);
-            if (qty > po.pendingDispatchQty) {
-              toast.error(`Quantity cannot exceed pending quantity (${po.pendingDispatchQty})`);
-              return { ...po, [field]: po.pendingDispatchQty };
-            }
-            if (qty < 0) return { ...po, [field]: 0 };
-          }
-          return { ...po, [field]: value };
-        }
-        return po;
-      })
+      prev.map((p) => (p.productionOrderId === productionOrderId ? { ...p, dispatchQty: val } : p))
+    );
+  };
+
+  const handleRemarksChange = (productionOrderId: string, val: string) => {
+    setSelectedPOs((prev) =>
+      prev.map((p) => (p.productionOrderId === productionOrderId ? { ...p, remarks: val } : p))
     );
   };
 
   const handleSubmit = async () => {
-    if (!formData.vehicleNumber || !formData.driverName) {
-      toast.error("Vehicle Number and Driver Name are required");
+    if (!formData.destinationStoreId) {
+      toast.error("Destination store is required");
       return;
     }
     if (selectedPOs.length === 0) {
-      toast.error("Please select at least one Production Order");
+      toast.error("At least one production order must be added to dispatch");
       return;
     }
-
-    const hasInvalidQty = selectedPOs.some((po) => !po.dispatchQty || po.dispatchQty <= 0);
-    if (hasInvalidQty) {
+    const invalidItem = selectedPOs.some((po) => !po.dispatchQty || Number(po.dispatchQty) <= 0);
+    if (invalidItem) {
       toast.error("All selected items must have a dispatch quantity greater than 0");
       return;
     }
@@ -121,7 +112,7 @@ const GoodsDispatchCreate: React.FC = () => {
     }
   };
 
-  const eligibleColumns = [
+  const eligibleColumns: DataTableColumn<any>[] = [
     { header: "PO No", accessor: "productionOrderId" },
     { header: "Product", accessor: "productItem", render: (item: any) => item.productItem?.productName },
     { header: "Batch", accessor: "batchNo" },
@@ -302,7 +293,7 @@ const GoodsDispatchCreate: React.FC = () => {
                                 step="any"
                                 max={po.pendingDispatchQty}
                                 value={po.dispatchQty}
-                                onChange={(e) => handleItemChange(po.productionOrderId, "dispatchQty", e.target.value)}
+                                onChange={(e) => handleQtyChange(po.productionOrderId, e.target.value, po.pendingDispatchQty)}
                                 className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-primary-500 focus:border-primary-500"
                               />
                               <span className="ml-2 text-xs text-gray-500">{po.uom}</span>

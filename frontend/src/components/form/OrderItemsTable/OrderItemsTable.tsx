@@ -55,7 +55,7 @@ return (
                                             options={productOptions}
                                             onChange={f.onChange}
                                             defaultOptionLabel="Select Product"
-                                            error={errors.items?.[index]?.productCode?.message as string}
+                                            error={(errors.items as any)?.[index]?.productCode?.message as string}
                                             disabled={!editable}
                                             hideLabel
                                         />
@@ -75,7 +75,7 @@ return (
                                             options={colorOptions}
                                             onChange={f.onChange}
                                             defaultOptionLabel="Select Color"
-                                            error={errors.items?.[index]?.colorType?.message as string}
+                                            error={(errors.items as any)?.[index]?.colorType?.message as string}
                                             disabled={!editable}
                                             hideLabel
                                         />
@@ -95,7 +95,7 @@ return (
                                             onBlur={f.onBlur}
                                             type="number"
                                             placeholder="0"
-                                            error={errors.items?.[index]?.quantity?.message as string}
+                                            error={(errors.items as any)?.[index]?.quantity?.message as string}
                                             disabled={!editable}
                                         />
                                     )}

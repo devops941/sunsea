@@ -799,7 +799,7 @@ const PurchaseOrderCreatePage: React.FC = () => {
                 label="PO Date"
                 name="poDate"
                 value={formData.poDate}
-                onChange={handleChange}
+                onChange={(e) => handleChange(e as any)}
                 required
                 error={errors.poDate}
               />
@@ -809,7 +809,7 @@ const PurchaseOrderCreatePage: React.FC = () => {
                 label="Expected Delivery Date"
                 name="expectedDeliveryDate"
                 value={formData.expectedDeliveryDate}
-                onChange={handleChange}
+                onChange={(e) => handleChange(e as any)}
                 required
                 error={errors.expectedDeliveryDate}
               />

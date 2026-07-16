@@ -7,6 +7,7 @@ import { fetchGoodsDispatches } from "../../../features/goods-dispatch/goodsDisp
 
 import CustomButton from "../../../components/ui/Button/Button";
 import DataTable from "../../../components/ui/table/DataTable";
+import type { DataTableColumn } from "../../../components/ui/table/DataTable";
 import SearchInput from "../../../components/ui/SearchInput/SearchInput";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
@@ -26,31 +27,31 @@ const GoodsDispatchList: React.FC = () => {
   const [status, setStatus] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
 
-  // Debounce search
+  // Handle search debouncing
   useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(searchTerm), 500);
-    return () => clearTimeout(timer);
+    const handler = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+      setCurrentPage(1);
+    }, 500);
+    return () => clearTimeout(handler);
   }, [searchTerm]);
 
-  // Fetch data
   useEffect(() => {
     dispatch(
       fetchGoodsDispatches({
         page: currentPage,
         limit: ITEMS_PER_PAGE,
-        search: debouncedSearch || undefined,
-        status: status || undefined,
+        search: debouncedSearch,
+        status,
       })
     );
   }, [dispatch, currentPage, debouncedSearch, status]);
 
-  const handlePageChange = (newPage: number) => {
-    if (newPage >= 1 && newPage <= (meta?.totalPages || 1)) {
-      setCurrentPage(newPage);
-    }
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
   };
 
-  const columns = [
+  const columns: DataTableColumn<any>[] = [
     {
       header: "Dispatch No",
       accessor: "dispatchNumber",
@@ -80,13 +81,7 @@ const GoodsDispatchList: React.FC = () => {
       header: "Status",
       accessor: "status",
       render: (item: any) => {
-        let variant: "default" | "success" | "warning" | "danger" | "primary" | "info" = "default";
-        if (item.status === "PENDING_GATE_APPROVAL") variant = "warning";
-        else if (item.status === "PENDING_STORE_RECEIPT") variant = "info";
-        else if (item.status === "WAREHOUSE_RECEIVED") variant = "success";
-        else if (item.status.includes("REJECTED")) variant = "danger";
-
-        return <StatusBadge status={item.status} variant={variant} />;
+        return <StatusBadge status={item.status} />;
       },
     },
     {
@@ -108,9 +103,8 @@ const GoodsDispatchList: React.FC = () => {
         </div>
         <div className="flex items-center space-x-4">
           <CustomButton
-            variant="primary"
-            icon={FaPlus}
             text="Create Dispatch"
+            icon={FaPlus}
             onClick={() => navigate("/production/goods-dispatch/create")}
           />
         </div>
@@ -122,7 +116,7 @@ const GoodsDispatchList: React.FC = () => {
           <div className="flex-1">
             <SearchInput
               value={searchTerm}
-              onChange={setSearchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Search by Dispatch No, Vehicle, Driver..."
             />
           </div>

@@ -66,7 +66,7 @@ const WastageViewModal: React.FC<WastageViewModalProps> = ({
       />
       <CustomButton
         text="Approve"
-        variant="success"
+        variant="primary"
         onClick={() => onApprove(String(wastage.id))}
       />
     </>

@@ -93,10 +93,10 @@ const CategoryEdit: React.FC = () => {
     setIsSubmitting(true);
     try {
       await editCategory(Number(id), {
-        categoryCode: formData.categoryCode,
-        categoryName: formData.categoryName,
+        code: formData.categoryCode,
+        name: formData.categoryName,
         description: formData.description || undefined,
-        isActive: formData.isActive,
+        status: formData.isActive ? "ACTIVE" : "INACTIVE",
       });
       toast.success("Category updated successfully!");
       navigate("/categories");

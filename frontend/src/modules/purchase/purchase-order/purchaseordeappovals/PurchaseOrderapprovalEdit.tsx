@@ -161,7 +161,7 @@ const PurchaseOrderViewPage: React.FC = () => {
                             <StatusPill status={po.status} modifierMap={STATUS_MODIFIER} />
                         </div>
                         <div>
-                            <BackButton text="Back to List" onClick={() => navigate("/purchase-order-approvals")} />
+                            <BackButton text="Back to List" to="/purchase-order-approvals" />
                         </div>
                     </div>
                 </div>

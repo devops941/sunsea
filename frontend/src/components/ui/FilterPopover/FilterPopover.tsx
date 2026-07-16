@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, ReactNode } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { FaFilter, FaTimes } from "react-icons/fa";
 import CustomButton from "../Button/Button";
 
@@ -8,7 +8,7 @@ interface FilterPopoverProps {
   onClear: () => void;
   onClose?: () => void;
   onOpen?: () => void;
-  children: ReactNode;
+  children: React.ReactNode;
   hasActiveFilters: boolean;
 }
 

@@ -53,7 +53,7 @@ const DayScheduleCard: React.FC<DayScheduleCardProps> = ({
   onEditClick,
   onDeleteClick,
   onAddUrgentClick,
-  startedPrograms, 
+  startedPrograms: _startedPrograms, 
   completedPrograms 
 }) => {
   const hasPlans = day.shifts.some((s) => s.programs.length > 0);
@@ -111,6 +111,7 @@ const DayScheduleCard: React.FC<DayScheduleCardProps> = ({
                   <div className="d-flex flex-column gap-3">
                     {shift.programs.map((prog) => {
                       const isStarted = prog.status === "IN_PROGRESS";
+                      const programKey = prog.weeklyProgramId;
                       const isCompletedByHours = completedPrograms?.has(programKey);
                       const isCompleted = prog.status === "COMPLETED" || prog.producedQty >= prog.plannedQty || isCompletedByHours;
 

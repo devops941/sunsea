@@ -255,8 +255,8 @@ const Sidebar = () => {
           {!activeCollapsed && (
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full overflow-hidden shrink-0 bg-white shadow-sm flex items-center justify-center text-primary font-bold text-lg border border-white/50">
-                {user?.profilePicture ? (
-                  <img src={user.profilePicture} alt="Profile" className="w-full h-full object-cover" />
+                {(user as any)?.profilePicture ? (
+                  <img src={(user as any).profilePicture} alt="Profile" className="w-full h-full object-cover" />
                 ) : (
                   user?.fullName
                     ? user.fullName.split(" ").map((n: string) => n[0]).join("").substring(0, 2).toUpperCase()
@@ -265,7 +265,7 @@ const Sidebar = () => {
               </div>
               <div className="flex flex-col">
                 <span className="text-[15px] font-bold text-slate-800 leading-tight tracking-tight">{user?.fullName || "Super Admin"}</span>
-                <span className="text-[13px] text-slate-500 font-medium">{user?.designation || "Designer"}</span>
+                <span className="text-[13px] text-slate-500 font-medium">{(user as any)?.designation || "Designer"}</span>
               </div>
             </div>
           )}

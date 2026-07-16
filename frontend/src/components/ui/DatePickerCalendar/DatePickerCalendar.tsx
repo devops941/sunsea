@@ -325,7 +325,7 @@ export function Demo() {
         <label className="mb-1.5 block text-xs font-semibold text-gray-500">
           Invoice date
         </label>
-        <DatePickerCalendar value={date} onChange={setDate} />
+        <DatePickerCalendar value={date} onChange={(e) => setDate(e.target.value ? new Date(e.target.value) : null)} />
       </div>
     </div>
   );

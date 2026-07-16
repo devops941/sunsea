@@ -98,7 +98,7 @@ const WastageList: React.FC = () => {
   };
 
   // Data directly from state without filters
-  const displayWastages = Array.isArray(wastages) ? wastages : (wastages?.data && Array.isArray(wastages.data) ? wastages.data : []);
+  const displayWastages = Array.isArray(wastages) ? (wastages as any) : ((wastages as any)?.data && Array.isArray((wastages as any).data) ? (wastages as any).data : []);
 
   return (
     <div className="p-4 md:p-6 min-h-screen bg-white">
@@ -191,7 +191,7 @@ const WastageList: React.FC = () => {
         onHide={() => setShowDeleteModal(false)}
         onConfirm={handleDeleteConfirm}
         title="Delete Wastage Log"
-        bodyText="Are you sure you want to delete this wastage log? This action cannot be undone."
+        message="Are you sure you want to delete this wastage log? This action cannot be undone."
         confirmText="Delete"
         confirmVariant="danger"
       />

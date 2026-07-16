@@ -84,14 +84,14 @@ const PurchaseOrderViewModal: React.FC<PurchaseOrderViewModalProps> = ({
   if (purchaseOrder.remarks) {
     sections.push({
       title: "Remarks",
-      fields: [{ label: "Notes", value: purchaseOrder.remarks, xs: 12 }],
+      fields: [{ label: "Notes", value: purchaseOrder.remarks }],
     });
   }
 
   if (purchaseOrder.status === "REJECTED" && purchaseOrder.rejectReason) {
     sections.push({
       title: "Rejection Reason",
-      fields: [{ label: "Reason", value: <span className="text-red-600 font-semibold">{purchaseOrder.rejectReason}</span>, xs: 12 }],
+      fields: [{ label: "Reason", value: <span className="text-red-600 font-semibold">{purchaseOrder.rejectReason}</span> }],
     });
   }
 

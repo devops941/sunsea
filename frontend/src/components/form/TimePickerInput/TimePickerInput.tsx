@@ -15,7 +15,7 @@ interface TimePickerInputProps {
 
 const TimePickerInput: React.FC<TimePickerInputProps> = ({
   label,
-  name,
+  name: _name,
   value,
   required = false,
   error,

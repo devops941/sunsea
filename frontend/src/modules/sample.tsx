@@ -319,13 +319,13 @@ const Login: React.FC = () => {
         <CustomButton
           text="Success"
           icon={FiSave}
-          variant="success"
+          variant={"success" as any}
         />
 
         <CustomButton
           text="Warning"
           icon={FiEdit}
-          variant="warning"
+          variant={"warning" as any}
         />
 
         <CustomButton
@@ -337,25 +337,25 @@ const Login: React.FC = () => {
         <CustomButton
           text="Info"
           icon={FiEye}
-          variant="info"
+          variant={"info" as any}
         />
 
         <CustomButton
           text="Outline"
           icon={FiSearch}
-          variant="outline"
+          variant={"outline" as any}
         />
 
         <CustomButton
           text="Ghost"
           icon={FiDownload}
-          variant="ghost"
+          variant={"ghost" as any}
         />
 
         <CustomButton
           text="Dark"
           icon={FiPlus}
-          variant="dark"
+          variant={"dark" as any}
         />
 
       </div>

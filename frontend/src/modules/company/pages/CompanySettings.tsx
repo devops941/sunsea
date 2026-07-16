@@ -169,8 +169,8 @@ const CompanySettings: React.FC = () => {
                   </div>
                   <div className="md:col-span-3">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                      <ImageUpload label="Company Logo" name="logoFile" currentImageUrl={formData.logoUrl} onChange={handleChange as any} />
-                      <ImageUpload label="Favicon" name="faviconFile" currentImageUrl={formData.faviconUrl} onChange={handleChange as any} />
+                  <ImageUpload label="Company Logo" name="logoFile" currentImageUrl={formData.logoUrl || undefined} onChange={handleChange as any} />
+                  <ImageUpload label="Favicon" name="faviconFile" currentImageUrl={formData.faviconUrl || undefined} onChange={handleChange as any} />
                     </div>
                   </div>
                 </div>
@@ -392,8 +392,8 @@ const CompanySettings: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 items-center">
               <div className="md:col-span-3">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  <ImageUpload label="Company Logo" name="logoFile" currentImageUrl={formData.logoUrl} onChange={handleChange as any} />
-                  <ImageUpload label="Favicon" name="faviconFile" currentImageUrl={formData.faviconUrl} onChange={handleChange as any} />
+                  <ImageUpload label="Company Logo" name="logoFile" currentImageUrl={formData.logoUrl || undefined} onChange={handleChange as any} />
+                  <ImageUpload label="Favicon" name="faviconFile" currentImageUrl={formData.faviconUrl || undefined} onChange={handleChange as any} />
                 </div>
               </div>
               <div>

@@ -149,12 +149,11 @@ const CategoryList: React.FC = () => {
         if (!validateForm()) return;
         
         try {
-            // CAT-006 fix: use correct API field names categoryCode/categoryName
             const payload = {
-                categoryCode: formData.code,
-                categoryName: formData.name,
+                code: formData.code,
+                name: formData.name,
                 description: formData.description,
-                isActive: formData.status === "ACTIVE",
+                status: formData.status,
             };
 
             if (editMode) {
