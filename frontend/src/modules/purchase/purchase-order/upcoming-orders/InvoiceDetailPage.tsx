@@ -10,6 +10,7 @@ import TextInput from "../../../../components/form/TextInput/TextInput";
 import QuantityInput from "../../../../components/form/QuantityInput/QuantityInput";
 import BackButton from "../../../../components/ui/BackButton/BackButton";
 import AddressForm from "../../../../components/form/AddressFrom/AddressFrom";
+import type { StateCityOption } from "../../../../components/ui/CityStateSelect/CityStateSelect";
 import DateInput from "../../../../components/form/DateInput/DateInput";
 import TextArea from "../../../../components/form/TextArea/TextArea";
 import { purchaseOrderService } from "../../../../services/purchaseOrderService";
@@ -549,7 +550,7 @@ const InvoiceDetailPage: React.FC = () => {
                             <TextInput label="Invoice No." name="invoiceNo" value={form.invoiceNo} onChange={handleChange} placeholder="Supplier invoice" required error={errors.invoiceNo} />
                         </div>
                         <div>
-                            <DateInput label="GRN Date" name="grnDate" value={form.grnDate} onChange={(val) => setForm(p => ({ ...p, grnDate: val }))} required />
+                            <DateInput label="GRN Date" name="grnDate" value={form.grnDate} onChange={(e) => setForm(p => ({ ...p, grnDate: e.target.value }))} required />
                             {errors.grnDate && <div className="text-red-500 text-sm mt-1">{errors.grnDate}</div>}
                         </div>
                         <div>
@@ -623,10 +624,10 @@ const InvoiceDetailPage: React.FC = () => {
                         <h6 className="text-lg font-semibold text-gray-800 mb-4">Receipt Details</h6>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
                             <div>
-                                <DateInput label="Receive Date" name="receiveDate" value={form.receiveDate} onChange={(val) => setForm(p => ({ ...p, receiveDate: val }))} />
+                                <DateInput label="Receive Date" name="receiveDate" value={form.receiveDate} onChange={(e) => setForm(p => ({ ...p, receiveDate: e.target.value }))} />
                             </div>
                             <div>
-                                <DateInput label="Bill Due Date" name="billDueDate" value={form.billDueDate} onChange={(val) => setForm(p => ({ ...p, billDueDate: val }))} />
+                                <DateInput label="Bill Due Date" name="billDueDate" value={form.billDueDate} onChange={(e) => setForm(p => ({ ...p, billDueDate: e.target.value }))} />
                             </div>
                             <div>
                                 <TextInput label="Challan No" name="challanNo" value={form.challanNo} onChange={handleChange} placeholder="Optional" />
@@ -665,7 +666,7 @@ const InvoiceDetailPage: React.FC = () => {
                     {/* Remarks */}
                     <div className="grid grid-cols-1 gap-6 mt-6">
                         <div>
-                            <TextArea label="Remarks (Optional)" name="remarks" value={form.remarks} placeholder="Additional notes..." rows={2} onChange={(val) => setForm(p => ({ ...p, remarks: val }))} />
+                            <TextArea label="Remarks (Optional)" name="remarks" value={form.remarks} placeholder="Additional notes..." rows={2} onChange={(e) => setForm(p => ({ ...p, remarks: e.target.value }))} />
                         </div>
                     </div>
 
@@ -679,13 +680,13 @@ const InvoiceDetailPage: React.FC = () => {
                         <table className="w-full text-left border-collapse text-sm">
                             <thead className="bg-gray-50 border-b border-gray-200 text-gray-600">
                                 <tr>
-                                    <th className="p-2 font-semibold w-10 text-center">#</th>
-                                    <th className="p-2 font-semibold w-full min-w-[150px]">PRODUCT / DESCRIPTION</th>
-                                    <th className="p-2 font-semibold w-44">QUANTITY / UOM</th>
-                                    <th className="p-2 font-semibold w-28">UNIT PRICE (₹)</th>
-                                    <th className="p-2 font-semibold w-24">TAX %</th>
-                                    <th className="p-2 font-semibold w-28 text-right">NET (₹)</th>
-                                    <th className="p-2 font-semibold w-12 text-center">ACTION</th>
+                                    <th className="p-2.5 font-semibold w-12 text-center align-middle">#</th>
+                                    <th className="p-2.5 font-semibold w-[40%] min-w-[220px] align-middle">PRODUCT / DESCRIPTION</th>
+                                    <th className="p-2.5 font-semibold w-56 align-middle">QUANTITY / UOM</th>
+                                    <th className="p-2.5 font-semibold w-32 align-middle">UNIT PRICE (₹)</th>
+                                    <th className="p-2.5 font-semibold w-40 align-middle">TAX %</th>
+                                    <th className="p-2.5 font-semibold w-36 text-right align-middle">NET (₹)</th>
+                                    <th className="p-2.5 font-semibold w-16 text-center align-middle">ACTION</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-200 bg-white">
@@ -698,16 +699,16 @@ const InvoiceDetailPage: React.FC = () => {
 
                                     return (
                                         <tr key={idx} className="hover:bg-slate-50 transition-colors">
-                                            <td className="p-2 text-center text-gray-500">{idx + 1}</td>
-                                            <td className="p-2">
+                                            <td className="p-2 text-center text-gray-500 align-middle">{idx + 1}</td>
+                                            <td className="p-2 align-middle">
                                                 <input
-                                                    className="w-full border-gray-300 rounded px-2 py-1.5 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none border"
+                                                    className="w-full border-gray-300 rounded px-2.5 py-1.5 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none border"
                                                     value={item.description}
                                                     onChange={(e) => updateItem(idx, "description", e.target.value)}
                                                     placeholder="Product name"
                                                 />
                                             </td>
-                                            <td className="p-2">
+                                            <td className="p-2 align-middle">
                                                 <QuantityInput
                                                     label=""
                                                     hideLabel={true}
@@ -719,13 +720,14 @@ const InvoiceDetailPage: React.FC = () => {
                                                     onChange={(e) => updateItem(idx, "qty", Number(e.target.value))}
                                                 />
                                             </td>
-                                            <td className="p-2">
-                                                <input className="w-full border-gray-300 rounded px-2 py-1.5 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none border" type="number" min={0} step={0.01} value={item.unitPrice} onChange={(e) => updateItem(idx, "unitPrice", Number(e.target.value))} />
+                                            <td className="p-2 align-middle">
+                                                <input className="w-full border-gray-300 rounded px-2.5 py-1.5 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none border" type="number" min={0} step={0.01} value={item.unitPrice} onChange={(e) => updateItem(idx, "unitPrice", Number(e.target.value))} />
                                             </td>
-                                            <td className="p-2">
+                                            <td className="p-2 align-middle">
                                                 <SelectInput
                                                     label=""
                                                     hideLabel={true}
+                                                    noMargin={true}
                                                     name={`items[${idx}].tax`}
                                                     options={gstOptions}
                                                     value={String(item.tax || 0)}
@@ -733,8 +735,8 @@ const InvoiceDetailPage: React.FC = () => {
                                                 />
                                             </td>
 
-                                            <td className="p-2 text-right font-semibold text-gray-700">₹{item.netAmount.toFixed(2)}</td>
-                                            <td className="p-2 text-center">
+                                            <td className="p-2 text-right align-middle font-semibold text-gray-700">₹{item.netAmount.toFixed(2)}</td>
+                                            <td className="p-2 text-center align-middle">
                                                 <button type="button" onClick={() => removeItem(idx)} className="text-red-500 hover:text-red-700 p-1.5 rounded-full hover:bg-red-50 transition-colors" title="Remove Item">
                                                     <FaTrash size={14} />
                                                 </button>
@@ -857,7 +859,7 @@ const InvoiceDetailPage: React.FC = () => {
                                 <TextInput label="Reference Number / UTR" name="referenceNumber" value={form.referenceNumber} onChange={handleChange} placeholder="Transaction reference" />
                             </div>
                             <div>
-                                <DateInput label="Payment Date" name="paymentDate" value={form.paymentDate} onChange={(val) => setForm(p => ({ ...p, paymentDate: val }))} />
+                                <DateInput label="Payment Date" name="paymentDate" value={form.paymentDate} onChange={(e) => setForm(p => ({ ...p, paymentDate: e.target.value }))} />
                             </div>
                         </div>
                     </div>

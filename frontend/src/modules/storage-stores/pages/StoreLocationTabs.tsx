@@ -1,5 +1,4 @@
 import React from "react";
-
 import { useLocation, useNavigate } from "react-router-dom";
 import { FaWarehouse, FaMapMarkerAlt, FaCogs } from "react-icons/fa";
 import Tabs from "../../../components/ui/tab/Tabs";
