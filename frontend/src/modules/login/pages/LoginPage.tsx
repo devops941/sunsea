@@ -153,15 +153,14 @@ const LoginPage = () => {
                     {/* Logo bar */}
 
 
-                    {/* Centered text area */}
                     <div className="flex-1 flex flex-col justify-center">
-                        <h1 className="text-5xl xl:text-6xl font-black text-white leading-[1.1] mb-5 tracking-tight">
-                            Hello<br />
-                            SunSea!
+                        <h1 className="text-4xl xl:text-5xl font-black text-white leading-[1.1] mb-5 tracking-tight">
+                            Welcome to<br />
+                            Sun Sea ERP
                         </h1>
 
-                        <p className="text-blue-100 text-base leading-relaxed max-w-[340px] opacity-80">
-                            Streamline your manufacturing operations — from production orders to inventory, all in one powerful platform.
+                        <p className="text-blue-100 text-base leading-relaxed max-w-[540px] opacity-80">
+                            Empowering your manufacturing journey. Gain complete control over your production, inventory, and supply chain from a single, intelligent platform.
                         </p>
                     </div>
 

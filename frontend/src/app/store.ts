@@ -34,6 +34,7 @@ import companyReducer from "../features/company/companySlice";
 import finishedGoodsStockReducer from "../features/finished-goods-stock/finishedGoodsStockSlice";
 import gstReducer from "../features/gst/gstSlice";
 import dailyPlanReducer from "../features/daily-plans/dailyPlanSlice";
+import goodsDispatchReducer from "../features/goods-dispatch/goodsDispatchSlice";
 
 
 export const store = configureStore({
@@ -73,6 +74,7 @@ export const store = configureStore({
         company: companyReducer,
         finishedGoodsStocks: finishedGoodsStockReducer,
         dailyPlans: dailyPlanReducer,
+        goodsDispatch: goodsDispatchReducer,
     },
     middleware: (getDefaultMiddleware) =>
         getDefaultMiddleware().concat(baseApi.middleware),

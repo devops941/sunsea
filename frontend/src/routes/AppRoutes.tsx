@@ -127,11 +127,16 @@ const WastageForm = lazy(() => import("../modules/production-wastage/pages/Wasta
 
 
 
+const ProductionOrderCreate = lazy(() => import("../modules/production-orders/pages/ProductionOrderCreate"));
+// const ProductionOrderEdit = lazy(() => import("../modules/production-orders/pages/ProductionOrderEdit"));
 const ProductionOrderTabs = lazy(() => import("../modules/production-orders/pages/ProductionOrderTabs"));
 
-const ProductionOrderCreate = lazy(() => import("../modules/production-orders/pages/ProductionOrderCreate"));
+// Goods Dispatch
+const GoodsDispatchList = lazy(() => import("../modules/goods-dispatch/pages/GoodsDispatchList"));
+const GoodsDispatchCreate = lazy(() => import("../modules/goods-dispatch/pages/GoodsDispatchCreate"));
+const GoodsDispatchView = lazy(() => import("../modules/goods-dispatch/pages/GoodsDispatchView"));
 
-
+// OEE Dashboard
 const BillOfMaterialList = lazy(() => import("../modules/bill-of-material/pages/BillOfMaterialList"));
 const BillOfMaterialCreate = lazy(() => import("../modules/bill-of-material/pages/BillOfMaterialCreate"));
 const BillOfMaterialEdit = lazy(() => import("../modules/bill-of-material/pages/BillOfMaterialEdit"));
@@ -535,6 +540,15 @@ const AppRoutes = () => {
             {/* Production Orders Edit :Id Route */}
             <Route element={<ProtectedRoute permission="production_orders.edit" />}>
               <Route path="/production-orders/edit/:id" element={<ProductionOrderCreate />} />
+            </Route>
+
+            {/* Goods Dispatch */}
+            <Route element={<ProtectedRoute permission="production_orders.view" />}>
+              <Route path="/production/goods-dispatch" element={<ProductionOrderTabs />} />
+              <Route path="/production/goods-dispatch/view/:id" element={<GoodsDispatchView />} />
+            </Route>
+            <Route element={<ProtectedRoute permission="production_orders.create" />}>
+              <Route path="/production/goods-dispatch/create" element={<GoodsDispatchCreate />} />
             </Route>
 
             {/* Bill Of Material */}

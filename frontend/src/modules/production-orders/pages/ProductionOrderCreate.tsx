@@ -7,10 +7,10 @@ import { useForm, Controller, useFieldArray, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 
+import DataTable, { type DataTableColumn } from "../../../components/ui/table/DataTable";
 import TextInput from "../../../components/form/TextInput/TextInput";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import CustomButton from "../../../components/ui/Button/Button";
-import Button from "../../../components/ui/Button/Button";
 import TextArea from "../../../components/form/TextArea/TextArea";
 import UOMSelect from "../../../components/form/SelectInput/UOMSelect";
 import QuantityInput from "../../../components/form/QuantityInput/QuantityInput";
@@ -36,7 +36,6 @@ interface RowRawMaterialState {
     fetchedForStoreId: string | null; // track which storeId we last fetched for
 }
 
-// â”€â”€â”€ Options â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const DISPATCH_TYPE_OPTIONS = [
     { label: "Priority", value: "priority" },
@@ -53,7 +52,15 @@ const ORDER_TYPE_OPTIONS = [
     { label: "Telephonic Enquiry", value: "telephone" },
 ];
 
-// â”€â”€â”€ Zod Schema â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+const salesOrderColumns: DataTableColumn<any>[] = [
+    { header: "#", width: "60px", render: (_, index) => index + 1 },
+    { header: "PRODUCT NAME", render: (item) => item.product?.productName || `Product ID: ${item.productId}` },
+    { header: "PRODUCT CODE", render: (item) => item.product?.productCode || "-" },
+    { header: "COLOR", render: (item) => item.colorType === 'mc' ? 'Multi Color' : (item.colorType === 'sc' ? 'Single Color' : '-') },
+    { header: "ORDERED QUANTITY", align: "right", render: (item) => item.quantity },
+    { header: "UOM", render: (item) => item.product?.uom?.name || "PCS" },
+];
 
 const productionOrderSchema = z.object({
     id: z.number().optional(),
@@ -910,7 +917,9 @@ const ProductionOrderCreate: React.FC = () => {
         [stores]
     );
 
-    // â”€â”€ Submit â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+
+    // ── Submit ──────────────────────────────────────────────────────────────────
     const onSubmit = async (data: ProductionOrderFormValues) => {
         setIsSubmitting(true);
         try {
@@ -1016,7 +1025,7 @@ const ProductionOrderCreate: React.FC = () => {
 
                 <form
                     onSubmit={handleSubmit(onSubmit)}
-                    className="space-y-6"
+                    className="space-y-6 px-4 md:px-6 pb-6"
                     noValidate
                 >
                     <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
@@ -1091,59 +1100,21 @@ const ProductionOrderCreate: React.FC = () => {
                                         <h6 className="font-semibold text-slate-800 mb-3">
                                             Sales Order Items
                                         </h6>
-                                        <div className="overflow-x-auto mt-2 mb-4">
-                                            <table className="w-full text-left text-sm text-slate-600">
-                                                <thead className="bg-slate-50 border-b border-slate-200 text-slate-700">
-                                                    <tr>
-                                                        <th style={{ width: 60 }}>#</th>
-                                                        <th>PRODUCT NAME</th>
-                                                        <th>PRODUCT CODE</th>
-                                                        <th>COLOR</th>
-                                                        <th>ORDERED QUANTITY</th>
-                                                        <th>UOM</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody className="divide-y divide-slate-100">
-                                                    {selectedSalesOrderItems.map(
-                                                        (item, i) => (
-                                                            <tr
-                                                                key={i}
-                                                                className="master-data-row"
-                                                            >
-                                                                <td className="px-4 py-3">
-                                                                    {i + 1}
-                                                                </td>
-                                                                <td className="px-4 py-3 font-medium">
-                                                                    {item.product
-                                                                        ?.productName ||
-                                                                        `Product ID: ${item.productId}`}
-                                                                </td>
-                                                                <td className="px-4 py-3">
-                                                                    {item.product
-                                                                        ?.productCode ||
-                                                                        "-"}
-                                                                </td>
-                                                                <td className="px-4 py-3">
-                                                                    {item.colorType === 'mc' ? 'Multi Color' : (item.colorType === 'sc' ? 'Single Color' : '-')}
-                                                                </td>
-                                                                <td className="px-4 py-3">
-                                                                    {item.quantity}
-                                                                </td>
-                                                                <td className="px-4 py-3">
-                                                                    {item.product?.uom
-                                                                        ?.name || "PCS"}
-                                                                </td>
-                                                            </tr>
-                                                        )
-                                                    )}
-                                                </tbody>
-                                            </table>
+                                        <div className="mt-2 mb-4 border rounded-lg border-slate-200 shadow-sm overflow-hidden">
+                                            <DataTable
+                                                columns={salesOrderColumns}
+                                                data={selectedSalesOrderItems}
+                                                rowKey={(item: any) => item.productId + (item.colorType || '')}
+                                                emptyMessage="No sales order items found."
+                                                className="border-0"
+                                                minHeightClassName="min-h-0"
+                                            />
                                         </div>
                                     </div>
                                 )}
                             </>
                         )}
-                        <div className="md:col-span-12 p-4 md:p-6">
+                        <div className="md:col-span-12">
                             <div className="flex justify-between items-center mb-3">
                                 <h6 className="text-lg font-bold text-slate-800 mb-6 ">
                                     {watchSalesOrderId ? "2. Production Item Details" : "1. Direct Production Item Details"}

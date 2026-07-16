@@ -143,6 +143,11 @@ const config = {
     salesInvoice: {
         base: "/sales-invoices",
     },
+    goodsDispatch: {
+        base: "/goods-dispatches",
+        nextNumber: "/goods-dispatches/next-number",
+        eligibleOrders: "/goods-dispatches/eligible-orders",
+    },
 
 
 }
