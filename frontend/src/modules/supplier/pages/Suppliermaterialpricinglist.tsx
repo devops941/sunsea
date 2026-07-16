@@ -6,15 +6,15 @@ import { supplierService } from "../../../services/supplierService";
 
 import TextInput from "../../../components/form/TextInput/TextInput";
 import Button from "../../../components/ui/Button/Button";
-import CustomButton from "../../../components/ui/custombutton/CustomButton";
+import CustomButton from "../../../components/ui/Button/Button";
 import { supplierMaterialPriceService } from "../../../services/Suppliermaterialpriceservice";
 import type {
     SupplierMaterialPriceRow,
     SupplierMaterialPrice,
 } from "../../../features/supplier/types";
 
-const fmtDate = (d: string | null) => (d ? new Date(d).toLocaleDateString("en-IN") : "—");
-const fmtMoney = (n: number) => (n > 0 ? `₹${Number(n).toFixed(2)}` : "—");
+const fmtDate = (d: string | null) => (d ? new Date(d).toLocaleDateString("en-IN") : "â€”");
+const fmtMoney = (n: number) => (n > 0 ? `â‚¹${Number(n).toFixed(2)}` : "â€”");
 const todayISO = () => new Date().toISOString().split("T")[0];
 
 const SupplierMaterialPricingList: React.FC = () => {
@@ -343,7 +343,7 @@ const SupplierMaterialPricingList: React.FC = () => {
                     <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-lg mx-auto flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
                         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
                             <h3 className="text-lg font-semibold text-slate-800">
-                                Revise Price <span className="text-slate-500 font-normal">— {reviseTarget.materialName}</span>
+                                Revise Price <span className="text-slate-500 font-normal">â€” {reviseTarget.materialName}</span>
                             </h3>
                             <button 
                                 onClick={closeReviseModal}
@@ -358,14 +358,14 @@ const SupplierMaterialPricingList: React.FC = () => {
                                 <p className="text-sm text-blue-800 leading-relaxed">
                                     Current price is <strong className="font-semibold">{fmtMoney(reviseTarget.price)}</strong> since{" "}
                                     <span className="font-medium">{fmtDate(reviseTarget.validFrom)}</span>. Setting a new price below will close the current
-                                    row and start a new one — the old price stays in history.
+                                    row and start a new one â€” the old price stays in history.
                                 </p>
                             </div>
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                                 <div>
                                     <TextInput
-                                        label="New Price (₹)"
+                                        label="New Price (â‚¹)"
                                         name="revisePrice"
                                         type="number"
                                         value={revisePrice}

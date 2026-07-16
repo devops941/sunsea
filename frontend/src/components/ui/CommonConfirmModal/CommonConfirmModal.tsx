@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import CustomButton from "../custombutton/CustomButton";
+import CustomButton from "../Button/Button";
 import { FaExclamationTriangle, FaTimes, FaTrash } from "react-icons/fa";
 import type { CommonConfirmModalProps } from "./common-confirm-modal.types";
 

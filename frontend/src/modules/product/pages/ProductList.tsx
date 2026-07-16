@@ -18,7 +18,6 @@ const ITEMS_PER_PAGE = 10;
 const ProductList: React.FC = () => {
     const navigate = useNavigate();
     const { products, loading, error, loadProducts, removeProduct } = useProducts();
-    console.log(products, "products");
 
     const [showViewModal, setShowViewModal] = useState(false);
     const [selectedProduct, setSelectedProduct] = useState<any>(null);

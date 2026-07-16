@@ -11,7 +11,7 @@ import StatusBadge from "../../../../components/ui/StatusBadge/Badge";
 import { purchaseOrderService } from "../../../../services/purchaseOrderService";
 import type { PurchaseOrder, PurchaseOrderStatus } from "../../../../features/purchaseOrder/types";
 import ViewButton from "../../../../components/ui/viewbutton/ViewButton";
-import CustomButton from "../../../../components/ui/custombutton/CustomButton";
+import CustomButton from "../../../../components/ui/Button/Button";
 import TextInput from "../../../../components/form/TextInput/TextInput";
 import EditButton from "../../../../components/ui/EditButton/EditButton";
 import DataTable from "../../../../components/ui/table/DataTable";
@@ -38,7 +38,7 @@ const POMDApproval: React.FC = () => {
     const [rejectReasonText, setRejectReasonText] = useState("");
     const [poToReject, setPoToReject] = useState<string | null>(null);
 
-    // ─── Fetch only PENDING purchase orders (awaiting MD approval) ────────
+    // â”€â”€â”€ Fetch only PENDING purchase orders (awaiting MD approval) â”€â”€â”€â”€â”€â”€â”€â”€
     const fetchOrders = useCallback(async () => {
         setLoading(true);
         try {
@@ -52,7 +52,7 @@ const POMDApproval: React.FC = () => {
             setData(response.data || []);
             setTotal(response.total || 0);
         } catch (error: any) {
-            console.error("❌ Fetch error:", error);
+            console.error("âŒ Fetch error:", error);
             toast.error(error?.response?.data?.message || "Failed to fetch purchase orders");
             setData([]);
         } finally {
@@ -79,12 +79,12 @@ const POMDApproval: React.FC = () => {
             setItemToDelete(null);
             fetchOrders();
         } catch (error: any) {
-            console.error("❌ Delete error:", error);
+            console.error("âŒ Delete error:", error);
             toast.error(error?.response?.data?.message || "Failed to delete order");
         }
     };
 
-    // ─── Approve / Reject actions ───────────────────────────────────────
+    // â”€â”€â”€ Approve / Reject actions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const handleApprove = async (id: string) => {
         try {
             await purchaseOrderService.updateStatus(id, "OPEN");
@@ -92,7 +92,7 @@ const POMDApproval: React.FC = () => {
             toast.success("Purchase order approved!");
             fetchOrders();
         } catch (error: any) {
-            console.error("❌ Approve error:", error);
+            console.error("âŒ Approve error:", error);
             toast.error(error?.response?.data?.message || "Failed to approve order");
         }
     };
@@ -115,7 +115,7 @@ const POMDApproval: React.FC = () => {
             toast.success("Purchase order rejected!");
             fetchOrders();
         } catch (error: any) {
-            console.error("❌ Reject error:", error);
+            console.error("âŒ Reject error:", error);
             toast.error(error?.response?.data?.message || "Failed to reject order");
         }
     };
@@ -127,7 +127,7 @@ const POMDApproval: React.FC = () => {
     };
 
     const formatCurrency = (amount: number) =>
-        `₹${(amount ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`;
+        `â‚¹${(amount ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`;
 
     const totalPages = Math.ceil(total / ITEMS_PER_PAGE);
 

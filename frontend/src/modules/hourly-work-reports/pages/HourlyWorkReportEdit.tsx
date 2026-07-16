@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from "react";
-import { Container, Row, Col, Card } from "react-bootstrap";
 import { FaSave, FaEraser, FaArrowLeft, FaCheckCircle } from "react-icons/fa";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 import TextInput from "../../../components/form/TextInput/TextInput";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
-import CustomButton from "../../../components/ui/custombutton/CustomButton";
+import CustomButton from "../../../components/ui/Button/Button";
 import QuantityInput from "../../../components/form/QuantityInput/QuantityInput";
 
 import { useAppDispatch } from "../../../hooks/reduxHooks";
@@ -104,223 +103,195 @@ const HourlyWorkReportEdit: React.FC = () => {
     };
 
     return (
-        <div className="inner-container">
-            <Container fluid>
-                <div className="page-header">
-                    <Row className="align-items-center g-3">
-                        <Col lg={6} md={12}>
-                            <div className="page-header-info">
-                                <h2 className="page-title mb-1">Edit Hourly Production Log</h2>
+        <div className="w-full mx-auto">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
 
-                            </div>
-                        </Col>
-                        <Col lg={6} md={12}>
-                            <div className="page-header-actions justify-content-lg-end">
-                                <CustomButton
-                                    text="Back to List"
-                                    icon={FaArrowLeft}
-                                    onClick={() => navigate("/hourly-work-reports")}
-                                    variant="secondary"
-                                    className="shadow-sm"
-                                />
-                            </div>
-                        </Col>
-                    </Row>
+                {/* Page Header */}
+                <div className="px-6 py-4 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <h2 className="text-xl font-bold text-gray-800">Edit Hourly Production Log</h2>
+                    <CustomButton
+                        text="Back to List"
+                        icon={FaArrowLeft}
+                        onClick={() => navigate("/hourly-work-reports")}
+                        variant="secondary"
+                    />
                 </div>
 
-                <form onSubmit={handleSubmit}>
-                    <Row className="g-4">
-                        {/* Left Column: Read-Only Info */}
-                        <Col lg={5} md={12}>
-                            <Card className="border-0 shadow-sm mb-4 h-100" style={{ borderRadius: "12px" }}>
-                                <Card.Body className="p-4">
-                                    <h2 className="form-title">Reference Plan Info</h2>
+                <form onSubmit={handleSubmit} className="px-6 py-6 space-y-6" noValidate>
+                    <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
 
-                                    <div className="p-3 rounded-3" style={{ background: "rgba(0, 52, 40, 0.04)", border: "1px solid rgba(0, 52, 40, 0.1)" }}>
-                                        <div className="d-flex align-items-center gap-2 mb-3 fw-bold small" style={{ color: "var(--color-primary)" }}>
-                                            <FaCheckCircle />
-                                            <span>LOCKED FOR EDITING</span>
-                                        </div>
-                                        <div className="mb-3">
-                                            <span className="text-muted small d-block">Machine</span>
-                                            <strong className="text-dark fs-6">{machineName}</strong>
-                                        </div>
-                                        <div className="mb-3">
-                                            <span className="text-muted small d-block">Production Date</span>
-                                            <strong className="text-dark fs-6">{productionDate}</strong>
-                                        </div>
-                                        <div className="mb-3">
-                                            <span className="text-muted small d-block">Shift</span>
-                                            <strong className="text-dark fs-6">{shiftName}</strong>
-                                        </div>
-                                        <div className="mb-3">
-                                            <span className="text-muted small d-block">Production Order</span>
-                                            <strong className="fs-5" style={{ color: "var(--color-primary)" }}>{productionOrderId}</strong>
-                                        </div>
-                                        <div className="mb-1">
-                                            <span className="text-muted small d-block">Product</span>
-                                            <strong className="text-dark">{productName}</strong>
-                                        </div>
+                        {/* Left Card: Read-Only Reference Info */}
+                        <div className="lg:col-span-2">
+                            <div className="bg-gray-50 border border-gray-200 rounded-lg p-5 h-full">
+                                <h6 className="text-base font-semibold text-gray-800 mb-4 border-b border-gray-100 pb-2">
+                                    Reference Plan Info
+                                </h6>
+
+                                <div className="bg-white rounded-lg p-4 border border-gray-100 space-y-4">
+                                    <div className="flex items-center gap-2 mb-1 text-sm font-semibold text-primary">
+                                        <FaCheckCircle size={13} />
+                                        <span>LOCKED FOR EDITING</span>
                                     </div>
-                                </Card.Body>
-                            </Card>
-                        </Col>
 
-                        {/* Right Column: Editable Entry Inputs */}
-                        <Col lg={7} md={12}>
-                            <Card className="border-0 shadow-sm h-100" style={{ borderRadius: "12px" }}>
-                                <Card.Body className="p-4">
-                                    <h2 className="form-title">Log Parameters</h2>
+                                    <div>
+                                        <span className="text-xs text-gray-400 block mb-0.5">Machine</span>
+                                        <strong className="text-gray-800 text-base">{machineName}</strong>
+                                    </div>
+                                    <div>
+                                        <span className="text-xs text-gray-400 block mb-0.5">Production Date</span>
+                                        <strong className="text-gray-800 text-base">{productionDate}</strong>
+                                    </div>
+                                    <div>
+                                        <span className="text-xs text-gray-400 block mb-0.5">Shift</span>
+                                        <strong className="text-gray-800 text-base">{shiftName}</strong>
+                                    </div>
+                                    <div>
+                                        <span className="text-xs text-gray-400 block mb-0.5">Production Order</span>
+                                        <strong className="text-lg text-primary">{productionOrderId}</strong>
+                                    </div>
+                                    <div>
+                                        <span className="text-xs text-gray-400 block mb-0.5">Product</span>
+                                        <strong className="text-gray-800">{productName}</strong>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
 
-                                    <Row className="g-3">
-                                        <Col md={6}>
-                                            <SelectInput
-                                                label="Hour index of Shift"
-                                                name="hourIndex"
-                                                value={hourIndex}
-                                                options={Array.from({ length: 24 }, (_, i) => ({
-                                                    label: `Hour ${i + 1}`,
-                                                    value: String(i + 1)
-                                                }))}
-                                                required
-                                                onChange={(e) => setHourIndex(e.target.value)}
-                                            />
-                                        </Col>
-                                        <Col md={6}>
-                                            <TextInput
-                                                label="Operator ID (Optional)"
-                                                name="operatorId"
-                                                value={operatorId}
-                                                placeholder="Enter Operator ID"
-                                                onChange={(e) => setOperatorId(e.target.value)}
-                                            />
-                                        </Col>
-                                        <Col md={6}>
-                                            <QuantityInput
-                                                label="Produced Qty"
-                                                name="qtyProduced"
-                                                value={qtyProduced}
-                                                baseUoms={uom}
-                                                onChange={(e) => setQtyProduced(e.target.value)}
-                                            />
-                                        </Col>
-                                        <Col md={6}>
-                                            <QuantityInput
-                                                label="Reject Qty"
-                                                name="rejectQty"
-                                                value={rejectQty}
-                                                baseUoms={uom}
-                                                onChange={(e) => setRejectQty(e.target.value)}
-                                            />
-                                        </Col>
-                                        <Col md={6}>
-                                            <QuantityInput
-                                                label="Scrap Qty"
-                                                name="scrapQty"
-                                                value={scrapQty}
-                                                baseUoms={uom}
-                                                onChange={(e) => setScrapQty(e.target.value)}
-                                            />
-                                        </Col>
-                                        <Col md={6}>
-                                            <QuantityInput
-                                                label="Downtime"
-                                                name="downtime"
-                                                value={downtime}
-                                                baseUoms="mins,hrs"
-                                                onChange={(e) => setDowntime(e.target.value)}
-                                            />
-                                        </Col>
-                                        {Number(downtime) > 0 && (
-                                            <Col md={6}>
-                                                <SelectInput
-                                                    label="Downtime Reason"
-                                                    name="downtimeReason"
-                                                    value={downtimeReason}
-                                                    onChange={(e) => setDowntimeReason(e.target.value)}
-                                                    options={[
-                                                        { label: "Machine Breakdown", value: "Machine Breakdown" },
-                                                        { label: "Power Failure", value: "Power Failure" },
-                                                        { label: "Material Shortage", value: "Material Shortage" },
-                                                        { label: "Tool/Mould Change", value: "Tool/Mould Change" },
-                                                        { label: "Operator Unavailable", value: "Operator Unavailable" },
-                                                        { label: "Quality Issue", value: "Quality Issue" },
-                                                        { label: "Preventative Maintenance", value: "Preventative Maintenance" },
-                                                        { label: "Others", value: "Others" },
-                                                    ]}
-                                                />
-                                            </Col>
-                                        )}
-                                        {Number(rejectQty) > 0 && (
-                                            <Col md={6}>
-                                                <SelectInput
-                                                    label="Reject Reason"
-                                                    name="rejectReason"
-                                                    value={rejectReason}
-                                                    onChange={(e) => setRejectReason(e.target.value)}
-                                                    options={[
-                                                        { value: "Quality Issue", label: "Quality Issue" },
-                                                        { value: "Machine Defect", label: "Machine Defect" },
-                                                        { value: "Material Defect", label: "Material Defect" },
-                                                        { value: "Operator Error", label: "Operator Error" },
-                                                        { value: "Others", label: "Others" }
-                                                    ]}
-                                                />
-                                            </Col>
-                                        )}
-                                        {Number(scrapQty) > 0 && (
-                                            <Col md={6}>
-                                                <SelectInput
-                                                    label="Scrap Reason"
-                                                    name="scrapReason"
-                                                    value={scrapReason}
-                                                    onChange={(e) => setScrapReason(e.target.value)}
-                                                    options={[
-                                                        { value: "Startup Scrap", label: "Startup Scrap" },
-                                                        { value: "Process Setting", label: "Process Setting" },
-                                                        { value: "Material Purging", label: "Material Purging" },
-                                                        { value: "Others", label: "Others" }
-                                                    ]}
-                                                />
-                                            </Col>
-                                        )}
-                                        {(downtimeReason === "Others" || rejectReason === "Others" || scrapReason === "Others") && (
-                                            <Col md={12}>
-                                                <TextInput
-                                                    label="Remarks (Reason for Others)"
-                                                    name="remarks"
-                                                    value={remarks}
-                                                    required
-                                                    placeholder="Enter specific reason"
-                                                    onChange={(e) => setRemarks(e.target.value)}
-                                                />
-                                            </Col>
-                                        )}
-                                    </Row>
+                        {/* Right Section: Editable Log Parameters */}
+                        <div className="lg:col-span-3">
+                            <h6 className="text-base font-semibold text-gray-800 mb-4 border-b border-gray-100 pb-2">
+                                Log Parameters
+                            </h6>
 
-                                    <div className="form-actions d-flex justify-content-end gap-3 mt-4 pt-3 border-top">
-                                        <CustomButton
-                                            text="Cancel"
-                                            icon={FaEraser}
-                                            onClick={() => navigate("/hourly-work-reports")}
-                                            disabled={isSubmitting}
-                                            variant="secondary"
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <SelectInput
+                                    label="Hour Index of Shift"
+                                    name="hourIndex"
+                                    value={hourIndex}
+                                    options={Array.from({ length: 24 }, (_, i) => ({
+                                        label: `Hour ${i + 1}`,
+                                        value: String(i + 1)
+                                    }))}
+                                    required
+                                    onChange={(e) => setHourIndex(e.target.value)}
+                                />
+                                <TextInput
+                                    label="Operator ID (Optional)"
+                                    name="operatorId"
+                                    value={operatorId}
+                                    placeholder="Enter Operator ID"
+                                    onChange={(e) => setOperatorId(e.target.value)}
+                                />
+                                <QuantityInput
+                                    label="Produced Qty"
+                                    name="qtyProduced"
+                                    value={qtyProduced}
+                                    baseUoms={uom}
+                                    onChange={(e) => setQtyProduced(e.target.value)}
+                                />
+                                <QuantityInput
+                                    label="Reject Qty"
+                                    name="rejectQty"
+                                    value={rejectQty}
+                                    baseUoms={uom}
+                                    onChange={(e) => setRejectQty(e.target.value)}
+                                />
+                                <QuantityInput
+                                    label="Scrap Qty"
+                                    name="scrapQty"
+                                    value={scrapQty}
+                                    baseUoms={uom}
+                                    onChange={(e) => setScrapQty(e.target.value)}
+                                />
+                                <QuantityInput
+                                    label="Downtime"
+                                    name="downtime"
+                                    value={downtime}
+                                    baseUoms="mins,hrs"
+                                    onChange={(e) => setDowntime(e.target.value)}
+                                />
+
+                                {Number(downtime) > 0 && (
+                                    <SelectInput
+                                        label="Downtime Reason"
+                                        name="downtimeReason"
+                                        value={downtimeReason}
+                                        onChange={(e) => setDowntimeReason(e.target.value)}
+                                        options={[
+                                            { label: "Machine Breakdown", value: "Machine Breakdown" },
+                                            { label: "Power Failure", value: "Power Failure" },
+                                            { label: "Material Shortage", value: "Material Shortage" },
+                                            { label: "Tool/Mould Change", value: "Tool/Mould Change" },
+                                            { label: "Operator Unavailable", value: "Operator Unavailable" },
+                                            { label: "Quality Issue", value: "Quality Issue" },
+                                            { label: "Preventative Maintenance", value: "Preventative Maintenance" },
+                                            { label: "Others", value: "Others" },
+                                        ]}
+                                    />
+                                )}
+                                {Number(rejectQty) > 0 && (
+                                    <SelectInput
+                                        label="Reject Reason"
+                                        name="rejectReason"
+                                        value={rejectReason}
+                                        onChange={(e) => setRejectReason(e.target.value)}
+                                        options={[
+                                            { value: "Quality Issue", label: "Quality Issue" },
+                                            { value: "Machine Defect", label: "Machine Defect" },
+                                            { value: "Material Defect", label: "Material Defect" },
+                                            { value: "Operator Error", label: "Operator Error" },
+                                            { value: "Others", label: "Others" }
+                                        ]}
+                                    />
+                                )}
+                                {Number(scrapQty) > 0 && (
+                                    <SelectInput
+                                        label="Scrap Reason"
+                                        name="scrapReason"
+                                        value={scrapReason}
+                                        onChange={(e) => setScrapReason(e.target.value)}
+                                        options={[
+                                            { value: "Startup Scrap", label: "Startup Scrap" },
+                                            { value: "Process Setting", label: "Process Setting" },
+                                            { value: "Material Purging", label: "Material Purging" },
+                                            { value: "Others", label: "Others" }
+                                        ]}
+                                    />
+                                )}
+                                {(downtimeReason === "Others" || rejectReason === "Others" || scrapReason === "Others") && (
+                                    <div className="md:col-span-2">
+                                        <TextInput
+                                            label="Remarks (Reason for Others)"
+                                            name="remarks"
+                                            value={remarks}
+                                            required
+                                            placeholder="Enter specific reason"
+                                            onChange={(e) => setRemarks(e.target.value)}
                                         />
-                                        <div className="ms-2">
-                                            <CustomButton
-                                                text={isSubmitting ? "Updating..." : "Update Log"}
-                                                icon={FaSave}
-                                                type="submit"
-                                                disabled={isSubmitting}
-                                            />
-                                        </div>
                                     </div>
-                                </Card.Body>
-                            </Card>
-                        </Col>
-                    </Row>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Form Actions */}
+                    <div className="flex justify-end items-center gap-3 pt-4 border-t border-gray-100">
+                        <CustomButton
+                            text="Cancel"
+                            icon={FaEraser}
+                            onClick={() => navigate("/hourly-work-reports")}
+                            disabled={isSubmitting}
+                            variant="secondary"
+                        />
+                        <CustomButton
+                            text={isSubmitting ? "Updating..." : "Update Log"}
+                            icon={FaSave}
+                            type="submit"
+                            disabled={isSubmitting}
+                        />
+                    </div>
                 </form>
-            </Container>
+            </div>
         </div>
     );
 };

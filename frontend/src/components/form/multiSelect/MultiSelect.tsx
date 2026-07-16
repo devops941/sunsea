@@ -61,7 +61,7 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
             </label>
 
             <div
-                className={`flex items-center justify-between w-full min-h-[38px] py-1 px-3 bg-white border rounded-sm ${error ? 'border-red-500' : 'border-slate-300'} rounded cursor-pointer ${open ? 'ring-1 ring-primary border-primary' : 'hover:border-slate-400'}`}
+                className={`flex items-center justify-between w-full min-h-10 py-1 px-3 bg-white border rounded-md ${error ? 'border-red-500' : 'border-slate-300'} cursor-pointer ${open ? 'ring-1 ring-primary border-primary' : 'hover:border-slate-400'}`}
                 onClick={() => setOpen((prev) => !prev)}
             >
                 <div className="flex flex-wrap gap-1 flex-1">

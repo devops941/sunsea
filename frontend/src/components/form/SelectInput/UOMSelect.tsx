@@ -198,8 +198,8 @@ export const UOMSelect: React.FC<UOMSelectProps> = ({
   const selectStyles = (isError: boolean) => ({
     control: (base: any, state: any) => ({
       ...base,
-      minHeight: '35px',
-      borderRadius: '10px',
+      minHeight: '40px',
+      borderRadius: '0.375rem',
       fontSize: '15px',
       boxShadow: state.isFocused ? '0 0 0 4px rgba(59, 130, 246, 0.15)' : 'none',
       borderColor: isError ? '#ef4444' : state.isFocused ? '#3b82f6' : '#cbd5e1',

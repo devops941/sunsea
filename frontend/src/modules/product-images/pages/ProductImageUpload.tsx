@@ -3,7 +3,7 @@ import { Container, Row, Col, Card } from "react-bootstrap";
 import { FaSave, FaTrash, FaCheckCircle, FaStar } from "react-icons/fa";
 import { toast } from "react-toastify";
 // adjust path to match where this file actually lives
-import CustomButton from "../../../components/ui/custombutton/CustomButton";
+import CustomButton from "../../../components/ui/Button/Button";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import FileUpload from "../../../components/form/FileUpload/FileUpload";
 import TextInput from "../../../components/form/TextInput/TextInput";

@@ -6,7 +6,7 @@ import SelectInput from "../../components/form/SelectInput/SelectInput";
 import DateInput from "../../components/form/DateInput/DateInput";
 import FileUpload from "../../components/form/FileUpload/FileUpload";
 import TextArea from "../../components/form/TextArea/TextArea";
-import CustomButton from "../../components/ui/custombutton/CustomButton";
+import CustomButton from "../../components/ui/Button/Button";
 import apiClient from "../../api/apiClient";
 import { useExpenses } from "../../hooks/useExpenses";
 import BackButton from "../../components/ui/BackButton/BackButton";
@@ -307,7 +307,7 @@ const ExpensesCreate: React.FC<ExpensesCreateProps> = ({
               />
 
               <TextInput
-                label="Amount (₹) *"
+                label="Amount (â‚¹) *"
                 name="amount"
                 type="number"
                 value={formData.amount}

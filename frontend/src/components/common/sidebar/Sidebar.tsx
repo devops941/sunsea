@@ -3,6 +3,7 @@ import { NavLink, useNavigate, useLocation } from "react-router-dom";
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
 import { logoutUser } from "../../../features/auth/authSlice";
 import React from "react";
+import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import {
   FaChevronDown,
   FaChevronRight,
@@ -18,6 +19,7 @@ const Sidebar = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [hoveredMenu, setHoveredMenu] = useState<string | null>(null);
   const [openMenu, setOpenMenu] = useState<string | null>("Dashboard");
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
   const location = useLocation();
   const isMenuActive = useCallback((menu: any) => {
     // Check main path
@@ -55,6 +57,10 @@ const Sidebar = () => {
   const { permissions, user } = useAppSelector((state) => state.auth);
   const { data: company } = useAppSelector((state) => state.company);
   const handleLogout = () => {
+    setShowLogoutModal(true);
+  };
+  const handleConfirmLogout = () => {
+    setShowLogoutModal(false);
     dispatch(logoutUser());
     navigate("/login");
   };
@@ -119,20 +125,19 @@ const Sidebar = () => {
           const Icon = menu.icon;
           // ── Flat top-level item (no children) → render as a direct link ──
           if (!menu.children && menu.path) {
+            // Use isMenuActive() instead of NavLink's isActive so that activePaths
+            // are respected (NavLink's isActive only matches the exact `to` path).
+            const menuActive = isMenuActive(menu);
             return (
               <div key={menu.title} className="relative mb-2.5">
                 <NavLink
                   to={menu.path}
-                  className={({ isActive }) =>
-                    `w-full border-none outline-none cursor-pointer p-[10px_15px] rounded-sm flex items-center justify-between transition-all duration-300 hover:bg-gray-100 ${isActive ? "!bg-gradient-to-r !from-blue-400 !to-primary !text-white font-semibold" : "bg-transparent text-[#2A3547]"} ${activeCollapsed ? "justify-center p-[14px]" : ""}`
-                  }
+                  className={`w-full border-none outline-none cursor-pointer p-[10px_15px] rounded-sm flex items-center justify-between transition-all duration-300 hover:bg-gray-100 ${menuActive ? "!bg-gradient-to-r !from-blue-400 !to-primary !text-white font-semibold" : "bg-transparent text-[#2A3547]"} ${activeCollapsed ? "justify-center p-[14px]" : ""}`}
                 >
-                  {({ isActive }) => (
-                    <div className={`flex items-center text-[15px] font-normal leading-[1.334rem] ${activeCollapsed ? "justify-center gap-0" : "gap-4"} ${isActive ? "!text-white" : ""}`}>
-                      <Icon className={`min-w-[20px] text-[20px] ${isActive ? "!text-white" : ""}`} />
-                      {!activeCollapsed && <span className={isActive ? "!text-white" : ""}>{menu.title}</span>}
-                    </div>
-                  )}
+                  <div className={`flex items-center text-[15px] font-normal leading-[1.334rem] ${activeCollapsed ? "justify-center gap-0" : "gap-4"} ${menuActive ? "!text-white" : ""}`}>
+                    <Icon className={`min-w-[20px] text-[20px] ${menuActive ? "!text-white" : ""}`} />
+                    {!activeCollapsed && <span className={menuActive ? "!text-white" : ""}>{menu.title}</span>}
+                  </div>
                 </NavLink>
               </div>
             );
@@ -273,6 +278,17 @@ const Sidebar = () => {
           </button>
         </div>
       </div>
+
+      {/* Logout Confirmation Modal */}
+      <CommonConfirmModal
+        show={showLogoutModal}
+        onHide={() => setShowLogoutModal(false)}
+        onConfirm={handleConfirmLogout}
+        title="Confirm Logout"
+        message="Are you sure you want to log out of your account?"
+        confirmText="Logout"
+        confirmVariant="danger"
+      />
     </aside>
   );
 };

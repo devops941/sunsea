@@ -10,7 +10,7 @@ import { z } from "zod";
 import TextInput from "../../../components/form/TextInput/TextInput";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import CustomButton from "../../../components/ui/Button/Button";
-import Button from "../../../components/ui/custombutton/CustomButton";
+import Button from "../../../components/ui/Button/Button";
 import TextArea from "../../../components/form/TextArea/TextArea";
 import UOMSelect from "../../../components/form/SelectInput/UOMSelect";
 import QuantityInput from "../../../components/form/QuantityInput/QuantityInput";
@@ -22,7 +22,7 @@ import { rawMaterialService } from "../../../services/rawMaterialService";
 import { productService } from "../../../services/productService";
 import { billOfMaterialService } from "../../../services/billOfMaterialService";
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface RawMaterialOption {
     label: string;
@@ -36,7 +36,7 @@ interface RowRawMaterialState {
     fetchedForStoreId: string | null; // track which storeId we last fetched for
 }
 
-// ─── Options ─────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Options â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const DISPATCH_TYPE_OPTIONS = [
     { label: "Priority", value: "priority" },
@@ -53,7 +53,7 @@ const ORDER_TYPE_OPTIONS = [
     { label: "Telephonic Enquiry", value: "telephone" },
 ];
 
-// ─── Zod Schema ──────────────────────────────────────────────────────────────
+// â”€â”€â”€ Zod Schema â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const productionOrderSchema = z.object({
     id: z.number().optional(),
@@ -107,7 +107,7 @@ const productionOrderSchema = z.object({
 
 type ProductionOrderFormValues = z.infer<typeof productionOrderSchema>;
 
-// ─── Defaults ────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Defaults â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const today = new Date().toISOString().split("T")[0];
 const nextWeek = new Date(
@@ -132,7 +132,7 @@ const defaultValues: ProductionOrderFormValues = {
     remarks: "",
 };
 
-// ─── CtrlText helper ─────────────────────────────────────────────────────────
+// â”€â”€â”€ CtrlText helper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 type CtrlTextProps = {
     label?: string;
@@ -170,7 +170,7 @@ const CtrlText: React.FC<CtrlTextProps> = ({
     />
 );
 
-// ─── RawMaterialRow ───────────────────────────────────────────────────────────
+// â”€â”€â”€ RawMaterialRow â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 //
 //  Each row owns its own options/loading/fetchedForStoreId state via the
 //  `rowState` prop (a slice of the parent's `rowRmStates` array).
@@ -300,7 +300,7 @@ const RawMaterialRowInner: React.FC<RawMaterialRowInnerProps> = React.memo(({
                             />
                             {loading && (
                                 <div className="text-slate-500 text-sm mt-1">
-                                    Fetching raw materials…
+                                    Fetching raw materialsâ€¦
                                 </div>
                             )}
                             {showEmpty && (
@@ -483,13 +483,13 @@ const ProductRawMaterialsSection: React.FC<ProductRawMaterialsSectionProps> = Re
     );
 });
 
-// ─── Main Component ───────────────────────────────────────────────────────────
+// â”€â”€â”€ Main Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const ProductionOrderCreate: React.FC = () => {
     const navigate = useNavigate();
     const location = useLocation();
 
-    // ── Generic state ───────────────────────────────────────────────────────
+    // â”€â”€ Generic state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isEditMode, setIsEditMode] = useState(false);
     const [orderId, setOrderId] = useState<number | string | null>(null);
@@ -501,7 +501,7 @@ const ProductionOrderCreate: React.FC = () => {
     const [selectedSalesOrderItems, setSelectedSalesOrderItems] = useState<any[]>([]);
     const [isFetchingSalesOrder, setIsFetchingSalesOrder] = useState(false);
 
-    // ── Per-row raw material state ──────────────────────────────────────────
+    // â”€â”€ Per-row raw material state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // Each element corresponds to one rawMaterials field-array row.
     const [rowRmStates, setRowRmStates] = useState<Record<string, RowRawMaterialState>>({});
 
@@ -519,7 +519,7 @@ const ProductionOrderCreate: React.FC = () => {
         }));
     };
 
-    // ── React Hook Form ─────────────────────────────────────────────────────
+    // â”€â”€ React Hook Form â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const {
         control,
         handleSubmit,
@@ -541,7 +541,7 @@ const ProductionOrderCreate: React.FC = () => {
     const watchSalesOrderId = useWatch({ control, name: "sourceSalesOrderId" });
     const watchProducts = useWatch({ control, name: "products" });
 
-    // ── Store changed for a specific row ────────────────────────────────────
+    // â”€â”€ Store changed for a specific row â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const fetchRawMaterialsForStore = useCallback(async (
         storeId: string,
         fieldId: string
@@ -614,7 +614,7 @@ const ProductionOrderCreate: React.FC = () => {
         }
     };
 
-    // ── Load Dependencies ───────────────────────────────────────────────────
+    // â”€â”€ Load Dependencies â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const [products, setProducts] = useState<any[]>([]);
 
     useEffect(() => {
@@ -631,7 +631,7 @@ const ProductionOrderCreate: React.FC = () => {
         billOfMaterialService.fetchAll().then((r) => setBoms(extractArray(r))).catch(() => { });
     }, []);
 
-    // ── Sales Order watch ───────────────────────────────────────────────────
+    // â”€â”€ Sales Order watch â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     useEffect(() => {
         if (!watchSalesOrderId) {
             setSelectedSalesOrder(null);
@@ -698,7 +698,7 @@ const ProductionOrderCreate: React.FC = () => {
         fetchSODetails();
     }, [watchSalesOrderId, setValue, getValues, isEditMode]);
 
-    // ── Recalculate Raw Material Required Qty when Target Qty/Damage Qty changes ────────────
+    // â”€â”€ Recalculate Raw Material Required Qty when Target Qty/Damage Qty changes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const [initialTargetQtyLoaded, setInitialTargetQtyLoaded] = useState(false);
     const lastCalculatedProductStates = React.useRef<Record<number, string>>({});
     useEffect(() => {
@@ -812,7 +812,7 @@ const ProductionOrderCreate: React.FC = () => {
 
     const { id } = useParams<{ id: string }>();
 
-    // ── Edit mode: hydrate form from route parameter ────────────────────────────
+    // â”€â”€ Edit mode: hydrate form from route parameter â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     useEffect(() => {
         if (id) {
             setIsEditMode(true);
@@ -875,7 +875,7 @@ const ProductionOrderCreate: React.FC = () => {
                     setRowRmStates({});
                 })
                 .catch((err) => {
-                    console.error("❌ Failed to fetch order details for edit:", err);
+                    console.error("âŒ Failed to fetch order details for edit:", err);
                     toast.error("Failed to load production order details");
                 });
         } else {
@@ -900,7 +900,7 @@ const ProductionOrderCreate: React.FC = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [id, reset, setValue]);
 
-    // ── Memoised select option lists ────────────────────────────────────────
+    // â”€â”€ Memoised select option lists â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const storeOptions = useMemo(
         () =>
             stores.map((s) => ({
@@ -910,7 +910,7 @@ const ProductionOrderCreate: React.FC = () => {
         [stores]
     );
 
-    // ── Submit ──────────────────────────────────────────────────────────────
+    // â”€â”€ Submit â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const onSubmit = async (data: ProductionOrderFormValues) => {
         setIsSubmitting(true);
         try {
@@ -992,7 +992,7 @@ const ProductionOrderCreate: React.FC = () => {
         }
     };
 
-    // ── Render ──────────────────────────────────────────────────────────────
+    // â”€â”€ Render â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     return (
         <div className="p-4 md:p-6 min-h-screen bg-white">
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200">
@@ -1021,7 +1021,7 @@ const ProductionOrderCreate: React.FC = () => {
                 >
                     <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
 
-                        {/* ── 1. Source Information ─────────────────────────── */}
+                        {/* â”€â”€ 1. Source Information â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
                         {watchSalesOrderId && (
                             <>
                                 <div className="md:col-span-12">
@@ -1031,7 +1031,7 @@ const ProductionOrderCreate: React.FC = () => {
                                     <div className="p-0" >
                                         {isFetchingSalesOrder ? (
                                             <div className="text-slate-500">
-                                                Fetching Sales Order details…
+                                                Fetching Sales Order detailsâ€¦
                                             </div>
                                         ) : selectedSalesOrder ? (
                                             <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
@@ -1085,7 +1085,7 @@ const ProductionOrderCreate: React.FC = () => {
                                         )}
                                     </div>
                                 </div>
-                                {/* ── Sales Order Items read-only table ───────────── */}
+                                {/* â”€â”€ Sales Order Items read-only table â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
                                 {selectedSalesOrderItems.length > 0 && (
                                     <div className="md:col-span-12 mt-3 mb-3">
                                         <h6 className="font-semibold text-slate-800 mb-3">
@@ -1360,7 +1360,7 @@ const ProductionOrderCreate: React.FC = () => {
                         </div>
 
 
-                        {/* ── 2. General Details ──────────────────────────── */}
+                        {/* â”€â”€ 2. General Details â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
                         <div className="md:col-span-12 lg:col-span-4 p-4 md:p-6">
 
                             <h6 className="text-lg font-bold text-slate-800 mb-6">
@@ -1392,7 +1392,7 @@ const ProductionOrderCreate: React.FC = () => {
                                         label="Remarks"
                                         name={field.name}
                                         value={field.value ?? ""}
-                                        placeholder="Any remarks for this order…"
+                                        placeholder="Any remarks for this orderâ€¦"
                                         rows={2}
                                         onChange={field.onChange}
                                     />
@@ -1401,7 +1401,7 @@ const ProductionOrderCreate: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* ── Form Actions ──────────────────────────────────────── */}
+                    {/* â”€â”€ Form Actions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
                     <div className="form-actions pb-4 pr-3 flex justify-end gap-3 mt-4 pt-3 border-t border-slate-200">
                         <CustomButton
                             text="Clear Form"
@@ -1425,8 +1425,8 @@ const ProductionOrderCreate: React.FC = () => {
                                 text={
                                     isSubmitting
                                         ? isEditMode
-                                            ? "Updating…"
-                                            : "Creating…"
+                                            ? "Updatingâ€¦"
+                                            : "Creatingâ€¦"
                                         : isEditMode
                                             ? "Update Order"
                                             : "Create Production Order"

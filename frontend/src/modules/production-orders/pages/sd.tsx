@@ -13,7 +13,7 @@ import TextInput from "../../../components/form/TextInput/TextInput";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import DateInput from "../../../components/form/DateInput/DateInput";
 import TextArea from "../../../components/form/TextArea/TextArea";
-import CustomButton from "../../../components/ui/custombutton/CustomButton";
+import CustomButton from "../../../components/ui/Button/Button";
 
 const STATUS_OPTIONS = [
     { label: "PLANNED", value: "PLANNED" },
