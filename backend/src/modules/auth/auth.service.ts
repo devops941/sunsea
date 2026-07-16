@@ -183,20 +183,8 @@ export class AuthService {
 
     // Generate unique session token
     const sessionToken = crypto.randomBytes(32).toString("hex");
-    const sessionId = crypto.randomUUID();
 
-    const accessPayload: AccessTokenPayload = {
-      userId: user.userId,
-      email: user.email!,
-      roleId: roleCode,
-      permissions,
-      isSuperAdmin: isAdminLogin,
-      sessionId
-    };
-
-    const accessToken = generateAccessToken(accessPayload);
-
-    // Create session (automatically manages 4-device limit)
+    // Create session first (automatically manages 4-device limit)
     const session = await authRepository.createUserSession({
       userId: isAdminLogin ? undefined : user.userId,
       adminId: isAdminLogin ? admin!.id : undefined,
@@ -205,6 +193,18 @@ export class AuthService {
       userAgent,
       deviceLabel: this.extractDeviceLabel(userAgent)
     });
+
+    // Use the database session ID in the JWT payload
+    const accessPayload: AccessTokenPayload = {
+      userId: user.userId,
+      email: user.email!,
+      roleId: roleCode,
+      permissions,
+      isSuperAdmin: isAdminLogin,
+      sessionId: session.id // Use the actual database session ID
+    };
+
+    const accessToken = generateAccessToken(accessPayload);
 
     // Update user
     if (isAdminLogin) {
@@ -255,13 +255,13 @@ export class AuthService {
     const isAdmin = userId.startsWith("admin_");
     
     if (sessionId) {
-      // Look up session by sessionId (UUID from JWT)
+      // Look up the specific session by sessionId (UUID from JWT)
       const session = await prisma.userSession.findFirst({
         where: {
+          id: sessionId, // Use the sessionId from JWT to find the exact session
           ...(isAdmin ? { adminId: BigInt(userId.replace("admin_", "")) } : { userId }),
           isActive: true
-        },
-        orderBy: { loginAt: 'desc' }
+        }
       });
       
       if (session) {
@@ -279,9 +279,9 @@ export class AuthService {
 
     await authRepository.createAuditLog({
       entityName: isAdmin ? "Admin" : "User",
-      entityId: userId,
+      entityId: isAdmin ? userId.replace("admin_", "") : userId,
       action: "LOGOUT",
-      changedBy: userId,
+      changedBy: isAdmin ? undefined : userId, // Don't pass admin userId to changedBy
       changedByAdmin: isAdmin ? BigInt(userId.replace("admin_", "")) : undefined,
       ipAddress,
       userAgent
@@ -303,10 +303,11 @@ export class AuthService {
     }
 
     await authRepository.createAuditLog({
-      entityName: "User",
-      entityId: userId,
+      entityName: isAdmin ? "Admin" : "User",
+      entityId: isAdmin ? userId.replace("admin_", "") : userId,
       action: "LOGOUT_ALL_SESSIONS",
-      changedBy: userId,
+      changedBy: isAdmin ? undefined : userId, // Don't pass admin userId to changedBy
+      changedByAdmin: isAdmin ? BigInt(userId.replace("admin_", "")) : undefined,
       ipAddress,
       userAgent
     });
