@@ -30,6 +30,18 @@ const envSchema = z.object({
     .default("development"),
 
   PORT: z.string().optional(),
+
+  FRONTEND_URL: z
+    .string()
+    .url()
+    .optional()
+    .default("http://localhost:5173"),
+
+  BACKEND_URL: z
+    .string()
+    .url()
+    .optional()
+    .default("http://localhost:5000"),
 });
 
 /**

@@ -6,7 +6,7 @@ import path from "path";
 import apiRoutes from "./routes/index.routes";
 
 import { errorMiddleware } from "./middleware/error.middleware";
-import { isProduction } from "./config/env";
+import { env, isProduction } from "./config/env";
 
 const app: Application = express();
 
@@ -18,16 +18,23 @@ if (isProduction) {
 /** CORS Configuration*/
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
+// Build CORS origin list from environment variables
+const allowedOrigins = [
+  env.FRONTEND_URL,
+  "http://localhost:5173",
+  "http://127.0.0.1:5173",
+  "http://localhost:5174",
+  "http://127.0.0.1:5174",
+];
+
+// Add production frontend URLs if different from defaults
+if (isProduction && env.FRONTEND_URL !== "http://localhost:5173") {
+  allowedOrigins.push(env.FRONTEND_URL);
+}
+
 app.use(
   cors({
-    origin: [
-      "http://localhost:5173",
-      "http://127.0.0.1:5173",
-      "http://localhost:5174",
-      "http://127.0.0.1:5174",
-      "https://sunsea-56iq.vercel.app",
-      "https://sunsea-gray.vercel.app",
-    ],
+    origin: allowedOrigins,
     credentials: true,
     methods: [
       "GET",
