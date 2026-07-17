@@ -175,7 +175,7 @@ const ShiftCreate: React.FC = () => {
     return (
         <div className="w-full  space-y-6">
             {/* Page Header */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+           <div className="bg-white rounded-2xl shadow-sm border border-slate-200">
                 <div className="px-6 py-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
                         <h2 className="text-2xl font-bold text-slate-800">

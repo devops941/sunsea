@@ -69,17 +69,20 @@ class ProductService {
         const file = files[index];
         const uniqueName = `product_${Date.now()}_${index}${path.extname(file.originalname)}`;
         try {
-          const imageUrl = await uploadToImageKit(file.path, uniqueName, "/products");
+          const fileData = file.buffer || file.path;
+          const imageUrl = await uploadToImageKit(fileData, uniqueName, "/products");
           uploadedImages.push({
             imageUrl,
             isPrimary: index === 0,
           });
 
-          // Clean up the local temp file after upload
-          try {
-            fs.unlinkSync(file.path);
-          } catch (err) {
-            console.error("Failed to delete temp file:", file.path, err);
+          // Clean up the local temp file after upload (only if diskStorage was used)
+          if (file.path) {
+            try {
+              fs.unlinkSync(file.path);
+            } catch (err) {
+              console.error("Failed to delete temp file:", file.path, err);
+            }
           }
         } catch (err) {
           console.error("Failed to upload product image to ImageKit:", err);
@@ -315,18 +318,21 @@ class ProductService {
         const file = files[index];
         const uniqueName = `product_${Date.now()}_${index}${path.extname(file.originalname)}`;
         try {
-          const imageUrl = await uploadToImageKit(file.path, uniqueName, "/products");
+          const fileData = file.buffer || file.path;
+          const imageUrl = await uploadToImageKit(fileData, uniqueName, "/products");
           uploadedImages.push({
             productId: id,
             imageUrl,
             isPrimary: false,
           });
 
-          // Clean up the local temp file after upload
-          try {
-            fs.unlinkSync(file.path);
-          } catch (err) {
-            console.error("Failed to delete temp file:", file.path, err);
+          // Clean up the local temp file after upload (only if diskStorage was used)
+          if (file.path) {
+            try {
+              fs.unlinkSync(file.path);
+            } catch (err) {
+              console.error("Failed to delete temp file:", file.path, err);
+            }
           }
         } catch (err) {
           console.error("Failed to upload product image to ImageKit:", err);

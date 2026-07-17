@@ -13,6 +13,7 @@ import { fetchActiveUOMs } from "../../../features/uoms/uomSlice";
 import TextInput from "../../../components/form/TextInput/TextInput";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import { z } from "zod";
+import BackButton from "../../../components/ui/BackButton/BackButton";
 
 const wastageSchema = z.object({
   wastageDate: z.string().min(1, "Wastage date is required"),
@@ -215,13 +216,9 @@ const WastageForm: React.FC = () => {
             </div>
           </div>
           <div className="mt-4 md:mt-0 flex gap-2">
-            <button
-              type="button"
-              className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 font-medium transition-colors"
-              onClick={() => navigate("/production-wastages")}
-            >
-              <FaArrowLeft /> Back to List
-            </button>
+            <div>
+                        <BackButton text="Back to List" to="/production-wastages" />
+                    </div>
           </div>
         </div>
 

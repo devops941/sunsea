@@ -12,6 +12,7 @@ import { fetchMachines } from "../../../features/machines/machineSlice";
 import { fetchShifts } from "../../../features/shifts/shiftSlice";
 import { weeklyProgramService } from "../../../services/weeklyProgramService";
 import { productionOrderService } from "../../../services/productionOrderService";
+import BackButton from "../../../components/ui/BackButton/BackButton";
 
 const normalizePriority = (pri?: string): "LOW" | "MEDIUM" | "HIGH" | "URGENT" => {
     if (!pri) return "MEDIUM";
@@ -291,7 +292,7 @@ const WeeklyMachineScheduleEdit: React.FC = () => {
                             
                         </Col>
                         <Col lg={6} className="text-end">
-                            <CustomButton text="Back to List" icon={FaArrowLeft} onClick={() => navigate("/weekly-machine-schedules")} />
+                            <BackButton text="Back to List" to="/weekly-machine-schedules" />
                         </Col>
                     </Row>
                 </div>

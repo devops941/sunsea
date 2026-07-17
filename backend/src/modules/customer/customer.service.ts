@@ -55,8 +55,32 @@ class CustomerService {
       prisma.customer.count({ where: whereClause }),
     ]);
 
+    // Fetch creator names from User and Admin tables
+    const creatorIds = [...new Set(customers.map(c => c.createdBy).filter(Boolean))];
+    
+    // Split IDs into admin IDs and normal user IDs
+    const adminIds = creatorIds.filter(id => id.startsWith('admin_')).map(id => BigInt(id.replace('admin_', '')));
+    const userIds = creatorIds.filter(id => !id.startsWith('admin_'));
+
+    const [admins, users] = await Promise.all([
+      adminIds.length > 0 ? prisma.admin.findMany({ where: { id: { in: adminIds } }, select: { id: true, fullName: true, role: { select: { name: true } } } }) : [],
+      userIds.length > 0 ? prisma.user.findMany({ where: { userId: { in: userIds } }, select: { userId: true, fullName: true, role: { select: { name: true } } } }) : []
+    ]);
+
+    const adminMap = new Map(admins.map(a => [`admin_${a.id}`, { name: a.fullName, role: a.role?.name || 'Super Admin' }]));
+    const userMap = new Map(users.map(u => [u.userId, { name: u.fullName, role: u.role?.name || 'User' }]));
+
+    const customersWithCreators = customers.map(customer => {
+      const creatorInfo = adminMap.get(customer.createdBy) || userMap.get(customer.createdBy) || { name: 'Unknown User', role: 'Unknown Role' };
+      return {
+        ...customer,
+        createdUserName: creatorInfo.name,
+        createdUserRole: creatorInfo.role
+      };
+    });
+
     return {
-      customers,
+      customers: customersWithCreators,
       total,
       page,
       totalPages: Math.ceil(total / limit),
@@ -100,7 +124,30 @@ class CustomerService {
       );
     }
 
-    return customer;
+    let createdUserName = 'Unknown User';
+    let createdUserRole = 'Unknown Role';
+    if (customer.createdBy) {
+      if (customer.createdBy.startsWith('admin_')) {
+        const adminId = BigInt(customer.createdBy.replace('admin_', ''));
+        const admin = await prisma.admin.findUnique({ where: { id: adminId }, select: { fullName: true, role: { select: { name: true } } } });
+        if (admin) {
+            createdUserName = admin.fullName;
+            createdUserRole = admin.role?.name || 'Super Admin';
+        }
+      } else {
+        const user = await prisma.user.findUnique({ where: { userId: customer.createdBy }, select: { fullName: true, role: { select: { name: true } } } });
+        if (user) {
+            createdUserName = user.fullName;
+            createdUserRole = user.role?.name || 'User';
+        }
+      }
+    }
+
+    return {
+      ...customer,
+      createdUserName,
+      createdUserRole
+    };
   }
 
   async updateCustomer(

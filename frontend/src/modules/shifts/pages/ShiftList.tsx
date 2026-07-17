@@ -34,7 +34,7 @@ const calculateWorkingHours = (startTime: string, endTime: string, breakDuration
         const [sh, sm] = startTime.split(":").map(Number);
         const [eh, em] = endTime.split(":").map(Number);
 
-        let startMinutes = sh * 60 + sm;
+        const startMinutes = sh * 60 + sm;
         let endMinutes = eh * 60 + em;
 
         if (endMinutes < startMinutes) {

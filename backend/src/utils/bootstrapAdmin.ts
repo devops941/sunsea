@@ -8,6 +8,19 @@ export const bootstrapAdmin = async (prisma: PrismaClient) => {
 
   const passwordHash = await bcrypt.hash(adminPassword, 10);
 
+  // Ensure Admin role exists
+  const adminRole = await prisma.role.upsert({
+    where: { code: 'ROLE_ADMIN' },
+    update: {
+      name: 'Super Admin'
+    },
+    create: {
+      code: 'ROLE_ADMIN',
+      name: 'Super Admin',
+      description: 'System Administrator',
+    }
+  });
+
   // Create or Update Admin record in the new admins table
   const adminProfile = await prisma.admin.upsert({
     where: { email: adminEmail },
@@ -17,6 +30,7 @@ export const bootstrapAdmin = async (prisma: PrismaClient) => {
       email: adminEmail,
       phone: "9876543210",
       passwordHash,
+      roleId: adminRole.id,
     },
     create: {
       fullName: "Super Admin",
@@ -24,6 +38,7 @@ export const bootstrapAdmin = async (prisma: PrismaClient) => {
       email: adminEmail,
       phone: "9876543210",
       passwordHash,
+      roleId: adminRole.id,
     },
   });
 

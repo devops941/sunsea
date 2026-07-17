@@ -13,6 +13,7 @@ import { rawMaterialService } from "../../../../services/rawMaterialService";
 import type { RawMaterial } from "../../../../features/raw-materials/types";
 import Section from "../../../../components/ui/Section/Section";
 import SelectInput from "../../../../components/form/SelectInput/SelectInput";
+import BackButton from "../../../../components/ui/BackButton/BackButton";
 
 
 // â”€â”€â”€ Report-style read-only Field (matches QuotationForm / SalesOrderDetail) â”€â”€
@@ -239,11 +240,7 @@ const UpComingOrderDetailPage: React.FC = () => {
                         </Col>
                         <Col lg={6} md={12}>
                             <div className="page-header-actions">
-                                <CustomButton
-                                    text="Back to List"
-                                    icon={FaArrowLeft}
-                                    onClick={() => navigate("/purchase-orders")}
-                                />
+                                <BackButton text="Back to List" to="/purchase-orders" />
                             </div>
                         </Col>
                     </Row>

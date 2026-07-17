@@ -35,11 +35,11 @@ const HROrganizationTabs: React.FC = () => {
     const activeTab = pathToKey[location.pathname] || "employees";
 
     const tabs: TabItem[] = [
+        { key: "machines", label: "Machines", icon: <FaCogs />, content: <MachineList /> },
         { key: "employees", label: "Employees", icon: <FaUsers />, content: <Employeelist /> },
-        { key: "customers", label: "Customers", icon: <FaUserTie />, content: <CustomerListPage /> },
         { key: "suppliers", label: "Suppliers", icon: <FaTruck />, content: <SupplierListPage /> },
-        { key: "shifts", label: "Shift Management", icon: <FaClock />, content: <ShiftList /> },
-        { key: "machines", label: "Machines", icon: <FaCogs />, content: <MachineList /> }
+        { key: "customers", label: "Customers", icon: <FaUserTie />, content: <CustomerListPage /> },
+        { key: "shifts", label: "Shift Management", icon: <FaClock />, content: <ShiftList /> }
     ];
 
     const handleTabChange = (key: string) => {

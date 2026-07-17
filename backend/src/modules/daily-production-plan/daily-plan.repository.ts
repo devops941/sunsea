@@ -68,6 +68,8 @@ export class DailyPlanRepository {
     shiftId?: string;
     productionDate?: Date;
     status?: string;
+    page?: number;
+    limit?: number;
   }) {
     const where: any = {};
 
@@ -90,7 +92,7 @@ export class DailyPlanRepository {
       where.status = filters.status;
     }
 
-    return prisma.dailyProductionPlan.findMany({
+    const queryOptions: any = {
       where,
       orderBy: {
         productionDate: "desc",
@@ -110,7 +112,27 @@ export class DailyPlanRepository {
         carryForwardFrom: { select: { dailyPlanId: true } },
         carryForwardTo: { select: { dailyPlanId: true, productionDate: true, shiftId: true, status: true } },
       },
-    });
+    };
+
+    if (filters.page !== undefined || filters.limit !== undefined) {
+      const p = filters.page || 1;
+      const l = filters.limit || 10;
+      queryOptions.skip = (p - 1) * l;
+      queryOptions.take = l;
+    }
+
+    const [dailyPlans, total] = await Promise.all([
+      prisma.dailyProductionPlan.findMany(queryOptions),
+      prisma.dailyProductionPlan.count({ where }),
+    ]);
+
+    return {
+      dailyPlans,
+      total,
+      page: filters.page || 1,
+      limit: filters.limit || total,
+      totalPages: filters.limit ? Math.ceil(total / filters.limit) : 1,
+    };
   }
 
   async sumPlannedQtyForWeeklyProgram(weeklyProgramId: string, excludeDailyPlanId?: string, tx?: any) {

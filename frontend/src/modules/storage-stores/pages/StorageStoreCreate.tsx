@@ -12,6 +12,7 @@ import { fetchEmployees } from "../../../features/employee/employeeSlice";
 import { fetchStoreTypes } from "../../../features/store-types/storeTypeSlice";
 import { storeService } from "../../../services/storeService";
 import { z } from "zod";
+import BackButton from "../../../components/ui/BackButton/BackButton";
 
 const STATUS_OPTIONS = [
     { label: "Active", value: "Active" },
@@ -204,11 +205,7 @@ const StorageStoreCreate: React.FC = () => {
                 <div className="bg-white rounded-2xl shadow-sm border border-slate-200">
                     <div className="p-6 border-b border-slate-200 flex items-center justify-between">
                         <h2 className="text-2xl font-bold text-slate-800">Create Storage Store</h2>
-                        <CustomButton
-                            text="Back to List"
-                            icon={FaArrowLeft}
-                            onClick={() => navigate("/storage-stores")}
-                        />
+                        <BackButton text="Back to List" to="/storage-stores" />
                     </div>
 
                     <form onSubmit={handleSubmit} className="p-6" noValidate>

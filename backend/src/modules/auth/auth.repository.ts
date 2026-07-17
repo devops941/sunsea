@@ -58,15 +58,24 @@ export class AuthRepository {
   // ============================================================
 
   async findAdminByEmail(email: string) {
-    return prisma.admin.findUnique({ where: { email } });
+    return prisma.admin.findUnique({ 
+      where: { email },
+      include: { role: { select: { code: true, name: true } } }
+    });
   }
 
   async findAdminByUsername(username: string) {
-    return prisma.admin.findUnique({ where: { username } });
+    return prisma.admin.findUnique({ 
+      where: { username },
+      include: { role: { select: { code: true, name: true } } }
+    });
   }
 
   async findAdminById(id: bigint) {
-    return prisma.admin.findUnique({ where: { id } });
+    return prisma.admin.findUnique({ 
+      where: { id },
+      include: { role: { select: { code: true, name: true } } }
+    });
   }
 
   async updateAdminLastLogin(id: bigint) {

@@ -151,6 +151,9 @@ const DailyProductionPlanningPage: React.FC = () => {
     return Array.isArray(dailyPlans) ? dailyPlans : [];
   }, [dailyPlans]);
 
+  // Pagination state
+  const [visibleCount, setVisibleCount] = useState(10);
+
   // Stats
   const stats = useMemo(() => {
     const total = filteredPlans.length;

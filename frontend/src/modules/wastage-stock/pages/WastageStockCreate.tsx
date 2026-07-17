@@ -7,6 +7,7 @@ import TextInput from "../../../components/form/TextInput/TextInput";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import CustomButton from "../../../components/ui/Button/Button";
 import UOMSelect from "../../../components/form/SelectInput/UOMSelect";
+import BackButton from "../../../components/ui/BackButton/BackButton";
 
 const CATEGORY_OPTIONS = [
     { label: "Fabric Scraps", value: "Fabric Scraps" },
@@ -75,11 +76,7 @@ const WastageStockCreate: React.FC = () => {
                         </Col>
                         <Col lg={6} md={12}>
                             <div className="page-header-actions">
-                                <CustomButton
-                                    text="Back to List"
-                                    icon={FaArrowLeft}
-                                    onClick={() => navigate("/wastage-stock")}
-                                />
+                                <BackButton text="Back to List" to="/wastage-stock" />
                             </div>
                         </Col>
                     </Row>

@@ -41,13 +41,13 @@ const ProductMasterTabs: React.FC = () => {
     const activeTab = pathToKey[location.pathname] || "products";
 
     const tabs: TabItem[] = [
-        { key: "products", label: "Products", icon: <FaBox />, content: <ProductList /> },
-        { key: "categories", label: "Categories", icon: <FaTags />, content: <CategoryList /> },
         { key: "uoms", label: "UOM", icon: <FaWeightHanging />, content: <UomList /> },
         { key: "colours", label: "Colors", icon: <FaPalette />, content: <ColourList /> },
         { key: "sizes", label: "Sizes", icon: <FaRulerCombined />, content: <SizeList /> },
+        { key: "categories", label: "Categories", icon: <FaTags />, content: <CategoryList /> },
+        { key: "raw_material_categories", label: "RM Categories", icon: <FaLayerGroup />, content: <RawMaterialCategoryList /> },
         { key: "raw_materials", label: "Raw Materials", icon: <FaBoxes />, content: <RawMaterialList /> },
-        { key: "raw_material_categories", label: "RM Categories", icon: <FaLayerGroup />, content: <RawMaterialCategoryList /> }
+        { key: "products", label: "Products", icon: <FaBox />, content: <ProductList /> }
     ];
 
     const handleTabChange = (key: string) => {

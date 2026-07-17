@@ -178,7 +178,7 @@ export default function DatePickerCalendar({
   const cells = buildMonthGrid(viewYear, viewMonth);
 
   return (
-    <div ref={containerRef} className="relative w-full font-sans mb-[18px] group">
+    <div ref={containerRef} className="relative w-full font-sans  group">
       {label && (
         <label
           className={`

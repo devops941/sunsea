@@ -256,6 +256,8 @@ class DailyPlanService {
     shiftId?: string;
     productionDate?: string;
     status?: string;
+    page?: number;
+    limit?: number;
   }) {
     let dateObj: Date | undefined;
     if (filters.productionDate) {
@@ -270,6 +272,8 @@ class DailyPlanService {
       shiftId: filters.shiftId,
       productionDate: dateObj,
       status: filters.status,
+      page: filters.page,
+      limit: filters.limit,
     });
   }
 }

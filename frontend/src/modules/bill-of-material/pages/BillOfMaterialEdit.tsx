@@ -12,6 +12,7 @@ import { rawMaterialService } from "../../../services/rawMaterialService";
 import { uomService } from "../../../services/uomService";
 import { billOfMaterialService } from "../../../services/billOfMaterialService";
 import { toast } from "react-toastify";
+import BackButton from "../../../components/ui/BackButton/BackButton";
 
 const BillOfMaterialEdit: React.FC = () => {
     const navigate = useNavigate();
@@ -201,11 +202,7 @@ const BillOfMaterialEdit: React.FC = () => {
                         </h2>
                     </div>
                     <div>
-                        <CustomButton
-                            text="Back to List"
-                            icon={FaArrowLeft}
-                            onClick={() => navigate("/bill-of-materials")}
-                        />
+                        <BackButton text="Back to List" to="/bill-of-materials" />
                     </div>
                 </div>
 

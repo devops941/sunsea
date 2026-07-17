@@ -71,8 +71,8 @@ async function main() {
     },
     {
       code: 'ROLE_ADMIN',
-      name: 'IT / ERP Admin',
-      description: 'Users, Roles, Audit and System management',
+      name: 'Super Admin',
+      description: 'System Administrator',
     },
   ];
 
@@ -1410,6 +1410,30 @@ async function main() {
         { sizeCode: "SZ-LARGE", sizeName: "Large", description: "Standard Large", isActive: false },
       ]
     });
+  }
+  // Seed Super Admin
+  const adminRoleFromDbForSeed = await prisma.role.findUnique({
+    where: { code: "ROLE_ADMIN" }
+  });
+
+  if (adminRoleFromDbForSeed) {
+    const adminPasswordHash = await bcrypt.hash('admin123', 10);
+    
+    await prisma.admin.upsert({
+      where: { username: 'admin' },
+      update: {
+        roleId: adminRoleFromDbForSeed.id
+      },
+      create: {
+        fullName: 'Super Admin',
+        email: 'admin@sunsea.com',
+        username: 'admin',
+        passwordHash: adminPasswordHash,
+        status: UserStatus.active,
+        roleId: adminRoleFromDbForSeed.id
+      }
+    });
+    console.log("🌱 Super Admin created/updated with role.");
   }
 
   console.log('✅ Seed completed successfully!');
