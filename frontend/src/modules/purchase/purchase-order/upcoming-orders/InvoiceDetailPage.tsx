@@ -23,6 +23,11 @@ import { useUOMs } from "../../../../hooks/useUOMs";
 import { rawMaterialService } from "../../../../services/rawMaterialService";
 import { selectActiveGstTaxes, fetchGstTaxes } from "../../../../features/gst/gstSlice";
 import { fetchStores } from "../../../../features/stores/storeSlice";
+import { useSelector } from "react-redux";
+import FileUpload from "../../../../components/form/FileUpload/FileUpload";
+import CommonLoader from "../../../../components/ui/Loader/CommonLoader";
+
+
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface GRNItem {
@@ -33,6 +38,12 @@ interface GRNItem {
     unitPrice: number;
     tax: number;
     taxableAmount: number;
+    cgstRate: number;
+    cgstAmount: number;
+    sgstRate: number;
+    sgstAmount: number;
+    igstRate: number;
+    igstAmount: number;
     netAmount: number;
 }
 
@@ -44,8 +55,15 @@ const emptyItem = (): GRNItem => ({
     unitPrice: 0,
     tax: 0,
     taxableAmount: 0,
+    cgstRate: 0,
+    cgstAmount: 0,
+    sgstRate: 0,
+    sgstAmount: 0,
+    igstRate: 0,
+    igstAmount: 0,
     netAmount: 0,
 });
+
 
 // ─── Component ────────────────────────────────────────────────────────────────
 const InvoiceDetailPage: React.FC = () => {
@@ -57,6 +75,8 @@ const InvoiceDetailPage: React.FC = () => {
     const gstTaxes = useAppSelector(selectActiveGstTaxes);
     const gstLoading = useAppSelector((state: any) => state.gst.loading);
     const { activeUOMs, loadActiveUOMs } = useUOMs();
+    const { data: company } = useSelector((state: any) => state.company);
+    const companyState = company?.state;
 
     const [saving, setSaving] = useState(false);
     const [loadingPOs, setLoadingPOs] = useState(true);
@@ -64,6 +84,7 @@ const InvoiceDetailPage: React.FC = () => {
     const [approvedPOs, setApprovedPOs] = useState<PurchaseOrder[]>([]);
     const [selectedPO, setSelectedPO] = useState<any>(null);
     const [rawMaterials, setRawMaterials] = useState<any[]>([]);
+
 
     // ── Form ─────────────────────────────────────────────────────────────────────
     const [form, setForm] = useState({
@@ -108,6 +129,10 @@ const InvoiceDetailPage: React.FC = () => {
     });
 
     const [items, setItems] = useState<GRNItem[]>([]);
+    const isInterState = useMemo(() => {
+        if (!companyState || !form.shippingState) return false;
+        return companyState.toLowerCase().trim() !== form.shippingState.toLowerCase().trim();
+    }, [companyState, form.shippingState]);
     const [errors, setErrors] = useState<Record<string, string>>({});
 
     // ── Fetch on mount ────────────────────────────────────────────────────────────
@@ -145,6 +170,30 @@ const InvoiceDetailPage: React.FC = () => {
         };
         fetchRawMaterials();
     }, []);
+
+    //---- gst api--//
+
+    useEffect(() => {
+        setItems((prev) => {
+            if (prev.length === 0) return prev;
+            return prev.map((item) => {
+                const taxableAmount = item.qty * item.unitPrice;
+                const totalGstAmount = (taxableAmount * item.tax) / 100;
+                let cgstRate = 0, cgstAmount = 0, sgstRate = 0, sgstAmount = 0, igstRate = 0, igstAmount = 0;
+                if (isInterState) {
+                    igstRate = item.tax;
+                    igstAmount = totalGstAmount;
+                } else {
+                    cgstRate = item.tax / 2;
+                    sgstRate = item.tax / 2;
+                    cgstAmount = totalGstAmount / 2;
+                    sgstAmount = totalGstAmount / 2;
+                }
+                return { ...item, taxableAmount, cgstRate, cgstAmount, sgstRate, sgstAmount, igstRate, igstAmount, netAmount: taxableAmount + totalGstAmount };
+            });
+        });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isInterState]);
 
     // ── When PO selected → auto-fill ─────────────────────────────────────────────
     useEffect(() => {
@@ -321,10 +370,14 @@ const InvoiceDetailPage: React.FC = () => {
     // ── Computed totals ───────────────────────────────────────────────────────────
     const subtotal = useMemo(() => items.reduce((sum, i) => sum + i.qty * i.unitPrice, 0), [items]);
     const totalTax = useMemo(() => items.reduce((sum, i) => sum + (i.qty * i.unitPrice * i.tax) / 100, 0), [items]);
+    const totalCgst = useMemo(() => items.reduce((sum, i) => sum + i.cgstAmount, 0), [items]);
+    const totalSgst = useMemo(() => items.reduce((sum, i) => sum + i.sgstAmount, 0), [items]);
+    const totalIgst = useMemo(() => items.reduce((sum, i) => sum + i.igstAmount, 0), [items]);
     const discountAmount = useMemo(() => {
         if (form.discountType === "percent") return (subtotal * form.discountValue) / 100;
         return Number(form.discountValue) || 0;
     }, [subtotal, form.discountType, form.discountValue]);
+
     const [roundingSign, setRoundingSign] = useState<"+" | "-">("+");
 
     const grandTotal = useMemo(() => {
@@ -387,9 +440,27 @@ const InvoiceDetailPage: React.FC = () => {
 
             const lineSubtotal = item.qty * item.unitPrice;
             const taxableAmount = lineSubtotal;
-            const taxAmt = (taxableAmount * item.tax) / 100;
+            const totalGstAmount = (taxableAmount * item.tax) / 100;
+
+            let cgstRate = 0, cgstAmount = 0, sgstRate = 0, sgstAmount = 0, igstRate = 0, igstAmount = 0;
+            if (isInterState) {
+                igstRate = item.tax;
+                igstAmount = totalGstAmount;
+            } else {
+                cgstRate = item.tax / 2;
+                sgstRate = item.tax / 2;
+                cgstAmount = totalGstAmount / 2;
+                sgstAmount = totalGstAmount / 2;
+            }
+
             updated[index].taxableAmount = taxableAmount;
-            updated[index].netAmount = taxableAmount + taxAmt;
+            updated[index].cgstRate = cgstRate;
+            updated[index].cgstAmount = cgstAmount;
+            updated[index].sgstRate = sgstRate;
+            updated[index].sgstAmount = sgstAmount;
+            updated[index].igstRate = igstRate;
+            updated[index].igstAmount = igstAmount;
+            updated[index].netAmount = taxableAmount + totalGstAmount;
             return updated;
         });
     };
@@ -472,6 +543,10 @@ const InvoiceDetailPage: React.FC = () => {
             payload.append("discountType", form.discountType.toUpperCase());
             payload.append("discountValue", String(form.discountValue));
             payload.append("roundingAdjust", String(form.roundingAdjust));
+            payload.append("totalTax", String(totalTax));
+            payload.append("totalCgst", String(totalCgst));
+            payload.append("totalSgst", String(totalSgst));
+            payload.append("totalIgst", String(totalIgst));
 
             payload.append("paymentStatus", form.paymentStatus);
             if (form.paymentMethod) payload.append("paymentMethod", form.paymentMethod);
@@ -489,6 +564,13 @@ const InvoiceDetailPage: React.FC = () => {
                         quantity: Number(item.qty),
                         unitPrice: Number(item.unitPrice),
                         tax: Number(item.tax || 0),
+                        taxableAmount: item.taxableAmount || 0,
+                        cgstRate: item.cgstRate || 0,
+                        cgstAmount: item.cgstAmount || 0,
+                        sgstRate: item.sgstRate || 0,
+                        sgstAmount: item.sgstAmount || 0,
+                        igstRate: item.igstRate || 0,
+                        igstAmount: item.igstAmount || 0,
                     }))
                 )
             );
@@ -512,11 +594,7 @@ const InvoiceDetailPage: React.FC = () => {
     const isPOSelected = !!form.poId && !!selectedPO;
 
     if (loadingPOs) {
-        return (
-            <div className="inner-container d-flex justify-content-center align-items-center" style={{ minHeight: "300px" }}>
-                <div className="animate-spin rounded-full border-b-2 border-indigo-600 h-8 w-8"></div>
-            </div>
-        );
+        return <CommonLoader text="Loading..." fullScreen={false} />;
     }
 
     return (
@@ -668,21 +746,12 @@ const InvoiceDetailPage: React.FC = () => {
                                 </div>
                             </div>
                             <div>
-                                <label className="block text-sm font-semibold text-gray-700 mb-1">Invoice Copy Upload</label>
-                                <input
-                                    type="file"
-                                    accept="image/png,image/jpeg,image/webp,application/pdf"
-                                    className="w-full text-sm border border-gray-300 rounded p-2 focus:ring-1 focus:ring-blue-500 outline-none"
+                                <FileUpload
+                                    label={form.invoiceImage ? `Invoice: ${form.invoiceImage}` : "Upload Invoice"}
+                                    name="invoiceImage"
                                     onChange={handleFileChange}
                                 />
                             </div>
-                        </div>
-                    </div>
-
-                    {/* Remarks */}
-                    <div className="grid grid-cols-1 gap-6 mt-6">
-                        <div>
-                            <TextArea label="Remarks (Optional)" name="remarks" value={form.remarks} placeholder="Additional notes..." rows={2} onChange={(e) => setForm(p => ({ ...p, remarks: e.target.value }))} />
                         </div>
                     </div>
 
@@ -767,9 +836,20 @@ const InvoiceDetailPage: React.FC = () => {
                         </table>
                     </div>
 
-                    {/* Summary section */}
-                    <div className="flex flex-col md:flex-row justify-end mt-6">
-                        <div className="w-full md:w-1/2 lg:w-1/3 border border-gray-200 rounded-lg overflow-hidden shadow-sm">
+                    {/* Remarks + Summary section */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
+                        <div className="col-span-2">
+                            <TextArea
+                                label="Remarks (Optional)"
+                                name="remarks"
+                                value={form.remarks}
+                                placeholder="Additional notes..."
+                                rows={4}
+                                onChange={(e) => setForm(p => ({ ...p, remarks: e.target.value }))}
+                            />
+                        </div>
+
+                        <div className="border border-gray-200 rounded-lg overflow-hidden shadow-sm h-fit">
                             <div className="bg-white px-4 py-3 border-b border-gray-200 font-semibold text-gray-700">Order Summary</div>
                             <div className="p-4 space-y-3 bg-white">
                                 <div className="flex justify-between text-sm text-gray-600">
@@ -797,20 +877,10 @@ const InvoiceDetailPage: React.FC = () => {
                                     <span>Rounding</span>
                                     <div className="flex items-center gap-2">
                                         <div className="flex items-center">
-                                            <button
-                                                type="button"
-                                                onClick={() => setRoundingSign("+")}
-                                                className={`px-2 py-1 border border-gray-300 rounded-l text-xs font-semibold ${roundingSign === "+" ? "bg-blue-600 text-white border-blue-600" : "bg-gray-50 text-gray-600"}`}
-                                            >
-                                                +
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => setRoundingSign("-")}
-                                                className={`px-2 py-1 border border-gray-300 border-l-0 rounded-r text-xs font-semibold ${roundingSign === "-" ? "bg-red-500 text-white border-red-500" : "bg-gray-50 text-gray-600"}`}
-                                            >
-                                                -
-                                            </button>
+                                            <button type="button" onClick={() => setRoundingSign("+")}
+                                                className={`px-2 py-1 border border-gray-300 rounded-l text-xs font-semibold ${roundingSign === "+" ? "bg-blue-600 text-white border-blue-600" : "bg-gray-50 text-gray-600"}`}>+</button>
+                                            <button type="button" onClick={() => setRoundingSign("-")}
+                                                className={`px-2 py-1 border border-gray-300 border-l-0 rounded-r text-xs font-semibold ${roundingSign === "-" ? "bg-red-500 text-white border-red-500" : "bg-gray-50 text-gray-600"}`}>-</button>
                                         </div>
                                         <input type="number" min={0} step={0.01} value={form.roundingAdjust}
                                             onChange={(e) => setForm((p) => ({ ...p, roundingAdjust: Math.abs(Number(e.target.value)) }))}
@@ -819,13 +889,26 @@ const InvoiceDetailPage: React.FC = () => {
                                         />
                                     </div>
                                 </div>
-                                <div className="flex justify-between text-sm text-gray-600">
-                                    <span>Total Tax</span>
-                                    <span className="font-semibold text-green-600">₹{totalTax.toFixed(2)}</span>
-                                </div>
+                                {isInterState ? (
+                                    <div className="flex justify-between text-sm text-gray-600">
+                                        <span>Total IGST</span>
+                                        <span className="font-semibold text-green-600">+ ₹{totalIgst.toFixed(2)}</span>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <div className="flex justify-between text-sm text-gray-600">
+                                            <span>Total CGST</span>
+                                            <span className="font-semibold text-green-600">+ ₹{totalCgst.toFixed(2)}</span>
+                                        </div>
+                                        <div className="flex justify-between text-sm text-gray-600">
+                                            <span>Total SGST</span>
+                                            <span className="font-semibold text-green-600">+ ₹{totalSgst.toFixed(2)}</span>
+                                        </div>
+                                    </>
+                                )}
                             </div>
                             <div className="bg-white px-4 py-3 border-t border-gray-200 flex justify-between items-center">
-                                <span className="font-bold text-gray-800">Grand Total</span>
+                                <span className="font-bold text-gray-800">Net Amount</span>
                                 <span className="font-extrabold text-blue-600 text-lg">₹{grandTotal.toFixed(2)}</span>
                             </div>
                         </div>

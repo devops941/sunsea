@@ -232,7 +232,7 @@ const EmployeeCreatePage: React.FC = () => {
         </div>
       </div>
 
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+      <div className="bg-white  border border-gray-200">
         <form onSubmit={handleSubmit} className="px-6 py-6 space-y-8" noValidate>
           {/* General Info */}
           <div>

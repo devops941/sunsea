@@ -434,7 +434,7 @@ const StockAdjustmentForm: React.FC = () => {
   // ── Render ──────────────────────────────
   return (
     <div className="w-full mx-auto">
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+      <div className="bg-white  border border-gray-200">
         {/* Page Header */}
         <div className="px-6 py-4 border-b border-gray-100">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -578,67 +578,67 @@ const StockAdjustmentForm: React.FC = () => {
                       <th className="px-3 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200 min-w-[150px]">ISSUE QTY*</th>
                       <th className="px-3 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200 min-w-[180px]">REMARKS</th>
                     </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {pmiItems.map((item, index) => {
-                        const isOver = item.issueQty > item.availableStock;
-                        return (
-                          <tr key={index} className={`hover:bg-slate-50/50 transition-colors ${isOver ? 'bg-red-50' : ''}`}>
-                            <td className="px-4 py-3 font-mono text-xs">{item.rawMaterialId}</td>
-                            <td className="px-4 py-3 font-medium text-slate-800">{item.materialName}</td>
-                            <td className="px-4 py-3 text-right">{Number(item.requiredQty).toFixed(2)}</td>
-                            <td className="px-4 py-3 text-right">{Number(item.reservedQty).toFixed(2)}</td>
-                            <td className="px-4 py-3 text-right">{Number(item.alreadyIssuedQty).toFixed(2)}</td>
-                            <td className="px-4 py-3 text-right text-yellow-600 font-semibold">{Number(item.remainingQty).toFixed(2)}</td>
-                            <td className="px-4 py-3 text-right text-green-600 font-semibold">{Number(item.availableStock).toFixed(2)}</td>
-                            <td className="px-4 py-3 text-slate-500">{item.uom}</td>
-                            <td className="px-4 py-3 align-top">
-                              <SelectInput
-                                label=""
-                                hideLabel
-                                noMargin
-                                name={`storeId-${index}`}
-                                value={item.storeId || ""}
-                                options={[
-                                  { label: "Select Store", value: "" },
-                                  ...stores.map((s) => ({
-                                    label: s.storeName,
-                                    value: s.storeId,
-                                  })),
-                                ]}
-                                onChange={(e) =>
-                                  handlePMIItemChange(index, "storeId", e.target.value)
-                                }
-                              />
-                            </td>
-                            <td className="px-4 py-3 align-top">
-                              <QuantityInput
-                                label=""
-                                name={`issueQty-${index}`}
-                                value={item.issueQty}
-                                baseUoms={item.uom}
-                                step="0.001"
-                                onChange={(e: any) =>
-                                  handlePMIItemChange(index, "issueQty", Number(e.target.value))
-                                }
-                              />
-                            </td>
-                            <td className="px-4 py-3 align-top">
-                              <TextInput
-                                label=""
-                                name={`remarks-${index}`}
-                                placeholder="Remarks..."
-                                value={item.remarks || ""}
-                                onChange={(e) =>
-                                  handlePMIItemChange(index, "remarks", e.target.value)
-                                }
-                              />
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {pmiItems.map((item, index) => {
+                      const isOver = item.issueQty > item.availableStock;
+                      return (
+                        <tr key={index} className={`hover:bg-slate-50/50 transition-colors ${isOver ? 'bg-red-50' : ''}`}>
+                          <td className="px-4 py-3 font-mono text-xs">{item.rawMaterialId}</td>
+                          <td className="px-4 py-3 font-medium text-slate-800">{item.materialName}</td>
+                          <td className="px-4 py-3 text-right">{Number(item.requiredQty).toFixed(2)}</td>
+                          <td className="px-4 py-3 text-right">{Number(item.reservedQty).toFixed(2)}</td>
+                          <td className="px-4 py-3 text-right">{Number(item.alreadyIssuedQty).toFixed(2)}</td>
+                          <td className="px-4 py-3 text-right text-yellow-600 font-semibold">{Number(item.remainingQty).toFixed(2)}</td>
+                          <td className="px-4 py-3 text-right text-green-600 font-semibold">{Number(item.availableStock).toFixed(2)}</td>
+                          <td className="px-4 py-3 text-slate-500">{item.uom}</td>
+                          <td className="px-4 py-3 align-top">
+                            <SelectInput
+                              label=""
+                              hideLabel
+                              noMargin
+                              name={`storeId-${index}`}
+                              value={item.storeId || ""}
+                              options={[
+                                { label: "Select Store", value: "" },
+                                ...stores.map((s) => ({
+                                  label: s.storeName,
+                                  value: s.storeId,
+                                })),
+                              ]}
+                              onChange={(e) =>
+                                handlePMIItemChange(index, "storeId", e.target.value)
+                              }
+                            />
+                          </td>
+                          <td className="px-4 py-3 align-top">
+                            <QuantityInput
+                              label=""
+                              name={`issueQty-${index}`}
+                              value={item.issueQty}
+                              baseUoms={item.uom}
+                              step="0.001"
+                              onChange={(e: any) =>
+                                handlePMIItemChange(index, "issueQty", Number(e.target.value))
+                              }
+                            />
+                          </td>
+                          <td className="px-4 py-3 align-top">
+                            <TextInput
+                              label=""
+                              name={`remarks-${index}`}
+                              placeholder="Remarks..."
+                              value={item.remarks || ""}
+                              onChange={(e) =>
+                                handlePMIItemChange(index, "remarks", e.target.value)
+                              }
+                            />
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             </div>
           )}
@@ -667,149 +667,149 @@ const StockAdjustmentForm: React.FC = () => {
                       <th className="px-3 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200 min-w-[150px]">REMARKS</th>
                       <th className="px-3 py-3 text-center text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200 w-16">ACTION</th>
                     </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {formData.items.length > 0 ? (
-                        formData.items.map((item: any, index: number) => {
-                          const itemSelectionError =
-                            errors[`items.${index}.rawMaterialId`] ||
-                            errors[`items.${index}.productItemId`] ||
-                            errors[`items.${index}.itemSelection`];
-                          const storeError = errors[`items.${index}.storeId`];
-                          const adjustedQtyError = errors[`items.${index}.adjustedQty`];
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {formData.items.length > 0 ? (
+                      formData.items.map((item: any, index: number) => {
+                        const itemSelectionError =
+                          errors[`items.${index}.rawMaterialId`] ||
+                          errors[`items.${index}.productItemId`] ||
+                          errors[`items.${index}.itemSelection`];
+                        const storeError = errors[`items.${index}.storeId`];
+                        const adjustedQtyError = errors[`items.${index}.adjustedQty`];
 
-                          return (
-                            <tr key={index} className="hover:bg-slate-50/50 transition-colors">
-                              <td className="px-4 py-3 align-top">
+                        return (
+                          <tr key={index} className="hover:bg-slate-50/50 transition-colors">
+                            <td className="px-4 py-3 align-top">
+                              <SelectInput
+                                label=""
+                                hideLabel
+                                noMargin
+                                name={`itemType-${index}`}
+                                value={item.itemType}
+                                options={[
+                                  { label: "Raw Material", value: "RAW_MATERIAL" },
+                                  { label: "Finished Goods", value: "FINISHED_GOODS" },
+                                ]}
+                                onChange={(e) =>
+                                  handleItemChange(index, "itemType", e.target.value)
+                                }
+                              />
+                            </td>
+                            <td className="px-4 py-3 align-top">
+                              {item.itemType === "RAW_MATERIAL" ? (
                                 <SelectInput
                                   label=""
                                   hideLabel
                                   noMargin
-                                  name={`itemType-${index}`}
-                                  value={item.itemType}
-                                  options={[
-                                    { label: "Raw Material", value: "RAW_MATERIAL" },
-                                    { label: "Finished Goods", value: "FINISHED_GOODS" },
-                                  ]}
-                                  onChange={(e) =>
-                                    handleItemChange(index, "itemType", e.target.value)
-                                  }
-                                />
-                              </td>
-                              <td className="px-4 py-3 align-top">
-                                {item.itemType === "RAW_MATERIAL" ? (
-                                  <SelectInput
-                                    label=""
-                                    hideLabel
-                                    noMargin
-                                    name={`rawMaterialId-${index}`}
-                                    value={item.rawMaterialId || ""}
-                                    error={itemSelectionError}
-                                    required
-                                    options={[
-                                      { label: "Select Material", value: "" },
-                                      ...rawMaterials.map((rm) => ({
-                                        label: `${rm.materialName} (${rm.rawMaterialId})`,
-                                        value: rm.rawMaterialId,
-                                      })),
-                                    ]}
-                                    onChange={(e) =>
-                                      handleItemChange(index, "rawMaterialId", e.target.value)
-                                    }
-                                  />
-                                ) : (
-                                  <SelectInput
-                                    label=""
-                                    hideLabel
-                                    noMargin
-                                    name={`productItemId-${index}`}
-                                    value={item.productItemId || ""}
-                                    error={itemSelectionError}
-                                    required
-                                    options={[
-                                      { label: "Select Product", value: "" },
-                                      ...products.map((p) => ({
-                                        label: `${p.productName} (${p.productCode})`,
-                                        value: p.id.toString(),
-                                      })),
-                                    ]}
-                                    onChange={(e) =>
-                                      handleItemChange(index, "productItemId", e.target.value)
-                                    }
-                                  />
-                                )}
-                              </td>
-                              <td className="px-4 py-3 align-top">
-                                <SelectInput
-                                  label=""
-                                  hideLabel
-                                  noMargin
-                                  name={`storeId-${index}`}
-                                  value={item.storeId || ""}
-                                  error={storeError}
+                                  name={`rawMaterialId-${index}`}
+                                  value={item.rawMaterialId || ""}
+                                  error={itemSelectionError}
                                   required
                                   options={[
-                                    { label: "Select Store", value: "" },
-                                    ...stores.map((s) => ({
-                                      label: s.storeName,
-                                      value: s.storeId,
+                                    { label: "Select Material", value: "" },
+                                    ...rawMaterials.map((rm) => ({
+                                      label: `${rm.materialName} (${rm.rawMaterialId})`,
+                                      value: rm.rawMaterialId,
                                     })),
                                   ]}
                                   onChange={(e) =>
-                                    handleItemChange(index, "storeId", e.target.value)
+                                    handleItemChange(index, "rawMaterialId", e.target.value)
                                   }
                                 />
-                              </td>
-                              <td className="px-4 py-3 align-top text-right pt-4">
-                                {String(item.currentQty)}
-                              </td>
-                              <td className="px-4 py-3 align-top">
-                                <TextInput
+                              ) : (
+                                <SelectInput
                                   label=""
-                                  name={`adjustedQty-${index}`}
-                                  type="number"
-                                  value={String(item.adjustedQty)}
-                                  error={adjustedQtyError}
+                                  hideLabel
+                                  noMargin
+                                  name={`productItemId-${index}`}
+                                  value={item.productItemId || ""}
+                                  error={itemSelectionError}
                                   required
-                                  onChange={(e: any) =>
-                                    handleItemChange(index, "adjustedQty", e.target.value)
+                                  options={[
+                                    { label: "Select Product", value: "" },
+                                    ...products.map((p) => ({
+                                      label: `${p.productName} (${p.productCode})`,
+                                      value: p.id.toString(),
+                                    })),
+                                  ]}
+                                  onChange={(e) =>
+                                    handleItemChange(index, "productItemId", e.target.value)
                                   }
                                 />
-                              </td>
-                              <td className={`px-4 py-3 align-top text-center pt-4 font-bold ${item.difference > 0
-                                ? "text-green-600"
-                                : item.difference < 0
-                                  ? "text-red-600"
-                                  : "text-slate-400"
-                                }`}>
-                                {item.difference > 0 ? `+${item.difference}` : item.difference}
-                              </td>
-                              <td className="px-4 py-3 align-top">
-                                <TextInput
-                                  label=""
-                                  name={`remarks-${index}`}
-                                  placeholder="Remarks"
-                                  value={item.remarks || ""}
-                                  onChange={(e: any) =>
-                                    handleItemChange(index, "remarks", e.target.value)
-                                  }
-                                />
-                              </td>
-                              <td className="px-4 py-3 align-top text-center pt-4">
-                                <DeleteButton onClick={() => removeItem(index)} />
-                              </td>
-                            </tr>
-                          );
-                        })
-                      ) : (
-                        <tr>
-                          <td colSpan={8} className="text-center py-8 text-slate-500">
-                            No adjustment items added. Click "Add Item" to begin.
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 align-top">
+                              <SelectInput
+                                label=""
+                                hideLabel
+                                noMargin
+                                name={`storeId-${index}`}
+                                value={item.storeId || ""}
+                                error={storeError}
+                                required
+                                options={[
+                                  { label: "Select Store", value: "" },
+                                  ...stores.map((s) => ({
+                                    label: s.storeName,
+                                    value: s.storeId,
+                                  })),
+                                ]}
+                                onChange={(e) =>
+                                  handleItemChange(index, "storeId", e.target.value)
+                                }
+                              />
+                            </td>
+                            <td className="px-4 py-3 align-top text-right pt-4">
+                              {String(item.currentQty)}
+                            </td>
+                            <td className="px-4 py-3 align-top">
+                              <TextInput
+                                label=""
+                                name={`adjustedQty-${index}`}
+                                type="number"
+                                value={String(item.adjustedQty)}
+                                error={adjustedQtyError}
+                                required
+                                onChange={(e: any) =>
+                                  handleItemChange(index, "adjustedQty", e.target.value)
+                                }
+                              />
+                            </td>
+                            <td className={`px-4 py-3 align-top text-center pt-4 font-bold ${item.difference > 0
+                              ? "text-green-600"
+                              : item.difference < 0
+                                ? "text-red-600"
+                                : "text-slate-400"
+                              }`}>
+                              {item.difference > 0 ? `+${item.difference}` : item.difference}
+                            </td>
+                            <td className="px-4 py-3 align-top">
+                              <TextInput
+                                label=""
+                                name={`remarks-${index}`}
+                                placeholder="Remarks"
+                                value={item.remarks || ""}
+                                onChange={(e: any) =>
+                                  handleItemChange(index, "remarks", e.target.value)
+                                }
+                              />
+                            </td>
+                            <td className="px-4 py-3 align-top text-center pt-4">
+                              <DeleteButton onClick={() => removeItem(index)} />
+                            </td>
+                          </tr>
+                        );
+                      })
+                    ) : (
+                      <tr>
+                        <td colSpan={8} className="text-center py-8 text-slate-500">
+                          No adjustment items added. Click "Add Item" to begin.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
               </div>
             </div>
           )}

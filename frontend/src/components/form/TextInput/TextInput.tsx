@@ -7,6 +7,7 @@ interface TextInputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement
   value: string;
   placeholder?: string;
   required?: boolean;
+  bottom?: boolean;
   icon?: React.ReactNode;
   trailingIcon?: React.ReactNode;
   step?: number | string;
@@ -28,6 +29,7 @@ const TextInput: React.FC<TextInputProps> = ({
   required = false,
   icon,
   trailingIcon,
+  bottom,
   error,
   disabled = false,
   onChange,
@@ -61,7 +63,7 @@ const TextInput: React.FC<TextInputProps> = ({
   };
 
   return (
-    <div className="mb-[18px] group">
+    <div className={`${bottom ? "" : "mb-[18px]"} group`}>
       {label && (
         <label
           htmlFor={name}
@@ -150,7 +152,7 @@ const TextInput: React.FC<TextInputProps> = ({
             {...rest}
           />
         )}
-        
+
         {trailingIcon && (
           <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center justify-center text-slate-400">
             {trailingIcon}

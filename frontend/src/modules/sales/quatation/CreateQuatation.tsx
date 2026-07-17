@@ -11,6 +11,7 @@ import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import CustomButton from "../../../components/ui/Button/Button";
 import BackButton from "../../../components/ui/BackButton/BackButton";
 import DetailBox from "../../../components/ui/DetailBox/DetailBox";
+import CommonLoader from "../../../components/ui/Loader/CommonLoader";
 import { useCustomers } from "../../../hooks/useCustomers";
 import { useProducts } from "../../../hooks/useProducts";
 import { useEmployees } from "../../../hooks/useEmployees";
@@ -628,31 +629,31 @@ const QuotationForm: React.FC = () => {
         pincode: watch("shippingPincode"),
     };
 
-    
+
 
     return (
         <div className="w-full mx-auto">
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-                {/* Page Header */}
-                <div className="px-6 py-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                        <div>
-                            <h2 className="text-xl font-bold text-gray-800">
-                                {isEditMode ? "Edit Quotation" : "Create Quotation"}
-                            </h2>
-                        </div>
-                        <div>
-                            <BackButton text="Back to List" />
-                        </div>
-                    </div>
-                </div>
+            {isLoading ? (
+                <CommonLoader text="Loading data..." fullScreen={false} />
+            ) : (
+                <div className="bg-white  border border-gray-200">
 
-                {isLoading ? (
-                    <div className="flex flex-col items-center justify-center py-20">
-                        <FaCircleNotch className="animate-spin text-primary text-4xl mb-4" />
-                        <p className="text-gray-500">Loading data...</p>
+
+                    {/* Page Header */}
+                    <div className="px-6 py-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                            <div>
+                                <h2 className="text-xl font-bold text-gray-800">
+                                    {isEditMode ? "Edit Quotation" : "Create Quotation"}
+                                </h2>
+                            </div>
+                            <div>
+                                <BackButton text="Back to List" />
+                            </div>
+                        </div>
                     </div>
-                ) : (
+
+
                     <form className="px-6 py-3 space-y-4" onSubmit={handleSubmit((data) => onSubmit(data, false))} noValidate>
                         {/* ── Draft Order Selector (only in create mode) ── */}
                         {!isEditMode && (
@@ -788,6 +789,8 @@ const QuotationForm: React.FC = () => {
                                                                     control={control}
                                                                     render={({ field: f }) => (
                                                                         <SelectInput
+                                                                            hideLabel
+                                                                            noMargin={true}
                                                                             label=""
                                                                             name={f.name}
                                                                             value={f.value ?? ""}
@@ -936,8 +939,10 @@ const QuotationForm: React.FC = () => {
                             </>
                         )}
                     </form>
-                )}
-            </div>
+
+
+                </div>
+            )}
         </div>
     );
 };

@@ -58,26 +58,25 @@ const UOMList: React.FC = () => {
                     </div>
 
                     {/* UOMs Table */}
-                    {loading && units.length === 0 ? (
-                        <div className="flex justify-center items-center h-64">
-                            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"></div>
-                        </div>
-                    ) : error ? (
+                    {error ? (
                         <div className="text-center p-5 text-red-500">
                             {error}
                         </div>
                     ) : (
-                        <DataTable
-                            columns={columns}
-                            data={paginatedUOMs}
-                            rowKey={(row) => `${row.category}-${row.code}`}
-                            emptyMessage="No UOMs found."
-                            pagination={totalPages > 1 ? {
-                                currentPage,
-                                totalPages,
-                                onPageChange: setCurrentPage
-                            } : undefined}
-                        />
+                        <div className="p-0">
+                            <DataTable
+                                columns={columns}
+                                data={paginatedUOMs}
+                                rowKey={(row) => `${row.category}-${row.code}`}
+                                loading={loading}
+                                emptyMessage="No UOMs found."
+                                pagination={totalPages > 1 ? {
+                                    currentPage,
+                                    totalPages,
+                                    onPageChange: setCurrentPage
+                                } : undefined}
+                            />
+                        </div>
                     )}
                 </div>
             </div>

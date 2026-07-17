@@ -781,7 +781,7 @@ const PurchaseOrderCreatePage: React.FC = () => {
   // ============================================================
   return (
     <div className="w-full mx-auto">
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+      <div className="bg-white  border border-gray-200">
         <div className="px-6 py-4 ">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div><h2 className="text-xl font-bold text-gray-800">Create Purchase Order</h2></div>
@@ -802,6 +802,7 @@ const PurchaseOrderCreatePage: React.FC = () => {
                 onChange={(e) => handleChange(e as any)}
                 required
                 error={errors.poDate}
+                disabled
               />
             </div>
             <div>
@@ -896,8 +897,8 @@ const PurchaseOrderCreatePage: React.FC = () => {
                   return (
                     <tr key={index} className="hover:bg-slate-50/50 transition-colors duration-200">
                       <td className="px-3 py-2 whitespace-nowrap text-sm font-medium text-slate-400 text-center">{index + 1}</td>
-                      <td className="px-3 py-2 whitespace-nowrap"><SelectInput label="" name={`items[${index}].productId`} value={item.productId ? String(item.productId) : ""} options={[{ value: "", label: "-- Select Material --" }, ...productOptions]} onChange={(e) => handleItemProductChange(index, e.target.value)} error={errors[`items.${index}.productId`]} hideLabel /></td>
-                      <td className="px-3 py-2 whitespace-nowrap align-top">
+                      <td className="px-3 py-2 whitespace-nowrap"><SelectInput noMargin={true} name={`items[${index}].productId`} value={item.productId ? String(item.productId) : ""} options={[{ value: "", label: "-- Select Material --" }, ...productOptions]} onChange={(e) => handleItemProductChange(index, e.target.value)} error={errors[`items.${index}.productId`]} hideLabel /></td>
+                      <td className="px-3 py-2 whitespace-nowrap ">
                         <QuantityInput
                           name={`items[${index}].quantity`}
                           value={item.quantity}
@@ -909,7 +910,7 @@ const PurchaseOrderCreatePage: React.FC = () => {
                         />
                       </td>
                       <td className="px-3 py-2 whitespace-nowrap"><TextInput label="" name={`items[${index}].unitPrice`} type="number" value={String(item.unitPrice)} onChange={(e) => handleItemChange(index, "unitPrice", Number(e.target.value))} error={errors[`items.${index}.unitPrice`]} min={0} step={0.01} placeholder="0.00" disabled /></td>
-                      <td className="px-3 py-2 whitespace-nowrap"><SelectInput label="" name={`items[${index}].tax`} options={gstOptions} value={String(item.tax || 0)} onChange={(e) => handleItemChange(index, "tax", Number(e.target.value))} hideLabel /></td>
+                      <td className="px-3 py-2 whitespace-nowrap"><SelectInput label="" noMargin={true} name={`items[${index}].tax`} options={gstOptions} value={String(item.tax || 0)} onChange={(e) => handleItemChange(index, "tax", Number(e.target.value))} hideLabel /></td>
                       <td className="px-3 py-2 whitespace-nowrap text-right font-medium text-slate-700">₹{taxableAmount.toFixed(2)}</td>
                       <td className="px-3 py-2 whitespace-nowrap text-center">
                         <button

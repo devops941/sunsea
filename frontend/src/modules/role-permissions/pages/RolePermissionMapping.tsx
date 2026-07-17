@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { FaCheckSquare, FaSquare, FaSlidersH, FaShieldAlt, FaSpinner, FaCube, FaShoppingCart, FaBoxOpen, FaWarehouse, FaCogs, FaUsersCog, FaChartBar } from "react-icons/fa";
 import { toast } from "react-toastify";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
+import CommonLoader from "../../../components/ui/Loader/CommonLoader";
 import { useRoles } from "../../../hooks/useRoles";
 import { usePermissions } from "../../../hooks/usePermissions";
 
@@ -262,10 +263,7 @@ const RolePermissionMapping: React.FC = () => {
 
             {/* MAIN CONTENT AREA - SIDEBAR TABS & MATRIX */}
             {loading && permissions.length === 0 ? (
-                <div className="flex flex-col items-center justify-center p-24 bg-white rounded-3xl border border-gray-100 shadow-sm">
-                    <FaSpinner className="animate-spin text-5xl text-primary mb-6" />
-                    <div className="text-gray-500 font-medium text-lg">Loading security policies...</div>
-                </div>
+                <CommonLoader text="Loading security policies..." fullScreen={false} />
             ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
                     

@@ -24,7 +24,7 @@ const OrderItemsTable: React.FC<OrderItemsTableProps> = ({
     remove,
     editable = true,
 }) => {
-return (
+    return (
         <div className="rounded-xl border border-slate-200 bg-white [&_.mb-\[18px\]]:!mb-0 [&_.select-input-group]:!mb-0">
             <table className="min-w-full divide-y divide-slate-200">
                 <thead className="bg-slate-50/80">
@@ -40,7 +40,7 @@ return (
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                     {fields.map((field, index) => (
-                        <tr key={field.id} className="hover:bg-slate-50/50 transition-colors duration-200">
+                        <tr key={field.id} className="hover:bg-slate-50/50 transition-colors duration-200 ">
                             <td className="px-3 py-2 whitespace-nowrap text-sm font-medium text-slate-400 text-center">{index + 1}</td>
 
                             <td className="px-3 py-2 whitespace-nowrap">
@@ -48,7 +48,7 @@ return (
                                     name={`items.${index}.productCode`}
                                     control={control}
                                     render={({ field: f }) => (
-                                        <SelectInput
+                                        <SelectInput noMargin={true}
                                             label=""
                                             name={f.name}
                                             value={String(f.value || "")}
@@ -70,6 +70,7 @@ return (
                                     render={({ field: f }) => (
                                         <SelectInput
                                             label=""
+                                            noMargin={true}
                                             name={f.name}
                                             value={f.value || ""}
                                             options={colorOptions}

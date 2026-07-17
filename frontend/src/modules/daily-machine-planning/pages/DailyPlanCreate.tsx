@@ -400,7 +400,7 @@ const DailyPlanCreate: React.FC = () => {
   // ── Render ───────────────────────────────────────────────────────────────
   return (
 
-    <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-sm border border-slate-200">
+    <form onSubmit={handleSubmit} className="bg-white  border border-slate-200">
       {/* Page Header */}
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 p-6 border-b border-slate-200">
         <div>

@@ -15,6 +15,8 @@ import TextInput from "../../../components/form/TextInput/TextInput";
 
 import { fetchMachines } from "../../../features/machines/machineSlice";
 import SearchInput from "../../../components/ui/SearchInput/SearchInput";
+import DataTable from "../../../components/ui/table/DataTable";
+import type { DataTableColumn } from "../../../components/ui/table/DataTable";
 
 const ITEMS_PER_PAGE = 20;
 
@@ -209,6 +211,114 @@ const WeeklyMachineScheduleList: React.FC = () => {
         }
     };
 
+    const columns: DataTableColumn<any>[] = [
+        {
+            header: "",
+            accessor: "expand",
+            align: "center",
+            render: (row) => (
+                <div className="text-slate-400">
+                    {expandedGroups[row.weekKey] ? <FaChevronDown size={12} /> : <FaCaretRight size={12} />}
+                </div>
+            ),
+        },
+        {
+            header: "WEEK PERIOD",
+            accessor: "weekKey",
+            render: (row) => (
+                <span className="font-bold text-slate-800">
+                    {getFormattedWeekLabel(row.weekStartDate, row.weekEndDate)}
+                </span>
+            )
+        },
+        {
+            header: "TOTAL PRODUCTION ORDERS",
+            accessor: "totalOrders",
+            render: (row) => (
+                <StatusBadge
+                    status="UNKNOWN"
+                    customText={`${row.totalOrders} Production Order(s)`}
+                    customColor={{ bg: '#e9ecef', text: '#0f766e' }}
+                />
+            )
+        },
+        {
+            header: "TOTAL WEEKLY QUANTITY",
+            accessor: "totalPlannedQty",
+            render: (row) => (
+                <span className="font-bold text-emerald-600">
+                    {row.totalPlannedQty} {row.uom?.toLowerCase() === 'ea' ? 'pcs' : row.uom}
+                </span>
+            )
+        }
+    ];
+
+    const renderSubRow = (row: any) => {
+        if (!expandedGroups[row.weekKey]) return null;
+        return (
+            <div className="bg-white/80 px-6 py-5 shadow-inner">
+                <div className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">
+                    Production Orders Scheduled for this Week
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    {row.ordersList.map((order: any) => (
+                        <div key={order.productionOrderId} className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm hover:shadow-md transition-shadow relative group">
+                            <div className="flex justify-between items-start mb-2">
+                                <div>
+                                    <h4 className="font-bold text-slate-800 text-sm">{order.productionOrderNumber}</h4>
+                                    <p className="text-xs text-slate-500">{order.productName}</p>
+                                </div>
+                                <StatusBadge status={order.status} />
+                            </div>
+                            
+                            <div className="mt-3 space-y-1">
+                                <div className="flex justify-between text-xs">
+                                    <span className="text-slate-500">Planned Qty:</span>
+                                    <span className="font-medium text-slate-700">{order.plannedQty} {order.uom}</span>
+                                </div>
+                            </div>
+
+                            <div className="mt-4 pt-3 border-t border-slate-100">
+                                <div className="text-[11px] font-semibold text-slate-500 mb-2 uppercase">Scheduled Machines</div>
+                                <div className="space-y-2">
+                                    {order.schedules.map((schedule: any) => (
+                                        <div key={schedule.weeklyProgramId} className="flex items-center justify-between bg-slate-50 p-2 rounded-lg border border-slate-100">
+                                            <div className="flex flex-col">
+                                                <span className="text-xs font-medium text-indigo-700">
+                                                    {schedule.machine?.machineName || "Unknown Machine"}
+                                                </span>
+                                                {schedule.machine?.machineId && (
+                                                    <span className="text-[10px] text-slate-400">ID: {schedule.machine.machineId}</span>
+                                                )}
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <div className="text-right">
+                                                    <div className="text-xs font-bold text-emerald-600">{schedule.plannedQty} {schedule.uom}</div>
+                                                </div>
+                                                <DeleteButton onClick={(e: any) => {
+                                                    e.stopPropagation();
+                                                    triggerGroupDelete(schedule);
+                                                }} />
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+                <div className="mt-4 flex justify-end">
+                    <button
+                        className="text-xs font-semibold text-red-500 hover:text-red-700 hover:underline transition-colors flex items-center gap-1"
+                        onClick={(e) => { e.stopPropagation(); triggerGroupDelete(row); }}
+                    >
+                        Delete Entire Week Schedule
+                    </button>
+                </div>
+            </div>
+        );
+    };
+
     return (
         <div>
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
@@ -222,7 +332,7 @@ const WeeklyMachineScheduleList: React.FC = () => {
                             <DatePickerCalendar
                                 name="filterWeek"
                                 value={filterWeekStartDate}
-                                onChange={handleDateChange}
+                                onChange={(e) => handleDateChange(e as any)}
                             />
                         </div>
                         <SearchInput
@@ -239,103 +349,18 @@ const WeeklyMachineScheduleList: React.FC = () => {
                 </div>
 
                 {/* Table */}
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left text-sm">
-                        <thead className="bg-[#E5EAEF]">
-                            <tr>
-                                <th className="px-4 py-3.5 font-semibold text-xs tracking-wide uppercase  w-10"></th>
-                                <th className="px-4 py-3.5 font-semibold text-xs tracking-wide uppercase ">WEEK PERIOD</th>
-                                <th className="px-4 py-3.5 font-semibold text-xs tracking-wide uppercase ">TOTAL PRODUCTION ORDERS</th>
-                                <th className="px-4 py-3.5 font-semibold text-xs tracking-wide uppercase ">TOTAL WEEKLY QUANTITY</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                            {loading ? (
-                                <tr>
-                                    <td colSpan={4} className="text-center py-10 text-slate-500">
-                                        <div className="flex items-center justify-center gap-2">
-                                            <div className="w-5 h-5 border-2 border-teal-500 border-t-transparent rounded-full animate-spin" />
-                                            Loading schedules...
-                                        </div>
-                                    </td>
-                                </tr>
-                            ) : paginatedGroups.length > 0 ? (
-                                paginatedGroups.map((group: any) => (
-                                    <React.Fragment key={group.weekKey}>
-                                        {/* Parent Row (Week) */}
-                                        <tr
-                                            className={`hover:bg-slate-50/50 transition-colors cursor-pointer ${expandedGroups[group.weekKey] ? 'bg-white' : ''}`}
-                                            onClick={() => toggleGroup(group.weekKey)}
-                                        >
-                                            <td className="px-4 py-3 text-center text-slate-400">
-                                                {expandedGroups[group.weekKey] ? <FaChevronDown size={12} /> : <FaCaretRight size={12} />}
-                                            </td>
-                                            <td className="px-4 py-3 font-bold text-slate-800">
-                                                {getFormattedWeekLabel(group.weekStartDate, group.weekEndDate)}
-                                            </td>
-                                            <td className="px-4 py-3">
-                                                <StatusBadge
-                                                    status="UNKNOWN"
-                                                    customText={`${group.totalOrders} Production Order(s)`}
-                                                    customColor={{ bg: '#e9ecef', text: '#0f766e' }}
-                                                />
-                                            </td>
-                                            <td className="px-4 py-3 font-bold text-emerald-600">
-                                                {group.totalPlannedQty} {group.uom?.toLowerCase() === 'ea' ? 'pcs' : group.uom}
-                                            </td>
-                                        </tr>
-
-                                        {/* Expanded Sub-rows (Card Grid Layout) */}
-                                        {expandedGroups[group.weekKey] && (
-                                            <tr>
-                                                <td colSpan={4} className="p-0 border-b border-slate-200">
-                                                    <div className="bg-white/80 px-6 py-5 shadow-inner">
-                                                        <div className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">
-                                                            Production Orders Scheduled for this Week
-                                                        </div>
-                                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                                                            {group.ordersList.map((order: any) => (
-                                                                <div key={order.productionOrderId} className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm hover:shadow-md transition-shadow relative group">
-                                                                    <div className="flex justify-between items-start mb-2">
-                                                                        <span className="font-bold text-slate-800 text-sm">{order.productionOrderId}</span>
-                                                                        <StatusBadge status={order.status} />
-                                                                    </div>
-
-                                                                    <div className="text-slate-700 font-medium text-sm mb-3 line-clamp-2" title={order.productName}>
-                                                                        {order.productName}
-                                                                    </div>
-
-                                                                    <div className="flex justify-between items-center pt-3 border-t border-slate-100 mt-auto">
-                                                                        <div className="font-bold text-emerald-600">
-                                                                            {order.plannedQty} <span className="font-normal text-slate-400 text-xs">{order.uom?.toLowerCase() === 'ea' ? 'pcs' : order.uom}</span>
-                                                                        </div>
-
-                                                                        <div>
-                                                                            {["IN_PROGRESS", "IN_PRODUCTION", "COMPLETED", "ON_HOLD", "FG_RECEIVED", "READY_FOR_DISPATCH", "DISPATCHED"].includes(order.status) ? (
-                                                                                <span className="text-slate-400 text-xs italic bg-slate-100 px-2 py-1 rounded">Started</span>
-                                                                            ) : (
-                                                                                <DeleteButton onClick={(e) => { e.stopPropagation(); triggerGroupDelete(order); }} />
-                                                                            )}
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </React.Fragment>
-                                ))
-                            ) : (
-                                <tr>
-                                    <td colSpan={4} className="text-center py-10 text-slate-500">No schedules found.</td>
-                                </tr>
-                            )}
-                        </tbody>
-                    </table>
+                <div className="p-0">
+                    <DataTable
+                        columns={columns}
+                        data={paginatedGroups}
+                        rowKey={(row) => row.weekKey}
+                        loading={loading}
+                        onRowClick={(row) => toggleGroup(row.weekKey)}
+                        renderSubRow={renderSubRow}
+                        emptyMessage="No weekly schedules found."
+                    />
                 </div>
-
+                
                 {/* Pagination */}
                 {totalPages > 1 && (
                     <div className="flex items-center justify-center gap-2 py-4 border-t border-slate-200">
@@ -349,7 +374,6 @@ const WeeklyMachineScheduleList: React.FC = () => {
                     </div>
                 )}
             </div>
-
             <CommonConfirmModal
                 show={showDeleteModal}
                 onHide={() => setShowDeleteModal(false)}

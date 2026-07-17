@@ -179,7 +179,7 @@ const GoodsDispatchCreate: React.FC = () => {
                   label="Dispatch Date *"
                   name="dispatchDate"
                   value={formData.dispatchDate}
-                  onChange={handleInputChange}
+                  onChange={(e) => handleInputChange(e as any)}
                   required
                 />
                 <TextInput

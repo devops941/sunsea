@@ -4,6 +4,8 @@ import { Routes, Route } from "react-router-dom";
 import BaseLayout from "../components/layout/BaseLayout";
 import ProtectedRoute from "./ProtectedRoute";
 import PublicRoute from "./PublicRoute";
+import CommonLoader from "../components/ui/Loader/CommonLoader";
+import logo from '../../public/loaderimage.png'
 
 
 const Dashboard = lazy(() => import("../modules/dashboard/pages/DashboardPage"));
@@ -142,7 +144,7 @@ const BillOfMaterialCreate = lazy(() => import("../modules/bill-of-material/page
 const BillOfMaterialEdit = lazy(() => import("../modules/bill-of-material/pages/BillOfMaterialEdit"));
 
 const SalesOrderCreate = lazy(() => import("../modules/sales/salesorder/CreateOrder"));
-const SalesInvoiceView = lazy(() => import("../modules/sales-order-invoice/SalesInvoiceView"))
+const SalesInvoiceView = lazy(() => import("../modules/sales-order-invoice/SalesInvoiceView"));
 const GrnInvoiceViewPage = lazy(() => import("../modules/purchase/purchase-order/invoice/GrnInvoiceViewPage"))
 
 const OrderDetails = lazy(() => import("../modules/sales/salesorder/SalesOrderDetail"))
@@ -169,11 +171,7 @@ const SalesInvoiceForm = lazy(() => import("../modules/sales-order-invoice/Sales
 const ProfilePage = lazy(() => import("../modules/profile/ProfilePage"));
 const Settings = lazy(() => import("../modules/settings/Setting"))
 
-const LoadingFallback = () => (
-  <div className="flex justify-center items-center min-h-screen">
-    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-  </div>
-);
+const LoadingFallback = () => <CommonLoader text="Loading..." image={logo} />;
 
 const AppRoutes = () => {
   return (

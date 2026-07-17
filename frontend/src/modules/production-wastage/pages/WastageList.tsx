@@ -122,7 +122,7 @@ const WastageList: React.FC = () => {
 
         {/* Table */}
         <DataTable
-          data={displayWastages}
+          data={displayWastages.slice(0, visibleCount)}
           rowKey={(item) => String(item.id)}
           loading={loading}
           columns={[
@@ -183,8 +183,6 @@ const WastageList: React.FC = () => {
               ),
             },
           ]}
-          data={displayWastages.slice(0, visibleCount)}
-          loading={loading}
           emptyMessage="No wastage logs found"
         />
         {!loading && displayWastages.length > visibleCount && (
