@@ -332,7 +332,7 @@ const WeeklyMachineScheduleList: React.FC = () => {
                             <DatePickerCalendar
                                 name="filterWeek"
                                 value={filterWeekStartDate}
-                                onChange={handleDateChange}
+                                onChange={(e) => handleDateChange(e as any)}
                             />
                         </div>
                         <SearchInput
