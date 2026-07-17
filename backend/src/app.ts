@@ -98,7 +98,13 @@ app.use(
 );
 /** Application Routes*/
 app.get("/", (req, res) => {
-  res.send("Hello Welcome to Sunsea ERP API");
+  res.status(200).json({
+    success: true,
+    message: "Welcome to Sunsea ERP API",
+    version: "1.0.0",
+    environment: process.env.NODE_ENV || "development",
+    timestamp: new Date().toISOString()
+  });
 });
 app.use("/api", apiRoutes);
 

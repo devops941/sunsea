@@ -3,24 +3,40 @@ import path from "path";
 import fs from "fs";
 import { Request } from "express";
 
-// Keep this OUTSIDE src/ (e.g. project root /uploads) so it survives a
-// TypeScript build step and isn't wiped when you redeploy compiled code.
-const UPLOAD_DIR = path.join(process.cwd(), "uploads", "products");
+// In production (Vercel), filesystem is read-only - ALWAYS use memory storage
+// In development, use disk storage for easier testing
+const isProduction = process.env.NODE_ENV === "production";
 
-if (!fs.existsSync(UPLOAD_DIR)) {
-    fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+// Helper function to ensure directory exists (only for development)
+function ensureUploadDir(dir: string): void {
+    try {
+        if (!fs.existsSync(dir)) {
+            fs.mkdirSync(dir, { recursive: true });
+        }
+    } catch (error) {
+        console.warn("⚠️ Could not create upload directory (using memory storage):", error);
+    }
 }
 
-const storage = multer.diskStorage({
-    destination: (_req, _file, cb) => {
-        cb(null, UPLOAD_DIR);
-    },
-    filename: (_req, file, cb) => {
-        const ext = path.extname(file.originalname).toLowerCase();
-        const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-        cb(null, `${unique}${ext}`);
-    },
-});
+// Configure storage based on environment
+const storage = isProduction
+    ? multer.memoryStorage() // Production: Always use memory storage for Vercel
+    : (() => {
+          // Development: Use disk storage
+          const UPLOAD_DIR = path.join(process.cwd(), "uploads", "products");
+          ensureUploadDir(UPLOAD_DIR); // Create directory in dev only
+          
+          return multer.diskStorage({
+              destination: (_req, _file, cb) => {
+                  cb(null, UPLOAD_DIR);
+              },
+              filename: (_req, file, cb) => {
+                  const ext = path.extname(file.originalname).toLowerCase();
+                  const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+                  cb(null, `${unique}${ext}`);
+              },
+          });
+      })();
 
 const ALLOWED_MIME_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
