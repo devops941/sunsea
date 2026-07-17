@@ -15,14 +15,12 @@ const PORT = Number(process.env.PORT) || 5000;
 
 const startServer = async (): Promise<void> => {
   try {
-    try {
-      await prisma.$connect();
-      console.log("✅ Database connected successfully");
-      // Automatically create admin user from .env variables
-      await bootstrapAdmin(prisma);
-    } catch (dbError) {
-      console.error("❌ Database connection failed. Running without database:", dbError);
-    }
+    await prisma.$connect();
+
+    console.log("✅ Database connected successfully");
+
+    // Automatically create admin user from .env variables
+    await bootstrapAdmin(prisma);
 
     const server = app.listen(PORT, () => {
       console.log(
