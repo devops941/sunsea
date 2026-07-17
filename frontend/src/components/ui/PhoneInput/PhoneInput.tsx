@@ -90,7 +90,7 @@ const IndiaPhoneInput: React.FC<IndiaPhoneInputProps> = ({
                     onChange={handleOnChange}
                     onBlur={handleBlur}
                     className={`
-                        w-full h-[35px] px-4 flex items-center
+                        w-full h-10 px-4 flex items-center
                         border rounded-[10px] outline-none
                         text-[15px] font-medium
                         transition-all duration-250 bg-white

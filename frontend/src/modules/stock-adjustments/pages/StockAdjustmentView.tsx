@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   FaCheck, FaTimes, FaBoxes, FaEdit,
   FaClipboardList, FaInfoCircle, FaExclamationTriangle,
@@ -10,7 +10,6 @@ import { toast } from "react-toastify";
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
 import {
   fetchStockAdjustmentById,
-  approveStockAdjustment,
   clearCurrent,
 } from "../../../features/stock-adjustments/stockAdjustmentSlice";
 import CustomButton from "../../../components/ui/Button/Button";
@@ -46,38 +45,10 @@ const StockAdjustmentView: React.FC = () => {
     (state) => state.stockAdjustments
   );
 
-  const [showModal, setShowModal] = useState(false);
-  const [modalAction, setModalAction] = useState<"APPROVED" | "REJECTED" | null>(null);
-  const [reason, setReason] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
   useEffect(() => {
     if (id) dispatch(fetchStockAdjustmentById(id));
     return () => { dispatch(clearCurrent()); };
   }, [dispatch, id]);
-
-  const openModal = (action: "APPROVED" | "REJECTED") => {
-    setModalAction(action);
-    setReason("");
-    setShowModal(true);
-  };
-
-  const handleConfirm = async () => {
-    if (!id || !modalAction) return;
-    setIsSubmitting(true);
-    try {
-      await dispatch(
-        approveStockAdjustment({ id, status: modalAction, reason })
-      ).unwrap();
-      toast.success(`Stock Adjustment ${modalAction === "APPROVED" ? "approved" : "rejected"} successfully`);
-      setShowModal(false);
-      dispatch(fetchStockAdjustmentById(id));
-    } catch (err: any) {
-      toast.error(err || "Failed to update status");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
 
   if (loading || !currentAdjustment) {
     return (
@@ -172,11 +143,6 @@ const StockAdjustmentView: React.FC = () => {
             } />
             <InfoField label="Status" value={<StatusBadge status={currentAdjustment.status} />} />
             <InfoField label="Created By" value={currentAdjustment.createdBy} />
-            <InfoField label="Approved By" value={
-              currentAdjustment.approvedBy
-                ? `${currentAdjustment.approvedBy} (${formatDate(currentAdjustment.approvedAt)})`
-                : null
-            } />
             {currentAdjustment.reason && (
               <div className="col-span-2 sm:col-span-3 lg:col-span-6">
                 <InfoField label="Reason / Notes" value={currentAdjustment.reason} />
@@ -311,88 +277,7 @@ const StockAdjustmentView: React.FC = () => {
               </table>
             )}
           </div>
-        </div>
-
-        {isPending && (
-          <div className="rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="flex items-center gap-3 px-5 py-4 bg-slate-50 border-b border-slate-200">
-              <div className="h-8 w-8 rounded-lg bg-amber-100 flex items-center justify-center">
-                <FaExclamationTriangle className="text-amber-600" size={14} />
-              </div>
-              <h3 className="font-bold text-slate-700 text-base">Workflow Actions</h3>
-            </div>
-            <div className="p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <div>
-                <p className="font-semibold text-slate-700 text-sm mb-1">Review and Approve</p>
-                <p className="text-slate-500 text-xs">
-                  {isPMI
-                    ? "Approving this Material Issue will deduct raw material stock and enable Production Start."
-                    : "Review the items and approve or reject this stock adjustment."}
-                </p>
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <CustomButton text="Reject" icon={FaTimes} variant="danger" onClick={() => openModal("REJECTED")} />
-                <CustomButton text="Approve" icon={FaCheck} variant="secondary" onClick={() => openModal("APPROVED")} />
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {showModal && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-            <div className={`px-6 py-4 border-b border-slate-200 flex items-center gap-3 ${modalAction === "APPROVED" ? "bg-emerald-50" : "bg-red-50"}`}>
-              <div className={`h-9 w-9 rounded-full flex items-center justify-center ${modalAction === "APPROVED" ? "bg-emerald-100" : "bg-red-100"}`}>
-                {modalAction === "APPROVED" ? <FaCheck className="text-emerald-600" size={15} /> : <FaTimes className="text-red-600" size={15} />}
-              </div>
-              <div>
-                <h4 className={`font-bold text-base ${modalAction === "APPROVED" ? "text-emerald-800" : "text-red-800"}`}>
-                  {modalAction === "APPROVED" ? "Approve Adjustment" : "Reject Adjustment"}
-                </h4>
-                <p className="text-xs text-slate-500 mt-0.5">{currentAdjustment.adjustmentNumber}</p>
-              </div>
-            </div>
-            <div className="p-6">
-              <p className="text-slate-600 text-sm mb-4">
-                Are you sure you want to <strong>{modalAction === "APPROVED" ? "approve" : "reject"}</strong> this stock adjustment?
-                {modalAction === "APPROVED" && (isPMI
-                  ? " This will deduct the issued quantities from raw material stock and enable Production Start."
-                  : " This will permanently update the stock levels.")}
-              </p>
-              <div>
-                <label className="block text-[11px] uppercase tracking-wider text-slate-500 font-semibold mb-1.5">
-                  Reason / Remarks <span className="normal-case font-normal text-slate-400">(optional)</span>
-                </label>
-                <textarea
-                  rows={3}
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value)}
-                  placeholder="Enter reason or remarks..."
-                  className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors resize-none placeholder:text-slate-300"
-                />
-              </div>
-            </div>
-            <div className="px-6 pb-6 flex items-center justify-end gap-2">
-              <CustomButton
-                text="Cancel"
-                icon={FaTimes}
-                variant="primary"
-                className="!bg-slate-100 !text-slate-700 hover:!bg-slate-200"
-                onClick={() => setShowModal(false)}
-                disabled={isSubmitting}
-              />
-              <CustomButton
-                text={modalAction === "APPROVED" ? "Confirm Approval" : "Confirm Rejection"}
-                icon={modalAction === "APPROVED" ? FaCheck : FaTimes}
-                variant={modalAction === "APPROVED" ? "secondary" : "danger"}
-                onClick={handleConfirm}
-                disabled={isSubmitting}
-              />
-            </div>
-          </div>
-        </div>
-      )}
+        </div>      </div>
     </div>
   );
 };

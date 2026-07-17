@@ -654,7 +654,6 @@ const DailyPlanCreate: React.FC = () => {
                       options={[
                         { value: "DRAFT", label: "Draft" },
                         { value: "PLANNED", label: "Planned" },
-                        { value: "APPROVED", label: "Approved" },
                         { value: "IN_PROGRESS", label: "In Progress" },
                         { value: "COMPLETED", label: "Completed" },
                         { value: "CANCELLED", label: "Cancelled" }

@@ -108,7 +108,7 @@ const HourlyWorkReportList: React.FC = () => {
                     productionOrderId: item.productionOrderId,
                     productName: item.productionOrder?.productItem?.productName || "Unknown Product",
                     productCode: item.productionOrder?.productItem?.productCode || "",
-                    uom: (item.productionOrder?.productItem?.uom?.uomCode?.toLowerCase() === "ea" ? "pcs" : item.productionOrder?.productItem?.uom?.uomCode) || "pcs",
+                    uom: (item.productionOrder?.productItem?.uom?.uomCode?.toUpperCase() === "EA" ? "PCS" : item.productionOrder?.productItem?.uom?.uomCode?.toUpperCase()) || "PCS",
                     plannedQty: Number(item.shiftPlannedQty || item.productionOrder?.targetQty || 0),
                     poTargetQty: Number(item.productionOrder?.targetQty || 0),
                     weeklyProgramStatus: item.weeklyProgramStatus || null,
@@ -162,9 +162,18 @@ const HourlyWorkReportList: React.FC = () => {
 
 
 
-    const handleOpenEdit = useCallback((item: any) => {
-        navigate(`/hourly-work-reports/edit/${item.hourlyProductionId}`, { state: item });
-    }, [navigate]);
+    const isGroupEditDisabled = useCallback((group: any) => {
+        const isStoppedOrCompleted = ["COMPLETED", "STOPPED", "CANCELLED"].includes(group.weeklyProgramStatus);
+        const hasLastHourLogged = group.hours.some((hr: any) => Number(hr.hourIndex) >= group.shiftTotalHours);
+        return isStoppedOrCompleted || hasLastHourLogged;
+    }, []);
+
+    const handleOpenEdit = useCallback((group: any, item: any) => {
+        const disabled = isGroupEditDisabled(group);
+        navigate(`/hourly-work-reports/edit/${item.hourlyProductionId}`, { 
+            state: { ...item, isEditDisabled: disabled } 
+        });
+    }, [navigate, isGroupEditDisabled]);
 
     const handleAddHourly = (group: any) => {
         const nextHourIndex = group.hours.length + 1;
@@ -258,7 +267,7 @@ const HourlyWorkReportList: React.FC = () => {
             render: (group) => {
                 const isActiveNoEntry = group.weeklyProgramStatus === "IN_PROGRESS" && group.hours.length === 0;
                 if (isActiveNoEntry) {
-                    return <span className="text-slate-400">— pcs</span>;
+                    return <span className="text-slate-400">— PCS</span>;
                 }
                 return <span className="font-bold text-emerald-600">{group.totalQtyProduced} <span className="text-xs text-slate-500 font-normal">{group.uom}</span></span>;
             }
@@ -331,11 +340,7 @@ const HourlyWorkReportList: React.FC = () => {
                         <h6 className="font-bold mb-0 text-slate-800 tracking-wide text-sm uppercase">
                             SHIFT SUMMARY DASHBOARD
                         </h6>
-                        {group.hours.length < group.shiftTotalHours && (
-                            <button onClick={() => handleAddHourly(group)} className="font-bold rounded-full px-5 py-2 shadow-sm text-white text-sm" style={{ background: "linear-gradient(45deg, var(--color-primary), #005f4b)", border: "none" }}>
-                                + Log Next Hour (H{group.hours.length + 1})
-                            </button>
-                        )}
+                       
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
                         <div className="p-4 rounded-xl border border-slate-100 bg-slate-50/50 text-center">
@@ -408,9 +413,15 @@ const HourlyWorkReportList: React.FC = () => {
                                             </div>
                                         </div>
                                         <div className="ml-4 flex gap-2">
-                                            <EditButton onClick={() => handleOpenEdit(h)} />
-                                            {user?.roleId === "ROLE_ADMIN" && (
-                                                <DeleteButton onClick={() => triggerDelete(h.hourlyProductionId?.toString())} />
+                                            {!isGroupEditDisabled(group) ? (
+                                                <>
+                                                    <EditButton onClick={() => handleOpenEdit(group, h)} />
+                                                    {user?.roleId === "ROLE_ADMIN" && (
+                                                        <DeleteButton onClick={() => triggerDelete(h.hourlyProductionId?.toString())} />
+                                                    )}
+                                                </>
+                                            ) : (
+                                                <span className="text-slate-400 text-xs font-semibold select-none flex items-center bg-slate-100 border border-slate-200 rounded px-2.5 py-1">Locked</span>
                                             )}
                                         </div>
                                     </div>
