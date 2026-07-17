@@ -13,6 +13,7 @@ import ViewButton from "../../../components/ui/viewbutton/ViewButton";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import TextInput from "../../../components/form/TextInput/TextInput";
+import DatePickerCalendar from "../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 import SearchInput from "../../../components/ui/SearchInput/SearchInput";
 import DataTable, { type DataTableColumn } from "../../../components/ui/table/DataTable";
 
@@ -91,7 +92,7 @@ const HourlyWorkReportList: React.FC = () => {
                 if (item.shift?.startTime && item.shift?.endTime) {
                     const [startH, startM] = item.shift.startTime.split(":").map(Number);
                     const [endH, endM] = item.shift.endTime.split(":").map(Number);
-                    let startMin = startH * 60 + startM;
+                    const startMin = startH * 60 + startM;
                     let endMin = endH * 60 + endM;
                     if (endMin <= startMin) endMin += 24 * 60;
                     shiftTotalHours = Math.floor((endMin - startMin) / 60);
@@ -436,12 +437,13 @@ const HourlyWorkReportList: React.FC = () => {
                             onChange={handleSearch}
                             placeholder="Search by PO, Product, Machine..."
                         />
-                        <TextInput
-                            name="dateFilter"
-                            type="date"
-                            value={filterDate}
-                            onChange={(e) => setFilterDate(e.target.value)}
-                        />
+                        <div className="w-[160px]">
+                            <DatePickerCalendar
+                                name="dateFilter"
+                                value={filterDate}
+                                onChange={(e) => setFilterDate(e.target.value)}
+                            />
+                        </div>
                     </div>
                 </div>
 

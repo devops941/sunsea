@@ -2,6 +2,23 @@ import { prisma } from "../../config/prisma";
 import { ApiError } from "../../utils/ApiError";
 
 export class StockAdjustmentService {
+  static async getNextAdjustmentNumber(): Promise<string> {
+    const year = new Date().getFullYear();
+    const prefix = `ADJ-${year}-`;
+
+    const last = await prisma.stockAdjustment.findFirst({
+      where: { adjustmentNumber: { startsWith: prefix } },
+      orderBy: { adjustmentNumber: "desc" },
+      select: { adjustmentNumber: true },
+    });
+
+    let seq = 1;
+    if (last?.adjustmentNumber) {
+      const parts = last.adjustmentNumber.split("-");
+      seq = (parseInt(parts[parts.length - 1]) || 0) + 1;
+    }
+    return `${prefix}${String(seq).padStart(4, "0")}`;
+  }
   static async createStockAdjustment(data: any, userId: string) {
     const { items, adjustmentDate, adjustmentType, productionOrderId, ...adjustmentData } = data;
 
@@ -92,6 +109,7 @@ export class StockAdjustmentService {
               storeId: true,
               rawMaterial: { select: { materialName: true } },
               store: { select: { storeName: true } },
+              product: { select: { productName: true, productCode: true } },
             },
           },
         },

@@ -324,7 +324,7 @@ const QuotationForm: React.FC = () => {
 
         const loadOrder = async () => {
             try {
-                let order = state as SalesOrder;
+                const order = state as SalesOrder;
                 populateFormFromOrder(order);
             } catch (error) {
                 toast.error("Failed to load quotation");

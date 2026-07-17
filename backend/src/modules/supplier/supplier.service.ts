@@ -22,27 +22,11 @@ class SupplierService {
 
     const { addresses, userId, materialPrices, ...supplierData } = data;
 
-    const isAdmin = userId.startsWith("admin_");
-
-    // When admin creates a supplier, we need a valid userId for the FK constraint
-    // since admins are in a separate table and createdBy references the User table
-    let createdByUserId = userId;
-    if (isAdmin) {
-      const fallbackUser = await prisma.user.findFirst({
-        where: { status: "active" },
-        select: { userId: true },
-      });
-      if (!fallbackUser) {
-        throw new ApiError(500, "No active user found in the system to attribute this record to");
-      }
-      createdByUserId = fallbackUser.userId;
-    }
-
     const insertData: Prisma.SupplierCreateInput = {
       ...supplierData,
       bankAccount: supplierData.bankAccount as any,
       minOrderQty: supplierData.minOrderQty !== undefined && supplierData.minOrderQty !== null ? new Prisma.Decimal(supplierData.minOrderQty) : undefined,
-      createdByUser: { connect: { userId: createdByUserId } },
+      createdBy: userId,
       addresses: addresses && addresses.length > 0
         ? {
           create: addresses.map((addr) => ({
@@ -125,8 +109,37 @@ class SupplierService {
       supplierRepository.count(where),
     ]);
 
+    // Fetch creator and updater names from User and Admin tables
+    const creatorIds = suppliers.map(s => s.createdBy).filter((id): id is string => Boolean(id));
+    const updaterIds = suppliers.map(s => s.updatedBy).filter((id): id is string => Boolean(id));
+    const allUserIds = [...new Set([...creatorIds, ...updaterIds])];
+
+    const adminIds = allUserIds.filter(id => id.startsWith('admin_')).map(id => BigInt(id.replace('admin_', '')));
+    const normalUserIds = allUserIds.filter(id => !id.startsWith('admin_'));
+
+    const [admins, users] = await Promise.all([
+      prisma.admin.findMany({ where: { id: { in: adminIds } }, select: { id: true, fullName: true, role: { select: { name: true } } } }),
+      prisma.user.findMany({ where: { userId: { in: normalUserIds } }, select: { userId: true, fullName: true, role: { select: { name: true } } } })
+    ]);
+
+    const adminMap = new Map(admins.map(a => [`admin_${a.id}`, { name: a.fullName, role: a.role?.name || 'Super Admin' }]));
+    const userMap = new Map(users.map(u => [u.userId, { name: u.fullName, role: u.role?.name || 'User' }]));
+
+    const suppliersWithNames = suppliers.map(supplier => {
+      const creatorInfo = adminMap.get(supplier.createdBy) || userMap.get(supplier.createdBy) || { name: 'Unknown User', role: 'Unknown Role' };
+      const updaterInfo = supplier.updatedBy ? (adminMap.get(supplier.updatedBy) || userMap.get(supplier.updatedBy)) : null;
+      
+      return {
+        ...supplier,
+        createdUserName: creatorInfo.name,
+        createdUserRole: creatorInfo.role,
+        updatedUserName: updaterInfo ? updaterInfo.name : null,
+        updatedUserRole: updaterInfo ? updaterInfo.role : null
+      };
+    });
+
     return {
-      suppliers,
+      suppliers: suppliersWithNames,
       pagination: {
         total,
         page,
@@ -148,7 +161,52 @@ class SupplierService {
       );
     }
 
-    return supplier;
+    let createdUserName = 'Unknown User';
+    let createdUserRole = 'Unknown Role';
+    let updatedUserName = null;
+    let updatedUserRole = null;
+
+    if (supplier.createdBy) {
+      if (supplier.createdBy.startsWith('admin_')) {
+        const adminId = BigInt(supplier.createdBy.replace('admin_', ''));
+        const admin = await prisma.admin.findUnique({ where: { id: adminId }, select: { fullName: true, role: { select: { name: true } } } });
+        if (admin) {
+            createdUserName = admin.fullName;
+            createdUserRole = admin.role?.name || 'Super Admin';
+        }
+      } else {
+        const user = await prisma.user.findUnique({ where: { userId: supplier.createdBy }, select: { fullName: true, role: { select: { name: true } } } });
+        if (user) {
+            createdUserName = user.fullName;
+            createdUserRole = user.role?.name || 'User';
+        }
+      }
+    }
+
+    if (supplier.updatedBy) {
+      if (supplier.updatedBy.startsWith('admin_')) {
+        const adminId = BigInt(supplier.updatedBy.replace('admin_', ''));
+        const admin = await prisma.admin.findUnique({ where: { id: adminId }, select: { fullName: true, role: { select: { name: true } } } });
+        if (admin) {
+            updatedUserName = admin.fullName;
+            updatedUserRole = admin.role?.name || 'Super Admin';
+        }
+      } else {
+        const user = await prisma.user.findUnique({ where: { userId: supplier.updatedBy }, select: { fullName: true, role: { select: { name: true } } } });
+        if (user) {
+            updatedUserName = user.fullName;
+            updatedUserRole = user.role?.name || 'User';
+        }
+      }
+    }
+
+    return {
+      ...supplier,
+      createdUserName,
+      createdUserRole,
+      updatedUserName,
+      updatedUserRole
+    };
   }
 
   async updateSupplier(
@@ -171,15 +229,8 @@ class SupplierService {
 
     const { addresses, userId, materialPrices, ...supplierData } = data;
 
-    // Handle admin user fallback for updatedByUser relation
+    // We no longer need to map to a fallback user because updatedBy is a plain string
     let updatedByUserId = userId;
-    if (userId && userId.startsWith("admin_")) {
-      const fallbackUser = await prisma.user.findFirst({
-        where: { status: "active" },
-        select: { userId: true },
-      });
-      updatedByUserId = fallbackUser ? fallbackUser.userId : undefined;
-    }
 
     return prisma.$transaction(async (tx) => {
       if (addresses !== undefined) {
@@ -229,7 +280,7 @@ class SupplierService {
         ...supplierData,
         bankAccount: supplierData.bankAccount as any,
         minOrderQty: supplierData.minOrderQty !== undefined && supplierData.minOrderQty !== null ? new Prisma.Decimal(supplierData.minOrderQty) : undefined,
-        updatedByUser: updatedByUserId ? { connect: { userId: updatedByUserId } } : undefined,
+        updatedBy: updatedByUserId ? updatedByUserId : undefined,
       };
 
       return tx.supplier.update({

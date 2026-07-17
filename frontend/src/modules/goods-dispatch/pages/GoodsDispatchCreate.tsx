@@ -16,6 +16,8 @@ import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import DataTable from "../../../components/ui/table/DataTable";
 import type { DataTableColumn } from "../../../components/ui/table/DataTable";
 import { formatDate } from "../../../utils/dateUtils";
+import BackButton from "../../../components/ui/BackButton/BackButton";
+import DatePickerCalendar from "../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 
 const GoodsDispatchCreate: React.FC = () => {
   const navigate = useNavigate();
@@ -146,37 +148,25 @@ const GoodsDispatchCreate: React.FC = () => {
   );
 
   return (
-    <div className="min-h-screen bg-white p-4 md:p-6">
-      {/* Page Header */}
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-800">
-            Create Goods Dispatch
-          </h2>
-          <div className="text-sm text-slate-500 mt-1">
-            Select completed production orders to dispatch to the warehouse
+    <div className="w-full mx-auto p-4 md:p-6 min-h-screen ">
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+        {/* Page Header */}
+        <div className="px-6 py-4 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h2 className="text-xl font-bold text-gray-800">
+              Create Goods Dispatch
+            </h2>
+            <div className="text-sm text-gray-500 mt-1">
+              Select completed production orders to dispatch to the warehouse
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <BackButton text="Back to List" to="/production/goods-dispatch" />
           </div>
         </div>
-        <div className="mt-4 md:mt-0 flex gap-2">
-          <button
-            type="button"
-            className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 font-medium transition-colors"
-            onClick={() => navigate("/production/goods-dispatch")}
-          >
-            <FaArrowLeft /> Back to List
-          </button>
-          <button
-            type="button"
-            className="flex items-center gap-2 px-4 py-2 bg-[#5D87FF] text-white rounded-lg hover:bg-[#4570F5] font-medium transition-colors"
-            onClick={handleSubmit}
-            disabled={loading}
-          >
-            <FaSave /> {loading ? "Creating..." : "Create Dispatch"}
-          </button>
-        </div>
-      </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="p-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column - Form & Selected Items */}
         <div className="lg:col-span-2 space-y-6">
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
@@ -185,10 +175,9 @@ const GoodsDispatchCreate: React.FC = () => {
                 1. Vehicle & Transport Details
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <TextInput
+                <DatePickerCalendar
                   label="Dispatch Date *"
                   name="dispatchDate"
-                  type="date"
                   value={formData.dispatchDate}
                   onChange={handleInputChange}
                   required
@@ -346,7 +335,26 @@ const GoodsDispatchCreate: React.FC = () => {
           </div>
         </div>
       </div>
+      </div>
+      
+      {/* Form Actions */}
+      <div className="flex justify-end items-center gap-3 p-6 border-t border-gray-100 bg-white rounded-b-lg">
+        <CustomButton
+            text="Cancel"
+            icon={FaArrowLeft}
+            onClick={() => navigate("/production/goods-dispatch")}
+            disabled={loading}
+            variant="secondary"
+        />
+        <CustomButton
+          text={loading ? "Creating..." : "Create Dispatch"}
+          icon={FaSave}
+          onClick={handleSubmit}
+          disabled={loading}
+        />
+      </div>
     </div>
+  </div>
   );
 };
-        export default GoodsDispatchCreate;
+export default GoodsDispatchCreate;

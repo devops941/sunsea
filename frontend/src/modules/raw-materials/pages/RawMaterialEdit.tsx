@@ -14,6 +14,7 @@ import UOMSelect from "../../../components/form/SelectInput/UOMSelect";
 import QuantityInput from "../../../components/form/QuantityInput/QuantityInput";
 import { z } from "zod";
 import { rawMaterialService } from "../../../services/rawMaterialService";
+import BackButton from "../../../components/ui/BackButton/BackButton";
 
 // const CATEGORY_OPTIONS = [
 //     { label: "Yarn", value: "Yarn" },
@@ -388,11 +389,7 @@ const RawMaterialEdit: React.FC = () => {
                     <h2 className="text-xl font-bold text-gray-800">
                         Edit Raw Material
                     </h2>
-                    <CustomButton
-                        text="Back to List"
-                        icon={FaArrowLeft}
-                        onClick={() => navigate("/raw-materials")}
-                    />
+                    <BackButton text="Back to List" to="/raw-materials" />
                 </div>
 
                 <form onSubmit={handleSubmit} className="px-6 py-4 space-y-8" noValidate>

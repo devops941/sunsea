@@ -9,6 +9,7 @@ import { createStoreType } from "../../../features/store-types/storeTypeSlice";
 import { storeTypeService } from "../../../services/storeTypeService";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import { z } from "zod";
+import BackButton from "../../../components/ui/BackButton/BackButton";
 
 const initialFormState = {
     code: "",
@@ -148,11 +149,7 @@ const StoreTypeCreate: React.FC = () => {
                 <div className="bg-white rounded-2xl shadow-sm border border-slate-200">
                     <div className="p-6 border-b border-slate-200 flex items-center justify-between">
                         <h2 className="text-2xl font-bold text-slate-800">Create Store Type</h2>
-                        <CustomButton
-                            text="Back to List"
-                            icon={FaArrowLeft}
-                            onClick={() => navigate("/store-types")}
-                        />
+                        <BackButton text="Back to List" to="/store-types" />
                     </div>
 
                     <form onSubmit={handleSubmit} className="p-6">

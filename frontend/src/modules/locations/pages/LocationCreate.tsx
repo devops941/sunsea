@@ -10,6 +10,7 @@ import { createLocation } from "../../../features/locations/locationSlice";
 import { locationService } from "../../../services/locationService";
 import CityStateSelect from "../../../components/ui/CityStateSelect/CityStateSelect";
 import { z } from "zod";
+import BackButton from "../../../components/ui/BackButton/BackButton";
 
 const LOCATION_TYPE_OPTIONS = [
     { label: "Warehouse", value: "Warehouse" },
@@ -141,11 +142,7 @@ const LocationCreate: React.FC = () => {
                 <div className="bg-white rounded-2xl shadow-sm border border-slate-200">
                     <div className="p-6 border-b border-slate-200 flex items-center justify-between">
                         <h2 className="text-2xl font-bold text-slate-800">Create Location</h2>
-                        <CustomButton
-                            text="Back to List"
-                            icon={FaArrowLeft}
-                            onClick={() => navigate("/locations")}
-                        />
+                        <BackButton text="Back to List" to="/locations" />
                     </div>
 
                     <form onSubmit={handleSubmit} className="p-6" noValidate>

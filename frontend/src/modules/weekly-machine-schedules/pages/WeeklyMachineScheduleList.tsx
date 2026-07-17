@@ -9,6 +9,7 @@ import CustomButton from "../../../components/ui/Button/Button";
 
 import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
+import DatePickerCalendar from "../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import TextInput from "../../../components/form/TextInput/TextInput";
 
@@ -218,10 +219,8 @@ const WeeklyMachineScheduleList: React.FC = () => {
                     </div>
                     <div className="flex flex-wrap items-center gap-3">
                         <div className="w-[160px]">
-                            <TextInput
-                                label=""
+                            <DatePickerCalendar
                                 name="filterWeek"
-                                type="date"
                                 value={filterWeekStartDate}
                                 onChange={handleDateChange}
                             />

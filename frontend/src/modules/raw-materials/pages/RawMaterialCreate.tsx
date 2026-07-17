@@ -48,6 +48,7 @@ const initialFormState = {
 };
 
 import { z } from "zod";
+import BackButton from "../../../components/ui/BackButton/BackButton";
 
 const rawMaterialSchema = z
     .object({
@@ -351,11 +352,7 @@ const RawMaterialCreate: React.FC = () => {
                     <h2 className="text-xl font-bold text-gray-800">
                         Create Raw Material
                     </h2>
-                    <CustomButton
-                        text="Back to List"
-                        icon={FaArrowLeft}
-                        onClick={() => navigate("/raw-materials")}
-                    />
+                    <BackButton text="Back to List" to="/raw-materials" />
                 </div>
 
                 <form onSubmit={handleSubmit} className="px-6 py-4 space-y-8" noValidate>

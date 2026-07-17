@@ -13,6 +13,7 @@ import { rawMaterialService } from "../../../services/rawMaterialService";
 import { uomService } from "../../../services/uomService";
 import { billOfMaterialService } from "../../../services/billOfMaterialService";
 import { toast } from "react-toastify";
+import BackButton from "../../../components/ui/BackButton/BackButton";
 
 const BillOfMaterialCreate: React.FC = () => {
 
@@ -195,11 +196,7 @@ const BillOfMaterialCreate: React.FC = () => {
                         </Col>
                         <Col lg={6} md={12}>
                             <div className="page-header-actions justify-content-end">
-                                <CustomButton
-                                    text="Back to List"
-                                    icon={FaArrowLeft}
-                                    onClick={() => navigate("/bill-of-materials")}
-                                />
+                                <BackButton text="Back to List" to="/bill-of-materials" />
                             </div>
                         </Col>
                     </Row>

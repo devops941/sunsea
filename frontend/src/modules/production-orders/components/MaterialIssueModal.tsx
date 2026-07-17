@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Modal, Button, Form, Table } from "react-bootstrap";
+import { FaTimes } from "react-icons/fa";
 import { toast } from "react-toastify";
 import { productionOrderService } from "../../../services/productionOrderService";
 import { storeService } from "../../../services/storeService";
@@ -127,94 +127,126 @@ export const MaterialIssueModal: React.FC<MaterialIssueModalProps> = ({
         }
     };
 
-    return (
-        <Modal show={show} onHide={onHide} size="lg" backdrop="static" centered>
-            <Form onSubmit={handleSubmit}>
-                <Modal.Header closeButton={!issuing}>
-                    <Modal.Title>Issue Raw Materials (Production Order: {productionOrderId})</Modal.Title>
-                </Modal.Header>
-                <Modal.Body>
-                    <p className="text-muted small">
-                        Please review and confirm the quantity of raw materials you are taking from the store.
-                        This will automatically update the Physical Stock (on hand) and log an approved Stock Adjustment.
-                    </p>
+    if (!show) return null;
 
-                    <Table responsive bordered hover className="align-middle">
-                        <thead>
-                            <tr className="table-light">
-                                <th>Raw Material</th>
-                                <th style={{ width: "120px" }}>Reserved Qty</th>
-                                <th style={{ width: "140px" }}>Issue Qty</th>
-                                <th style={{ width: "180px" }}>Store Location</th>
-                                <th>Remarks</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {issueItems.map((item, idx) => (
-                                <tr key={item.rawMaterialId}>
-                                    <td>
-                                        <div className="fw-bold">{item.materialName}</div>
-                                        <div className="text-muted small">{item.rawMaterialId}</div>
-                                    </td>
-                                    <td>
-                                        <span className="fw-semibold">{item.reservedQty.toFixed(2)} KG</span>
-                                    </td>
-                                    <td>
-                                        <Form.Control
-                                            type="number"
-                                            step="0.001"
-                                            min="0.001"
-                                            value={item.qty || ""}
-                                            onChange={(e) => handleQtyChange(idx, e.target.value)}
-                                            required
-                                            disabled={issuing}
-                                        />
-                                    </td>
-                                    <td>
-                                        <Form.Select
-                                            value={item.storeId}
-                                            onChange={(e) => handleStoreChange(idx, e.target.value)}
-                                            required
-                                            disabled={issuing}
-                                        >
-                                            <option value="">-- Select Store --</option>
-                                            {stores.map((s) => (
-                                                <option key={s.storeId} value={s.storeId}>
-                                                    {s.storeName}
-                                                </option>
-                                            ))}
-                                        </Form.Select>
-                                    </td>
-                                    <td>
-                                        <Form.Control
-                                            type="text"
-                                            placeholder="e.g. Batch #1 issue"
-                                            value={item.remarks}
-                                            onChange={(e) => handleRemarksChange(idx, e.target.value)}
-                                            disabled={issuing}
-                                        />
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </Table>
-                </Modal.Body>
-                <Modal.Footer>
-                    <Button variant="secondary" onClick={onHide} disabled={issuing}>
-                        Cancel
-                    </Button>
-                    <Button variant="success" type="submit" disabled={issuing}>
-                        {issuing ? (
-                            <>
-                                <div className="animate-spin rounded-full border-b-2 border-indigo-600 h-4 w-4 border-b-2 mr-2"></div>
-                                Issuing...
-                            </>
-                        ) : (
-                            "Confirm Material Issue"
+    return (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh] overflow-hidden">
+                <form onSubmit={handleSubmit} className="flex flex-col h-full m-0">
+                    {/* Header */}
+                    <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50/50">
+                        <h3 className="text-xl font-bold text-gray-800 m-0">Issue Raw Materials (PO: {productionOrderId})</h3>
+                        {!issuing && (
+                            <button
+                                type="button"
+                                onClick={onHide}
+                                className="text-gray-400 hover:text-gray-600 transition-colors p-2 rounded-md hover:bg-gray-200"
+                            >
+                                <FaTimes />
+                            </button>
                         )}
-                    </Button>
-                </Modal.Footer>
-            </Form>
-        </Modal>
+                    </div>
+
+                    {/* Body */}
+                    <div className="p-6 overflow-y-auto flex-1">
+                        <div className="bg-blue-50 border border-blue-100 text-blue-800 rounded-lg p-4 mb-6 text-sm">
+                            Please review and confirm the quantity of raw materials you are taking from the store.
+                            This will automatically update the Physical Stock (on hand) and log an approved Stock Adjustment.
+                        </div>
+
+                        <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+                            <table className="w-full text-left text-sm text-slate-600">
+                                <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 font-semibold">
+                                    <tr>
+                                        <th className="px-4 py-3">Raw Material</th>
+                                        <th className="px-4 py-3 w-32">Reserved Qty</th>
+                                        <th className="px-4 py-3 w-36">Issue Qty</th>
+                                        <th className="px-4 py-3 w-48">Store Location</th>
+                                        <th className="px-4 py-3">Remarks</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {issueItems.map((item, idx) => (
+                                        <tr key={item.rawMaterialId} className="hover:bg-slate-50 transition-colors">
+                                            <td className="px-4 py-3">
+                                                <div className="font-bold text-slate-800">{item.materialName}</div>
+                                                <div className="text-xs text-slate-500 mt-0.5">{item.rawMaterialId}</div>
+                                            </td>
+                                            <td className="px-4 py-3 font-medium text-slate-700">
+                                                {item.reservedQty.toFixed(2)} KG
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <input
+                                                    type="number"
+                                                    step="0.001"
+                                                    min="0.001"
+                                                    className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary disabled:bg-slate-100"
+                                                    value={item.qty || ""}
+                                                    onChange={(e) => handleQtyChange(idx, e.target.value)}
+                                                    required
+                                                    disabled={issuing}
+                                                />
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <select
+                                                    className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary disabled:bg-slate-100"
+                                                    value={item.storeId}
+                                                    onChange={(e) => handleStoreChange(idx, e.target.value)}
+                                                    required
+                                                    disabled={issuing}
+                                                >
+                                                    <option value="">-- Select Store --</option>
+                                                    {stores.map((s) => (
+                                                        <option key={s.storeId} value={s.storeId}>
+                                                            {s.storeName}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <input
+                                                    type="text"
+                                                    placeholder="e.g. Batch #1 issue"
+                                                    className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary disabled:bg-slate-100"
+                                                    value={item.remarks}
+                                                    onChange={(e) => handleRemarksChange(idx, e.target.value)}
+                                                    disabled={issuing}
+                                                />
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    {/* Footer */}
+                    <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-end gap-3 rounded-b-xl">
+                        <button
+                            type="button"
+                            onClick={onHide}
+                            disabled={issuing}
+                            className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 bg-white hover:bg-slate-50 font-medium disabled:opacity-50 transition-colors"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={issuing}
+                            className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium shadow-sm transition-colors flex items-center disabled:opacity-70"
+                        >
+                            {issuing ? (
+                                <>
+                                    <div className="animate-spin rounded-full border-b-2 border-white h-4 w-4 mr-2"></div>
+                                    Issuing...
+                                </>
+                            ) : (
+                                "Confirm Material Issue"
+                            )}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
     );
 };

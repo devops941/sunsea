@@ -9,6 +9,7 @@ import QuantityInput from "../../../components/form/QuantityInput/QuantityInput"
 
 import { useAppDispatch } from "../../../hooks/reduxHooks";
 import { updateHourlyProduction } from "../../../features/hourly-productions/hourlyProductionSlice";
+import BackButton from "../../../components/ui/BackButton/BackButton";
 
 const HourlyWorkReportEdit: React.FC = () => {
     const navigate = useNavigate();
@@ -109,12 +110,7 @@ const HourlyWorkReportEdit: React.FC = () => {
                 {/* Page Header */}
                 <div className="px-6 py-4 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <h2 className="text-xl font-bold text-gray-800">Edit Hourly Production Log</h2>
-                    <CustomButton
-                        text="Back to List"
-                        icon={FaArrowLeft}
-                        onClick={() => navigate("/hourly-work-reports")}
-                        variant="secondary"
-                    />
+                    <BackButton text="Back to List" to="/hourly-work-reports" />
                 </div>
 
                 <form onSubmit={handleSubmit} className="px-6 py-6 space-y-6" noValidate>

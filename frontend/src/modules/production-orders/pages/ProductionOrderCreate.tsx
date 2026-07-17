@@ -21,8 +21,9 @@ import { salesOrderService } from "../../../services/salesOrderService";
 import { rawMaterialService } from "../../../services/rawMaterialService";
 import { productService } from "../../../services/productService";
 import { billOfMaterialService } from "../../../services/billOfMaterialService";
+import BackButton from "../../../components/ui/BackButton/BackButton";
 
-// â”€â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
 
 interface RawMaterialOption {
     label: string;
@@ -1015,11 +1016,7 @@ const ProductionOrderCreate: React.FC = () => {
                         </h2>
                     </div>
                     <div>
-                        <CustomButton
-                            text="Back to List"
-                            icon={FaArrowLeft}
-                            onClick={() => navigate("/production-orders")}
-                        />
+                        <BackButton text="Back to List" to="/production-orders" />
                     </div>
                 </div>
 

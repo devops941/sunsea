@@ -11,6 +11,7 @@ import { useAppDispatch } from "../../../hooks/reduxHooks";
 import { createWeeklyProgram } from "../../../features/weekly-programs/weeklyProgramSlice";
 import { weeklyProgramService } from "../../../services/weeklyProgramService";
 import { productionOrderService } from "../../../services/productionOrderService";
+import BackButton from "../../../components/ui/BackButton/BackButton";
 
 const WeeklyMachineScheduleCreate: React.FC = () => {
     const navigate = useNavigate();
@@ -201,7 +202,7 @@ const WeeklyMachineScheduleCreate: React.FC = () => {
 
                         </div>
                         <div>
-                            <CustomButton text="Back to List" icon={FaArrowLeft} onClick={() => navigate("/weekly-machine-schedules")} />
+                            <BackButton text="Back to List" to="/weekly-machine-schedules" />
                         </div>
                     </div>
                 </div>

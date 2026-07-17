@@ -18,7 +18,12 @@ export const fetchDailyPlans = createAsyncThunk(
   async (params: any | undefined, { rejectWithValue }) => {
     try {
       const response = await dailyPlanService.getAll(params);
-      return response.data;
+      if (Array.isArray(response)) return response;
+      if (response && Array.isArray(response.data)) return response.data;
+      if (response && response.data && Array.isArray(response.data.dailyPlans)) return response.data.dailyPlans;
+      if (response && Array.isArray(response.dailyPlans)) return response.dailyPlans;
+      if (response && Array.isArray(response.content)) return response.content;
+      return [];
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.message || "Failed to fetch daily plans");
     }
