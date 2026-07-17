@@ -128,14 +128,11 @@ const SupplierList: React.FC = () => {
                     </div>
 
                     {/* View Table */}
-                    {loading && (suppliers || []).length === 0 ? (
-                        <div className="flex justify-center items-center h-64">
-                            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"></div>
-                        </div>
-                    ) : (
+                    <div className="p-0">
                         <DataTable
                             data={paginatedSuppliers}
                             rowKey={(supplier) => supplier.id}
+                            loading={loading}
                             emptyMessage="No suppliers found."
                             pagination={
                                 totalPages > 1
@@ -150,8 +147,6 @@ const SupplierList: React.FC = () => {
                                 { header: "#", width: "60px", render: (_item, index) => startIndex + index + 1, align: "center" },
                                 { header: "CODE", accessor: "supplierCode" },
                                 { header: "NAME", accessor: "legalName" },
-                                // { header: "CITY", render: (supplier) => supplier.billingCity || "N/A" },
-                                // { header: "GSTIN", render: (supplier) => supplier.gstin || "N/A" },
                                 { header: "WHATSAPP", render: (supplier) => supplier.whatsapp || "N/A" },
                                 { header: "PAYMENT", accessor: "paymentTerms" },
                                 { header: "LEAD TIME", render: (supplier) => supplier.leadTimeDays !== null ? `${supplier.leadTimeDays} days` : "N/A" },
@@ -160,33 +155,27 @@ const SupplierList: React.FC = () => {
                                     header: "STATUS", render: (supplier) => (
                                         <span className={`px-3 py-1 rounded-full text-xs font-semibold ${supplier.status === "Active"
                                             ? "bg-green-100 text-green-700 border border-green-200"
-                                            : supplier.status === "Backup"
-                                                ? "bg-blue-100 text-blue-700 border border-blue-200"
-                                                : supplier.status === "Blacklisted"
-                                                    ? "bg-red-100 text-red-700 border border-red-200"
-                                                    : "bg-slate-100 text-slate-700 border border-slate-200"
+                                            : "bg-red-100 text-red-700 border border-red-200"
                                             }`}>
                                             {supplier.status}
                                         </span>
-                                    )
+                                    ), align: "center"
                                 },
                                 {
                                     header: "ACTIONS",
                                     render: (supplier) => (
                                         <div className="flex items-center gap-2">
                                             <ViewButton onClick={() => handleOpenView(supplier)} />
+                                            {/* BUG-SUP-009 fix: only show Edit / Delete actions to authorized users */}
                                             {canEditSupplier && <EditButton onClick={() => handleEdit(supplier)} />}
-                                            {canViewPricing && (
-                                                <PricingButton onClick={() => handleViewPricing(supplier)} />
-                                            )}
                                             {canDeleteSupplier && <DeleteButton onClick={() => triggerDelete(String(supplier.id))} />}
                                         </div>
                                     ),
-                                    align: "left"
+                                    align: "center"
                                 },
                             ]}
                         />
-                    )}
+                    </div>
                 </div>
 
                 <SupplierViewModal

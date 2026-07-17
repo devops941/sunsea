@@ -8,6 +8,7 @@ import type { RootState, AppDispatch } from "../../app/store";
 import { fetchProfile } from "../../features/profiles/profileSlice";
 import { StatusBadge } from "../../components/ui/StatusBadge/Badge";
 
+import CommonLoader from "../../components/ui/Loader/CommonLoader";
 
 const formatDate = (date?: string | null) =>
     date ? new Date(date).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' }) : "N/A";
@@ -32,11 +33,7 @@ const ProfilePage: React.FC = () => {
     }, [dispatch]);
 
     if (loading || !employee) {
-        return (
-            <div className="flex items-center justify-center min-h-100">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-            </div>
-        );
+        return <CommonLoader text="Loading Profile..." />;
     }
 
     return (

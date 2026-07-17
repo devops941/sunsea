@@ -5,6 +5,7 @@ import apiClient from "../../api/apiClient";
 import TextInput from "../../components/form/TextInput/TextInput";
 import CustomButton from "../../components/ui/Button/Button";
 import IndiaPhoneInput from "../../components/ui/PhoneInput/PhoneInput";
+import CommonLoader from "../../components/ui/Loader/CommonLoader";
 // import BackButton from "../../components/ui/BackButton/BackButton";
 
 interface WhatsappConfigForm {
@@ -25,6 +26,7 @@ const WhatsappCreatePage: React.FC = () => {
     const [formData, setFormData] = useState<WhatsappConfigForm>(initialFormData);
     const [saving, setSaving] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
+    const [loading, setLoading] = useState(true);
     const [errors, setErrors] = useState<Record<string, string>>({});
 
     // Fetch the existing configuration on mount
@@ -44,6 +46,8 @@ const WhatsappCreatePage: React.FC = () => {
                 }
             } catch (error) {
                 console.error("[WhatsApp Config] Error fetching:", error);
+            } finally {
+                setLoading(false);
             }
         };
         fetchConfig();
@@ -128,6 +132,8 @@ const WhatsappCreatePage: React.FC = () => {
             setSaving(false);
         }
     };
+
+    if (loading) return <CommonLoader text="Loading ..." fullScreen={false} />;
 
     return (
         <div className="w-full mx-auto">

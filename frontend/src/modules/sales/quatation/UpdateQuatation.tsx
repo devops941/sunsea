@@ -15,6 +15,7 @@ import {
 } from "../../../services/salesOrderService";
 import { getUnitPrice } from "../../../utils/pricingUtils";
 import CommonModal from "../../../components/ui/Modal/CommonModal";
+import CommonLoader from "../../../components/ui/Loader/CommonLoader";
 
 // ─── Formatting helpers ─────────────────────────────────────────────────
 const formatMoney = (val: string | number | null | undefined) => {
@@ -106,12 +107,7 @@ const QuotationReport: React.FC = () => {
     const isRejectReasonValid = reason.trim().length > 0;
 
     if (loading) {
-        return (
-            <div className="flex flex-col items-center justify-center py-20">
-                <FaCircleNotch className="animate-spin text-primary text-4xl mb-4" />
-                <p className="text-gray-500">Loading data...</p>
-            </div>
-        );
+        return <CommonLoader text="Loading data..." fullScreen={false} />;
     }
 
     if (!order) {
@@ -124,7 +120,7 @@ const QuotationReport: React.FC = () => {
 
     return (
         <div className="w-full mx-auto">
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+            <div className="bg-white border border-gray-200">
                 {/* ── Page Header ── */}
                 <div className="px-6 py-4">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">

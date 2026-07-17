@@ -231,15 +231,12 @@ const RoleList: React.FC = () => {
                     </div>
 
                     {/* Roles Table */}
-                    {loading && roles.length === 0 ? (
-                        <div className="flex justify-center items-center h-64">
-                            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"></div>
-                        </div>
-                    ) : (
+                    <div className="p-0">
                         <DataTable
                             columns={columns}
                             data={paginatedRoles}
                             rowKey={(row) => row.id}
+                            loading={loading}
                             emptyMessage="No roles found."
                             pagination={totalPages > 1 ? {
                                 currentPage,
@@ -247,7 +244,7 @@ const RoleList: React.FC = () => {
                                 onPageChange: setCurrentPage
                             } : undefined}
                         />
-                    )}
+                    </div>
                 </div>
 
                 {/* Add/Edit Modal */}

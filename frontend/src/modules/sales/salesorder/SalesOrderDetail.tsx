@@ -7,6 +7,7 @@ import { toast } from "react-toastify";
 import CustomButton from "../../../components/ui/Button/Button";
 import BackButton from "../../../components/ui/BackButton/BackButton";
 import DetailBox from "../../../components/ui/DetailBox/DetailBox";
+import CommonLoader from "../../../components/ui/Loader/CommonLoader";
 import { salesOrderService, type SalesOrder } from "../../../services/salesOrderService";
 import { getUnitPrice } from "../../../utils/pricingUtils";
 
@@ -106,16 +107,11 @@ const SalesOrderDetail: React.FC = () => {
     }, [idParam]);
 
     if (loading || !order) {
-        return (
-            <div className="flex flex-col items-center justify-center py-20">
-                <FaCircleNotch className="animate-spin text-primary text-4xl mb-4" />
-                <p className="text-gray-500">Loading order details...</p>
-            </div>
-        );
+        return <CommonLoader text="Loading order details..." fullScreen={false} />;
     }
     return (
         <div className="w-full mx-auto">
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+            <div className="bg-white  border border-gray-200">
                 {/* ── Page Header ── */}
                 <div className="px-6 py-4 border-b border-gray-200 bg-gray-50/50">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">

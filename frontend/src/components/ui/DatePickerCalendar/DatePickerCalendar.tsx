@@ -203,7 +203,7 @@ export default function DatePickerCalendar({
           type="button"
           disabled={disabled}
           onClick={() => setOpen((o) => !o)}
-          className={`flex w-full h-[35px] items-center justify-between rounded-[10px] border px-4 text-[15px] font-medium transition-all duration-250 outline-none text-left
+          className={`flex w-full h-[40px] items-center justify-between rounded-[10px] border px-4 text-[15px] font-medium transition-all duration-250 outline-none text-left
             ${error
               ? "border-red-500 bg-white focus:border-red-500 focus:ring-4 focus:ring-red-500/15"
               : open

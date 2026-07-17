@@ -1,5 +1,6 @@
 import React from "react";
 import { FaChevronLeft, FaChevronRight } from "react-icons/fa";
+import CommonLoader from "../Loader/CommonLoader";
 
 export interface DataTableColumn<T> {
   header: string;
@@ -125,11 +126,8 @@ function DataTable<T>({
             {/* Body */}
             {loading ? (
               <div role="row" style={rowStyle}>
-                <div style={fullSpanStyle} className="text-center p-6 text-gray-500">
-                  <span className="inline-flex items-center gap-2">
-                    <span className="h-4 w-4 rounded-full border-2 border-gray-300 border-t-red-600 animate-spin" />
-                    Loading...
-                  </span>
+                <div style={fullSpanStyle}>
+                  <CommonLoader text="Loading data..." fullScreen={false} />
                 </div>
               </div>
             ) : data.length > 0 ? (

@@ -11,6 +11,7 @@ import Button from "../../../components/ui/Button/Button";
 import CityStateSelect from "../../../components/ui/CityStateSelect/CityStateSelect";
 import IndiaPhoneInput from "../../../components/ui/PhoneInput/PhoneInput";
 import type { RootState, AppDispatch } from '../../../app/store';
+import CommonLoader from "../../../components/ui/Loader/CommonLoader";
 import { fetchCompany, updateCompany } from '../../../features/company/companySlice';
 import type { UpdateCompanyDto } from '../../../features/company/types';
 
@@ -136,7 +137,7 @@ const CompanySettings: React.FC = () => {
     }
   };
 
-  if (loading && !company) return <div className="text-center p-5 mt-5">Loading...</div>;
+  if (loading && !company) return <CommonLoader text="Loading Company Settings..." fullScreen={false} />;
 
   // Onboarding Screen Design
   if (company && !company.isOnboarded) {

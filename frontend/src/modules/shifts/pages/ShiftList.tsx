@@ -159,48 +159,47 @@ const ShiftList: React.FC = () => {
                     </div>
 
                     {/* Table */}
-                    {loading && data.length === 0 ? (
-                        <div className="flex justify-center items-center h-64">
-                            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"></div>
-                        </div>
-                    ) : error ? (
+                    {error ? (
                         <div className="text-center text-red-500 p-4">{error}</div>
                     ) : (
-                        <DataTable
-                            data={paginatedData}
-                            rowKey={(item) => item.id}
-                            emptyMessage="No shifts found."
-                            pagination={
-                                totalPages > 1
-                                    ? {
-                                        currentPage,
-                                        totalPages,
-                                        onPageChange: (page) => setCurrentPage(page),
-                                    }
-                                    : undefined
-                            }
-                            columns={[
-                                { header: "#", width: "60px", render: (_item, index) => startIndex + index + 1, align: "center" },
-                                { header: "SHIFT CODE", accessor: "shiftCode" },
-                                { header: "SHIFT NAME", accessor: "shiftName" },
-                                { header: "START TIME", render: (item) => formatTime12h(item.startTime) },
-                                { header: "END TIME", render: (item) => formatTime12h(item.endTime) },
-                                { header: "BREAK DURATION", render: (item) => item.breakDuration ? `${item.breakDuration} mins` : "N/A" },
-                                { header: "WORKING HOURS", render: (item) => calculateWorkingHours(item.startTime, item.endTime, item.breakDuration) },
-                                { header: "STATUS", render: (item) => <StatusBadge status={item.isActive ? "ACTIVE" : "INACTIVE"} />, align: "center" },
-                                {
-                                    header: "ACTIONS",
-                                    render: (item) => (
-                                        <div className="flex items-center gap-2">
-                                            <ViewButton onClick={() => handleOpenView(item)} />
-                                            {canEditShift && <EditButton onClick={() => handleOpenEdit(item)} />}
-                                            {canDeleteShift && <DeleteButton onClick={() => triggerDelete(item.id)} />}
-                                        </div>
-                                    ),
-                                    align: "left"
-                                },
-                            ]}
-                        />
+                        <div className="p-0">
+                            <DataTable
+                                data={paginatedData}
+                                rowKey={(item) => item.id}
+                                loading={loading}
+                                emptyMessage="No shifts found."
+                                pagination={
+                                    totalPages > 1
+                                        ? {
+                                            currentPage,
+                                            totalPages,
+                                            onPageChange: (page) => setCurrentPage(page),
+                                        }
+                                        : undefined
+                                }
+                                columns={[
+                                    { header: "#", width: "60px", render: (_item, index) => startIndex + index + 1, align: "center" },
+                                    { header: "SHIFT CODE", accessor: "shiftCode" },
+                                    { header: "SHIFT NAME", accessor: "shiftName" },
+                                    { header: "START TIME", render: (item) => formatTime12h(item.startTime) },
+                                    { header: "END TIME", render: (item) => formatTime12h(item.endTime) },
+                                    { header: "BREAK DURATION", render: (item) => item.breakDuration ? `${item.breakDuration} mins` : "N/A" },
+                                    { header: "WORKING HOURS", render: (item) => calculateWorkingHours(item.startTime, item.endTime, item.breakDuration) },
+                                    { header: "STATUS", render: (item) => <StatusBadge status={item.isActive ? "ACTIVE" : "INACTIVE"} />, align: "center" },
+                                    {
+                                        header: "ACTIONS",
+                                        render: (item) => (
+                                            <div className="flex items-center gap-2">
+                                                <ViewButton onClick={() => handleOpenView(item)} />
+                                                {canEditShift && <EditButton onClick={() => handleOpenEdit(item)} />}
+                                                {canDeleteShift && <DeleteButton onClick={() => triggerDelete(item.id)} />}
+                                            </div>
+                                        ),
+                                        align: "center"
+                                    },
+                                ]}
+                            />
+                        </div>
                     )}
                 </div>
 

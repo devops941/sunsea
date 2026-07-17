@@ -147,7 +147,7 @@ const CategoryList: React.FC = () => {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!validateForm()) return;
-        
+
         try {
             const payload = {
                 code: formData.code,
@@ -196,7 +196,7 @@ const CategoryList: React.FC = () => {
                     {/* Page Header */}
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-6 border-b border-slate-200">
                         <div>
-                            <h2 className="text-2xl font-bold text-slate-800">Category Management</h2>
+                            <h2 className="text-2xl font-bold text-slate-800">Catsdegory Management</h2>
                         </div>
                         <div className="flex items-center gap-3 w-full md:w-auto">
                             <div className="relative w-full md:w-64">

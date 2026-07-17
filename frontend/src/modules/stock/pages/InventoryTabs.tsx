@@ -98,9 +98,9 @@ const InventoryTabs: React.FC = () => {
 
     return (
         <div className="inner-container">
-            <Container fluid>
-                <Tabs tabs={tabs} activeKey={activeTab} onChange={handleTabChange} align="left" />
-            </Container>
+
+            <Tabs tabs={tabs} activeKey={activeTab} onChange={handleTabChange} align="left" />
+
         </div>
     );
 };
