@@ -1737,3 +1737,38 @@ model MachineOeeSnapshot {
   @@index([dailyPlanId])
   @@map("machine_oee_snapshots")
 }
+
+enum EodItemCategory {
+  RAW_MATERIAL
+  FINISHED_PRODUCT
+}
+
+model EodStockSnapshot {
+  id           BigInt          @id @default(autoincrement())
+  category     EodItemCategory @map("category")
+  itemId       String          @map("item_id") @db.VarChar(20)
+  itemCode     String          @map("item_code") @db.VarChar(20)
+  itemName     String          @map("item_name") @db.VarChar(150)
+  uom          String?         @map("uom") @db.VarChar(50)
+  storeId      String          @map("store_id") @db.VarChar(20)
+  snapshotDate DateTime        @map("snapshot_date") @db.Date
+  startQty     Decimal         @map("start_qty") @db.Decimal(14, 3)
+  eodQty       Decimal         @map("eod_qty") @db.Decimal(14, 3)
+  recordedAt   DateTime        @map("recorded_at")
+  createdAt    DateTime        @default(now()) @map("created_at")
+
+  @@unique([category, itemId, storeId, snapshotDate])
+  @@index([snapshotDate])
+  @@index([category])
+  @@index([storeId])
+  @@map("eod_stock_snapshots")
+}
+
+model SystemSetting {
+  id        Int      @id @default(autoincrement())
+  key       String   @unique @db.VarChar(100)
+  value     String   @db.VarChar(255)
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("system_settings")
+}

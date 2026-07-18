@@ -120,6 +120,7 @@ export const sidebarItems: SidebarItem[] = [
     activePaths: [
       "/stock",
       "/inventory/stock-adjustments",
+      "/inventory/eod-stock",
       "/finished-stock",
       "/wastage-stock",
     ],

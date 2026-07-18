@@ -414,6 +414,10 @@ const AppRoutes = () => {
             <Route element={<ProtectedRoute permission="raw_material_stocks.view" />}>
               <Route path="/inventory/stock-adjustments" element={<InventoryTabs />} />
             </Route>
+            {/* EOD Stock */}
+            <Route element={<ProtectedRoute permission="raw_material_stocks.view" />}>
+              <Route path="/inventory/eod-stock" element={<InventoryTabs />} />
+            </Route>
             {/* Stock Adjustments Create Route */}
             <Route element={<ProtectedRoute permission="raw_material_stocks.create" />}>
               <Route path="/inventory/stock-adjustments/create" element={<StockAdjustmentForm />} />

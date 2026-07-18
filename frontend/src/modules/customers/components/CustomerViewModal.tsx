@@ -1,6 +1,7 @@
 import React from "react";
-import { Modal, Row, Col } from "react-bootstrap";
 import type { Customer } from "../../../features/customer/types";
+import CommonViewModal from "../../../components/ui/CommonViewModal/CommonViewModal";
+import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 
 interface CustomerViewModalProps {
     show: boolean;
@@ -15,334 +16,148 @@ const CustomerViewModal: React.FC<CustomerViewModalProps> = ({
 }) => {
     if (!customer) return null;
 
+    // Helper to render bank details within custom content
+    const renderBankDetails = () => {
+        if (!customer.bankAccount) return null;
+
+        let bankAccounts: any[] = [];
+        if (Array.isArray(customer.bankAccount)) {
+            bankAccounts = customer.bankAccount;
+        } else if (typeof customer.bankAccount === "object") {
+            bankAccounts = [customer.bankAccount];
+        } else {
+            return null;
+        }
+
+        if (bankAccounts.length === 0) return null;
+
+        return (
+            <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden mt-6">
+                <div className="px-5 py-3 bg-slate-50 border-b border-slate-100">
+                    <h6 className="text-sm font-semibold text-slate-700 uppercase tracking-wider">Bank Account Details</h6>
+                </div>
+                <div className="p-5 space-y-5">
+                    {bankAccounts.map((bank, idx) => (
+                        <div key={idx} className={idx > 0 ? "pt-5 border-t border-slate-100" : ""}>
+                            {bankAccounts.length > 1 && (
+                                <h6 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Bank Account #{idx + 1}</h6>
+                            )}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-y-5 gap-x-8">
+                                <div className="flex flex-col gap-1.5">
+                                    <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Account Holder Name</span>
+                                    <span className="text-sm font-medium text-slate-800 break-words">{bank.bankHolderName || "N/A"}</span>
+                                </div>
+                                <div className="flex flex-col gap-1.5">
+                                    <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Bank Name</span>
+                                    <span className="text-sm font-medium text-slate-800 break-words">{bank.bankName || "N/A"}</span>
+                                </div>
+                                <div className="flex flex-col gap-1.5">
+                                    <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Account Number</span>
+                                    <span className="text-sm font-medium text-slate-800 break-words">{bank.accountNumber || "N/A"}</span>
+                                </div>
+                                <div className="flex flex-col gap-1.5">
+                                    <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">IFSC Code</span>
+                                    <span className="text-sm font-medium text-slate-800 break-words">{bank.ifscCode || "N/A"}</span>
+                                </div>
+                                <div className="flex flex-col gap-1.5">
+                                    <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Branch Name</span>
+                                    <span className="text-sm font-medium text-slate-800 break-words">{bank.branchName || "N/A"}</span>
+                                </div>
+                                <div className="flex flex-col gap-1.5">
+                                    <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">GPay / PhonePe Number</span>
+                                    <span className="text-sm font-medium text-slate-800 break-words">{bank.upiMobileNumber || "N/A"}</span>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        );
+    };
+
     return (
-        <Modal
+        <CommonViewModal
             show={show}
             onHide={onHide}
-            size="lg"
-            centered
-            className="customer-view-modal"
-        >
-            <Modal.Header closeButton>
-                <Modal.Title>
-                    Customer Details
-                </Modal.Title>
-            </Modal.Header>
-            <Modal.Body>
-                {/* Customer Info */}
-                <div className="customer-view-section">
-                    <h5 className="section-title">Customer Information</h5>
-                    <Row className="g-3">
-                        <Col md={4}>
-                            <div className="info-item">
-                                <label>Customer Code</label>
-                                <p>{customer.customerCode || "N/A"}</p>
-                            </div>
-                        </Col>
-
-                        <Col md={4}>
-                            <div className="info-item">
-                                <label>Status</label>
-                                <p className={customer.status === "Active" ? "status-active" : "status-inactive"}>
-                                    {customer.status || "N/A"}
-                                </p>
-                            </div>
-                        </Col>
-
-                        <Col md={4}>
-                            <div className="info-item">
-                                <label>Customer Type</label>
-                                <p>{customer.customerType || "N/A"}</p>
-                            </div>
-                        </Col>
-                    </Row>
-                </div>
-
-                {/* Basic Information */}
-                <div className="customer-view-section mt-4">
-                    <h5 className="section-title">Basic Information</h5>
-
-                    <Row className="g-3">
-                        <Col md={6}>
-                            <div className="info-item">
-                                <label>Firm Name</label>
-                                <p>{customer.firmName || "N/A"}</p>
-                            </div>
-                        </Col>
-
-                        <Col md={6}>
-                            <div className="info-item">
-                                <label>Display Name</label>
-                                <p>{customer.displayName || "N/A"}</p>
-                            </div>
-                        </Col>
-
-                        <Col md={6}>
-                            <div className="info-item">
-                                <label>Contact Person</label>
-                                <p>{customer.contactPerson || "N/A"}</p>
-                            </div>
-                        </Col>
-
-                        <Col md={6}>
-                            <div className="info-item">
-                                <label>Designation</label>
-                                <p>{customer.designation || "N/A"}</p>
-                            </div>
-                        </Col>
-                    </Row>
-                </div>
-
-                {/* Contact Information */}
-                <div className="customer-view-section mt-4">
-                    <h5 className="section-title">Contact Information</h5>
-
-                    <Row className="g-3">
-                        <Col md={4}>
-                            <div className="info-item">
-                                <label>Mobile Number</label>
-                                <p>{customer.mobile || "N/A"}</p>
-                            </div>
-                        </Col>
-
-                        <Col md={4}>
-                            <div className="info-item">
-                                <label>Alternative Phone</label>
-                                <p>{customer.altPhone || "N/A"}</p>
-                            </div>
-                        </Col>
-
-                        <Col md={4}>
-                            <div className="info-item">
-                                <label>WhatsApp Number</label>
-                                <p>{customer.whatsapp || "N/A"}</p>
-                            </div>
-                        </Col>
-
-                        <Col md={6}>
-                            <div className="info-item">
-                                <label>Email Address</label>
-                                <p>{customer.email || "N/A"}</p>
-                            </div>
-                        </Col>
-                    </Row>
-                </div>
-
-                {/* GST & Statutory */}
-                <div className="customer-view-section mt-4">
-                    <h5 className="section-title">GST & Statutory Information</h5>
-
-                    <Row className="g-3">
-                        <Col md={4}>
-                            <div className="info-item">
-                                <label>GSTIN</label>
-                                <p>{customer.gstin || "N/A"}</p>
-                            </div>
-                        </Col>
-
-                        <Col md={4}>
-                            <div className="info-item">
-                                <label>PAN</label>
-                                <p>{customer.pan || "N/A"}</p>
-                            </div>
-                        </Col>
-
-                        <Col md={4}>
-                            <div className="info-item">
-                                <label>GST Registration Type</label>
-                                <p>{customer.gstRegType || "N/A"}</p>
-                            </div>
-                        </Col>
-
-                        <Col md={4}>
-                            <div className="info-item">
-                                <label>State Code</label>
-                                <p>{customer.stateCode || "N/A"}</p>
-                            </div>
-                        </Col>
-
-                        <Col md={4}>
-                            <div className="info-item">
-                                <label>TDS Section</label>
-                                <p>{customer.tdsSection || "N/A"}</p>
-                            </div>
-                        </Col>
-
-                        <Col md={4}>
-                            <div className="info-item">
-                                <label>TCS Rate %</label>
-                                <p>{customer.tcsRate !== undefined && customer.tcsRate !== null ? `${customer.tcsRate}%` : "0%"}</p>
-                            </div>
-                        </Col>
-                    </Row>
-                </div>
-
-                {/* Address Information */}
-                <div className="customer-view-section mt-4">
-                    <h5 className="section-title">Address Information</h5>
-
-                    <Row className="g-3">
-                        <Col md={6}>
-                            <div className="info-item">
-                                <label>Billing Address</label>
-                                <p>
+            modalTitle="Customer Details"
+            avatarText={customer.displayName?.charAt(0).toUpperCase() || customer.firmName?.charAt(0).toUpperCase() || "C"}
+            headerTitle={customer.displayName || customer.firmName || "N/A"}
+            headerSubtitle={`${customer.customerCode || "N/A"} | ${customer.customerType || "N/A"}`}
+            statusNode={
+                <StatusBadge status={customer.status === "Active" ? "ACTIVE" : "INACTIVE"} />
+            }
+            sections={[
+                {
+                    title: "Customer Information",
+                    fields: [
+                        { label: "Customer Code", value: customer.customerCode || "N/A" },
+                        { label: "Customer Type", value: customer.customerType || "N/A" }
+                    ]
+                },
+                {
+                    title: "Basic Information",
+                    fields: [
+                        { label: "Firm Name", value: customer.firmName || "N/A" },
+                        { label: "Display Name", value: customer.displayName || "N/A" },
+                        { label: "Contact Person", value: customer.contactPerson || "N/A" },
+                        { label: "Designation", value: customer.designation || "N/A" }
+                    ]
+                },
+                {
+                    title: "Contact Information",
+                    fields: [
+                        { label: "Mobile Number", value: customer.mobile || "N/A" },
+                        { label: "Alternative Phone", value: customer.altPhone || "N/A" },
+                        { label: "WhatsApp Number", value: customer.whatsapp || "N/A" },
+                        { label: "Email Address", value: customer.email || "N/A" }
+                    ]
+                },
+                {
+                    title: "GST & Statutory Information",
+                    fields: [
+                        { label: "GSTIN", value: customer.gstin || "N/A" },
+                    ]
+                },
+                {
+                    title: "Address Information",
+                    fields: [
+                        {
+                            label: "Billing Address",
+                            value: (
+                                <>
                                     {customer.billingAddressLine1 || "N/A"}
                                     <br />
                                     {customer.billingCity || "N/A"},{" "}
                                     {customer.billingState || "N/A"} -{" "}
                                     {customer.billingPincode || "N/A"}
-                                </p>
-                            </div>
-                        </Col>
-
-                        <Col md={6}>
-                            <div className="info-item">
-                                <label>Shipping Address</label>
-                                <p>
+                                </>
+                            )
+                        },
+                        {
+                            label: "Shipping Address",
+                            value: (
+                                <>
                                     {customer.shippingAddressLine1 || "N/A"}
                                     <br />
                                     {customer.shippingCity || "N/A"},{" "}
                                     {customer.shippingState || "N/A"} -{" "}
                                     {customer.shippingPincode || "N/A"}
-                                </p>
-                            </div>
-                        </Col>
-                    </Row>
-                </div>
-
-                {/* Commercial Settings */}
-                <div className="customer-view-section mt-4">
-                    <h5 className="section-title">Commercial Settings</h5>
-
-                    <Row className="g-3">
-                        <Col md={4}>
-                            <div className="info-item">
-                                <label>Credit Limit</label>
-                                <p>₹ {customer.creditLimit !== undefined && customer.creditLimit !== null ? customer.creditLimit : 0}</p>
-                            </div>
-                        </Col>
-
-                        <Col md={4}>
-                            <div className="info-item">
-                                <label>Credit Days</label>
-                                <p>{customer.creditDays !== undefined && customer.creditDays !== null ? `${customer.creditDays} Days` : "0 Days"}</p>
-                            </div>
-                        </Col>
-
-                        <Col md={4}>
-                            <div className="info-item">
-                                <label>Price List</label>
-                                <p>{customer.priceList || "N/A"}</p>
-                            </div>
-                        </Col>
-                    </Row>
-                </div>
-
-                {/* Bank Details */}
-                <div className="customer-view-section mt-4">
-                    <h5 className="section-title">Bank Account Details</h5>
-
-                    {Array.isArray(customer.bankAccount) && customer.bankAccount.length > 0 ? (
-                        customer.bankAccount.map((bank: any, idx: number) => (
-                            <div key={idx} className="bank-account-block mb-3 p-3 border rounded">
-                                {customer.bankAccount.length > 1 && (
-                                    <h6 className="mb-3 text-muted">Bank Account #{idx + 1}</h6>
-                                )}
-                                <Row className="g-3">
-                                    <Col md={4}>
-                                        <div className="info-item">
-                                            <label>Account Holder Name</label>
-                                            <p>{bank.bankHolderName || "N/A"}</p>
-                                        </div>
-                                    </Col>
-
-                                    <Col md={4}>
-                                        <div className="info-item">
-                                            <label>Bank Name</label>
-                                            <p>{bank.bankName || "N/A"}</p>
-                                        </div>
-                                    </Col>
-
-                                    <Col md={4}>
-                                        <div className="info-item">
-                                            <label>Account Number</label>
-                                            <p>{bank.accountNumber || "N/A"}</p>
-                                        </div>
-                                    </Col>
-
-                                    <Col md={4}>
-                                        <div className="info-item">
-                                            <label>IFSC Code</label>
-                                            <p>{bank.ifscCode || "N/A"}</p>
-                                        </div>
-                                    </Col>
-
-                                    <Col md={4}>
-                                        <div className="info-item">
-                                            <label>Branch Name</label>
-                                            <p>{bank.branchName || "N/A"}</p>
-                                        </div>
-                                    </Col>
-
-                                    <Col md={4}>
-                                        <div className="info-item">
-                                            <label>GPay / PhonePe Number</label>
-                                            <p>{bank.upiMobileNumber || "N/A"}</p>
-                                        </div>
-                                    </Col>
-                                </Row>
-                            </div>
-                        ))
-                    ) : customer.bankAccount && typeof customer.bankAccount === "object" ? (
-                        <Row className="g-3">
-                            <Col md={4}>
-                                <div className="info-item">
-                                    <label>Account Holder Name</label>
-                                    <p>{(customer.bankAccount as any).bankHolderName || "N/A"}</p>
-                                </div>
-                            </Col>
-
-                            <Col md={4}>
-                                <div className="info-item">
-                                    <label>Bank Name</label>
-                                    <p>{(customer.bankAccount as any).bankName || "N/A"}</p>
-                                </div>
-                            </Col>
-
-                            <Col md={4}>
-                                <div className="info-item">
-                                    <label>Account Number</label>
-                                    <p>{(customer.bankAccount as any).accountNumber || "N/A"}</p>
-                                </div>
-                            </Col>
-
-                            <Col md={4}>
-                                <div className="info-item">
-                                    <label>IFSC Code</label>
-                                    <p>{(customer.bankAccount as any).ifscCode || "N/A"}</p>
-                                </div>
-                            </Col>
-
-                            <Col md={4}>
-                                <div className="info-item">
-                                    <label>Branch Name</label>
-                                    <p>{(customer.bankAccount as any).branchName || "N/A"}</p>
-                                </div>
-                            </Col>
-
-                            <Col md={4}>
-                                <div className="info-item">
-                                    <label>GPay / PhonePe Number</label>
-                                    <p>{(customer.bankAccount as any).upiMobileNumber || "N/A"}</p>
-                                </div>
-                            </Col>
-                        </Row>
-                    ) : (
-                        <p className="text-muted">No Bank Details Available</p>
-                    )}
-                </div>
-            </Modal.Body>
-        </Modal>
+                                </>
+                            )
+                        }
+                    ]
+                },
+                {
+                    title: "Commercial Settings",
+                    fields: [
+                        { label: "Credit Limit", value: `₹ ${customer.creditLimit !== undefined && customer.creditLimit !== null ? customer.creditLimit : 0}` },
+                        { label: "Credit Days", value: customer.creditDays !== undefined && customer.creditDays !== null ? `${customer.creditDays} Days` : "0 Days" },
+                        { label: "Price List", value: customer.priceList || "N/A" }
+                    ]
+                }
+            ]}
+            customContent={renderBankDetails()}
+        />
     );
 };
 
