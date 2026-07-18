@@ -250,10 +250,15 @@ export class StockAdjustmentService {
           const rm = await tx.rawMaterial.findUnique({ where: { rawMaterialId: item.rawMaterialId } });
           if (!rm) throw new ApiError(404, `Raw Material ${item.rawMaterialId} not found`);
 
+          const updatedReservedQty = existing.adjustmentType === "PRODUCTION_MATERIAL_ISSUE"
+            ? Math.max(0, Number(rm.reservedQty) - Math.abs(item.difference.toNumber()))
+            : Number(rm.reservedQty);
+
           await tx.rawMaterial.update({
             where: { rawMaterialId: item.rawMaterialId },
             data: {
               onHandQty: { increment: item.difference },
+              reservedQty: updatedReservedQty,
               updatedBy: userId,
             },
           });
