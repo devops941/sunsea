@@ -59,26 +59,30 @@ class CompanyService {
     // Check if a new logo file was uploaded
     if (logoFile) {
       const fileName = `logo_${Date.now()}${path.extname(logoFile.originalname)}`;
-      companyData.logoUrl = await uploadToImageKit(logoFile.path, fileName, "/company-logos")
+      companyData.logoUrl = await uploadToImageKit(logoFile.buffer || logoFile.path, fileName, "/company-logos")
 
       // Clean up the local temp file after upload
-      try {
-        fs.unlinkSync(logoFile.path);
-      } catch (err) {
-        console.error("Failed to delete temp file:", logoFile.path, err);
+      if (logoFile.path) {
+        try {
+          fs.unlinkSync(logoFile.path);
+        } catch (err) {
+          console.error("Failed to delete temp file:", logoFile.path, err);
+        }
       }
     }
 
     // Check if a new favicon file was uploaded
     if (faviconFile) {
       const fileName = `favicon_${Date.now()}${path.extname(faviconFile.originalname)}`;
-      companyData.faviconUrl = await uploadToImageKit(faviconFile.path, fileName, "/company-logos")
+      companyData.faviconUrl = await uploadToImageKit(faviconFile.buffer || faviconFile.path, fileName, "/company-logos")
 
       // Clean up the local temp file after upload
-      try {
-        fs.unlinkSync(faviconFile.path);
-      } catch (err) {
-        console.error("Failed to delete temp file:", faviconFile.path, err);
+      if (faviconFile.path) {
+        try {
+          fs.unlinkSync(faviconFile.path);
+        } catch (err) {
+          console.error("Failed to delete temp file:", faviconFile.path, err);
+        }
       }
     }
 
