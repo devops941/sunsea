@@ -256,7 +256,20 @@ const InvoiceDetailPage: React.FC = () => {
                         const unitPrice = Number(item.unitPrice || 0);
                         const tax = Number(item.tax || 0);
                         const taxableAmount = qty * unitPrice;
-                        const netAmount = taxableAmount + (taxableAmount * tax) / 100;
+                        const totalGstAmount = (taxableAmount * tax) / 100;
+                        const netAmount = taxableAmount + totalGstAmount;
+
+                        let cgstRate = 0, cgstAmount = 0, sgstRate = 0, sgstAmount = 0, igstRate = 0, igstAmount = 0;
+                        if (isInterState) {
+                            igstRate = tax;
+                            igstAmount = totalGstAmount;
+                        } else {
+                            cgstRate = tax / 2;
+                            sgstRate = tax / 2;
+                            cgstAmount = totalGstAmount / 2;
+                            sgstAmount = totalGstAmount / 2;
+                        }
+
                         return {
                             productId: item.productId || "",
                             description: item.product?.materialName || item.product?.productName || item.productId,
@@ -265,6 +278,12 @@ const InvoiceDetailPage: React.FC = () => {
                             unitPrice,
                             tax,
                             taxableAmount,
+                            cgstRate,
+                            cgstAmount,
+                            sgstRate,
+                            sgstAmount,
+                            igstRate,
+                            igstAmount,
                             netAmount,
                         };
                     })

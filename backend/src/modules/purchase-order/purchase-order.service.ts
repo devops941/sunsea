@@ -174,6 +174,9 @@ class PurchaseOrderService {
                 discountValue: poDiscountValue,
                 totalDiscount,
                 totalTax,
+                totalCgst,
+                totalSgst,
+                totalIgst,
                 netAmount,
 
                 companyId: currentUser.companyId,
@@ -378,6 +381,10 @@ class PurchaseOrderService {
             updateData.discountValue = poDiscountValue;
             updateData.totalDiscount = totalDiscount;
             updateData.totalTax = totalTax;
+            updateData.totalCgst = totalCgst;
+            updateData.totalSgst = totalSgst;
+            updateData.totalIgst = totalIgst;
+
             updateData.netAmount = netAmount;
 
             updateData.items = {

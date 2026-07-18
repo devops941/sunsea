@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useMemo } from "react";
-import { FaPrint, FaEye, FaDownload, FaTrash, FaArrowLeft, FaFilePdf, FaCircleNotch } from "react-icons/fa";
+import { FaPrint, FaEye, FaDownload, FaTrash, FaArrowLeft, FaFilePdf } from "react-icons/fa";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useSelector, useDispatch } from "react-redux";
@@ -9,6 +9,7 @@ import { grnInvoiceService } from "../../../../services/grnInvoiceService";
 import CustomButton from "../../../../components/ui/Button/Button";
 import SearchInput from "../../../../components/ui/SearchInput/SearchInput";
 import { fetchCompany } from "../../../../features/company/companySlice";
+import CommonLoader from "../../../../components/ui/Loader/CommonLoader";
 
 // ─── Formatting helpers ─────────────────────────────────────────────────
 const formatMoney = (val: string | number | null | undefined) => {
@@ -145,9 +146,7 @@ const GrnInvoiceViewPage: React.FC = () => {
                 {/* List Content */}
                 <div className="flex-1 overflow-y-auto divide-y divide-gray-100">
                     {loadingList ? (
-                        <div className="flex items-center justify-center py-8">
-                            <FaCircleNotch className="animate-spin text-gray-400 text-xl" />
-                        </div>
+                        <CommonLoader text="Loading invoices..." fullScreen={false} />
                     ) : filteredInvoices.map((inv) => {
                         const isSelected = String(inv.id) === String(idParam);
                         return (
@@ -186,10 +185,7 @@ const GrnInvoiceViewPage: React.FC = () => {
             {/* ── Right Content Panel ── */}
             <div className="flex-1 overflow-y-auto p-6 lg:p-8">
                 {loadingDetail ? (
-                    <div className="flex flex-col items-center justify-center h-full min-h-[400px]">
-                        <FaCircleNotch className="animate-spin text-primary text-4xl mb-4" />
-                        <p className="text-gray-500 font-medium">Loading invoice details...</p>
-                    </div>
+                    <CommonLoader text="Loading invoice details..." fullScreen={false} />
                 ) : !selectedItem ? (
                     <div className="flex flex-col items-center justify-center h-full min-h-[400px] text-slate-400">
                         <p className="text-base font-semibold">Select an invoice from the sidebar to view details.</p>
@@ -388,10 +384,23 @@ const GrnInvoiceViewPage: React.FC = () => {
                                             </div>
                                         )}
 
-                                        <div className="flex justify-between text-sm font-semibold text-gray-700 px-2">
-                                            <span>Total Tax</span>
-                                            <span>+ {formatMoney(selectedItem.totalTax)}</span>
-                                        </div>
+                                        {selectedItem.totalIgst > 0 ? (
+                                            <div className="flex justify-between text-sm font-semibold text-gray-700 px-2">
+                                                <span>Total IGST</span>
+                                                <span className="text-green-600">+ {formatMoney(selectedItem.totalIgst)}</span>
+                                            </div>
+                                        ) : (
+                                            <>
+                                                <div className="flex justify-between text-sm font-semibold text-gray-700 px-2">
+                                                    <span>Total CGST</span>
+                                                    <span className="text-blue-600">+ {formatMoney(selectedItem.totalCgst)}</span>
+                                                </div>
+                                                <div className="flex justify-between text-sm font-semibold text-gray-700 px-2">
+                                                    <span>Total SGST</span>
+                                                    <span className="text-purple-600">+ {formatMoney(selectedItem.totalSgst)}</span>
+                                                </div>
+                                            </>
+                                        )}
 
                                         <div className="border-t-2 border-gray-800 my-2"></div>
 
