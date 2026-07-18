@@ -18,6 +18,10 @@ import type { DataTableColumn } from "../../../components/ui/table/DataTable";
 import { formatDate } from "../../../utils/dateUtils";
 import BackButton from "../../../components/ui/BackButton/BackButton";
 import DatePickerCalendar from "../../../components/ui/DatePickerCalendar/DatePickerCalendar";
+import IndiaPhoneInput, { validatePhoneNumber } from "../../../components/ui/PhoneInput/PhoneInput";
+import TimePickerInput from "../../../components/form/TimePickerInput/TimePickerInput";
+import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
+import IconButton from "../../../components/ui/IconButton/IconButton";
 
 const GoodsDispatchCreate: React.FC = () => {
   const navigate = useNavigate();
@@ -37,6 +41,13 @@ const GoodsDispatchCreate: React.FC = () => {
     transportName: "",
     loadingTime: "",
     remarks: "",
+    destinationStoreId: "",
+  });
+
+  const [formErrors, setFormErrors] = useState({
+    vehicleNumber: "",
+    driverName: "",
+    driverMobile: "",
     destinationStoreId: "",
   });
 
@@ -79,9 +90,42 @@ const GoodsDispatchCreate: React.FC = () => {
     );
   };
 
-  const handleSubmit = async () => {
+  const validateForm = () => {
+    const errors = {
+      vehicleNumber: "",
+      driverName: "",
+      driverMobile: "",
+      destinationStoreId: "",
+    };
+    let isValid = true;
+
+    if (!formData.vehicleNumber.trim()) {
+      errors.vehicleNumber = "Vehicle number is required";
+      isValid = false;
+    }
+    if (!formData.driverName.trim()) {
+      errors.driverName = "Driver name is required";
+      isValid = false;
+    }
+    if (formData.driverMobile) {
+      const mobileErr = validatePhoneNumber(formData.driverMobile, false);
+      if (mobileErr) {
+        errors.driverMobile = mobileErr;
+        isValid = false;
+      }
+    }
     if (!formData.destinationStoreId) {
-      toast.error("Destination store is required");
+      errors.destinationStoreId = "Destination store is required";
+      isValid = false;
+    }
+
+    setFormErrors(errors);
+    return isValid;
+  };
+
+  const handleSubmit = async () => {
+    if (!validateForm()) {
+      toast.error("Please fix form errors before submitting");
       return;
     }
     if (selectedPOs.length === 0) {
@@ -128,24 +172,25 @@ const GoodsDispatchCreate: React.FC = () => {
       header: "Action",
       accessor: "id",
       render: (item: any) => (
-        <button
+        <IconButton
+          icon={FaPlus}
           onClick={() => handleSelectPO(item)}
           disabled={selectedPOs.some((p) => p.productionOrderId === item.productionOrderId)}
-          className="text-primary-600 hover:text-primary-800 disabled:text-gray-400 p-2 rounded-full hover:bg-primary-50 transition-colors"
+          variant="primary"
           title="Add to Dispatch"
-        >
-          <FaPlus />
-        </button>
+        />
       ),
     },
   ];
 
-  const filteredEligibleOrders = eligibleOrders.filter(
-    (o) =>
+  const filteredEligibleOrders = eligibleOrders.filter((o) => {
+    if (selectedPOs.some((p) => p.productionOrderId === o.productionOrderId)) return false;
+    return (
       o.productionOrderId.toLowerCase().includes(searchPo.toLowerCase()) ||
       o.productItem?.productName.toLowerCase().includes(searchPo.toLowerCase()) ||
       (o.batchNo && o.batchNo.toLowerCase().includes(searchPo.toLowerCase()))
-  );
+    );
+  });
 
   return (
     <div className="w-full mx-auto p-4 md:p-6 min-h-screen ">
@@ -189,6 +234,7 @@ const GoodsDispatchCreate: React.FC = () => {
                   onChange={handleInputChange}
                   placeholder="e.g. TN-XX-XXXX"
                   required
+                  error={formErrors.vehicleNumber}
                 />
                 <TextInput
                   label="Driver Name *"
@@ -196,12 +242,15 @@ const GoodsDispatchCreate: React.FC = () => {
                   value={formData.driverName}
                   onChange={handleInputChange}
                   required
+                  error={formErrors.driverName}
                 />
-                <TextInput
+                <IndiaPhoneInput
                   label="Driver Mobile"
                   name="driverMobile"
                   value={formData.driverMobile}
-                  onChange={handleInputChange}
+                  onChange={(e: any) => handleInputChange(e)}
+                  required={false}
+                  error={formErrors.driverMobile}
                 />
                 <TextInput
                   label="Transport Name"
@@ -209,21 +258,22 @@ const GoodsDispatchCreate: React.FC = () => {
                   value={formData.transportName}
                   onChange={handleInputChange}
                 />
-                <TextInput
+                <TimePickerInput
                   label="Loading Time"
                   name="loadingTime"
-                  type="time"
                   value={formData.loadingTime}
-                  onChange={handleInputChange}
+                  onChange={(val) => setFormData((prev) => ({ ...prev, loadingTime: val }))}
                 />
                 <div className="md:col-span-2">
                   <SelectInput
-                    label="Destination Store (Optional)"
+                    label="Destination Store *"
                     name="destinationStoreId"
                     value={formData.destinationStoreId}
                     onChange={handleInputChange}
+                    required={true}
+                    error={formErrors.destinationStoreId}
                     options={[
-                      { value: "", label: "Select Store (defaults to PO store)" },
+                      { value: "", label: "Select Store" },
                       ...stores.map((s) => ({ value: s.storeId, label: s.storeName })),
                     ]}
                   />
@@ -261,11 +311,11 @@ const GoodsDispatchCreate: React.FC = () => {
                   <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
                       <tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">PO No</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Pending</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-32">Dispatch Qty</th>
-                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Action</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-1/5">PO No</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-1/3">Product</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-1/6 whitespace-nowrap">Pending</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-1/5 whitespace-nowrap">Dispatch Qty</th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase w-24">Action</th>
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
@@ -289,12 +339,9 @@ const GoodsDispatchCreate: React.FC = () => {
                             </div>
                           </td>
                           <td className="px-4 py-3 text-right">
-                            <button
+                            <DeleteButton
                               onClick={() => handleRemovePO(po.productionOrderId)}
-                              className="text-red-500 hover:text-red-700 p-2 rounded-full hover:bg-red-50 transition-colors"
-                            >
-                              <FaTrash />
-                            </button>
+                            />
                           </td>
                         </tr>
                       ))}

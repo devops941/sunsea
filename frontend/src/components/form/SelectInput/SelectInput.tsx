@@ -77,7 +77,7 @@ const SelectInput: React.FC<SelectInputProps> = ({
     : options;
 
   return (
-    <div className={`${noMargin ? "" : "mb-4.5 "}group flex flex-col w-full`} ref={dropdownRef}>
+    <div className={`${noMargin ? "" : "mb-0.5 "}group flex flex-col w-full`} ref={dropdownRef}>
       {!hideLabel && (
         <label className={`
           flex items-center gap-1.5 mb-2
