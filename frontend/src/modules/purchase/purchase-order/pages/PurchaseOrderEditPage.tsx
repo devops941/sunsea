@@ -151,6 +151,7 @@ const PurchaseOrderEditPage: React.FC = () => {
   const { activeUOMs, loadActiveUOMs } = useUOMs();
 
   const [formData, setFormData] = useState<PurchaseOrderFormData>(initialFormData);
+  console.log(formData, "formData")
 
   const selectedSupplier = useMemo(() => (suppliers || []).find(
     (s) => String(s?.id) === String(formData.supplierId)
@@ -989,7 +990,7 @@ const PurchaseOrderEditPage: React.FC = () => {
                   <span>-₹{(formData.totalDiscount || 0).toFixed(2)}</span>
                 </div>
 
-                <div className="flex justify-between items-center mb-2 text-green-600 text-sm"><span>Total Tax:</span><span>₹{formData.totalTax.toFixed(2)}</span></div>
+                {/* <div className="flex justify-between items-center mb-2 text-green-600 text-sm"><span>Total Tax:</span><span>₹{formData.totalTax.toFixed(2)}</span></div> */}
 
                 <div className="flex justify-between items-center mb-2 text-gray-600 text-sm">
                   <span className="flex items-center gap-2">Round Off:

@@ -116,22 +116,26 @@ const calculateInvoiceNumber = (dateStr: string, settings: any, orders: any[]) =
 
   let seq = settings.currentSequenceNumber || 1;
 
-  if (!isCurrentFy) {
-    // If previous year, find the highest sequence number of existing orders in that financial year
-    let maxSeq = 0;
-    orders.forEach((order: any) => {
-      const orderDateStr = order.orderDate || order.invoiceDate || order.createdAt;
-      if (!orderDateStr) return;
+  // Find the highest sequence number of existing orders in that financial year
+  let maxSeq = 0;
+  orders.forEach((order: any) => {
+    const orderDateStr = order.orderDate || order.invoiceDate || order.createdAt;
+    if (!orderDateStr) return;
 
-      const orderFyInfo = getFinancialYearForDate(orderDateStr, settings);
-      if (orderFyInfo && orderFyInfo.fyLabel === fyLabel) {
-        const orderSeq = extractSequenceNumber(order.orderNo || order.invoiceNo || "");
-        if (orderSeq > maxSeq) {
-          maxSeq = orderSeq;
-        }
+    const orderFyInfo = getFinancialYearForDate(orderDateStr, settings);
+    if (orderFyInfo && orderFyInfo.fyLabel === fyLabel) {
+      const orderSeq = extractSequenceNumber(order.orderNo || order.invoiceNo || "");
+      if (orderSeq > maxSeq) {
+        maxSeq = orderSeq;
       }
-    });
+    }
+  });
+
+  if (!isCurrentFy) {
     seq = maxSeq + 1;
+  } else {
+    // If it is the current year, use the larger of the configured sequence number or maxSeq + 1
+    seq = Math.max(seq, maxSeq + 1);
   }
 
   const paddedSeq = String(seq).padStart(settings.sequenceLength || 4, "0");
@@ -534,13 +538,13 @@ const SalesInvoiceForm: React.FC = () => {
               <table className="w-full text-left text-sm">
                 <thead className="bg-slate-50 border-b border-slate-200">
                   <tr>
-                    <th className="px-4 py-3 font-semibold text-slate-600 w-1/3 text-[11px] uppercase tracking-wider">Product</th>
-                    <th className="px-4 py-3 font-semibold text-slate-600 w-24 text-[11px] uppercase tracking-wider">Qty</th>
-                    <th className="px-4 py-3 font-semibold text-slate-600 w-32 text-[11px] uppercase tracking-wider">Unit Price</th>
-                    <th className="px-4 py-3 font-semibold text-slate-600 w-32 text-[11px] uppercase tracking-wider">Subtotal</th>
-                    <th className="px-4 py-3 font-semibold text-slate-600 w-40 text-[11px] uppercase tracking-wider">GST Rate</th>
-                    <th className="px-4 py-3 font-semibold text-slate-600 w-32 text-[11px] uppercase tracking-wider">GST Amt</th>
-                    <th className="px-4 py-3 font-semibold text-slate-600 w-32 text-[11px] uppercase tracking-wider text-right">Total</th>
+                    <th className="px-4 py-3 font-semibold text-slate-600 w-[25%] text-[11px] uppercase tracking-wider">Product</th>
+                    <th className="px-4 py-3 font-semibold text-slate-600 w-[13%] text-[11px] uppercase tracking-wider">Qty</th>
+                    <th className="px-4 py-3 font-semibold text-slate-600 w-[13%] text-[11px] uppercase tracking-wider">Unit Price</th>
+                    <th className="px-4 py-3 font-semibold text-slate-600 w-[13%] text-[11px] uppercase tracking-wider">Subtotal</th>
+                    <th className="px-4 py-3 font-semibold text-slate-600 w-[13%] text-[11px] uppercase tracking-wider">GST Rate</th>
+                    <th className="px-4 py-3 font-semibold text-slate-600 w-[13%] text-[11px] uppercase tracking-wider">GST Amt</th>
+                    <th className="px-4 py-3 font-semibold text-slate-600 w-[13%] text-[11px] uppercase tracking-wider text-right">Total</th>
                     <th className="px-4 py-3 font-semibold text-slate-600 w-12 text-center"></th>
                   </tr>
                 </thead>
