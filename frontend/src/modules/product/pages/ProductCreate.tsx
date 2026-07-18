@@ -138,8 +138,7 @@ const ProductCreatePage: React.FC = () => {
             newErrors.productName = "Product Name is required.";
         if (!formData.categoryId)
             newErrors.categoryId = "Category is required.";
-        if (!formData.hsnCode.trim())
-            newErrors.hsnCode = "HSN Code is required.";
+
 
         if (!formData.gstTaxRateId) {
             newErrors.gstTaxRateId = "GST Tax Type is required.";
@@ -176,9 +175,6 @@ const ProductCreatePage: React.FC = () => {
         }
 
         // ── Images ──────────────────────────────────────────────────────
-        if (imageFiles.length === 0) {
-            newErrors.images = "At least one product image is required.";
-        }
 
         // ── Color Type ──────────────────────────────────────────────────
         if (formData.colorType.length === 0) {
@@ -666,7 +662,6 @@ const ProductCreatePage: React.FC = () => {
                                 name="hsnCode"
                                 value={formData.hsnCode}
                                 placeholder="e.g. 3924"
-                                required
                                 onChange={handleChange}
                                 error={errors.hsnCode}
                             />
