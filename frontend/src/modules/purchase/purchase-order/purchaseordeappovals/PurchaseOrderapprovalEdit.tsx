@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { useSelector } from "react-redux";
-import { 
-    FaInfoCircle, FaUser, FaMapMarkerAlt, FaBoxOpen, FaCheck, FaTimes, 
-    FaArrowLeft, FaCheckCircle, FaExclamationTriangle, FaFileAlt, 
-    FaCalendarAlt, FaCircleNotch 
+import {
+    FaInfoCircle, FaUser, FaMapMarkerAlt, FaBoxOpen, FaCheck, FaTimes,
+    FaArrowLeft, FaCheckCircle, FaExclamationTriangle, FaFileAlt,
+    FaCalendarAlt, FaCircleNotch
 } from "react-icons/fa";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -13,6 +13,7 @@ import CustomButton from "../../../../components/ui/Button/Button";
 import BackButton from "../../../../components/ui/BackButton/BackButton";
 import DetailBox from "../../../../components/ui/DetailBox/DetailBox";
 import CommonConfirmModal from "../../../../components/ui/CommonConfirmModal/CommonConfirmModal";
+import CommonLoader from "../../../../components/ui/Loader/CommonLoader";
 import { purchaseOrderService } from "../../../../services/purchaseOrderService";
 import { useSuppliers } from "../../../../hooks/useSuppliers";
 import { useUsers } from "../../../../hooks/useUsers";
@@ -134,12 +135,7 @@ const PurchaseOrderViewPage: React.FC = () => {
     };
 
     if (loading || !po) {
-        return (
-            <div className="flex flex-col items-center justify-center py-20">
-                <FaCircleNotch className="animate-spin text-primary text-4xl mb-4" />
-                <p className="text-gray-500">{loading ? "Loading order details..." : "Purchase order not found."}</p>
-            </div>
-        );
+        return <CommonLoader text={loading ? "Loading order details..." : "Purchase order not found."} fullScreen={false} />;
     }
 
     const supplier = suppliers.find((s) => String(s.id) === String(po.supplierId));
@@ -150,7 +146,7 @@ const PurchaseOrderViewPage: React.FC = () => {
 
     return (
         <div className="w-full mx-auto">
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+            <div className="bg-white  border border-gray-200">
                 {/* ── Page Header ── */}
                 <div className="px-6 py-4 border-b border-gray-200 bg-gray-50/50">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -203,9 +199,9 @@ const PurchaseOrderViewPage: React.FC = () => {
                                     <FaUser className="text-blue-500" /> Supplier
                                 </h3>
                                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                                    <DetailBox 
-                                        label="Name" 
-                                        value={supplier ? `${supplier.supplierCode} - ${supplier.legalName || supplier.displayName || ""}` : po.supplierId} 
+                                    <DetailBox
+                                        label="Name"
+                                        value={supplier ? `${supplier.supplierCode} - ${supplier.legalName || supplier.displayName || ""}` : po.supplierId}
                                     />
                                 </div>
                             </div>
@@ -272,7 +268,7 @@ const PurchaseOrderViewPage: React.FC = () => {
                                                     <td className="py-3 px-2 text-gray-700">{item.uom || "—"}</td>
                                                     <td className="py-3 px-2 text-right text-gray-900">{item.quantity}</td>
                                                     <td className="py-3 px-2 text-right text-gray-900">{formatMoney(item.unitPrice)}</td>
-                                                    
+
                                                     {isInterState ? (
                                                         <td className="py-3 px-2 text-right text-gray-900">
                                                             {formatMoney(item.igstAmount || 0)}

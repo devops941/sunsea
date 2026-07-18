@@ -36,6 +36,9 @@ const WastageList: React.FC = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<string | null>(null);
 
+  // Pagination state
+  const [visibleCount, setVisibleCount] = useState(10);
+
   useEffect(() => {
     dispatch(fetchProductionWastages(undefined));
     dispatch(fetchMachines());
@@ -101,7 +104,7 @@ const WastageList: React.FC = () => {
   const displayWastages = Array.isArray(wastages) ? (wastages as any) : ((wastages as any)?.data && Array.isArray((wastages as any).data) ? (wastages as any).data : []);
 
   return (
-    <div className="p-4 md:p-6 min-h-screen bg-white">
+    <div className="p-4 md:p-6 min-h-screen bg-slate-50">
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
         {/* Page Header */}
         <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-slate-200">
@@ -119,23 +122,21 @@ const WastageList: React.FC = () => {
 
         {/* Table */}
         <DataTable
-          data={displayWastages}
+          data={displayWastages.slice(0, visibleCount)}
           rowKey={(item) => String(item.id)}
           loading={loading}
-          emptyMessage="No wastage logs reported matching criteria."
           columns={[
             {
-              header: "#",
-              width: "60px",
-              render: (_item: any, index: number) => index + 1,
+              header: "DATE",
+              render: (item: any) => <span className="font-medium text-slate-800">{new Date(item.wastageDate).toLocaleDateString()}</span>,
             },
             {
-              header: "DATE",
-              render: (item: any) => <span className="font-mono text-slate-600">{new Date(item.wastageDate).toLocaleDateString()}</span>,
+              header: "PO REFERENCE",
+              render: (item: any) => <span className="text-[#5D87FF] font-medium">{item.productionOrderId}</span>,
             },
             {
               header: "PRODUCT",
-              render: (item: any) => <span className="font-semibold text-slate-800">{item.product?.productName || "Unknown"}</span>,
+              render: (item: any) => <span className="text-slate-600">{item.product?.productName || item.productId}</span>,
             },
             {
               header: "MACHINE",
@@ -182,7 +183,17 @@ const WastageList: React.FC = () => {
               ),
             },
           ]}
+          emptyMessage="No wastage logs found"
         />
+        {!loading && displayWastages.length > visibleCount && (
+          <div className="flex justify-center p-4 border-t border-slate-100 bg-slate-50/50">
+            <CustomButton
+              text="Load More"
+              onClick={() => setVisibleCount((prev) => prev + 10)}
+              variant="secondary"
+            />
+          </div>
+        )}
       </div>
 
       {/* Delete Confirmation Modal */}

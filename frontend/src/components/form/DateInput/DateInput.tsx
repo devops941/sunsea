@@ -52,7 +52,7 @@ const DateInput: React.FC<DateInputProps> = ({
         disabled={disabled}
         min={min}
         className={`
-          w-full h-[35px] px-4
+          w-full h-[40px] px-4
           border border-slate-300 rounded-[10px] outline-none
           text-[15px] font-medium
           transition-all duration-250

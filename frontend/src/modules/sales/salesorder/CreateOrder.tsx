@@ -576,7 +576,7 @@ const SalesOrderForm: React.FC = () => {
     // ─── Render ──────────────────────────────────────────────────────
     return (
         <div className="w-full mx-auto">
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+            <div className="bg-white border border-gray-200">
                 {/* Page Header */}
                 <div className="px-6 py-4 ">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">

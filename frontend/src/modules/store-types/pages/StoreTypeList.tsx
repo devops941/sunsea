@@ -129,15 +129,12 @@ const StoreTypeList: React.FC = () => {
                     </div>
 
                     {/* Table */}
-                    {loading && data.length === 0 ? (
-                        <div className="flex justify-center items-center h-64">
-                            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"></div>
-                        </div>
-                    ) : (
+                    <div className="p-0">
                         <DataTable
                             data={data}
                             rowKey={(item) => item.id}
                             emptyMessage="No store types found."
+                            loading={loading}
                             pagination={
                                 totalPages > 1
                                     ? {
@@ -175,7 +172,7 @@ const StoreTypeList: React.FC = () => {
                                 },
                             ]}
                         />
-                    )}
+                    </div>
                 </div>
 
                 <CommonViewModal

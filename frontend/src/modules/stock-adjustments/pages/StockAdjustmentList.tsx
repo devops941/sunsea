@@ -16,7 +16,7 @@ import { fetchStockAdjustments } from "../../../features/stock-adjustments/stock
 import CustomButton from "../../../components/ui/Button/Button";
 import DataTable from "../../../components/ui/table/DataTable";
 import SearchInput from "../../../components/ui/SearchInput/SearchInput";
-import SelectInput from "../../../components/form/SelectInput/SelectInput";
+import FilterPopover from "../../../components/ui/FilterPopover/FilterPopover";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import ViewButton from "../../../components/ui/viewbutton/ViewButton";
 import { formatDate } from "../../../utils/dateUtils";
@@ -62,7 +62,15 @@ const StockAdjustmentList: React.FC = () => {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const [showFilters, setShowFilters] = useState(false);
+
+  // Draft filter states for popover
+  const [draftStatus, setDraftStatus] = useState("");
+  const [draftAdjustmentType, setDraftAdjustmentType] = useState("");
+  const [draftDateFrom, setDraftDateFrom] = useState("");
+  const [draftDateTo, setDraftDateTo] = useState("");
+
+  const hasActiveFilters = !!(status || adjustmentType || dateFrom || dateTo);
+  const activeFilterCount = [status, adjustmentType, dateFrom, dateTo].filter(Boolean).length;
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(searchTerm), 500);
@@ -87,7 +95,32 @@ const StockAdjustmentList: React.FC = () => {
     if (error) toast.error(error);
   }, [error]);
 
+  const handleOpenFilter = () => {
+    setDraftStatus(status);
+    setDraftAdjustmentType(adjustmentType);
+    setDraftDateFrom(dateFrom);
+    setDraftDateTo(dateTo);
+  };
 
+  const handleApplyFilters = () => {
+    setStatus(draftStatus);
+    setAdjustmentType(draftAdjustmentType);
+    setDateFrom(draftDateFrom);
+    setDateTo(draftDateTo);
+    setCurrentPage(1);
+  };
+
+  const handleClearFilters = () => {
+    setDraftStatus("");
+    setDraftAdjustmentType("");
+    setDraftDateFrom("");
+    setDraftDateTo("");
+    setStatus("");
+    setAdjustmentType("");
+    setDateFrom("");
+    setDateTo("");
+    setCurrentPage(1);
+  };
 
   const getTypeBadgeClass = (type: string) => {
     switch(ADJUSTMENT_TYPE_BADGE[type]) {
@@ -110,17 +143,8 @@ const StockAdjustmentList: React.FC = () => {
 
   const totalPages = meta?.totalPages || Math.ceil((data?.length || 0) / ITEMS_PER_PAGE);
 
-  const clearFilters = () => {
-    setSearchTerm("");
-    setStatus("");
-    setAdjustmentType("");
-    setDateFrom("");
-    setDateTo("");
-    setCurrentPage(1);
-  };
-
   return (
-    <div className="p-4 md:p-6 min-h-screen bg-white">
+    <div className="p-4 md:p-6 min-h-screen bg-slate-50/50">
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
         {/* Page Header */}
         <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-slate-200">
@@ -129,64 +153,6 @@ const StockAdjustmentList: React.FC = () => {
           </div>
 
           <div className="flex flex-wrap items-center gap-3 relative w-full lg:w-auto">
-            {/* Status Filter */}
-            <div className="w-40">
-              <SelectInput
-                label="Filter Status"
-                hideLabel
-                noMargin
-                name="statusFilter"
-                value={status}
-                options={[
-                  { label: "All Statuses", value: "" },
-                  { label: "Draft", value: "DRAFT" },
-                  { label: "Pending Approval", value: "PENDING_APPROVAL" },
-                  { label: "Approved", value: "APPROVED" },
-                  { label: "Rejected", value: "REJECTED" },
-                ]}
-                onChange={(e) => {
-                  setStatus(e.target.value);
-                  setCurrentPage(1);
-                }}
-              />
-            </div>
-
-            {/* Type Filter */}
-            <div className="w-52">
-              <SelectInput
-                label="Adjustment Type"
-                hideLabel
-                noMargin
-                name="typeFilter"
-                value={adjustmentType}
-                options={[
-                  { label: "All Types", value: "" },
-                  { label: "Production Material Issue", value: "PRODUCTION_MATERIAL_ISSUE" },
-                  { label: "Production Material Return", value: "PRODUCTION_MATERIAL_RETURN" },
-                  { label: "Stock Increase", value: "STOCK_INCREASE" },
-                  { label: "Stock Decrease", value: "STOCK_DECREASE" },
-                  { label: "Damage", value: "DAMAGE" },
-                  { label: "Scrap", value: "SCRAP" },
-                  { label: "Opening Stock", value: "OPENING_STOCK" },
-                  { label: "Manual Correction", value: "MANUAL_CORRECTION" },
-                  { label: "Other", value: "OTHER" },
-                ]}
-                onChange={(e) => {
-                  setAdjustmentType(e.target.value);
-                  setCurrentPage(1);
-                }}
-              />
-            </div>
-
-            {/* Advanced Filters Toggle */}
-            <button
-              className={`p-2 rounded-lg border transition-colors ${showFilters ? 'bg-blue-50 border-blue-200 text-blue-600' : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'}`}
-              onClick={() => setShowFilters(!showFilters)}
-              title="Date Filters"
-            >
-              <FaFilter size={18} />
-            </button>
-
             {/* Search */}
             <SearchInput
               value={searchTerm}
@@ -197,6 +163,80 @@ const StockAdjustmentList: React.FC = () => {
               placeholder="Search by No, Reason, PO..."
             />
 
+            {/* Filter Popover */}
+            <FilterPopover
+              activeFilterCount={activeFilterCount}
+              hasActiveFilters={hasActiveFilters}
+              onApply={handleApplyFilters}
+              onClear={handleClearFilters}
+              onOpen={handleOpenFilter}
+            >
+              <div className="mb-3">
+                <label className="block mb-1 text-[11px] uppercase tracking-wider text-slate-500 font-semibold">
+                  Status
+                </label>
+                <select
+                  className="w-full border border-slate-200 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary bg-white text-slate-700 font-medium"
+                  value={draftStatus}
+                  onChange={(e) => setDraftStatus(e.target.value)}
+                >
+                  <option value="">All Statuses</option>
+                  <option value="DRAFT">Draft</option>
+                  <option value="PENDING_APPROVAL">Pending Approval</option>
+                  <option value="APPROVED">Approved</option>
+                  <option value="REJECTED">Rejected</option>
+                </select>
+              </div>
+
+              <div className="mb-3">
+                <label className="block mb-1 text-[11px] uppercase tracking-wider text-slate-500 font-semibold">
+                  Adjustment Type
+                </label>
+                <select
+                  className="w-full border border-slate-200 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary bg-white text-slate-700 font-medium"
+                  value={draftAdjustmentType}
+                  onChange={(e) => setDraftAdjustmentType(e.target.value)}
+                >
+                  <option value="">All Types</option>
+                  <option value="PRODUCTION_MATERIAL_ISSUE">Production Material Issue</option>
+                  <option value="PRODUCTION_MATERIAL_RETURN">Production Material Return</option>
+                  <option value="STOCK_INCREASE">Stock Increase</option>
+                  <option value="STOCK_DECREASE">Stock Decrease</option>
+                  <option value="DAMAGE">Damage</option>
+                  <option value="SCRAP">Scrap</option>
+                  <option value="OPENING_STOCK">Opening Stock</option>
+                  <option value="MANUAL_CORRECTION">Manual Correction</option>
+                  <option value="OTHER">Other</option>
+                </select>
+              </div>
+
+              <div className="mb-3">
+                <label className="block mb-1 text-[11px] uppercase tracking-wider text-slate-500 font-semibold">
+                  From Date
+                </label>
+                <input
+                  type="date"
+                  className="w-full border border-slate-200 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary text-slate-700"
+                  value={draftDateFrom}
+                  max={draftDateTo || undefined}
+                  onChange={(e) => setDraftDateFrom(e.target.value)}
+                />
+              </div>
+
+              <div className="mb-3">
+                <label className="block mb-1 text-[11px] uppercase tracking-wider text-slate-500 font-semibold">
+                  To Date
+                </label>
+                <input
+                  type="date"
+                  className="w-full border border-slate-200 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary text-slate-700"
+                  value={draftDateTo}
+                  min={draftDateFrom || undefined}
+                  onChange={(e) => setDraftDateTo(e.target.value)}
+                />
+              </div>
+            </FilterPopover>
+
             <CustomButton
               text="New Adjustment"
               icon={FaPlus}
@@ -204,38 +244,6 @@ const StockAdjustmentList: React.FC = () => {
             />
           </div>
         </div>
-
-        {/* Advanced Date Filters */}
-        {showFilters && (
-          <div className="p-4 bg-white border-b border-slate-200 flex flex-wrap items-end gap-4">
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Date From</label>
-              <input
-                type="date"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                value={dateFrom}
-                onChange={(e) => { setDateFrom(e.target.value); setCurrentPage(1); }}
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Date To</label>
-              <input
-                type="date"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                value={dateTo}
-                onChange={(e) => { setDateTo(e.target.value); setCurrentPage(1); }}
-              />
-            </div>
-            <div>
-              <button
-                className="px-4 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
-                onClick={clearFilters}
-              >
-                Clear Filters
-              </button>
-            </div>
-          </div>
-        )}
 
         {/* Table */}
         <DataTable

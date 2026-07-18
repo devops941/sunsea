@@ -35,8 +35,7 @@ const formatLocalDateString = (d: Date) => {
 
 const STATUS_FLOW: Record<string, { label: string; next: string | null; color: string }> = {
   DRAFT: { label: "Draft", next: "PLANNED", color: "secondary" },
-  PLANNED: { label: "Planned", next: "APPROVED", color: "info" },
-  APPROVED: { label: "Approved", next: "IN_PROGRESS", color: "primary" },
+  PLANNED: { label: "Planned", next: "IN_PROGRESS", color: "info" },
   IN_PROGRESS: { label: "In Progress", next: "COMPLETED", color: "success" },
   COMPLETED: { label: "Completed", next: null, color: "success" },
   CANCELLED: { label: "Cancelled", next: null, color: "danger" },
@@ -45,15 +44,13 @@ const STATUS_FLOW: Record<string, { label: string; next: string | null; color: s
 
 const NEXT_ACTION_LABELS: Record<string, string> = {
   DRAFT: "Mark as Planned",
-  PLANNED: "Approve Plan",
-  APPROVED: "Start Production",
+  PLANNED: "Start Production",
   IN_PROGRESS: "Mark Completed",
 };
 
 const NEXT_ACTION_ICONS: Record<string, any> = {
   DRAFT: FaCalendarAlt,
-  PLANNED: FaThumbsUp,
-  APPROVED: FaPlay,
+  PLANNED: FaPlay,
   IN_PROGRESS: FaCheckCircle,
 };
 
@@ -151,14 +148,29 @@ const DailyProductionPlanningPage: React.FC = () => {
     return Array.isArray(dailyPlans) ? dailyPlans : [];
   }, [dailyPlans]);
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+  
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filterDate, filterStatus, filterMachine]);
+
+  const paginatedPlans = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return filteredPlans.slice(startIndex, startIndex + itemsPerPage);
+  }, [filteredPlans, currentPage]);
+
+  const totalPages = Math.ceil(filteredPlans.length / itemsPerPage);
+
   // Stats
   const stats = useMemo(() => {
     const total = filteredPlans.length;
-    const approved = filteredPlans.filter((p: any) => p.status === "APPROVED").length;
+    const planned = filteredPlans.filter((p: any) => p.status === "PLANNED" || p.status === "APPROVED").length;
     const running = filteredPlans.filter((p: any) => p.status === "IN_PROGRESS").length;
     const completed = filteredPlans.filter((p: any) => p.status === "COMPLETED").length;
     const totalPlanned = filteredPlans.reduce((s: number, p: any) => s + Number(p.plannedQty || 0), 0);
-    return { total, approved, running, completed, totalPlanned };
+    return { total, planned, running, completed, totalPlanned };
   }, [filteredPlans]);
 
   // ──────────────────────────────────────────────────────────────
@@ -360,7 +372,7 @@ const DailyProductionPlanningPage: React.FC = () => {
     {
       header: "#",
       width: "50px",
-      render: (_row: any, idx: number) => <span className="text-slate-500">{idx + 1}</span>
+      render: (_row: any, idx: number) => <span className="text-slate-500">{(currentPage - 1) * itemsPerPage + idx + 1}</span>
     },
     {
       header: "PRODUCTION ORDER",
@@ -432,25 +444,45 @@ const DailyProductionPlanningPage: React.FC = () => {
           ? plan.hourlyProductions.reduce((sum: number, h: any) => sum + Number(h.qtyProduced || 0), 0)
           : 0;
         const progressPercent = Math.min(100, plannedQty > 0 ? Math.round((producedQty / plannedQty) * 100) : 0);
-        const pendingQty = plannedQty > producedQty ? plannedQty - producedQty : 0;
         return (
           <div>
-            <div className="mb-1">
+            <div className="mb-2">
               <CustomProgressBar progressPercent={progressPercent} />
             </div>
             <div className="flex items-center justify-between text-xs">
-              <span className="text-slate-500">{producedQty} / {plannedQty} pcs</span>
-              {producedQty > plannedQty ? (
-                <span className="bg-emerald-100 text-emerald-700 border border-emerald-200 py-0.5 px-2 rounded text-[9px] font-bold">
-                  +{producedQty - plannedQty} Over
-                </span>
-              ) 
-              : pendingQty > 0 ? (
-                <span className="bg-rose-100 text-rose-700 border border-rose-200 py-0.5 px-2 rounded text-[9px] font-bold">
-                  {pendingQty} Pending
-                </span>
-              ) : null}
+              <span className="text-slate-500 font-semibold">{producedQty} / {plannedQty} pcs</span>
             </div>
+          </div>
+        );
+      }
+    },
+    {
+      header: "PENDING / EXTRA",
+      width: "140px",
+      render: (plan: any) => {
+        const plannedQty = Number(plan.plannedQty || 0);
+        const producedQty = Array.isArray(plan.hourlyProductions)
+          ? plan.hourlyProductions.reduce((sum: number, h: any) => sum + Number(h.qtyProduced || 0), 0)
+          : 0;
+        const pendingQty = plannedQty > producedQty ? plannedQty - producedQty : 0;
+        
+        return (
+          <div className="flex">
+            {producedQty > plannedQty ? (
+              <StatusBadge 
+                status="COMPLETED" 
+                customText={`+${producedQty - plannedQty} Extra`} 
+                customColor={{ bg: '#d1fae5', text: '#065f46' }} 
+              />
+            ) : pendingQty > 0 ? (
+              <StatusBadge 
+                status="PENDING" 
+                customText={`${pendingQty} Pending`} 
+                customColor={{ bg: '#fee2e2', text: '#b91c1c' }} 
+              />
+            ) : (
+              <span className="text-slate-400 text-[11px] font-medium">—</span>
+            )}
           </div>
         );
       }
@@ -642,7 +674,7 @@ const DailyProductionPlanningPage: React.FC = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
           {[
             { label: "Total Plans", value: stats.total, icon: FaCalendarAlt, colorClass: "text-indigo-600", iconColor: "text-indigo-500", bgClass: "bg-indigo-50/80" },
-            { label: "Approved", value: stats.approved, icon: FaCheckCircle, colorClass: "text-amber-600", iconColor: "text-amber-500", bgClass: "bg-amber-50/80" },
+            { label: "Planned", value: stats.planned, icon: FaCheckCircle, colorClass: "text-amber-600", iconColor: "text-amber-500", bgClass: "bg-amber-50/80" },
             { label: "In Progress", value: stats.running, icon: FaPlay, colorClass: "text-sky-600", iconColor: "text-sky-500", bgClass: "bg-sky-50/80" },
             { label: "Completed", value: stats.completed, icon: FaStop, colorClass: "text-emerald-600", iconColor: "text-emerald-500", bgClass: "bg-emerald-50/80" },
           ].map((stat) => (
@@ -663,9 +695,14 @@ const DailyProductionPlanningPage: React.FC = () => {
           <div className="p-0">
             <DataTable
               columns={columns}
-              data={filteredPlans}
+              data={paginatedPlans}
               rowKey={(row) => row.dailyPlanId}
               loading={loading}
+              pagination={{
+                currentPage,
+                totalPages,
+                onPageChange: setCurrentPage
+              }}
               emptyMessage={
                 <div className="text-center py-12">
                   <FaCalendarAlt className="text-slate-300 mx-auto mb-3" size={32} />

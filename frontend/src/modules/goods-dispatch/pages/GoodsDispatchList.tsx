@@ -94,24 +94,25 @@ const GoodsDispatchList: React.FC = () => {
   ];
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      {/* Header section */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Goods Dispatch</h1>
-          <p className="text-gray-500 mt-2">Manage finished goods dispatches to warehouse</p>
+    <div className="p-4 md:p-6 min-h-screen ">
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        {/* Header section */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center p-6 border-b border-slate-200 gap-4">
+          <div>
+            <h2 className="text-2xl font-bold text-slate-800">Goods Dispatch</h2>
+            <div className="text-sm text-slate-500 mt-1">Manage finished goods dispatches to warehouse</div>
+          </div>
+          <div className="flex items-center space-x-4">
+            <CustomButton
+              text="Create Dispatch"
+              icon={FaPlus}
+              onClick={() => navigate("/production/goods-dispatch/create")}
+            />
+          </div>
         </div>
-        <div className="flex items-center space-x-4">
-          <CustomButton
-            text="Create Dispatch"
-            icon={FaPlus}
-            onClick={() => navigate("/production/goods-dispatch/create")}
-          />
-        </div>
-      </div>
 
-      {/* Filters section */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-8">
+        {/* Filters section */}
+        <div className="p-6 border-b border-slate-100 bg-slate-50/50">
         <div className="flex flex-col md:flex-row gap-6">
           <div className="flex-1">
             <SearchInput
@@ -144,13 +145,13 @@ const GoodsDispatchList: React.FC = () => {
 
       {/* Error State */}
       {error && (
-        <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-8">
+        <div className="bg-red-50 border-l-4 border-red-500 p-4 m-6">
           <p className="text-red-700">{error}</p>
         </div>
       )}
 
       {/* Data Table */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="overflow-x-auto">
         <DataTable
           columns={columns}
           data={dispatches || []}
@@ -158,45 +159,46 @@ const GoodsDispatchList: React.FC = () => {
           rowKey={(item) => item.id.toString()}
           emptyMessage="No dispatches found"
         />
+      </div>
 
-        {/* Pagination */}
-        {!loading && meta && meta.totalPages > 1 && (
-          <div className="flex items-center justify-between px-6 py-4 bg-gray-50 border-t border-gray-100">
-            <div className="text-sm text-gray-500">
-              Showing {(meta.page - 1) * meta.limit + 1} to{" "}
-              {Math.min(meta.page * meta.limit, meta.total)} of {meta.total} entries
-            </div>
-            <div className="flex space-x-2">
-              <button
-                onClick={() => handlePageChange(currentPage - 1)}
-                disabled={currentPage === 1}
-                className="p-2 rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                <FaChevronLeft className="w-4 h-4" />
-              </button>
-              {Array.from({ length: meta.totalPages }, (_, i) => i + 1).map((page) => (
-                <button
-                  key={page}
-                  onClick={() => handlePageChange(page)}
-                  className={`px-4 py-2 rounded-md border text-sm font-medium transition-colors ${
-                    currentPage === page
-                      ? "bg-primary-600 text-white border-primary-600 hover:bg-primary-700"
-                      : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-                  }`}
-                >
-                  {page}
-                </button>
-              ))}
-              <button
-                onClick={() => handlePageChange(currentPage + 1)}
-                disabled={currentPage === meta.totalPages}
-                className="p-2 rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                <FaChevronRight className="w-4 h-4" />
-              </button>
-            </div>
+      {/* Pagination */}
+      {!loading && meta && meta.totalPages > 1 && (
+        <div className="flex items-center justify-between px-6 py-4 bg-slate-50/50 border-t border-slate-100">
+          <div className="text-sm text-slate-500">
+            Showing {(meta.page - 1) * meta.limit + 1} to{" "}
+            {Math.min(meta.page * meta.limit, meta.total)} of {meta.total} entries
           </div>
-        )}
+          <div className="flex space-x-2">
+            <button
+              onClick={() => handlePageChange(currentPage - 1)}
+              disabled={currentPage === 1}
+              className="p-2 rounded-md border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              <FaChevronLeft className="w-4 h-4" />
+            </button>
+            {Array.from({ length: meta.totalPages }, (_, i) => i + 1).map((page) => (
+              <button
+                key={page}
+                onClick={() => handlePageChange(page)}
+                className={`px-4 py-2 rounded-md border text-sm font-medium transition-colors ${
+                  currentPage === page
+                    ? "bg-primary text-white border-primary hover:bg-primary-dark"
+                    : "bg-white text-slate-700 border-slate-300 hover:bg-slate-50"
+                }`}
+              >
+                {page}
+              </button>
+            ))}
+            <button
+              onClick={() => handlePageChange(currentPage + 1)}
+              disabled={currentPage === meta.totalPages}
+              className="p-2 rounded-md border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              <FaChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
       </div>
     </div>
   );

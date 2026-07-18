@@ -12,6 +12,7 @@ import { fetchStores } from "../../../../features/stores/storeSlice";
 import TextInput from "../../../../components/form/TextInput/TextInput";
 import SelectInput from "../../../../components/form/SelectInput/SelectInput";
 import CustomButton from "../../../../components/ui/Button/Button";
+import CommonLoader from "../../../../components/ui/Loader/CommonLoader";
 import QuantityInput from "../../../../components/form/QuantityInput/QuantityInput";
 import CityStateSelect from "../../../../components/ui/CityStateSelect/CityStateSelect";
 import type { StateCityOption } from "../../../../components/ui/CityStateSelect/CityStateSelect";
@@ -150,6 +151,7 @@ const PurchaseOrderEditPage: React.FC = () => {
   const { activeUOMs, loadActiveUOMs } = useUOMs();
 
   const [formData, setFormData] = useState<PurchaseOrderFormData>(initialFormData);
+  console.log(formData, "formData")
 
   const selectedSupplier = useMemo(() => (suppliers || []).find(
     (s) => String(s?.id) === String(formData.supplierId)
@@ -755,11 +757,7 @@ const PurchaseOrderEditPage: React.FC = () => {
   // LOADING & ERROR UI
   // ============================================================
   if (loading) {
-    return (
-      <div className="inner-container d-flex justify-content-center align-items-center" style={{ minHeight: "300px" }}>
-        <div className="animate-spin rounded-full border-b-2 border-indigo-600 h-8 w-8"></div>
-      </div>
-    );
+    return <CommonLoader text="Loading Purchase Order..." fullScreen={false} />;
   }
 
   if (poNotFound) {
@@ -821,7 +819,7 @@ const PurchaseOrderEditPage: React.FC = () => {
   // ============================================================
   return (
     <div className="w-full mx-auto">
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+      <div className="bg-white  border border-gray-200">
         <div className="px-6 py-4 ">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div><h2 className="text-xl font-bold text-gray-800">Edit Purchase Order</h2></div>
@@ -848,9 +846,9 @@ const PurchaseOrderEditPage: React.FC = () => {
               <TextInput label="Expected Delivery Date" name="expectedDeliveryDate" type="date" value={formData.expectedDeliveryDate} onChange={handleChange} required disabled={isLocked} />
               {errors.expectedDeliveryDate && <div className="text-red-500 mt-1 text-sm">{errors.expectedDeliveryDate}</div>}
             </div>
-            <div>
+            {/* <div>
               <SelectInput label="Status" name="status" value={formData.status} options={statusOptions} onChange={handleChange} disabled />
-            </div>
+            </div> */}
             <div>
               <TextInput label="Created by-on" name="createdByOn" value={createdOn || ""} onChange={() => { }} disabled />
             </div>
@@ -936,21 +934,21 @@ const PurchaseOrderEditPage: React.FC = () => {
                   return (
                     <tr key={index} className="hover:bg-slate-50/50 transition-colors duration-200">
                       <td className="px-3 py-2 whitespace-nowrap text-sm font-medium text-slate-400 text-center">{index + 1}</td>
-                      <td className="px-3 py-2 whitespace-nowrap"><SelectInput label="" name={`items[${index}].productId`} value={item.productId ? String(item.productId) : ""} options={[{ value: "", label: "-- Select Material --" }, ...productOptions]} onChange={(e) => handleItemProductChange(index, e.target.value)} error={errors[`items.${index}.productId`]} hideLabel disabled={isLocked} /></td>
-                      <td className="px-3 py-2 whitespace-nowrap align-top">
-                        <QuantityInput 
-                          name={`items[${index}].quantity`} 
-                          value={item.quantity} 
+                      <td className="px-3 py-2 whitespace-nowrap"><SelectInput noMargin={true} label="" name={`items[${index}].productId`} value={item.productId ? String(item.productId) : ""} options={[{ value: "", label: "-- Select Material --" }, ...productOptions]} onChange={(e) => handleItemProductChange(index, e.target.value)} error={errors[`items.${index}.productId`]} hideLabel disabled={isLocked} /></td>
+                      <td className="px-3 py-2 whitespace-nowrap">
+                        <QuantityInput
+                          name={`items[${index}].quantity`}
+                          value={item.quantity}
                           baseUoms={rawMaterial?.baseUom || item.uom || "KG"}
-                          onChange={(e) => handleItemChange(index, "quantity", Number(e.target.value))} 
-                          error={errors[`items.${index}.quantity`]} 
-                          step="0.01" 
-                          hideLabel 
+                          onChange={(e) => handleItemChange(index, "quantity", Number(e.target.value))}
+                          error={errors[`items.${index}.quantity`]}
+                          step="0.01"
+                          hideLabel
                           disabled={isLocked}
                         />
                       </td>
                       <td className="px-3 py-2 whitespace-nowrap"><TextInput label="" name={`items[${index}].unitPrice`} type="number" value={String(item.unitPrice)} onChange={(e) => handleItemChange(index, "unitPrice", Number(e.target.value))} error={errors[`items.${index}.unitPrice`]} min={0} step={0.01} placeholder="0.00" disabled /></td>
-                      <td className="px-3 py-2 whitespace-nowrap"><SelectInput label="" name={`items[${index}].tax`} options={gstOptions} value={String(item.tax || 0)} onChange={(e) => handleItemChange(index, "tax", Number(e.target.value))} hideLabel disabled={isLocked} /></td>
+                      <td className="px-3 py-2 whitespace-nowrap"><SelectInput noMargin={true} label="" name={`items[${index}].tax`} options={gstOptions} value={String(item.tax || 0)} onChange={(e) => handleItemChange(index, "tax", Number(e.target.value))} hideLabel disabled={isLocked} /></td>
                       <td className="px-3 py-2 whitespace-nowrap text-right font-medium text-slate-700">₹{taxableAmount.toFixed(2)}</td>
                       {!isLocked && (
                         <td className="px-3 py-2 whitespace-nowrap text-center">
@@ -983,7 +981,7 @@ const PurchaseOrderEditPage: React.FC = () => {
                 <div className="flex justify-between items-center mb-2 text-red-500 text-sm">
                   <span className="flex items-center gap-2">Discount:
                     <div className="w-24 [&_.mb-\[18px\]]:!mb-0 [&_.select-input-group]:!mb-0">
-                      <SelectInput label="" name="discountType" options={[{ value: "PERCENT", label: "%" }, { value: "FLAT", label: "Flat" }]} value={formData.discountType || "PERCENT"} onChange={(e) => { setFormData(prev => { const newTotals = recalculateTotals(prev.items, e.target.value as any, prev.discountValue); return { ...prev, discountType: e.target.value as any, ...newTotals }; }); }} disabled={isLocked} hideLabel />
+                      <SelectInput noMargin={true} label="" name="discountType" options={[{ value: "PERCENT", label: "%" }, { value: "FLAT", label: "Flat" }]} value={formData.discountType || "PERCENT"} onChange={(e) => { setFormData(prev => { const newTotals = recalculateTotals(prev.items, e.target.value as any, prev.discountValue); return { ...prev, discountType: e.target.value as any, ...newTotals }; }); }} disabled={isLocked} hideLabel />
                     </div>
                     <div className="w-24 [&_.mb-\[18px\]]:!mb-0">
                       <TextInput label="" name="discountValue" type="number" min={0} step={0.01} value={String(formData.discountValue || 0)} onChange={(e) => { setFormData(prev => { const newTotals = recalculateTotals(prev.items, prev.discountType, Number(e.target.value) || 0); return { ...prev, discountValue: Number(e.target.value) || 0, ...newTotals }; }); }} disabled={isLocked} />
@@ -992,7 +990,7 @@ const PurchaseOrderEditPage: React.FC = () => {
                   <span>-₹{(formData.totalDiscount || 0).toFixed(2)}</span>
                 </div>
 
-                <div className="flex justify-between items-center mb-2 text-green-600 text-sm"><span>Total Tax:</span><span>₹{formData.totalTax.toFixed(2)}</span></div>
+                {/* <div className="flex justify-between items-center mb-2 text-green-600 text-sm"><span>Total Tax:</span><span>₹{formData.totalTax.toFixed(2)}</span></div> */}
 
                 <div className="flex justify-between items-center mb-2 text-gray-600 text-sm">
                   <span className="flex items-center gap-2">Round Off:

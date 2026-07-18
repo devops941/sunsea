@@ -117,6 +117,8 @@ const PurchaseOrderViewModal: React.FC<PurchaseOrderViewModalProps> = ({
               <th className="p-4 text-right">Qty</th>
               <th className="p-4 text-right">Unit Price</th>
               <th className="p-4 text-right">Tax %</th>
+              <th className="p-4 text-right">CGST</th>
+              <th className="p-4 text-right">SGST</th>
               <th className="p-4 text-right">Total</th>
             </tr>
           </thead>
@@ -131,6 +133,13 @@ const PurchaseOrderViewModal: React.FC<PurchaseOrderViewModalProps> = ({
                 const taxAmt = (base * tax) / 100;
                 const total = item.lineTotal ? safeNumber(item.lineTotal) : base + taxAmt;
 
+                const cgstAmt = item.cgstAmount !== undefined
+                  ? safeNumber(item.cgstAmount)
+                  : taxAmt / 2;
+                const sgstAmt = item.sgstAmount !== undefined
+                  ? safeNumber(item.sgstAmount)
+                  : taxAmt / 2;
+
                 const matchedMaterial = rawMaterials.find(
                   (rm: any) => String(rm.rawMaterialId) === String(item.productId)
                 );
@@ -143,13 +152,15 @@ const PurchaseOrderViewModal: React.FC<PurchaseOrderViewModalProps> = ({
                     <td className="p-4 text-right">{qty}</td>
                     <td className="p-4 text-right">₹{price.toFixed(2)}</td>
                     <td className="p-4 text-right">{tax}%</td>
+                    <td className="p-4 text-right text-blue-600">₹{cgstAmt.toFixed(2)}</td>
+                    <td className="p-4 text-right text-purple-600">₹{sgstAmt.toFixed(2)}</td>
                     <td className="p-4 text-right font-medium">₹{total.toFixed(2)}</td>
                   </tr>
                 );
               })
             ) : (
               <tr>
-                <td colSpan={6} className="p-8 text-center text-slate-500">
+                <td colSpan={8} className="p-8 text-center text-slate-500">
                   No items found
                 </td>
               </tr>
@@ -168,9 +179,17 @@ const PurchaseOrderViewModal: React.FC<PurchaseOrderViewModalProps> = ({
             <span>Discount:</span>
             <span>-₹{safeNumber(purchaseOrder.totalDiscount).toFixed(2)}</span>
           </div>
-          <div className="flex justify-between text-green-600">
+          {/* <div className="flex justify-between text-green-600">
             <span>Tax:</span>
             <span>+₹{safeNumber(purchaseOrder.totalTax).toFixed(2)}</span>
+          </div> */}
+          <div className="flex justify-between text-blue-600">
+            <span>CGST:</span>
+            <span>+₹{safeNumber(purchaseOrder.totalCgst).toFixed(2)}</span>
+          </div>
+          <div className="flex justify-between text-purple-600">
+            <span>SGST:</span>
+            <span>+₹{safeNumber(purchaseOrder.totalSgst).toFixed(2)}</span>
           </div>
           <div className="border-t border-slate-200 pt-2 mt-2 flex justify-between font-bold text-slate-900 text-base">
             <span>Net Amount:</span>

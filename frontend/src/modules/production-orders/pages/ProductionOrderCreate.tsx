@@ -14,6 +14,7 @@ import CustomButton from "../../../components/ui/Button/Button";
 import TextArea from "../../../components/form/TextArea/TextArea";
 import UOMSelect from "../../../components/form/SelectInput/UOMSelect";
 import QuantityInput from "../../../components/form/QuantityInput/QuantityInput";
+import DatePickerCalendar from "../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 
 import { productionOrderService } from "../../../services/productionOrderService";
 import { storeService } from "../../../services/storeService";
@@ -21,8 +22,9 @@ import { salesOrderService } from "../../../services/salesOrderService";
 import { rawMaterialService } from "../../../services/rawMaterialService";
 import { productService } from "../../../services/productService";
 import { billOfMaterialService } from "../../../services/billOfMaterialService";
+import BackButton from "../../../components/ui/BackButton/BackButton";
 
-// â”€â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
 
 interface RawMaterialOption {
     label: string;
@@ -1015,11 +1017,7 @@ const ProductionOrderCreate: React.FC = () => {
                         </h2>
                     </div>
                     <div>
-                        <CustomButton
-                            text="Back to List"
-                            icon={FaArrowLeft}
-                            onClick={() => navigate("/production-orders")}
-                        />
+                        <BackButton text="Back to List" to="/production-orders" />
                     </div>
                 </div>
 
@@ -1259,12 +1257,11 @@ const ProductionOrderCreate: React.FC = () => {
                                             name="orderDate"
                                             control={control}
                                             render={({ field }) => (
-                                                <TextInput
+                                                <DatePickerCalendar
                                                     label="Order Date"
                                                     name={field.name}
-                                                    type="date"
                                                     value={field.value ? field.value.substring(0, 10) : ""}
-                                                    onChange={field.onChange}
+                                                    onChange={(e) => field.onChange(e.target.value)}
                                                     required
                                                     error={errors.orderDate?.message}
                                                 />
@@ -1276,12 +1273,11 @@ const ProductionOrderCreate: React.FC = () => {
                                             name="dueDate"
                                             control={control}
                                             render={({ field }) => (
-                                                <TextInput
+                                                <DatePickerCalendar
                                                     label="Due Date"
                                                     name={field.name}
-                                                    type="date"
                                                     value={field.value ? field.value.substring(0, 10) : ""}
-                                                    onChange={field.onChange}
+                                                    onChange={(e) => field.onChange(e.target.value)}
                                                     required
                                                     error={errors.dueDate?.message}
                                                 />

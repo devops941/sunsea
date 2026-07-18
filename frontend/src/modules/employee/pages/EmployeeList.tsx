@@ -147,23 +147,24 @@ const Employeelist: React.FC = () => {
           </div>
 
           {/* View Table */}
-          {loading && employees.length === 0 ? (
-            <div className="flex justify-center items-center h-64">
-              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"></div>
-            </div>
-          ) : (
+          <div className="p-0">
             <DataTable
-              columns={columns}
               data={employees}
-              rowKey={(row) => row.id}
+              rowKey={(emp) => emp.id}
+              loading={loading}
               emptyMessage="No employees found."
-              pagination={totalPages > 1 ? {
-                currentPage,
-                totalPages,
-                onPageChange: setCurrentPage
-              } : undefined}
+              pagination={
+                totalPages > 1
+                  ? {
+                    currentPage,
+                    totalPages,
+                    onPageChange: setCurrentPage,
+                  }
+                  : undefined
+              }
+              columns={columns}
             />
-          )}
+          </div>
         </div>
 
         {/* Employee View Modal */}

@@ -9,6 +9,7 @@ import { fetchCompany } from "../../features/company/companySlice";
 import SelectInput from "../../components/form/SelectInput/SelectInput";
 import CustomButton from "../../components/ui/Button/Button";
 import BackButton from "../../components/ui/BackButton/BackButton";
+import CommonLoader from "../../components/ui/Loader/CommonLoader";
 import { invoiceSettingsService } from "../../services/invoiceSettingsService";
 import { customerService } from "../../services/customerService";
 import { productService } from "../../services/productService";
@@ -16,6 +17,7 @@ import { salesInvoiceService } from "../../services/salesInvoiceService";
 import { salesOrderService, type SalesOrderStatus } from "../../services/salesOrderService";
 import { finishedGoodsStockService } from "../../services/finishedGoodsStockService";
 import { gstTaxService } from "../../services/gstTaxService";
+import DatePickerCalendar from "../../components/ui/DatePickerCalendar/DatePickerCalendar";
 
 // ---- Types ----
 interface InvoiceLineItem {
@@ -114,22 +116,26 @@ const calculateInvoiceNumber = (dateStr: string, settings: any, orders: any[]) =
 
   let seq = settings.currentSequenceNumber || 1;
 
-  if (!isCurrentFy) {
-    // If previous year, find the highest sequence number of existing orders in that financial year
-    let maxSeq = 0;
-    orders.forEach((order: any) => {
-      const orderDateStr = order.orderDate || order.invoiceDate || order.createdAt;
-      if (!orderDateStr) return;
+  // Find the highest sequence number of existing orders in that financial year
+  let maxSeq = 0;
+  orders.forEach((order: any) => {
+    const orderDateStr = order.orderDate || order.invoiceDate || order.createdAt;
+    if (!orderDateStr) return;
 
-      const orderFyInfo = getFinancialYearForDate(orderDateStr, settings);
-      if (orderFyInfo && orderFyInfo.fyLabel === fyLabel) {
-        const orderSeq = extractSequenceNumber(order.orderNo || order.invoiceNo || "");
-        if (orderSeq > maxSeq) {
-          maxSeq = orderSeq;
-        }
+    const orderFyInfo = getFinancialYearForDate(orderDateStr, settings);
+    if (orderFyInfo && orderFyInfo.fyLabel === fyLabel) {
+      const orderSeq = extractSequenceNumber(order.orderNo || order.invoiceNo || "");
+      if (orderSeq > maxSeq) {
+        maxSeq = orderSeq;
       }
-    });
+    }
+  });
+
+  if (!isCurrentFy) {
     seq = maxSeq + 1;
+  } else {
+    // If it is the current year, use the larger of the configured sequence number or maxSeq + 1
+    seq = Math.max(seq, maxSeq + 1);
   }
 
   const paddedSeq = String(seq).padStart(settings.sequenceLength || 4, "0");
@@ -415,12 +421,12 @@ const SalesInvoiceForm: React.FC = () => {
   };
 
   if (loading) {
-    return <div className="text-center py-5">Loading...</div>;
+    return <CommonLoader text="Loading Invoice Form..." fullScreen={false} />;
   }
 
   return (
     <div className="mx-auto pb-12">
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+      <div className="bg-white  border border-slate-200 overflow-hidden">
 
         {/* Page Header */}
         <div className="px-6 py-5 border-b border-slate-200 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -489,19 +495,19 @@ const SalesInvoiceForm: React.FC = () => {
                 defaultOptionLabel={customerId ? "-- Select Sales Order --" : "-- Select Customer First --"}
                 onChange={(e) => handleSalesOrderChange(e.target.value)}
               />
-              <TextInput
+              <DatePickerCalendar
                 label="Invoice Date"
                 name="invoiceDate"
-                type="date"
+
                 value={invoiceDate}
                 onChange={(e) => setInvoiceDate(e.target.value)}
                 required
                 error={errors.invoiceDate}
               />
-              <TextInput
+              <DatePickerCalendar
                 label="Due Date"
                 name="dueDate"
-                type="date"
+
                 value={dueDate}
                 onChange={(e) => setDueDate(e.target.value)}
               />
@@ -532,13 +538,13 @@ const SalesInvoiceForm: React.FC = () => {
               <table className="w-full text-left text-sm">
                 <thead className="bg-slate-50 border-b border-slate-200">
                   <tr>
-                    <th className="px-4 py-3 font-semibold text-slate-600 w-1/3 text-[11px] uppercase tracking-wider">Product</th>
-                    <th className="px-4 py-3 font-semibold text-slate-600 w-24 text-[11px] uppercase tracking-wider">Qty</th>
-                    <th className="px-4 py-3 font-semibold text-slate-600 w-32 text-[11px] uppercase tracking-wider">Unit Price</th>
-                    <th className="px-4 py-3 font-semibold text-slate-600 w-32 text-[11px] uppercase tracking-wider">Subtotal</th>
-                    <th className="px-4 py-3 font-semibold text-slate-600 w-40 text-[11px] uppercase tracking-wider">GST Rate</th>
-                    <th className="px-4 py-3 font-semibold text-slate-600 w-32 text-[11px] uppercase tracking-wider">GST Amt</th>
-                    <th className="px-4 py-3 font-semibold text-slate-600 w-32 text-[11px] uppercase tracking-wider text-right">Total</th>
+                    <th className="px-4 py-3 font-semibold text-slate-600 w-[25%] text-[11px] uppercase tracking-wider">Product</th>
+                    <th className="px-4 py-3 font-semibold text-slate-600 w-[13%] text-[11px] uppercase tracking-wider">Qty</th>
+                    <th className="px-4 py-3 font-semibold text-slate-600 w-[13%] text-[11px] uppercase tracking-wider">Unit Price</th>
+                    <th className="px-4 py-3 font-semibold text-slate-600 w-[13%] text-[11px] uppercase tracking-wider">Subtotal</th>
+                    <th className="px-4 py-3 font-semibold text-slate-600 w-[13%] text-[11px] uppercase tracking-wider">GST Rate</th>
+                    <th className="px-4 py-3 font-semibold text-slate-600 w-[13%] text-[11px] uppercase tracking-wider">GST Amt</th>
+                    <th className="px-4 py-3 font-semibold text-slate-600 w-[13%] text-[11px] uppercase tracking-wider text-right">Total</th>
                     <th className="px-4 py-3 font-semibold text-slate-600 w-12 text-center"></th>
                   </tr>
                 </thead>
@@ -550,6 +556,8 @@ const SalesInvoiceForm: React.FC = () => {
                         <SelectInput
                           label=""
                           name="itemId"
+                          noMargin={true}
+                          hideLabel={true}
                           value={line.itemId}
                           options={items.map((i) => ({ label: i.name, value: i.id }))}
                           defaultOptionLabel="Select item"
@@ -559,6 +567,7 @@ const SalesInvoiceForm: React.FC = () => {
                       {/* Qty */}
                       <td className="px-4 py-2">
                         <TextInput
+                          bottom={true}
                           label=""
                           name="qty"
                           type="number"
@@ -569,6 +578,7 @@ const SalesInvoiceForm: React.FC = () => {
                       {/* Unit Price */}
                       <td className="px-4 py-2">
                         <TextInput
+                          bottom={true}
                           label=""
                           name="rate"
                           type="number"
@@ -585,6 +595,8 @@ const SalesInvoiceForm: React.FC = () => {
                         <SelectInput
                           label=""
                           name="taxPercent"
+                          noMargin={true}
+                          hideLabel={true}
                           value={String(line.taxPercent)}
                           options={gstRates.map((g) => ({
                             label: `${g.taxName} (${g.taxRate}%)`,
@@ -617,7 +629,7 @@ const SalesInvoiceForm: React.FC = () => {
                 </tbody>
               </table>
             </div>
-            
+
             <div className="flex justify-end mt-6">
               <div className="w-full max-w-sm bg-slate-50 rounded-xl p-5 border border-slate-200">
                 <div className="flex justify-between items-center text-sm mb-3">
@@ -654,16 +666,15 @@ const SalesInvoiceForm: React.FC = () => {
           <hr className="border-slate-100" />
 
           {/* Notes */}
-          <div>
-            <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-3">
-              Notes & Remarks
-            </h3>
-            <textarea
+          <div className="w-full md:w-[50%] lg:w-[33%]">
+            <TextInput
+              as="textarea"
+              label="Notes & Remarks"
+              name="notes"
               rows={3}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Optional notes for this invoice..."
-              className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-slate-400 focus:ring focus:ring-slate-200 focus:ring-opacity-50 transition-colors text-sm resize-none"
             />
           </div>
 

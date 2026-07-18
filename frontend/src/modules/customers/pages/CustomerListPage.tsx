@@ -121,14 +121,11 @@ const CustomerListPage: React.FC = () => {
           </div>
 
           {/* View Table */}
-          {loading && (customers ?? []).length === 0 ? (
-            <div className="flex justify-center items-center h-64">
-              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"></div>
-            </div>
-          ) : (
+          <div className="p-0">
             <DataTable
               data={customers ?? []}
               rowKey={(customer) => customer.id}
+              loading={loading}
               emptyMessage="No customers found."
               pagination={
                 totalPages > 1
@@ -149,8 +146,8 @@ const CustomerListPage: React.FC = () => {
                 {
                   header: "STATUS", render: (customer) => (
                     <span className={`px-3 py-1 rounded-full text-xs font-semibold ${customer.status === "Active"
-                        ? "bg-green-100 text-green-700 border border-green-200"
-                        : "bg-red-100 text-red-700 border border-red-200"
+                      ? "bg-green-100 text-green-700 border border-green-200"
+                      : "bg-red-100 text-red-700 border border-red-200"
                       }`}>
                       {customer.status}
                     </span>
@@ -169,7 +166,7 @@ const CustomerListPage: React.FC = () => {
                 },
               ]}
             />
-          )}
+          </div>
         </div>
 
         <CustomerViewModal

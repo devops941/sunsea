@@ -11,13 +11,15 @@ export const normalizeImageBody = async (req: Request, res: Response, next: Next
 
     try {
         const uniqueName = `product_${Date.now()}_${req.file.originalname}`;
-        req.body.imageUrl = await uploadToImageKit(req.file.path, uniqueName, "/products");
+        req.body.imageUrl = await uploadToImageKit(req.file.buffer || req.file.path, uniqueName, "/products");
 
         // Clean up the local temp file after upload
-        try {
-            fs.unlinkSync(req.file.path);
-        } catch (err) {
-            console.error("Failed to delete temp file:", req.file.path, err);
+        if (req.file.path) {
+            try {
+                fs.unlinkSync(req.file.path);
+            } catch (err) {
+                console.error("Failed to delete temp file:", req.file.path, err);
+            }
         }
 
         if (req.body.isPrimary !== undefined) {
@@ -34,13 +36,15 @@ export const normalizeImageBodyOptional = async (req: Request, res: Response, ne
     if (req.file) {
         try {
             const uniqueName = `product_${Date.now()}_${req.file.originalname}`;
-            req.body.imageUrl = await uploadToImageKit(req.file.path, uniqueName, "/products");
+            req.body.imageUrl = await uploadToImageKit(req.file.buffer || req.file.path, uniqueName, "/products");
 
             // Clean up the local temp file after upload
-            try {
-                fs.unlinkSync(req.file.path);
-            } catch (err) {
-                console.error("Failed to delete temp file:", req.file.path, err);
+            if (req.file.path) {
+                try {
+                    fs.unlinkSync(req.file.path);
+                } catch (err) {
+                    console.error("Failed to delete temp file:", req.file.path, err);
+                }
             }
         } catch (err: any) {
             return next(err);

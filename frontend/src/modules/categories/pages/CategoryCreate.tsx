@@ -8,6 +8,7 @@ import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import CustomButton from "../../../components/ui/Button/Button";
 import { useCategories } from "../../../hooks/useCategories";
 import { categoryService } from "../../../services/categoryService";
+import BackButton from "../../../components/ui/BackButton/BackButton";
 
 const initialFormState = {
   categoryCode: "",
@@ -96,11 +97,7 @@ const CategoryCreate: React.FC = () => {
           <div className="p-6 border-b border-slate-200 flex items-center justify-between">
             {/* CAT-003 fix: corrected typo "Categorie" → "Category" */}
             <h2 className="text-2xl font-bold text-slate-800">Add New Category</h2>
-            <CustomButton
-              text="Back to List"
-              icon={FaArrowLeft}
-              onClick={() => navigate("/categories")}
-            />
+            <BackButton text="Back to List" to="/categories" />
           </div>
 
           <form onSubmit={handleSubmit} className="p-6" noValidate>

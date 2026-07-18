@@ -142,15 +142,12 @@ const LocationList: React.FC = () => {
                     </div>
 
                     {/* Table */}
-                    {loading && data.length === 0 ? (
-                        <div className="flex justify-center items-center h-64">
-                            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"></div>
-                        </div>
-                    ) : (
+                    <div className="p-0">
                         <DataTable
                             data={data}
                             rowKey={(item) => item.locationId}
                             emptyMessage="No locations found."
+                            loading={loading}
                             pagination={
                                 totalPages > 1
                                     ? {
@@ -189,7 +186,7 @@ const LocationList: React.FC = () => {
                                 },
                             ]}
                         />
-                    )}
+                    </div>
                 </div>
 
                 {/* View Modal */}

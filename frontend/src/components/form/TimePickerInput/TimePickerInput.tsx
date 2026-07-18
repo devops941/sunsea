@@ -126,7 +126,7 @@ const TimePickerInput: React.FC<TimePickerInputProps> = ({
       <div className="relative">
         <div
           className={`
-            w-full h-[35px] px-4 flex items-center justify-between
+            w-full h-10 px-4 flex items-center justify-between
             border rounded-[10px] outline-none cursor-pointer
             text-[15px] font-medium
             transition-all duration-250

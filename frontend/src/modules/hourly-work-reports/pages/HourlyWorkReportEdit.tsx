@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { FaSave, FaEraser, FaArrowLeft, FaCheckCircle } from "react-icons/fa";
+import { FaSave, FaEraser, FaArrowLeft, FaCheckCircle, FaInfoCircle } from "react-icons/fa";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 import TextInput from "../../../components/form/TextInput/TextInput";
@@ -9,6 +9,7 @@ import QuantityInput from "../../../components/form/QuantityInput/QuantityInput"
 
 import { useAppDispatch } from "../../../hooks/reduxHooks";
 import { updateHourlyProduction } from "../../../features/hourly-productions/hourlyProductionSlice";
+import BackButton from "../../../components/ui/BackButton/BackButton";
 
 const HourlyWorkReportEdit: React.FC = () => {
     const navigate = useNavigate();
@@ -39,6 +40,7 @@ const HourlyWorkReportEdit: React.FC = () => {
     const [uom, setUom] = useState("units");
 
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isEditDisabled, setIsEditDisabled] = useState(false);
 
     useEffect(() => {
         if (locationState.state) {
@@ -62,7 +64,8 @@ const HourlyWorkReportEdit: React.FC = () => {
             setProductName(s.productionOrder?.productItem?.productName || "Unknown Product");
             setMachineName(s.machine?.machineName || s.machineId || "Unknown Machine");
             setShiftName(s.shift?.shiftName || s.shiftId || "Unknown Shift");
-            setUom(s.productionOrder?.productItem?.uom?.uomCode || "units");
+            setUom((s.productionOrder?.productItem?.uom?.uomCode?.toUpperCase() === "EA" ? "PCS" : s.productionOrder?.productItem?.uom?.uomCode?.toUpperCase()) || "PCS");
+            setIsEditDisabled(s.isEditDisabled || false);
         } else {
             toast.error("No report data provided.");
             navigate("/hourly-work-reports");
@@ -103,18 +106,17 @@ const HourlyWorkReportEdit: React.FC = () => {
     };
 
     return (
-        <div className="w-full mx-auto">
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+        <div className="p-4 md:p-6 min-h-screen">
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200">
 
                 {/* Page Header */}
-                <div className="px-6 py-4 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <h2 className="text-xl font-bold text-gray-800">Edit Hourly Production Log</h2>
-                    <CustomButton
-                        text="Back to List"
-                        icon={FaArrowLeft}
-                        onClick={() => navigate("/hourly-work-reports")}
-                        variant="secondary"
-                    />
+                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 p-6 border-b border-slate-200">
+                    <div>
+                        <h2 className="text-2xl font-bold text-slate-800 m-0">Edit Hourly Production Log</h2>
+                    </div>
+                    <div className="flex justify-end">
+                        <BackButton text="Back to List" to="/hourly-work-reports" />
+                    </div>
                 </div>
 
                 <form onSubmit={handleSubmit} className="px-6 py-6 space-y-6" noValidate>
@@ -123,6 +125,12 @@ const HourlyWorkReportEdit: React.FC = () => {
                         {/* Left Card: Read-Only Reference Info */}
                         <div className="lg:col-span-2">
                             <div className="bg-gray-50 border border-gray-200 rounded-lg p-5 h-full">
+                                {isEditDisabled && (
+                                    <div className="bg-rose-50 border border-rose-200 text-rose-700 px-4 py-3 rounded-xl flex items-center gap-2 text-xs font-semibold mb-4">
+                                        <FaInfoCircle size={14} className="flex-shrink-0 text-rose-500" />
+                                        <span>This log is locked (shift completed, stopped, or final hour logged).</span>
+                                    </div>
+                                )}
                                 <h6 className="text-base font-semibold text-gray-800 mb-4 border-b border-gray-100 pb-2">
                                     Reference Plan Info
                                 </h6>
@@ -173,6 +181,7 @@ const HourlyWorkReportEdit: React.FC = () => {
                                         value: String(i + 1)
                                     }))}
                                     required
+                                    disabled={isEditDisabled}
                                     onChange={(e) => setHourIndex(e.target.value)}
                                 />
                                 <TextInput
@@ -180,6 +189,7 @@ const HourlyWorkReportEdit: React.FC = () => {
                                     name="operatorId"
                                     value={operatorId}
                                     placeholder="Enter Operator ID"
+                                    disabled={isEditDisabled}
                                     onChange={(e) => setOperatorId(e.target.value)}
                                 />
                                 <QuantityInput
@@ -187,6 +197,7 @@ const HourlyWorkReportEdit: React.FC = () => {
                                     name="qtyProduced"
                                     value={qtyProduced}
                                     baseUoms={uom}
+                                    disabled={isEditDisabled}
                                     onChange={(e) => setQtyProduced(e.target.value)}
                                 />
                                 <QuantityInput
@@ -194,6 +205,7 @@ const HourlyWorkReportEdit: React.FC = () => {
                                     name="rejectQty"
                                     value={rejectQty}
                                     baseUoms={uom}
+                                    disabled={isEditDisabled}
                                     onChange={(e) => setRejectQty(e.target.value)}
                                 />
                                 <QuantityInput
@@ -201,6 +213,7 @@ const HourlyWorkReportEdit: React.FC = () => {
                                     name="scrapQty"
                                     value={scrapQty}
                                     baseUoms={uom}
+                                    disabled={isEditDisabled}
                                     onChange={(e) => setScrapQty(e.target.value)}
                                 />
                                 <QuantityInput
@@ -208,6 +221,7 @@ const HourlyWorkReportEdit: React.FC = () => {
                                     name="downtime"
                                     value={downtime}
                                     baseUoms="mins,hrs"
+                                    disabled={isEditDisabled}
                                     onChange={(e) => setDowntime(e.target.value)}
                                 />
 
@@ -216,6 +230,7 @@ const HourlyWorkReportEdit: React.FC = () => {
                                         label="Downtime Reason"
                                         name="downtimeReason"
                                         value={downtimeReason}
+                                        disabled={isEditDisabled}
                                         onChange={(e) => setDowntimeReason(e.target.value)}
                                         options={[
                                             { label: "Machine Breakdown", value: "Machine Breakdown" },
@@ -234,6 +249,7 @@ const HourlyWorkReportEdit: React.FC = () => {
                                         label="Reject Reason"
                                         name="rejectReason"
                                         value={rejectReason}
+                                        disabled={isEditDisabled}
                                         onChange={(e) => setRejectReason(e.target.value)}
                                         options={[
                                             { value: "Quality Issue", label: "Quality Issue" },
@@ -249,6 +265,7 @@ const HourlyWorkReportEdit: React.FC = () => {
                                         label="Scrap Reason"
                                         name="scrapReason"
                                         value={scrapReason}
+                                        disabled={isEditDisabled}
                                         onChange={(e) => setScrapReason(e.target.value)}
                                         options={[
                                             { value: "Startup Scrap", label: "Startup Scrap" },
@@ -266,6 +283,7 @@ const HourlyWorkReportEdit: React.FC = () => {
                                             value={remarks}
                                             required
                                             placeholder="Enter specific reason"
+                                            disabled={isEditDisabled}
                                             onChange={(e) => setRemarks(e.target.value)}
                                         />
                                     </div>
@@ -283,12 +301,14 @@ const HourlyWorkReportEdit: React.FC = () => {
                             disabled={isSubmitting}
                             variant="secondary"
                         />
-                        <CustomButton
-                            text={isSubmitting ? "Updating..." : "Update Log"}
-                            icon={FaSave}
-                            type="submit"
-                            disabled={isSubmitting}
-                        />
+                        {!isEditDisabled && (
+                            <CustomButton
+                                text={isSubmitting ? "Updating..." : "Update Log"}
+                                icon={FaSave}
+                                type="submit"
+                                disabled={isSubmitting}
+                            />
+                        )}
                     </div>
                 </form>
             </div>

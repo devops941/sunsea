@@ -92,7 +92,13 @@ const DailyPlanCreate: React.FC = () => {
       return;
     }
     dailyPlanService.getAll({ productionDate, machineId }).then((res) => {
-      setPlansForDateAndMachine(res.data || []);
+      let data = [];
+      if (Array.isArray(res)) data = res;
+      else if (res && Array.isArray(res.data)) data = res.data;
+      else if (res && res.data && Array.isArray(res.data.dailyPlans)) data = res.data.dailyPlans;
+      else if (res && Array.isArray(res.dailyPlans)) data = res.dailyPlans;
+      else if (res && Array.isArray(res.content)) data = res.content;
+      setPlansForDateAndMachine(data);
     }).catch(() => { });
 
     // Fetch OEE summary for selected machine
@@ -109,7 +115,8 @@ const DailyPlanCreate: React.FC = () => {
 
     shifts.forEach((s: any) => {
       const shiftHrs = computeShiftHours(s.startTime, s.endTime);
-      const existingPlans = plansForDateAndMachine.filter(
+      const safePlans = Array.isArray(plansForDateAndMachine) ? plansForDateAndMachine : [];
+      const existingPlans = safePlans.filter(
         (p: any) => p.shiftId === s.shiftCode && p.status !== "CANCELLED" && p.dailyPlanId !== editId
       );
       const plannedHrsSum = existingPlans.reduce((sum: number, p: any) => {
@@ -212,8 +219,15 @@ const DailyPlanCreate: React.FC = () => {
     // Auto-fill planned qty = remaining on this weekly program
     setLoadingRemaining(true);
     dailyPlanService.getAll({ weeklyProgramId }).then((res) => {
-      const existingPlans: any[] = res.data || [];
-      const alreadyPlanned = existingPlans
+      let existingPlans: any[] = [];
+      if (Array.isArray(res)) existingPlans = res;
+      else if (res && Array.isArray(res.data)) existingPlans = res.data;
+      else if (res && res.data && Array.isArray(res.data.dailyPlans)) existingPlans = res.data.dailyPlans;
+      else if (res && Array.isArray(res.dailyPlans)) existingPlans = res.dailyPlans;
+      else if (res && Array.isArray(res.content)) existingPlans = res.content;
+
+      const safePlans = Array.isArray(existingPlans) ? existingPlans : [];
+      const alreadyPlanned = safePlans
         .filter((p: any) => p.status !== "CANCELLED" && p.dailyPlanId !== editId)
         .reduce((sum: number, p: any) => {
           const produced = Array.isArray(p.hourlyProductions)
@@ -386,7 +400,7 @@ const DailyPlanCreate: React.FC = () => {
   // ── Render ───────────────────────────────────────────────────────────────
   return (
 
-    <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-sm border border-slate-200">
+    <form onSubmit={handleSubmit} className="bg-white  border border-slate-200">
       {/* Page Header */}
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 p-6 border-b border-slate-200">
         <div>
@@ -640,7 +654,6 @@ const DailyPlanCreate: React.FC = () => {
                       options={[
                         { value: "DRAFT", label: "Draft" },
                         { value: "PLANNED", label: "Planned" },
-                        { value: "APPROVED", label: "Approved" },
                         { value: "IN_PROGRESS", label: "In Progress" },
                         { value: "COMPLETED", label: "Completed" },
                         { value: "CANCELLED", label: "Cancelled" }

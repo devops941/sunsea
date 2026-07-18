@@ -2,6 +2,8 @@ import React, { useEffect } from 'react';
 import { useAppDispatch, useAppSelector } from './hooks/reduxHooks';
 import { initializeAuth } from './features/auth/authSlice';
 import AppRoutes from './routes/AppRoutes';
+import CommonLoader from './components/ui/Loader/CommonLoader';
+import Logo from "../../frontend/public/loaderimage.png";
 
 const App: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -13,10 +15,7 @@ const App: React.FC = () => {
 
   if (!isInitialized) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-[#f4f7f9]">
-
-        <div className="">SUNSEA ERP</div>
-      </div>
+      <CommonLoader text="Loading..." image={Logo} />
     );
   }
 

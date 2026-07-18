@@ -1,6 +1,7 @@
 import { prisma } from "../../config/prisma";
 import { ApiError } from "../../utils/ApiError";
 import { CreateGoodsDispatchInput, GateApproveInput, StoreReceiveInput } from "./goods-dispatch.validation";
+import { StockAdjustmentService } from "../stock-adjustment/stock-adjustment.service";
 
 export class GoodsDispatchService {
   // ── Generate next dispatch number ──────────────────────────────────────────
@@ -56,7 +57,16 @@ export class GoodsDispatchService {
       include: {
         productItem: { select: { id: true, productName: true, productCode: true, uom: true } },
         Machine: { select: { machineId: true, machineName: true } },
-        goodsDispatchItems: { select: { dispatchQty: true } },
+        goodsDispatchItems: {
+          where: {
+            dispatch: {
+              status: {
+                notIn: ["GATE_REJECTED", "STORE_REJECTED"],
+              },
+            },
+          },
+          select: { dispatchQty: true },
+        },
       },
       orderBy: { orderDate: "desc" },
     });
@@ -82,7 +92,7 @@ export class GoodsDispatchService {
         machine: o.Machine,
         destinationStoreId: o.destinationStoreId,
       };
-    });
+    }).filter(o => o.pendingDispatchQty > 0);
   }
 
   // ── Create Dispatch ─────────────────────────────────────────────────────────
@@ -91,7 +101,18 @@ export class GoodsDispatchService {
     for (const item of data.items) {
       const po = await prisma.productionOrder.findUnique({
         where: { productionOrderId: item.productionOrderId },
-        include: { goodsDispatchItems: { select: { dispatchQty: true } } },
+        include: {
+          goodsDispatchItems: {
+            where: {
+              dispatch: {
+                status: {
+                  notIn: ["GATE_REJECTED", "STORE_REJECTED"],
+                },
+              },
+            },
+            select: { dispatchQty: true },
+          },
+        },
       });
 
       if (!po) {
@@ -313,7 +334,7 @@ export class GoodsDispatchService {
       });
 
       // Create a StockAdjustment for the Dispatch
-      const adjustmentNumber = `ADJ-GD-${dispatch.dispatchNumber}-${Date.now().toString().slice(-4)}`;
+      const adjustmentNumber = await StockAdjustmentService.getNextAdjustmentNumber();
       const stockAdjustment = await tx.stockAdjustment.create({
         data: {
           adjustmentNumber,

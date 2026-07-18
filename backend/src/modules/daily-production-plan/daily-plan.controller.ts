@@ -30,7 +30,7 @@ class DailyPlanController {
   });
 
   findAll = asyncHandler(async (req: Request, res: Response) => {
-    const { weeklyProgramId, productionOrderId, machineId, shiftId, productionDate, status } = req.query;
+    const { weeklyProgramId, productionOrderId, machineId, shiftId, productionDate, status, page, limit } = req.query;
 
     const filters = {
       weeklyProgramId: weeklyProgramId ? String(weeklyProgramId) : undefined,
@@ -39,6 +39,8 @@ class DailyPlanController {
       shiftId: shiftId ? String(shiftId) : undefined,
       productionDate: productionDate ? String(productionDate) : undefined,
       status: status ? String(status) : undefined,
+      page: page ? Number(page) : undefined,
+      limit: limit ? Number(limit) : undefined,
     };
 
     const dailyPlans = await dailyPlanService.findAll(filters);

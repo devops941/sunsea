@@ -10,6 +10,7 @@ import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import CustomButton from "../../../components/ui/Button/Button";
 import { useRawMaterialCategories } from "../../../hooks/useRawMaterialCategories";
 import { rawMaterialCategoryService } from "../../../services/rawMaterialCategoryService";
+import BackButton from "../../../components/ui/BackButton/BackButton";
 
 const categorySchema = z.object({
     code: z
@@ -149,11 +150,7 @@ const RawMaterialCategoryEdit: React.FC = () => {
                 <div className="px-6 py-4 border-b border-gray-100">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <h2 className="text-xl font-bold text-gray-800">Edit Raw Material Category</h2>
-                        <CustomButton
-                            text="Back to List"
-                            icon={FaArrowLeft}
-                            onClick={() => navigate("/raw-material-categories")}
-                        />
+                        <BackButton text="Back to List" to="/raw-material-categories" />
                     </div>
                 </div>
 

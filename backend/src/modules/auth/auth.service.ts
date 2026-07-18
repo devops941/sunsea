@@ -93,8 +93,8 @@ export class AuthService {
         passwordHash: admin.passwordHash,
         fullName: admin.fullName,
         status: admin.status || "active",
-        roleId: null,
-        role: null,
+        roleId: admin.roleId || null,
+        role: admin.role || null,
         failedAttempts: 0,
         lockedUntil: null
       };

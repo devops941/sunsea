@@ -11,6 +11,7 @@ import { useAppDispatch } from "../../../hooks/reduxHooks";
 import { createMachine } from "../../../features/machines/machineSlice";
 import { machineService } from "../../../services/machineService";
 import { useEmployees } from "../../../hooks/useEmployees";
+import BackButton from "../../../components/ui/BackButton/BackButton";
 
 const machineSchema = z.object({
     machineId: z.string().min(1, "Machine ID is required").max(20, "Maximum 20 characters allowed"),
@@ -140,11 +141,7 @@ const MachineCreate: React.FC = () => {
                 <div className="px-6 py-5 border-b border-slate-200">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <h2 className="text-xl font-bold text-slate-800">Create Machine</h2>
-                        <CustomButton
-                            text="Back to List"
-                            icon={FaArrowLeft}
-                            onClick={() => navigate("/machines")}
-                        />
+                        <BackButton text="Back to List" to="/machines" />
                     </div>
                 </div>
 

@@ -5,6 +5,7 @@ import { toast } from "react-toastify";
 
 import TextInput from "../../components/form/TextInput/TextInput";
 import CustomButton from "../../components/ui/Button/Button";
+import CommonLoader from "../../components/ui/Loader/CommonLoader";
 
 import { invoiceSettingsService, type InvoiceSettingDto } from "../../services/invoiceSettingsService";
 
@@ -122,12 +123,17 @@ const SalesInvoiceCreate: React.FC = () => {
         const { name, value, type, checked } = e.target;
         const val = type === "checkbox" ? checked : value;
 
+        if (name === "invoicePrefix") {
+            const cleaned = String(val).toUpperCase().slice(0, 3);
+            setFormData((prev) => ({ ...prev, invoicePrefix: cleaned }));
+            if (errors[name]) setErrors((prev) => ({ ...prev, [name]: "" }));
+            return;
+        }
+
         if (name === "autoFinancialYear") {
             setFormData((prev) => ({
                 ...prev,
                 autoFinancialYear: checked,
-                // Switching to Auto -> recalc start date automatically.
-                // Switching to Manual -> keep current value, let user edit it.
                 financialYearStart: checked ? getAutoFinancialYearStart() : prev.financialYearStart,
             }));
         } else {
@@ -141,7 +147,16 @@ const SalesInvoiceCreate: React.FC = () => {
 
     const validate = (): boolean => {
         const errs: Record<string, string> = {};
-        if (!formData.invoicePrefix?.trim()) errs.invoicePrefix = "Invoice Prefix is required";
+        const prefix = formData.invoicePrefix?.trim() || "";
+
+        if (!prefix) {
+            errs.invoicePrefix = "Invoice Prefix is required";
+        } else if (prefix.length < 2 || prefix.length > 3) {
+            errs.invoicePrefix = "Invoice Prefix must be 2 or 3 characters";
+        } else if (!/^[A-Za-z]+$/.test(prefix)) {
+            errs.invoicePrefix = "Invoice Prefix must contain only letters";
+        }
+
         if (!formData.sequenceLength || formData.sequenceLength <= 0)
             errs.sequenceLength = "Sequence Length must be greater than 0";
         if (!formData.financialYearStart) errs.financialYearStart = "Financial Year Start date is required";
@@ -192,7 +207,7 @@ const SalesInvoiceCreate: React.FC = () => {
     }, [formData]);
 
     if (loading) {
-        return <div className="text-center py-5">Loading settings...</div>;
+        return <CommonLoader text="Loading settings..." fullScreen={false} />;
     }
 
     return (
@@ -226,8 +241,9 @@ const SalesInvoiceCreate: React.FC = () => {
                                     onChange={handleChange as any}
                                     required
                                     error={errors.invoicePrefix}
+                                    maxLength={3}
                                 />
-                                <small className="text-gray-400">Prefix for all invoice numbers (e.g., INV, BILL)</small>
+                                <small className="text-gray-400">2–3 letter prefix for invoice numbers (e.g., IN, INV)</small>
                             </div>
                             <div>
                                 <TextInput
