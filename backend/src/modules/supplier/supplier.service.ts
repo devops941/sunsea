@@ -6,6 +6,28 @@ import type {
   CreateSupplierInput,
   UpdateSupplierInput,
 } from "./supplier.validation";
+import { uploadToImageKit } from "../../utils/Imagekit";
+
+async function processBankAccounts(bankAccounts: any): Promise<any> {
+  if (!Array.isArray(bankAccounts)) return bankAccounts;
+  
+  return Promise.all(bankAccounts.map(async (acc, index) => {
+    if (acc.qrImage && acc.qrImage.startsWith("data:image")) {
+      try {
+        const base64Data = acc.qrImage.split(";base64,").pop();
+        if (base64Data) {
+          const buffer = Buffer.from(base64Data, "base64");
+          const fileName = `supplier_qr_${Date.now()}_${index}.png`;
+          const imageUrl = await uploadToImageKit(buffer, fileName, "/suppliers");
+          return { ...acc, qrImage: imageUrl };
+        }
+      } catch (err) {
+        console.error("Failed to upload QR image to ImageKit:", err);
+      }
+    }
+    return acc;
+  }));
+}
 
 class SupplierService {
   async createSupplier(
@@ -22,18 +44,20 @@ class SupplierService {
 
     const { addresses, userId, materialPrices, ...supplierData } = data;
 
+    const processedBankAccount = await processBankAccounts(supplierData.bankAccount);
+
     const insertData: Prisma.SupplierCreateInput = {
       ...supplierData,
-      bankAccount: supplierData.bankAccount as any,
+      bankAccount: processedBankAccount as any,
       minOrderQty: supplierData.minOrderQty !== undefined && supplierData.minOrderQty !== null ? new Prisma.Decimal(supplierData.minOrderQty) : undefined,
       createdBy: userId,
       addresses: addresses && addresses.length > 0
         ? {
-          create: addresses.map((addr) => ({
-            label: addr.label,
-            isDefault: addr.isDefault,
+          create: addresses.map((addr: any, index: number) => ({
             address: addr.address as any,
-            stateCode: addr.stateCode,
+            label: `Address ${index + 1}`,
+            state_code: addr.address.state || "",
+            is_default: index === 0,
           })),
         }
         : undefined,
@@ -242,12 +266,12 @@ class SupplierService {
         // Insert new addresses
         if (addresses.length > 0) {
           await tx.supplierAddress.createMany({
-            data: addresses.map((addr) => ({
+            data: addresses.map((addr: any, index: number) => ({
               supplierId: Number(id),
-              label: addr.label,
-              isDefault: addr.isDefault,
               address: addr.address as any,
-              stateCode: addr.stateCode,
+              label: `Address ${index + 1}`,
+              state_code: addr.address.state || "",
+              is_default: index === 0,
             })),
           });
         }
@@ -276,9 +300,11 @@ class SupplierService {
         }
       }
 
+      const processedBankAccount = await processBankAccounts(supplierData.bankAccount);
+
       const updateData: Prisma.SupplierUpdateInput = {
         ...supplierData,
-        bankAccount: supplierData.bankAccount as any,
+        bankAccount: processedBankAccount as any,
         minOrderQty: supplierData.minOrderQty !== undefined && supplierData.minOrderQty !== null ? new Prisma.Decimal(supplierData.minOrderQty) : undefined,
         updatedBy: updatedByUserId ? updatedByUserId : undefined,
       };

@@ -150,8 +150,9 @@ export class DailyPlanRepository {
     return Number(aggregate._sum.plannedQty || 0);
   }
 
-  async existsByDateMachineShift(productionDate: Date, machineId: string, shiftId: string, productionOrderId: string, excludeDailyPlanId?: string) {
-    const count = await prisma.dailyProductionPlan.count({
+  async existsByDateMachineShift(productionDate: Date, machineId: string, shiftId: string, productionOrderId: string, excludeDailyPlanId?: string, tx?: any) {
+    const client = tx || prisma;
+    const count = await client.dailyProductionPlan.count({
       where: {
         productionDate,
         machineId,

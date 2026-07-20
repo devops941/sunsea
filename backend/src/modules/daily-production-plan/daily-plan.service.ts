@@ -6,21 +6,20 @@ import { CreateDailyPlanInput, UpdateDailyPlanInput } from "./daily-plan.validat
 class DailyPlanService {
   async generateNextDailyPlanId(tx?: any): Promise<string> {
     const client = tx || prisma;
-    const plans = await client.dailyProductionPlan.findMany({
+    const latest = await client.dailyProductionPlan.findFirst({
+      orderBy: { dailyPlanId: "desc" },
       select: { dailyPlanId: true },
     });
 
-    let maxNum = 0;
-    for (const p of plans) {
-      if (p.dailyPlanId && p.dailyPlanId.startsWith("DP")) {
-        const num = parseInt(p.dailyPlanId.slice(2), 10);
-        if (!isNaN(num) && num > maxNum) {
-          maxNum = num;
-        }
-      }
+    if (!latest || !latest.dailyPlanId) {
+      return "DP0001";
     }
 
-    return `DP${String(maxNum + 1).padStart(4, "0")}`;
+    const match = latest.dailyPlanId.match(/\d+/);
+    if (!match) return "DP0001";
+
+    const nextNumber = parseInt(match[0], 10) + 1;
+    return `DP${String(nextNumber).padStart(4, "0")}`;
   }
 
   async create(data: CreateDailyPlanInput, userId?: string) {
@@ -82,7 +81,7 @@ class DailyPlanService {
 
     return prisma.$transaction(async (tx) => {
       // 8. Validation: Machine must not already be planned for the same date, shift, and PO
-      const isAlreadyPlanned = await dailyPlanRepository.existsByDateMachineShift(prodDate, data.machineId, data.shiftId, data.productionOrderId);
+      const isAlreadyPlanned = await dailyPlanRepository.existsByDateMachineShift(prodDate, data.machineId, data.shiftId, data.productionOrderId, undefined, tx);
       if (isAlreadyPlanned) {
         throw new ApiError(409, `Machine ${data.machineId} is already scheduled with production order ${data.productionOrderId} on shift ${data.shiftId} for date ${data.productionDate}`);
       }
@@ -172,7 +171,7 @@ class DailyPlanService {
 
     return prisma.$transaction(async (tx) => {
       // 7. Verify machine is not already planned on this date, shift & PO (excluding self)
-      const isAlreadyPlanned = await dailyPlanRepository.existsByDateMachineShift(prodDate, checkMachineId, checkShiftId, checkProductionOrderId, dailyPlanId);
+      const isAlreadyPlanned = await dailyPlanRepository.existsByDateMachineShift(prodDate, checkMachineId, checkShiftId, checkProductionOrderId, dailyPlanId, tx);
       if (isAlreadyPlanned) {
         throw new ApiError(
           409,

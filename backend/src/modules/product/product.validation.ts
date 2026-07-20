@@ -44,6 +44,7 @@ export const createProductSchema = z.object({
       
     openingStockQty: z.string().optional(),
     openingStockStoreId: z.string().optional(),
+    rawMaterials: z.any().optional(),
   }),
 });
 
