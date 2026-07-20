@@ -269,12 +269,26 @@ model Customer {
   route                Route?                   @relation(fields: [routeId], references: [id])
   salesOrders          SalesOrder[]             @relation("CustomerSalesOrders")
   salesInvoices        SalesInvoice[]
+  addresses            CustomerAddress[]
 
   @@unique([companyId, customerCode])
   @@index([companyId, status], map: "idx_cust_company_status")
   @@index([routeId, collectionAgentId], map: "idx_cust_route_agent")
   @@map("customers")
 }
+
+model CustomerAddress {
+  id         String   @id @default(uuid()) @map("id")
+  address    Json     @map("address")
+  customerId String   @map("customer_id") @db.Uuid
+  is_default Boolean  @default(false)
+  label      String   @db.VarChar(40)
+  state_code String   @db.VarChar(50)
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@map("customer_addresses")
+}
+
 
 model Company {
   id             String          @id @default(uuid()) @db.Uuid

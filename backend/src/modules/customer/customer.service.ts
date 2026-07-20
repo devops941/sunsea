@@ -20,12 +20,24 @@ class CustomerService {
       throw new Error("Customer code already exists for this company");
     }
 
+    const { addresses, ...restData } = data;
+
     return prisma.customer.create({
       data: {
-        ...data,
+        ...restData,
         customerType: data.customerType.join(","),
         companyId: currentUser.companyId,
         createdBy: currentUser.userId,
+        ...(addresses && addresses.length > 0 && {
+          addresses: {
+            create: addresses.map((addr, index) => ({
+              address: addr,
+              is_default: index === 0,
+              label: `Address ${index + 1}`,
+              state_code: addr.state.toLowerCase(),
+            }))
+          }
+        })
       },
     });
   }
@@ -115,6 +127,9 @@ class CustomerService {
   async getCustomerById(id: string) {
     const customer = await prisma.customer.findUnique({
       where: { id },
+      include: {
+        addresses: true,
+      }
     });
 
     if (!customer) {
@@ -179,13 +194,26 @@ class CustomerService {
       }
     }
 
+    const { addresses, ...restData } = data as any;
+
     return prisma.customer.update({
       where: { id },
       data: {
-        ...(data as any),
+        ...restData,
         ...(data.customerType && {
-          customerType: data.customerType.join(","), // only join if it's present in this update
+          customerType: data.customerType.join(","),
         }),
+        ...(addresses && {
+          addresses: {
+            deleteMany: {},
+            create: addresses.map((addr: any, index: number) => ({
+              address: addr,
+              is_default: index === 0,
+              label: `Address ${index + 1}`,
+              state_code: addr.state.toLowerCase(),
+            }))
+          }
+        })
       }
     });
   }

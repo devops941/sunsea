@@ -68,14 +68,6 @@ const CustomerCreatePage: React.FC = () => {
     billingAddressState: "",
     billingAddressPincode: "",
 
-    sameAsBilling: false,
-
-    shippingAddressLine1: "",
-    shippingAddressCountry: "",
-    shippingAddressCity: "",
-    shippingAddressState: "",
-    shippingAddressPincode: "",
-
     creditLimit: "",
     creditDays: "0",
 
@@ -100,6 +92,18 @@ const CustomerCreatePage: React.FC = () => {
 
   const [formData, setFormData] = useState<CustomerFormData>(initialFormData);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  
+  const [addresses, setAddresses] = useState<any[]>([
+      {
+          address: {
+              addressLine1: "",
+              addressLine2: "",
+              city: "",
+              state: "",
+              pincode: "",
+          }
+      }
+  ]);
 
   // Bump this key to force CityStateSelect (shipping) to reset/remount
   const [shippingResetKey, setShippingResetKey] = useState(0);
@@ -150,55 +154,79 @@ const CustomerCreatePage: React.FC = () => {
     setFormData((prev) => ({ ...prev, [name]: values }));
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement> | { target: { name: string; value: string } }) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement> | { target: { name: string; value: string } }) => {
     const { name, value } = e.target;
-
-    if (name === "sameAsBilling") {
+    
+    // Checkboxes (native events only)
+    if ('type' in e.target && e.target.type === "checkbox") {
       const checked = (e.target as HTMLInputElement).checked;
-
-      setFormData((prev) => ({
-        ...prev,
-        sameAsBilling: checked,
-        ...(checked
-          ? {
-            shippingAddressLine1: prev.billingAddressLine1,
-            shippingAddressCountry: prev.billingAddressCountry,
-            shippingAddressCity: prev.billingAddressCity,
-            shippingAddressState: prev.billingAddressState,
-            shippingAddressPincode: prev.billingAddressPincode,
-          }
-          : {
-            shippingAddressLine1: "",
-            shippingAddressCountry: "",
-            shippingAddressCity: "",
-            shippingAddressState: "",
-            shippingAddressPincode: "",
-          }),
-      }));
-      setShippingResetKey((k) => k + 1);
-      setErrors((prev) => ({ ...prev, shippingAddressLine1: "", shippingAddressCountry: "", shippingAddressCity: "", shippingAddressState: "", shippingAddressPincode: "", sameAsBilling: "" }));
+      setFormData((prev) => ({ ...prev, [name]: checked }));
+      if (errors[name]) setErrors((prev) => ({ ...prev, [name]: "" }));
       return;
     }
 
-    setFormData((prev) => {
-      const updated = { ...prev, [name]: value };
-      if (prev.sameAsBilling) {
-        if (name === "billingAddressLine1") updated.shippingAddressLine1 = value;
-        else if (name === "billingAddressPincode") updated.shippingAddressPincode = value;
-      }
-      return updated;
-    });
+    setFormData((prev) => ({ ...prev, [name]: value }));
 
     if (errors[name]) {
-      setErrors((prev) => {
-        const updatedErrors = { ...prev, [name]: "" };
-        if (prev.sameAsBilling) {
-          if (name === "billingAddressLine1") updatedErrors.shippingAddressLine1 = "";
-          else if (name === "billingAddressPincode") updatedErrors.shippingAddressPincode = "";
-        }
-        return updatedErrors;
-      });
+      setErrors((prev) => ({ ...prev, [name]: "" }));
     }
+  };
+
+  const addShippingAddress = () => {
+      setAddresses(prev => [
+          ...prev,
+          {
+              address: {
+                  addressLine1: "",
+                  addressLine2: "",
+                  city: "",
+                  state: "",
+                  pincode: "",
+              }
+          }
+      ]);
+  };
+
+  const removeShippingAddress = (index: number) => {
+      setAddresses(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleShippingAddressChange = (index: number, field: string, value: string) => {
+      setAddresses(prev => {
+          const newAddresses = [...prev];
+          newAddresses[index] = {
+              ...newAddresses[index],
+              address: {
+                  ...newAddresses[index].address,
+                  [field]: value
+              }
+          };
+          return newAddresses;
+      });
+
+      const errorKey = `addresses.${index}.address.${field}`;
+      if (errors[errorKey]) {
+          setErrors(prev => ({ ...prev, [errorKey]: "" }));
+      }
+  };
+
+  const toggleSameAsBilling = (index: number, checked: boolean) => {
+      if (checked) {
+          setAddresses(prev => {
+              const newAddresses = [...prev];
+              newAddresses[index] = {
+                  ...newAddresses[index],
+                  address: {
+                      ...newAddresses[index].address,
+                      addressLine1: formData.billingAddressLine1,
+                      city: formData.billingAddressCity,
+                      state: formData.billingAddressState,
+                      pincode: formData.billingAddressPincode,
+                  }
+              };
+              return newAddresses;
+          });
+      }
   };
 
   const handleStateChange = (stateData: StateCityOption) => {
@@ -208,7 +236,6 @@ const CustomerCreatePage: React.FC = () => {
       billingAddressState: stateData.name,
       billingAddressCity: "",
       stateCode: gstCode || prev.stateCode,
-      ...(prev.sameAsBilling && { shippingAddressState: stateData.name, shippingAddressCity: "" }),
     }));
     setErrors((prev) => ({ ...prev, billingAddressState: "", billingAddressCity: "", stateCode: "" }));
   };
@@ -217,19 +244,8 @@ const CustomerCreatePage: React.FC = () => {
     setFormData((prev) => ({
       ...prev,
       billingAddressCity: cityData.name,
-      ...(prev.sameAsBilling && { shippingAddressCity: cityData.name }),
     }));
     setErrors((prev) => ({ ...prev, billingAddressCity: "" }));
-  };
-
-  const handleShippingStateChange = (stateData: StateCityOption) => {
-    setFormData((prev) => ({ ...prev, shippingAddressState: stateData.name, shippingAddressCity: "" }));
-    setErrors((prev) => ({ ...prev, shippingAddressState: "", shippingAddressCity: "" }));
-  };
-
-  const handleShippingCityChange = (cityData: StateCityOption) => {
-    setFormData((prev) => ({ ...prev, shippingAddressCity: cityData.name }));
-    setErrors((prev) => ({ ...prev, shippingAddressCity: "" }));
   };
 
   useEffect(() => {
@@ -244,18 +260,6 @@ const CustomerCreatePage: React.FC = () => {
     fetchCode();
   }, []);
 
-  useEffect(() => {
-    if (formData.sameAsBilling) {
-      setFormData((prev) => ({
-        ...prev,
-        shippingAddressLine1: prev.billingAddressLine1,
-        shippingAddressCountry: prev.billingAddressCountry,
-        shippingAddressCity: prev.billingAddressCity,
-        shippingAddressState: prev.billingAddressState,
-        shippingAddressPincode: prev.billingAddressPincode,
-      }));
-    }
-  }, [formData.billingAddressLine1, formData.billingAddressCountry, formData.billingAddressCity, formData.billingAddressState, formData.billingAddressPincode, formData.sameAsBilling]);
 
   const handleClear = () => {
     setFormData(initialFormData);
@@ -271,9 +275,7 @@ const CustomerCreatePage: React.FC = () => {
       billingState: formData.billingAddressState,
       billingCity: formData.billingAddressCity,
       billingPincode: formData.billingAddressPincode,
-      shippingState: formData.shippingAddressState,
-      shippingCity: formData.shippingAddressCity,
-      shippingPincode: formData.shippingAddressPincode,
+      addresses,
     };
 
     const validationErrors = validateCustomer(validationData);
@@ -284,9 +286,6 @@ const CustomerCreatePage: React.FC = () => {
         if (key === "billingState") mappedErrors.billingAddressState = validationErrors.billingState;
         else if (key === "billingCity") mappedErrors.billingAddressCity = validationErrors.billingCity;
         else if (key === "billingPincode") mappedErrors.billingAddressPincode = validationErrors.billingPincode;
-        else if (key === "shippingState") mappedErrors.shippingAddressState = validationErrors.shippingState;
-        else if (key === "shippingCity") mappedErrors.shippingAddressCity = validationErrors.shippingCity;
-        else if (key === "shippingPincode") mappedErrors.shippingAddressPincode = validationErrors.shippingPincode;
         else mappedErrors[key] = validationErrors[key];
       });
       setErrors(mappedErrors);
@@ -317,11 +316,7 @@ const CustomerCreatePage: React.FC = () => {
         billingCity: formData.billingAddressCity,
         billingState: formData.billingAddressState,
         billingPincode: formData.billingAddressPincode,
-        shippingAddressLine1: formData.shippingAddressLine1,
-        shippingCountry: formData.shippingAddressCountry || "India",
-        shippingCity: formData.shippingAddressCity,
-        shippingState: formData.shippingAddressState,
-        shippingPincode: formData.shippingAddressPincode,
+        addresses: addresses.map(addr => addr.address),
         creditLimit: Number(formData.creditLimit),
         creditDays: Number(formData.creditDays),
         bankAccount: activeBankAccounts.length > 0 ? activeBankAccounts : undefined,
@@ -463,7 +458,6 @@ const CustomerCreatePage: React.FC = () => {
                         billingAddressCountry: v,
                         billingAddressState: "",
                         billingAddressCity: "",
-                        ...(prev.sameAsBilling && { shippingAddressCountry: v, shippingAddressState: "", shippingAddressCity: "" })
                       }));
                       setErrors(prev => ({ ...prev, billingAddressCountry: "", billingAddressState: "", billingAddressCity: "" }));
                     }}
@@ -474,7 +468,6 @@ const CustomerCreatePage: React.FC = () => {
                       const gstCode = getGstStateCode(v);
                       setFormData(prev => ({
                         ...prev, billingAddressState: v, billingAddressCity: "", stateCode: gstCode || prev.stateCode,
-                        ...(prev.sameAsBilling && { shippingAddressState: v, shippingAddressCity: "" })
                       }));
                       setErrors(prev => ({ ...prev, billingAddressState: "", billingAddressCity: "", stateCode: "" }));
                     }}
@@ -482,7 +475,7 @@ const CustomerCreatePage: React.FC = () => {
 
                     cityValue={formData.billingAddressCity}
                     onCityChange={(v) => {
-                      setFormData(prev => ({ ...prev, billingAddressCity: v, ...(prev.sameAsBilling && { shippingAddressCity: v }) }));
+                      setFormData(prev => ({ ...prev, billingAddressCity: v }));
                       setErrors(prev => ({ ...prev, billingAddressCity: "" }));
                     }}
                     cityError={errors.billingAddressCity}
@@ -494,54 +487,92 @@ const CustomerCreatePage: React.FC = () => {
                   />
                 </div>
 
-                {/* Shipping */}
-                <div className="space-y-2">
+                {/* Additional Addresses */}
+                <div className="space-y-4 col-span-full mt-6">
                   <div className="flex items-center justify-between">
-                    <h5 className="font-bold text-slate-700">Shipping Address</h5>
-                    <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        name="sameAsBilling"
-                        checked={formData.sameAsBilling}
-                        onChange={handleChange}
-                        className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary"
-                      />
-                      Same as billing
-                    </label>
+                    <h5 className="font-bold text-slate-700">Additional Addresses</h5>
+                    <button
+                        type="button"
+                        onClick={addShippingAddress}
+                        className="text-sm px-3 py-1.5 bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100 font-medium border border-blue-200 transition-colors"
+                    >
+                        + Add Address
+                    </button>
                   </div>
 
-                  <AddressForm
-                    addressValue={formData.shippingAddressLine1}
-                    onAddressChange={(v) => handleChange({ target: { name: "shippingAddressLine1", value: v } })}
-                    addressError={errors.shippingAddressLine1}
+                  {addresses.map((addr, index) => {
+                      const isThisSameAsBilling = addr.address.addressLine1 === formData.billingAddressLine1 &&
+                          addr.address.city === formData.billingAddressCity &&
+                          addr.address.state === formData.billingAddressState &&
+                          addr.address.pincode === formData.billingAddressPincode &&
+                          !!formData.billingAddressLine1;
 
-                    countryValue={formData.shippingAddressCountry}
-                    onCountryChange={(v) => {
-                      setFormData(prev => ({ ...prev, shippingAddressCountry: v, shippingAddressState: "", shippingAddressCity: "" }));
-                      setErrors(prev => ({ ...prev, shippingAddressCountry: "", shippingAddressState: "", shippingAddressCity: "" }));
-                    }}
-                    countryError={errors.shippingAddressCountry}
+                      const isAnyAddressSameAsBilling = addresses.some(a =>
+                          a.address.addressLine1 === formData.billingAddressLine1 &&
+                          a.address.city === formData.billingAddressCity &&
+                          a.address.state === formData.billingAddressState &&
+                          a.address.pincode === formData.billingAddressPincode &&
+                          !!formData.billingAddressLine1
+                      );
 
-                    stateValue={formData.shippingAddressState}
-                    onStateChange={(v) => {
-                      setFormData(prev => ({ ...prev, shippingAddressState: v, shippingAddressCity: "" }));
-                      setErrors(prev => ({ ...prev, shippingAddressState: "", shippingAddressCity: "" }));
-                    }}
-                    stateError={errors.shippingAddressState}
+                      const showSameAsBillingCheckbox = isThisSameAsBilling || !isAnyAddressSameAsBilling;
 
-                    cityValue={formData.shippingAddressCity}
-                    onCityChange={(v) => {
-                      setFormData(prev => ({ ...prev, shippingAddressCity: v }));
-                      setErrors(prev => ({ ...prev, shippingAddressCity: "" }));
-                    }}
-                    cityError={errors.shippingAddressCity}
+                      return (
+                          <div key={index} className="p-4 border border-slate-200 rounded-md bg-slate-50 relative">
+                              <div className="flex items-center justify-between mb-3 border-b border-slate-200 pb-2">
+                                  <h4 className="text-sm font-semibold text-slate-700 uppercase">Address {index + 1}</h4>
 
-                    pincodeValue={formData.shippingAddressPincode}
-                    onPincodeChange={(v) => handleChange({ target: { name: "shippingAddressPincode", value: v } })}
-                    pincodeError={errors.shippingAddressPincode}
-                    disabled={formData.sameAsBilling}
-                    resetKey={shippingResetKey}
-                  />
+                                  <div className="flex items-center gap-4">
+                                      {showSameAsBillingCheckbox && (
+                                          <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer hover:text-slate-800">
+                                              <input
+                                                  type="checkbox"
+                                                  className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                                  checked={isThisSameAsBilling}
+                                                  onChange={(e) => toggleSameAsBilling(index, e.target.checked)}
+                                              />
+                                              <span>Same as billing</span>
+                                          </label>
+                                      )}
+
+                                      {addresses.length > 1 && (
+                                          <button
+                                              type="button"
+                                              onClick={() => removeShippingAddress(index)}
+                                              className="text-red-500 hover:text-red-700 p-1.5 bg-red-50 rounded"
+                                              title="Remove Address"
+                                          >
+                                              <span className="font-bold">Remove</span>
+                                          </button>
+                                      )}
+                                  </div>
+                              </div>
+                              <AddressForm
+                                  addressValue={addr.address.addressLine1}
+                                  onAddressChange={(v) => handleShippingAddressChange(index, "addressLine1", v)}
+                                  addressError={errors[`addresses.${index}.address.addressLine1`]}
+
+                                  countryValue="India"
+
+                                  stateValue={addr.address.state}
+                                  onStateChange={(v) => {
+                                      handleShippingAddressChange(index, "state", v);
+                                      handleShippingAddressChange(index, "city", "");
+                                  }}
+                                  stateError={errors[`addresses.${index}.address.state`]}
+
+                                  cityValue={addr.address.city}
+                                  onCityChange={(v) => handleShippingAddressChange(index, "city", v)}
+                                  cityError={errors[`addresses.${index}.address.city`]}
+
+                                  pincodeValue={addr.address.pincode}
+                                  onPincodeChange={(v) => handleShippingAddressChange(index, "pincode", v)}
+                                  pincodeError={errors[`addresses.${index}.address.pincode`]}
+                                  required
+                              />
+                          </div>
+                      );
+                  })}
                 </div>
               </div>
             </div>

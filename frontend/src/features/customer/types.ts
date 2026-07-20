@@ -1,3 +1,18 @@
+export interface CustomerAddress {
+  id: string;
+  address: {
+    addressLine1: string;
+    addressLine2?: string;
+    city: string;
+    state: string;
+    pincode: string;
+  };
+  customerId: string;
+  is_default: boolean;
+  label: string;
+  state_code: string;
+}
+
 export interface Customer {
   id: string;
   companyId: string;
@@ -34,6 +49,7 @@ export interface Customer {
   routeId?: string | null;
   bankAccount?: any;
   status: string;
+  addresses?: CustomerAddress[];
   createdAt: string;
   updatedAt: string;
   createdUser?: {
@@ -79,6 +95,7 @@ export interface CreateCustomerDto {
   bankAccount?: any;
   status?: string;
   createdBy?: string;
+  addresses?: any[];
 }
 
 export interface UpdateCustomerDto {
@@ -114,6 +131,7 @@ export interface UpdateCustomerDto {
   collectionAgentId?: string | null;
   bankAccount?: any;
   status?: string;
+  addresses?: any[];
 }
 
 export interface CustomerState {
