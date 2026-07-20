@@ -970,7 +970,7 @@ const ProductEdit: React.FC = () => {
                             </button>
                         </div>
                         {rawMaterials.length > 0 ? (
-                            <div className="border border-slate-200 rounded-xl overflow-hidden">
+                            <div className="border border-slate-200 rounded-xl overflow-visible">
                                 <table className="w-full text-left text-sm whitespace-nowrap">
                                     <thead className="bg-slate-50 text-slate-600">
                                         <tr>
