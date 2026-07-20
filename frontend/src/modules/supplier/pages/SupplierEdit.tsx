@@ -9,6 +9,7 @@ import TextInput from "../../../components/form/TextInput/TextInput";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import Button from "../../../components/ui/Button/Button";
 import CustomButton from "../../../components/ui/Button/Button";
+import FileUpload from "../../../components/form/FileUpload/FileUpload";
 import Checkbox from "../../../components/form/CheckboxInput/CheckboxInput";
 import { useSuppliers } from "../../../hooks/useSuppliers";
 import type { SupplierAddress } from "../../../features/supplier/types";
@@ -20,26 +21,7 @@ import CityStateSelect from "../../../components/ui/CityStateSelect/CityStateSel
 import type { StateCityOption } from "../../../components/ui/CityStateSelect/CityStateSelect";
 import AddressForm from "../../../components/form/AddressFrom/AddressFrom";
 
-const getGstStateCode = (stateNameOrCode: string): string => {
-  const normalized = stateNameOrCode.toLowerCase().replace(/[^a-z0-9]/g, "");
-  const mapping: Record<string, string> = {
-    jk: "01", hp: "02", pb: "03", ch: "04", ut: "05", hr: "06", dl: "07",
-    rj: "08", up: "09", br: "10", sk: "11", ar: "12", nl: "13", mn: "14",
-    mz: "15", tr: "16", ml: "17", as: "18", wb: "19", jh: "20", or: "21",
-    od: "21", ct: "22", cg: "22", mp: "23", gj: "24", dd: "26", dn: "26",
-    mh: "27", ap: "37", ka: "29", ga: "30", ld: "31", kl: "32", tn: "33",
-    py: "34", an: "35", tg: "36", ts: "36", la: "38", jammuandkashmir: "01",
-    himachalpradesh: "02", punjab: "03", chandigarh: "04", uttarakhand: "05",
-    haryana: "06", delhi: "07", rajasthan: "08", uttarpradesh: "09", bihar: "10",
-    sikkim: "11", arunachalpradesh: "12", nagaland: "13", manipur: "14", mizoram: "15",
-    tripura: "16", meghalaya: "17", assam: "18", westbengal: "19", jharkhand: "20",
-    odisha: "21", chhattisgarh: "22", madhyapradesh: "23", gujarat: "24", damananddiu: "26",
-    dadraandnagarhaveli: "26", maharashtra: "27", andhrapradesh: "37", karnataka: "29",
-    goa: "30", lakshadweep: "31", kerala: "32", tamilnadu: "33", puducherry: "34",
-    andamanandnicobarislands: "35", telangana: "36", ladakh: "38",
-  };
-  return mapping[normalized] || "";
-};
+
 
 const supplierFormSchema = z.object({
     // BUG-SUP-001 fix: companyId is resolved server-side — make it optional in frontend validation
@@ -141,6 +123,7 @@ const SupplierEdit: React.FC = () => {
                 ifscCode: "",
                 branchName: "",
                 upiMobileNumber: "",
+                qrImage: "",
             },
         ],
         status: "Active",
@@ -156,18 +139,6 @@ const SupplierEdit: React.FC = () => {
         validFrom: string;
         validTo: string;
     }[]>([]);
-
-    // Shipping Address Temp Form State
-    const [tempAddress, setTempAddress] = useState({
-        label: "",
-        addressLine1: "",
-        addressLine2: "",
-        city: "",
-        state: "",
-        pincode: "",
-        stateCode: "TN",
-        isDefault: false,
-    });
 
     const handleClear = () => {
         if (supplierData) {
@@ -211,6 +182,7 @@ const SupplierEdit: React.FC = () => {
                         ifscCode: bank.ifscCode || "",
                         branchName: bank.branchName || "",
                         upiMobileNumber: bank.upiMobileNumber || "",
+                        qrImage: bank.qrImage || "",
                     }))
                     : supplierData.bankAccount && typeof supplierData.bankAccount === "object"
                         ? [
@@ -221,6 +193,7 @@ const SupplierEdit: React.FC = () => {
                                 ifscCode: supplierData.bankAccount.ifscCode || "",
                                 branchName: supplierData.bankAccount.branchName || "",
                                 upiMobileNumber: supplierData.bankAccount.upiMobileNumber || "",
+                                qrImage: supplierData.bankAccount.qrImage || "",
                             }
                         ]
                         : supplierData.bankAccount && typeof supplierData.bankAccount === "string"
@@ -232,6 +205,7 @@ const SupplierEdit: React.FC = () => {
                                     ifscCode: supplierData.bankIfsc || "",
                                     branchName: "",
                                     upiMobileNumber: "",
+                                    qrImage: "",
                                 }
                             ]
                             : [
@@ -242,6 +216,7 @@ const SupplierEdit: React.FC = () => {
                                     ifscCode: "",
                                     branchName: "",
                                     upiMobileNumber: "",
+                                    qrImage: "",
                                 }
                             ],
                 status: supplierData.status || "Active",
@@ -250,8 +225,18 @@ const SupplierEdit: React.FC = () => {
                     ? `${supplierData.createdByUser.fullName}${supplierData.createdAt ? " - " + new Date(supplierData.createdAt).toLocaleString() : ""}`
                     : "",
             });
-            if (supplierData.addresses) {
+            if (supplierData.addresses && supplierData.addresses.length > 0) {
                 setAddresses(supplierData.addresses);
+            } else {
+                setAddresses([{
+                    address: {
+                        addressLine1: "",
+                        addressLine2: "",
+                        city: "",
+                        state: "",
+                        pincode: "",
+                    }
+                }]);
             }
         }
     };
@@ -442,24 +427,38 @@ const SupplierEdit: React.FC = () => {
     };
 
 
-    const handleBankChange = (
-        index: number,
-        e: React.ChangeEvent<HTMLInputElement>
-    ) => {
+    const handleBankChange = (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
-
         setFormData((prev) => {
-            const updatedBanks = [...prev.bankAccounts];
-            updatedBanks[index] = {
-                ...updatedBanks[index],
-                [name]: value,
-            };
-            return { ...prev, bankAccounts: updatedBanks };
+            const updated = [...prev.bankAccounts];
+            updated[index] = { ...updated[index], [name]: value };
+            return { ...prev, bankAccounts: updated };
         });
 
         const errorKey = `bankAccounts.${index}.${name}`;
         if (errors[errorKey]) {
             setErrors((prev) => ({ ...prev, [errorKey]: "" }));
+        }
+    };
+
+    const handleBankFileChange = (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setFormData((prev) => {
+                    const updated = [...prev.bankAccounts];
+                    updated[index] = { ...updated[index], qrImage: reader.result as string };
+                    return { ...prev, bankAccounts: updated };
+                });
+            };
+            reader.readAsDataURL(file);
+        } else {
+            setFormData((prev) => {
+                const updated = [...prev.bankAccounts];
+                updated[index] = { ...updated[index], qrImage: "" };
+                return { ...prev, bankAccounts: updated };
+            });
         }
     };
 
@@ -475,6 +474,7 @@ const SupplierEdit: React.FC = () => {
                     ifscCode: "",
                     branchName: "",
                     upiMobileNumber: "",
+                    qrImage: "",
                 },
             ],
         }));
@@ -487,52 +487,67 @@ const SupplierEdit: React.FC = () => {
         }));
     };
 
-    const handleTempAddressChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-        const { name, value, type } = e.target;
+    const addShippingAddress = () => {
+        setAddresses(prev => [
+            ...prev,
+            {
+                address: {
+                    addressLine1: "",
+                    addressLine2: "",
+                    city: "",
+                    state: "",
+                    pincode: "",
+                }
+            }
+        ]);
+    };
 
-        if (type === "checkbox") {
-            const checked = (e.target as HTMLInputElement).checked;
-            setTempAddress(prev => ({ ...prev, [name]: checked }));
-        } else {
-            setTempAddress(prev => ({ ...prev, [name]: value }));
+    const handleShippingAddressChange = (index: number, field: string, value: string) => {
+        setAddresses(prev => {
+            const updated = [...prev];
+            updated[index] = {
+                ...updated[index],
+                address: {
+                    ...updated[index].address,
+                    [field]: value,
+                }
+            };
+            return updated;
+        });
+
+        // Also clear error if any
+        const errorKey = `addresses.${index}.address.${field}`;
+        if (errors[errorKey]) {
+            setErrors(prev => ({ ...prev, [errorKey]: "" }));
         }
     };
 
-    const addShippingAddress = () => {
-        if (!tempAddress.label || !tempAddress.addressLine1 || !tempAddress.city || !tempAddress.state || !tempAddress.pincode) {
-            toast.warning("Please fill all required shipping address fields");
-            return;
-        }
-
-        const newAddr: SupplierAddress = {
-            label: tempAddress.label,
-            isDefault: tempAddress.isDefault,
-            stateCode: tempAddress.stateCode,
-            address: {
-                addressLine1: tempAddress.addressLine1,
-                addressLine2: tempAddress.addressLine2 || null,
-                city: tempAddress.city,
-                state: tempAddress.state,
-                pincode: tempAddress.pincode,
-            }
-        };
-
-        if (newAddr.isDefault) {
-            setAddresses(prev => prev.map(a => ({ ...a, isDefault: false })).concat(newAddr));
-        } else {
-            setAddresses(prev => [...prev, newAddr]);
-        }
-
-        setTempAddress({
-            label: "",
-            addressLine1: "",
-            addressLine2: "",
-            city: "",
-            state: "",
-            pincode: "",
-            stateCode: "TN",
-            isDefault: false,
+    const toggleSameAsBilling = (index: number, isSame: boolean) => {
+        setAddresses(prev => {
+            const updated = [...prev];
+            updated[index] = {
+                ...updated[index],
+                address: {
+                    ...updated[index].address,
+                    addressLine1: isSame ? formData.billingAddressLine1 : "",
+                    city: isSame ? formData.billingAddressCity : "",
+                    state: isSame ? formData.billingAddressState : "",
+                    pincode: isSame ? formData.billingAddressPincode : "",
+                }
+            };
+            return updated;
         });
+
+        if (isSame) {
+            setErrors(prev => {
+                const newErrors = { ...prev };
+                delete newErrors[`addresses.${index}.address.addressLine1`];
+                delete newErrors[`addresses.${index}.address.city`];
+                delete newErrors[`addresses.${index}.address.state`];
+                delete newErrors[`addresses.${index}.address.pincode`];
+                return newErrors;
+            });
+        }
     };
 
     const removeShippingAddress = (index: number) => {
@@ -671,7 +686,7 @@ const SupplierEdit: React.FC = () => {
                                         onChange={handleChange}
                                     />
                                 </div>
-                                <div>
+                                {/* <div>
                                     <TextInput
                                         label="Created by-on"
                                         name="createdByOn"
@@ -681,7 +696,7 @@ const SupplierEdit: React.FC = () => {
                                         disabled
                                         error={errors.createdByOn}
                                     />
-                                </div>
+                                </div> */}
                             </div>
                         </div>
 
@@ -868,11 +883,10 @@ const SupplierEdit: React.FC = () => {
 
                                         stateValue={formData.billingAddressState}
                                         onStateChange={(v) => {
-                                            const gstCode = getGstStateCode(v);
                                             setFormData(prev => ({
-                                                ...prev, billingAddressState: v, billingAddressCity: "", stateCode: gstCode || prev.stateCode
+                                                ...prev, billingAddressState: v, billingAddressCity: ""
                                             }));
-                                            setErrors(prev => ({ ...prev, billingAddressState: "", billingAddressCity: "", stateCode: "" }));
+                                            setErrors(prev => ({ ...prev, billingAddressState: "", billingAddressCity: "" }));
                                         }}
                                         stateError={errors.billingAddressState}
 
@@ -891,6 +905,99 @@ const SupplierEdit: React.FC = () => {
                                 </div>
                             </div>
                         </div>
+
+                        {/* ADDITIONAL DELIVERY ADDRESSES */}
+                        <div>
+                            <div className="flex items-center justify-between mb-2">
+                                <h3 className="text-lg font-semibold text-slate-700">Additional Delivery / Plant Addresses</h3>
+                                <CustomButton
+                                    text="Add Address"
+                                    icon={FaPlus}
+                                    onClick={addShippingAddress}
+                                    type="button"
+                                />
+                            </div>
+                            <div className="bg-white border border-slate-200 p-4 rounded-xl mb-4 space-y-4">
+                                {addresses.length === 0 && (
+                                    <div className="text-center text-sm text-slate-500 py-4">No additional addresses added.</div>
+                                )}
+                                {(() => {
+                                    const isAnyAddressSameAsBilling = addresses.some((addr) =>
+                                        addr.address.addressLine1 === formData.billingAddressLine1 &&
+                                        addr.address.city === formData.billingAddressCity &&
+                                        addr.address.state === formData.billingAddressState &&
+                                        addr.address.pincode === formData.billingAddressPincode &&
+                                        !!formData.billingAddressLine1
+                                    );
+
+                                    return addresses.map((addr, index) => {
+                                        const isThisSameAsBilling = addr.address.addressLine1 === formData.billingAddressLine1 &&
+                                            addr.address.city === formData.billingAddressCity &&
+                                            addr.address.state === formData.billingAddressState &&
+                                            addr.address.pincode === formData.billingAddressPincode &&
+                                            !!formData.billingAddressLine1;
+
+                                        const showSameAsBillingCheckbox = isThisSameAsBilling || !isAnyAddressSameAsBilling;
+
+                                        return (
+                                            <div key={index} className="p-4 border border-slate-200 rounded-md bg-slate-50 relative">
+                                                <div className="flex items-center justify-between mb-3 border-b border-slate-200 pb-2">
+                                                    <h4 className="text-sm font-semibold text-slate-700 uppercase">Address {index + 1}</h4>
+
+                                                    <div className="flex items-center gap-4">
+                                                        {showSameAsBillingCheckbox && (
+                                                            <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer hover:text-slate-800">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                                                    checked={isThisSameAsBilling}
+                                                                    onChange={(e) => toggleSameAsBilling(index, e.target.checked)}
+                                                                />
+                                                                <span>Same as billing</span>
+                                                            </label>
+                                                        )}
+
+                                                        {addresses.length > 1 && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => removeShippingAddress(index)}
+                                                                className="text-red-500 hover:text-red-700 p-1.5 bg-red-50 rounded"
+                                                                title="Remove Address"
+                                                            >
+                                                                <FaTrash />
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <AddressForm
+                                                    addressValue={addr.address.addressLine1 || ""}
+                                                    onAddressChange={(v) => handleShippingAddressChange(index, "addressLine1", v)}
+                                                    addressError={errors[`addresses.${index}.address.addressLine1`]}
+
+                                                    stateValue={addr.address.state || ""}
+                                                    onStateChange={(v) => {
+                                                        handleShippingAddressChange(index, "state", v);
+                                                        handleShippingAddressChange(index, "city", "");
+                                                    }}
+                                                    stateError={errors[`addresses.${index}.address.state`]}
+
+                                                    cityValue={addr.address.city || ""}
+                                                    onCityChange={(v) => handleShippingAddressChange(index, "city", v)}
+                                                    cityError={errors[`addresses.${index}.address.city`]}
+
+                                                    pincodeValue={addr.address.pincode || ""}
+                                                    onPincodeChange={(v) => handleShippingAddressChange(index, "pincode", v)}
+                                                    pincodeError={errors[`addresses.${index}.address.pincode`]}
+                                                    required
+                                                />
+                                            </div>
+                                        );
+                                    })
+                                })()}
+
+                            </div>
+                        </div>
+
 
                         {/* COMMERCIAL TERMS */}
                         <div>
@@ -941,94 +1048,6 @@ const SupplierEdit: React.FC = () => {
                             </div>
                         </div>
 
-                        {/* ADDITIONAL DELIVERY ADDRESSES */}
-                        <div>
-                            <h3 className="text-lg font-semibold text-slate-700 mb-2">Additional Delivery / Plant Addresses</h3>
-                            <div className="bg-white border border-slate-200 p-4 rounded-xl mb-4">
-                                <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                                    <TextInput
-                                        label="Label (e.g. Chennai Plant)"
-                                        name="label"
-                                        value={tempAddress.label}
-                                        onChange={(e) => setTempAddress(prev => ({ ...prev, label: e.target.value }))}
-                                    />
-                                    <div className="md:col-span-2 lg:col-span-3">
-                                        <AddressForm
-                                            addressValue={tempAddress.addressLine1}
-                                            onAddressChange={(v) => setTempAddress(prev => ({ ...prev, addressLine1: v }))}
-
-                                            stateValue={tempAddress.state}
-                                            onStateChange={(v) => {
-                                                const gstCode = getGstStateCode(v);
-                                                setTempAddress(prev => ({ ...prev, state: v, city: "", stateCode: gstCode || prev.stateCode }));
-                                            }}
-
-                                            cityValue={tempAddress.city}
-                                            onCityChange={(v) => setTempAddress(prev => ({ ...prev, city: v }))}
-
-                                            pincodeValue={tempAddress.pincode}
-                                            onPincodeChange={(v) => setTempAddress(prev => ({ ...prev, pincode: v }))}
-                                        />
-                                    </div>
-                                    <div className="flex items-center justify-between col-span-full mt-2">
-                                        <label className="flex items-center gap-2 text-sm font-semibold text-slate-700 cursor-pointer">
-                                            <input
-                                                type="checkbox"
-                                                name="isDefault"
-                                                checked={tempAddress.isDefault}
-                                                onChange={(e) => setTempAddress(prev => ({ ...prev, isDefault: e.target.checked }))}
-                                                className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary"
-                                            />
-                                            Set as Default
-                                        </label>
-                                        <CustomButton
-                                            text="Add Address"
-                                            icon={FaPlus}
-                                            onClick={addShippingAddress}
-                                            type="button"
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Plant Addresses List Table */}
-                            {addresses.length > 0 && (
-                                <div className="border border-slate-200 rounded-md overflow-hidden">
-                                    <table className="w-full text-sm text-left">
-                                        <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
-                                            <tr>
-                                                <th className="px-4 py-2">Label</th>
-                                                <th className="px-4 py-2">Address</th>
-                                                <th className="px-4 py-2">State Code</th>
-                                                <th className="px-4 py-2">Default</th>
-                                                <th className="px-4 py-2 text-center" style={{ width: "80px" }}>Actions</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-slate-200">
-                                            {addresses.map((addr, idx) => (
-                                                <tr key={idx} className="bg-white">
-                                                    <td className="px-4 py-2 font-medium">{addr.label}</td>
-                                                    <td className="px-4 py-2">{`${addr.address.addressLine1}, ${addr.address.addressLine2 || ""}, ${addr.address.city}, ${addr.address.state} - ${addr.address.pincode}`}</td>
-                                                    <td className="px-4 py-2">{addr.stateCode}</td>
-                                                    <td className="px-4 py-2">
-                                                        {addr.isDefault ? <span className="text-green-600 font-semibold">Yes</span> : "No"}
-                                                    </td>
-                                                    <td className="px-4 py-2 text-center">
-                                                        <button
-                                                            type="button"
-                                                            className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
-                                                            onClick={() => removeShippingAddress(idx)}
-                                                        >
-                                                            <FaTrash />
-                                                        </button>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            )}
-                        </div>
 
                         {/* BANK DETAILS */}
                         <div>
@@ -1053,7 +1072,7 @@ const SupplierEdit: React.FC = () => {
                                         )}
                                         <h6 className="font-bold text-slate-600 mb-2">Bank #{index + 1}</h6>
 
-                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
                                             <TextInput
                                                 label="Account Holder Name"
                                                 name="bankHolderName"
@@ -1092,10 +1111,17 @@ const SupplierEdit: React.FC = () => {
                                             <IndiaPhoneInput
                                                 label="GPay / PhonePe Number"
                                                 name="upiMobileNumber"
-                                                value={bank.upiMobileNumber}
+                                                value={bank.upiMobileNumber || ""}
                                                 placeholder="9876543210"
                                                 onChange={(e) => handleBankChange(index, e as React.ChangeEvent<HTMLInputElement>)}
                                                 error={errors[`bankAccounts.${index}.upiMobileNumber`]}
+                                                required
+                                            />
+                                            <FileUpload
+                                                label="Upload QR Image"
+                                                name="qrImage"
+                                                onChange={(e) => handleBankFileChange(index, e)}
+                                                previewUrl={bank.qrImage}
                                             />
                                         </div>
                                     </div>

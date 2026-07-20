@@ -424,11 +424,11 @@ model Supplier {
 
 model SupplierAddress {
   id         String   @id @default(uuid()) @map("id")
-  label      String   @map("label") @db.VarChar(40)
-  isDefault  Boolean  @default(false) @map("is_default")
   address    Json     @map("address")
-  stateCode  String   @map("state_code") @db.VarChar(2)
   supplierId Int      @map("supplier_id")
+  is_default Boolean  @default(false)
+  label      String   @db.VarChar(40)
+  state_code String   @db.VarChar(50)
   supplier   Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
 
   @@map("supplier_addresses")
@@ -819,6 +819,7 @@ model BillOfMaterial {
   productId        BigInt      @map("product_id")
   rawMaterialId    String      @map("raw_material_id") @db.VarChar(20)
   requiredQuantity Decimal     @map("required_quantity") @db.Decimal(12, 3)
+  percentage       Decimal?    @map("percentage") @db.Decimal(5, 2)
   uom              String?     @map("uom") @db.VarChar(10)
   remarks          String?     @db.VarChar(255)
   createdAt        DateTime    @default(now()) @map("created_at")

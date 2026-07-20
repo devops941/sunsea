@@ -8,10 +8,7 @@ export interface Address {
 
 export interface SupplierAddress {
   id?: string;
-  label: string;
-  isDefault: boolean;
   address: Address;
-  stateCode: string;
 }
 
 export interface Supplier {
