@@ -71,7 +71,7 @@ const productionOrderSchema = z.object({
     products: z.array(z.object({
         productItemId: z.string().min(1, "Product is required"),
         targetQty: z.number().min(0.01, "Target Quantity must be > 0"),
-        damageQty: z.number().min(0, "Damage Quantity must be >= 0").optional().default(100),
+        damageQty: z.number().min(0, "Damage Quantity must be >= 0").optional().default(0),
         uom: z.string().min(1, "UOM is required"),
         sourceSalesOrderLineId: z.string().optional(),
         rawMaterials: z
@@ -127,7 +127,7 @@ const defaultValues: ProductionOrderFormValues = {
     id: undefined,
     sourceSalesOrderId: "",
     sourceSalesOrderLineId: "",
-    products: [{ productItemId: "", targetQty: 0, damageQty: 100, uom: "PCS", sourceSalesOrderLineId: "", rawMaterials: [{ rawMaterialId: "", requiredQty: "", uom: "", storeId: "", remarks: "" }], colorType: "sc" }],
+    products: [{ productItemId: "", targetQty: 0, damageQty: 0, uom: "PCS", sourceSalesOrderLineId: "", rawMaterials: [{ rawMaterialId: "", requiredQty: "", uom: "", storeId: "", remarks: "" }], colorType: "sc" }],
     productionOrderId: "",
     orderDate: today,
     dueDate: nextWeek,
@@ -646,7 +646,7 @@ const ProductionOrderCreate: React.FC = () => {
             setSelectedSalesOrder(null);
             setSelectedSalesOrderItems([]);
             setValue("sourceSalesOrderLineId", "");
-            setValue("products", [{ productItemId: "", targetQty: 0, damageQty: 100, uom: "PCS", rawMaterials: [{ rawMaterialId: "", requiredQty: "", uom: "", storeId: "", remarks: "" }] }]);
+            setValue("products", [{ productItemId: "", targetQty: 0, damageQty: 0, uom: "PCS", rawMaterials: [{ rawMaterialId: "", requiredQty: "", uom: "", storeId: "", remarks: "" }] }]);
             return;
         }
 
@@ -664,8 +664,8 @@ const ProductionOrderCreate: React.FC = () => {
                             const targetQty = Number(item.quantity) || 0;
                             return {
                                 productItemId: item.productId?.toString() || "",
-                                targetQty: targetQty,
-                                damageQty: 100,
+                                targetQty: item.quantity ? Number(item.quantity) : 0,
+                                damageQty: 0,
                                 uom: item.product?.uom?.name || "PCS",
                                 sourceSalesOrderLineId: item.id?.toString() || "",
                                 rawMaterials: [{ rawMaterialId: "", requiredQty: "", uom: "", storeId: "", remarks: "" }],
@@ -707,7 +707,7 @@ const ProductionOrderCreate: React.FC = () => {
         fetchSODetails();
     }, [watchSalesOrderId, setValue, getValues, isEditMode]);
 
-    // â”€â”€ Recalculate Raw Material Required Qty when Target Qty/Damage Qty changes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Recalculate Raw Material Required Qty when Target Qty/Damage Qty changes ──────────────────
     const [initialTargetQtyLoaded, setInitialTargetQtyLoaded] = useState(false);
     const lastCalculatedProductStates = React.useRef<Record<number, string>>({});
     useEffect(() => {
@@ -722,11 +722,9 @@ const ProductionOrderCreate: React.FC = () => {
                 if (!prod.productItemId) return;
                 const targetQty = Number(prod.targetQty) || 0;
 
-                // Do not auto-calculate or add raw materials until a target quantity is entered
-                if (targetQty === 0) return;
-
+                // Allow auto-fill even when target quantity is 0 (it will just show 0 or base damageQty required)
                 const product = products.find(p => p.id?.toString() === prod.productItemId);
-                const damageQty = prod.damageQty !== undefined ? Number(prod.damageQty) : 100;
+                const damageQty = prod.damageQty !== undefined ? Number(prod.damageQty) : 0;
                 const totalQty = targetQty + damageQty;
 
                 // Create a state key based on product ID and quantities
@@ -740,16 +738,22 @@ const ProductionOrderCreate: React.FC = () => {
                 // Update the ref to the current state
                 lastCalculatedProductStates.current[pIdx] = currentStateKey;
 
-                const bom = boms.find(b => Number(b.productId) === Number(prod.productItemId));
                 const currentRms = getValues(`products.${pIdx}.rawMaterials`) || [];
+                const productBoms = product?.billOfMaterials || [];
 
-                if (bom && bom.items && bom.items.length > 0) {
-                    const expectedRms = bom.items.map((bomItem: any) => {
-                        const reqQty = totalQty * (Number(bomItem.requiredQuantity) || 0);
+                if (productBoms && productBoms.length > 0) {
+                    const weight = product ? (Number(product.weightPerPiece) || 0) : 0;
+                    const totalWeight = totalQty * weight;
+                    
+                    const expectedRms = productBoms.map((bomItem: any) => {
+                        const rawPercentage = Number(bomItem.percentage);
+                        const percentageToUse = rawPercentage > 0 ? rawPercentage : 100;
+                        const reqQty = totalWeight * (percentageToUse / 100);
                         return {
                             rawMaterialId: bomItem.rawMaterialId?.toString() || "",
                             requiredQty: String(reqQty.toFixed(3)),
-                            uom: bomItem.uom || "KG",
+                            uom: bomItem.rawMaterial?.baseUom || "KG",
+                            storeId: bomItem.rawMaterial?.storeId?.toString() || "",
                             remarks: ""
                         };
                     });
@@ -758,11 +762,14 @@ const ProductionOrderCreate: React.FC = () => {
                     const newRms = [...currentRms];
                     expectedRms.forEach((expected: any, idx: number) => {
                         if (newRms[idx]) {
-                            if (newRms[idx].requiredQty !== expected.requiredQty || newRms[idx].remarks !== expected.remarks || newRms[idx].rawMaterialId !== expected.rawMaterialId) {
+                            if (newRms[idx].requiredQty !== expected.requiredQty || newRms[idx].remarks !== expected.remarks || newRms[idx].rawMaterialId !== expected.rawMaterialId || newRms[idx].storeId !== expected.storeId) {
                                 setValue(`products.${pIdx}.rawMaterials.${idx}.requiredQty`, expected.requiredQty);
                                 setValue(`products.${pIdx}.rawMaterials.${idx}.remarks`, expected.remarks);
-                                if (!newRms[idx].rawMaterialId) {
+                                if (newRms[idx].rawMaterialId !== expected.rawMaterialId) {
                                     setValue(`products.${pIdx}.rawMaterials.${idx}.rawMaterialId`, expected.rawMaterialId);
+                                }
+                                if (newRms[idx].storeId !== expected.storeId) {
+                                    setValue(`products.${pIdx}.rawMaterials.${idx}.storeId`, expected.storeId);
                                 }
                                 updated = true;
                             }
@@ -771,7 +778,7 @@ const ProductionOrderCreate: React.FC = () => {
                                 rawMaterialId: expected.rawMaterialId,
                                 requiredQty: expected.requiredQty,
                                 uom: expected.uom,
-                                storeId: "",
+                                storeId: expected.storeId,
                                 remarks: expected.remarks
                             });
                             updated = true;
@@ -866,7 +873,7 @@ const ProductionOrderCreate: React.FC = () => {
                         products: (fullOrder as any).products ? (fullOrder as any).products.map((p: any) => ({
                             productItemId: p.productItemId?.toString() || p.productId?.toString() || "",
                             targetQty: Number(p.targetQty || p.quantity || 0),
-                            damageQty: Number((fullOrder as any).damageQty) || 100,
+                            damageQty: Number((fullOrder as any).damageQty) || 0,
                             uom: fullOrder.uom || "PCS",
                             sourceSalesOrderLineId: fullOrder.sourceSalesOrderLineId || "",
                             rawMaterials: rmRows,
@@ -874,7 +881,7 @@ const ProductionOrderCreate: React.FC = () => {
                         })) : [{
                             productItemId: fullOrder.productItemId?.toString() || "",
                             targetQty: Number(fullOrder.targetQty) || 0,
-                            damageQty: Number((fullOrder as any).damageQty) || 100,
+                            damageQty: Number((fullOrder as any).damageQty) || 0,
                             uom: fullOrder.uom || "PCS",
                             sourceSalesOrderLineId: fullOrder.sourceSalesOrderLineId || "",
                             rawMaterials: rmRows,
@@ -896,7 +903,7 @@ const ProductionOrderCreate: React.FC = () => {
                 ...defaultValues,
                 sourceSalesOrderId:
                     (location.state as any)?.sourceSalesOrderId?.toString() || "",
-                products: [{ productItemId: "", targetQty: 0, damageQty: 100, uom: "PCS", rawMaterials: [{ rawMaterialId: "", requiredQty: "", uom: "", storeId: "", remarks: "" }], colorType: "sc" }],
+                products: [{ productItemId: "", targetQty: 0, damageQty: 0, uom: "PCS", rawMaterials: [{ rawMaterialId: "", requiredQty: "", uom: "", storeId: "", remarks: "" }], colorType: "sc" }],
             });
 
             productionOrderService
@@ -942,7 +949,7 @@ const ProductionOrderCreate: React.FC = () => {
                     remarks: data.remarks || null,
                     productItemId: data.products?.[0]?.productItemId || "",
                     targetQty: data.products?.[0]?.targetQty || 0,
-                    damageQty: data.products?.[0]?.damageQty !== undefined ? Number(data.products[0].damageQty) : 100,
+                    damageQty: data.products?.[0]?.damageQty !== undefined ? Number(data.products[0].damageQty) : 0,
                     uom: data.products?.[0]?.uom || "PCS",
                     colorType: data.products?.[0]?.colorType || "sc",
                     rawMaterials: (data.products?.[0]?.rawMaterials ?? []).map((rm) => ({
@@ -981,7 +988,7 @@ const ProductionOrderCreate: React.FC = () => {
                         remarks: data.remarks || null,
                         productItemId: prod.productItemId,
                         targetQty: prod.targetQty,
-                        damageQty: prod.damageQty !== undefined ? Number(prod.damageQty) : 100,
+                        damageQty: prod.damageQty !== undefined ? Number(prod.damageQty) : 0,
                         uom: prod.uom,
                         colorType: prod.colorType || "sc",
                         rawMaterials: productRawMaterials,
@@ -1122,7 +1129,7 @@ const ProductionOrderCreate: React.FC = () => {
                                         text="Add Production"
                                         icon={FaPlus}
                                         type="button"
-                                        onClick={() => appendProduct({ productItemId: "", targetQty: 0, damageQty: 100, uom: "PCS", rawMaterials: [{ rawMaterialId: "", requiredQty: "", uom: "", storeId: "", remarks: "" }] })}
+                                        onClick={() => appendProduct({ productItemId: "", targetQty: 0, damageQty: 0, uom: "PCS", rawMaterials: [{ rawMaterialId: "", requiredQty: "", uom: "", storeId: "", remarks: "" }] })}
                                     />
                                 )}
                             </div>

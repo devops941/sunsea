@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { FaSave, FaImage, FaTimes } from "react-icons/fa";
+import { FaSave, FaImage, FaTimes, FaPlus } from "react-icons/fa";
 import { toast } from "react-toastify";
 import TextInput from "../../../components/form/TextInput/TextInput";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
@@ -14,6 +14,7 @@ import { useSizes } from "../../../hooks/useSizes";
 import QuantityInput from "../../../components/form/QuantityInput/QuantityInput";
 import { productService } from "../../../services/productService";
 import { storeService } from "../../../services/storeService";
+import { rawMaterialService } from "../../../services/rawMaterialService";
 import { getImageUrl } from "../../../utils/ImageUrls";
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
 import { fetchGstTaxes, selectActiveGstTaxes } from "../../../features/gst/gstSlice";
@@ -113,6 +114,11 @@ const ProductEdit: React.FC = () => {
 
     const [colorTypePricing, setColorTypePricing] = useState<ColorTypePriceRow[]>([]);
 
+    // ✅ Raw Materials Composition
+    type RawMaterialRow = { rawMaterialId: string; percentage: string; };
+    const [rawMaterials, setRawMaterials] = useState<RawMaterialRow[]>([]);
+    const [rawMaterialOptions, setRawMaterialOptions] = useState<{value: string, label: string}[]>([]);
+
     // Load dropdowns
     useEffect(() => {
         loadCategories({ isActive: true });
@@ -132,6 +138,12 @@ const ProductEdit: React.FC = () => {
                         openingStockStoreId: prev.openingStockStoreId || (fgStore ? fgStore.storeId : data[0].storeId)
                     }));
                 }
+            }).catch(() => {});
+
+        rawMaterialService.fetchAll({})
+            .then((res: any) => {
+                const data = Array.isArray(res?.rawMaterials) ? res.rawMaterials : Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
+                setRawMaterialOptions(data.map((rm: any) => ({ value: String(rm.rawMaterialId), label: rm.materialName })));
             }).catch(() => {});
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -191,6 +203,15 @@ const ProductEdit: React.FC = () => {
         }));
 
         setColorTypePricing(buildInitialColorTypePricing(productData));
+
+        if (productData.billOfMaterials) {
+            setRawMaterials(productData.billOfMaterials.map((bom: any) => ({
+                rawMaterialId: bom.rawMaterialId,
+                percentage: bom.percentage ? String(bom.percentage) : ""
+            })));
+        } else {
+            setRawMaterials([]);
+        }
 
         const images: ExistingProductImage[] = (productData.images || []).slice();
         images.sort((a: any, b: any) => (b.isPrimary ? 1 : 0) - (a.isPrimary ? 1 : 0));
@@ -313,7 +334,6 @@ const ProductEdit: React.FC = () => {
                     newErrors[`${prefix}.b2c`] = "Must be > 0";
             }
 
-            // Export
             if (!row.exportPrice) {
                 newErrors[`${prefix}.exportPrice`] = "Required";
             } else {
@@ -322,6 +342,18 @@ const ProductEdit: React.FC = () => {
                     newErrors[`${prefix}.exportPrice`] = "Must be > 0";
             }
         });
+
+        if (rawMaterials.length > 0) {
+            const totalPercent = rawMaterials.reduce((acc, rm) => acc + Number(rm.percentage), 0);
+            if (Math.abs(totalPercent - 100) > 0.01) {
+                newErrors.rawMaterials = "Total percentage must be exactly 100%";
+                toast.error("Total Raw Material percentage must be 100%");
+            }
+            rawMaterials.forEach((rm, index) => {
+                if (!rm.rawMaterialId) newErrors[`rawMaterials.${index}.rawMaterialId`] = "Required";
+                if (!rm.percentage || Number(rm.percentage) <= 0) newErrors[`rawMaterials.${index}.percentage`] = "Invalid %";
+            });
+        }
 
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
@@ -354,6 +386,25 @@ const ProductEdit: React.FC = () => {
         const errorKey = `colorTypePricing.${typeId}.${field}`;
         if (errors[errorKey]) {
             setErrors((prev) => ({ ...prev, [errorKey]: "" }));
+        }
+    };
+
+    const handleAddRawMaterial = () => {
+        setRawMaterials(prev => [...prev, { rawMaterialId: "", percentage: "" }]);
+    };
+
+    const handleRemoveRawMaterial = (index: number) => {
+        setRawMaterials(prev => prev.filter((_, i) => i !== index));
+    };
+
+    const handleRawMaterialChange = (index: number, field: keyof RawMaterialRow, value: string) => {
+        setRawMaterials(prev => {
+            const newRm = [...prev];
+            newRm[index] = { ...newRm[index], [field]: value };
+            return newRm;
+        });
+        if (errors[`rawMaterials.${index}.${field}`] || errors.rawMaterials) {
+            setErrors(prev => ({ ...prev, [`rawMaterials.${index}.${field}`]: "", rawMaterials: "" }));
         }
     };
 
@@ -463,6 +514,17 @@ const ProductEdit: React.FC = () => {
                     }))
                 )
             );
+
+            if (rawMaterials.length > 0) {
+                payload.append("rawMaterials", JSON.stringify(
+                    rawMaterials.map(rm => ({
+                        rawMaterialId: rm.rawMaterialId,
+                        percentage: Number(rm.percentage)
+                    }))
+                ));
+            } else {
+                payload.append("rawMaterials", "[]");
+            }
 
             // Images
             newImageFiles.forEach((file) => payload.append("images", file));
@@ -891,6 +953,80 @@ const ProductEdit: React.FC = () => {
                                         </tbody>
                                     </table>
                                 </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Raw Materials Composition */}
+                    <div className="pt-2">
+                        <div className="flex justify-between items-center mb-3">
+                            <h6 className="text-base font-semibold text-gray-800 m-0">Raw Materials Composition (BOM)</h6>
+                            <button
+                                type="button"
+                                onClick={handleAddRawMaterial}
+                                className="text-xs bg-indigo-50 text-indigo-600 hover:bg-indigo-100 px-3 py-1.5 rounded-lg font-medium transition-colors border border-indigo-100 flex items-center gap-1"
+                            >
+                                <FaPlus size={10} /> Add Raw Material
+                            </button>
+                        </div>
+                        {rawMaterials.length > 0 ? (
+                            <div className="border border-slate-200 rounded-xl overflow-hidden">
+                                <table className="w-full text-left text-sm whitespace-nowrap">
+                                    <thead className="bg-slate-50 text-slate-600">
+                                        <tr>
+                                            <th className="px-4 py-3 font-semibold border-b border-slate-200 w-[60%]">Raw Material</th>
+                                            <th className="px-4 py-3 font-semibold border-b border-slate-200 w-[30%]">Percentage (%)</th>
+                                            <th className="px-4 py-3 font-semibold border-b border-slate-200 w-[10%] text-center">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {rawMaterials.map((rm, idx) => (
+                                            <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
+                                                <td className="px-4 py-3 align-top">
+                                                    <SelectInput
+                                                        label=""
+                                                        name={`rm-${idx}`}
+                                                        value={rm.rawMaterialId}
+                                                        options={[{ value: "", label: "-- Select --" }, ...rawMaterialOptions]}
+                                                        onChange={(e) => handleRawMaterialChange(idx, "rawMaterialId", e.target.value)}
+                                                        error={errors[`rawMaterials.${idx}.rawMaterialId`]}
+                                                    />
+                                                </td>
+                                                <td className="px-4 py-3 align-top">
+                                                    <TextInput
+                                                        label=""
+                                                        name={`percent-${idx}`}
+                                                        type="number"
+                                                        step="0.01"
+                                                        value={rm.percentage}
+                                                        placeholder="0.00"
+                                                        onChange={(e) => handleRawMaterialChange(idx, "percentage", e.target.value)}
+                                                        error={errors[`rawMaterials.${idx}.percentage`]}
+                                                    />
+                                                </td>
+                                                <td className="px-4 py-3 align-top text-center">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleRemoveRawMaterial(idx)}
+                                                        className="text-red-500 hover:text-red-700 p-2"
+                                                        title="Remove"
+                                                    >
+                                                        <FaTimes size={14} />
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                                {errors.rawMaterials && (
+                                    <div className="px-4 py-2 bg-red-50 text-red-600 text-sm font-medium border-t border-slate-200">
+                                        {errors.rawMaterials}
+                                    </div>
+                                )}
+                            </div>
+                        ) : (
+                            <div className="text-sm text-slate-500 italic bg-slate-50 p-4 rounded-xl border border-dashed border-slate-200 text-center">
+                                No raw materials added. Click "Add Raw Material" to specify the composition.
                             </div>
                         )}
                     </div>
