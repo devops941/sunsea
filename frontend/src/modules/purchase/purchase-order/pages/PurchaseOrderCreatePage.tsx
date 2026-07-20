@@ -38,11 +38,13 @@ const initialFormData = {
   createdByOn: "",
 
   billingAddressLine1: "",
+  billingCountry: "India",
   billingCity: "",
   billingState: "",
   billingPincode: "",
   sameAsBilling: false,
   shippingAddressLine1: "",
+  shippingCountry: "India",
   shippingCity: "",
   shippingState: "",
   shippingPincode: "",
@@ -684,10 +686,12 @@ const PurchaseOrderCreatePage: React.FC = () => {
         supplierId: formData.supplierId,
 
         billingAddressLine1: formData.billingAddressLine1,
+        billingCountry: formData.billingCountry || "India",
         billingCity: formData.billingCity,
         billingState: formData.billingState,
         billingPincode: formData.billingPincode,
         shippingAddressLine1: formData.shippingAddressLine1,
+        shippingCountry: formData.shippingCountry || "India",
         shippingCity: formData.shippingCity,
         shippingState: formData.shippingState,
         shippingPincode: formData.shippingPincode,
@@ -831,6 +835,9 @@ const PurchaseOrderCreatePage: React.FC = () => {
                 addressValue={formData.billingAddressLine1 || ""}
                 onAddressChange={(val) => setFormData(prev => ({ ...prev, billingAddressLine1: val }))}
                 addressError={errors.billingAddressLine1}
+                countryValue={formData.billingCountry || "India"}
+                onCountryChange={(val) => setFormData(prev => ({ ...prev, billingCountry: val, ...(prev.sameAsBilling && { shippingCountry: val }) }))}
+                countryError={errors.billingCountry}
                 stateValue={formData.billingState || ""}
                 onStateChange={handleBillingStateChange}
                 stateError={errors.billingState}
@@ -855,6 +862,9 @@ const PurchaseOrderCreatePage: React.FC = () => {
                 addressValue={formData.shippingAddressLine1 || ""}
                 onAddressChange={(val) => setFormData(prev => ({ ...prev, shippingAddressLine1: val }))}
                 addressError={errors.shippingAddressLine1}
+                countryValue={formData.shippingCountry || "India"}
+                onCountryChange={(val) => setFormData(prev => ({ ...prev, shippingCountry: val }))}
+                countryError={errors.shippingCountry}
                 stateValue={formData.shippingState || ""}
                 onStateChange={handleShippingStateChange}
                 stateError={errors.shippingState}

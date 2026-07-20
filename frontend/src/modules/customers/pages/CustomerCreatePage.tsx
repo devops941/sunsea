@@ -63,6 +63,7 @@ const CustomerCreatePage: React.FC = () => {
     stateCode: "",
 
     billingAddressLine1: "",
+    billingAddressCountry: "",
     billingAddressCity: "",
     billingAddressState: "",
     billingAddressPincode: "",
@@ -70,6 +71,7 @@ const CustomerCreatePage: React.FC = () => {
     sameAsBilling: false,
 
     shippingAddressLine1: "",
+    shippingAddressCountry: "",
     shippingAddressCity: "",
     shippingAddressState: "",
     shippingAddressPincode: "",
@@ -160,19 +162,21 @@ const CustomerCreatePage: React.FC = () => {
         ...(checked
           ? {
             shippingAddressLine1: prev.billingAddressLine1,
+            shippingAddressCountry: prev.billingAddressCountry,
             shippingAddressCity: prev.billingAddressCity,
             shippingAddressState: prev.billingAddressState,
             shippingAddressPincode: prev.billingAddressPincode,
           }
           : {
             shippingAddressLine1: "",
+            shippingAddressCountry: "",
             shippingAddressCity: "",
             shippingAddressState: "",
             shippingAddressPincode: "",
           }),
       }));
       setShippingResetKey((k) => k + 1);
-      setErrors((prev) => ({ ...prev, shippingAddressLine1: "", shippingAddressCity: "", shippingAddressState: "", shippingAddressPincode: "", sameAsBilling: "" }));
+      setErrors((prev) => ({ ...prev, shippingAddressLine1: "", shippingAddressCountry: "", shippingAddressCity: "", shippingAddressState: "", shippingAddressPincode: "", sameAsBilling: "" }));
       return;
     }
 
@@ -245,12 +249,13 @@ const CustomerCreatePage: React.FC = () => {
       setFormData((prev) => ({
         ...prev,
         shippingAddressLine1: prev.billingAddressLine1,
+        shippingAddressCountry: prev.billingAddressCountry,
         shippingAddressCity: prev.billingAddressCity,
         shippingAddressState: prev.billingAddressState,
         shippingAddressPincode: prev.billingAddressPincode,
       }));
     }
-  }, [formData.billingAddressLine1, formData.billingAddressCity, formData.billingAddressState, formData.billingAddressPincode, formData.sameAsBilling]);
+  }, [formData.billingAddressLine1, formData.billingAddressCountry, formData.billingAddressCity, formData.billingAddressState, formData.billingAddressPincode, formData.sameAsBilling]);
 
   const handleClear = () => {
     setFormData(initialFormData);
@@ -308,10 +313,12 @@ const CustomerCreatePage: React.FC = () => {
         gstin: formData.gstin,
         stateCode: formData.stateCode,
         billingAddressLine1: formData.billingAddressLine1,
+        billingCountry: formData.billingAddressCountry || "India",
         billingCity: formData.billingAddressCity,
         billingState: formData.billingAddressState,
         billingPincode: formData.billingAddressPincode,
         shippingAddressLine1: formData.shippingAddressLine1,
+        shippingCountry: formData.shippingAddressCountry || "India",
         shippingCity: formData.shippingAddressCity,
         shippingState: formData.shippingAddressState,
         shippingPincode: formData.shippingAddressPincode,
@@ -449,6 +456,19 @@ const CustomerCreatePage: React.FC = () => {
                     onAddressChange={(v) => handleChange({ target: { name: "billingAddressLine1", value: v } })}
                     addressError={errors.billingAddressLine1}
 
+                    countryValue={formData.billingAddressCountry}
+                    onCountryChange={(v) => {
+                      setFormData(prev => ({
+                        ...prev,
+                        billingAddressCountry: v,
+                        billingAddressState: "",
+                        billingAddressCity: "",
+                        ...(prev.sameAsBilling && { shippingAddressCountry: v, shippingAddressState: "", shippingAddressCity: "" })
+                      }));
+                      setErrors(prev => ({ ...prev, billingAddressCountry: "", billingAddressState: "", billingAddressCity: "" }));
+                    }}
+                    countryError={errors.billingAddressCountry}
+
                     stateValue={formData.billingAddressState}
                     onStateChange={(v) => {
                       const gstCode = getGstStateCode(v);
@@ -494,6 +514,13 @@ const CustomerCreatePage: React.FC = () => {
                     addressValue={formData.shippingAddressLine1}
                     onAddressChange={(v) => handleChange({ target: { name: "shippingAddressLine1", value: v } })}
                     addressError={errors.shippingAddressLine1}
+
+                    countryValue={formData.shippingAddressCountry}
+                    onCountryChange={(v) => {
+                      setFormData(prev => ({ ...prev, shippingAddressCountry: v, shippingAddressState: "", shippingAddressCity: "" }));
+                      setErrors(prev => ({ ...prev, shippingAddressCountry: "", shippingAddressState: "", shippingAddressCity: "" }));
+                    }}
+                    countryError={errors.shippingAddressCountry}
 
                     stateValue={formData.shippingAddressState}
                     onStateChange={(v) => {

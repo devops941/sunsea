@@ -169,7 +169,7 @@ const InvoiceDetail = lazy(() => import("../modules/purchase/purchase-order/upco
 const SalesInvoiceForm = lazy(() => import("../modules/sales-order-invoice/SalesInvoiceCreate"));
 // profile
 const ProfilePage = lazy(() => import("../modules/profile/ProfilePage"));
-const Settings = lazy(() => import("../modules/settings/Setting"))
+const Settings = lazy(() => import("../modules/settings/Setting"));
 
 const LoadingFallback = () => <CommonLoader text="Loading..." image={logo} />;
 
@@ -413,6 +413,10 @@ const AppRoutes = () => {
             {/* Stock Adjustments */}
             <Route element={<ProtectedRoute permission="raw_material_stocks.view" />}>
               <Route path="/inventory/stock-adjustments" element={<InventoryTabs />} />
+            </Route>
+            {/* EOD Stock */}
+            <Route element={<ProtectedRoute permission="raw_material_stocks.view" />}>
+              <Route path="/inventory/eod-stock" element={<InventoryTabs />} />
             </Route>
             {/* Stock Adjustments Create Route */}
             <Route element={<ProtectedRoute permission="raw_material_stocks.create" />}>

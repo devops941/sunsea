@@ -20,10 +20,12 @@ export interface Customer {
   billingCity: string;
   billingState: string;
   billingPincode: string;
+  billingCountry?: string | null;
   shippingAddressLine1?: string | null;
   shippingCity?: string | null;
   shippingState?: string | null;
   shippingPincode?: string | null;
+  shippingCountry?: string | null;
   stateCode?: string;
   creditLimit?: number | string | null;
   creditDays?: number | null;
@@ -63,10 +65,12 @@ export interface CreateCustomerDto {
   billingCity: string;
   billingState: string;
   billingPincode: string;
+  billingCountry?: string;
   shippingAddressLine1?: string;
   shippingCity?: string;
   shippingState?: string;
   shippingPincode?: string;
+  shippingCountry?: string;
   creditLimit?: number;
   creditDays?: number;
   priceList?: string;
@@ -97,10 +101,12 @@ export interface UpdateCustomerDto {
   billingCity?: string;
   billingState?: string;
   billingPincode?: string;
+  billingCountry?: string;
   shippingAddressLine1?: string;
   shippingCity?: string;
   shippingState?: string;
   shippingPincode?: string;
+  shippingCountry?: string;
   creditLimit?: number;
   creditDays?: number;
   priceList?: string;

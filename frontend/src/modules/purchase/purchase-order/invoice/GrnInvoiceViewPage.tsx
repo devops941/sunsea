@@ -296,7 +296,7 @@ const GrnInvoiceViewPage: React.FC = () => {
                                             {selectedItem.billingAddressLine1} <br />
                                             {(selectedItem.billingCity || selectedItem.billingState) && (
                                                 <>
-                                                    {selectedItem.billingCity}, {selectedItem.billingState} — {selectedItem.billingPincode} <br />
+                                                    {selectedItem.billingCity}, {selectedItem.billingState} — {selectedItem.billingPincode}{selectedItem.billingCountry ? `, ${selectedItem.billingCountry}` : ""} <br />
                                                 </>
                                             )}
                                             {selectedItem.supplier?.phone && `Phone: ${selectedItem.supplier.phone}`}
@@ -314,7 +314,7 @@ const GrnInvoiceViewPage: React.FC = () => {
                                             {selectedItem.shippingAddressLine1 || "Same as Billing Address"} <br />
                                             {(selectedItem.shippingCity || selectedItem.shippingState) && (
                                                 <>
-                                                    {selectedItem.shippingCity}, {selectedItem.shippingState} — {selectedItem.shippingPincode}
+                                                    {selectedItem.shippingCity}, {selectedItem.shippingState} — {selectedItem.shippingPincode}{selectedItem.shippingCountry ? `, ${selectedItem.shippingCountry}` : ""}
                                                 </>
                                             )}
                                         </div>

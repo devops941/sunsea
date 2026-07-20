@@ -237,6 +237,7 @@ model Customer {
   billingCity          String                   @db.VarChar(100)
   billingState         String                   @db.VarChar(100)
   billingPincode       String                   @db.VarChar(20)
+  billingCountry       String?                  @default("India") @db.VarChar(100)
   collectionAgentId    BigInt?
   companyId            String                   @db.Uuid
   creditDays           Int                      @default(0)
@@ -256,6 +257,7 @@ model Customer {
   shippingCity         String?                  @db.VarChar(100)
   shippingState        String?                  @db.VarChar(100)
   shippingPincode      String?                  @db.VarChar(20)
+  shippingCountry      String?                  @default("India") @db.VarChar(100)
   stateCode            String                   @db.VarChar(2)
   status               String                   @default("Active") @db.VarChar(20)
   tcsRate              Decimal                  @default(0) @db.Decimal(5, 2)
@@ -819,7 +821,7 @@ model BillOfMaterial {
   productId        BigInt      @map("product_id")
   rawMaterialId    String      @map("raw_material_id") @db.VarChar(20)
   requiredQuantity Decimal     @map("required_quantity") @db.Decimal(12, 3)
-  percentage       Decimal?    @map("percentage") @db.Decimal(5, 2)
+  percentage       Decimal?    @map("percentage") @db.Decimal(12, 4)
   uom              String?     @map("uom") @db.VarChar(10)
   remarks          String?     @db.VarChar(255)
   createdAt        DateTime    @default(now()) @map("created_at")
@@ -1115,10 +1117,12 @@ model SalesOrder {
   billingCity             String           @db.VarChar(100)
   billingState            String           @db.VarChar(100)
   billingPincode          String           @db.VarChar(20)
+  billingCountry          String?          @default("India") @map("billing_country") @db.VarChar(100)
   shippingAddressLine1    String?          @db.VarChar(255)
   shippingCity            String?          @db.VarChar(100)
   shippingState           String?          @db.VarChar(100)
   shippingPincode         String?          @db.VarChar(20)
+  shippingCountry         String?          @default("India") @map("shipping_country") @db.VarChar(100)
   sameAsBilling           Boolean          @default(false)
   remarks                 String?
   internalNotes           String?
@@ -1207,10 +1211,12 @@ model PurchaseOrder {
   billingCity          String
   billingState         String
   billingPincode       String
+  billingCountry       String?             @default("India") @map("billing_country")
   shippingAddressLine1 String
   shippingCity         String
   shippingState        String
   shippingPincode      String
+  shippingCountry      String?             @default("India") @map("shipping_country")
   subtotal             Decimal             @default(0) @db.Decimal(12, 2)
   totalDiscount        Decimal             @default(0) @db.Decimal(12, 2)
   totalTax             Decimal             @default(0) @db.Decimal(12, 2)
@@ -1276,12 +1282,14 @@ model GrnInvoice {
   billingCity          String   @map("billing_city")
   billingState         String   @map("billing_state")
   billingPincode       String   @map("billing_pincode")
+  billingCountry       String?  @default("India") @map("billing_country")
   sameAsBilling        Boolean  @default(false) @map("same_as_billing")
   updateStock          Boolean  @default(false) @map("update_stock")
   shippingAddressLine1 String   @map("shipping_address_line1")
   shippingCity         String   @map("shipping_city")
   shippingState        String   @map("shipping_state")
   shippingPincode      String   @map("shipping_pincode")
+  shippingCountry      String?  @default("India") @map("shipping_country")
 
   receiveDate  DateTime? @map("receive_date") @db.Date
   billDueDate  DateTime? @map("bill_due_date") @db.Date
@@ -1737,4 +1745,39 @@ model MachineOeeSnapshot {
   @@index([machineId, productionDate])
   @@index([dailyPlanId])
   @@map("machine_oee_snapshots")
+}
+
+enum EodItemCategory {
+  RAW_MATERIAL
+  FINISHED_PRODUCT
+}
+
+model EodStockSnapshot {
+  id           BigInt          @id @default(autoincrement())
+  category     EodItemCategory @map("category")
+  itemId       String          @map("item_id") @db.VarChar(20)
+  itemCode     String          @map("item_code") @db.VarChar(20)
+  itemName     String          @map("item_name") @db.VarChar(150)
+  uom          String?         @map("uom") @db.VarChar(50)
+  storeId      String          @map("store_id") @db.VarChar(20)
+  snapshotDate DateTime        @map("snapshot_date") @db.Date
+  startQty     Decimal         @map("start_qty") @db.Decimal(14, 3)
+  eodQty       Decimal         @map("eod_qty") @db.Decimal(14, 3)
+  recordedAt   DateTime        @map("recorded_at")
+  createdAt    DateTime        @default(now()) @map("created_at")
+
+  @@unique([category, itemId, storeId, snapshotDate])
+  @@index([snapshotDate])
+  @@index([category])
+  @@index([storeId])
+  @@map("eod_stock_snapshots")
+}
+
+model SystemSetting {
+  id        Int      @id @default(autoincrement())
+  key       String   @unique @db.VarChar(100)
+  value     String   @db.VarChar(255)
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("system_settings")
 }

@@ -29,11 +29,13 @@ export const CreateGrnInvoiceSchema = z.object({
     billingCity: z.string().min(1, "Billing City is required"),
     billingState: z.string().min(1, "Billing State is required"),
     billingPincode: z.string().min(1, "Billing Pincode is required"),
+    billingCountry: z.string().optional().nullable(),
 
     shippingAddressLine1: z.string().min(1, "Shipping Address Line 1 is required"),
     shippingCity: z.string().min(1, "Shipping City is required"),
     shippingState: z.string().min(1, "Shipping State is required"),
     shippingPincode: z.string().min(1, "Shipping Pincode is required"),
+    shippingCountry: z.string().optional().nullable(),
     sameAsBilling: z.preprocess(
         (val) => val === "true" || val === true,
         z.boolean().optional()

@@ -58,6 +58,7 @@ const initialFormData = {
   tcsRate: "0",
 
   billingAddressLine1: "",
+  billingCountry: "India",
   billingCity: "",
   billingState: "",
   billingPincode: "",
@@ -65,6 +66,7 @@ const initialFormData = {
   sameAsBilling: false,
 
   shippingAddressLine1: "",
+  shippingCountry: "India",
   shippingCity: "",
   shippingState: "",
   shippingPincode: "",
@@ -91,10 +93,14 @@ const mapCustomerToFormData = (customer: any): CustomerFormData => {
     customer.billingState === customer.shippingState &&
     customer.billingPincode === customer.shippingPincode;
 
+  const creatorName = customer.createdUserName || customer.createdUser?.fullName || customer.createdBy || "";
+  const createdDateStr = customer.createdAt ? new Date(customer.createdAt).toLocaleString() : "";
+  const createdByOn = creatorName && createdDateStr ? `${creatorName} - ${createdDateStr}` : creatorName || createdDateStr || "";
+
   return {
     customerId: customer.customerCode || "",
     isActive: customer.status === "Active" ? "true" : "false",
-    createdByOn: customer.createdUser ? `${customer.createdUser.fullName} - ${new Date(customer.createdAt).toLocaleString()}` : "",
+    createdByOn: createdByOn,
 
     firmName: customer.firmName || "",
     displayName: customer.displayName || "",
@@ -118,6 +124,7 @@ const mapCustomerToFormData = (customer: any): CustomerFormData => {
     tcsRate: customer.tcsRate != null ? String(customer.tcsRate) : "0",
 
     billingAddressLine1: customer.billingAddressLine1 || "",
+    billingCountry: customer.billingCountry || customer.billingAddressCountry || "",
     billingCity: customer.billingCity || "",
     billingState: customer.billingState || "",
     billingPincode: customer.billingPincode || "",
@@ -125,6 +132,7 @@ const mapCustomerToFormData = (customer: any): CustomerFormData => {
     sameAsBilling: billingMatchesShipping,
 
     shippingAddressLine1: customer.shippingAddressLine1 || "",
+    shippingCountry: customer.shippingCountry || customer.shippingAddressCountry || "",
     shippingCity: customer.shippingCity || "",
     shippingState: customer.shippingState || "",
     shippingPincode: customer.shippingPincode || "",
@@ -196,11 +204,11 @@ const CustomerEditPage: React.FC = () => {
         ...prev,
         sameAsBilling: checked,
         ...(checked
-          ? { shippingAddressLine1: prev.billingAddressLine1, shippingCity: prev.billingCity, shippingState: prev.billingState, shippingPincode: prev.billingPincode }
-          : { shippingAddressLine1: "", shippingCity: "", shippingState: "", shippingPincode: "" }),
+          ? { shippingAddressLine1: prev.billingAddressLine1, shippingCountry: prev.billingCountry, shippingCity: prev.billingCity, shippingState: prev.billingState, shippingPincode: prev.billingPincode }
+          : { shippingAddressLine1: "", shippingCountry: "", shippingCity: "", shippingState: "", shippingPincode: "" }),
       }));
       setShippingResetKey((k) => k + 1);
-      setErrors((prev) => ({ ...prev, shippingAddressLine1: "", shippingCity: "", shippingState: "", shippingPincode: "", sameAsBilling: "" }));
+      setErrors((prev) => ({ ...prev, shippingAddressLine1: "", shippingCountry: "", shippingCity: "", shippingState: "", shippingPincode: "", sameAsBilling: "" }));
       return;
     }
 
@@ -259,12 +267,13 @@ const CustomerEditPage: React.FC = () => {
       setFormData((prev) => ({
         ...prev,
         shippingAddressLine1: prev.billingAddressLine1,
+        shippingCountry: prev.billingCountry,
         shippingCity: prev.billingCity,
         shippingState: prev.billingState,
         shippingPincode: prev.billingPincode,
       }));
     }
-  }, [formData.sameAsBilling, formData.billingAddressLine1, formData.billingCity, formData.billingState, formData.billingPincode]);
+  }, [formData.sameAsBilling, formData.billingAddressLine1, formData.billingCountry, formData.billingCity, formData.billingState, formData.billingPincode]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -291,10 +300,12 @@ const CustomerEditPage: React.FC = () => {
         email: formData.email || undefined,
         gstin: formData.gstin || undefined,
         billingAddressLine1: formData.billingAddressLine1,
+        billingCountry: formData.billingCountry || "India",
         billingCity: formData.billingCity,
         billingState: formData.billingState,
         billingPincode: formData.billingPincode,
         shippingAddressLine1: formData.sameAsBilling ? formData.billingAddressLine1 : formData.shippingAddressLine1 || undefined,
+        shippingCountry: formData.sameAsBilling ? (formData.billingCountry || "India") : formData.shippingCountry || "India",
         shippingCity: formData.sameAsBilling ? formData.billingCity : formData.shippingCity || undefined,
         shippingState: formData.sameAsBilling ? formData.billingState : formData.shippingState || undefined,
         shippingPincode: formData.sameAsBilling ? formData.billingPincode : formData.shippingPincode || undefined,
@@ -439,6 +450,16 @@ const CustomerEditPage: React.FC = () => {
                     onAddressChange={(v) => handleChange({ target: { name: "billingAddressLine1", value: v } })}
                     addressError={errors.billingAddressLine1}
 
+                    countryValue={formData.billingCountry}
+                    onCountryChange={(v) => {
+                      setFormData(prev => ({
+                        ...prev, billingCountry: v, billingState: "", billingCity: "",
+                        ...(prev.sameAsBilling && { shippingCountry: v, shippingState: "", shippingCity: "" })
+                      }));
+                      setErrors(prev => ({ ...prev, billingCountry: "", billingState: "", billingCity: "" }));
+                    }}
+                    countryError={errors.billingCountry}
+
                     stateValue={formData.billingState}
                     onStateChange={(v) => {
                       const gstCode = getGstStateCode(v);
@@ -485,6 +506,13 @@ const CustomerEditPage: React.FC = () => {
                     addressValue={formData.shippingAddressLine1}
                     onAddressChange={(v) => handleChange({ target: { name: "shippingAddressLine1", value: v } })}
                     addressError={errors.shippingAddressLine1}
+
+                    countryValue={formData.shippingCountry}
+                    onCountryChange={(v) => {
+                      setFormData(prev => ({ ...prev, shippingCountry: v, shippingState: "", shippingCity: "" }));
+                      setErrors(prev => ({ ...prev, shippingCountry: "", shippingState: "", shippingCity: "" }));
+                    }}
+                    countryError={errors.shippingCountry}
 
                     stateValue={formData.shippingState}
                     onStateChange={(v) => {

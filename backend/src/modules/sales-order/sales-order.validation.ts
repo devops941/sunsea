@@ -116,11 +116,13 @@ const salesOrderBodyShape = z.object({
     billingCity: z.string().min(1, "Billing City is required"),
     billingState: z.string().min(1, "Billing State is required"),
     billingPincode: z.string().min(1, "Billing Pincode is required"),
+    billingCountry: z.string().optional().nullable().default("India"),
 
     shippingAddressLine1: z.string().optional().nullable(),
     shippingCity: z.string().optional().nullable(),
     shippingState: z.string().optional().nullable(),
     shippingPincode: z.string().optional().nullable(),
+    shippingCountry: z.string().optional().nullable().default("India"),
     sameAsBilling: z.boolean().default(false).optional(),
     remarks: z.string().max(500, "Remarks must be less than 500 characters").optional().nullable(),
     internalNotes: z.string().max(1000, "Internal notes must be less than 1000 characters").optional().nullable(),

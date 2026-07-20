@@ -49,6 +49,7 @@ import grnInvoiceRoutes from "../modules/grn-invoice/grn-invoice.routes";
 import salesInvoiceRoutes from "../modules/sales-invoice/sales-invoice.routes";
 import oeeRoutes from "../modules/oee/oee.routes";
 import goodsDispatchRoutes from "../modules/goods-dispatch/goods-dispatch.routes";
+import inventoryRoutes from "../modules/inventory/inventory.routes";
 
 const router = Router();
 
@@ -108,6 +109,7 @@ router.use("/grn-invoices", grnInvoiceRoutes);
 router.use("/sales-invoices", salesInvoiceRoutes);
 router.use("/oee", oeeRoutes);
 router.use("/goods-dispatches", goodsDispatchRoutes);
+router.use("/inventory", inventoryRoutes);
 
 router.get("/", (req, res) => {
     res.status(200).json({

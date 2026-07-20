@@ -163,11 +163,13 @@ class PurchaseOrderService {
                 billingCity: data.billingCity,
                 billingState: data.billingState,
                 billingPincode: data.billingPincode,
+                billingCountry: data.billingCountry || "India",
 
                 shippingAddressLine1: data.shippingAddressLine1,
                 shippingCity: data.shippingCity,
                 shippingState: data.shippingState,
                 shippingPincode: data.shippingPincode,
+                shippingCountry: data.shippingCountry || "India",
 
                 subtotal,
                 discountType: poDiscountType,
@@ -344,11 +346,13 @@ class PurchaseOrderService {
             ...(data.billingCity !== undefined && { billingCity: data.billingCity }),
             ...(data.billingState !== undefined && { billingState: data.billingState }),
             ...(data.billingPincode !== undefined && { billingPincode: data.billingPincode }),
+            ...(data.billingCountry !== undefined && { billingCountry: data.billingCountry }),
 
             ...(data.shippingAddressLine1 !== undefined && { shippingAddressLine1: data.shippingAddressLine1 }),
             ...(data.shippingCity !== undefined && { shippingCity: data.shippingCity }),
             ...(data.shippingState !== undefined && { shippingState: data.shippingState }),
             ...(data.shippingPincode !== undefined && { shippingPincode: data.shippingPincode }),
+            ...(data.shippingCountry !== undefined && { shippingCountry: data.shippingCountry }),
 
             ...(data.storeId !== undefined && { storeId: data.storeId }),
             ...(data.discountType !== undefined && { discountType: data.discountType }),

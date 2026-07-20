@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Container } from "react-bootstrap";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import { FaBoxes, FaBoxOpen, FaSlidersH, FaTags, FaWarehouse } from "react-icons/fa";
+import { FaBoxes, FaBoxOpen, FaSlidersH, FaHistory } from "react-icons/fa";
 import Tabs from "../../../components/ui/tab/Tabs";
 import type { TabItem } from "../../../components/ui/tab/Tabs";
 import { storeService } from "../../../services/storeService";
@@ -9,6 +9,7 @@ import { storeService } from "../../../services/storeService";
 import StockList from "../../stock/pages/StockList";
 import FinishedStockList from "../../finished-stock/pages/FinishedStockList";
 import StockAdjustmentList from "../../stock-adjustments/pages/StockAdjustmentList";
+import EodStockList from "../../Eodstock/pages/EodStockList";
 
 const InventoryTabs: React.FC = () => {
     const location = useLocation();
@@ -34,10 +35,12 @@ const InventoryTabs: React.FC = () => {
     // Map pathnames to tab keys for static tabs
     const pathToKey: Record<string, string> = {
         "/inventory/stock-adjustments": "adjustments",
+        "/inventory/eod-stock": "eod-stock",
     };
 
     const keyToPath: Record<string, string> = {
         "adjustments": "/inventory/stock-adjustments",
+        "eod-stock": "/inventory/eod-stock",
     };
 
     let activeTab = pathToKey[location.pathname];
@@ -80,7 +83,8 @@ const InventoryTabs: React.FC = () => {
 
     const tabs: TabItem[] = [
         ...dynamicStoreTabs,
-        { key: "adjustments", label: "Stock Adjustment", icon: <FaSlidersH />, content: <StockAdjustmentList /> }
+        { key: "adjustments", label: "Stock Adjustment", icon: <FaSlidersH />, content: <StockAdjustmentList /> },
+        { key: "eod-stock", label: "EOD Stock", icon: <FaHistory />, content: <EodStockList /> }
     ];
 
     const handleTabChange = (key: string) => {
@@ -98,9 +102,9 @@ const InventoryTabs: React.FC = () => {
 
     return (
         <div className="inner-container">
-
-            <Tabs tabs={tabs} activeKey={activeTab} onChange={handleTabChange} align="left" />
-
+            <Container fluid>
+                <Tabs tabs={tabs} activeKey={activeTab} onChange={handleTabChange} align="left" />
+            </Container>
         </div>
     );
 };
