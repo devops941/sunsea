@@ -14,14 +14,8 @@ const addressSubSchema = z.object({
     .regex(/^\d{6}$/, "Pincode must be exactly 6 digits"),
 });
 
-/**
- * Supplier Address Schema Validation
- */
 const supplierAddressInputSchema = z.object({
-  label: z.string().min(1, "Label is required").max(40),
-  isDefault: z.boolean().default(false),
   address: addressSubSchema,
-  stateCode: z.string().length(2, "State code must be exactly 2 characters"),
 });
 
 /**
@@ -90,6 +84,7 @@ export const createSupplierSchema = z.object({
           ifscCode: z.string().min(11).max(11),
           branchName: z.string().min(1, "Branch Name is required"),
           upiMobileNumber: z.string().optional(),
+          qrImage: z.string().optional().nullable(),
         })
       )
       .optional()

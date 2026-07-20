@@ -150,7 +150,7 @@ const SupplierList: React.FC = () => {
                                 { header: "WHATSAPP", render: (supplier) => supplier.whatsapp || "N/A" },
                                 { header: "PAYMENT", accessor: "paymentTerms" },
                                 { header: "LEAD TIME", render: (supplier) => supplier.leadTimeDays !== null ? `${supplier.leadTimeDays} days` : "N/A" },
-                                { header: "ON TIME", render: (supplier) => supplier.onTimePct !== null ? `${supplier.onTimePct} %` : "N/A" },
+                                // { header: "ON TIME", render: (supplier) => supplier.onTimePct !== null ? `${supplier.onTimePct} %` : "N/A" },
                                 {
                                     header: "STATUS", render: (supplier) => (
                                         <span className={`px-3 py-1 rounded-full text-xs font-semibold ${supplier.status === "Active"
