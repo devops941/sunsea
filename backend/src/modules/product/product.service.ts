@@ -164,6 +164,23 @@ class ProductService {
       }
     }
 
+    let rawMaterialsList: any[] = [];
+    if (data.rawMaterials) {
+      try {
+        rawMaterialsList = typeof data.rawMaterials === "string"
+          ? JSON.parse(data.rawMaterials)
+          : data.rawMaterials;
+        
+        const totalPercent = rawMaterialsList.reduce((acc, curr) => acc + Number(curr.percentage), 0);
+        if (rawMaterialsList.length > 0 && Math.abs(totalPercent - 100) > 0.01) {
+          throw new ApiError(400, "Total raw material percentage must be exactly 100%");
+        }
+      } catch (e: any) {
+        if (e instanceof ApiError) throw e;
+        console.error("Failed to parse rawMaterials in create:", e);
+      }
+    }
+
     return prisma.product.create({
       data: {
         ...payload,
@@ -203,6 +220,15 @@ class ProductService {
               },
             }
           : {}),
+        ...(rawMaterialsList.length > 0 && {
+          billOfMaterials: {
+            create: rawMaterialsList.map((rm: any) => ({
+              rawMaterialId: String(rm.rawMaterialId),
+              requiredQuantity: new Prisma.Decimal(0),
+              percentage: toNumberOrNull(rm.percentage),
+            })),
+          },
+        }),
       },
 
       include: {
@@ -213,6 +239,7 @@ class ProductService {
         size: true,
         images: true,
         colorTypePrices: true,
+        billOfMaterials: { include: { rawMaterial: true } },
       },
     });
   }
@@ -240,6 +267,7 @@ class ProductService {
         size: true,
         images: true,
         finishedGoodsStocks: true,
+        billOfMaterials: { include: { rawMaterial: true } },
       },
       orderBy: {
         createdAt: "desc",
@@ -259,6 +287,7 @@ class ProductService {
         size: true,
         images: true,
         finishedGoodsStocks: true,
+        billOfMaterials: { include: { rawMaterial: true } },
       },
     });
 
@@ -309,6 +338,25 @@ class ProductService {
           : data.colorTypePricing;
       } catch (e) {
         console.error("Failed to parse colorTypePricing in update:", e);
+      }
+    }
+
+    let rawMaterialsList: any[] | null = null;
+    if (data.rawMaterials !== undefined) {
+      try {
+        rawMaterialsList = typeof data.rawMaterials === "string"
+          ? JSON.parse(data.rawMaterials)
+          : data.rawMaterials;
+        
+        if (rawMaterialsList && rawMaterialsList.length > 0) {
+          const totalPercent = rawMaterialsList.reduce((acc, curr) => acc + Number(curr.percentage), 0);
+          if (Math.abs(totalPercent - 100) > 0.01) {
+            throw new ApiError(400, "Total raw material percentage must be exactly 100%");
+          }
+        }
+      } catch (e: any) {
+        if (e instanceof ApiError) throw e;
+        console.error("Failed to parse rawMaterials in update:", e);
       }
     }
 
@@ -399,6 +447,20 @@ class ProductService {
               b2c: toNumberOrNull(p.b2c),
               exportPrice: toNumberOrNull(p.exportPrice)
             })),
+          });
+        }
+      }
+
+      if (rawMaterialsList !== null) {
+        await tx.billOfMaterial.deleteMany({ where: { productId: id } });
+        if (rawMaterialsList.length > 0) {
+          await tx.billOfMaterial.createMany({
+            data: rawMaterialsList.map((rm: any) => ({
+              productId: id,
+              rawMaterialId: String(rm.rawMaterialId),
+              requiredQuantity: new Prisma.Decimal(0),
+              percentage: toNumberOrNull(rm.percentage)
+            }))
           });
         }
       }
@@ -512,6 +574,7 @@ class ProductService {
         size: true,
         colorTypePrices: true,
         images: true,
+        billOfMaterials: { include: { rawMaterial: true } },
       },
     });
   }
@@ -523,7 +586,7 @@ class ProductService {
       prisma.finishedGoodsStock.count({ where: { productItemId: id } })
     ]);
     if (salesCount > 0 || stockCount > 0) {
-      throw new Error("Cannot delete product as it is referenced in sales orders or stock");
+      throw new ApiError(400, "Cannot delete product as it is referenced in sales orders or stock");
     }
     return prisma.product.delete({ where: { id } });
   }
