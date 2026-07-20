@@ -130,25 +130,25 @@ export const validateCustomer = (
         newErrors.billingPincode = "Enter a valid 6-digit pincode";
     }
 
-    // ---- Shipping Address ----
-    if (!formData.sameAsBilling) {
-        if (!formData.shippingAddressLine1 || !formData.shippingAddressLine1.trim()) {
-            newErrors.shippingAddressLine1 = "Shipping Address is required";
-        }
-
-        if (!formData.shippingCity || !formData.shippingCity.trim()) {
-            newErrors.shippingCity = "City is required";
-        }
-
-        if (!formData.shippingState || !formData.shippingState.trim()) {
-            newErrors.shippingState = "State is required";
-        }
-
-        if (!formData.shippingPincode || !formData.shippingPincode.trim()) {
-            newErrors.shippingPincode = "Pincode is required";
-        } else if (!/^[1-9][0-9]{5}$/.test(formData.shippingPincode)) {
-            newErrors.shippingPincode = "Enter a valid 6-digit pincode";
-        }
+    // ---- Additional Addresses ----
+    if (formData.addresses && Array.isArray(formData.addresses)) {
+        formData.addresses.forEach((addr: any, index: number) => {
+            const address = addr.address;
+            if (!address.addressLine1?.trim()) {
+                newErrors[`addresses.${index}.address.addressLine1`] = "Address Line 1 is required";
+            }
+            if (!address.state?.trim()) {
+                newErrors[`addresses.${index}.address.state`] = "State is required";
+            }
+            if (!address.city?.trim()) {
+                newErrors[`addresses.${index}.address.city`] = "City is required";
+            }
+            if (!address.pincode?.trim()) {
+                newErrors[`addresses.${index}.address.pincode`] = "Pincode is required";
+            } else if (!/^[1-9][0-9]{5}$/.test(address.pincode)) {
+                newErrors[`addresses.${index}.address.pincode`] = "Enter a valid 6-digit pincode";
+            }
+        });
     }
 
     // ---- Commercial Settings ----
