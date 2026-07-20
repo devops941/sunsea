@@ -19,6 +19,7 @@ import { useProducts } from "../../../hooks/useProducts";
 import { salesOrderService } from "../../../services/salesOrderService";
 import { useEmployees } from "../../../hooks/useEmployees";
 import { customerService } from "../../../services/customerService";
+import DatePickerCalendar from "../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 import { COLOUR_OPTIONS, CUSTOMER_TYPE_OPTIONS, DISPATCH_TYPE_OPTIONS, ORDER_TYPE_OPTIONS } from "../../../constants/selectOption";
 
 const orderItemSchema = z.object({
@@ -641,7 +642,7 @@ const SalesOrderForm: React.FC = () => {
 
                         <div>
                             <Controller name="expectedCompletionDate" control={control} render={({ field }) => (
-                                <DateInput label="Expected Completion Date" name={field.name} value={field.value} min={today} icon={<FaCalendarAlt />} required onChange={field.onChange} />
+                                <DatePickerCalendar label="Expected Completion Date" name={field.name} value={field.value} required onChange={field.onChange} />
                             )} />
                             <Err message={errors.expectedCompletionDate?.message} />
                         </div>
