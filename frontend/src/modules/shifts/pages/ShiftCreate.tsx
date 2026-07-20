@@ -128,15 +128,6 @@ const ShiftCreate: React.FC = () => {
         if (formData.startTime && formData.endTime) {
             if (formData.startTime === formData.endTime) {
                 newErrors.endTime = "Start time and end time cannot be the same";
-            } else {
-                // Check this new shift's time range against every existing shift.
-                // Handles overnight ranges (e.g. 09:00-06:00) correctly via shiftsOverlap.
-                const conflict = existingShifts.find(shift =>
-                    shiftsOverlap(formData.startTime, formData.endTime, shift.startTime, shift.endTime)
-                );
-                if (conflict) {
-                    newErrors.endTime = `Overlaps with "${conflict.shiftName}" (${conflict.startTime} - ${conflict.endTime})`;
-                }
             }
         }
 

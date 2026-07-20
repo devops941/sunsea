@@ -157,16 +157,6 @@ const ShiftEdit: React.FC = () => {
         if (formData.startTime && formData.endTime) {
             if (formData.startTime === formData.endTime) {
                 newErrors.endTime = "Start time and end time cannot be the same";
-            } else {
-                // BUG-SHF-001 fix: check overlap against all other shifts (excluding current shift being edited)
-                const conflict = existingShifts.find(
-                    (shift) =>
-                        shift.id !== formData.id &&
-                        shiftsOverlap(formData.startTime, formData.endTime, shift.startTime, shift.endTime)
-                );
-                if (conflict) {
-                    newErrors.endTime = `Overlaps with "${conflict.shiftName}" (${conflict.startTime} - ${conflict.endTime})`;
-                }
             }
         }
 
