@@ -186,10 +186,12 @@ class GrnInvoiceService {
                     billingCity: data.billingCity,
                     billingState: data.billingState,
                     billingPincode: data.billingPincode,
+                    billingCountry: data.billingCountry || "India",
                     shippingAddressLine1: data.shippingAddressLine1,
                     shippingCity: data.shippingCity,
                     shippingState: data.shippingState,
                     shippingPincode: data.shippingPincode,
+                    shippingCountry: data.shippingCountry || "India",
                     sameAsBilling,
 
                     receiveDate: data.receiveDate ? new Date(data.receiveDate) : null,
@@ -351,30 +353,29 @@ class GrnInvoiceService {
                     throw new ApiError(404, "Purchase Order not found");
                 }
 
-                for (const item of itemsWithTotals) {
-                    const poItem = po.items.find((i) => i.productId === item.productId);
-                    if (poItem) {
+                let allFullyReceived = true;
+                let hasPartialReceived = false;
+
+                for (const poItem of po.items) {
+                    const item = itemsWithTotals.find((i) => i.productId === poItem.productId);
+                    const currentRec = Number(poItem.receivedQty) || 0;
+                    const addedRec = item ? Number(item.quantity) : 0;
+                    const newRec = currentRec + addedRec;
+
+                    if (addedRec > 0) {
                         await tx.purchaseOrderItem.update({
                             where: { id: poItem.id },
-                            data: {
-                                receivedQty: {
-                                    increment: item.quantity,
-                                },
-                            },
+                            data: { receivedQty: newRec },
                         });
                     }
+
+                    if (newRec < Number(poItem.quantity)) {
+                        allFullyReceived = false;
+                    }
+                    if (newRec > 0) {
+                        hasPartialReceived = true;
+                    }
                 }
-
-                const updatedPoItems = await tx.purchaseOrderItem.findMany({
-                    where: { purchaseOrderId: data.poId },
-                });
-
-                const allFullyReceived = updatedPoItems.every(
-                    (i) => Number(i.receivedQty) >= Number(i.quantity)
-                );
-                const hasPartialReceived = updatedPoItems.some(
-                    (i) => Number(i.receivedQty) > 0
-                );
 
                 const newStatus = allFullyReceived
                     ? "CLOSED"
@@ -389,7 +390,7 @@ class GrnInvoiceService {
             }
 
             return grnInvoice;
-        });
+        }, { timeout: 30000, maxWait: 10000 });
     }
 
     // ── Get All ─────────────────────────────────────────────────────────────────
@@ -565,10 +566,12 @@ class GrnInvoiceService {
                     billingCity: data.billingCity || existing.billingCity,
                     billingState: data.billingState || existing.billingState,
                     billingPincode: data.billingPincode || existing.billingPincode,
+                    billingCountry: data.billingCountry || existing.billingCountry || "India",
                     shippingAddressLine1: data.shippingAddressLine1 || existing.shippingAddressLine1,
                     shippingCity: data.shippingCity || existing.shippingCity,
                     shippingState: data.shippingState || existing.shippingState,
                     shippingPincode: data.shippingPincode || existing.shippingPincode,
+                    shippingCountry: data.shippingCountry || existing.shippingCountry || "India",
                     sameAsBilling: sameAsBilling ?? existing.sameAsBilling,
                     updateStock: updateStockEnabled,
 
@@ -1109,29 +1112,29 @@ class GrnInvoiceService {
                     include: { items: true },
                 });
                 if (po) {
-                    for (const item of existing.items) {
-                        const poItem = po.items.find((i) => i.productId === item.productId);
-                        if (poItem) {
-                            const newReceivedQty = Math.max(0, Number(poItem.receivedQty) - Number(item.quantity));
+                    let allFullyReceived = true;
+                    let hasPartialReceived = false;
+
+                    for (const poItem of po.items) {
+                        const item = existing.items.find((i) => i.productId === poItem.productId);
+                        const currentRec = Number(poItem.receivedQty) || 0;
+                        const removedRec = item ? Number(item.quantity) : 0;
+                        const newRec = Math.max(0, currentRec - removedRec);
+
+                        if (removedRec > 0) {
                             await tx.purchaseOrderItem.update({
                                 where: { id: poItem.id },
-                                data: {
-                                    receivedQty: newReceivedQty,
-                                },
+                                data: { receivedQty: newRec },
                             });
                         }
+
+                        if (newRec < Number(poItem.quantity)) {
+                            allFullyReceived = false;
+                        }
+                        if (newRec > 0) {
+                            hasPartialReceived = true;
+                        }
                     }
-
-                    const updatedPoItems = await tx.purchaseOrderItem.findMany({
-                        where: { purchaseOrderId: existing.poId },
-                    });
-
-                    const allFullyReceived = updatedPoItems.every(
-                        (i) => Number(i.receivedQty) >= Number(i.quantity)
-                    );
-                    const hasPartialReceived = updatedPoItems.some(
-                        (i) => Number(i.receivedQty) > 0
-                    );
 
                     const newStatus = allFullyReceived
                         ? "CLOSED"
@@ -1150,7 +1153,7 @@ class GrnInvoiceService {
             await tx.grnInvoice.delete({
                 where: { id },
             });
-        });
+        }, { timeout: 30000, maxWait: 10000 });
     }
 }
 

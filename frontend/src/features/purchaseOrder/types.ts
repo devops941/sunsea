@@ -68,11 +68,13 @@ export interface PurchaseOrder {
     billingCity: string;
     billingState: string;
     billingPincode: string;
+    billingCountry?: string;
 
     shippingAddressLine1: string;
     shippingCity: string;
     shippingState: string;
     shippingPincode: string;
+    shippingCountry?: string;
 
     sameAsBilling: boolean;
     remarks?: string;
@@ -109,6 +111,7 @@ export interface PurchaseOrderFormData {
     billingCity: string;
     billingState: string;
     billingPincode: string;
+    billingCountry?: string;
 
     sameAsBilling?: boolean;
 
@@ -116,6 +119,7 @@ export interface PurchaseOrderFormData {
     shippingCity: string;
     shippingState: string;
     shippingPincode: string;
+    shippingCountry?: string;
 
     remarks: string;
     items: PurchaseOrderItem[];
@@ -138,10 +142,12 @@ export interface CreatePurchaseOrderDto {
     billingCity: string;
     billingState: string;
     billingPincode: string;
+    billingCountry?: string;
     shippingAddressLine1: string;
     shippingCity: string;
     shippingState: string;
     shippingPincode: string;
+    shippingCountry?: string;
     sameAsBilling?: boolean;
     remarks?: string;
     storeId?: string;

@@ -32,6 +32,7 @@ const TextInput: React.FC<TextInputProps> = ({
   bottom,
   error,
   disabled = false,
+  preventNegative,
   onChange,
   onKeyDown,
   onPaste,
@@ -40,16 +41,17 @@ const TextInput: React.FC<TextInputProps> = ({
   ...rest
 }) => {
   const isNumberType = type === "number";
+  const shouldPreventNegative = preventNegative || isNumberType;
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    if (isNumberType && (e.key === "-" || e.key === "e" || e.key === "E" || e.key === "+")) {
+    if (shouldPreventNegative && (e.key === "-" || e.key === "e" || e.key === "E" || e.key === "+")) {
       e.preventDefault();
     }
     onKeyDown?.(e as React.KeyboardEvent<HTMLInputElement>);
   };
 
   const handlePaste = (e: React.ClipboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    if (isNumberType) {
+    if (shouldPreventNegative) {
       const pasted = e.clipboardData.getData("text");
       if (/^-/.test(pasted) || Number(pasted) < 0) {
         e.preventDefault();

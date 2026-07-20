@@ -40,11 +40,13 @@ export const createCustomerSchema = z.object({
   billingCity: z.string().min(1, "City is required"),
   billingState: z.string().min(1, "State is required"),
   billingPincode: z.string().min(6, "Pincode is required"),
+  billingCountry: z.string().optional().nullable(),
 
   shippingAddressLine1: z.string().optional().nullable(),
   shippingCity: z.string().optional().nullable(),
   shippingState: z.string().optional().nullable(),
   shippingPincode: z.string().optional().nullable(),
+  shippingCountry: z.string().optional().nullable(),
 
   // BUG-CUST-005 fix: added user-friendly error message to stateCode length validation
   stateCode: z.string().length(2, "State code must be exactly 2 digits (e.g. 33 for Tamil Nadu)"),

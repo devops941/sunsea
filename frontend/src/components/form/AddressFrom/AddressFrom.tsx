@@ -9,6 +9,11 @@ interface AddressFormProps {
     onAddressChange: (value: string) => void;
     addressError?: string;
 
+    // Country
+    countryValue?: string;
+    onCountryChange?: (value: string) => void;
+    countryError?: string;
+
     // State
     stateValue: string;
     onStateChange: (value: string) => void;
@@ -28,6 +33,7 @@ interface AddressFormProps {
     required?: boolean;
     disabled?: boolean;
     resetKey?: number;
+    countryLabel?: string;
     stateLabel?: string;
     cityLabel?: string;
     pincodeLabel?: string;
@@ -38,6 +44,9 @@ const AddressForm: React.FC<AddressFormProps> = ({
     addressValue,
     onAddressChange,
     addressError,
+    countryValue = "",
+    onCountryChange,
+    countryError,
     stateValue,
     onStateChange,
     stateError,
@@ -50,13 +59,14 @@ const AddressForm: React.FC<AddressFormProps> = ({
     required = false,
     disabled = false,
     resetKey,
+    countryLabel = "Country",
     stateLabel = "State",
     cityLabel = "City",
     pincodeLabel = "Pincode",
     addressLabel = "Address Line",
 }) => {
     return (
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-3 w-full [&_.mb-\[18px\]]:!mb-0 [&_.select-input-group]:!mb-0">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-3 w-full [&_.mb-\[18px\]]:!mb-0 [&_.select-input-group]:!mb-0">
             {/* Address Line */}
             <div className="w-full md:col-span-2">
                 <TextInput
@@ -71,14 +81,18 @@ const AddressForm: React.FC<AddressFormProps> = ({
                 />
             </div>
 
-            {/* State & City (2 columns) */}
+            {/* Country, State & City */}
             <CityStateSelect
+                countryLabel={countryLabel}
                 stateLabel={stateLabel}
                 cityLabel={cityLabel}
+                countryValue={countryValue}
                 stateValue={stateValue}
                 cityValue={cityValue}
+                onCountryChange={(country) => onCountryChange?.(country.name)}
                 onStateChange={(state) => onStateChange(state.name)}
                 onCityChange={(city) => onCityChange(city.name)}
+                countryError={countryError}
                 stateError={stateError}
                 cityError={cityError}
                 required={required}

@@ -129,7 +129,8 @@ const CustomerViewModal: React.FC<CustomerViewModalProps> = ({
                                     <br />
                                     {customer.billingCity || "N/A"},{" "}
                                     {customer.billingState || "N/A"} -{" "}
-                                    {customer.billingPincode || "N/A"}
+                                    {customer.billingPincode || "N/A"},{" "}
+                                    {(customer as any).billingCountry || (customer as any).billingAddressCountry || "India"}
                                 </>
                             )
                         },
@@ -141,7 +142,8 @@ const CustomerViewModal: React.FC<CustomerViewModalProps> = ({
                                     <br />
                                     {customer.shippingCity || "N/A"},{" "}
                                     {customer.shippingState || "N/A"} -{" "}
-                                    {customer.shippingPincode || "N/A"}
+                                    {customer.shippingPincode || "N/A"},{" "}
+                                    {(customer as any).shippingCountry || (customer as any).shippingAddressCountry || "India"}
                                 </>
                             )
                         }

@@ -169,7 +169,7 @@ const InvoiceDetail = lazy(() => import("../modules/purchase/purchase-order/upco
 const SalesInvoiceForm = lazy(() => import("../modules/sales-order-invoice/SalesInvoiceCreate"));
 // profile
 const ProfilePage = lazy(() => import("../modules/profile/ProfilePage"));
-const Settings = lazy(() => import("../modules/settings/Setting"))
+const Settings = lazy(() => import("../modules/settings/Setting"));
 
 const LoadingFallback = () => <CommonLoader text="Loading..." image={logo} />;
 

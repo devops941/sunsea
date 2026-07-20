@@ -40,6 +40,7 @@ const initialFormData: PurchaseOrderFormData = {
   createdByOn: "",
 
   billingAddressLine1: "",
+  billingCountry: "India",
   billingCity: "",
   billingState: "",
   billingPincode: "",
@@ -48,6 +49,7 @@ const initialFormData: PurchaseOrderFormData = {
   storeId: "",
 
   shippingAddressLine1: "",
+  shippingCountry: "India",
   shippingCity: "",
   shippingState: "",
   shippingPincode: "",
@@ -79,6 +81,7 @@ const mapPOToFormData = (po: any): PurchaseOrderFormData => {
     createdByOn: po.createdBy ? String(po.createdBy) : "",
 
     billingAddressLine1: po.billingAddressLine1 ?? "",
+    billingCountry: po.billingCountry ?? "India",
     billingCity: po.billingCity ?? "",
     billingState: po.billingState ?? "",
     billingPincode: po.billingPincode ?? "",
@@ -86,6 +89,7 @@ const mapPOToFormData = (po: any): PurchaseOrderFormData => {
     storeId: po.storeId ?? "",
 
     shippingAddressLine1: po.shippingAddressLine1 ?? "",
+    shippingCountry: po.shippingCountry ?? "India",
     shippingCity: po.shippingCity ?? "",
     shippingState: po.shippingState ?? "",
     shippingPincode: po.shippingPincode ?? "",
@@ -708,10 +712,12 @@ const PurchaseOrderEditPage: React.FC = () => {
         expectedDeliveryDate: formData.expectedDeliveryDate,
         supplierId: formData.supplierId,
         billingAddressLine1: formData.billingAddressLine1,
+        billingCountry: formData.billingCountry || "India",
         billingCity: formData.billingCity,
         billingState: formData.billingState,
         billingPincode: formData.billingPincode,
         shippingAddressLine1: formData.shippingAddressLine1,
+        shippingCountry: formData.shippingCountry || "India",
         shippingCity: formData.shippingCity,
         shippingState: formData.shippingState,
         shippingPincode: formData.shippingPincode,
@@ -868,6 +874,9 @@ const PurchaseOrderEditPage: React.FC = () => {
                 addressValue={formData.billingAddressLine1 || ""}
                 onAddressChange={(val) => setFormData(prev => ({ ...prev, billingAddressLine1: val }))}
                 addressError={errors.billingAddressLine1}
+                countryValue={formData.billingCountry || "India"}
+                onCountryChange={(val) => setFormData(prev => ({ ...prev, billingCountry: val, ...(prev.sameAsBilling && { shippingCountry: val }) }))}
+                countryError={errors.billingCountry}
                 stateValue={formData.billingState || ""}
                 onStateChange={handleBillingStateChange}
                 stateError={errors.billingState}
@@ -889,6 +898,9 @@ const PurchaseOrderEditPage: React.FC = () => {
                 addressValue={formData.shippingAddressLine1 || ""}
                 onAddressChange={(val) => setFormData(prev => ({ ...prev, shippingAddressLine1: val }))}
                 addressError={errors.shippingAddressLine1}
+                countryValue={formData.shippingCountry || "India"}
+                onCountryChange={(val) => setFormData(prev => ({ ...prev, shippingCountry: val }))}
+                countryError={errors.shippingCountry}
                 stateValue={formData.shippingState || ""}
                 onStateChange={handleShippingStateChange}
                 stateError={errors.shippingState}

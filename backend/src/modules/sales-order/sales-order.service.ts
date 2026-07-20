@@ -486,10 +486,12 @@ class SalesOrderService {
                 billingCity: data.billingCity,
                 billingState: data.billingState,
                 billingPincode: data.billingPincode,
+                billingCountry: data.billingCountry || "India",
                 shippingAddressLine1: data.sameAsBilling ? data.billingAddressLine1 : data.shippingAddressLine1,
                 shippingCity: data.sameAsBilling ? data.billingCity : data.shippingCity,
                 shippingState: data.sameAsBilling ? data.billingState : data.shippingState,
                 shippingPincode: data.sameAsBilling ? data.billingPincode : data.shippingPincode,
+                shippingCountry: data.sameAsBilling ? (data.billingCountry || "India") : (data.shippingCountry || "India"),
                 sameAsBilling: data.sameAsBilling,
                 remarks: data.remarks,
                 dispatchType: data.dispatchType,
@@ -700,6 +702,9 @@ class SalesOrderService {
         if (data.billingPincode !== undefined) {
             updateData.billingPincode = data.billingPincode;
         }
+        if (data.billingCountry !== undefined) {
+            updateData.billingCountry = data.billingCountry;
+        }
 
         if (data.dispatchType !== undefined) {
             updateData.dispatchType = data.dispatchType;
@@ -720,6 +725,9 @@ class SalesOrderService {
         }
         if (data.shippingPincode !== undefined) {
             updateData.shippingPincode = data.shippingPincode;
+        }
+        if (data.shippingCountry !== undefined) {
+            updateData.shippingCountry = data.shippingCountry;
         }
 
         if (data.sameAsBilling !== undefined) {

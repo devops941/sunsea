@@ -77,6 +77,11 @@ const CompanySettings: React.FC = () => {
     }
   };
 
+  const handleCountryChange = (countryData: any) => {
+    setFormData((prev) => ({ ...prev, country: countryData.name, state: "", city: "" }));
+    setErrors((prev: any) => ({ ...prev, country: undefined, state: undefined, city: undefined }));
+  };
+
   const handleStateChange = (stateData: any) => {
     setFormData((prev) => ({ ...prev, state: stateData.name, city: "" }));
     setErrors((prev: any) => ({ ...prev, state: undefined, city: undefined }));
@@ -205,24 +210,27 @@ const CompanySettings: React.FC = () => {
                   </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
-                  <div className="lg:col-span-2">
-                    <CityStateSelect
-                      stateLabel="State"
-                      stateValue={formData.state || ""}
-                      onStateChange={handleStateChange}
-                      stateError={errors.state}
-                      cityLabel="City"
-                      cityValue={formData.city || ""}
-                      onCityChange={handleCityChange}
-                      cityError={errors.city}
-                      required
-                    />
+                  <div className="lg:col-span-3">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <CityStateSelect
+                        countryLabel="Country"
+                        countryValue={formData.country || "India"}
+                        onCountryChange={handleCountryChange}
+                        countryError={errors.country}
+                        stateLabel="State"
+                        stateValue={formData.state || ""}
+                        onStateChange={handleStateChange}
+                        stateError={errors.state}
+                        cityLabel="City"
+                        cityValue={formData.city || ""}
+                        onCityChange={handleCityChange}
+                        cityError={errors.city}
+                        required
+                      />
+                    </div>
                   </div>
                   <div>
                     <TextInput label="Zipcode" name="zipcode" value={formData.zipcode || ""} onChange={handleChange} placeholder="Enter Zipcode" required error={errors.zipcode} />
-                  </div>
-                  <div>
-                    <TextInput label="Country" name="country" value={formData.country || ""} onChange={handleChange} placeholder="Enter Country" required error={errors.country} />
                   </div>
                 </div>
               </div>
@@ -331,25 +339,28 @@ const CompanySettings: React.FC = () => {
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mt-3">
-              <div className="lg:col-span-2">
-                <CityStateSelect
-                  stateLabel="State"
-                  stateValue={formData.state || ""}
-                  onStateChange={handleStateChange}
-                  stateError={errors.state}
-                  cityLabel="City"
-                  cityValue={formData.city || ""}
-                  onCityChange={handleCityChange}
-                  cityError={errors.city}
-                  disabled={isEditMode}
-                  required  
-                />
+              <div className="lg:col-span-3">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <CityStateSelect
+                    countryLabel="Country"
+                    countryValue={formData.country || "India"}
+                    onCountryChange={handleCountryChange}
+                    countryError={errors.country}
+                    stateLabel="State"
+                    stateValue={formData.state || ""}
+                    onStateChange={handleStateChange}
+                    stateError={errors.state}
+                    cityLabel="City"
+                    cityValue={formData.city || ""}
+                    onCityChange={handleCityChange}
+                    cityError={errors.city}
+                    disabled={isEditMode}
+                    required  
+                  />
+                </div>
               </div>
               <div>
                 <TextInput label="Zipcode" name="zipcode" value={formData.zipcode || ""} onChange={handleChange} placeholder="Enter Zipcode" required error={errors.zipcode} />
-              </div>
-              <div>
-                <TextInput label="Country" name="country" value={formData.country || ""} onChange={handleChange} placeholder="Enter Country" required disabled={isEditMode} error={errors.country} />
               </div>
             </div>
           </div>

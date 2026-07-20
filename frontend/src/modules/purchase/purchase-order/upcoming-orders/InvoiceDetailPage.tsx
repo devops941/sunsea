@@ -95,11 +95,13 @@ const InvoiceDetailPage: React.FC = () => {
         supplierId: "",
         storeId: "",
         billingAddressLine1: "",
+        billingCountry: "India",
         billingCity: "",
         billingState: "",
         billingPincode: "",
         sameAsBilling: false,
         shippingAddressLine1: "",
+        shippingCountry: "India",
         shippingCity: "",
         shippingState: "",
         shippingPincode: "",
@@ -234,11 +236,13 @@ const InvoiceDetailPage: React.FC = () => {
                     supplierId: String(po.supplierId || sup?.id || ""),
                     storeId: String(po.storeId || matchedStore?.storeId || ""),
                     billingAddressLine1: po.billingAddressLine1 || "",
+                    billingCountry: po.billingCountry || "India",
                     billingCity: po.billingCity || "",
                     billingState: po.billingState || "",
                     billingPincode: po.billingPincode || "",
                     sameAsBilling: po.sameAsBilling ?? false,
                     shippingAddressLine1: po.shippingAddressLine1 || "",
+                    shippingCountry: po.shippingCountry || "India",
                     shippingCity: po.shippingCity || "",
                     shippingState: po.shippingState || "",
                     shippingPincode: po.shippingPincode || "",
@@ -337,6 +341,7 @@ const InvoiceDetailPage: React.FC = () => {
             setForm((prev) => ({
                 ...prev,
                 shippingAddressLine1: prev.billingAddressLine1,
+                shippingCountry: prev.billingCountry,
                 shippingCity: prev.billingCity,
                 shippingState: prev.billingState,
                 shippingPincode: prev.billingPincode,
@@ -345,6 +350,7 @@ const InvoiceDetailPage: React.FC = () => {
     }, [
         form.sameAsBilling,
         form.billingAddressLine1,
+        form.billingCountry,
         form.billingCity,
         form.billingState,
         form.billingPincode,
@@ -530,12 +536,17 @@ const InvoiceDetailPage: React.FC = () => {
             payload.append("supplierId", String(form.supplierId));
             payload.append("storeId", form.storeId);
             payload.append("billingAddressLine1", form.billingAddressLine1);
+            payload.append("billingCountry", form.billingCountry || "India");
             payload.append("billingCity", form.billingCity);
             payload.append("billingState", form.billingState);
             payload.append("billingPincode", form.billingPincode);
             payload.append(
                 "shippingAddressLine1",
                 form.sameAsBilling ? form.billingAddressLine1 : form.shippingAddressLine1
+            );
+            payload.append(
+                "shippingCountry",
+                form.sameAsBilling ? (form.billingCountry || "India") : (form.shippingCountry || "India")
             );
             payload.append(
                 "shippingCity",
@@ -674,6 +685,9 @@ const InvoiceDetailPage: React.FC = () => {
                                 addressValue={form.billingAddressLine1}
                                 onAddressChange={(val) => setForm((prev) => ({ ...prev, billingAddressLine1: val }))}
                                 addressError={errors.billingAddressLine1}
+                                countryValue={form.billingCountry || "India"}
+                                onCountryChange={(val) => setForm((prev) => ({ ...prev, billingCountry: val, ...(prev.sameAsBilling && { shippingCountry: val }) }))}
+                                countryError={errors.billingCountry}
                                 stateValue={form.billingState}
                                 onStateChange={(val) => handleBillingStateChange({ id: 0, name: val, isoCode: "" })}
                                 stateError={errors.billingState}
@@ -707,6 +721,9 @@ const InvoiceDetailPage: React.FC = () => {
                                 addressValue={form.shippingAddressLine1}
                                 onAddressChange={(val) => setForm((prev) => ({ ...prev, shippingAddressLine1: val }))}
                                 addressError={errors.shippingAddressLine1}
+                                countryValue={form.shippingCountry || "India"}
+                                onCountryChange={(val) => setForm((prev) => ({ ...prev, shippingCountry: val }))}
+                                countryError={errors.shippingCountry}
                                 stateValue={form.shippingState}
                                 onStateChange={(val) => handleShippingStateChange({ id: 0, name: val, isoCode: "" })}
                                 stateError={errors.shippingState}

@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import { GetState, GetCity } from "react-country-state-city";
 import SelectInput from "../../form/SelectInput/SelectInput";
 import TextInput from "../../form/TextInput/TextInput";
-// import { FaMapMarkerAlt } from "react-icons/fa";
 
 const INDIA_COUNTRY_ID = 101;
 
@@ -14,12 +13,16 @@ export interface StateCityOption {
 }
 
 interface CityStateSelectProps {
+    countryLabel?: string;
     stateLabel?: string;
     cityLabel?: string;
+    countryValue?: string;
     stateValue: string;
     cityValue: string;
+    onCountryChange?: (country: StateCityOption) => void;
     onStateChange: (state: StateCityOption) => void;
     onCityChange: (city: StateCityOption) => void;
+    countryError?: string;
     stateError?: string;
     cityError?: string;
     required?: boolean;
@@ -28,12 +31,16 @@ interface CityStateSelectProps {
 }
 
 const CityStateSelect: React.FC<CityStateSelectProps> = ({
+    countryLabel = "Country",
     stateLabel = "State",
     cityLabel = "City",
+    countryValue = "India",
     stateValue,
     cityValue,
+    onCountryChange,
     onStateChange,
     onCityChange,
+    countryError,
     stateError,
     cityError,
     required = false,
@@ -42,32 +49,44 @@ const CityStateSelect: React.FC<CityStateSelectProps> = ({
     const [states, setStates] = useState<StateCityOption[]>([]);
     const [cities, setCities] = useState<StateCityOption[]>([]);
 
-    // Load all India states once
+    // On mount, auto-select India if countryValue is empty, and load India states
     useEffect(() => {
+        if (!countryValue && onCountryChange) {
+            onCountryChange({ id: INDIA_COUNTRY_ID, name: "India" });
+        }
+
         GetState(INDIA_COUNTRY_ID)
             .then((result: StateCityOption[]) => {
                 setStates(result);
             })
             .catch((err) => {
                 console.error("Failed to load states:", err);
+                setStates([]);
             });
     }, []);
 
-    // When stateValue changes (or states load), resolve matching id and load its cities
+    // When stateValue changes (or states load), load cities for selected state
     useEffect(() => {
         if (!stateValue || states.length === 0) {
             setCities([]);
             return;
         }
-        const matched = states.find((s) => s.name === stateValue);
-        if (matched) {
-            GetCity(INDIA_COUNTRY_ID, matched.id)
+
+        const matchedState = states.find(
+            (s) => s.name.toLowerCase() === stateValue.toLowerCase()
+        );
+
+        if (matchedState) {
+            GetCity(INDIA_COUNTRY_ID, matchedState.id)
                 .then((result: StateCityOption[]) => {
                     setCities(result);
                 })
                 .catch((err) => {
                     console.error("Failed to load cities:", err);
+                    setCities([]);
                 });
+        } else {
+            setCities([]);
         }
     }, [stateValue, states]);
 
@@ -85,6 +104,7 @@ const CityStateSelect: React.FC<CityStateSelectProps> = ({
         const selectedName = e.target.value;
         const matched = states.find((s) => s.name === selectedName);
         onStateChange(matched || { id: 0, name: "" });
+        onCityChange({ id: 0, name: "" });
     };
 
     const handleCitySelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -102,6 +122,9 @@ const CityStateSelect: React.FC<CityStateSelectProps> = ({
                 <div className="w-full">
                     <TextInput label={cityLabel} name="cityDisplay" value={cityValue} onChange={() => { }} disabled />
                 </div>
+                <div className="w-full">
+                    <TextInput label={countryLabel} name="countryDisplay" value={countryValue || "India"} onChange={() => { }} disabled />
+                </div>
             </>
         );
     }
@@ -117,7 +140,6 @@ const CityStateSelect: React.FC<CityStateSelectProps> = ({
                     onChange={handleStateSelect}
                     required={required}
                     searchable={true}
-                // icon={<FaMapMarkerAlt />}
                 />
                 {stateError && <div className="text-red-500 text-sm mt-1">{stateError}</div>}
             </div>
@@ -132,9 +154,20 @@ const CityStateSelect: React.FC<CityStateSelectProps> = ({
                     disabled={!stateValue}
                     required={required}
                     searchable={true}
-                // icon={<FaMapMarkerAlt />}
                 />
                 {cityError && <div className="text-red-500 text-sm mt-1">{cityError}</div>}
+            </div>
+
+            {/* Country field defaulting to India after City */}
+            <div className="w-full">
+                <TextInput
+                    label={countryLabel}
+                    name="country"
+                    value={countryValue || "India"}
+                    onChange={() => { }}
+                    disabled={true}
+                />
+                {countryError && <div className="text-red-500 text-sm mt-1">{countryError}</div>}
             </div>
         </>
     );
