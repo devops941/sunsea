@@ -232,7 +232,7 @@ const SalesOrderDetail: React.FC = () => {
                                                         <th className="py-3 px-2 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wide">SGST</th>
                                                     </>
                                                 )}
-                                                <th className="py-3 pr-4 pl-2 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wide">Line Total</th>
+                                                {/* <th className="py-3 pr-4 pl-2 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wide">Line Total</th> */}
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -265,7 +265,7 @@ const SalesOrderDetail: React.FC = () => {
                                                         </>
                                                     )}
 
-                                                    <td className="py-3 pr-4 pl-2 text-right font-medium text-gray-900">{formatMoney(item.lineTotal)}</td>
+                                                    {/* <td className="py-3 pr-4 pl-2 text-right font-medium text-gray-900">{formatMoney(item.lineTotal)}</td> */}
                                                 </tr>
                                             ))}
                                             {(!order.items || order.items.length === 0) && (

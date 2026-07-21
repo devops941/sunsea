@@ -18,6 +18,7 @@ import { rawMaterialService } from "../../../services/rawMaterialService";
 import { getImageUrl } from "../../../utils/ImageUrls";
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
 import { fetchGstTaxes, selectActiveGstTaxes } from "../../../features/gst/gstSlice";
+import FlowInput from "../../../components/ui/FlowInput/FlowInput";
 
 const MAX_IMAGES = 3;
 
@@ -86,7 +87,8 @@ const ProductEdit: React.FC = () => {
     // ✅ Raw Materials Composition
     type RawMaterialRow = { rawMaterialId: string; percentage: string; };
     const [rawMaterials, setRawMaterials] = useState<RawMaterialRow[]>([]);
-    const [rawMaterialOptions, setRawMaterialOptions] = useState<{value: string, label: string}[]>([]);
+    const [rawMaterialOptions, setRawMaterialOptions] = useState<{ value: string, label: string }[]>([]);
+    const [productionSteps, setProductionSteps] = useState<string[]>([]);
 
     // Load dropdowns
     useEffect(() => {
@@ -95,25 +97,25 @@ const ProductEdit: React.FC = () => {
         dispatch(fetchGstTaxes({ status: "ACTIVE" }));
         loadColors({ isActive: true });
         loadSizes({ isActive: true });
-        
+
         storeService.fetchAll({ limit: 1000 })
             .then(res => {
                 const data = Array.isArray(res?.stores) ? res.stores : Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
                 setStores(data);
                 if (data.length > 0) {
                     const fgStore = data.find((s: any) => s.storeName.toLowerCase().includes('finish'));
-                    setFormData(prev => ({ 
-                        ...prev, 
+                    setFormData(prev => ({
+                        ...prev,
                         openingStockStoreId: prev.openingStockStoreId || (fgStore ? fgStore.storeId : data[0].storeId)
                     }));
                 }
-            }).catch(() => {});
+            }).catch(() => { });
 
         rawMaterialService.fetchAll({})
             .then((res: any) => {
                 const data = Array.isArray(res?.rawMaterials) ? res.rawMaterials : Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
                 setRawMaterialOptions(data.map((rm: any) => ({ value: String(rm.rawMaterialId), label: rm.materialName })));
-            }).catch(() => {});
+            }).catch(() => { });
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     // Fetch product
@@ -174,6 +176,12 @@ const ProductEdit: React.FC = () => {
             })));
         } else {
             setRawMaterials([]);
+        }
+
+        if (productData.productionSteps) {
+            setProductionSteps(productData.productionSteps.map((s: any) => s.stepKey));
+        } else {
+            setProductionSteps([]);
         }
 
         const images: ExistingProductImage[] = (productData.images || []).slice();
@@ -276,6 +284,14 @@ const ProductEdit: React.FC = () => {
             });
         }
 
+        if (productionSteps.length > 0) {
+            const normalized = productionSteps.map(s => s.trim().toLowerCase());
+            const unique = new Set(normalized);
+            if (unique.size !== normalized.length) {
+                newErrors.productionSteps = "Each step can only be added once";
+            }
+        }
+
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
     };
@@ -293,6 +309,13 @@ const ProductEdit: React.FC = () => {
         setFormData((prev) => ({ ...prev, [name]: values }));
         if (errors[name]) {
             setErrors((prev) => ({ ...prev, [name]: "" }));
+        }
+    };
+
+    const handleProductionStepsChange = (steps: string[]) => {
+        setProductionSteps(steps);
+        if (errors.productionSteps) {
+            setErrors(prev => ({ ...prev, productionSteps: "" }));
         }
     };
 
@@ -422,6 +445,17 @@ const ProductEdit: React.FC = () => {
                 payload.append("rawMaterials", "[]");
             }
 
+            if (productionSteps.length > 0) {
+                payload.append("productionSteps", JSON.stringify(
+                    productionSteps.map((step, index) => ({
+                        stepKey: step,
+                        stepOrder: index + 1,
+                    }))
+                ));
+            } else {
+                payload.append("productionSteps", "[]");
+            }
+
             // Images
             newImageFiles.forEach((file) => payload.append("images", file));
             removedImageIds.forEach((imgId) => payload.append("removedImageIds", String(imgId)));
@@ -493,7 +527,7 @@ const ProductEdit: React.FC = () => {
 
     return (
         <div className="w-full mx-auto">
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+            <div className="bg-white  border border-gray-200">
                 {/* Page Header */}
                 <div className="px-6 py-4 border-b border-gray-100">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -739,47 +773,47 @@ const ProductEdit: React.FC = () => {
                             />
                         </div>
 
-                            <TextInput
-                                label="MRP (₹)"
-                                name="mrp"
-                                type="number"
-                                step="0.01"
-                                value={formData.mrp}
-                                placeholder="0.00"
-                                onChange={handleChange}
-                                error={errors.mrp}
-                            />
-                            <TextInput
-                                label="B2B (₹)"
-                                name="b2b"
-                                type="number"
-                                step="0.01"
-                                value={formData.b2b}
-                                placeholder="0.00"
-                                onChange={handleChange}
-                                error={errors.b2b}
-                            />
-                            <TextInput
-                                label="B2C (₹)"
-                                name="b2c"
-                                type="number"
-                                step="0.01"
-                                value={formData.b2c}
-                                placeholder="0.00"
-                                onChange={handleChange}
-                                error={errors.b2c}
-                            />
-                            <TextInput
-                                label="Export Price (₹)"
-                                name="exportPrice"
-                                type="number"
-                                step="0.01"
-                                value={formData.exportPrice}
-                                placeholder="0.00"
-                                onChange={handleChange}
-                                error={errors.exportPrice}
-                            />
-                        </div>
+                        <TextInput
+                            label="MRP (₹)"
+                            name="mrp"
+                            type="number"
+                            step="0.01"
+                            value={formData.mrp}
+                            placeholder="0.00"
+                            onChange={handleChange}
+                            error={errors.mrp}
+                        />
+                        <TextInput
+                            label="B2B (₹)"
+                            name="b2b"
+                            type="number"
+                            step="0.01"
+                            value={formData.b2b}
+                            placeholder="0.00"
+                            onChange={handleChange}
+                            error={errors.b2b}
+                        />
+                        <TextInput
+                            label="B2C (₹)"
+                            name="b2c"
+                            type="number"
+                            step="0.01"
+                            value={formData.b2c}
+                            placeholder="0.00"
+                            onChange={handleChange}
+                            error={errors.b2c}
+                        />
+                        <TextInput
+                            label="Export Price (₹)"
+                            name="exportPrice"
+                            type="number"
+                            step="0.01"
+                            value={formData.exportPrice}
+                            placeholder="0.00"
+                            onChange={handleChange}
+                            error={errors.exportPrice}
+                        />
+                    </div>
 
                     {/* Raw Materials Composition */}
                     <div className="pt-2">
@@ -853,6 +887,15 @@ const ProductEdit: React.FC = () => {
                                 No raw materials added. Click "Add Raw Material" to specify the composition.
                             </div>
                         )}
+                    </div>
+
+                    {/* Production Workflow (optional, free-text step-by-step pipeline) */}
+                    <div className="pt-2 flex flex-col w-full md:w-[50%]">
+                        <FlowInput
+                            value={productionSteps}
+                            onChange={handleProductionStepsChange}
+                            error={errors.productionSteps}
+                        />
                     </div>
 
                     {/* Form Actions */}

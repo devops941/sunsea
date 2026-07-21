@@ -109,6 +109,7 @@ type CtrlTextProps = {
     label: string;
     placeholder?: string;
     required?: boolean;
+    bottom?: boolean;
     type?: string;
     disabled?: boolean;
     error?: string;
@@ -120,7 +121,7 @@ type CtrlTextProps = {
     };
 };
 
-const CtrlText: React.FC<CtrlTextProps> = ({ field, label, placeholder, required, type, disabled, error }) => (
+const CtrlText: React.FC<CtrlTextProps> = ({ field, label, placeholder, required, type, disabled, error, bottom }) => (
     <TextInput
         label={label}
         name={field.name}
@@ -132,6 +133,7 @@ const CtrlText: React.FC<CtrlTextProps> = ({ field, label, placeholder, required
         type={type}
         disabled={disabled}
         error={error}
+        bottom={bottom}
     />
 );
 
@@ -733,14 +735,14 @@ const QuotationForm: React.FC = () => {
                                     <table className="min-w-full text-sm">
                                         <thead>
                                             <tr className="bg-gray-50 border-b border-gray-200">
-                                                <th className="py-3 pl-4 pr-2 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wide w-8">#</th>
-                                                <th className="py-3 px-2 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wide">Product</th>
+                                                <th className="py-3 pl-4 pr-2 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wide w-[5%]">#</th>
+                                                <th className="py-3 px-2 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wide w-[35%]">Product</th>
                                                 {/* <th className="py-3 px-2 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wide">Color Type</th> */}
-                                                <th className="py-3 px-2 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wide">Qty</th>
-                                                <th className="py-3 px-2 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wide">Unit Price</th>
-                                                <th className="py-3 px-2 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wide">Subtotal</th>
-                                                <th className="py-3 px-2 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wide w-56 min-w-[14rem]">GST Rate</th>
-                                                <th className="py-3 pr-4 pl-2 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wide">GST Amt</th>
+                                                <th className="py-3 px-2 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wide w-[15%]">Qty</th>
+                                                <th className="py-3 px-2 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wide w-[15%]">Unit Price</th>
+                                                <th className="py-3 px-2 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wide w-[15%]">Subtotal</th>
+                                                <th className="py-3 px-2 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wide w-[15%]">GST Rate</th>
+
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -772,7 +774,7 @@ const QuotationForm: React.FC = () => {
                                                             ₹{calc.subtotal.toFixed(2)}
                                                         </td>
 
-                                                        <td className="py-2 px-2 w-56 min-w-[14rem]">
+                                                        <td className="py-2 px-2 min-w-[12rem]">
                                                             <div className="w-full">
                                                                 <Controller
                                                                     name={`items.${index}.gstTaxRateId`}
@@ -792,12 +794,7 @@ const QuotationForm: React.FC = () => {
                                                             </div>
                                                         </td>
 
-                                                        <td className="py-3 pr-4 pl-2 text-right text-gray-900">
-                                                            <div className="font-medium">₹{calc.gstAmount.toFixed(2)}</div>
-                                                            {calc.gstRate > 0 && (
-                                                                <div className="text-gray-500 text-xs">({calc.gstRate}%)</div>
-                                                            )}
-                                                        </td>
+
                                                     </tr>
                                                 );
                                             })}
@@ -841,10 +838,12 @@ const QuotationForm: React.FC = () => {
                                                         control={control}
                                                         render={({ field: f }) => (
                                                             <CtrlText
+
                                                                 field={{ ...f, value: String(f.value ?? "") }}
                                                                 label="Value"
                                                                 type="number"
                                                                 placeholder="0"
+                                                                bottom={true}
                                                                 error={errors.orderDiscountValue?.message}
                                                             />
                                                         )}
@@ -883,10 +882,10 @@ const QuotationForm: React.FC = () => {
                                                     </>
                                                 )}
 
-                                                <div className="flex justify-between pb-2 border-b border-gray-300">
+                                                {/* <div className="flex justify-between pb-2 border-b border-gray-300">
                                                     <span className="text-gray-500">Total GST</span>
                                                     <span className="text-gray-900">+ ₹{totals.totalGst.toFixed(2)}</span>
-                                                </div>
+                                                </div> */}
 
                                                 <div className="flex justify-between pt-2">
                                                     <span className="text-base font-bold text-gray-900">Net Amount</span>

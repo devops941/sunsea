@@ -159,6 +159,17 @@ class ProductService {
       }
     }
 
+    let productionStepsList: any[] = [];
+    if (data.productionSteps) {
+      try {
+        productionStepsList = typeof data.productionSteps === "string"
+          ? JSON.parse(data.productionSteps)
+          : data.productionSteps;
+      } catch (e: any) {
+        console.error("Failed to parse productionSteps in create:", e);
+      }
+    }
+
     return prisma.product.create({
       data: {
         ...payload,
@@ -194,6 +205,14 @@ class ProductService {
             })),
           },
         }),
+        ...(productionStepsList.length > 0 && {
+          productionSteps: {
+            create: productionStepsList.map((ps: any) => ({
+              stepKey: ps.stepKey,
+              stepOrder: Number(ps.stepOrder),
+            })),
+          },
+        }),
       },
 
       include: {
@@ -202,6 +221,7 @@ class ProductService {
         uom: true,
         images: true,
         billOfMaterials: { include: { rawMaterial: true } },
+        productionSteps: { orderBy: { stepOrder: "asc" } },
       },
     });
   }
@@ -227,6 +247,7 @@ class ProductService {
         images: true,
         finishedGoodsStocks: true,
         billOfMaterials: { include: { rawMaterial: true } },
+        productionSteps: { orderBy: { stepOrder: "asc" } },
       },
       orderBy: {
         createdAt: "desc",
@@ -244,6 +265,7 @@ class ProductService {
         images: true,
         finishedGoodsStocks: true,
         billOfMaterials: { include: { rawMaterial: true } },
+        productionSteps: { orderBy: { stepOrder: "asc" } },
       },
     });
 
@@ -315,6 +337,18 @@ class ProductService {
         console.error("Failed to parse rawMaterials in update:", e);
       }
     }
+
+    let productionStepsList: any[] | null = null;
+    if (data.productionSteps !== undefined) {
+      try {
+        productionStepsList = typeof data.productionSteps === "string"
+          ? JSON.parse(data.productionSteps)
+          : data.productionSteps;
+      } catch (e: any) {
+        console.error("Failed to parse productionSteps in update:", e);
+      }
+    }
+
 
     const uploadedImages: any[] = [];
     if (files && files.length > 0) {
@@ -402,6 +436,20 @@ class ProductService {
         }
       }
 
+      if (productionStepsList !== null) {
+        await tx.productionStep.deleteMany({ where: { productId: id } });
+        if (productionStepsList.length > 0) {
+          await tx.productionStep.createMany({
+            data: productionStepsList.map((ps: any) => ({
+              productId: id,
+              stepKey: ps.stepKey,
+              stepOrder: Number(ps.stepOrder),
+            })),
+          });
+        }
+      }
+
+
     });
 
     const payload: Prisma.ProductUncheckedUpdateInput = {
@@ -482,6 +530,7 @@ class ProductService {
         uom: true,
         images: true,
         billOfMaterials: { include: { rawMaterial: true } },
+        productionSteps: { orderBy: { stepOrder: "asc" } },
       },
     });
   }

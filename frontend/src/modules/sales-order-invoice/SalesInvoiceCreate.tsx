@@ -544,7 +544,7 @@ const SalesInvoiceForm: React.FC = () => {
                     <th className="px-4 py-3 font-semibold text-slate-600 w-[13%] text-[11px] uppercase tracking-wider">Subtotal</th>
                     <th className="px-4 py-3 font-semibold text-slate-600 w-[13%] text-[11px] uppercase tracking-wider">GST Rate</th>
                     <th className="px-4 py-3 font-semibold text-slate-600 w-[13%] text-[11px] uppercase tracking-wider">GST Amt</th>
-                    <th className="px-4 py-3 font-semibold text-slate-600 w-[13%] text-[11px] uppercase tracking-wider text-right">Total</th>
+                    {/* <th className="px-4 py-3 font-semibold text-slate-600 w-[13%] text-[11px] uppercase tracking-wider text-right">Total</th> */}
                     <th className="px-4 py-3 font-semibold text-slate-600 w-12 text-center"></th>
                   </tr>
                 </thead>
@@ -612,9 +612,9 @@ const SalesInvoiceForm: React.FC = () => {
                         <div className="text-gray-400 text-xs">({line.taxPercent}%)</div>
                       </td>
                       {/* Total */}
-                      <td className="px-4 py-2 text-right align-middle font-bold text-slate-700">
+                      {/* <td className="px-4 py-2 text-right align-middle font-bold text-slate-700">
                         ₹{line.total.toFixed(2)}
-                      </td>
+                      </td> */}
                       <td className="px-4 py-2 text-center align-middle">
                         <button
                           type="button"

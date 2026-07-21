@@ -548,6 +548,7 @@ model Product {
   images                    ProductImage[]
   productionOrders          ProductionOrder[]
   productionWastages        ProductionWastage[]
+  productionSteps           ProductionStep[]
   category                  Category                   @relation(fields: [categoryId], references: [id])
   gstTaxRate                GstTaxRate?                @relation(fields: [gstTaxRateId], references: [id])
   subCategory               SubCategory?               @relation(fields: [subCategoryId, categoryId], references: [id, categoryId])
@@ -564,6 +565,18 @@ model Product {
   @@index([gstTaxRateId])
   @@index([productName])
   @@map("products")
+}
+
+model ProductionStep {
+  id         BigInt  @id @default(autoincrement())
+  productId  BigInt  @map("product_id")
+  stepKey    String  @map("step_key")
+  stepOrder  Int     @map("step_order")
+
+  product    Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+  @@map("production_steps")
 }
 
 model UnitOfMeasure {
