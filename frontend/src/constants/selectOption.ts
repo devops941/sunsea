@@ -15,6 +15,7 @@ export const ORDER_TYPE_OPTIONS = [
     { value: "telephone", label: "Telephonic Enquiry" },
     { value: "website", label: "Website" },
     { value: "salesperson", label: "Sales Person" },
+    { value: "reference", label: "Reference" },
 ];
 
 export const COLOUR_OPTIONS = [

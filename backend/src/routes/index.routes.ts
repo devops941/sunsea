@@ -11,10 +11,7 @@ import customerRoutes from "../modules/customer/customer.routes";
 import supplierRoutes from "../modules/supplier/supplier.routes";
 import categoryRoutes from "../modules/category/category.routes";
 import subCategoryRoutes from "../modules/sub-category/sub-category.routes";
-import colorRoutes from "../modules/color/color.routes";
-import sizeRoutes from "../modules/size/size.routes";
 import uomRoutes from "../modules/uom/uom.routes";
-import productPricingRoutes from "../modules/product-pricing/product-pricing.routes";
 import productImageRoutes from "../modules/product-image/product-image.routes";
 import productRoutes from "../modules/product/product.routes";
 import companyRoutes from "../modules/company/company.routes";
@@ -71,12 +68,8 @@ router.use("/supplier-material-prices", supplierMaterialPriceRoutes);
 
 router.use("/product/categories", categoryRoutes);
 router.use("/product/sub-categories", subCategoryRoutes);
-router.use("/product/colors", colorRoutes);
-router.use("/product/sizes", sizeRoutes);
 router.use("/product/uoms", uomRoutes);
 router.use("/uom", uomRoutes);
-
-router.use("/product-pricing", productPricingRoutes);
 router.use("/product-images", productImageRoutes);
 router.use("/products", productRoutes);
 router.use("/companies", companyRoutes);

@@ -27,11 +27,6 @@ export type OrderType = z.infer<typeof OrderTypeEnum>;
 export const CustomerTypeEnum = z.enum(["B2B", "B2C", "EXPORT"]);
 export type CustomerType = z.infer<typeof CustomerTypeEnum>;
 
-/**
- * Color Type Enum (mirrors "sc" | "mc" used on SalesOrderItem.colorType)
- */
-export const ColorTypeEnum = z.enum(["sc", "mc"]);
-export type ColorType = z.infer<typeof ColorTypeEnum>;
 
 /**
  * Sales Order Workflow Status Enum (mirrors Prisma's SalesOrderStatus)
@@ -87,7 +82,6 @@ const salesOrderItemInputSchema = z.object({
         .refine((val) => !isNaN(Number(val)), "Product ID must be a valid number"),
     quantity: z.number().positive("Quantity must be positive")
         .refine((val) => Number.isFinite(val) && val > 0, "Quantity must be a valid positive number"),
-    colorTypeId: ColorTypeEnum, // ← added — "sc" | "mc", required
     gstTaxRateId: z.string().uuid("GST Tax Rate ID must be a valid UUID").optional().nullable(),
 });
 
@@ -172,22 +166,22 @@ const salesOrderBodyRefined = salesOrderBodyShape.superRefine((data, ctx) => {
         ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Customer rejection reason is required when status is REJECTED", path: ["customerRejectionReason"] });
     }
 
-    // Reject duplicate (productId + colorTypeId) pairs at the validation layer too,
+    // Reject duplicate (productId) pairs at the validation layer too,
     // so the client gets a field-level Zod error before it even hits the service.
     const seen = new Map<string, number>();
     data.items.forEach((item, index) => {
-        const key = `${item.productId}::${item.colorTypeId}`;
+        const key = `${item.productId}`;
         if (seen.has(key)) {
             ctx.addIssue({
                 code: z.ZodIssueCode.custom,
-                message: `Duplicate item: productId=${item.productId}, colorType=${item.colorTypeId}`,
-                path: ["items", index, "colorTypeId"],
+                message: `Duplicate item: productId=${item.productId}`,
+                path: ["items", index, "productId"],
             });
             // also flag the original occurrence
             ctx.addIssue({
                 code: z.ZodIssueCode.custom,
-                message: `Duplicate item: productId=${item.productId}, colorType=${item.colorTypeId}`,
-                path: ["items", seen.get(key)!, "colorTypeId"],
+                message: `Duplicate item: productId=${item.productId}`,
+                path: ["items", seen.get(key)!, "productId"],
             });
         } else {
             seen.set(key, index);
@@ -317,7 +311,6 @@ export const createSalesOrderItemSchema = z.object({
                 "Quantity must be a valid positive number"
             ),
 
-        colorTypeId: ColorTypeEnum, // ← added
         gstTaxRateId: z.string().uuid("GST Tax Rate ID must be a valid UUID").optional().nullable(),
     })
 });

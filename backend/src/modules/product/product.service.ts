@@ -118,6 +118,10 @@ class ProductService {
       cess: toNumberOrNull(data.cess),
       minimumQty: data.minimumQty || "0",
       maximumQty: data.maximumQty || "0",
+      mrp: toNumberOrNull(data.mrp),
+      b2b: toNumberOrNull(data.b2b),
+      b2c: toNumberOrNull(data.b2c),
+      exportPrice: toNumberOrNull(data.exportPrice),
 
 
       ...(colorIds.length
@@ -522,6 +526,10 @@ class ProductService {
 
       hsnCode: data.hsnCode !== undefined ? data.hsnCode || null : undefined,
       gstTaxRateId: data.gstTaxRateId !== undefined ? data.gstTaxRateId || null : undefined,
+      mrp: data.mrp !== undefined ? toNumberOrNull(data.mrp) : undefined,
+      b2b: data.b2b !== undefined ? toNumberOrNull(data.b2b) : undefined,
+      b2c: data.b2c !== undefined ? toNumberOrNull(data.b2c) : undefined,
+      exportPrice: data.exportPrice !== undefined ? toNumberOrNull(data.exportPrice) : undefined,
       gstRate: data.gstRate !== undefined ? toNumberOrNull(data.gstRate) : undefined,
       cess: data.cess !== undefined ? toNumberOrNull(data.cess) : undefined,
       

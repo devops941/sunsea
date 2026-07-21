@@ -48,13 +48,13 @@ class CustomerService {
 
     const whereClause = search
       ? {
-          OR: [
-            { customerCode: { contains: search, mode: "insensitive" as const } },
-            { firmName: { contains: search, mode: "insensitive" as const } },
-            { email: { contains: search, mode: "insensitive" as const } },
-            { mobile: { contains: search, mode: "insensitive" as const } },
-          ],
-        }
+        OR: [
+          { customerCode: { contains: search, mode: "insensitive" as const } },
+          { firmName: { contains: search, mode: "insensitive" as const } },
+          { email: { contains: search, mode: "insensitive" as const } },
+          { mobile: { contains: search, mode: "insensitive" as const } },
+        ],
+      }
       : {};
 
     const [customers, total] = await Promise.all([
@@ -63,13 +63,14 @@ class CustomerService {
         orderBy: { createdAt: "desc" },
         skip: (page - 1) * limit,
         take: limit,
+        include: { addresses: true }
       }),
       prisma.customer.count({ where: whereClause }),
     ]);
 
     // Fetch creator names from User and Admin tables
     const creatorIds = [...new Set(customers.map(c => c.createdBy).filter(Boolean))];
-    
+
     // Split IDs into admin IDs and normal user IDs
     const adminIds = creatorIds.filter(id => id.startsWith('admin_')).map(id => BigInt(id.replace('admin_', '')));
     const userIds = creatorIds.filter(id => !id.startsWith('admin_'));
@@ -146,14 +147,14 @@ class CustomerService {
         const adminId = BigInt(customer.createdBy.replace('admin_', ''));
         const admin = await prisma.admin.findUnique({ where: { id: adminId }, select: { fullName: true, role: { select: { name: true } } } });
         if (admin) {
-            createdUserName = admin.fullName;
-            createdUserRole = admin.role?.name || 'Super Admin';
+          createdUserName = admin.fullName;
+          createdUserRole = admin.role?.name || 'Super Admin';
         }
       } else {
         const user = await prisma.user.findUnique({ where: { userId: customer.createdBy }, select: { fullName: true, role: { select: { name: true } } } });
         if (user) {
-            createdUserName = user.fullName;
-            createdUserRole = user.role?.name || 'User';
+          createdUserName = user.fullName;
+          createdUserRole = user.role?.name || 'User';
         }
       }
     }

@@ -62,6 +62,8 @@ export interface SalesOrder {
     internalNotes?: string;
     dispatchType?: string;
     orderType?: string;
+    referenceText?: string | null;
+    salesPersonId?: number | null;
 
     // ─── Workflow status (drives the quotation list / UI state) ───────
     status?: SalesOrderStatus;

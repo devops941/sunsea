@@ -110,7 +110,7 @@ const SupplierViewModal: React.FC<SupplierViewModalProps> = ({
                     <h6 className="text-sm font-semibold text-slate-700 uppercase tracking-wider">Additional Delivery / Plant Addresses</h6>
                 </div>
                 <div className="p-5 space-y-5">
-                    {supplier.addresses.map((addr, idx) => (
+                    {supplier.addresses.map((addr: any, idx: number) => (
                         <div key={idx} className={idx > 0 ? "pt-5 border-t border-slate-100" : ""}>
                             <div className="flex items-center gap-2 mb-3">
                                 <h6 className="text-sm font-bold text-slate-700">{addr.label || `Address #${idx + 1}`}</h6>

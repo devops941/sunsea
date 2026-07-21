@@ -21,37 +21,7 @@ import { fetchGstTaxes, selectActiveGstTaxes } from "../../../features/gst/gstSl
 
 const MAX_IMAGES = 3;
 
-// ─── Per‑color‑type pricing row (matches create page) ──────────────────
-type ColorTypePriceRow = {
-    typeId: string;      // "sc" or "mc"
-    typeName: string;    // "Single Color" or "Multi Color"
-    mrp: string;
-    b2b: string;
-    b2c: string;
-    exportPrice: string;
-};
 
-const emptyTypePriceRow = (typeId: string, typeName: string): ColorTypePriceRow => ({
-    typeId,
-    typeName,
-    mrp: "",
-    b2b: "",
-    b2c: "",
-    exportPrice: "",
-});
-
-// Build initial rows from product data
-const buildInitialColorTypePricing = (product: any): ColorTypePriceRow[] => {
-    const prices = product?.colorTypePrices || [];
-    return prices.map((p: any) => ({
-        typeId: p.colorType,           // "sc" or "mc"
-        typeName: p.colorType === "sc" ? "Single Color" : "Multi Color",
-        mrp: p.mrp != null ? String(p.mrp) : "",
-        b2b: p.b2b != null ? String(p.b2b) : "",
-        b2c: p.b2c != null ? String(p.b2c) : "",
-        exportPrice: p.exportPrice != null ? String(p.exportPrice) : "",
-    }));
-};
 
 interface ExistingProductImage {
     id: string | number;
@@ -101,18 +71,17 @@ const ProductEdit: React.FC = () => {
         tags: "",
         description: "",
         isActive: "true",
-        colorType: [] as string[],      // selected color types (sc/mc)
-        colorIds: [] as string[],       // selected actual colors
-        sizeId: "",
         hsnCode: "",
         gstTaxRateId: "",
         minimumQty: "",
         maximumQty: "",
         openingStockQty: "",
         openingStockStoreId: "",
+        mrp: "",
+        b2b: "",
+        b2c: "",
+        exportPrice: "",
     });
-
-    const [colorTypePricing, setColorTypePricing] = useState<ColorTypePriceRow[]>([]);
 
     // ✅ Raw Materials Composition
     type RawMaterialRow = { rawMaterialId: string; percentage: string; };
@@ -168,10 +137,6 @@ const ProductEdit: React.FC = () => {
     useEffect(() => {
         if (!productData) return;
 
-        const colorTypesFromProduct = (productData.colorTypePrices || []).map(
-            (p: any) => p.colorType
-        );
-
         setFormData((prev) => ({
             ...prev,
             productCode: productData.productCode || "",
@@ -189,11 +154,10 @@ const ProductEdit: React.FC = () => {
             tags: productData.tags || "",
             description: productData.description || "",
             isActive: productData.isActive ? "true" : "false",
-            colorType: colorTypesFromProduct,
-            colorIds: (productData.colors || []).map((c: any) =>
-                String(c.colorId ?? c.color?.id ?? c.id)
-            ),
-            sizeId: productData.sizeId ? String(productData.sizeId) : "",
+            mrp: productData.mrp != null ? String(productData.mrp) : "",
+            b2b: productData.b2b != null ? String(productData.b2b) : "",
+            b2c: productData.b2c != null ? String(productData.b2c) : "",
+            exportPrice: productData.exportPrice != null ? String(productData.exportPrice) : "",
             hsnCode: productData.hsnCode || "",
             gstTaxRateId: productData.gstTaxRateId ? String(productData.gstTaxRateId) : "",
             minimumQty: productData.minimumQty != null ? String(productData.minimumQty) : "",
@@ -202,7 +166,6 @@ const ProductEdit: React.FC = () => {
             openingStockStoreId: productData.finishedGoodsStocks?.[0] ? String(productData.finishedGoodsStocks[0].storeId) : (prev.openingStockStoreId || ""),
         }));
 
-        setColorTypePricing(buildInitialColorTypePricing(productData));
 
         if (productData.billOfMaterials) {
             setRawMaterials(productData.billOfMaterials.map((bom: any) => ({
@@ -219,17 +182,7 @@ const ProductEdit: React.FC = () => {
         setRemovedImageIds([]);
     }, [productData]);
 
-    // Sync pricing rows when colorType changes
-    useEffect(() => {
-        setColorTypePricing((prev) => {
-            const prevMap = new Map(prev.map((row) => [row.typeId, row]));
-            return formData.colorType.map((typeId) => {
-                const typeName = typeId === "sc" ? "Single Color" : "Multi Color";
-                const existing = prevMap.get(typeId);
-                return existing ? { ...existing, typeName } : emptyTypePriceRow(typeId, typeName);
-            });
-        });
-    }, [formData.colorType]);
+
 
     // Cleanup previews
     useEffect(() => {
@@ -275,73 +228,41 @@ const ProductEdit: React.FC = () => {
 
 
 
-        // --- UOM, Size ---
-        if (!formData.uomId) {
-            newErrors.uomId = "UOM is required.";
-        }
-        if (!formData.sizeId) {
-            newErrors.sizeId = "Size is required.";
-        }
-
-        // --- Images (total existing + new > 0) ---
-
-        // --- Color Type ---
-        if (formData.colorType.length === 0) {
-            newErrors.colorType = "Select at least one color type.";
+        // --- Pricing validation ---
+        if (!formData.mrp) {
+            newErrors.mrp = "Required";
+        } else {
+            const mrp = Number(formData.mrp);
+            if (isNaN(mrp) || mrp <= 0) newErrors.mrp = "Must be > 0";
         }
 
-        // --- Colors ---
-        if (formData.colorIds.length === 0) {
-            newErrors.colorIds = "Select at least one color.";
+        if (!formData.b2b) {
+            newErrors.b2b = "Required";
+        } else {
+            const b2b = Number(formData.b2b);
+            if (isNaN(b2b) || b2b <= 0) newErrors.b2b = "Must be > 0";
         }
 
-        // --- Per‑color‑type pricing validation (mirror Create) ---
-        colorTypePricing.forEach((row) => {
-            const prefix = `colorTypePricing.${row.typeId}`;
+        if (formData.mrp && formData.b2b) {
+            const mrp = Number(formData.mrp);
+            const b2b = Number(formData.b2b);
+            if (!isNaN(mrp) && !isNaN(b2b) && mrp < b2b)
+                newErrors.mrp = "Cannot be less than B2B price";
+        }
 
-            // MRP
-            if (!row.mrp) {
-                newErrors[`${prefix}.mrp`] = "Required";
-            } else {
-                const mrp = Number(row.mrp);
-                if (isNaN(mrp) || mrp <= 0)
-                    newErrors[`${prefix}.mrp`] = "Must be > 0";
-            }
+        if (!formData.b2c) {
+            newErrors.b2c = "Required";
+        } else {
+            const b2c = Number(formData.b2c);
+            if (isNaN(b2c) || b2c <= 0) newErrors.b2c = "Must be > 0";
+        }
 
-            // B2B
-            if (!row.b2b) {
-                newErrors[`${prefix}.b2b`] = "Required";
-            } else {
-                const price = Number(row.b2b);
-                if (isNaN(price) || price <= 0)
-                    newErrors[`${prefix}.b2b`] = "Must be > 0";
-            }
-
-            // Cross-check MRP >= B2B
-            if (row.mrp && row.b2b) {
-                const mrp = Number(row.mrp);
-                const b2b = Number(row.b2b);
-                if (!isNaN(mrp) && !isNaN(b2b) && mrp < b2b)
-                    newErrors[`${prefix}.mrp`] = "Cannot be less than B2B price";
-            }
-
-            // B2C
-            if (!row.b2c) {
-                newErrors[`${prefix}.b2c`] = "Required";
-            } else {
-                const price = Number(row.b2c);
-                if (isNaN(price) || price <= 0)
-                    newErrors[`${prefix}.b2c`] = "Must be > 0";
-            }
-
-            if (!row.exportPrice) {
-                newErrors[`${prefix}.exportPrice`] = "Required";
-            } else {
-                const price = Number(row.exportPrice);
-                if (isNaN(price) || price <= 0)
-                    newErrors[`${prefix}.exportPrice`] = "Must be > 0";
-            }
-        });
+        if (!formData.exportPrice) {
+            newErrors.exportPrice = "Required";
+        } else {
+            const exp = Number(formData.exportPrice);
+            if (isNaN(exp) || exp <= 0) newErrors.exportPrice = "Must be > 0";
+        }
 
         if (rawMaterials.length > 0) {
             const totalPercent = rawMaterials.reduce((acc, rm) => acc + Number(rm.percentage), 0);
@@ -375,19 +296,7 @@ const ProductEdit: React.FC = () => {
         }
     };
 
-    const handleColorTypePriceChange = (
-        typeId: string,
-        field: keyof Omit<ColorTypePriceRow, "typeId" | "typeName">,
-        value: string
-    ) => {
-        setColorTypePricing((prev) =>
-            prev.map((row) => (row.typeId === typeId ? { ...row, [field]: value } : row))
-        );
-        const errorKey = `colorTypePricing.${typeId}.${field}`;
-        if (errors[errorKey]) {
-            setErrors((prev) => ({ ...prev, [errorKey]: "" }));
-        }
-    };
+
 
     const handleAddRawMaterial = () => {
         setRawMaterials(prev => [...prev, { rawMaterialId: "", percentage: "" }]);
@@ -480,12 +389,7 @@ const ProductEdit: React.FC = () => {
             if (formData.mouldReference) payload.append("mouldReference", formData.mouldReference);
             if (formData.typeCode) payload.append("typeCode", formData.typeCode);
 
-            // Color & size
-            formData.colorIds.forEach((colorId) => payload.append("colorIds", colorId));
-            if (formData.sizeId) payload.append("sizeId", formData.sizeId);
 
-            // Color type (sc/mc)
-            formData.colorType.forEach((type) => payload.append("colorType[]", type));
 
             // Tax — FK to gst_tax_rates, plus a snapshot rate for historical accuracy
             if (formData.hsnCode) payload.append("hsnCode", formData.hsnCode);
@@ -501,19 +405,11 @@ const ProductEdit: React.FC = () => {
             if (formData.openingStockQty) payload.append("openingStockQty", formData.openingStockQty);
             if (formData.openingStockStoreId) payload.append("openingStockStoreId", formData.openingStockStoreId);
 
-            // ── Pricing: only per‑color‑type ─────────────────────────────
-            payload.append(
-                "colorTypePricing",
-                JSON.stringify(
-                    colorTypePricing.map((row) => ({
-                        typeId: row.typeId,
-                        mrp: row.mrp ? Number(row.mrp) : null,
-                        b2b: Number(row.b2b),
-                        b2c: row.b2c ? Number(row.b2c) : null,
-                        exportPrice: Number(row.exportPrice),
-                    }))
-                )
-            );
+            // ── Pricing ─────────────────────────────
+            if (formData.mrp) payload.append("mrp", formData.mrp);
+            if (formData.b2b) payload.append("b2b", formData.b2b);
+            if (formData.b2c) payload.append("b2c", formData.b2c);
+            if (formData.exportPrice) payload.append("exportPrice", formData.exportPrice);
 
             if (rawMaterials.length > 0) {
                 payload.append("rawMaterials", JSON.stringify(
@@ -801,34 +697,7 @@ const ProductEdit: React.FC = () => {
                                 onChange={handleChange}
                                 error={errors.weightPerPiece}
                             />
-                            <MultiSelect
-                                label="Color Type"
-                                name="colorType"
-                                value={formData.colorType}
-                                options={[
-                                    { value: "sc", label: "Single Color" },
-                                    { value: "mc", label: "Multi Color" },
-                                ]}
-                                onChange={handleMultiSelect}
-                                error={errors.colorType}
-                                required
-                                placeholder="Select color type"
-                            />
-                            <MultiSelect
-                                label="Colors"
-                                name="colorIds"
-                                options={colorsOptions}
-                                value={formData.colorIds}
-                                onChange={handleMultiSelect}
-                                placeholder="-- Select Colors --"
-                            />
-                            <SelectInput
-                                label="Sizes"
-                                name="sizeId"
-                                value={formData.sizeId}
-                                options={sizeOptions}
-                                onChange={handleChange}
-                            />
+
                             <TextInput
                                 label="Dimensions (L×B×H CM)"
                                 name="dimensions"
@@ -870,92 +739,47 @@ const ProductEdit: React.FC = () => {
                             />
                         </div>
 
-                        {colorTypePricing.length !== 0 && (
-                            <div className="mt-4 border border-slate-200 rounded-xl overflow-hidden">
-                                <div className="bg-white px-4 py-3 border-b border-slate-200">
-                                    <h6 className="font-semibold text-slate-700 m-0">Price Per Color Type</h6>
-                                </div>
-                                <div className="overflow-x-auto">
-                                    <table className="w-full text-left text-sm whitespace-nowrap">
-                                        <thead className="bg-slate-50 text-slate-600">
-                                            <tr>
-                                                <th className="px-4 py-3 font-semibold w-40 border-b border-slate-200">COLOR TYPE</th>
-                                                <th className="px-4 py-3 font-semibold border-b border-slate-200">MRP (₹)</th>
-                                                <th className="px-4 py-3 font-semibold border-b border-slate-200">B2B (₹)</th>
-                                                <th className="px-4 py-3 font-semibold border-b border-slate-200">B2C (₹)</th>
-                                                <th className="px-4 py-3 font-semibold border-b border-slate-200">EXPORT (₹)</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-slate-100">
-                                            {colorTypePricing.map((row) => (
-                                                <tr key={row.typeId} className="hover:bg-slate-50/50 transition-colors">
-                                                    <td className="px-4 py-3 font-medium text-slate-800">
-                                                        {row.typeName}
-                                                    </td>
-                                                    <td className="px-4 py-3 align-top">
-                                                        <TextInput
-                                                            label=""
-                                                            name={`colorTypePricing.${row.typeId}.mrp`}
-                                                            type="number"
-                                                            step="0.01"
-                                                            value={row.mrp}
-                                                            placeholder="0.00"
-                                                            onChange={(e) =>
-                                                                handleColorTypePriceChange(row.typeId, "mrp", e.target.value)
-                                                            }
-                                                            error={errors[`colorTypePricing.${row.typeId}.mrp`]}
-                                                        />
-                                                    </td>
-                                                    <td className="px-4 py-3 align-top">
-                                                        <TextInput
-                                                            label=""
-                                                            name={`colorTypePricing.${row.typeId}.b2b`}
-                                                            type="number"
-                                                            step="0.01"
-                                                            value={row.b2b}
-                                                            placeholder="0.00"
-                                                            onChange={(e) =>
-                                                                handleColorTypePriceChange(row.typeId, "b2b", e.target.value)
-                                                            }
-                                                            error={errors[`colorTypePricing.${row.typeId}.b2b`]}
-                                                        />
-                                                    </td>
-                                                    <td className="px-4 py-3 align-top">
-                                                        <TextInput
-                                                            label=""
-                                                            name={`colorTypePricing.${row.typeId}.b2c`}
-                                                            type="number"
-                                                            step="0.01"
-                                                            value={row.b2c}
-                                                            placeholder="0.00"
-                                                            onChange={(e) =>
-                                                                handleColorTypePriceChange(row.typeId, "b2c", e.target.value)
-                                                            }
-                                                            error={errors[`colorTypePricing.${row.typeId}.b2c`]}
-                                                        />
-                                                    </td>
-                                                    <td className="px-4 py-3 align-top">
-                                                        <TextInput
-                                                            label=""
-                                                            name={`colorTypePricing.${row.typeId}.exportPrice`}
-                                                            type="number"
-                                                            step="0.01"
-                                                            value={row.exportPrice}
-                                                            placeholder="0.00"
-                                                            onChange={(e) =>
-                                                                handleColorTypePriceChange(row.typeId, "exportPrice", e.target.value)
-                                                            }
-                                                            error={errors[`colorTypePricing.${row.typeId}.exportPrice`]}
-                                                        />
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        )}
-                    </div>
+                            <TextInput
+                                label="MRP (₹)"
+                                name="mrp"
+                                type="number"
+                                step="0.01"
+                                value={formData.mrp}
+                                placeholder="0.00"
+                                onChange={handleChange}
+                                error={errors.mrp}
+                            />
+                            <TextInput
+                                label="B2B (₹)"
+                                name="b2b"
+                                type="number"
+                                step="0.01"
+                                value={formData.b2b}
+                                placeholder="0.00"
+                                onChange={handleChange}
+                                error={errors.b2b}
+                            />
+                            <TextInput
+                                label="B2C (₹)"
+                                name="b2c"
+                                type="number"
+                                step="0.01"
+                                value={formData.b2c}
+                                placeholder="0.00"
+                                onChange={handleChange}
+                                error={errors.b2c}
+                            />
+                            <TextInput
+                                label="Export Price (₹)"
+                                name="exportPrice"
+                                type="number"
+                                step="0.01"
+                                value={formData.exportPrice}
+                                placeholder="0.00"
+                                onChange={handleChange}
+                                error={errors.exportPrice}
+                            />
+                        </div>
 
                     {/* Raw Materials Composition */}
                     <div className="pt-2">

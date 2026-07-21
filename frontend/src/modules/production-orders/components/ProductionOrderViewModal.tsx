@@ -166,17 +166,7 @@ export const ProductionOrderViewModal: React.FC<ProductionOrderViewModalProps> =
                                         <div className="text-xs text-slate-500 font-medium mb-1 uppercase">Order Type</div>
                                         <div className="font-semibold text-slate-800">{fullOrder?.orderType || order.orderType || "-"}</div>
                                     </div>
-                                    <div>
-                                        <div className="text-xs text-slate-500 font-medium mb-1 uppercase">Color Type</div>
-                                        <div className="font-semibold text-slate-800">
-                                            {(fullOrder?.colorType || order?.colorType) ? (
-                                                <StatusBadge 
-                                                    status={(fullOrder?.colorType || order?.colorType) === 'mc' ? 'MULTI COLOR' : 'SINGLE COLOR'} 
-                                                    customColor={(fullOrder?.colorType || order?.colorType) === 'mc' ? { bg: '#e0e7ff', text: '#3730a3' } : { bg: '#fef3c7', text: '#92400e' }}
-                                                />
-                                            ) : "-"}
-                                        </div>
-                                    </div>
+
                                 </div>
                             </div>
 

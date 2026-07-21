@@ -289,7 +289,6 @@ model CustomerAddress {
   @@map("customer_addresses")
 }
 
-
 model Company {
   id             String          @id @default(uuid()) @db.Uuid
   companyCode    String?         @unique @db.VarChar(20)
@@ -500,35 +499,6 @@ model SubCategory {
   @@map("sub_categories")
 }
 
-model Color {
-  id           Int            @id @default(autoincrement())
-  colorCode    String         @unique
-  colorName    String
-  hexCode      String?
-  isActive     Boolean        @default(true)
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
-  colorType    String?        @default("sc")
-  hexCode2     String?
-  ProductColor ProductColor[]
-
-  @@map("colors")
-}
-
-model Size {
-  id          Int           @id @default(autoincrement())
-  sizeCode    String        @unique
-  sizeName    String
-  description String?
-  isActive    Boolean       @default(true)
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-  ProductSize ProductSize[]
-  products    Product[]
-
-  @@map("sizes")
-}
-
 model ProductImage {
   id        BigInt  @id @default(autoincrement())
   productId BigInt
@@ -538,21 +508,6 @@ model ProductImage {
 
   @@index([productId])
   @@map("product_images")
-}
-
-model ProductColorTypePrice {
-  id          BigInt   @id @default(autoincrement())
-  productId   BigInt
-  colorType   String   @db.VarChar(10)
-  b2b         Decimal? @db.Decimal(12, 2)
-  mrp         Decimal? @db.Decimal(12, 2)
-  b2c         Decimal? @db.Decimal(12, 2)
-  exportPrice Decimal? @db.Decimal(12, 2)
-  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-
-  @@unique([productId, colorType])
-  @@index([productId])
-  @@map("product_color_type_prices")
 }
 
 model Product {
@@ -577,7 +532,10 @@ model Product {
   modifiedBy                String?
   createdAt                 DateTime                   @default(now())
   updatedAt                 DateTime                   @updatedAt
-  sizeId                    Int?
+  mrp                       Decimal?                   @db.Decimal(12, 2)
+  b2b                       Decimal?                   @db.Decimal(12, 2)
+  b2c                       Decimal?                   @db.Decimal(12, 2)
+  exportPrice               Decimal?                   @db.Decimal(12, 2)
   cess                      Decimal?                   @db.Decimal(5, 2)
   gstRate                   Decimal?                   @db.Decimal(5, 2)
   gstTaxRateId              String?                    @map("gst_tax_rate_id")
@@ -587,15 +545,11 @@ model Product {
   billOfMaterials           BillOfMaterial[]
   finishedGoodsStocks       FinishedGoodsStock[]
   finishedGoodsTransactions FinishedGoodsTransaction[]
-  colorTypePrices           ProductColorTypePrice[]
-  colors                    ProductColor[]
   images                    ProductImage[]
-  sizes                     ProductSize[]
   productionOrders          ProductionOrder[]
   productionWastages        ProductionWastage[]
   category                  Category                   @relation(fields: [categoryId], references: [id])
   gstTaxRate                GstTaxRate?                @relation(fields: [gstTaxRateId], references: [id])
-  size                      Size?                      @relation(fields: [sizeId], references: [id], onDelete: Restrict)
   subCategory               SubCategory?               @relation(fields: [subCategoryId, categoryId], references: [id, categoryId])
   uom                       UnitOfMeasure?             @relation(fields: [uomId], references: [id], onDelete: Restrict)
   salesOrderItems           SalesOrderItem[]           @relation("SalesOrderItemProduct")
@@ -608,7 +562,6 @@ model Product {
   @@index([subCategoryId])
   @@index([uomId])
   @@index([gstTaxRateId])
-  @@index([sizeId])
   @@index([productName])
   @@map("products")
 }
@@ -624,31 +577,6 @@ model UnitOfMeasure {
   Product     Product[]
 
   @@map("units_of_measure")
-}
-
-model ProductColor {
-  id        BigInt  @id @default(autoincrement())
-  productId BigInt
-  colorId   Int
-  isDefault Boolean @default(false)
-  color     Color   @relation(fields: [colorId], references: [id], onDelete: Cascade)
-  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
-
-  @@unique([productId, colorId])
-  @@index([colorId])
-  @@map("product_colors")
-}
-
-model ProductSize {
-  id        BigInt  @id @default(autoincrement())
-  productId BigInt
-  sizeId    Int
-  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
-  size      Size    @relation(fields: [sizeId], references: [id], onDelete: Cascade)
-
-  @@unique([productId, sizeId])
-  @@index([sizeId])
-  @@map("product_sizes")
 }
 
 model Location {
@@ -896,7 +824,6 @@ model ProductionOrder {
   uom                       String                     @db.VarChar(10)
   sourceSalesOrderId        String?                    @map("source_sales_order_id") @db.VarChar(20)
   sourceSalesOrderLineId    BigInt?                    @map("source_sales_order_line_id")
-  colorType                 String?                    @map("color_type") @db.VarChar(10)
   status                    String                     @default("PLANNED") @db.VarChar(20)
   remarks                   String?                    @db.VarChar(255)
   createdAt                 DateTime                   @default(now()) @map("created_at")
@@ -1126,6 +1053,7 @@ model SalesOrder {
   customerId              String           @db.Uuid
   customerType            String?          @db.VarChar(20)
   salesPersonId           BigInt?
+  referenceText           String?          @db.VarChar(255)
   paymentTermId           Int?
   billingAddressLine1     String           @db.VarChar(255)
   billingCity             String           @db.VarChar(100)
@@ -1201,7 +1129,6 @@ model SalesOrderItem {
   sgstAmount     Decimal      @default(0) @db.Decimal(14, 2)
   igstRate       Decimal      @default(0) @db.Decimal(5, 2)
   igstAmount     Decimal      @default(0) @db.Decimal(14, 2)
-  colorType      String       @db.VarChar(10)
   gstTaxRate     GstTaxRate?  @relation(fields: [gstTaxRateId], references: [id])
   product        Product      @relation("SalesOrderItemProduct", fields: [productId], references: [id])
   salesOrder     SalesOrder   @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)

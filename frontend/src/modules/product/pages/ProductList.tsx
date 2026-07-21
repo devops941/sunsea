@@ -91,13 +91,6 @@ const ProductList: React.FC = () => {
         { header: "Product Code", accessor: "productCode" },
         { header: "Product Name", accessor: "productName" },
         { header: "Category", render: (product) => product.category?.name || product.category?.categoryName || "N/A" },
-        { header: "Size", render: (product) => product.size?.sizeName || product.size?.sizeCode || "-" },
-        {
-            header: "Color",
-            render: (product) => product.colors?.length > 0
-                ? product.colors.map((c: any) => c.color?.colorName).join(", ")
-                : "N/A"
-        },
         {
             header: "Weight",
             render: (product) => product.weightPerPiece != null
@@ -192,9 +185,10 @@ const ProductList: React.FC = () => {
                                 },
                                 { label: "Category", value: selectedProduct.category?.name || selectedProduct.category?.categoryName || "N/A" },
                                 { label: "Class", value: selectedProduct.subCategory?.name || selectedProduct.subCategory?.subCategoryName || "N/A" },
-                                { label: "MRP", value: selectedProduct.pricing?.length > 0 && selectedProduct.pricing[0].mrp != null ? `₹${selectedProduct.pricing[0].mrp}` : "N/A" },
-                                { label: "Min Sale", value: selectedProduct.pricing?.length > 0 && selectedProduct.pricing[0].minSalePrice != null ? `₹${selectedProduct.pricing[0].minSalePrice}` : "N/A" },
-                                { label: "Colour", value: selectedProduct.colors?.length > 0 ? selectedProduct.colors.map((c: any) => c.color?.colorName).join(", ") : "N/A" },
+                                { label: "MRP", value: selectedProduct.mrp != null ? `₹${selectedProduct.mrp}` : "N/A" },
+                                { label: "B2B", value: selectedProduct.b2b != null ? `₹${selectedProduct.b2b}` : "N/A" },
+                                { label: "B2C", value: selectedProduct.b2c != null ? `₹${selectedProduct.b2c}` : "N/A" },
+                                { label: "Export Price", value: selectedProduct.exportPrice != null ? `₹${selectedProduct.exportPrice}` : "N/A" },
                                 { label: "Weight", value: selectedProduct.weightPerPiece != null ? (Number(selectedProduct.weightPerPiece) < 1 ? `${Number(selectedProduct.weightPerPiece) * 1000} g` : `${selectedProduct.weightPerPiece} kg`) : "N/A" },
                                 { label: "Status", value: selectedProduct.isActive ? "Active" : "Inactive" },
                             ]

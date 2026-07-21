@@ -70,8 +70,6 @@ export const productionOrderBodyShape = z.object({
   routingId: z.string().max(20).optional().nullable(),
   machineMachineId: z.string().max(20).optional().nullable(),
 
-  colorType: z.enum(["sc", "mc"]).optional().nullable(),
-
   status: z
     .string()
     .max(20)

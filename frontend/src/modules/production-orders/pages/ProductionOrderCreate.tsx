@@ -59,7 +59,6 @@ const salesOrderColumns: DataTableColumn<any>[] = [
     { header: "#", width: "60px", render: (_, index) => index + 1 },
     { header: "PRODUCT NAME", render: (item) => item.product?.productName || `Product ID: ${item.productId}` },
     { header: "PRODUCT CODE", render: (item) => item.product?.productCode || "-" },
-    { header: "COLOR", render: (item) => item.colorType === 'mc' ? 'Multi Color' : (item.colorType === 'sc' ? 'Single Color' : '-') },
     { header: "ORDERED QUANTITY", align: "right", render: (item) => item.quantity },
     { header: "UOM", render: (item) => item.product?.uom?.name || "PCS" },
 ];
@@ -91,7 +90,6 @@ const productionOrderSchema = z.object({
                 })
             )
             .optional().default([]),
-        colorType: z.string().optional(),
     })).min(1, "At least one product is required"),
     productionOrderId: z.string().min(1, "Order No is required"),
     orderDate: z.string().min(1, "Order Date is required"),
@@ -127,7 +125,7 @@ const defaultValues: ProductionOrderFormValues = {
     id: undefined,
     sourceSalesOrderId: "",
     sourceSalesOrderLineId: "",
-    products: [{ productItemId: "", targetQty: 0, damageQty: 0, uom: "PCS", sourceSalesOrderLineId: "", rawMaterials: [{ rawMaterialId: "", requiredQty: "", uom: "", storeId: "", remarks: "" }], colorType: "sc" }],
+    products: [{ productItemId: "", targetQty: 0, damageQty: 0, uom: "PCS", sourceSalesOrderLineId: "", rawMaterials: [{ rawMaterialId: "", requiredQty: "", uom: "", storeId: "", remarks: "" }] }],
     productionOrderId: "",
     orderDate: today,
     dueDate: nextWeek,
@@ -668,8 +666,7 @@ const ProductionOrderCreate: React.FC = () => {
                                 damageQty: 0,
                                 uom: item.product?.uom?.name || "PCS",
                                 sourceSalesOrderLineId: item.id?.toString() || "",
-                                rawMaterials: [{ rawMaterialId: "", requiredQty: "", uom: "", storeId: "", remarks: "" }],
-                                colorType: item.colorType || "sc"
+                                rawMaterials: [{ rawMaterialId: "", requiredQty: "", uom: "", storeId: "", remarks: "" }]
                             };
                         });
                         setValue("products", newProducts);
@@ -876,16 +873,14 @@ const ProductionOrderCreate: React.FC = () => {
                             damageQty: Number((fullOrder as any).damageQty) || 0,
                             uom: fullOrder.uom || "PCS",
                             sourceSalesOrderLineId: fullOrder.sourceSalesOrderLineId || "",
-                            rawMaterials: rmRows,
-                            colorType: fullOrder.colorType || "sc",
+                            rawMaterials: rmRows
                         })) : [{
                             productItemId: fullOrder.productItemId?.toString() || "",
                             targetQty: Number(fullOrder.targetQty) || 0,
                             damageQty: Number((fullOrder as any).damageQty) || 0,
                             uom: fullOrder.uom || "PCS",
                             sourceSalesOrderLineId: fullOrder.sourceSalesOrderLineId || "",
-                            rawMaterials: rmRows,
-                            colorType: fullOrder.colorType || "sc",
+                            rawMaterials: rmRows
                         }],
                     });
                     setRowRmStates({});
@@ -903,7 +898,7 @@ const ProductionOrderCreate: React.FC = () => {
                 ...defaultValues,
                 sourceSalesOrderId:
                     (location.state as any)?.sourceSalesOrderId?.toString() || "",
-                products: [{ productItemId: "", targetQty: 0, damageQty: 0, uom: "PCS", rawMaterials: [{ rawMaterialId: "", requiredQty: "", uom: "", storeId: "", remarks: "" }], colorType: "sc" }],
+                products: [{ productItemId: "", targetQty: 0, damageQty: 0, uom: "PCS", rawMaterials: [{ rawMaterialId: "", requiredQty: "", uom: "", storeId: "", remarks: "" }] }],
             });
 
             productionOrderService
@@ -951,7 +946,6 @@ const ProductionOrderCreate: React.FC = () => {
                     targetQty: data.products?.[0]?.targetQty || 0,
                     damageQty: data.products?.[0]?.damageQty !== undefined ? Number(data.products[0].damageQty) : 0,
                     uom: data.products?.[0]?.uom || "PCS",
-                    colorType: data.products?.[0]?.colorType || "sc",
                     rawMaterials: (data.products?.[0]?.rawMaterials ?? []).map((rm) => ({
                         rawMaterialId: rm.rawMaterialId,
                         requiredQty: Number(rm.requiredQty),
@@ -990,7 +984,6 @@ const ProductionOrderCreate: React.FC = () => {
                         targetQty: prod.targetQty,
                         damageQty: prod.damageQty !== undefined ? Number(prod.damageQty) : 0,
                         uom: prod.uom,
-                        colorType: prod.colorType || "sc",
                         rawMaterials: productRawMaterials,
                     };
                     return productionOrderService.create(payload as any);
@@ -1109,7 +1102,7 @@ const ProductionOrderCreate: React.FC = () => {
                                             <DataTable
                                                 columns={salesOrderColumns}
                                                 data={selectedSalesOrderItems}
-                                                rowKey={(item: any) => item.productId + (item.colorType || '')}
+                                                rowKey={(item: any) => item.productId}
                                                 emptyMessage="No sales order items found."
                                                 className="border-0"
                                                 minHeightClassName="min-h-0"
@@ -1197,26 +1190,7 @@ const ProductionOrderCreate: React.FC = () => {
                                                     )}
                                                 />
                                             </div>
-                                            <div className="md:col-span-2">
-                                                <Controller
-                                                    name={`products.${index}.colorType` as const}
-                                                    control={control}
-                                                    render={({ field }) => (
-                                                        <SelectInput
-                                                            label="Color"
-                                                            name={field.name}
-                                                            value={field.value || "sc"}
-                                                            options={[
-                                                                { label: "Single Color", value: "sc" },
-                                                                { label: "Multi Color", value: "mc" },
-                                                            ]}
-                                                            onChange={field.onChange}
-                                                            disabled={!!watchSalesOrderId}
-                                                            error={errors.products?.[index]?.colorType?.message}
-                                                        />
-                                                    )}
-                                                />
-                                            </div>
+
                                             <div className="md:col-span-2">
                                                 <Controller
                                                     name={`products.${index}.uom` as const}
