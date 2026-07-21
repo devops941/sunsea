@@ -106,7 +106,6 @@ class ProductService {
       categoryId: Number(data.categoryId),
       subCategoryId: Number(data.subCategoryId),
       uomId: await this.resolveUomId(data.uomId),
-      sizeId: data.sizeId ? Number(data.sizeId) : null,
 
       capacityLitres: toNumberOrNull(data.capacityLitres),
       weightPerPiece: toNumberOrNull(data.weightPerPiece),
@@ -122,31 +121,6 @@ class ProductService {
       b2b: toNumberOrNull(data.b2b),
       b2c: toNumberOrNull(data.b2c),
       exportPrice: toNumberOrNull(data.exportPrice),
-
-
-      ...(colorIds.length
-        ? {
-          colors: {
-            create: colorIds.map((colorId, index) => {
-              let priceObj: any = {};
-              if (data.colorPricing) {
-                try {
-                  const pricingArr = typeof data.colorPricing === "string"
-                    ? JSON.parse(data.colorPricing)
-                    : data.colorPricing;
-                  priceObj = (pricingArr || []).find((p: any) => Number(p.colorId) === colorId) || {};
-                } catch (e) {
-                  console.error("Failed to parse colorPricing in create:", e);
-                }
-              }
-              return {
-                colorId,
-                isDefault: index === 0,
-              };
-            }),
-          },
-        }
-        : {}),
 
       ...(uploadedImages.length
         ? {
@@ -188,19 +162,6 @@ class ProductService {
     return prisma.product.create({
       data: {
         ...payload,
-        // Existing colors create block remains unchanged...
-        // New: create color type pricing rows
-        ...(colorTypePricingList.length > 0 && {
-          colorTypePrices: {
-            create: colorTypePricingList.map((p: any) => ({
-              colorType: p.typeId,                // "sc" or "mc"
-              b2b: toNumberOrNull(p.b2b),
-              mrp: toNumberOrNull(p.mrp),
-              b2c: toNumberOrNull(p.b2c),
-              exportPrice: toNumberOrNull(p.exportPrice),
-            })),
-          },
-        }),
         ...(data.openingStockQty && data.openingStockStoreId
           ? {
               finishedGoodsStocks: {
@@ -239,10 +200,7 @@ class ProductService {
         category: true,
         subCategory: true,
         uom: true,
-        colors: { include: { color: true } }, // ✅ multi-color
-        size: true,
         images: true,
-        colorTypePrices: true,
         billOfMaterials: { include: { rawMaterial: true } },
       },
     });
@@ -265,10 +223,7 @@ class ProductService {
       include: {
         category: true,
         subCategory: true,
-        colorTypePrices: true,
         uom: true,
-        colors: { include: { color: true } }, // ✅ was: color: true
-        size: true,
         images: true,
         finishedGoodsStocks: true,
         billOfMaterials: { include: { rawMaterial: true } },
@@ -285,10 +240,7 @@ class ProductService {
       include: {
         category: true,
         subCategory: true,
-        colorTypePrices: true,
         uom: true,
-        colors: { include: { color: true } }, // ✅ was: color: true
-        size: true,
         images: true,
         finishedGoodsStocks: true,
         billOfMaterials: { include: { rawMaterial: true } },
@@ -436,25 +388,6 @@ class ProductService {
         }
       }
 
-      if (colorTypePricingList !== null) {
-        // Delete all existing rows for this product
-        await tx.productColorTypePrice.deleteMany({ where: { productId: id } });
-
-        // Create new rows if the list is not empty
-        if (colorTypePricingList.length > 0) {
-          await tx.productColorTypePrice.createMany({
-            data: colorTypePricingList.map((p: any) => ({
-              productId: id,
-              colorType: p.typeId,
-              b2b: toNumberOrNull(p.b2b),
-              mrp: toNumberOrNull(p.mrp),
-              b2c: toNumberOrNull(p.b2c),
-              exportPrice: toNumberOrNull(p.exportPrice)
-            })),
-          });
-        }
-      }
-
       if (rawMaterialsList !== null) {
         await tx.billOfMaterial.deleteMany({ where: { productId: id } });
         if (rawMaterialsList.length > 0) {
@@ -469,35 +402,6 @@ class ProductService {
         }
       }
 
-      // ✅ Color handling — only if colorIds was sent in the request
-      if (colorIds !== null) {
-        await tx.productColor.deleteMany({ where: { productId: id } });
-
-        if (colorIds.length) {
-          let colorPricing: any[] = [];
-          if (data.colorPricing) {
-            try {
-              colorPricing = typeof data.colorPricing === "string"
-                ? JSON.parse(data.colorPricing)
-                : data.colorPricing;
-            } catch (e) {
-              console.error("Failed to parse colorPricing in update:", e);
-            }
-          }
-
-          await tx.productColor.createMany({
-            data: colorIds.map((colorId, index) => {
-              const priceObj = (colorPricing || []).find((p: any) => Number(p.colorId) === colorId) || {};
-              return {
-                productId: id,
-                colorId,
-                isDefault: index === 0,
-
-              };
-            }),
-          });
-        }
-      }
     });
 
     const payload: Prisma.ProductUncheckedUpdateInput = {
@@ -514,8 +418,6 @@ class ProductService {
       categoryId: data.categoryId ? Number(data.categoryId) : undefined,
       subCategoryId: undefined,
       uomId: data.uomId !== undefined ? await this.resolveUomId(data.uomId) : undefined,
-      // ✅ removed colorId — colors handled via ProductColor in transaction above
-      sizeId: data.sizeId !== undefined ? (data.sizeId ? Number(data.sizeId) : null) : undefined,
 
       capacityLitres: data.capacityLitres !== undefined ? toNumberOrNull(data.capacityLitres) : undefined,
       weightPerPiece: data.weightPerPiece !== undefined ? toNumberOrNull(data.weightPerPiece) : undefined,
@@ -578,9 +480,6 @@ class ProductService {
         category: true,
         subCategory: true,
         uom: true,
-        colors: { include: { color: true } }, // ✅ was: color: true
-        size: true,
-        colorTypePrices: true,
         images: true,
         billOfMaterials: { include: { rawMaterial: true } },
       },
