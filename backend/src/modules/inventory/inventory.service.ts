@@ -14,14 +14,27 @@ class InventoryService {
   }) {
     const { date, category, storeId, search, page, limit } = query;
 
+    let categoryFilterValue: any = undefined;
+    if (category) {
+      const normalized = category.toUpperCase().trim();
+      if (normalized === "RAW_MATERIAL" || normalized === "RAW_MATERIALS" || normalized === "RAW") {
+        categoryFilterValue = "RAW_MATERIAL";
+      } else if (normalized === "FINISHED_PRODUCT" || normalized === "FINISHED_PRODUCTS" || normalized === "FINISHED" || normalized === "PRODUCT") {
+        categoryFilterValue = "FINISHED_PRODUCT";
+      } else {
+        return { data: [], total: 0 };
+      }
+    }
+
     const where: any = {
       snapshotDate: date,
-      ...(category && { category }),
+      ...(categoryFilterValue && { category: categoryFilterValue }),
       ...(storeId && { storeId }),
       ...(search && {
         OR: [
           { itemCode: { contains: search, mode: "insensitive" } },
           { itemName: { contains: search, mode: "insensitive" } },
+          { uom: { contains: search, mode: "insensitive" } },
         ],
       }),
     };

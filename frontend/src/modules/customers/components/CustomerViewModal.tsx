@@ -106,9 +106,11 @@ const CustomerViewModal: React.FC<CustomerViewModalProps> = ({
                 {
                     title: "Contact Information",
                     fields: [
-                        { label: "Mobile Number", value: customer.mobile || "N/A" },
-                        { label: "Alternative Phone", value: customer.altPhone || "N/A" },
-                        { label: "WhatsApp Number", value: customer.whatsapp || "N/A" },
+                        ...(Array.isArray(customer.mobile) && customer.mobile.length > 0
+                            ? customer.mobile.map((p: any) => ({ label: p.label || "Phone", value: p.number }))
+                            : (customer as any).phones && Array.isArray((customer as any).phones) && (customer as any).phones.length > 0
+                                ? (customer as any).phones.map((p: any) => ({ label: p.label || "Phone", value: p.number }))
+                                : [{ label: "Mobile Number", value: typeof customer.mobile === "string" ? customer.mobile : "N/A" }]),
                         { label: "Email Address", value: customer.email || "N/A" }
                     ]
                 },

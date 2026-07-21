@@ -6,7 +6,7 @@ import app from "./app";
 import { prisma } from "./config/prisma";
 import { bootstrapAdmin } from "./utils/bootstrapAdmin";
 import "./modules/inventory/jobs/scheduler";
-// Global BigInt serialization for JSON responses
+// Global BigInt serialization for JSON responses (reconnected)
 // This ensures all BigInt values are converted to strings when Express calls JSON.stringify.
 (BigInt.prototype as any).toJSON = function () {
   return this.toString();

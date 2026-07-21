@@ -18,9 +18,8 @@ import { rawMaterialCategoryService } from "../../../services/rawMaterialCategor
 import CityStateSelect from "../../../components/ui/CityStateSelect/CityStateSelect";
 import type { StateCityOption } from "../../../components/ui/CityStateSelect/CityStateSelect";
 import MultiSelect from "../../../components/form/multiSelect/MultiSelect";
-import IndiaPhoneInput from "../../../components/ui/PhoneInput/PhoneInput";
 import AddressForm from "../../../components/form/AddressFrom/AddressFrom";
-
+import IndiaPhoneInput, { type PhoneEntry } from "../../../components/ui/PhoneInput/PhoneInput";
 
 import { validatePhoneNumber } from "../../../components/ui/PhoneInput/PhoneInput";
 import BackButton from "../../../components/ui/BackButton/BackButton";
@@ -50,30 +49,6 @@ const supplierFormSchema = z.object({
                 });
             }
         }),
-    altPhone: z.string()
-        .trim()
-        .max(15, "Maximum 15 characters allowed")
-        .superRefine((val, ctx) => {
-            const error = validatePhoneNumber(val, true);
-            if (error) {
-                ctx.addIssue({
-                    code: z.ZodIssueCode.custom,
-                    message: error,
-                });
-            }
-        }),
-    whatsapp: z.string()
-        .trim()
-        .max(15, "Maximum 15 characters allowed")
-        .superRefine((val, ctx) => {
-            const error = validatePhoneNumber(val, true);
-            if (error) {
-                ctx.addIssue({
-                    code: z.ZodIssueCode.custom,
-                    message: error,
-                });
-            }
-        }),
     email: z.preprocess((val) => (val === "" ? null : val), z.string().trim().email("Invalid email address").max(120).nullable()).optional(),
     website: z.string().trim().max(200, "Maximum 200 characters allowed").optional().nullable(),
     gstin: z.preprocess((val) => (val === "" ? null : val), z.string().trim().max(15, "Maximum 15 characters allowed").nullable()).optional(),
@@ -87,6 +62,7 @@ const supplierFormSchema = z.object({
     billingAddressCity: z.string().trim().min(1, "City is required"),
     billingAddressState: z.string().trim().min(1, "State is required"),
     billingAddressPincode: z.string().trim().min(1, "Pincode is required"),
+    billingAddressCountry: z.string().optional().nullable().default("India"),
     // stateCode: z.string().trim().length(2, "State code must be exactly 2 characters"),
     paymentTerms: z.enum(["Advance", "Net15", "Net30", "Net45", "Net60"]),
     leadTimeDays: z.number().int().min(0, "Lead time cannot be negative"),
@@ -116,7 +92,7 @@ const SupplierCreate: React.FC = () => {
     const [allRawMaterials, setAllRawMaterials] = useState<any[]>([]);
     const [rawMaterialOptions, setRawMaterialOptions] = useState<{ value: string; label: string }[]>([]);
     const [selectedParentCategories, setSelectedParentCategories] = useState<string[]>([]);
-
+    const [phones, setPhones] = useState<PhoneEntry[]>([]);
     const [formData, setFormData] = useState({
         // BUG-SUP-001 fix: companyId is now resolved server-side — no longer hardcoded here
         companyId: "",
@@ -130,8 +106,6 @@ const SupplierCreate: React.FC = () => {
         contactPerson: "",
         designation: "",
         mobile: "",
-        altPhone: "",
-        whatsapp: "",
         email: "",
         website: "",
         gstin: "",
@@ -145,6 +119,7 @@ const SupplierCreate: React.FC = () => {
         billingAddressCity: "",
         billingAddressState: "",
         billingAddressPincode: "",
+        billingAddressCountry: "India",
         stateCode: "TN",
         paymentTerms: "Net30",
         leadTimeDays: 7,
@@ -230,8 +205,6 @@ const SupplierCreate: React.FC = () => {
             contactPerson: "",
             designation: "",
             mobile: "",
-            altPhone: "",
-            whatsapp: "",
             email: "",
             website: "",
             gstin: "",
@@ -489,8 +462,25 @@ const SupplierCreate: React.FC = () => {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
+        const isBankEmpty = (b: any) =>
+            !b.bankHolderName?.trim() &&
+            !b.bankName?.trim() &&
+            !b.accountNumber?.trim() &&
+            !b.ifscCode?.trim() &&
+            !b.branchName?.trim();
+
+        const filteredBankAccounts = (formData.bankAccounts || []).filter(b => !isBankEmpty(b));
+
+        const primaryMobile = phones && phones.length > 0 ? phones[0].number : "";
+
+        const dataToValidate = {
+            ...formData,
+            mobile: primaryMobile,
+            bankAccounts: filteredBankAccounts,
+        };
+
         try {
-            supplierFormSchema.parse(formData);
+            supplierFormSchema.parse(dataToValidate);
             setErrors({});
         } catch (error) {
             if (error instanceof z.ZodError) {
@@ -518,9 +508,7 @@ const SupplierCreate: React.FC = () => {
                 .join(","),
             contactPerson: formData.contactPerson || null,
             designation: formData.designation || null,
-            mobile: formData.mobile,
-            altPhone: formData.altPhone || null,
-            whatsapp: formData.whatsapp || null,
+            mobile: phones,
             email: formData.email || null,
             website: formData.website || null,
             gstin: formData.gstin || null,
@@ -533,12 +521,13 @@ const SupplierCreate: React.FC = () => {
             billingCity: formData.billingAddressCity,
             billingState: formData.billingAddressState,
             billingPincode: formData.billingAddressPincode,
+            billingCountry: formData.billingAddressCountry || "India",
             stateCode: formData.stateCode,
             paymentTerms: formData.paymentTerms,
             leadTimeDays: formData.leadTimeDays,
             minOrderQty: formData.minOrderQty,
             currency: formData.currency,
-            bankAccount: formData.bankAccounts,
+            bankAccount: filteredBankAccounts,
             status: formData.status,
             addresses,
             materialPrices: materialPrices.map((mp) => ({
@@ -725,31 +714,23 @@ const SupplierCreate: React.FC = () => {
                                     error={errors.designation}
                                     onChange={handleChange}
                                 />
-                                <IndiaPhoneInput
-                                    label="Mobile Number"
-                                    name="mobile"
-                                    value={formData.mobile}
-                                    placeholder="Enter mobile number"
-                                    required
-                                    error={errors.mobile}
-                                    onChange={handleChange}
-                                />
-                                <IndiaPhoneInput
-                                    label="Alt Phone"
-                                    name="altPhone"
-                                    value={formData.altPhone}
-                                    placeholder="Enter secondary number"
-                                    error={errors.altPhone}
-                                    onChange={handleChange}
-                                />
-                                <IndiaPhoneInput
-                                    label="WhatsApp Number"
-                                    name="whatsapp"
-                                    value={formData.whatsapp}
-                                    placeholder="e.g. 9840012345"
-                                    error={errors.whatsapp}
-                                    onChange={handleChange}
-                                />
+                                <div>
+                                    <IndiaPhoneInput
+                                        multi
+                                        label="Mobile Numbers"
+                                        name="phones"
+                                        value={phones}
+                                        onChange={(e) => {
+                                            setPhones(e.target.value);
+                                            if (errors.mobile) {
+                                                setErrors((prev) => ({ ...prev, mobile: "" }));
+                                            }
+                                        }}
+                                        maxNumbers={5}
+                                        error={errors.mobile}
+                                    />
+                                </div>
+
                                 <TextInput
                                     label="Email"
                                     name="email"
@@ -793,6 +774,13 @@ const SupplierCreate: React.FC = () => {
                                         addressValue={formData.billingAddressLine1}
                                         onAddressChange={(v) => handleChange({ target: { name: "billingAddressLine1", value: v } })}
                                         addressError={errors.billingAddressLine1}
+
+                                        countryValue={formData.billingAddressCountry}
+                                        onCountryChange={(v) => {
+                                            setFormData(prev => ({ ...prev, billingAddressCountry: v, billingAddressState: "", billingAddressCity: "" }));
+                                            setErrors(prev => ({ ...prev, billingAddressCountry: "", billingAddressState: "", billingAddressCity: "" }));
+                                        }}
+                                        countryError={errors.billingAddressCountry}
 
                                         stateValue={formData.billingAddressState}
                                         onStateChange={(v) => {

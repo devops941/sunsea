@@ -17,10 +17,11 @@ export const createCustomerSchema = z.object({
   contactPerson: z.string().optional(),
   designation: z.string().optional(),
 
-  mobile: z.string().min(10, "Mobile number is required"),
+  mobile: z.any().optional().nullable(),
 
   altPhone: z.string().optional(),
   whatsapp: z.string().optional(),
+  phones: z.any().optional().nullable(),
 
   // accepts "", undefined, or a valid email — only rejects a malformed non-empty string
   email: z.preprocess(

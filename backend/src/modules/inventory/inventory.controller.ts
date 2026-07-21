@@ -10,11 +10,17 @@ class InventoryController {
    */
   getEodStock = asyncHandler(async (req: Request, res: Response) => {
     const { date, category, storeId, search, page = 1, limit = 20 } = req.query;
-    
-    const targetDate = date ? new Date(date as string) : new Date();
-    targetDate.setHours(0, 0, 0, 0);
 
-    const result = await inventoryService.getEodStock({
+    let targetDate: Date;
+    if (date && typeof date === "string") {
+      const [year, month, day] = date.split("T")[0].split("-").map(Number);
+      targetDate = new Date(Date.UTC(year, month - 1, day));
+    } else {
+      const now = new Date();
+      targetDate = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
+    }
+
+    let result = await inventoryService.getEodStock({
       date: targetDate,
       category: category as string || undefined,
       storeId: storeId as string || undefined,

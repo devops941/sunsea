@@ -20,17 +20,19 @@ class CustomerService {
       throw new Error("Customer code already exists for this company");
     }
 
-    const { addresses, ...restData } = data;
+    const { phones, addresses, ...restData } = data as any;
+    const mobileData = phones || restData.mobile || null;
 
-    return prisma.customer.create({
+    const newCustomer = await prisma.customer.create({
       data: {
         ...restData,
-        customerType: data.customerType.join(","),
+        mobile: mobileData as any,
+        customerType: Array.isArray(restData.customerType) ? restData.customerType.join(",") : restData.customerType,
         companyId: currentUser.companyId,
         createdBy: currentUser.userId,
         ...(addresses && addresses.length > 0 && {
           addresses: {
-            create: addresses.map((addr, index) => ({
+            create: addresses.map((addr: any, index: number) => ({
               address: addr,
               is_default: index === 0,
               label: `Address ${index + 1}`,
@@ -40,6 +42,8 @@ class CustomerService {
         })
       },
     });
+
+    return newCustomer;
   }
 
   // BUG-CUST-004 fix: added server-side pagination (page, limit, skip/take)
@@ -195,14 +199,16 @@ class CustomerService {
       }
     }
 
-    const { addresses, ...restData } = data as any;
+    const { phones, addresses, ...restData } = data as any;
+    const mobileData = phones !== undefined ? phones : restData.mobile;
 
-    return prisma.customer.update({
+    const updated = await prisma.customer.update({
       where: { id },
       data: {
         ...restData,
-        ...(data.customerType && {
-          customerType: data.customerType.join(","),
+        ...(mobileData !== undefined && { mobile: mobileData as any }),
+        ...(restData.customerType && {
+          customerType: Array.isArray(restData.customerType) ? restData.customerType.join(",") : restData.customerType,
         }),
         ...(addresses && {
           addresses: {
@@ -217,6 +223,8 @@ class CustomerService {
         })
       }
     });
+
+    return updated;
   }
 
   async deleteCustomer(id: string) {

@@ -42,12 +42,14 @@ class SupplierService {
       );
     }
 
-    const { addresses, userId, materialPrices, ...supplierData } = data;
+    const { addresses, userId, materialPrices, phones, ...supplierData } = data as any;
 
     const processedBankAccount = await processBankAccounts(supplierData.bankAccount);
+    const mobileData = phones || supplierData.mobile || null;
 
     const insertData: Prisma.SupplierCreateInput = {
       ...supplierData,
+      mobile: mobileData as any,
       bankAccount: processedBankAccount as any,
       minOrderQty: supplierData.minOrderQty !== undefined && supplierData.minOrderQty !== null ? new Prisma.Decimal(supplierData.minOrderQty) : undefined,
       createdBy: userId,
@@ -251,7 +253,7 @@ class SupplierService {
       }
     }
 
-    const { addresses, userId, materialPrices, ...supplierData } = data;
+    const { addresses, userId, materialPrices, phones, ...supplierData } = data as any;
 
     // We no longer need to map to a fallback user because updatedBy is a plain string
     let updatedByUserId = userId;
@@ -301,9 +303,11 @@ class SupplierService {
       }
 
       const processedBankAccount = await processBankAccounts(supplierData.bankAccount);
+      const mobileData = phones !== undefined ? phones : supplierData.mobile;
 
       const updateData: Prisma.SupplierUpdateInput = {
         ...supplierData,
+        ...(mobileData !== undefined && { mobile: mobileData as any }),
         bankAccount: processedBankAccount as any,
         minOrderQty: supplierData.minOrderQty !== undefined && supplierData.minOrderQty !== null ? new Prisma.Decimal(supplierData.minOrderQty) : undefined,
         updatedBy: updatedByUserId ? updatedByUserId : undefined,

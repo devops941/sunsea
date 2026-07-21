@@ -32,7 +32,8 @@ export const createSupplierSchema = z.object({
     rawMaterialCategories: z.string().max(255).optional().nullable(),
     contactPerson: z.string().max(80).optional().nullable(),
     designation: z.string().max(60).optional().nullable(),
-    mobile: z.string().min(1, "Mobile is required").max(15),
+    mobile: z.any().optional().nullable(),
+    phones: z.any().optional().nullable(),
     altPhone: z.string().max(15).optional().nullable(),
     whatsapp: z.string().max(15).optional(),
     email: z.string().email("Invalid email address").max(120).optional().nullable().or(z.literal("")),
@@ -69,6 +70,7 @@ export const createSupplierSchema = z.object({
       .string()
       .regex(/^\d{6}$/, "Pincode must be exactly 6 digits")
       .or(z.string().max(20)),  // keep max(20) for non-Indian use, but enforce 6-digit Indian format
+    billingCountry: z.string().optional().nullable().default("India"),
     stateCode: z.string().length(2, "State code must be exactly 2 characters"),
     paymentTerms: z.enum(["Advance", "Net15", "Net30", "Net45", "Net60"]),
     leadTimeDays: z.number().int().min(0, "Lead time cannot be negative"),

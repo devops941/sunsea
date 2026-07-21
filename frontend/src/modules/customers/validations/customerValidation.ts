@@ -46,19 +46,10 @@ export const validateCustomer = (
         newErrors.designation = "Designation should only contain letters";
     }
 
-    const mobileError = validatePhoneNumber(formData.mobile, true);
+    const primaryMobileNumber = Array.isArray(formData.mobile) && formData.mobile.length > 0 ? formData.mobile[0].number : (typeof formData.mobile === "string" ? formData.mobile : "");
+    const mobileError = validatePhoneNumber(primaryMobileNumber, true);
     if (mobileError) {
         newErrors.mobile = mobileError;
-    }
-
-    const altPhoneError = validatePhoneNumber(formData.altPhone, false);
-    if (altPhoneError) {
-        newErrors.altPhone = altPhoneError;
-    }
-
-    const whatsappError = validatePhoneNumber(formData.whatsapp, false);
-    if (whatsappError) {
-        newErrors.whatsapp = whatsappError;
     }
 
     const email = formData.email?.trim();

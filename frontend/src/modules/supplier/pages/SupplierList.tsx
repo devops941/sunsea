@@ -147,7 +147,7 @@ const SupplierList: React.FC = () => {
                                 { header: "#", width: "60px", render: (_item, index) => startIndex + index + 1, align: "center" },
                                 { header: "CODE", accessor: "supplierCode" },
                                 { header: "NAME", accessor: "legalName" },
-                                { header: "WHATSAPP", render: (supplier) => supplier.whatsapp || "N/A" },
+                                { header: "MOBILE", render: (supplier) => Array.isArray(supplier.mobile) && supplier.mobile.length > 0 ? supplier.mobile[0].number : (typeof supplier.mobile === "string" ? supplier.mobile : "N/A") },
                                 { header: "PAYMENT", accessor: "paymentTerms" },
                                 { header: "LEAD TIME", render: (supplier) => supplier.leadTimeDays !== null ? `${supplier.leadTimeDays} days` : "N/A" },
                                 // { header: "ON TIME", render: (supplier) => supplier.onTimePct !== null ? `${supplier.onTimePct} %` : "N/A" },

@@ -248,7 +248,7 @@ const InvoiceDetailPage: React.FC = () => {
                     shippingPincode: po.shippingPincode || "",
                     gstNumber: fullSupplier?.gstin || "",
                     contactName: fullSupplier?.contactPerson || "",
-                    mobileNumber: fullSupplier?.mobile || (fullSupplier as any)?.phone || "",
+                    mobileNumber: Array.isArray(fullSupplier?.mobile) && fullSupplier.mobile.length > 0 ? fullSupplier.mobile[0].number : (typeof fullSupplier?.mobile === "string" ? fullSupplier.mobile : ""),
                     email: fullSupplier?.email || "",
                     supplierAddress: [fullSupplier?.billingAddressLine1, fullSupplier?.billingCity, fullSupplier?.billingState].filter(Boolean).join(", "),
                 }));
@@ -308,7 +308,7 @@ const InvoiceDetailPage: React.FC = () => {
                 ...prev,
                 gstNumber: (sup as any).gstin || "",
                 contactName: (sup as any).contactPerson || "",
-                mobileNumber: (sup as any).mobile || (sup as any).phone || "",
+                mobileNumber: Array.isArray((sup as any)?.mobile) && (sup as any).mobile.length > 0 ? (sup as any).mobile[0].number : (typeof (sup as any)?.mobile === "string" ? (sup as any).mobile : ""),
                 email: (sup as any).email || "",
                 supplierAddress: [(sup as any).billingAddressLine1, (sup as any).billingCity, (sup as any).billingState].filter(Boolean).join(", "),
                 shippingAddressLine1: (sup as any).billingAddressLine1 || "",

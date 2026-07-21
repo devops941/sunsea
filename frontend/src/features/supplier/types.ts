@@ -21,9 +21,7 @@ export interface Supplier {
   category: string;
   contactPerson?: string | null;
   designation?: string | null;
-  mobile: string;
-  altPhone?: string | null;
-  whatsapp?: string | null;
+  mobile: any;
   email?: string | null;
   website?: string | null;
   gstin?: string | null;
@@ -36,6 +34,7 @@ export interface Supplier {
   billingCity: string;
   billingState: string;
   billingPincode: string;
+  billingCountry?: string | null;
   stateCode: string;
   paymentTerms: string;
   leadTimeDays: number;
@@ -63,9 +62,7 @@ export interface CreateSupplierDto {
   category: string;
   contactPerson?: string | null;
   designation?: string | null;
-  mobile: string;
-  altPhone?: string | null;
-  whatsapp?: string | null;
+  mobile: any;
   email?: string | null;
   website?: string | null;
   gstin?: string | null;
@@ -78,6 +75,7 @@ export interface CreateSupplierDto {
   billingCity: string;
   billingState: string;
   billingPincode: string;
+  billingCountry?: string | null;
   stateCode: string;
   paymentTerms: string;
   leadTimeDays: number;

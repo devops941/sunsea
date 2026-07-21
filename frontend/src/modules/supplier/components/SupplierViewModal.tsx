@@ -175,11 +175,12 @@ const SupplierViewModal: React.FC<SupplierViewModalProps> = ({
                 {
                     title: "Contact Information",
                     fields: [
-                        { label: "Mobile Number", value: supplier.mobile || "N/A" },
-                        { label: "Alternative Phone", value: supplier.altPhone || "N/A" },
-                        { label: "WhatsApp Number", value: supplier.whatsapp || "N/A" },
+                        ...(Array.isArray(supplier.mobile) && supplier.mobile.length > 0
+                            ? supplier.mobile.map((p: any) => ({ label: p.label || "Phone", value: p.number }))
+                            : (supplier as any).phones && Array.isArray((supplier as any).phones) && (supplier as any).phones.length > 0
+                                ? (supplier as any).phones.map((p: any) => ({ label: p.label || "Phone", value: p.number }))
+                                : [{ label: "Mobile Number", value: typeof supplier.mobile === "string" ? supplier.mobile : "N/A" }]),
                         { label: "Email Address", value: supplier.email || "N/A" },
-                        
                     ]
                 },
                 {
@@ -202,12 +203,13 @@ const SupplierViewModal: React.FC<SupplierViewModalProps> = ({
                                 const city = supplier.billingCity || supplier.billingAddress?.city || "N/A";
                                 const state = supplier.billingState || supplier.billingAddress?.state || "N/A";
                                 const pincode = supplier.billingPincode || supplier.billingAddress?.pincode || "N/A";
+                                const country = supplier.billingCountry || "India";
                                 return (
                                     <>
                                         {line1}
                                         {line2 ? `, ${line2}` : ""}
                                         <br />
-                                        {city}, {state} - {pincode}
+                                        {city}, {state} - {pincode}, {country}
                                     </>
                                 );
                             })(),

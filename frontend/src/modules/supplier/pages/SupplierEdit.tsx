@@ -16,7 +16,7 @@ import type { SupplierAddress } from "../../../features/supplier/types";
 import { rawMaterialService } from "../../../services/rawMaterialService";
 import { rawMaterialCategoryService } from "../../../services/rawMaterialCategoryService";
 import MultiSelect from "../../../components/form/multiSelect/MultiSelect";
-import IndiaPhoneInput from "../../../components/ui/PhoneInput/PhoneInput";
+import IndiaPhoneInput, { type PhoneEntry } from "../../../components/ui/PhoneInput/PhoneInput";
 import CityStateSelect from "../../../components/ui/CityStateSelect/CityStateSelect";
 import type { StateCityOption } from "../../../components/ui/CityStateSelect/CityStateSelect";
 import AddressForm from "../../../components/form/AddressFrom/AddressFrom";
@@ -35,8 +35,6 @@ const supplierFormSchema = z.object({
     contactPerson: z.string().trim().max(80, "Maximum 80 characters allowed").optional().nullable(),
     designation: z.string().trim().max(60, "Maximum 60 characters allowed").optional().nullable(),
     mobile: z.string().trim().min(1, "Mobile number is required").max(15, "Maximum 15 characters allowed"),
-    altPhone: z.string().trim().max(15, "Maximum 15 characters allowed").optional().nullable(),
-    whatsapp: z.string().trim().max(15, "Maximum 15 characters allowed").optional().nullable(),
     email: z.preprocess((val) => (val === "" ? null : val), z.string().trim().email("Invalid email address").max(120).nullable()).optional(),
     website: z.string().trim().max(200, "Maximum 200 characters allowed").optional().nullable(),
     gstin: z.preprocess((val) => (val === "" ? null : val), z.string().trim().max(15, "Maximum 15 characters allowed").nullable()).optional(),
@@ -50,6 +48,7 @@ const supplierFormSchema = z.object({
     billingAddressCity: z.string().trim().min(1, "City is required"),
     billingAddressState: z.string().trim().min(1, "State is required"),
     billingAddressPincode: z.string().trim().min(1, "Pincode is required"),
+    billingAddressCountry: z.string().optional().nullable().default("India"),
     // stateCode: z.string().trim().length(2, "State code must be exactly 2 characters"),
     paymentTerms: z.enum(["Advance", "Net15", "Net30", "Net45", "Net60"]),
     leadTimeDays: z.number().int().min(0, "Lead time cannot be negative"),
@@ -95,8 +94,6 @@ const SupplierEdit: React.FC = () => {
         contactPerson: "",
         designation: "",
         mobile: "",
-        altPhone: "",
-        whatsapp: "",
         email: "",
         website: "",
         gstin: "",
@@ -109,7 +106,8 @@ const SupplierEdit: React.FC = () => {
         billingAddressLine2: "",
         billingAddressCity: "",
         billingAddressState: "",
-        billingAddressPincode: "",
+        billingAddressPincode: supplierData?.billingPincode || "",
+        billingAddressCountry: supplierData?.billingCountry || "India",
         stateCode: "TN",
         paymentTerms: "Net30",
         leadTimeDays: 7,
@@ -139,6 +137,7 @@ const SupplierEdit: React.FC = () => {
         validFrom: string;
         validTo: string;
     }[]>([]);
+    const [phones, setPhones] = useState<PhoneEntry[]>([]);
 
     const handleClear = () => {
         if (supplierData) {
@@ -154,8 +153,6 @@ const SupplierEdit: React.FC = () => {
                 contactPerson: supplierData.contactPerson || "",
                 designation: supplierData.designation || "",
                 mobile: supplierData.mobile || "",
-                altPhone: supplierData.altPhone || "",
-                whatsapp: supplierData.whatsapp || "",
                 email: supplierData.email || "",
                 website: supplierData.website || "",
                 gstin: supplierData.gstin || "",
@@ -169,6 +166,7 @@ const SupplierEdit: React.FC = () => {
                 billingAddressCity: supplierData.billingCity || "",
                 billingAddressState: supplierData.billingState || "",
                 billingAddressPincode: supplierData.billingPincode || "",
+                billingAddressCountry: supplierData.billingCountry || "India",
                 stateCode: supplierData.stateCode || "TN",
                 paymentTerms: supplierData.paymentTerms || "Net30",
                 leadTimeDays: Number(supplierData.leadTimeDays) || 7,
@@ -237,6 +235,15 @@ const SupplierEdit: React.FC = () => {
                         pincode: "",
                     }
                 }]);
+            }
+            if (Array.isArray(supplierData.mobile) && supplierData.mobile.length > 0) {
+                setPhones(supplierData.mobile);
+            } else if ((supplierData as any).phones && Array.isArray((supplierData as any).phones) && (supplierData as any).phones.length > 0) {
+                setPhones((supplierData as any).phones);
+            } else if (typeof supplierData.mobile === "string" && supplierData.mobile) {
+                setPhones([{ label: "Mobile", number: supplierData.mobile }]);
+            } else {
+                setPhones([]);
             }
         }
     };
@@ -567,8 +574,25 @@ const SupplierEdit: React.FC = () => {
         e.preventDefault();
         if (!id) return;
 
+        const isBankEmpty = (b: any) =>
+            !b.bankHolderName?.trim() &&
+            !b.bankName?.trim() &&
+            !b.accountNumber?.trim() &&
+            !b.ifscCode?.trim() &&
+            !b.branchName?.trim();
+
+        const filteredBankAccounts = (formData.bankAccounts || []).filter(b => !isBankEmpty(b));
+
+        const primaryMobile = phones && phones.length > 0 ? phones[0].number : "";
+
+        const dataToValidate = {
+            ...formData,
+            mobile: primaryMobile,
+            bankAccounts: filteredBankAccounts,
+        };
+
         try {
-            supplierFormSchema.parse(formData);
+            supplierFormSchema.parse(dataToValidate);
             setErrors({});
         } catch (error) {
             if (error instanceof z.ZodError) {
@@ -596,9 +620,7 @@ const SupplierEdit: React.FC = () => {
                 .join(","),
             contactPerson: formData.contactPerson || null,
             designation: formData.designation || null,
-            mobile: formData.mobile,
-            altPhone: formData.altPhone || null,
-            whatsapp: formData.whatsapp || null,
+            mobile: phones,
             email: formData.email || null,
             website: formData.website || null,
             gstin: formData.gstin || null,
@@ -611,12 +633,13 @@ const SupplierEdit: React.FC = () => {
             billingCity: formData.billingAddressCity,
             billingState: formData.billingAddressState,
             billingPincode: formData.billingAddressPincode,
+            billingCountry: formData.billingAddressCountry || "India",
             stateCode: formData.stateCode,
             paymentTerms: formData.paymentTerms,
             leadTimeDays: formData.leadTimeDays,
             minOrderQty: formData.minOrderQty,
             currency: formData.currency,
-            bankAccount: formData.bankAccounts,
+            bankAccount: filteredBankAccounts,
             status: formData.status,
             addresses: addresses.map((addr) => {
                 const copy = { ...addr };
@@ -812,31 +835,22 @@ const SupplierEdit: React.FC = () => {
                                     error={errors.designation}
                                     onChange={handleChange}
                                 />
-                                <IndiaPhoneInput
-                                    label="Mobile Number"
-                                    name="mobile"
-                                    value={formData.mobile}
-                                    placeholder="Enter mobile number"
-                                    required
-                                    error={errors.mobile}
-                                    onChange={handleChange}
-                                />
-                                <IndiaPhoneInput
-                                    label="Alt Phone"
-                                    name="altPhone"
-                                    value={formData.altPhone}
-                                    placeholder="Enter secondary number"
-                                    error={errors.altPhone}
-                                    onChange={handleChange}
-                                />
-                                <IndiaPhoneInput
-                                    label="WhatsApp Number"
-                                    name="whatsapp"
-                                    value={formData.whatsapp}
-                                    placeholder="e.g. 9840012345"
-                                    error={errors.whatsapp}
-                                    onChange={handleChange}
-                                />
+                                <div>
+                                    <IndiaPhoneInput
+                                        multi
+                                        label="Mobile Numbers"
+                                        name="phones"
+                                        value={phones}
+                                        onChange={(e) => {
+                                            setPhones(e.target.value);
+                                            if (errors.mobile) {
+                                                setErrors((prev) => ({ ...prev, mobile: "" }));
+                                            }
+                                        }}
+                                        maxNumbers={5}
+                                        error={errors.mobile}
+                                    />
+                                </div>
                                 <TextInput
                                     label="Email"
                                     name="email"
@@ -880,6 +894,13 @@ const SupplierEdit: React.FC = () => {
                                         addressValue={formData.billingAddressLine1}
                                         onAddressChange={(v) => handleChange({ target: { name: "billingAddressLine1", value: v } })}
                                         addressError={errors.billingAddressLine1}
+
+                                        countryValue={formData.billingAddressCountry}
+                                        onCountryChange={(v) => {
+                                            setFormData(prev => ({ ...prev, billingAddressCountry: v, billingAddressState: "", billingAddressCity: "" }));
+                                            setErrors(prev => ({ ...prev, billingAddressCountry: "", billingAddressState: "", billingAddressCity: "" }));
+                                        }}
+                                        countryError={errors.billingAddressCountry}
 
                                         stateValue={formData.billingAddressState}
                                         onStateChange={(v) => {
