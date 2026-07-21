@@ -119,15 +119,10 @@ class SalesOrderService {
                 id: true,
                 gstRate: true,
                 gstTaxRateId: true,
-                colorTypePrices: {
-                    select: {
-                        colorType: true,
-                        b2b: true,
-                        mrp: true,
-                        b2c: true,
-                        exportPrice: true,
-                    },
-                },
+                b2b: true,
+                mrp: true,
+                b2c: true,
+                exportPrice: true,
             },
         });
 
@@ -157,24 +152,12 @@ class SalesOrderService {
                 id: p.id,
                 gstTaxRateId: p.gstTaxRateId,
                 gstRate: resolvedGstRate,
-                b2b: null,
-                mrp: null,
-                b2c: null,
-                exportPrice: null,
+                b2b: p.b2b,
+                mrp: p.mrp,
+                b2c: p.b2c,
+                exportPrice: p.exportPrice,
             };
             map.set(`${p.id.toString()}::${BASE_PRICE_KEY}`, baseRow);
-
-            for (const override of p.colorTypePrices) {
-                map.set(`${p.id.toString()}::${override.colorType}`, {
-                    id: p.id,
-                    b2b: override.b2b,
-                    mrp: override.mrp,
-                    b2c: override.b2c,
-                    exportPrice: override.exportPrice,
-                    gstTaxRateId: p.gstTaxRateId,
-                    gstRate: resolvedGstRate,
-                });
-            }
         }
         return map;
     }

@@ -20,7 +20,7 @@ const CompanySettings: React.FC = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch<AppDispatch>();
   const { data: company, loading } = useSelector((state: RootState) => state.company);
-  
+
   const isEditMode = location.pathname.includes('edit') || location.pathname.includes('settings') || !!(company && company.isOnboarded);
 
   const [formData, setFormData] = useState<UpdateCompanyDto>({});
@@ -175,8 +175,8 @@ const CompanySettings: React.FC = () => {
                   </div>
                   <div className="md:col-span-3">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  <ImageUpload label="Company Logo" name="logoFile" currentImageUrl={formData.logoUrl || undefined} onChange={handleChange as any} />
-                  <ImageUpload label="Favicon" name="faviconFile" currentImageUrl={formData.faviconUrl || undefined} onChange={handleChange as any} />
+                      <ImageUpload label="Company Logo" name="logoFile" currentImageUrl={formData.logoUrl || undefined} onChange={handleChange as any} />
+                      <ImageUpload label="Favicon" name="faviconFile" currentImageUrl={formData.faviconUrl || undefined} onChange={handleChange as any} />
                     </div>
                   </div>
                 </div>
@@ -355,7 +355,7 @@ const CompanySettings: React.FC = () => {
                     onCityChange={handleCityChange}
                     cityError={errors.city}
                     disabled={isEditMode}
-                    required  
+                    required
                   />
                 </div>
               </div>
