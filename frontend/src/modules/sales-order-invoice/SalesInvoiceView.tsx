@@ -305,8 +305,9 @@ const SalesInvoiceView: React.FC = () => {
                                                 <th className="py-3 px-2">ITEM DESCRIPTION</th>
                                                 <th className="py-3 px-2 w-24 text-right">QTY</th>
                                                 <th className="py-3 px-2 w-32 text-right">RATE</th>
-                                                <th className="py-3 px-2 w-24 text-right">TAX</th>
                                                 <th className="py-3 px-2 w-32 text-right">AMOUNT</th>
+                                                <th className="py-3 px-2 w-24 text-right">TAX</th>
+
                                             </tr>
                                         </thead>
                                         <tbody className="text-sm text-gray-800">
@@ -325,10 +326,11 @@ const SalesInvoiceView: React.FC = () => {
                                                     </td>
                                                     <td className="py-4 px-2 text-right font-semibold">{item.quantity ?? item.qty}</td>
                                                     <td className="py-4 px-2 text-right">{formatMoney(item.unitPrice ?? item.rate)}</td>
+                                                    <td className="py-4 px-2 text-right font-bold text-gray-900">{formatMoney(item.taxableAmount)}</td>
                                                     <td className="py-4 px-2 text-right font-medium">
                                                         {((item.taxRate ?? item.taxPercent ?? item.tax) !== undefined && (item.taxRate ?? item.taxPercent ?? item.tax) !== null) ? `${item.taxRate ?? item.taxPercent ?? item.tax}%` : "0%"}
                                                     </td>
-                                                    <td className="py-4 px-2 text-right font-bold text-gray-900">{formatMoney(item.lineTotal ?? item.totalAmount ?? item.total ?? item.amount)}</td>
+
                                                 </tr>
                                             ))}
                                             {(!invoice.items || invoice.items.length === 0) && (

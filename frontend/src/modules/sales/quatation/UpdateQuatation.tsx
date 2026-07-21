@@ -36,6 +36,7 @@ const QuotationReport: React.FC = () => {
     const location = useLocation();
 
     const [order, setOrder] = useState<SalesOrder | null>(null);
+    console.log(order, 'sdkjflk')
     const [loading, setLoading] = useState(true);
 
     const [actionMode, setActionMode] = useState<"approve" | "reject" | null>(null);
@@ -190,8 +191,8 @@ const QuotationReport: React.FC = () => {
                                     <th className="py-3 px-2 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wide">Product</th>
                                     <th className="py-3 px-2 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wide">Qty</th>
                                     <th className="py-3 px-2 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wide">Unit Price</th>
-                                    <th className="py-3 px-2 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wide">Discount</th>
-                                    <th className="py-3 px-2 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wide">Taxable</th>
+                                    {/* <th className="py-3 px-2 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wide">Discount</th> */}
+                                    <th className="py-3 px-2 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wide">SubTotal</th>
                                     {order.isInterState ? (
                                         <th className="py-3 px-2 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wide">IGST</th>
                                     ) : (
@@ -200,7 +201,7 @@ const QuotationReport: React.FC = () => {
                                             <th className="py-3 px-2 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wide">SGST</th>
                                         </>
                                     )}
-                                    <th className="py-3 pr-4 pl-2 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wide">Line Total</th>
+                                    {/* <th className="py-3 pr-4 pl-2 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wide">Line Total</th> */}
                                 </tr>
                             </thead>
                             <tbody>
@@ -213,13 +214,13 @@ const QuotationReport: React.FC = () => {
                                         </td>
                                         <td className="py-3 px-2 text-right text-gray-900">{item.quantity}</td>
                                         <td className="py-3 px-2 text-right text-gray-900">{formatMoney(getUnitPrice(item, order.customerType))}</td>
-                                        <td className="py-3 px-2 text-right text-gray-900">
+                                        {/* <td className="py-3 px-2 text-right text-gray-900">
                                             {formatMoney(item.discountAmount)}
                                             <div className="text-gray-500 text-xs">
                                                 ({item.discountType === "PERCENT" ? `${item.discountValue}%` : "flat"})
                                             </div>
-                                        </td>
-                                        <td className="py-3 px-2 text-right text-gray-900">{formatMoney(item.taxableAmount || item.taxableValue)}</td>
+                                        </td> */}
+                                        <td className="py-3 px-2 text-right text-gray-900">{formatMoney(item.lineSubtotal)}</td>
 
                                         {order.isInterState ? (
                                             <td className="py-3 px-2 text-right text-gray-900">
@@ -238,7 +239,7 @@ const QuotationReport: React.FC = () => {
                                                 </td>
                                             </>
                                         )}
-                                        <td className="py-3 pr-4 pl-2 text-right font-medium text-gray-900">{formatMoney(item.lineTotal)}</td>
+                                        {/* <td className="py-3 pr-4 pl-2 text-right font-medium text-gray-900">{formatMoney(item.lineTotal)}</td> */}
                                     </tr>
                                 ))}
                                 {(!order.items || order.items.length === 0) && (

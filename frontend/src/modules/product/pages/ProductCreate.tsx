@@ -17,8 +17,7 @@ import { useColors } from "../../../hooks/useColors";
 import { useSizes } from "../../../hooks/useSizes";
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
 import { fetchGstTaxes, selectActiveGstTaxes } from "../../../features/gst/gstSlice";
-
-
+import FlowInput from "../../../components/ui/FlowInput/FlowInput";
 
 const ProductCreatePage: React.FC = () => {
     const navigate = useNavigate();
@@ -70,6 +69,7 @@ const ProductCreatePage: React.FC = () => {
     type RawMaterialRow = { rawMaterialId: string; percentage: string; };
     const [rawMaterials, setRawMaterials] = useState<RawMaterialRow[]>([]);
     const [rawMaterialOptions, setRawMaterialOptions] = useState<{ value: string, label: string }[]>([]);
+    const [productionSteps, setProductionSteps] = useState<string[]>([]);
 
     // Load initial data
     useEffect(() => {
@@ -201,6 +201,16 @@ const ProductCreatePage: React.FC = () => {
             });
         }
 
+
+        if (productionSteps.length > 0) {
+            const normalized = productionSteps.map(s => s.trim().toLowerCase());
+            const uniqueCount = new Set(normalized).size;
+            if (uniqueCount !== normalized.length) {
+                newErrors.productionSteps = "Each step can only be added once";
+                toast.error("The same production step has been added more than once");
+            }
+        }
+
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
     };
@@ -241,6 +251,13 @@ const ProductCreatePage: React.FC = () => {
         });
         if (errors[`rawMaterials.${index}.${field}`] || errors.rawMaterials) {
             setErrors(prev => ({ ...prev, [`rawMaterials.${index}.${field}`]: "", rawMaterials: "" }));
+        }
+    };
+
+    const handleProductionStepsChange = (steps: string[]) => {
+        setProductionSteps(steps);
+        if (errors.productionSteps) {
+            setErrors(prev => ({ ...prev, productionSteps: "" }));
         }
     };
 
@@ -310,6 +327,7 @@ const ProductCreatePage: React.FC = () => {
             exportPrice: "",
         });
         setRawMaterials([]);
+        setProductionSteps([]);
         setErrors({});
         setImageFiles([]);
         setImagePreviews([]);
@@ -361,6 +379,15 @@ const ProductCreatePage: React.FC = () => {
                 ));
             }
 
+            if (productionSteps.length > 0) {
+                payload.append("productionSteps", JSON.stringify(
+                    productionSteps.map((step, index) => ({
+                        stepKey: step,
+                        stepOrder: index + 1,
+                    }))
+                ));
+            }
+
             // Append images
             imageFiles.forEach((file, index) => {
                 payload.append("images", file);
@@ -407,7 +434,7 @@ const ProductCreatePage: React.FC = () => {
     // ─── Render ───────────────────────────────────────────────────────────
     return (
         <div className="w-full mx-auto">
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+            <div className="bg-white  border border-gray-200">
                 {/* Page Header */}
                 <div className="px-6 py-4 border-b border-gray-100">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -617,7 +644,7 @@ const ProductCreatePage: React.FC = () => {
                                 error={errors.gstTaxRateId}
                                 disabled={gstLoading}
                             />
-                        </div>
+
 
                             <TextInput
                                 label="MRP (₹)"
@@ -660,6 +687,7 @@ const ProductCreatePage: React.FC = () => {
                                 error={errors.exportPrice}
                             />
                         </div>
+                    </div>
 
                     {/* Raw Materials Composition */}
                     <div className="pt-2">
@@ -733,6 +761,15 @@ const ProductCreatePage: React.FC = () => {
                                 No raw materials added. Click "Add Raw Material" to specify the composition.
                             </div>
                         )}
+                    </div>
+
+                    {/* Production Workflow (optional, free-text step-by-step pipeline) */}
+                    <div className="pt-2 flex flex-col w-full md:w-[50%]">
+                        <FlowInput
+                            value={productionSteps}
+                            onChange={handleProductionStepsChange}
+                            error={errors.productionSteps}
+                        />
                     </div>
 
                     {/* Form Actions */}
