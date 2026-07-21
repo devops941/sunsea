@@ -96,6 +96,13 @@ app.use(
     limit: "10mb",
   })
 );
+/** Request Logger Middleware */
+app.use((req, res, next) => {
+  const timestamp = new Date().toLocaleTimeString();
+  console.log(`[${timestamp}] ${req.method} ${req.originalUrl}`);
+  next();
+});
+
 /** Application Routes*/
 app.get("/", (req, res) => {
   res.status(200).json({
