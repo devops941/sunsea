@@ -108,7 +108,6 @@ class ProductionOrderService {
           orderType: data.orderType ?? "STANDARD",
           batchNo: data.batchNo,
           lotNo: data.lotNo,
-          colorType: data.colorType,
           sourceSalesOrderId: data.sourceSalesOrderId,
           sourceSalesOrderLineId,
           sourceStoreId: data.sourceStoreId,
@@ -582,9 +581,6 @@ class ProductionOrderService {
         updateData.sourceSalesOrderLineId = data.sourceSalesOrderLineId ? BigInt(data.sourceSalesOrderLineId) : null;
       }
 
-      if (data.colorType !== undefined) {
-        updateData.colorType = data.colorType;
-      }
 
       if (data.sourceStoreId !== undefined) {
         if (data.sourceStoreId) {

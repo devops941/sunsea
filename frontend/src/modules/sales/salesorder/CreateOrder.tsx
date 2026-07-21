@@ -28,7 +28,6 @@ const orderItemSchema = z.object({
         .string()
         .min(1, "Required")
         .refine(v => !isNaN(Number(v)) && Number(v) > 0, { message: "Must be > 0" }),
-    colorType: z.string().min(1, "Color type is required"),
 });
 
 const salesOrderSchema = z
@@ -40,6 +39,7 @@ const salesOrderSchema = z
         customerId: z.string().min(1, "Customer is required"),
         orderType: z.string().optional(),
         dispatchType: z.string().optional(),
+        referenceText: z.string().optional(),
         salesPersonId: z.string().optional(),
         paymentTermId: z.string().optional(),
         customerType: z.string().min(1, "Customer type is required"),
@@ -83,11 +83,11 @@ const salesOrderSchema = z
             });
         }
 
-        if (data.orderType === "salesperson" && !data.salesPersonId?.trim()) {
+        if ((data.orderType === "salesperson" || data.orderType === "reference") && !data.referenceText?.trim()) {
             ctx.addIssue({
                 code: z.ZodIssueCode.custom,
-                message: "Sales person is required",
-                path: ["salesPersonId"],
+                message: "Reference text is required",
+                path: ["referenceText"],
             });
         }
     });
@@ -115,7 +115,6 @@ type SalesOrderFormValues = z.infer<typeof salesOrderSchema> & {
         salesOrderId?: number;
         productId?: string | number;
         productCode?: string | number;
-        colorType?: string;
         quantity?: string | number;
         product?: {
             id?: string | number;
@@ -141,6 +140,7 @@ const defaultValues: SalesOrderFormValues = {
     billingState: "",
     dispatchType: "",
     orderType: "",
+    referenceText: "",
     billingPincode: "",
     sameAsBilling: false,
     shippingAddressLine1: "",
@@ -148,7 +148,7 @@ const defaultValues: SalesOrderFormValues = {
     shippingState: "",
     shippingPincode: "",
     isInterState: false,   // <-- default false
-    items: [{ productCode: "", quantity: "", colorType: "" }],
+    items: [{ productCode: "", quantity: "" }],
     remarks: "",
     internalNotes: "",
 };
@@ -260,9 +260,8 @@ const SalesOrderForm: React.FC = () => {
                         item.productId ?? item.product?.id ?? item.productCode ?? ""
                     ),
                     quantity: String(item.quantity ?? ""),
-                    colorType: String(item.colorType ?? ""),
                 }))
-                : [{ productCode: "", quantity: "", colorType: "" }];
+                : [{ productCode: "", quantity: "" }];
 
             reset({
                 id: state.id,
@@ -273,6 +272,7 @@ const SalesOrderForm: React.FC = () => {
                 expectedCompletionDate: state.expectedCompletionDate?.split("T")[0] || "",
                 customerId: state.customerId != null ? String(state.customerId) : "",
                 customerType: state.customerType ? String(state.customerType) : "",
+                referenceText: state.referenceText || "",
                 salesPersonId: state.salesPersonId != null ? String(state.salesPersonId) : "",
                 paymentTermId: state.paymentTermId != null ? String(state.paymentTermId) : "",
                 billingAddressLine1: state.billingAddressLine1 || "",
@@ -342,6 +342,35 @@ const SalesOrderForm: React.FC = () => {
     const shippingPincode = watch("shippingPincode");
     const selectedCustomerId = watch("customerId");
     const orderType = watch("orderType");
+
+    const [selectedShippingIndex, setSelectedShippingIndex] = useState<string>("");
+
+    const selectedCustomer = useMemo(() => {
+        if (!selectedCustomerId) return null;
+        return customers.find(c => String(c.id) === selectedCustomerId);
+    }, [selectedCustomerId, customers]);
+
+    const shippingAddressOptions = useMemo(() => {
+        if (!selectedCustomer?.addresses || selectedCustomer.addresses.length === 0) return [];
+        return selectedCustomer.addresses.map((addr: any, idx: number) => ({
+            label: addr.label || `Address ${idx + 1} (${addr.address?.city || ''})`,
+            value: String(idx),
+            original: addr.address
+        }));
+    }, [selectedCustomer]);
+
+    const handleShippingAddressSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const idxStr = e.target.value;
+        setSelectedShippingIndex(idxStr);
+        if (!idxStr || !selectedCustomer?.addresses) return;
+        const addrObj = selectedCustomer.addresses[Number(idxStr)]?.address;
+        if (addrObj) {
+            setValue("shippingAddressLine1", addrObj.addressLine1 || "", { shouldValidate: true });
+            setValue("shippingCity", addrObj.city || "", { shouldValidate: true });
+            setValue("shippingState", addrObj.state || "", { shouldValidate: true });
+            setValue("shippingPincode", addrObj.pincode || "", { shouldValidate: true });
+        }
+    };
 
     useEffect(() => {
         if (!selectedCustomerId) {
@@ -445,9 +474,6 @@ const SalesOrderForm: React.FC = () => {
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     // ─── Customer type options based on selected customer ──────────
-    const selectedCustomer = useMemo(() => {
-        return customers.find(c => String(c.id) === selectedCustomerId);
-    }, [customers, selectedCustomerId]);
 
     const customerTypeOptions = useMemo(() => {
         const raw = selectedCustomer?.customerType;
@@ -506,8 +532,8 @@ const SalesOrderForm: React.FC = () => {
             justResetRef.current = false;
             return;
         }
-        if (orderType !== "salesperson") {
-            setValue("salesPersonId", "", { shouldValidate: true });
+        if (orderType !== "salesperson" && orderType !== "reference") {
+            setValue("referenceText", "", { shouldValidate: true });
         }
     }, [orderType, setValue]);
 
@@ -526,10 +552,8 @@ const SalesOrderForm: React.FC = () => {
         try {
             const transformedItems = data.items.map(item => ({
                 productId: Number(item.productCode),
-                quantity: Number(item.quantity),
-                colorTypeId: item.colorType
+                quantity: Number(item.quantity)
             }));
-
             const payload = {
                 orderNo: data.orderNo,
                 orderDate: new Date(data.orderDate).toISOString(),
@@ -538,7 +562,8 @@ const SalesOrderForm: React.FC = () => {
                 customerType: data.customerType,
                 orderType: data.orderType,
                 dispatchType: data.dispatchType,
-                salesPersonId: data.orderType === "salesperson" && data.salesPersonId ? Number(data.salesPersonId) : null,
+                referenceText: data.referenceText || null,
+                salesPersonId: null,
                 paymentTermId: data.paymentTermId ? Number(data.paymentTermId) : null,
                 billingAddressLine1: data.billingAddressLine1 ?? '',
                 billingCity: data.billingCity ?? '',
@@ -659,12 +684,12 @@ const SalesOrderForm: React.FC = () => {
                             )} />
                         </div>
 
-                        {orderType === "salesperson" && (
+                        {(orderType === "salesperson" || orderType === "reference") && (
                             <div>
-                                <Controller name="salesPersonId" control={control} render={({ field }) => (
-                                    <SelectInput label="Sales Person" name={field.name} value={field.value ?? ""} options={salesPersonOptions} defaultOptionLabel="select sales person" onChange={field.onChange} />
+                                <Controller name="referenceText" control={control} render={({ field }) => (
+                                    <TextInput label="Reference Name" name={field.name} value={field.value ?? ""} placeholder="Enter name or reference" onChange={field.onChange} />
                                 )} />
-                                <Err message={errors.salesPersonId?.message} />
+                                <Err message={errors.referenceText?.message} />
                             </div>
                         )}
                     </div>
@@ -698,11 +723,28 @@ const SalesOrderForm: React.FC = () => {
                                 <h6 className="text-lg font-semibold text-gray-800 mb-0">Shipping</h6>
                                 <Controller name="sameAsBilling" control={control} render={({ field }) => (
                                     <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-700 mb-0">
-                                        <input type="checkbox" className="w-4 h-4 text-blue-600 rounded border-gray-300" checked={field.value} onChange={e => field.onChange(e.target.checked)} />
+                                        <input type="checkbox" className="w-4 h-4 text-blue-600 rounded border-gray-300" checked={field.value} onChange={e => {
+                                            field.onChange(e.target.checked);
+                                            if (e.target.checked) setSelectedShippingIndex("");
+                                        }} />
                                         <span>Same as billing</span>
                                     </label>
                                 )} />
                             </div>
+
+                            {!sameAsBilling && (
+                                <div className="mb-4">
+                                    <SelectInput
+                                        label="Select Saved Address"
+                                        options={shippingAddressOptions}
+                                        value={selectedShippingIndex}
+                                        onChange={handleShippingAddressSelect}
+                                        defaultOptionLabel={shippingAddressOptions.length > 0 ? "-- Select saved address --" : "No additional addresses saved"}
+                                        disabled={shippingAddressOptions.length === 0}
+                                    />
+                                </div>
+                            )}
+
                             <AddressForm
                                 addressValue={shippingAddressLine1 || ""}
                                 onAddressChange={(val) => setValue("shippingAddressLine1", val, { shouldValidate: true })}
@@ -727,7 +769,7 @@ const SalesOrderForm: React.FC = () => {
 
                     <div className="flex justify-between items-center mb-4">
                         <span className="text-lg font-semibold text-gray-800">Order Items</span>
-                        <CustomButton text="Add Item" variant="secondary" icon={FaPlus} onClick={() => append({ productCode: "", quantity: "", colorType: "" })} />
+                        <CustomButton text="Add Item" variant="secondary" icon={FaPlus} onClick={() => append({ productCode: "", quantity: "" })} />
                     </div>
                     {errors.items?.root && <Err message={errors.items.root.message} />}
 
@@ -736,7 +778,6 @@ const SalesOrderForm: React.FC = () => {
                         fields={fields}
                         errors={errors}
                         productOptions={productOptions}
-                        colorOptions={COLOUR_OPTIONS}
                         remove={remove}
                         editable={true}
                     />

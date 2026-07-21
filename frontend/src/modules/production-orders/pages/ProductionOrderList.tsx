@@ -500,10 +500,7 @@ const ProductionOrderList: React.FC = () => {
                     { label: "Order Date", value: formatDate(fullOrder?.orderDate || selectedItem.orderDate) },
                     { label: "Due Date", value: formatDate(fullOrder?.dueDate || selectedItem.dueDate) },
                     { label: "Order Type", value: fullOrder?.orderType || selectedItem.orderType || "-" },
-                    { 
-                        label: "Color Type", 
-                        value: (fullOrder?.colorType || selectedItem.colorType) === 'mc' ? 'MULTI COLOR' : 'SINGLE COLOR' 
-                    },
+
                 ],
             },
         ]

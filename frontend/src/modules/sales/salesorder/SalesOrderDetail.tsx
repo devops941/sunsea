@@ -162,6 +162,7 @@ const SalesOrderDetail: React.FC = () => {
                                     <DetailBox label="Order Date" value={formatDate(order.orderDate)} icon={<FaCalendarAlt />} />
                                     <DetailBox label="Expected Completion" value={formatDate(order.expectedCompletionDate)} icon={<FaCalendarAlt />} />
                                     <DetailBox label="Order Type" value={order.orderType} icon={<FaGlobe />} />
+                                    {order.referenceText && <DetailBox label="Reference Name" value={order.referenceText} icon={<FaUser />} />}
                                     <DetailBox label="Dispatch Type" value={order.dispatchType} icon={<FaTruck />} />
                                     <DetailBox
                                         label="Production Status"
@@ -220,7 +221,7 @@ const SalesOrderDetail: React.FC = () => {
                                             <tr className="bg-gray-50 border-b border-gray-200">
                                                 <th className="py-3 pl-4 pr-2 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wide w-8">#</th>
                                                 <th className="py-3 px-2 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wide">Product</th>
-                                                <th className="py-3 px-2 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wide">Color</th>
+
                                                 <th className="py-3 px-2 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wide">Qty</th>
                                                 <th className="py-3 px-2 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wide">Unit Price</th>
                                                 {order.isInterState ? (
@@ -242,7 +243,7 @@ const SalesOrderDetail: React.FC = () => {
                                                         <div className="font-medium text-gray-900">{item.product?.productName}</div>
                                                         <div className="text-gray-500 text-xs">{item.product?.productCode}</div>
                                                     </td>
-                                                    <td className="py-3 px-2 text-gray-700">{COLOR_TYPE_LABELS[item.colorType] || item.colorType || "—"}</td>
+
                                                     <td className="py-3 px-2 text-right text-gray-900">{item.quantity}</td>
                                                     <td className="py-3 px-2 text-right text-gray-900">{formatMoney(getUnitPrice(item, order.customerType))}</td>
 

@@ -28,10 +28,7 @@ const formatDate = (val?: string | null) => {
     return new Date(val).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
 };
 
-const COLOR_TYPE_LABELS: Record<string, string> = {
-    sc: "Single Color",
-    mc: "Multi Color",
-};
+
 
 // ─── Component ────────────────────────────────────────────────────────────
 const QuotationReport: React.FC = () => {
@@ -191,7 +188,6 @@ const QuotationReport: React.FC = () => {
                                 <tr className="bg-gray-50 border-b border-gray-200">
                                     <th className="py-3 pl-4 pr-2 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wide w-8">#</th>
                                     <th className="py-3 px-2 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wide">Product</th>
-                                    <th className="py-3 px-2 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wide">Color</th>
                                     <th className="py-3 px-2 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wide">Qty</th>
                                     <th className="py-3 px-2 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wide">Unit Price</th>
                                     <th className="py-3 px-2 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wide">Discount</th>
@@ -215,7 +211,6 @@ const QuotationReport: React.FC = () => {
                                             <div className="font-medium text-gray-900">{item.product?.productName || item.productId}</div>
                                             <div className="text-gray-500 text-xs">{item.product?.productCode}</div>
                                         </td>
-                                        <td className="py-3 px-2 text-gray-700">{COLOR_TYPE_LABELS[item.colorType] || item.colorType || "—"}</td>
                                         <td className="py-3 px-2 text-right text-gray-900">{item.quantity}</td>
                                         <td className="py-3 px-2 text-right text-gray-900">{formatMoney(getUnitPrice(item, order.customerType))}</td>
                                         <td className="py-3 px-2 text-right text-gray-900">

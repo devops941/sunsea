@@ -21,11 +21,7 @@ import { fetchGstTaxes, selectActiveGstTaxes } from "../../../features/gst/gstSl
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
 import { useSelector } from "react-redux";
 
-// ─── Options ────────────────────────────────────────────────────────────────
-const COLOR_TYPE_LABELS: Record<string, string> = {
-    sc: "Single Color",
-    mc: "Multi Color",
-};
+
 
 // ─── Zod Schema ─────────────────────────────────────────────────────────────
 // No per-item discount fields — discount is now ONLY at order level.
@@ -35,7 +31,7 @@ const orderItemSchema = z.object({
         .string()
         .min(1, "Required")
         .refine(v => !isNaN(Number(v)) && Number(v) > 0, { message: "Must be > 0" }),
-    colorType: z.string().optional(),
+
     mrp: z.string().optional(),
     b2b: z.string().optional(),
     b2c: z.string().optional(),
@@ -99,7 +95,7 @@ const defaultValues: QuotationFormValues = {
     shippingPincode: "",
     items: [{
         productId: "", quantity: "",
-        colorType: "", mrp: "", b2b: "", b2c: "", exportPrice: "",
+        mrp: "", b2b: "", b2c: "", exportPrice: "",
         gstRate: "", cessRate: "", gstTaxRateId: "",
     }],
     remarks: "",
@@ -255,7 +251,6 @@ const QuotationForm: React.FC = () => {
             ? order.items.map((item: any) => ({
                 productId: String(item.productId || ""),
                 quantity: String(item.quantity || ""),
-                colorType: item.colorType || "",
                 mrp: item.mrp != null ? String(item.mrp) : "",
                 b2b: item.b2b != null ? String(item.b2b) : "",
                 b2c: item.b2c != null ? String(item.b2c) : "",
@@ -266,7 +261,7 @@ const QuotationForm: React.FC = () => {
             }))
             : [{
                 productId: "", quantity: "",
-                colorType: "", mrp: "", b2b: "", b2c: "", exportPrice: "",
+                mrp: "", b2b: "", b2c: "", exportPrice: "",
                 gstRate: "", cessRate: "", gstTaxRateId: "",
             }];
 
@@ -549,7 +544,6 @@ const QuotationForm: React.FC = () => {
             const transformedItems = data.items.map(item => ({
                 productId: Number(item.productId),
                 quantity: Number(item.quantity),
-                colorTypeId: item.colorType || undefined,
                 gstTaxRateId: item.gstTaxRateId || undefined,
             }));
 
@@ -741,7 +735,7 @@ const QuotationForm: React.FC = () => {
                                             <tr className="bg-gray-50 border-b border-gray-200">
                                                 <th className="py-3 pl-4 pr-2 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wide w-8">#</th>
                                                 <th className="py-3 px-2 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wide">Product</th>
-                                                <th className="py-3 px-2 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wide">Color Type</th>
+                                                {/* <th className="py-3 px-2 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wide">Color Type</th> */}
                                                 <th className="py-3 px-2 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wide">Qty</th>
                                                 <th className="py-3 px-2 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wide">Unit Price</th>
                                                 <th className="py-3 px-2 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wide">Subtotal</th>
@@ -764,10 +758,6 @@ const QuotationForm: React.FC = () => {
                                                         <td className="py-3 px-2">
                                                             <div className="font-medium text-gray-900">{product?.productName || "—"}</div>
                                                             <div className="text-gray-500 text-xs">{product?.productCode}</div>
-                                                        </td>
-
-                                                        <td className="py-3 px-2 text-gray-700">
-                                                            {COLOR_TYPE_LABELS[itemValue?.colorType || ''] || itemValue?.colorType || '—'}
                                                         </td>
 
                                                         <td className="py-3 px-2 text-right text-gray-900">

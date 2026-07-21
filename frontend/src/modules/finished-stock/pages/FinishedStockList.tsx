@@ -195,8 +195,8 @@ const FinishedStockList: React.FC<FinishedStockListProps> = ({ storeId: propStor
                                 { label: "Product Code", value: selectedItem.product?.productCode || "N/A" },
                                 { label: "Product Name", value: selectedItem.product?.productName || "N/A" },
                                 { label: "Category", value: selectedItem.product?.category?.categoryName || "N/A" },
-                                { label: "Color", value: selectedItem.product?.colors?.map((c: any) => c.color?.colorName).join(", ") || "N/A" },
-                                { label: "Size", value: selectedItem.product?.size?.sizeName ? `${selectedItem.product.size.sizeName} (${selectedItem.product.size.sizeCode})` : "N/A" },
+                                // { label: "Color", value: selectedItem.product?.colors?.map((c: any) => c.color?.colorName).join(", ") || "N/A" },
+                                // { label: "Size", value: selectedItem.product?.size?.sizeName ? `${selectedItem.product.size.sizeName} (${selectedItem.product.size.sizeCode})` : "N/A" },
                                 { label: "Store / Location", value: selectedItem.store?.storeName || "N/A" },
                                 { label: "HSN Code", value: selectedItem.product?.hsnCode || "N/A" },
                             ]

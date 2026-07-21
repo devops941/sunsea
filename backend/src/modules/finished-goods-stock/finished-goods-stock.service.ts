@@ -74,13 +74,7 @@ class FinishedGoodsStockService {
         product: {
           include: {
             category: true,
-            colors: {
-              include: {
-                color: true,
-              },
-            },
             uom: true,
-            size: true,
           },
         },
       },
@@ -103,13 +97,7 @@ class FinishedGoodsStockService {
         product: {
           include: {
             category: true,
-            colors: {
-              include: {
-                color: true,
-              },
-            },
             uom: true,
-            size: true,
           },
         },
       },
