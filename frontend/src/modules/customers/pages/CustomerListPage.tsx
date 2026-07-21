@@ -140,7 +140,7 @@ const CustomerListPage: React.FC = () => {
                 { header: "#", width: "60px", render: (_item, index) => startIndex + index + 1, align: "center" },
                 { header: "CUSTOMER CODE", accessor: "customerCode" },
                 { header: "FIRM NAME", accessor: "firmName" },
-                { header: "Shift Management", render: (customer) => customer.mobile || "N/A" },
+                { header: "MOBILE", render: (customer) => Array.isArray(customer.mobile) && customer.mobile.length > 0 ? customer.mobile[0].number : (typeof customer.mobile === "string" ? customer.mobile : "N/A") },
                 // BUG-CUST-006 fix: renamed "GMAIL" to "EMAIL"
                 { header: "EMAIL", render: (customer) => customer.email || "N/A" },
                 {

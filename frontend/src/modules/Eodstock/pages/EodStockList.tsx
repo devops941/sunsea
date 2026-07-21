@@ -41,7 +41,7 @@ const EodStockList: React.FC = () => {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("");
   const [storeIdFilter, setStoreIdFilter] = useState<string>("");
-  const [selectedDate, setSelectedDate] = useState("2026-07-18");
+  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [simulateEmptyState, setSimulateEmptyState] = useState(false);

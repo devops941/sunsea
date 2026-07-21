@@ -13,7 +13,7 @@ import { customerService } from "../../../services/customerService";
 import { useSelector } from "react-redux";
 import { validateCustomer } from "../validations/customerValidation";
 import MultiSelect from "../../../components/form/multiSelect/MultiSelect";
-import IndiaPhoneInput from "../../../components/ui/PhoneInput/PhoneInput";
+import IndiaPhoneInput, { type PhoneEntry } from "../../../components/ui/PhoneInput/PhoneInput";
 
 const getGstStateCode = (stateName: string): string => {
   const normalized = stateName.toLowerCase().replace(/[^a-z]/g, "");
@@ -94,10 +94,6 @@ const mapCustomerToFormData = (customer: any): CustomerFormData => {
     contactPerson: customer.contactPerson || "",
     designation: customer.designation || "",
 
-    mobile: customer.mobile || "",
-    altPhone: customer.altPhone || "",
-    whatsapp: customer.whatsapp || "",
-
     email: customer.email || "",
 
     gstin: customer.gstin || "",
@@ -144,14 +140,28 @@ const CustomerEditPage: React.FC = () => {
 
   const [formData, setFormData] = useState<CustomerFormData>(initialFormData);
   const [addresses, setAddresses] = useState<any[]>([]);
+  const [phones, setPhones] = useState<PhoneEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const user = useSelector((state: any) => state.auth.user);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [shippingResetKey, setShippingResetKey] = useState(0);
 
+  const populatePhones = (cust: any) => {
+    if (Array.isArray(cust.mobile) && cust.mobile.length > 0) {
+      setPhones(cust.mobile);
+    } else if (cust.phones && Array.isArray(cust.phones) && cust.phones.length > 0) {
+      setPhones(cust.phones);
+    } else if (typeof cust.mobile === "string" && cust.mobile) {
+      setPhones([{ label: "Primary Mobile Number", number: cust.mobile }]);
+    } else {
+      setPhones([]);
+    }
+  };
+
   useEffect(() => {
     if (location.state) {
         setFormData(mapCustomerToFormData(location.state));
+        populatePhones(location.state);
         if (location.state.addresses && location.state.addresses.length > 0) {
             setAddresses(location.state.addresses);
         }
@@ -162,6 +172,7 @@ const CustomerEditPage: React.FC = () => {
       try {
         const customer = await customerService.fetchById(id);
         setFormData(mapCustomerToFormData(customer));
+        populatePhones(customer);
         if (customer.addresses && customer.addresses.length > 0) {
             setAddresses(customer.addresses);
         } else {
@@ -305,15 +316,19 @@ const CustomerEditPage: React.FC = () => {
     }
 
     try {
+      const phonesPayload = [
+        ...(formData.mobile ? [{ label: 'Primary Mobile Number', number: formData.mobile }] : []),
+        ...(formData.altPhone ? [{ label: 'Alternative Number', number: formData.altPhone }] : []),
+        ...(formData.whatsapp ? [{ label: 'WhatsApp Number', number: formData.whatsapp }] : []),
+      ];
+
       await editCustomer(id, {
         firmName: formData.firmName,
         displayName: formData.displayName || undefined,
         customerType: formData.customerType,
         contactPerson: formData.contactPerson || undefined,
         designation: formData.designation || undefined,
-        mobile: formData.mobile,
-        altPhone: formData.altPhone || undefined,
-        whatsapp: formData.whatsapp || undefined,
+        mobile: phones,
         email: formData.email || undefined,
         gstin: formData.gstin || undefined,
         billingAddressLine1: formData.billingAddressLine1,
@@ -422,14 +437,20 @@ const CustomerEditPage: React.FC = () => {
                   <TextInput label="Designation" name="designation" value={formData.designation} placeholder="Proprietor" error={errors.designation} onChange={handleChange} />
                 </div>
                 <div>
-                  <IndiaPhoneInput label="Mobile" name="mobile" value={formData.mobile} placeholder="98400 XXXXX" required onChange={handleChange} error={errors.mobile} />
-                </div>
-                <div>
-                  {/* BUG-CUST-003 fix: altPhone is optional on the backend — removed required prop */}
-                  <IndiaPhoneInput label="Alt. Phone" name="altPhone" value={formData.altPhone} placeholder="98400 XXXXX" onChange={handleChange} error={errors.altPhone} />
-                </div>
-                <div>
-                  <IndiaPhoneInput label="WhatsApp #" name="whatsapp" value={formData.whatsapp} placeholder="98400 XXXXX" onChange={handleChange} error={errors.whatsapp} />
+                  <IndiaPhoneInput
+                    multi
+                    label="Mobile Numbers"
+                    name="phones"
+                    value={phones}
+                    onChange={(e) => {
+                      setPhones(e.target.value);
+                      if (errors.mobile) {
+                        setErrors((prev) => ({ ...prev, mobile: "" }));
+                      }
+                    }}
+                    maxNumbers={5}
+                    error={errors.mobile}
+                  />
                 </div>
                 <div>
                   <TextInput label="Email" name="email" type="email" value={formData.email} placeholder="x@y.com" error={errors.email} onChange={handleChange} />

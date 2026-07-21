@@ -22,9 +22,7 @@ export interface Customer {
   customerType: string;
   contactPerson?: string | null;
   designation?: string | null;
-  mobile: string;
-  altPhone?: string | null;
-  whatsapp?: string | null;
+  mobile: any;
   email?: string | null;
   gstin?: string | null;
   pan?: string | null;
@@ -67,9 +65,7 @@ export interface CreateCustomerDto {
   customerType: string[];
   contactPerson?: string;
   designation?: string;
-  mobile: string;
-  altPhone?: string;
-  whatsapp?: string;
+  mobile: any;
   email?: string;
   gstin?: string;
   //pan?: string;
