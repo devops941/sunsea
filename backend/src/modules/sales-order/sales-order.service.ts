@@ -26,7 +26,6 @@ type ProductPricingRow = {
 
 type LineCalculation = {
     productId: bigint;
-    colorType: string;
     quantity: Prisma.Decimal;
     b2b: Prisma.Decimal | null;
     mrp: Prisma.Decimal | null;
@@ -50,7 +49,6 @@ type LineCalculation = {
 type IncomingItem = {
     productId: string | number | bigint;
     quantity: number | string;
-    colorTypeId: string;
 };
 
 const BASE_PRICE_KEY = "__base__";
@@ -82,13 +80,13 @@ class SalesOrderService {
         }
     }
 
-    private assertNoDuplicateProductColorPairs(items: IncomingItem[]) {
+    private assertNoDuplicateProducts(items: IncomingItem[]) {
         const seenAt = new Map<string, number>();
         const duplicateIndexes = new Set<number>();
         const duplicatePairs = new Set<string>();
 
         items.forEach((item, index) => {
-            const key = `${item.productId.toString()}::${item.colorTypeId}`;
+            const key = `${item.productId.toString()}`;
             if (seenAt.has(key)) {
                 duplicateIndexes.add(seenAt.get(key)!);
                 duplicateIndexes.add(index);
@@ -100,15 +98,14 @@ class SalesOrderService {
 
         if (duplicateIndexes.size > 0) {
             const readable = [...duplicatePairs].map((key) => {
-                const [productId, colorTypeId] = key.split("::");
-                return `productId=${productId}, colorType=${colorTypeId}`;
+                return `productId=${key}`;
             });
             throw new ApiError(400, `Duplicate item(s) found: ${readable.join(" | ")}`);
         }
     }
 
     private async getProductPricingMap(
-        items: { productId: bigint; colorType: string; gstTaxRateId?: string | null }[]
+        items: { productId: bigint; gstTaxRateId?: string | null }[]
     ): Promise<Map<string, ProductPricingRow>> {
         const uniqueProductIds = [...new Set(items.map((i) => i.productId.toString()))]
             .map((id) => BigInt(id));
@@ -157,20 +154,16 @@ class SalesOrderService {
                 b2c: p.b2c,
                 exportPrice: p.exportPrice,
             };
-            map.set(`${p.id.toString()}::${BASE_PRICE_KEY}`, baseRow);
+            map.set(`${p.id.toString()}`, baseRow);
         }
         return map;
     }
 
     private resolvePricing(
         map: Map<string, ProductPricingRow>,
-        productId: bigint,
-        colorType: string
+        productId: bigint
     ): ProductPricingRow | undefined {
-        return (
-            map.get(`${productId.toString()}::${colorType}`) ??
-            map.get(`${productId.toString()}::${BASE_PRICE_KEY}`)
-        );
+        return map.get(`${productId.toString()}`);
     }
 
     private resolveUnitPrice(
@@ -192,7 +185,6 @@ class SalesOrderService {
 
     private calculateLine(params: {
         productId: bigint;
-        colorType: string;
         quantity: Prisma.Decimal;
         pricing: ProductPricingRow;
         customerType?: string | null;
@@ -202,7 +194,7 @@ class SalesOrderService {
         customGstRate?: Prisma.Decimal | null;
         isInterState?: boolean;
     }): LineCalculation {
-        const { productId, colorType, quantity, pricing, isInterState = false } = params;
+        const { productId, quantity, pricing, isInterState = false } = params;
 
         const unitPrice = this.resolveUnitPrice(params.customerType, pricing);
         const mrp = pricing.mrp;
@@ -252,7 +244,6 @@ class SalesOrderService {
 
         return {
             productId,
-            colorType,
             quantity,
             b2b,
             mrp,
@@ -277,7 +268,6 @@ class SalesOrderService {
     private calculateLinesWithOrderDiscount(
         items: Array<{
             productId: bigint;
-            colorType: string;
             quantity: Prisma.Decimal;
             pricing: ProductPricingRow;
             gstTaxRateId?: string | null;
@@ -291,7 +281,6 @@ class SalesOrderService {
         const baseLines = items.map((item) => {
             return this.calculateLine({
                 productId: item.productId,
-                colorType: item.colorType,
                 quantity: item.quantity,
                 pricing: item.pricing,
                 customerType,
@@ -317,7 +306,6 @@ class SalesOrderService {
 
             return this.calculateLine({
                 productId: baseLine.productId,
-                colorType: baseLine.colorType,
                 quantity: baseLine.quantity,
                 pricing: item.pricing,
                 customerType,
@@ -340,7 +328,7 @@ class SalesOrderService {
             throw new ApiError(400, "At least one item is required");
         }
 
-        this.assertNoDuplicateProductColorPairs(data.items);
+        this.assertNoDuplicateProducts(data.items);
 
         const customer = await prisma.customer.findUnique({
             where: { id: data.customerId },
@@ -363,7 +351,7 @@ class SalesOrderService {
         const isInterState = data.isInterState ?? false;
 
         const pricingMap = await this.getProductPricingMap(
-            data.items.map((i) => ({ productId: BigInt(i.productId), colorType: i.colorTypeId, gstTaxRateId: i.gstTaxRateId }))
+            data.items.map((i) => ({ productId: BigInt(i.productId), gstTaxRateId: i.gstTaxRateId }))
         );
 
         const customGstTaxRateIds = new Set<string>();
@@ -382,7 +370,7 @@ class SalesOrderService {
         const lineCalcs = this.calculateLinesWithOrderDiscount(
             data.items.map((item) => {
                 const productId = BigInt(item.productId);
-                const pricing = this.resolvePricing(pricingMap, productId, item.colorTypeId);
+                const pricing = this.resolvePricing(pricingMap, productId);
                 if (!pricing) {
                     throw new ApiError(404, `Product with ID ${item.productId} not found`);
                 }
@@ -398,7 +386,6 @@ class SalesOrderService {
 
                 return {
                     productId,
-                    colorType: item.colorTypeId,
                     quantity: new Prisma.Decimal(item.quantity),
                     pricing,
                     gstTaxRateId: item.gstTaxRateId,
@@ -463,7 +450,8 @@ class SalesOrderService {
                 isInterState,
                 customerId: data.customerId,
                 customerType: data.customerType,
-                salesPersonId: data.salesPersonId ? Number(data.salesPersonId) : null,
+                salesPersonName: data.salesPersonName || null,
+                transportName: data.transportName || null,
                 paymentTermId: data.paymentTermId,
                 billingAddressLine1: data.billingAddressLine1,
                 billingCity: data.billingCity,
@@ -497,7 +485,6 @@ class SalesOrderService {
                 items: {
                     create: lineCalcs.map((line) => ({
                         productId: line.productId,
-                        colorType: line.colorType,
                         quantity: line.quantity,
                         mrp: line.mrp,
                         b2b: line.b2b,
@@ -650,7 +637,8 @@ class SalesOrderService {
         }
 
         if (data.customerType !== undefined) updateData.customerType = data.customerType;
-        if (data.salesPersonId !== undefined) updateData.salesPersonId = data.salesPersonId ? Number(data.salesPersonId) : null;
+        if (data.salesPersonName !== undefined) updateData.salesPersonName = data.salesPersonName;
+        if (data.transportName !== undefined) updateData.transportName = data.transportName;
         if (data.expectedCompletionDate) updateData.expectedCompletionDate = new Date(data.expectedCompletionDate);
         if (data.paymentTermId !== undefined) updateData.paymentTermId = data.paymentTermId;
         if (data.dispatchType !== undefined) updateData.dispatchType = data.dispatchType;
@@ -731,13 +719,13 @@ class SalesOrderService {
 
         // Handle items update if provided
         if (data.items) {
-            this.assertNoDuplicateProductColorPairs(data.items);
+            this.assertNoDuplicateProducts(data.items);
 
             const productIds = data.items.map((i) => BigInt(i.productId));
             await this.assertProductsExist(productIds);
 
             const pricingMap = await this.getProductPricingMap(
-                data.items.map((i) => ({ productId: BigInt(i.productId), colorType: i.colorTypeId, gstTaxRateId: i.gstTaxRateId }))
+                data.items.map((i) => ({ productId: BigInt(i.productId), gstTaxRateId: i.gstTaxRateId }))
             );
 
             const customGstTaxRateIds = new Set<string>();
@@ -753,7 +741,7 @@ class SalesOrderService {
             const lineCalcs = this.calculateLinesWithOrderDiscount(
                 data.items.map((item) => {
                     const productId = BigInt(item.productId);
-                    const pricing = this.resolvePricing(pricingMap, productId, item.colorTypeId);
+                    const pricing = this.resolvePricing(pricingMap, productId);
                     if (!pricing) {
                         throw new ApiError(404, `Product with ID ${item.productId} not found`);
                     }
@@ -769,7 +757,6 @@ class SalesOrderService {
 
                     return {
                         productId,
-                        colorType: item.colorTypeId,
                         quantity: new Prisma.Decimal(item.quantity),
                         pricing,
                         gstTaxRateId: item.gstTaxRateId,
@@ -790,7 +777,6 @@ class SalesOrderService {
             updateData.items = {
                 create: lineCalcs.map((line) => ({
                     productId: line.productId,
-                    colorType: line.colorType,
                     quantity: line.quantity,
                     mrp: line.mrp,
                     b2b: line.b2b,
@@ -841,7 +827,6 @@ class SalesOrderService {
             const lineCalcs = this.calculateLinesWithOrderDiscount(
                 existing.items.map((item) => ({
                     productId: item.productId,
-                    colorType: item.colorType,
                     quantity: item.quantity,
                     pricing: {
                         id: item.productId,

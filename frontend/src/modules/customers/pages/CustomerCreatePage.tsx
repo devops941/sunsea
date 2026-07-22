@@ -87,6 +87,17 @@ const CustomerCreatePage: React.FC = () => {
         upiMobileNumber: "",
       },
     ],
+    transports: [
+      {
+        transportName: "",
+        phone: "",
+        addressLine1: "",
+        country: "India",
+        state: "",
+        city: "",
+        pincode: "",
+      },
+    ],
   };
 
   type CustomerFormData = typeof initialFormData;
@@ -148,6 +159,65 @@ const CustomerCreatePage: React.FC = () => {
     setFormData((prev) => ({
       ...prev,
       bankAccounts: prev.bankAccounts.filter((_, i) => i !== index),
+    }));
+  };
+
+  const handleTransportChange = (index: number, e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData((prev) => {
+      const updatedTransports = [...prev.transports];
+      updatedTransports[index] = { ...updatedTransports[index], [name]: value };
+      return { ...prev, transports: updatedTransports };
+    });
+
+    const errorKey = `transports.${index}.${name}`;
+    if (errors[errorKey]) {
+      setErrors((prev) => ({ ...prev, [errorKey]: "" }));
+    }
+  };
+
+  const handleTransportAddressChange = (index: number, field: string, value: string) => {
+    setFormData((prev) => {
+      const updatedTransports = [...prev.transports];
+      updatedTransports[index] = { ...updatedTransports[index], [field]: value };
+      return { ...prev, transports: updatedTransports };
+    });
+
+    const errorKey = `transports.${index}.${field}`;
+    if (errors[errorKey]) {
+      setErrors((prev) => ({ ...prev, [errorKey]: "" }));
+    }
+  };
+
+  const addTransport = () => {
+    const lastTransport = formData.transports[formData.transports.length - 1];
+    if (lastTransport) {
+      const isFilled = lastTransport.transportName?.trim() && 
+                       lastTransport.phone?.trim() && 
+                       lastTransport.addressLine1?.trim() && 
+                       lastTransport.state?.trim() && 
+                       lastTransport.city?.trim() && 
+                       lastTransport.pincode?.trim();
+                       
+      if (!isFilled) {
+        toast.error("Please completely fill the current transport details before adding a new one.");
+        return;
+      }
+    }
+
+    setFormData((prev) => ({
+      ...prev,
+      transports: [
+        ...prev.transports,
+        { transportName: "", phone: "", addressLine1: "", country: "India", state: "", city: "", pincode: "" },
+      ],
+    }));
+  };
+
+  const removeTransport = (index: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      transports: prev.transports.filter((_, i) => i !== index),
     }));
   };
 
@@ -281,15 +351,38 @@ const CustomerCreatePage: React.FC = () => {
     };
 
     const validationErrors = validateCustomer(validationData);
+    let hasCustomErrors = false;
+    const mappedErrors: Record<string, string> = {};
 
-    if (Object.keys(validationErrors).length > 0) {
-      const mappedErrors: Record<string, string> = {};
-      Object.keys(validationErrors).forEach((key) => {
-        if (key === "billingState") mappedErrors.billingAddressState = validationErrors.billingState;
-        else if (key === "billingCity") mappedErrors.billingAddressCity = validationErrors.billingCity;
-        else if (key === "billingPincode") mappedErrors.billingAddressPincode = validationErrors.billingPincode;
-        else mappedErrors[key] = validationErrors[key];
-      });
+    Object.keys(validationErrors).forEach((key) => {
+      if (key === "billingState") mappedErrors.billingAddressState = validationErrors.billingState;
+      else if (key === "billingCity") mappedErrors.billingAddressCity = validationErrors.billingCity;
+      else if (key === "billingPincode") mappedErrors.billingAddressPincode = validationErrors.billingPincode;
+      else mappedErrors[key] = validationErrors[key];
+    });
+
+    // Validate transports
+    formData.transports.forEach((transport, index) => {
+      const isPartiallyFilled = !!(
+        transport.transportName?.trim() || 
+        transport.phone?.trim() || 
+        transport.addressLine1?.trim() || 
+        transport.city?.trim() || 
+        transport.state?.trim() || 
+        transport.pincode?.trim()
+      );
+      
+      if (isPartiallyFilled) {
+        if (!transport.transportName?.trim()) { mappedErrors[`transports.${index}.transportName`] = "Required"; hasCustomErrors = true; }
+        if (!transport.phone?.trim()) { mappedErrors[`transports.${index}.phone`] = "Required"; hasCustomErrors = true; }
+        if (!transport.addressLine1?.trim()) { mappedErrors[`transports.${index}.addressLine1`] = "Required"; hasCustomErrors = true; }
+        if (!transport.state?.trim()) { mappedErrors[`transports.${index}.state`] = "Required"; hasCustomErrors = true; }
+        if (!transport.city?.trim()) { mappedErrors[`transports.${index}.city`] = "Required"; hasCustomErrors = true; }
+        if (!transport.pincode?.trim()) { mappedErrors[`transports.${index}.pincode`] = "Required"; hasCustomErrors = true; }
+      }
+    });
+
+    if (Object.keys(validationErrors).length > 0 || hasCustomErrors) {
       setErrors(mappedErrors);
       toast.error("Please fix the highlighted errors");
       return;
@@ -298,6 +391,10 @@ const CustomerCreatePage: React.FC = () => {
     try {
       const activeBankAccounts = formData.bankAccounts.filter(
         (bank) => bank.bankHolderName?.trim() || bank.bankName?.trim() || bank.accountNumber?.trim() || bank.ifscCode?.trim() || bank.branchName?.trim() || bank.upiMobileNumber?.trim()
+      );
+
+      const activeTransports = formData.transports.filter(
+        (transport) => transport.transportName?.trim() || transport.phone?.trim() || transport.addressLine1?.trim() || transport.city?.trim() || transport.state?.trim()
       );
 
       await addCustomer({
@@ -320,6 +417,7 @@ const CustomerCreatePage: React.FC = () => {
         creditLimit: Number(formData.creditLimit),
         creditDays: Number(formData.creditDays),
         bankAccount: activeBankAccounts.length > 0 ? activeBankAccounts : undefined,
+        transports: activeTransports.length > 0 ? activeTransports : undefined,
         status: formData.isActive === "true" ? "Active" : "Inactive",
       });
 
@@ -641,6 +739,69 @@ const CustomerCreatePage: React.FC = () => {
                       </div>
                       <div>
                         <IndiaPhoneInput label="GPay / PhonePe Number" name="upiMobileNumber" value={bank.upiMobileNumber} placeholder="9876543210" onChange={(e) => handleBankChange(index, e as React.ChangeEvent<HTMLInputElement>)} error={errors[`bankAccounts.${index}.upiMobileNumber`]} />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* TRANSPORT DETAILS */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-lg font-semibold text-slate-700">Transport Details</h3>
+                <CustomButton text="Add Transport" onClick={addTransport} type="button" />
+              </div>
+
+              <div className="space-y-2">
+                {formData.transports.map((transport, index) => (
+                  <div key={index} className="p-4 border border-slate-200 rounded-xl bg-white relative">
+                    {formData.transports.length > 1 && (
+                      <div className="absolute top-4 right-4">
+                        <button
+                          type="button"
+                          onClick={() => removeTransport(index)}
+                          className="text-red-500 hover:text-red-700 text-sm font-semibold transition-colors"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    )}
+                    <h6 className="font-bold text-slate-600 mb-2">Transport #{index + 1}</h6>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                      <div>
+                        <TextInput label="Transport Name" bottom={true} name="transportName" value={transport.transportName} onChange={(e) => handleTransportChange(index, e)} error={errors[`transports.${index}.transportName`]} />
+                      </div>
+                      <div>
+                        <IndiaPhoneInput label="Phone" name="phone" value={transport.phone} onChange={(e) => handleTransportChange(index, e as React.ChangeEvent<HTMLInputElement>)} error={errors[`transports.${index}.phone`]} />
+                      </div>
+                      <div className="lg:col-span-3 ">
+                        <h6 className="font-semibold text-slate-700 mb-3">Transport Address</h6>
+                        <AddressForm
+                          addressValue={transport.addressLine1}
+                          onAddressChange={(v) => handleTransportAddressChange(index, "addressLine1", v)}
+                          addressError={errors[`transports.${index}.addressLine1`]}
+
+                          countryValue={transport.country || "India"}
+                          onCountryChange={(v) => handleTransportAddressChange(index, "country", v)}
+                          countryError={errors[`transports.${index}.country`]}
+
+                          stateValue={transport.state}
+                          onStateChange={(v) => {
+                            handleTransportAddressChange(index, "state", v);
+                            handleTransportAddressChange(index, "city", "");
+                          }}
+                          stateError={errors[`transports.${index}.state`]}
+
+                          cityValue={transport.city}
+                          onCityChange={(v) => handleTransportAddressChange(index, "city", v)}
+                          cityError={errors[`transports.${index}.city`]}
+
+                          pincodeValue={transport.pincode}
+                          onPincodeChange={(v) => handleTransportAddressChange(index, "pincode", v)}
+                          pincodeError={errors[`transports.${index}.pincode`]}
+                        />
                       </div>
                     </div>
                   </div>

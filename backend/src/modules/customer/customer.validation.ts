@@ -85,6 +85,20 @@ export const createCustomerSchema = z.object({
     )
     .optional(),
 
+  transports: z
+    .array(
+      z.object({
+        transportName: z.string().min(1, "Transport Name is required"),
+        phone: z.string().min(1, "Phone is required"),
+        addressLine1: z.string().min(1, "Address Line 1 is required"),
+        country: z.string().optional(),
+        state: z.string().min(1, "State is required"),
+        city: z.string().min(1, "City is required"),
+        pincode: z.string().min(1, "Pincode is required"),
+      })
+    )
+    .optional(),
+
 
   status: z
     .enum(["Active", "OnHold", "Blocked", "Lead", "Inactive"])
