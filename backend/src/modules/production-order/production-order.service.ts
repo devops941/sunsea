@@ -19,10 +19,15 @@ class ProductionOrderService {
     // Validate Dependencies
     const product = await prisma.product.findUnique({
       where: { id: productItemId },
+      include: { productionSteps: { orderBy: { stepOrder: 'asc' } } }
     });
     if (!product) {
       throw new ApiError(404, `Product with ID ${productItemId.toString()} not found`);
     }
+
+    const firstStep = product.productionSteps && product.productionSteps.length > 0 
+      ? product.productionSteps[0] 
+      : null;
 
     const weightPerPieceUsed = product.weightPerPiece ? Number(product.weightPerPiece) : 0;
     const requiredRawMaterialQty = Number(data.targetQty) * weightPerPieceUsed;
@@ -123,6 +128,8 @@ class ProductionOrderService {
           weightPerPieceUsed,
           requiredRawMaterialQty,
           draftRawMaterials: data.rawMaterials as any,
+          currentStepIndex: 0,
+          currentProductionStep: "Production",
         } as any,
         include: {
           productItem: true,

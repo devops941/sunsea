@@ -862,6 +862,8 @@ model ProductionOrder {
   requiredRawMaterialQty    Decimal?                   @map("required_raw_material_qty") @db.Decimal(14, 3)
   weightPerPieceUsed        Decimal?                   @map("weight_per_piece_used") @db.Decimal(10, 3)
   draftRawMaterials         Json?                      @map("draft_raw_materials")
+  currentProductionStep     String?                    @map("current_production_step") @db.VarChar(100)
+  currentStepIndex          Int?                       @map("current_step_index")
   finishedGoodsTransactions FinishedGoodsTransaction[]
   hourlyProductions         HourlyProduction[]
   rawMaterialTransactions   RawMaterialTransaction[]
