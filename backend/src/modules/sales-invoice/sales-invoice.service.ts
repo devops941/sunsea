@@ -31,7 +31,8 @@ class SalesInvoiceService {
     const invoiceItems = data.items.map((item) => {
       const qty = Number(item.qty);
       const rate = Number(item.rate);
-      const lineSubtotal = qty * rate;
+      const discount = Number(item.discountAmount) || 0;
+      const lineSubtotal = (qty * rate) - discount;
 
       const taxRate = Number(item.taxPercent) || 0;
       const lineTax = (lineSubtotal * taxRate) / 100;
@@ -62,6 +63,7 @@ class SalesInvoiceService {
         productId: BigInt(item.productId),
         quantity: qty,
         unitPrice: rate,
+        discountAmount: discount,
         tax: taxRate,
         taxableAmount: lineSubtotal,
         cgstRate,

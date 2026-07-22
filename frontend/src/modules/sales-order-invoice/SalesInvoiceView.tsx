@@ -99,8 +99,11 @@ const SalesInvoiceView: React.FC = () => {
     }, [invoicesList, searchTerm]);
 
     const totalIgst = useMemo(() => invoice?.items?.reduce((acc: number, curr: any) => acc + (Number(curr.igstAmount) || 0), 0) || 0, [invoice]);
-    const totalCgst = useMemo(() => invoice?.items?.reduce((acc: number, curr: any) => acc + (Number(curr.cgstAmount) || 0), 0) || 0, [invoice]);
-    const totalSgst = useMemo(() => invoice?.items?.reduce((acc: number, curr: any) => acc + (Number(curr.sgstAmount) || 0), 0) || 0, [invoice]);
+    const totalCgst = useMemo(() => invoice?.items?.reduce((acc: number, item: any) => acc + Number(item.cgstAmount || 0), 0) || 0, [invoice]);
+    const totalSgst = useMemo(() => invoice?.items?.reduce((acc: number, item: any) => acc + Number(item.sgstAmount || 0), 0) || 0, [invoice]);
+
+    const discountTotal = useMemo(() => invoice?.items?.reduce((acc: number, item: any) => acc + (Number(item.discountAmount) || 0), 0) || 0, [invoice]);
+    const subTotalBeforeDiscount = useMemo(() => (Number(invoice?.subTotal) || 0) + discountTotal, [invoice, discountTotal]);
 
     return (
         <div className="flex bg-gray-100 overflow-hidden h-[calc(100vh-115px)]">
@@ -326,7 +329,7 @@ const SalesInvoiceView: React.FC = () => {
                                                     </td>
                                                     <td className="py-4 px-2 text-right font-semibold">{item.quantity ?? item.qty}</td>
                                                     <td className="py-4 px-2 text-right">{formatMoney(item.unitPrice ?? item.rate)}</td>
-                                                    <td className="py-4 px-2 text-right font-bold text-gray-900">{formatMoney(item.taxableAmount)}</td>
+                                                    <td className="py-4 px-2 text-right font-bold text-gray-900">{formatMoney((item.quantity ?? item.qty) * (item.unitPrice ?? item.rate))}</td>
                                                     <td className="py-4 px-2 text-right font-medium">
                                                         {((item.taxRate ?? item.taxPercent ?? item.tax) !== undefined && (item.taxRate ?? item.taxPercent ?? item.tax) !== null) ? `${item.taxRate ?? item.taxPercent ?? item.tax}%` : "0%"}
                                                     </td>
@@ -349,47 +352,47 @@ const SalesInvoiceView: React.FC = () => {
                                     <div className="w-full md:w-1/2 lg:w-1/3 space-y-3">
                                         <div className="flex justify-between text-sm font-semibold text-gray-700 px-2">
                                             <span>Subtotal</span>
-                                            <span>{formatMoney(invoice.subTotal)}</span>
+                                            <span>{formatMoney(subTotalBeforeDiscount)}</span>
                                         </div>
 
-                                        {/* {Number(invoice.discountTotal) !== 0 && (
-                                            <div className="flex justify-between text-sm font-semibold text-gray-700 px-2">
-                                                <span>Discount</span>
-                                                <span>− {formatMoney(invoice.discountTotal)}</span>
-                                            </div>
-                                        )} */}
-
                                         {totalIgst > 0 ? (
-                                            <div className="flex justify-between text-sm font-semibold text-gray-700 px-2">
-                                                <span>IGST Total</span>
+                                            <div className="flex justify-between text-sm font-semibold text-emerald-600 px-2">
+                                                <span>IGST</span>
                                                 <span>+ {formatMoney(totalIgst)}</span>
                                             </div>
                                         ) : (totalCgst > 0 || totalSgst > 0) ? (
                                             <>
                                                 {totalCgst > 0 && (
-                                                    <div className="flex justify-between text-sm font-semibold text-gray-700 px-2">
-                                                        <span>CGST Total</span>
+                                                    <div className="flex justify-between text-sm font-semibold text-emerald-600 px-2">
+                                                        <span>CGST</span>
                                                         <span>+ {formatMoney(totalCgst)}</span>
                                                     </div>
                                                 )}
                                                 {totalSgst > 0 && (
-                                                    <div className="flex justify-between text-sm font-semibold text-gray-700 px-2">
-                                                        <span>SGST Total</span>
+                                                    <div className="flex justify-between text-sm font-semibold text-emerald-600 px-2">
+                                                        <span>SGST</span>
                                                         <span>+ {formatMoney(totalSgst)}</span>
                                                     </div>
                                                 )}
                                             </>
                                         ) : (
-                                            <div className="flex justify-between text-sm font-semibold text-gray-700 px-2">
+                                            <div className="flex justify-between text-sm font-semibold text-emerald-600 px-2">
                                                 <span>Total Tax</span>
                                                 <span>+ {formatMoney(invoice.taxTotal)}</span>
                                             </div>
                                         )}
 
-                                        <div className="border-t-2 border-gray-800 my-2"></div>
+                                        {discountTotal > 0 && (
+                                            <div className="flex justify-between text-sm font-semibold text-red-500 px-2">
+                                                <span>Discount</span>
+                                                <span>− {formatMoney(discountTotal)}</span>
+                                            </div>
+                                        )}
 
-                                        <div className="flex justify-between text-lg font-bold text-gray-900 px-2">
-                                            <span>Grand Total</span>
+                                        <div className="border-t border-gray-300 my-2"></div>
+
+                                        <div className="flex justify-between text-lg font-bold text-blue-600 px-2">
+                                            <span>Net Amount</span>
                                             <span>{formatMoney(invoice.grandTotal)}</span>
                                         </div>
                                     </div>
