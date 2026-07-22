@@ -94,6 +94,10 @@ const mapCustomerToFormData = (customer: any): CustomerFormData => {
     contactPerson: customer.contactPerson || "",
     designation: customer.designation || "",
 
+    mobile: typeof customer.mobile === "string" ? customer.mobile : "",
+    altPhone: customer.altPhone || "",
+    whatsapp: customer.whatsapp || "",
+
     email: customer.email || "",
 
     gstin: customer.gstin || "",
@@ -160,11 +164,11 @@ const CustomerEditPage: React.FC = () => {
 
   useEffect(() => {
     if (location.state) {
-        setFormData(mapCustomerToFormData(location.state));
-        populatePhones(location.state);
-        if (location.state.addresses && location.state.addresses.length > 0) {
-            setAddresses(location.state.addresses);
-        }
+      setFormData(mapCustomerToFormData(location.state));
+      populatePhones(location.state);
+      if (location.state.addresses && location.state.addresses.length > 0) {
+        setAddresses(location.state.addresses);
+      }
     }
 
     const fetchCustomer = async () => {
@@ -174,9 +178,9 @@ const CustomerEditPage: React.FC = () => {
         setFormData(mapCustomerToFormData(customer));
         populatePhones(customer);
         if (customer.addresses && customer.addresses.length > 0) {
-            setAddresses(customer.addresses);
+          setAddresses(customer.addresses);
         } else {
-            setAddresses([]);
+          setAddresses([]);
         }
       } catch (err) {
         toast.error("Failed to load customer details");
@@ -206,60 +210,60 @@ const CustomerEditPage: React.FC = () => {
   };
 
   const addShippingAddress = () => {
-      setAddresses(prev => [
-          ...prev,
-          {
-              address: {
-                  addressLine1: "",
-                  addressLine2: "",
-                  city: "",
-                  state: "",
-                  pincode: "",
-              }
-          }
-      ]);
+    setAddresses(prev => [
+      ...prev,
+      {
+        address: {
+          addressLine1: "",
+          addressLine2: "",
+          city: "",
+          state: "",
+          pincode: "",
+        }
+      }
+    ]);
   };
 
   const removeShippingAddress = (index: number) => {
-      setAddresses(prev => prev.filter((_, i) => i !== index));
+    setAddresses(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleShippingAddressChange = (index: number, field: string, value: string) => {
-      setAddresses(prev => {
-          const newAddresses = [...prev];
-          newAddresses[index] = {
-              ...newAddresses[index],
-              address: {
-                  ...newAddresses[index].address,
-                  [field]: value
-              }
-          };
-          return newAddresses;
-      });
+    setAddresses(prev => {
+      const newAddresses = [...prev];
+      newAddresses[index] = {
+        ...newAddresses[index],
+        address: {
+          ...newAddresses[index].address,
+          [field]: value
+        }
+      };
+      return newAddresses;
+    });
 
-      const errorKey = `addresses.${index}.address.${field}`;
-      if (errors[errorKey]) {
-          setErrors(prev => ({ ...prev, [errorKey]: "" }));
-      }
+    const errorKey = `addresses.${index}.address.${field}`;
+    if (errors[errorKey]) {
+      setErrors(prev => ({ ...prev, [errorKey]: "" }));
+    }
   };
 
   const toggleSameAsBilling = (index: number, checked: boolean) => {
-      if (checked) {
-          setAddresses(prev => {
-              const newAddresses = [...prev];
-              newAddresses[index] = {
-                  ...newAddresses[index],
-                  address: {
-                      ...newAddresses[index].address,
-                      addressLine1: formData.billingAddressLine1,
-                      city: formData.billingCity,
-                      state: formData.billingState,
-                      pincode: formData.billingPincode,
-                  }
-              };
-              return newAddresses;
-          });
-      }
+    if (checked) {
+      setAddresses(prev => {
+        const newAddresses = [...prev];
+        newAddresses[index] = {
+          ...newAddresses[index],
+          address: {
+            ...newAddresses[index].address,
+            addressLine1: formData.billingAddressLine1,
+            city: formData.billingCity,
+            state: formData.billingState,
+            pincode: formData.billingPincode,
+          }
+        };
+        return newAddresses;
+      });
+    }
   };
 
   const handleBillingStateChange = (stateData: StateCityOption) => {
@@ -304,6 +308,7 @@ const CustomerEditPage: React.FC = () => {
 
     const validationData = {
       ...formData,
+      mobile: phones,
       addresses,
     };
 
@@ -374,7 +379,7 @@ const CustomerEditPage: React.FC = () => {
               text="Back"
               icon={FaArrowLeft}
               onClick={() => navigate("/customers")}
-              
+
             />
           </div>
 
@@ -522,84 +527,84 @@ const CustomerEditPage: React.FC = () => {
                   <div className="flex items-center justify-between">
                     <h5 className="font-bold text-slate-700">Additional Addresses</h5>
                     <button
-                        type="button"
-                        onClick={addShippingAddress}
-                        className="text-sm px-3 py-1.5 bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100 font-medium border border-blue-200 transition-colors"
+                      type="button"
+                      onClick={addShippingAddress}
+                      className="text-sm px-3 py-1.5 bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100 font-medium border border-blue-200 transition-colors"
                     >
-                        + Add Address
+                      + Add Address
                     </button>
                   </div>
 
                   {addresses.map((addr, index) => {
-                      const isThisSameAsBilling = addr.address.addressLine1 === formData.billingAddressLine1 &&
-                          addr.address.city === formData.billingCity &&
-                          addr.address.state === formData.billingState &&
-                          addr.address.pincode === formData.billingPincode &&
-                          !!formData.billingAddressLine1;
+                    const isThisSameAsBilling = addr.address.addressLine1 === formData.billingAddressLine1 &&
+                      addr.address.city === formData.billingCity &&
+                      addr.address.state === formData.billingState &&
+                      addr.address.pincode === formData.billingPincode &&
+                      !!formData.billingAddressLine1;
 
-                      const isAnyAddressSameAsBilling = addresses.some(a =>
-                          a.address.addressLine1 === formData.billingAddressLine1 &&
-                          a.address.city === formData.billingCity &&
-                          a.address.state === formData.billingState &&
-                          a.address.pincode === formData.billingPincode &&
-                          !!formData.billingAddressLine1
-                      );
+                    const isAnyAddressSameAsBilling = addresses.some(a =>
+                      a.address.addressLine1 === formData.billingAddressLine1 &&
+                      a.address.city === formData.billingCity &&
+                      a.address.state === formData.billingState &&
+                      a.address.pincode === formData.billingPincode &&
+                      !!formData.billingAddressLine1
+                    );
 
-                      const showSameAsBillingCheckbox = isThisSameAsBilling || !isAnyAddressSameAsBilling;
+                    const showSameAsBillingCheckbox = isThisSameAsBilling || !isAnyAddressSameAsBilling;
 
-                      return (
-                          <div key={index} className="p-4 border border-slate-200 rounded-md bg-slate-50 relative">
-                              <div className="flex items-center justify-between mb-3 border-b border-slate-200 pb-2">
-                                  <h4 className="text-sm font-semibold text-slate-700 uppercase">Address {index + 1}</h4>
+                    return (
+                      <div key={index} className="p-4 border border-slate-200 rounded-md bg-slate-50 relative">
+                        <div className="flex items-center justify-between mb-3 border-b border-slate-200 pb-2">
+                          <h4 className="text-sm font-semibold text-slate-700 uppercase">Address {index + 1}</h4>
 
-                                  <div className="flex items-center gap-4">
-                                      {showSameAsBillingCheckbox && (
-                                          <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer hover:text-slate-800">
-                                              <input
-                                                  type="checkbox"
-                                                  className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                                                  checked={isThisSameAsBilling}
-                                                  onChange={(e) => toggleSameAsBilling(index, e.target.checked)}
-                                              />
-                                              <span>Same as billing</span>
-                                          </label>
-                                      )}
+                          <div className="flex items-center gap-4">
+                            {showSameAsBillingCheckbox && (
+                              <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer hover:text-slate-800">
+                                <input
+                                  type="checkbox"
+                                  className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                  checked={isThisSameAsBilling}
+                                  onChange={(e) => toggleSameAsBilling(index, e.target.checked)}
+                                />
+                                <span>Same as billing</span>
+                              </label>
+                            )}
 
-                                      <button
-                                          type="button"
-                                          onClick={() => removeShippingAddress(index)}
-                                          className="text-red-500 hover:text-red-700 p-1.5 bg-red-50 rounded"
-                                          title="Remove Address"
-                                      >
-                                          <span className="font-bold">Remove</span>
-                                      </button>
-                                  </div>
-                              </div>
-                              <AddressForm
-                                  addressValue={addr.address.addressLine1}
-                                  onAddressChange={(v) => handleShippingAddressChange(index, "addressLine1", v)}
-                                  addressError={errors[`addresses.${index}.address.addressLine1`]}
-
-                                  countryValue="India"
-
-                                  stateValue={addr.address.state}
-                                  onStateChange={(v) => {
-                                      handleShippingAddressChange(index, "state", v);
-                                      handleShippingAddressChange(index, "city", "");
-                                  }}
-                                  stateError={errors[`addresses.${index}.address.state`]}
-
-                                  cityValue={addr.address.city}
-                                  onCityChange={(v) => handleShippingAddressChange(index, "city", v)}
-                                  cityError={errors[`addresses.${index}.address.city`]}
-
-                                  pincodeValue={addr.address.pincode}
-                                  onPincodeChange={(v) => handleShippingAddressChange(index, "pincode", v)}
-                                  pincodeError={errors[`addresses.${index}.address.pincode`]}
-                                  required
-                              />
+                            <button
+                              type="button"
+                              onClick={() => removeShippingAddress(index)}
+                              className="text-red-500 hover:text-red-700 p-1.5 bg-red-50 rounded"
+                              title="Remove Address"
+                            >
+                              <span className="font-bold">Remove</span>
+                            </button>
                           </div>
-                      );
+                        </div>
+                        <AddressForm
+                          addressValue={addr.address.addressLine1}
+                          onAddressChange={(v) => handleShippingAddressChange(index, "addressLine1", v)}
+                          addressError={errors[`addresses.${index}.address.addressLine1`]}
+
+                          countryValue="India"
+
+                          stateValue={addr.address.state}
+                          onStateChange={(v) => {
+                            handleShippingAddressChange(index, "state", v);
+                            handleShippingAddressChange(index, "city", "");
+                          }}
+                          stateError={errors[`addresses.${index}.address.state`]}
+
+                          cityValue={addr.address.city}
+                          onCityChange={(v) => handleShippingAddressChange(index, "city", v)}
+                          cityError={errors[`addresses.${index}.address.city`]}
+
+                          pincodeValue={addr.address.pincode}
+                          onPincodeChange={(v) => handleShippingAddressChange(index, "pincode", v)}
+                          pincodeError={errors[`addresses.${index}.address.pincode`]}
+                          required
+                        />
+                      </div>
+                    );
                   })}
                 </div>
               </div>
@@ -676,7 +681,7 @@ const CustomerEditPage: React.FC = () => {
                 icon={FaArrowLeft}
                 onClick={() => navigate("/customers")}
                 type="button"
-                
+
               />
               <CustomButton text="Update Customer" icon={FaSave} type="submit" />
             </div>

@@ -142,6 +142,54 @@ const SupplierViewModal: React.FC<SupplierViewModalProps> = ({
         );
     };
 
+    const getShippingAddresses = () => {
+        const list: Array<{ line1?: string; line2?: string; city?: string; state?: string; pincode?: string; country?: string; label?: string }> = [];
+
+        if (Array.isArray(supplier.addresses) && supplier.addresses.length > 0) {
+            supplier.addresses.forEach((addrItem: any, idx: number) => {
+                let addrObj = addrItem.address;
+                if (typeof addrObj === "string") {
+                    try {
+                        addrObj = JSON.parse(addrObj);
+                    } catch {
+                        addrObj = {};
+                    }
+                }
+                if (!addrObj || typeof addrObj !== "object") {
+                    addrObj = addrItem;
+                }
+
+                const line1 = addrObj.addressLine1 || addrObj.line1 || addrItem.addressLine1 || "";
+                const line2 = addrObj.addressLine2 || addrObj.line2 || addrItem.addressLine2 || "";
+                const city = addrObj.city || addrItem.city || "";
+                const state = addrObj.state || addrItem.state || "";
+                const pincode = addrObj.pincode || addrItem.pincode || "";
+                const country = addrObj.country || addrItem.country || "India";
+                const label = addrItem.label || `Address #${idx + 1}`;
+
+                if (line1 || city || state || pincode) {
+                    list.push({ line1, line2, city, state, pincode, country, label });
+                }
+            });
+        }
+
+        if (list.length === 0 && (supplier.shippingAddressLine1 || supplier.deliveryAddressLine1)) {
+            list.push({
+                line1: supplier.shippingAddressLine1 || supplier.deliveryAddressLine1,
+                line2: supplier.shippingAddressLine2 || supplier.deliveryAddressLine2 || "",
+                city: supplier.shippingCity || supplier.deliveryCity || "",
+                state: supplier.shippingState || supplier.deliveryState || "",
+                pincode: supplier.shippingPincode || supplier.deliveryPincode || "",
+                country: supplier.shippingCountry || supplier.deliveryCountry || "India",
+                label: "Shipping Address",
+            });
+        }
+
+        return list;
+    };
+
+    const shippingAddresses = getShippingAddresses();
+
     return (
         <CommonViewModal
             show={show}
@@ -193,10 +241,10 @@ const SupplierViewModal: React.FC<SupplierViewModalProps> = ({
                     ]
                 },
                 {
-                    title: "Billing Address",
+                    title: "Address Information",
                     fields: [
                         {
-                            label: "Address",
+                            label: "Billing Address",
                             value: (() => {
                                 const line1 = supplier.billingAddressLine1 || supplier.billingAddress?.addressLine1 || "N/A";
                                 const line2 = supplier.billingAddressLine2 || supplier.billingAddress?.addressLine2 || "";
@@ -212,9 +260,25 @@ const SupplierViewModal: React.FC<SupplierViewModalProps> = ({
                                         {city}, {state} - {pincode}, {country}
                                     </>
                                 );
-                            })(),
-                            xs: 12
-                        }
+                            })()
+                        },
+                        ...(shippingAddresses.length > 0
+                            ? shippingAddresses.map((addr, idx) => ({
+                                label: shippingAddresses.length > 1 ? `Shipping Address #${idx + 1}` : "Shipping Address",
+                                value: (
+                                    <>
+                                        {addr.line1}
+                                        {addr.line2 && <><br />{addr.line2}</>}
+                                        <br />
+                                        {addr.city || "N/A"}, {addr.state || "N/A"} - {addr.pincode || "N/A"}, {addr.country || "India"}
+                                    </>
+                                )
+                            }))
+                            : [{
+                                label: "Shipping Address",
+                                value: "N/A"
+                            }]
+                        )
                     ]
                 },
                 {
@@ -228,10 +292,7 @@ const SupplierViewModal: React.FC<SupplierViewModalProps> = ({
                 }
             ]}
             customContent={
-                <>
-                    {renderBankDetails()}
-                    {renderAdditionalAddresses()}
-                </>
+                renderBankDetails()
             }
         />
     );
