@@ -153,6 +153,7 @@ const QuotationForm: React.FC = () => {
     const [dispatchType, setDispatchType] = useState<string | null>(null);
     const [orderType, setOrderType] = useState<string | null>(null);
     const [salesPersonId, setSalesPersonId] = useState<string | null>(null);
+    const [transportName, setTransportName] = useState<string | null>(null);
 
     // ── Draft orders dropdown ──
     const [draftOrders, setDraftOrders] = useState<SalesOrder[]>([]);
@@ -301,6 +302,7 @@ const QuotationForm: React.FC = () => {
         setDispatchType((order as any).dispatchType || null);
         setOrderType((order as any).orderType || null);
         setSalesPersonId((order as any).salesPersonId != null ? String((order as any).salesPersonId) : null);
+        setTransportName(order.transportName || null);
     };
 
     // ── Load order ──
@@ -516,6 +518,7 @@ const QuotationForm: React.FC = () => {
             setDispatchType(null);
             setOrderType(null);
             setSalesPersonId(null);
+            setTransportName(null);
             reset(defaultValues);
             salesOrderService.getNextOrderNo().then((orderNo) => {
                 const qtNo = orderNo.replace('SO', 'QT');
@@ -698,6 +701,7 @@ const QuotationForm: React.FC = () => {
                                     <DetailBox label="Dispatch Type" value={dispatchTypeLabel} icon={<FaTruck />} />
                                     <DetailBox label="Order Source Platform" value={orderTypeLabel} icon={<FaGlobe />} />
                                     <DetailBox label="Customer Type" value={watchedCustomerType} icon={<FaUser />} />
+                                    {transportName ? <DetailBox label="Transport" value={transportName} icon={<FaTruck />} /> : null}
                                     {orderType === "salesperson" && (
                                         <DetailBox label="Sales Person" value={salesPersonName} icon={<FaUser />} />
                                     )}

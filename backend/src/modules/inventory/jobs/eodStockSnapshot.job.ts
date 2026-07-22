@@ -57,13 +57,19 @@ const upsertEodSnapshot = async (data: {
 export const runEodStockSnapshot = async (targetDateStr?: string) => {
   const now = new Date();
   
+  let dateStr: string;
   let today: Date;
   if (targetDateStr) {
-    const [year, month, day] = targetDateStr.split("T")[0].split("-").map(Number);
+    dateStr = targetDateStr.split("T")[0];
+    const [year, month, day] = dateStr.split("-").map(Number);
     today = new Date(Date.UTC(year, month - 1, day));
   } else {
     today = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
+    dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
   }
+
+  // Construct a fixed recordedAt timestamp at 23:59:00 in India Standard Time (+05:30)
+  const recordedAtFixed = new Date(`${dateStr}T23:59:00+05:30`);
 
   const yesterday = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() - 1));
 
@@ -97,7 +103,7 @@ export const runEodStockSnapshot = async (targetDateStr?: string) => {
       snapshotDate: today,
       startQty,
       eodQty: currentQty,
-      recordedAt: now,
+      recordedAt: recordedAtFixed,
     });
     rmCount++;
   }
@@ -143,7 +149,7 @@ export const runEodStockSnapshot = async (targetDateStr?: string) => {
       snapshotDate: today,
       startQty,
       eodQty: currentQty,
-      recordedAt: now,
+      recordedAt: recordedAtFixed,
     });
     fgCount++;
   }
@@ -182,10 +188,10 @@ export const runEodStockSnapshot = async (targetDateStr?: string) => {
       snapshotDate: today,
       startQty,
       eodQty: currentQty,
-      recordedAt: now,
+      recordedAt: recordedAtFixed,
     });
     fgCount++;
   }
 
-  console.log(`✅ EOD snapshot done: ${rmCount} RM, ${fgCount} FG rows at ${now.toISOString()}`);
+  console.log(`✅ EOD snapshot done: ${rmCount} RM, ${fgCount} FG rows at ${now.toISOString()} (locked recordedAt to ${recordedAtFixed.toISOString()})`);
 };
