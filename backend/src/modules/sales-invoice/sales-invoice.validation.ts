@@ -20,6 +20,7 @@ export const CreateSalesInvoiceSchema = z.object({
   ),
   customerId: z.string().uuid("Invalid Customer ID"),
   notes: z.string().optional().nullable(),
+  storeId: z.string().optional().nullable(),
   salesOrderId: z.preprocess(
     (val) => (val === "" || val === "null" || val === "undefined" ? null : val),
     z.coerce.number().optional().nullable()
