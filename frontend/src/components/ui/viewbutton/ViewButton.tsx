@@ -1,21 +1,34 @@
 import React from "react";
 import { FiEye } from "react-icons/fi";
-import "./ViewButton.css";
 
 interface ViewButtonProps {
   onClick?: () => void;
+  disabled?: boolean;
 }
 
-const ViewButton: React.FC<ViewButtonProps> = ({
-  onClick,
-}) => {
+const ViewButton: React.FC<ViewButtonProps> = ({ onClick, disabled }) => {
   return (
     <button
       type="button"
-      className="view-btn"
       onClick={onClick}
+      disabled={disabled}
+      className="
+        w-10 h-10
+        flex items-center justify-center
+        border-none rounded-xl
+        cursor-pointer
+        bg-blue-500/[0.12]
+        text-blue-500
+        transition-all duration-[250ms] ease-in-out
+        hover:-translate-y-[3px]
+        hover:bg-blue-500/[0.22]
+        hover:shadow-[0_8px_18px_rgba(59,130,246,0.18)]
+        active:scale-95
+        disabled:opacity-50
+        disabled:cursor-not-allowed
+      "
     >
-      <FiEye />
+      <FiEye className="text-[18px]" />
     </button>
   );
 };

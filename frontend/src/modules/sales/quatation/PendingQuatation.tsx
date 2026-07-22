@@ -215,6 +215,7 @@ const PendingQuotationList: React.FC = () => {
                                                 selectedItem.customer?.firmName ||
                                                 "N/A",
                                         },
+                                        ...(selectedItem.transportName ? [{ label: "Transport", value: selectedItem.transportName }] : []),
                                     ],
                                 },
                                 {

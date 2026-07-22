@@ -64,6 +64,8 @@ export interface SalesOrder {
     orderType?: string;
     referenceText?: string | null;
     salesPersonId?: number | null;
+    transportName?: string | null;
+    salesPersonName?: string | null;
 
     // ─── Workflow status (drives the quotation list / UI state) ───────
     status?: SalesOrderStatus;
@@ -135,6 +137,8 @@ export interface CreateSalesOrderDto {
     sameAsBilling: boolean;
     remarks?: string;
     internalNotes?: string;
+    transportName?: string | null;
+    salesPersonName?: string | null;
     items: Array<{
         productId: number;
         quantity: number;

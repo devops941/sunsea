@@ -218,6 +218,7 @@ const SupplierCreate: React.FC = () => {
             billingAddressCity: "",
             billingAddressState: "",
             billingAddressPincode: "",
+            billingAddressCountry: "India",
             stateCode: "TN",
             paymentTerms: "Net30",
             leadTimeDays: 7,

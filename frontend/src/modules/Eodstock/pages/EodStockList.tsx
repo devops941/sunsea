@@ -41,7 +41,14 @@ const EodStockList: React.FC = () => {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("");
   const [storeIdFilter, setStoreIdFilter] = useState<string>("");
-  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split("T")[0]);
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const y = yesterday.getFullYear();
+    const m = String(yesterday.getMonth() + 1).padStart(2, "0");
+    const d = String(yesterday.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  });
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [simulateEmptyState, setSimulateEmptyState] = useState(false);
@@ -176,7 +183,12 @@ const EodStockList: React.FC = () => {
     setSearchTerm("");
     setCategoryFilter("");
     setStoreIdFilter("");
-    setSelectedDate("2026-07-18");
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const y = yesterday.getFullYear();
+    const m = String(yesterday.getMonth() + 1).padStart(2, "0");
+    const d = String(yesterday.getDate()).padStart(2, "0");
+    setSelectedDate(`${y}-${m}-${d}`);
     setSimulateEmptyState(false);
     setCurrentPage(1);
   };
@@ -297,7 +309,11 @@ const EodStockList: React.FC = () => {
         <div className="px-6 py-3.5 bg-slate-50/70 border-b border-slate-200 flex items-center gap-2.5 text-slate-700 text-sm">
           <FaInfoCircle size={15} className="text-[#3B82F6] flex-shrink-0" />
           <span className="font-medium">
-            Stock shown as of last EOD run: <span className="text-slate-900 font-semibold">{asOfDate ? formatDate(asOfDate) : formatDate(selectedDate)}, 11:00 PM</span>
+            Stock shown as of last EOD run: <span className="text-slate-900 font-semibold">
+              {data.length > 0 
+                ? formatDateTime(data[0].recordedAt) 
+                : `${asOfDate ? formatDate(asOfDate) : formatDate(selectedDate)}, 11:59 PM`}
+            </span>
           </span>
         </div>
 

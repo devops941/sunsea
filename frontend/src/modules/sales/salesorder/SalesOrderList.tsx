@@ -11,6 +11,11 @@ import { salesOrderService } from "../../../services/salesOrderService";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import DataTable from "../../../components/ui/table/DataTable";
 import SearchInput from "../../../components/ui/SearchInput/SearchInput";
+import { FaPrint, FaEye, FaDownload, FaTimes } from "react-icons/fa";
+import { FiFileText } from "react-icons/fi";
+import CustomButton from "../../../components/ui/Button/Button";
+import { DocumentPrintLayout } from "../../../components/common/DocumentPrintLayout";
+import { SalesOrderEstimateContent } from "../../../components/salesOrder/SalesOrderEstimateContent";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -30,6 +35,25 @@ const SalesOrderList: React.FC = () => {
 
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [itemToDelete, setItemToDelete] = useState<number | null>(null);
+
+    const [showEstimateModal, setShowEstimateModal] = useState(false);
+    const [estimateOrder, setEstimateOrder] = useState<any | null>(null);
+    const [loadingEstimate, setLoadingEstimate] = useState(false);
+
+    const handleOpenEstimate = async (salesOrderId: number) => {
+        setLoadingEstimate(true);
+        setShowEstimateModal(true);
+        setEstimateOrder(null);
+        try {
+            const orderData = await salesOrderService.fetchById(salesOrderId);
+            setEstimateOrder(orderData);
+        } catch (error) {
+            toast.error("Failed to load sales order estimate");
+            setShowEstimateModal(false);
+        } finally {
+            setLoadingEstimate(false);
+        }
+    };
 
     const fetchOrders = useCallback(async () => {
         setLoading(true);
@@ -149,6 +173,13 @@ const SalesOrderList: React.FC = () => {
                             render: (item) => (
                                 <div className="flex justify-end items-center gap-2">
                                     <ViewButton onClick={() => handleOpenView(item)} />
+                                    <button
+                                        title="View Sales Order Estimate"
+                                        onClick={() => handleOpenEstimate(item.id)}
+                                        className="w-12 h-10 border border-slate-200 rounded-full text-indigo-600 bg-white hover:bg-indigo-50/30 hover:border-indigo-300 hover:text-indigo-700 hover:-translate-y-[3px] active:scale-95 hover:shadow-md transition-all duration-200 flex items-center justify-center"
+                                    >
+                                        <FiFileText className="text-[18px]" />
+                                    </button>
                                     <EditButton onClick={() => handleOpenEdit(item)} />
                                     <DeleteButton onClick={() => triggerDelete(item.id)} />
                                 </div>
@@ -173,6 +204,7 @@ const SalesOrderList: React.FC = () => {
                                 { label: "Customer", value: selectedItem.customerName || selectedItem.customer?.displayName || selectedItem.customer?.firmName },
                                 { label: "Sales Person", value: selectedItem.salesPersonName || "N/A" },
                                 { label: "Payment Term", value: selectedItem.paymentTermName || "N/A" },
+                                ...(selectedItem.transportName ? [{ label: "Transport", value: selectedItem.transportName }] : []),
                             ]
                         },
                         {
@@ -212,6 +244,100 @@ const SalesOrderList: React.FC = () => {
                     confirmText="Delete"
                     confirmVariant="danger"
                 />
+
+                {/* Sales Order Estimate Modal (Tailwind CSS - On-Screen Only) */}
+                {showEstimateModal && (
+                    <div className="fixed inset-0 z-50 overflow-y-auto no-print">
+                        {/* Backdrop */}
+                        <div
+                            className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm transition-opacity"
+                            onClick={() => setShowEstimateModal(false)}
+                        />
+
+                        {/* Modal Wrapper */}
+                        <div className="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+                            <div className="relative transform overflow-hidden rounded-2xl bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-4xl">
+                                {/* Header */}
+                                <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                                    <h3 className="text-lg font-bold text-slate-800">
+                                        Sales Order Estimate
+                                    </h3>
+                                    <button
+                                        onClick={() => setShowEstimateModal(false)}
+                                        className="rounded-lg p-1 text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition-colors"
+                                    >
+                                        <FaTimes size={18} />
+                                    </button>
+                                </div>
+
+                                {/* Body */}
+                                <div className="p-6 bg-slate-50 min-h-[400px]">
+                                    {loadingEstimate ? (
+                                        <div className="flex flex-col items-center justify-center py-20 h-full">
+                                            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"></div>
+                                            <span className="mt-4 text-slate-500 font-semibold">Loading estimate details...</span>
+                                        </div>
+                                    ) : estimateOrder ? (
+                                        <DocumentPrintLayout subtitle="Sales Order" title="ESTIMATE">
+                                            <SalesOrderEstimateContent
+                                                estimateOrder={estimateOrder}
+                                                formatDate={formatDate}
+                                            />
+                                        </DocumentPrintLayout>
+                                    ) : (
+                                        <div className="text-center py-10 text-slate-500">
+                                            Failed to load order estimate.
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Footer */}
+                                <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
+                                    <button
+                                        onClick={() => setShowEstimateModal(false)}
+                                        className="px-4 py-2 border border-slate-200 text-slate-600 rounded-lg text-sm font-semibold hover:bg-slate-100 hover:text-slate-800 transition-colors"
+                                    >
+                                        Close
+                                    </button>
+                                    {estimateOrder && (
+                                        <div className="flex gap-2">
+                                            <CustomButton
+                                                text="Print"
+                                                icon={FaPrint}
+                                                onClick={() => window.print()}
+                                                variant="primary"
+                                            />
+                                            <CustomButton
+                                                text="View PDF"
+                                                icon={FaEye}
+                                                onClick={() => window.print()}
+                                                variant="secondary"
+                                            />
+                                            <CustomButton
+                                                text="Download PDF"
+                                                icon={FaDownload}
+                                                onClick={() => window.print()}
+                                                variant="primary"
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Print-Only Estimate Section */}
+                {estimateOrder && (
+                    <div id="print-only-estimate-section" className="hidden print:block">
+                        <DocumentPrintLayout subtitle="Sales Order" title="ESTIMATE">
+                            <SalesOrderEstimateContent
+                                estimateOrder={estimateOrder}
+                                formatDate={formatDate}
+                            />
+                        </DocumentPrintLayout>
+                    </div>
+                )}
             </div>
         </div>
     );

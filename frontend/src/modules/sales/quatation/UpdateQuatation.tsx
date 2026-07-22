@@ -161,6 +161,7 @@ const QuotationReport: React.FC = () => {
                         <DetailBox label="Quotation Date" value={formatDate(order.orderDate)} icon={<FaCalendarAlt />} />
                         <DetailBox label="Valid Until" value={formatDate(order.expectedCompletionDate)} icon={<FaCalendarAlt />} />
                         <DetailBox label="Customer Type" value={order.customerType ? order.customerType.toLowerCase() : ""} icon={<FaUser />} />
+                        {order.transportName ? <DetailBox label="Transport" value={order.transportName} icon={<FaTruck />} /> : null}
                     </div>
 
                     {/* ── Billing ── */}

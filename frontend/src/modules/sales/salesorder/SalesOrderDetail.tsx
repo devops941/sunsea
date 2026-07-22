@@ -164,6 +164,7 @@ const SalesOrderDetail: React.FC = () => {
                                     <DetailBox label="Order Type" value={order.orderType} icon={<FaGlobe />} />
                                     {order.referenceText && <DetailBox label="Reference Name" value={order.referenceText} icon={<FaUser />} />}
                                     <DetailBox label="Dispatch Type" value={order.dispatchType} icon={<FaTruck />} />
+                                    {order.transportName ? <DetailBox label="Transport" value={order.transportName} icon={<FaTruck />} /> : null}
                                     <DetailBox
                                         label="Production Status"
                                         icon={<FaInfoCircle />}
