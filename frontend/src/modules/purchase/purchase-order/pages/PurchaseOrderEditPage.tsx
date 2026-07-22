@@ -161,89 +161,10 @@ const PurchaseOrderEditPage: React.FC = () => {
     (s) => String(s?.id) === String(formData.supplierId)
   ), [suppliers, formData.supplierId]);
 
-  const [selectedShippingIndex, setSelectedShippingIndex] = useState<string>("");
-
-  const shippingAddressOptions = useMemo(() => {
-    if (!selectedSupplier?.addresses || !Array.isArray(selectedSupplier.addresses) || selectedSupplier.addresses.length === 0) return [];
-    return selectedSupplier.addresses.map((addr: any, idx: number) => {
-      const a = addr.address || addr;
-      const addressParts = [a?.addressLine1, a?.addressLine2, a?.city, a?.state, a?.pincode].filter(Boolean);
-      const fullAddressStr = addressParts.join(", ");
-      return {
-        label: fullAddressStr || (addr.label && addr.label !== `Address ${idx + 1}` ? addr.label : `Address ${idx + 1}`),
-        value: String(idx),
-      };
-    });
-  }, [selectedSupplier]);
-
-  const handleShippingAddressSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const idxStr = e.target.value;
-    setSelectedShippingIndex(idxStr);
-    if (!idxStr) {
-      setFormData((prev) => ({
-        ...prev,
-        shippingAddressLine1: "",
-        shippingCity: "",
-        shippingState: "",
-        shippingPincode: "",
-      }));
-      return;
-    }
-    if (!selectedSupplier?.addresses) return;
-    const item = selectedSupplier.addresses[Number(idxStr)];
-    const addrObj: any = (item as any)?.address || item;
-    if (addrObj) {
-      setFormData((prev) => ({
-        ...prev,
-        shippingAddressLine1: addrObj.addressLine1 || "",
-        shippingCity: addrObj.city || "",
-        shippingState: addrObj.state || "",
-        shippingPincode: addrObj.pincode || "",
-      }));
-      setErrors((prev) => ({
-        ...prev,
-        shippingAddressLine1: "",
-        shippingCity: "",
-        shippingState: "",
-        shippingPincode: "",
-      }));
-    }
-  };
-
   const isInterState = useMemo(() => {
     if (!companyState || !selectedSupplier?.billingState) return false;
     return companyState.toLowerCase().trim() !== selectedSupplier.billingState.toLowerCase().trim();
   }, [companyState, selectedSupplier]);
-
-  const gstRateBreakdown = useMemo(() => {
-    const map = new Map<number, number>();
-    (formData.items || []).forEach((item) => {
-      const qty = Number(item.quantity) || 0;
-      const price = Number(item.unitPrice) || 0;
-      const taxable = qty * price;
-      const rate = Number(item.tax) || 0;
-      map.set(rate, (map.get(rate) || 0) + taxable);
-    });
-
-    const sortedRates = Array.from(map.keys()).sort((a, b) => a - b);
-
-    return sortedRates.map((rate) => {
-      const taxableForRate = map.get(rate) || 0;
-      const cgstRate = rate / 2;
-      const sgstRate = rate / 2;
-      const cgstAmount = taxableForRate * (cgstRate / 100);
-      const sgstAmount = taxableForRate * (sgstRate / 100);
-      const igstAmount = taxableForRate * (rate / 100);
-      return {
-        gstRate: rate,
-        cgstRate,
-        sgstRate,
-        cgstAmount,
-        sgstAmount,
-        igstAmount,
-      };
-    });
-  }, [formData.items]);
 
   const gstOptions = useMemo(() => [
     { value: "", label: gstLoading ? "Loading GST rates..." : "-- Select GST Rate --" },
@@ -973,18 +894,6 @@ const PurchaseOrderEditPage: React.FC = () => {
               <div className="flex items-center justify-between mb-4">
                 <h6 className="text-lg font-semibold text-gray-800 mb-0">Shipping</h6>
               </div>
-              {!formData.sameAsBilling && (
-                <div className="mb-4">
-                  <SelectInput
-                    label="Select Saved Address"
-                    options={shippingAddressOptions}
-                    value={selectedShippingIndex}
-                    onChange={handleShippingAddressSelect}
-                    defaultOptionLabel={shippingAddressOptions.length > 0 ? "-- Select saved address --" : "No additional addresses saved"}
-                    disabled={shippingAddressOptions.length === 0 || isLocked}
-                  />
-                </div>
-              )}
               <AddressForm
                 addressValue={formData.shippingAddressLine1 || ""}
                 onAddressChange={(val) => setFormData(prev => ({ ...prev, shippingAddressLine1: val }))}
@@ -1020,8 +929,7 @@ const PurchaseOrderEditPage: React.FC = () => {
                   <th className="px-3 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200 min-w-[200px]">QTY & UOM</th>
                   <th className="px-3 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200">UNIT PRICE (₹)</th>
                   <th className="px-3 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200">TAX %</th>
-                  <th className="px-3 py-3 text-right text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200">GST (₹)</th>
-                  <th className="px-3 py-3 text-right text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200">TOTAL (₹)</th>
+                  <th className="px-3 py-3 text-right text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200">TAXABLE (₹)</th>
                   {!isLocked && (
                     <th className="px-3 py-3 text-center text-[11px] font-bold text-slate-500 uppercase tracking-widest w-16 border-b border-slate-200"></th>
                   )}
@@ -1031,10 +939,7 @@ const PurchaseOrderEditPage: React.FC = () => {
                 {formData.items.map((item, index) => {
                   const qty = Number(item.quantity) || 0;
                   const price = Number(item.unitPrice) || 0;
-                  const taxPercent = Number(item.tax) || 0;
                   const taxableAmount = qty * price;
-                  const gstAmount = taxableAmount * (taxPercent / 100);
-                  const lineTotal = taxableAmount + gstAmount;
                   const rawMaterial = rawMaterials.find(
                     (rm) => String(rm.rawMaterialId) === String(item.productId)
                   );
@@ -1056,8 +961,7 @@ const PurchaseOrderEditPage: React.FC = () => {
                       </td>
                       <td className="px-3 py-2 whitespace-nowrap"><TextInput label="" name={`items[${index}].unitPrice`} type="number" value={String(item.unitPrice)} onChange={(e) => handleItemChange(index, "unitPrice", Number(e.target.value))} error={errors[`items.${index}.unitPrice`]} min={0} step={0.01} placeholder="0.00" disabled /></td>
                       <td className="px-3 py-2 whitespace-nowrap"><SelectInput noMargin={true} label="" name={`items[${index}].tax`} options={gstOptions} value={String(item.tax || 0)} onChange={(e) => handleItemChange(index, "tax", Number(e.target.value))} hideLabel disabled={isLocked} /></td>
-                      <td className="px-3 py-2 whitespace-nowrap text-right font-medium text-slate-700">₹{gstAmount.toFixed(2)}</td>
-                      <td className="px-3 py-2 whitespace-nowrap text-right font-medium text-slate-700">₹{lineTotal.toFixed(2)}</td>
+                      <td className="px-3 py-2 whitespace-nowrap text-right font-medium text-slate-700">₹{taxableAmount.toFixed(2)}</td>
                       {!isLocked && (
                         <td className="px-3 py-2 whitespace-nowrap text-center">
                           <button
@@ -1073,7 +977,7 @@ const PurchaseOrderEditPage: React.FC = () => {
                     </tr>
                   );
                 })}
-                {formData.items.length === 0 && <tr><td colSpan={isLocked ? 7 : 8} className="px-3 py-4 text-center text-slate-400 font-medium">No items added</td></tr>}
+                {formData.items.length === 0 && <tr><td colSpan={isLocked ? 6 : 7} className="px-3 py-4 text-center text-slate-400 font-medium">No items added</td></tr>}
               </tbody>
             </table>
           </div>
@@ -1113,36 +1017,12 @@ const PurchaseOrderEditPage: React.FC = () => {
                   <span>{roundingSign === "+" ? "+" : "-"}₹{(roundingValue || 0).toFixed(2)}</span>
                 </div>
                 {isInterState ? (
-                  gstRateBreakdown.length === 0 ? (
-                    <div className="flex justify-between mb-2 text-green-600 text-sm"><span>Total IGST:</span><span>+₹{(formData.totalIgst ?? 0).toFixed(2)}</span></div>
-                  ) : (
-                    gstRateBreakdown.map((group) => (
-                      <div key={`igst-${group.gstRate}`} className="flex justify-between mb-2 text-green-600 text-sm">
-                        <span>IGST {group.gstRate}%:</span>
-                        <span>+₹{group.igstAmount.toFixed(2)}</span>
-                      </div>
-                    ))
-                  )
+                  <div className="flex justify-between mb-2 text-green-600 text-sm"><span>Total IGST:</span><span>+₹{(formData.totalIgst ?? 0).toFixed(2)}</span></div>
                 ) : (
-                  gstRateBreakdown.length === 0 ? (
-                    <>
-                      <div className="flex justify-between mb-2 text-green-600 text-sm"><span>Total CGST:</span><span>+₹{(formData.totalCgst ?? 0).toFixed(2)}</span></div>
-                      <div className="flex justify-between mb-2 text-green-600 text-sm"><span>Total SGST:</span><span>+₹{(formData.totalSgst ?? 0).toFixed(2)}</span></div>
-                    </>
-                  ) : (
-                    gstRateBreakdown.map((group) => (
-                      <React.Fragment key={`gst-${group.gstRate}`}>
-                        <div className="flex justify-between mb-2 text-green-600 text-sm">
-                          <span>CGST {group.cgstRate}%:</span>
-                          <span>+₹{group.cgstAmount.toFixed(2)}</span>
-                        </div>
-                        <div className="flex justify-between mb-2 text-green-600 text-sm">
-                          <span>SGST {group.sgstRate}%:</span>
-                          <span>+₹{group.sgstAmount.toFixed(2)}</span>
-                        </div>
-                      </React.Fragment>
-                    ))
-                  )
+                  <>
+                    <div className="flex justify-between mb-2 text-green-600 text-sm"><span>Total CGST:</span><span>+₹{(formData.totalCgst ?? 0).toFixed(2)}</span></div>
+                    <div className="flex justify-between mb-2 text-green-600 text-sm"><span>Total SGST:</span><span>+₹{(formData.totalSgst ?? 0).toFixed(2)}</span></div>
+                  </>
                 )}
                 <hr className="my-2 border-gray-300" />
                 <div className="flex justify-between font-bold"><span>Net Amount:</span><span>₹{formData.netAmount.toFixed(2)}</span></div>

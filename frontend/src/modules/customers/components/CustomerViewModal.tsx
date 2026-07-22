@@ -75,54 +75,6 @@ const CustomerViewModal: React.FC<CustomerViewModalProps> = ({
         );
     };
 
-    const getShippingAddresses = () => {
-        const list: Array<{ line1?: string; line2?: string; city?: string; state?: string; pincode?: string; country?: string; label?: string }> = [];
-
-        if (Array.isArray(customer.addresses) && customer.addresses.length > 0) {
-            customer.addresses.forEach((addrItem: any, idx: number) => {
-                let addrObj = addrItem.address;
-                if (typeof addrObj === "string") {
-                    try {
-                        addrObj = JSON.parse(addrObj);
-                    } catch {
-                        addrObj = {};
-                    }
-                }
-                if (!addrObj || typeof addrObj !== "object") {
-                    addrObj = addrItem;
-                }
-
-                const line1 = addrObj.addressLine1 || addrObj.line1 || addrItem.addressLine1 || "";
-                const line2 = addrObj.addressLine2 || addrObj.line2 || addrItem.addressLine2 || "";
-                const city = addrObj.city || addrItem.city || "";
-                const state = addrObj.state || addrItem.state || "";
-                const pincode = addrObj.pincode || addrItem.pincode || "";
-                const country = addrObj.country || addrItem.country || "India";
-                const label = addrItem.label || `Address #${idx + 1}`;
-
-                if (line1 || city || state || pincode) {
-                    list.push({ line1, line2, city, state, pincode, country, label });
-                }
-            });
-        }
-
-        if (list.length === 0 && customer.shippingAddressLine1) {
-            list.push({
-                line1: customer.shippingAddressLine1,
-                line2: (customer as any).shippingAddressLine2 || "",
-                city: customer.shippingCity || "",
-                state: customer.shippingState || "",
-                pincode: customer.shippingPincode || "",
-                country: (customer as any).shippingCountry || (customer as any).shippingAddressCountry || "India",
-                label: "Shipping Address",
-            });
-        }
-
-        return list;
-    };
-
-    const shippingAddresses = getShippingAddresses();
-
     return (
         <CommonViewModal
             show={show}
@@ -166,7 +118,6 @@ const CustomerViewModal: React.FC<CustomerViewModalProps> = ({
                     title: "GST & Statutory Information",
                     fields: [
                         { label: "GSTIN", value: customer.gstin || "N/A" },
-                        { label: "State Code", value: (customer as any).stateCode || "N/A" },
                     ]
                 },
                 {
@@ -185,23 +136,19 @@ const CustomerViewModal: React.FC<CustomerViewModalProps> = ({
                                 </>
                             )
                         },
-                        ...(shippingAddresses.length > 0
-                            ? shippingAddresses.map((addr, idx) => ({
-                                label: shippingAddresses.length > 1 ? `Shipping Address #${idx + 1}` : "Shipping Address",
-                                value: (
-                                    <>
-                                        {addr.line1}
-                                        {addr.line2 && <><br />{addr.line2}</>}
-                                        <br />
-                                        {addr.city || "N/A"}, {addr.state || "N/A"} - {addr.pincode || "N/A"}, {addr.country || "India"}
-                                    </>
-                                )
-                            }))
-                            : [{
-                                label: "Shipping Address",
-                                value: "N/A"
-                            }]
-                        )
+                        {
+                            label: "Shipping Address",
+                            value: (
+                                <>
+                                    {customer.shippingAddressLine1 || "N/A"}
+                                    <br />
+                                    {customer.shippingCity || "N/A"},{" "}
+                                    {customer.shippingState || "N/A"} -{" "}
+                                    {customer.shippingPincode || "N/A"},{" "}
+                                    {(customer as any).shippingCountry || (customer as any).shippingAddressCountry || "India"}
+                                </>
+                            )
+                        }
                     ]
                 },
                 {

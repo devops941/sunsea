@@ -100,7 +100,7 @@ export interface UpdateCustomerDto {
   customerType?: string[];
   contactPerson?: string;
   designation?: string;
-  mobile?: any;
+  mobile?: string;
   altPhone?: string;
   whatsapp?: string;
   email?: string;

@@ -352,31 +352,18 @@ const SalesOrderForm: React.FC = () => {
 
     const shippingAddressOptions = useMemo(() => {
         if (!selectedCustomer?.addresses || selectedCustomer.addresses.length === 0) return [];
-        return selectedCustomer.addresses.map((addr: any, idx: number) => {
-            const a = addr.address || addr;
-            const addressParts = [a?.addressLine1, a?.addressLine2, a?.city, a?.state, a?.pincode].filter(Boolean);
-            const fullAddressStr = addressParts.join(", ");
-            return {
-                label: fullAddressStr || (addr.label && addr.label !== `Address ${idx + 1}` ? addr.label : `Address ${idx + 1}`),
-                value: String(idx),
-                original: a,
-            };
-        });
+        return selectedCustomer.addresses.map((addr: any, idx: number) => ({
+            label: addr.label || `Address ${idx + 1} (${addr.address?.city || ''})`,
+            value: String(idx),
+            original: addr.address
+        }));
     }, [selectedCustomer]);
 
     const handleShippingAddressSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
         const idxStr = e.target.value;
         setSelectedShippingIndex(idxStr);
-        if (!idxStr) {
-            setValue("shippingAddressLine1", "", { shouldValidate: true });
-            setValue("shippingCity", "", { shouldValidate: true });
-            setValue("shippingState", "", { shouldValidate: true });
-            setValue("shippingPincode", "", { shouldValidate: true });
-            return;
-        }
-        if (!selectedCustomer?.addresses) return;
-        const item = selectedCustomer.addresses[Number(idxStr)];
-        const addrObj: any = (item as any)?.address || item;
+        if (!idxStr || !selectedCustomer?.addresses) return;
+        const addrObj = selectedCustomer.addresses[Number(idxStr)]?.address;
         if (addrObj) {
             setValue("shippingAddressLine1", addrObj.addressLine1 || "", { shouldValidate: true });
             setValue("shippingCity", addrObj.city || "", { shouldValidate: true });
