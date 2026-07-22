@@ -274,10 +274,15 @@ const InvoiceDetailPage: React.FC = () => {
                             sgstAmount = totalGstAmount / 2;
                         }
 
+                        const matchingRm = (rawMaterials || []).find(
+                            (rm: any) => String(rm.rawMaterialId) === String(item.productId) || String(rm.id) === String(item.productId) || String(rm.materialCode) === String(item.productId)
+                        );
+                        const desc = item.product?.materialName || item.product?.productName || matchingRm?.materialName || item.description || item.productId || "";
+
                         return {
                             productId: item.productId || "",
-                            description: item.product?.materialName || item.product?.productName || item.productId,
-                            uom: item.uom || "",
+                            description: desc,
+                            uom: item.uom || matchingRm?.baseUom || "",
                             qty,
                             unitPrice,
                             tax,
@@ -398,6 +403,36 @@ const InvoiceDetailPage: React.FC = () => {
     const totalCgst = useMemo(() => items.reduce((sum, i) => sum + i.cgstAmount, 0), [items]);
     const totalSgst = useMemo(() => items.reduce((sum, i) => sum + i.sgstAmount, 0), [items]);
     const totalIgst = useMemo(() => items.reduce((sum, i) => sum + i.igstAmount, 0), [items]);
+
+    const gstRateBreakdown = useMemo(() => {
+        const map = new Map<number, number>();
+        (items || []).forEach((item) => {
+            const qty = Number(item.qty) || 0;
+            const price = Number(item.unitPrice) || 0;
+            const taxable = qty * price;
+            const rate = Number(item.tax) || 0;
+            map.set(rate, (map.get(rate) || 0) + taxable);
+        });
+
+        const sortedRates = Array.from(map.keys()).sort((a, b) => a - b);
+
+        return sortedRates.map((rate) => {
+            const taxableForRate = map.get(rate) || 0;
+            const cgstRate = rate / 2;
+            const sgstRate = rate / 2;
+            const cgstAmount = taxableForRate * (cgstRate / 100);
+            const sgstAmount = taxableForRate * (sgstRate / 100);
+            const igstAmount = taxableForRate * (rate / 100);
+            return {
+                gstRate: rate,
+                cgstRate,
+                sgstRate,
+                cgstAmount,
+                sgstAmount,
+                igstAmount,
+            };
+        });
+    }, [items]);
     const discountAmount = useMemo(() => {
         if (form.discountType === "percent") return (subtotal * form.discountValue) / 100;
         return Number(form.discountValue) || 0;
@@ -812,22 +847,63 @@ const InvoiceDetailPage: React.FC = () => {
                             </thead>
                             <tbody className="divide-y divide-gray-200 bg-white">
                                 {items.map((item, idx) => {
-                                    const itemRawMaterial = rawMaterials.find(
-                                        (rm) => String(rm.rawMaterialId) === String(item.productId)
+                                    const itemRawMaterial = (rawMaterials || []).find(
+                                        (rm: any) => String(rm.rawMaterialId) === String(item.productId) || String(rm.id) === String(item.productId) || String(rm.materialCode) === String(item.productId)
                                     );
                                     const fallbackUoms = (activeUOMs || []).map((u: any) => u.uomName).join(",");
                                     const baseUoms = itemRawMaterial?.baseUom || fallbackUoms;
+                                    const materialName = itemRawMaterial?.materialName || itemRawMaterial?.productName || (item.description && item.description !== item.productId ? item.description : "") || item.productId || "—";
 
                                     return (
                                         <tr key={idx} className="hover:bg-slate-50 transition-colors">
                                             <td className="p-2 text-center text-gray-500 align-middle">{idx + 1}</td>
                                             <td className="p-2 align-middle">
-                                                <input
-                                                    className="w-full border-gray-300 rounded px-2.5 py-1.5 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none border"
-                                                    value={item.description}
-                                                    onChange={(e) => updateItem(idx, "description", e.target.value)}
-                                                    placeholder="Product name"
-                                                />
+                                                {isPOSelected ? (
+                                                    <span className="font-semibold text-slate-800 text-sm px-1">{materialName}</span>
+                                                ) : (
+                                                    <SelectInput
+                                                        label=""
+                                                        hideLabel={true}
+                                                        noMargin={true}
+                                                        value={item.productId ? String(item.productId) : ""}
+                                                        options={[
+                                                            { value: "", label: "-- Select Material --" },
+                                                            ...(rawMaterials || []).map((rm: any) => ({
+                                                                value: String(rm.rawMaterialId),
+                                                                label: rm.materialName || rm.productName || String(rm.rawMaterialId),
+                                                            }))
+                                                        ]}
+                                                        onChange={(e) => {
+                                                            const selId = e.target.value;
+                                                            const selectedRm = rawMaterials.find((rm: any) => String(rm.rawMaterialId) === String(selId));
+                                                            if (selectedRm) {
+                                                                const matName = selectedRm.materialName || selectedRm.productName || "";
+                                                                const uPrice = Number(selectedRm.unitPrice) || 0;
+                                                                const gRate = Number(selectedRm.gstRate) || 0;
+                                                                const baseUomVal = selectedRm.baseUom ? selectedRm.baseUom.split(",")[0].trim() : "";
+
+                                                                setItems((prev) => {
+                                                                    const updated = [...prev];
+                                                                    updated[idx] = {
+                                                                        ...updated[idx],
+                                                                        productId: selId,
+                                                                        description: matName,
+                                                                        unitPrice: uPrice,
+                                                                        tax: gRate,
+                                                                        uom: baseUomVal || updated[idx].uom,
+                                                                    };
+                                                                    const lineSubtotal = updated[idx].qty * uPrice;
+                                                                    const totalGstAmount = (lineSubtotal * gRate) / 100;
+                                                                    updated[idx].taxableAmount = lineSubtotal;
+                                                                    updated[idx].netAmount = lineSubtotal + totalGstAmount;
+                                                                    return updated;
+                                                                });
+                                                            } else {
+                                                                updateItem(idx, "productId", selId);
+                                                            }
+                                                        }}
+                                                    />
+                                                )}
                                             </td>
                                             <td className="p-2 align-middle">
                                                 <QuantityInput
@@ -842,7 +918,14 @@ const InvoiceDetailPage: React.FC = () => {
                                                 />
                                             </td>
                                             <td className="p-2 align-middle">
-                                                <input className="w-full border-gray-300 rounded px-2.5 py-1.5 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none border" type="number" min={0} step={0.01} value={item.unitPrice} onChange={(e) => updateItem(idx, "unitPrice", Number(e.target.value))} />
+                                                <input
+                                                    className="w-full border-gray-200 bg-gray-50 rounded px-2.5 py-1.5 text-sm outline-none border text-gray-600 font-medium cursor-not-allowed"
+                                                    type="number"
+                                                    min={0}
+                                                    step={0.01}
+                                                    value={item.unitPrice}
+                                                    disabled
+                                                />
                                             </td>
                                             <td className="p-2 align-middle">
                                                 <SelectInput
@@ -853,6 +936,7 @@ const InvoiceDetailPage: React.FC = () => {
                                                     options={gstOptions}
                                                     value={String(item.tax || 0)}
                                                     onChange={(e) => updateItem(idx, "tax", Number(e.target.value))}
+                                                    disabled={true}
                                                 />
                                             </td>
 
@@ -926,21 +1010,45 @@ const InvoiceDetailPage: React.FC = () => {
                                     </div>
                                 </div>
                                 {isInterState ? (
-                                    <div className="flex justify-between text-sm text-gray-600">
-                                        <span>Total IGST</span>
-                                        <span className="font-semibold text-green-600">+ ₹{totalIgst.toFixed(2)}</span>
-                                    </div>
+                                    gstRateBreakdown.length === 0 ? (
+                                        <div className="flex justify-between text-sm text-gray-600">
+                                            <span>Total IGST</span>
+                                            <span className="font-semibold text-green-600">+ ₹{totalIgst.toFixed(2)}</span>
+                                        </div>
+                                    ) : (
+                                        gstRateBreakdown.map((group) => (
+                                            <div key={`igst-${group.gstRate}`} className="flex justify-between text-sm text-gray-600">
+                                                <span>IGST {group.gstRate}%</span>
+                                                <span className="font-semibold text-green-600">+ ₹{group.igstAmount.toFixed(2)}</span>
+                                            </div>
+                                        ))
+                                    )
                                 ) : (
-                                    <>
-                                        <div className="flex justify-between text-sm text-gray-600">
-                                            <span>Total CGST</span>
-                                            <span className="font-semibold text-green-600">+ ₹{totalCgst.toFixed(2)}</span>
-                                        </div>
-                                        <div className="flex justify-between text-sm text-gray-600">
-                                            <span>Total SGST</span>
-                                            <span className="font-semibold text-green-600">+ ₹{totalSgst.toFixed(2)}</span>
-                                        </div>
-                                    </>
+                                    gstRateBreakdown.length === 0 ? (
+                                        <>
+                                            <div className="flex justify-between text-sm text-gray-600">
+                                                <span>Total CGST</span>
+                                                <span className="font-semibold text-green-600">+ ₹{totalCgst.toFixed(2)}</span>
+                                            </div>
+                                            <div className="flex justify-between text-sm text-gray-600">
+                                                <span>Total SGST</span>
+                                                <span className="font-semibold text-green-600">+ ₹{totalSgst.toFixed(2)}</span>
+                                            </div>
+                                        </>
+                                    ) : (
+                                        gstRateBreakdown.map((group) => (
+                                            <React.Fragment key={`gst-${group.gstRate}`}>
+                                                <div className="flex justify-between text-sm text-gray-600">
+                                                    <span>CGST {group.cgstRate}%</span>
+                                                    <span className="font-semibold text-green-600">+ ₹{group.cgstAmount.toFixed(2)}</span>
+                                                </div>
+                                                <div className="flex justify-between text-sm text-gray-600">
+                                                    <span>SGST {group.sgstRate}%</span>
+                                                    <span className="font-semibold text-green-600">+ ₹{group.sgstAmount.toFixed(2)}</span>
+                                                </div>
+                                            </React.Fragment>
+                                        ))
+                                    )
                                 )}
                             </div>
                             <div className="bg-white px-4 py-3 border-t border-gray-200 flex justify-between items-center">

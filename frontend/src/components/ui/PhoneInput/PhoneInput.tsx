@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, KeyboardEvent } from 'react';
+import React, { useState, useRef, useEffect, type KeyboardEvent } from 'react';
 import PhoneInput, { isValidPhoneNumber } from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
 import { X, ChevronDown, Check } from 'lucide-react';
@@ -11,7 +11,8 @@ export const validatePhoneNumber = (value: string | undefined, required: boolean
     if (digitsOnly.length !== 10) {
         return 'Enter a valid 10-digit mobile number';
     }
-    if (!isValidPhoneNumber(value)) {
+    const formatted = `+91${digitsOnly}`;
+    if (!isValidPhoneNumber(formatted)) {
         return 'Enter a valid Indian mobile number';
     }
     return null;
@@ -23,16 +24,20 @@ export type PhoneEntryType = typeof PHONE_ENTRY_TYPES[number];
 
 /**
  * Validates a list of named phone entries (multi mode).
- * - "Primary Mobile Number" is always required and must be a valid 10-digit Indian number.
- * - Any other entries present must also be valid 10-digit Indian numbers.
+ * - "Primary Mobile Number" is required if required=true.
+ * - Any entries present must also be valid 10-digit Indian numbers.
  */
 export const validatePhoneEntries = (
     entries: { label: string; number: string }[] | undefined,
     required: boolean = true
 ): string | null => {
     const list = entries || [];
-    const primary = list.find((e) => e.label === 'Primary Mobile Number');
 
+    if (required && list.length === 0) {
+        return 'Mobile Number is required';
+    }
+
+    const primary = list.find((e) => e.label === 'Primary Mobile Number');
     if (required && !primary) {
         return 'Primary Mobile Number is required';
     }
@@ -60,10 +65,10 @@ interface SinglePhoneFieldProps {
 }
 
 const SinglePhoneField: React.FC<SinglePhoneFieldProps> = ({
-    name,
+    name: _name,
     value,
     placeholder,
-    required = true,
+    required: _required = true,
     error,
     onChange,
     onBlur,
@@ -199,6 +204,7 @@ const IndiaPhoneInput: React.FC<IndiaPhoneInputProps> = (props) => {
     const [draftError, setDraftError] = useState<string | null>(null);
     const [requiredError, setRequiredError] = useState<string | null>(null);
     const wrapperRef = useRef<HTMLDivElement>(null);
+    const wasOpened = useRef(false);
 
     // close dropdown on outside click
     useEffect(() => {
@@ -213,7 +219,9 @@ const IndiaPhoneInput: React.FC<IndiaPhoneInputProps> = (props) => {
 
     // multi mode: validate (required + 10-digit Indian number) whenever the dropdown closes
     useEffect(() => {
-        if (!isOpen && props.multi) {
+        if (isOpen) {
+            wasOpened.current = true;
+        } else if (wasOpened.current && props.multi) {
             setRequiredError(validatePhoneEntries(props.value, props.required ?? true));
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -265,6 +273,10 @@ const IndiaPhoneInput: React.FC<IndiaPhoneInputProps> = (props) => {
             }
             const formatted = `+91${digits}`;
 
+            if (entries.some((e) => e.label === rawName)) {
+                setDraftError(`${rawName} is already added`);
+                return;
+            }
             if (entries.some((e) => e.number === formatted)) {
                 setDraftError('This number is already added');
                 return;
@@ -274,13 +286,20 @@ const IndiaPhoneInput: React.FC<IndiaPhoneInputProps> = (props) => {
                 return;
             }
 
-            onChange({ target: { name, value: [...entries, { label: rawName, number: formatted }] } });
+            const updated = [...entries, { label: rawName, number: formatted }];
+            if (wasOpened.current) {
+                setRequiredError(validatePhoneEntries(updated, props.required ?? true));
+            }
+            onChange({ target: { name, value: updated } });
             setDraftValue('');
             setDraftError(null);
         };
 
         const handleRemove = (idx: number) => {
             const updated = entries.filter((_, i) => i !== idx);
+            if (wasOpened.current) {
+                setRequiredError(validatePhoneEntries(updated, props.required ?? true));
+            }
             onChange({ target: { name, value: updated } });
         };
 
@@ -511,7 +530,7 @@ const IndiaPhoneInput: React.FC<IndiaPhoneInputProps> = (props) => {
     }
 
     /* ============ SINGLE MODE (original behavior) ============ */
-    const { value, error, onChange } = props;
+    const { value, error, onChange } = props as IndiaPhoneInputSingleProps;
 
     const handleBlur = () => {
         setSingleLocalError(validatePhoneNumber(value, required));
