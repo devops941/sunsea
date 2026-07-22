@@ -26,6 +26,7 @@ interface InvoiceLineItem {
   itemName: string;
   qty: number;
   rate: number;
+  discountAmount: number;
   taxPercent: number;
   amount: number;        // computed: qty * rate
   taxAmount: number;      // computed: amount * taxPercent / 100
@@ -50,6 +51,7 @@ const emptyLine = (): InvoiceLineItem => ({
   itemName: "",
   qty: 1,
   rate: 0,
+  discountAmount: 0,
   taxPercent: 0,
   amount: 0,
   taxAmount: 0,
@@ -173,6 +175,7 @@ const SalesInvoiceForm: React.FC = () => {
   const [salesOrders, setSalesOrders] = useState<any[]>([]);
   const [selectedSalesOrderId, setSelectedSalesOrderId] = useState("");
   const [gstRates, setGstRates] = useState<any[]>([]);
+  const [stockMap, setStockMap] = useState<Map<string, number>>(new Map());
 
   useEffect(() => {
     dispatch(fetchCompany());
@@ -215,14 +218,24 @@ const SalesInvoiceForm: React.FC = () => {
 
         // Map Finished Goods Stock to onHandQty by productItemId
         const fgList: any[] = Array.isArray(fgStockResponse) ? fgStockResponse : (fgStockResponse as any).data || [];
-        const fgStockMap = new Map<string, number>();
+
+        const latestFgMap = new Map<string, any>();
         fgList.forEach((fg: any) => {
           const prodId = (fg.productItemId || fg.productId)?.toString();
           if (prodId) {
-            const qty = Number(fg.onHandQty || 0);
-            fgStockMap.set(prodId, (fgStockMap.get(prodId) || 0) + qty);
+            const currentLatest = latestFgMap.get(prodId);
+            if (!currentLatest || new Date(fg.updatedAt).getTime() > new Date(currentLatest.updatedAt).getTime()) {
+              latestFgMap.set(prodId, fg);
+            }
           }
         });
+
+        const fgStockMap = new Map<string, number>();
+        latestFgMap.forEach((fg: any, prodId: string) => {
+          fgStockMap.set(prodId, Number(fg.onHandQty || 0));
+        });
+
+        setStockMap(fgStockMap);
 
         setSalesOrders(salesOrdersList);
 
@@ -272,21 +285,24 @@ const SalesInvoiceForm: React.FC = () => {
       if (selectedOrder.items && selectedOrder.items.length > 0) {
         const newLines = selectedOrder.items.map((item: any) => {
           const qty = Number(item.quantity || item.qty || 1);
+          const discountAmount = Number(item.discountAmount || 0);
           const totalTaxable = Number(item.taxableAmount || item.lineSubtotal || 0);
-          const rate = qty > 0 ? (totalTaxable / qty) : Number(item.b2b || item.b2c || item.mrp || 0);
+          const rate = qty > 0 ? ((totalTaxable + discountAmount) / qty) : Number(item.b2b || item.b2c || item.mrp || 0);
           const taxPercent = Number(item.igstRate) > 0
             ? Number(item.igstRate)
             : (Number(item.cgstRate || 0) + Number(item.sgstRate || 0));
 
-          const amount = qty * rate;
-          const taxAmount = (amount * taxPercent) / 100;
-          const total = amount + taxAmount;
+          const amount = (qty * rate);
+          const taxableAmount = amount - discountAmount;
+          const taxAmount = (taxableAmount * taxPercent) / 100;
+          const total = taxableAmount + taxAmount;
           return {
             id: crypto.randomUUID(),
             itemId: String(item.productId || ""),
             itemName: item.product?.productName || item.productName || "Unknown Item",
             qty,
             rate,
+            discountAmount,
             taxPercent,
             amount,
             taxAmount,
@@ -300,9 +316,10 @@ const SalesInvoiceForm: React.FC = () => {
 
   // ---- Line item handlers ----
   const recalcLine = (line: InvoiceLineItem): InvoiceLineItem => {
-    const amount = line.amount !== undefined ? line.amount : (line.qty * line.rate);
-    const taxAmount = (amount * line.taxPercent) / 100;
-    return { ...line, amount, taxAmount, total: amount + taxAmount };
+    const amount = (line.qty * line.rate);
+    const taxableAmount = amount - (line.discountAmount || 0);
+    const taxAmount = (taxableAmount * line.taxPercent) / 100;
+    return { ...line, amount, taxAmount, total: taxableAmount + taxAmount };
   };
 
   const updateLine = (id: string, field: keyof InvoiceLineItem, value: any) => {
@@ -317,13 +334,15 @@ const SalesInvoiceForm: React.FC = () => {
           if (selected) {
             updated.itemName = selected.name;
             updated.rate = selected.defaultRate ?? 0;
+            updated.discountAmount = 0;
             updated.taxPercent = selected.gstRate ?? 0;
-            updated.amount = updated.qty * updated.rate;
+            updated.amount = (updated.qty * updated.rate);
           }
-        } else if (field === "qty" || field === "rate") {
+        } else if (field === "qty" || field === "rate" || field === "discountAmount") {
           const qty = field === "qty" ? Number(value) : updated.qty;
           const rate = field === "rate" ? Number(value) : updated.rate;
-          updated.amount = qty * rate;
+          const disc = field === "discountAmount" ? Number(value) : updated.discountAmount;
+          updated.amount = (qty * rate);
         } else if (field === "amount") {
           const amt = Number(value);
           updated.amount = amt;
@@ -350,9 +369,10 @@ const SalesInvoiceForm: React.FC = () => {
 
   // ---- Totals ----
   const totals = useMemo(() => {
-    const subTotal = lines.reduce((sum, l) => sum + l.amount, 0);
+    const subTotal = lines.reduce((sum, l) => sum + (l.qty * l.rate), 0);
+    const totalDiscount = lines.reduce((sum, l) => sum + (l.discountAmount || 0), 0);
     const taxTotal = lines.reduce((sum, l) => sum + l.taxAmount, 0);
-    const grandTotal = subTotal + taxTotal;
+    const grandTotal = subTotal - totalDiscount + taxTotal;
 
     let cgst = 0;
     let sgst = 0;
@@ -365,7 +385,7 @@ const SalesInvoiceForm: React.FC = () => {
       sgst = taxTotal / 2;
     }
 
-    return { subTotal, taxTotal, grandTotal, cgst, sgst, igst };
+    return { subTotal, totalDiscount, taxTotal, grandTotal, cgst, sgst, igst };
   }, [lines, isInterState]);
 
   // ---- Validation ----
@@ -376,6 +396,17 @@ const SalesInvoiceForm: React.FC = () => {
 
     const hasValidLine = lines.some((l) => l.itemId && l.qty > 0);
     if (!hasValidLine) errs.lines = "Add at least one item with quantity greater than 0";
+
+    // Stock availability check
+    for (const l of lines) {
+      if (l.itemId && l.qty > 0) {
+        const available = stockMap.get(l.itemId) || 0;
+        if (l.qty > available) {
+          errs.lines = `Stock not available for ${l.itemName} (Available: ${available})`;
+          break; // Stop on first error
+        }
+      }
+    }
 
     setErrors(errs);
     return Object.keys(errs).length === 0;
@@ -400,6 +431,7 @@ const SalesInvoiceForm: React.FC = () => {
             productId: l.itemId,
             qty: l.qty,
             rate: l.rate,
+            discountAmount: l.discountAmount,
             taxPercent: l.taxPercent,
             amount: l.amount,
             taxAmount: l.taxAmount,
@@ -423,6 +455,8 @@ const SalesInvoiceForm: React.FC = () => {
   if (loading) {
     return <CommonLoader text="Loading Invoice Form..." fullScreen={false} />;
   }
+
+  const isStockNotEnough = lines.some((l) => l.itemId && l.qty > (stockMap.get(l.itemId) || 0));
 
   return (
     <div className="mx-auto pb-12">
@@ -477,7 +511,7 @@ const SalesInvoiceForm: React.FC = () => {
                 }}
               />
               <SelectInput
-                label="Sales Order (Optional)"
+                label="Sales Order "
                 name="selectedSalesOrderId"
                 value={selectedSalesOrderId}
                 disabled={!customerId}
@@ -489,7 +523,7 @@ const SalesInvoiceForm: React.FC = () => {
                       ? new Date(orderDateStr).toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" })
                       : "N/A";
                     const formattedAmount = `₹${Number(so.netAmount || so.grandTotal || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`;
-                    const labelStr = `${so.orderNo} — ${formattedDate} — ${formattedAmount}`;
+                    const labelStr = `${so.orderNo} — ${formattedAmount}`;
                     return { label: labelStr, value: so.id.toString() };
                   })}
                 defaultOptionLabel={customerId ? "-- Select Sales Order --" : "-- Select Customer First --"}
@@ -565,7 +599,7 @@ const SalesInvoiceForm: React.FC = () => {
                         />
                       </td>
                       {/* Qty */}
-                      <td className="px-4 py-2">
+                      <td className="px-4 py-2 align-top">
                         <TextInput
                           bottom={true}
                           label=""
@@ -574,6 +608,11 @@ const SalesInvoiceForm: React.FC = () => {
                           value={String(line.qty)}
                           onChange={(e) => updateLine(line.id, "qty", Number(e.target.value))}
                         />
+                        {line.itemId && line.qty > (stockMap.get(line.itemId) || 0) && (
+                          <div className="text-red-500 text-[10px] mt-1 font-medium whitespace-nowrap">
+                            Available: {stockMap.get(line.itemId) || 0}
+                          </div>
+                        )}
                       </td>
                       {/* Unit Price */}
                       <td className="px-4 py-2">
@@ -633,30 +672,36 @@ const SalesInvoiceForm: React.FC = () => {
             <div className="flex justify-end mt-6">
               <div className="w-full max-w-sm bg-slate-50 rounded-xl p-5 border border-slate-200">
                 <div className="flex justify-between items-center text-sm mb-3">
-                  <span className="text-slate-500 font-medium">Sub Total</span>
+                  <span className="text-slate-500 font-medium">Subtotal</span>
                   <span className="font-semibold text-slate-700">₹{totals.subTotal.toFixed(2)}</span>
                 </div>
                 {isInterState ? (
                   <div className="flex justify-between items-center text-sm mb-4">
-                    <span className="text-slate-500 font-medium">IGST Total</span>
-                    <span className="font-semibold text-slate-700">₹{totals.igst.toFixed(2)}</span>
+                    <span className="text-emerald-600 font-medium">IGST</span>
+                    <span className="font-semibold text-emerald-600">+ ₹{totals.igst.toFixed(2)}</span>
                   </div>
                 ) : (
                   <>
                     <div className="flex justify-between items-center text-sm mb-3">
-                      <span className="text-slate-500 font-medium">CGST Total</span>
-                      <span className="font-semibold text-slate-700">₹{totals.cgst.toFixed(2)}</span>
+                      <span className="text-emerald-600 font-medium">CGST</span>
+                      <span className="font-semibold text-emerald-600">+ ₹{totals.cgst.toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between items-center text-sm mb-4">
-                      <span className="text-slate-500 font-medium">SGST Total</span>
-                      <span className="font-semibold text-slate-700">₹{totals.sgst.toFixed(2)}</span>
+                      <span className="text-emerald-600 font-medium">SGST</span>
+                      <span className="font-semibold text-emerald-600">+ ₹{totals.sgst.toFixed(2)}</span>
                     </div>
                   </>
                 )}
+                {totals.totalDiscount > 0 && (
+                  <div className="flex justify-between items-center text-sm mb-4">
+                    <span className="text-red-500 font-medium">Discount</span>
+                    <span className="font-semibold text-red-500">- ₹{totals.totalDiscount.toFixed(2)}</span>
+                  </div>
+                )}
                 <div className="pt-3 border-t border-slate-200">
                   <div className="flex justify-between items-center">
-                    <span className="font-bold text-slate-800">Grand Total</span>
-                    <span className="text-xl font-bold text-emerald-600">₹{totals.grandTotal.toFixed(2)}</span>
+                    <span className="font-bold text-slate-800">Net Amount</span>
+                    <span className="text-xl font-bold text-blue-600">₹{totals.grandTotal.toFixed(2)}</span>
                   </div>
                 </div>
               </div>
@@ -690,7 +735,7 @@ const SalesInvoiceForm: React.FC = () => {
               text="Create Invoice"
               icon={FaSave}
               type="submit"
-
+              disabled={saving || isStockNotEnough}
               variant="primary"
             />
           </div>

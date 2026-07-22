@@ -139,6 +139,11 @@ const ProductEdit: React.FC = () => {
     useEffect(() => {
         if (!productData) return;
 
+        let latestStock: any = null;
+        if (productData.finishedGoodsStocks && productData.finishedGoodsStocks.length > 0) {
+            latestStock = [...productData.finishedGoodsStocks].sort((a: any, b: any) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())[0];
+        }
+
         setFormData((prev) => ({
             ...prev,
             productCode: productData.productCode || "",
@@ -164,8 +169,8 @@ const ProductEdit: React.FC = () => {
             gstTaxRateId: productData.gstTaxRateId ? String(productData.gstTaxRateId) : "",
             minimumQty: productData.minimumQty != null ? String(productData.minimumQty) : "",
             maximumQty: productData.maximumQty != null ? String(productData.maximumQty) : "",
-            openingStockQty: productData.finishedGoodsStocks?.[0] ? String(productData.finishedGoodsStocks[0].onHandQty) : "",
-            openingStockStoreId: productData.finishedGoodsStocks?.[0] ? String(productData.finishedGoodsStocks[0].storeId) : (prev.openingStockStoreId || ""),
+            openingStockQty: latestStock ? String(latestStock.onHandQty) : "",
+            openingStockStoreId: latestStock ? String(latestStock.storeId) : (prev.openingStockStoreId || ""),
         }));
 
 

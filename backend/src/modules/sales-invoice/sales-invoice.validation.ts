@@ -4,6 +4,7 @@ const ItemSchema = z.object({
   productId: z.union([z.string(), z.number()]).refine(val => !isNaN(Number(val)), "Product ID must be a valid number"),
   qty: z.coerce.number().min(0.001, "Qty must be > 0"),
   rate: z.coerce.number().min(0, "Rate must be ≥ 0"),
+  discountAmount: z.coerce.number().min(0).optional().default(0),
   taxPercent: z.coerce.number().min(0).max(100).optional().default(0),
   amount: z.coerce.number().min(0).optional(),
   taxAmount: z.coerce.number().min(0).optional(),
