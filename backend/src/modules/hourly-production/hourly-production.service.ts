@@ -299,7 +299,7 @@ class HourlyProductionService {
 
       await syncProductionOrderQuantities(tx, data.productionOrderId);
       return created;
-    }).then(async (result) => {
+    }, { timeout: 15000 }).then(async (result) => {
       // Auto-trigger OEE snapshot recalculation after transaction commits
       try {
         await oeeService.recalculateAndSaveSnapshot({
@@ -521,10 +521,10 @@ class HourlyProductionService {
 
       await syncProductionOrderQuantities(tx, updated.productionOrderId);
       if (existing.productionOrderId !== updated.productionOrderId) {
-        await syncProductionOrderQuantities(tx, existing.productionOrderId);
+      await syncProductionOrderQuantities(tx, existing.productionOrderId);
       }
       return updated;
-    });
+    }, { timeout: 15000 });
   }
 
   async delete(hourlyProductionId: bigint) {
@@ -536,7 +536,7 @@ class HourlyProductionService {
       });
       await syncProductionOrderQuantities(tx, existing.productionOrderId);
       return deleted;
-    });
+    }, { timeout: 15000 });
   }
 }
 

@@ -109,7 +109,7 @@ export const updateDailyPlanSchema = z.object({
       .optional(),
 
     status: z
-      .enum(["DRAFT", "PLANNED", "APPROVED", "IN_PROGRESS", "COMPLETED", "CANCELLED", "STOPPED"])
+      .enum(["DRAFT", "PLANNED", "APPROVED", "IN_PROGRESS", "COMPLETED", "CANCELLED", "STOPPED", "NEXT_STEP"])
       .optional(),
 
     remarks: z

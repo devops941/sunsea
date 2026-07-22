@@ -211,15 +211,64 @@ class DailyPlanService {
         plannedQty: checkPlannedQty,
         plannedHours: data.plannedHours !== undefined ? data.plannedHours : existingPlan.plannedHours,
         priority: data.priority || existingPlan.priority,
-        status: data.status || existingPlan.status,
+        // If it's a step advance, keep the status as IN_PROGRESS
+        status: data.status === "NEXT_STEP" ? "IN_PROGRESS" : (data.status || existingPlan.status),
         remarks: data.remarks !== undefined ? data.remarks : existingPlan.remarks,
         updatedBy: userId,
       };
 
+      // Handle dynamic production steps if Daily Plan is marked COMPLETED or NEXT_STEP
+      if ((data.status === "COMPLETED" || data.status === "NEXT_STEP") && existingPlan.status !== "COMPLETED") {
+        // Fetch ProductionOrder and Product with productionSteps
+        const productionOrder = await tx.productionOrder.findUnique({
+          where: { productionOrderId: checkProductionOrderId },
+          include: { productItem: { include: { productionSteps: { orderBy: { stepOrder: 'asc' } } } } }
+        });
+
+        if (productionOrder) {
+          const customSteps = productionOrder.productItem?.productionSteps || [];
+          const totalStepsCount = 1 + customSteps.length;
+          const currentIndex = productionOrder.currentStepIndex || 0;
+          const nextIndex = currentIndex + 1;
+
+
+
+          if (nextIndex < totalStepsCount) {
+            // Move to next step
+            const nextStepName = customSteps[nextIndex - 1].stepKey;
+
+            await tx.productionOrder.update({
+              where: { productionOrderId: checkProductionOrderId },
+              data: {
+                currentStepIndex: nextIndex,
+                currentProductionStep: nextStepName,
+                // Keep status IN_PROGRESS until all steps are done
+                status: "IN_PROGRESS"
+              }
+            });
+            // Force the Daily Plan to stay IN_PROGRESS so it isn't closed prematurely
+            updateData.status = "IN_PROGRESS";
+          } else {
+
+            // All steps completed, move to POST PRODUCTION (status = "COMPLETED")
+            await tx.productionOrder.update({
+              where: { productionOrderId: checkProductionOrderId },
+              data: {
+                status: "COMPLETED",
+                currentStepIndex: nextIndex,
+                currentProductionStep: "Finished",
+              }
+            });
+            // Also ensure the Daily Plan gets marked as COMPLETED
+            updateData.status = "COMPLETED";
+          }
+        }
+      }
+
       const updatedPlan = await dailyPlanRepository.update(dailyPlanId, updateData, tx);
 
       return updatedPlan;
-    });
+    }, { timeout: 15000, maxWait: 10000 });
   }
 
   async delete(dailyPlanId: string) {

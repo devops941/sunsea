@@ -9,7 +9,11 @@ export class DailyPlanRepository {
         weeklyMachineProgram: true,
         productionOrder: {
           include: {
-            productItem: true,
+            productItem: {
+              include: {
+                productionSteps: { orderBy: { stepOrder: 'asc' } }
+              }
+            },
           },
         },
         machine: true,
@@ -27,7 +31,11 @@ export class DailyPlanRepository {
         weeklyMachineProgram: true,
         productionOrder: {
           include: {
-            productItem: true,
+            productItem: {
+              include: {
+                productionSteps: { orderBy: { stepOrder: 'asc' } }
+              }
+            },
           },
         },
         machine: true,
@@ -50,7 +58,11 @@ export class DailyPlanRepository {
         weeklyMachineProgram: true,
         productionOrder: {
           include: {
-            productItem: true,
+            productItem: {
+              include: {
+                productionSteps: { orderBy: { stepOrder: 'asc' } }
+              }
+            },
           },
         },
         machine: true,
@@ -101,7 +113,11 @@ export class DailyPlanRepository {
         weeklyMachineProgram: true,
         productionOrder: {
           include: {
-            productItem: true,
+            productItem: {
+              include: {
+                productionSteps: { orderBy: { stepOrder: 'asc' } }
+              }
+            },
           },
         },
         machine: true,
