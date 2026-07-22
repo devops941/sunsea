@@ -13,6 +13,16 @@ export interface CustomerAddress {
   state_code: string;
 }
 
+export interface CustomerTransport {
+  transportName: string;
+  phone: string;
+  addressLine1: string;
+  country: string;
+  state: string;
+  city: string;
+  pincode: string;
+}
+
 export interface Customer {
   id: string;
   companyId: string;
@@ -48,6 +58,7 @@ export interface Customer {
   bankAccount?: any;
   status: string;
   addresses?: CustomerAddress[];
+  transports?: CustomerTransport[];
   createdAt: string;
   updatedAt: string;
   createdUser?: {
@@ -92,6 +103,7 @@ export interface CreateCustomerDto {
   status?: string;
   createdBy?: string;
   addresses?: any[];
+  transports?: CustomerTransport[];
 }
 
 export interface UpdateCustomerDto {
@@ -128,6 +140,7 @@ export interface UpdateCustomerDto {
   bankAccount?: any;
   status?: string;
   addresses?: any[];
+  transports?: CustomerTransport[];
 }
 
 export interface CustomerState {

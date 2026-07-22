@@ -24,7 +24,6 @@ model Employee {
   createdByUser            User?          @relation("EmployeeCreatedBy", fields: [createdBy], references: [userId])
   department               Department?    @relation(fields: [departmentId], references: [id])
   updatedByUser            User?          @relation("EmployeeUpdatedBy", fields: [updatedBy], references: [userId])
-  salesOrders              SalesOrder[]
   stores                   Store[]
   user                     User?
 
@@ -233,6 +232,7 @@ model Customer {
   aiRiskScore          Int?
   altPhone             String?                  @db.VarChar(15)
   bankAccount          Json?
+  transports           Json?
   billingAddressLine1  String                   @db.VarChar(255)
   billingCity          String                   @db.VarChar(100)
   billingState         String                   @db.VarChar(100)
@@ -1068,7 +1068,8 @@ model SalesOrder {
   isInterState            Boolean          @default(false)
   customerId              String           @db.Uuid
   customerType            String?          @db.VarChar(20)
-  salesPersonId           BigInt?
+  salesPersonName         String?          @db.VarChar(100)
+  transportName           String?          @db.VarChar(100)
   referenceText           String?          @db.VarChar(255)
   paymentTermId           Int?
   billingAddressLine1     String           @db.VarChar(255)
@@ -1115,7 +1116,6 @@ model SalesOrder {
   createdByUser           User?            @relation("SalesOrderCreatedBy", fields: [createdBy], references: [userId])
   customer                Customer         @relation("CustomerSalesOrders", fields: [customerId], references: [id])
   mdApprovedByUser        User?            @relation("SalesOrderMdApprover", fields: [mdApprovedBy], references: [userId])
-  salesPerson             Employee?        @relation(fields: [salesPersonId], references: [id])
 
   @@index([customerId])
   @@index([mdApprovalStatus])

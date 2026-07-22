@@ -102,9 +102,8 @@ const salesOrderBodyShape = z.object({
     paymentTermId: z.number().int().positive("...").optional().nullable(),
     dispatchType: z.union([DispatchTypeEnum, z.literal("")]).optional().transform(val => val === "" ? undefined : val),
     orderType: z.union([OrderTypeEnum, z.literal("")]).optional().transform(val => val === "" ? undefined : val),
-    salesPersonId: z.union([z.string(), z.number()])          // ← also missing entirely
-        .optional().nullable()
-        .refine((val) => val === null || val === undefined || !isNaN(Number(val)), "Sales person ID must be a valid number"),
+    salesPersonName: z.string().optional().nullable(),
+    transportName: z.string().optional().nullable(),
     status: SalesOrderStatusEnum.default("DRAFT"),
     billingAddressLine1: z.string().min(1, "Billing Address Line 1 is required"),
     billingCity: z.string().min(1, "Billing City is required"),
@@ -155,11 +154,11 @@ const salesOrderBodyRefined = salesOrderBodyShape.superRefine((data, ctx) => {
     if (data.customerApprovalStatus === "APPROVED" && !data.customerApprovedAt) {
         ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Customer approved at is required when status is APPROVED", path: ["customerApprovedAt"] });
     }
-    if (data.orderType === "salesperson" && !data.salesPersonId) {
+    if (data.orderType === "salesperson" && !data.salesPersonName) {
         ctx.addIssue({
             code: z.ZodIssueCode.custom,
-            message: "Sales person is required when order source is Sales Person",
-            path: ["salesPersonId"],
+            message: "Sales person name is required when order source is Sales Person",
+            path: ["salesPersonName"],
         });
     }
     if (data.customerApprovalStatus === "REJECTED" && !data.customerRejectionReason) {

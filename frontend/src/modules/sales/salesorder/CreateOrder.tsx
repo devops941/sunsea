@@ -40,7 +40,8 @@ const salesOrderSchema = z
         orderType: z.string().optional(),
         dispatchType: z.string().optional(),
         referenceText: z.string().optional(),
-        salesPersonId: z.string().optional(),
+        salesPersonName: z.string().optional(),
+        transportName: z.string().optional(),
         paymentTermId: z.string().optional(),
         customerType: z.string().min(1, "Customer type is required"),
         isInterState: z.boolean(),  // <-- new field
@@ -133,7 +134,8 @@ const defaultValues: SalesOrderFormValues = {
     orderDate: today,
     expectedCompletionDate: "",
     customerId: "",
-    salesPersonId: "",
+    salesPersonName: "",
+    transportName: "",
     paymentTermId: "",
     billingAddressLine1: "",
     billingCity: "",
@@ -273,7 +275,8 @@ const SalesOrderForm: React.FC = () => {
                 customerId: state.customerId != null ? String(state.customerId) : "",
                 customerType: state.customerType ? String(state.customerType) : "",
                 referenceText: state.referenceText || "",
-                salesPersonId: state.salesPersonId != null ? String(state.salesPersonId) : "",
+                salesPersonName: state.salesPersonName || "",
+                transportName: state.transportName || "",
                 paymentTermId: state.paymentTermId != null ? String(state.paymentTermId) : "",
                 billingAddressLine1: state.billingAddressLine1 || "",
                 billingCity: state.billingCity || "",
@@ -318,15 +321,6 @@ const SalesOrderForm: React.FC = () => {
         }));
     }, [products]);
 
-    console.log(productOptions, "kjlk")
-
-    const salesPersonOptions = useMemo(() => {
-        return employees.map((d) => ({
-            value: String(d?.id),
-            label: `${d.fullName}`,
-        }));
-    }, [employees]);
-
     // ─── Watched fields ──────────────────────────────────────────────
     const sameAsBilling = watch("sameAsBilling");
     useEffect(() => {
@@ -348,6 +342,18 @@ const SalesOrderForm: React.FC = () => {
     const selectedCustomer = useMemo(() => {
         if (!selectedCustomerId) return null;
         return customers.find(c => String(c.id) === selectedCustomerId);
+    }, [selectedCustomerId, customers]);
+
+    const transportOptions = useMemo(() => {
+        if (!selectedCustomerId) return [];
+        const customer = customers.find(c => String(c.id) === selectedCustomerId);
+        if (!customer || !Array.isArray(customer.transports)) return [];
+        return customer.transports
+            .filter((t: any) => t && t.transportName)
+            .map((t: any) => ({
+                value: t.transportName,
+                label: t.transportName,
+            }));
     }, [selectedCustomerId, customers]);
 
     const shippingAddressOptions = useMemo(() => {
@@ -576,7 +582,8 @@ const SalesOrderForm: React.FC = () => {
                 orderType: data.orderType,
                 dispatchType: data.dispatchType,
                 referenceText: data.referenceText || null,
-                salesPersonId: null,
+                salesPersonName: data.salesPersonName || null,
+                transportName: data.transportName || null,
                 paymentTermId: data.paymentTermId ? Number(data.paymentTermId) : null,
                 billingAddressLine1: data.billingAddressLine1 ?? '',
                 billingCity: data.billingCity ?? '',
@@ -697,7 +704,16 @@ const SalesOrderForm: React.FC = () => {
                             )} />
                         </div>
 
-                        {(orderType === "salesperson" || orderType === "reference") && (
+                        {(orderType === "salesperson") && (
+                            <div>
+                                <Controller name="salesPersonName" control={control} render={({ field }) => (
+                                    <TextInput label="Salesperson Name" name={field.name} value={field.value ?? ""} placeholder="Enter Salesperson Name" onChange={field.onChange} />
+                                )} />
+                                <Err message={errors.salesPersonName?.message} />
+                            </div>
+                        )}
+
+                        {(orderType === "reference") && (
                             <div>
                                 <Controller name="referenceText" control={control} render={({ field }) => (
                                     <TextInput label="Reference Name" name={field.name} value={field.value ?? ""} placeholder="Enter name or reference" onChange={field.onChange} />
@@ -705,6 +721,12 @@ const SalesOrderForm: React.FC = () => {
                                 <Err message={errors.referenceText?.message} />
                             </div>
                         )}
+
+                        <div>
+                            <Controller name="transportName" control={control} render={({ field }) => (
+                                <SelectInput label="Transport" name={field.name} value={field.value ?? ""} options={transportOptions} defaultOptionLabel={transportOptions.length > 0 ? "Select Transport" : "No Transports found"} disabled={transportOptions.length === 0} onChange={field.onChange} />
+                            )} />
+                        </div>
                     </div>
 
 
