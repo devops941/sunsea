@@ -669,6 +669,7 @@ model Store {
   storeLocations            StoreLocation[]
   grnInvoices               GrnInvoice[]
   goodsDispatches           GoodsDispatch[]
+  salesInvoices             SalesInvoice[]
   businessPlace             BusinessPlace?             @relation(fields: [businessPlaceId], references: [id])
   incharge                  Employee?                  @relation(fields: [inchargeId], references: [id])
   location                  Location?                  @relation(fields: [locationId], references: [locationId])
@@ -1640,13 +1641,17 @@ model SalesInvoice {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   salesOrderId Int?               @map("sales_order_id")
+  storeId      String?            @map("store_id") @db.VarChar(20)
+  
   salesOrder   SalesOrder?        @relation(fields: [salesOrderId], references: [id], onDelete: SetNull)
   customer     Customer           @relation(fields: [customerId], references: [id])
+  store        Store?             @relation(fields: [storeId], references: [storeId])
   items        SalesInvoiceItem[]
 
   @@index([customerId])
   @@index([companyId])
   @@index([salesOrderId])
+  @@index([storeId])
   @@map("sales_invoices")
 }
 

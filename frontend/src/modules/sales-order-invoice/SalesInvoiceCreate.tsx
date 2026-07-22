@@ -219,20 +219,13 @@ const SalesInvoiceForm: React.FC = () => {
         // Map Finished Goods Stock to onHandQty by productItemId
         const fgList: any[] = Array.isArray(fgStockResponse) ? fgStockResponse : (fgStockResponse as any).data || [];
 
-        const latestFgMap = new Map<string, any>();
+        const fgStockMap = new Map<string, number>();
         fgList.forEach((fg: any) => {
           const prodId = (fg.productItemId || fg.productId)?.toString();
           if (prodId) {
-            const currentLatest = latestFgMap.get(prodId);
-            if (!currentLatest || new Date(fg.updatedAt).getTime() > new Date(currentLatest.updatedAt).getTime()) {
-              latestFgMap.set(prodId, fg);
-            }
+            const currentQty = fgStockMap.get(prodId) || 0;
+            fgStockMap.set(prodId, currentQty + Number(fg.onHandQty || 0));
           }
-        });
-
-        const fgStockMap = new Map<string, number>();
-        latestFgMap.forEach((fg: any, prodId: string) => {
-          fgStockMap.set(prodId, Number(fg.onHandQty || 0));
         });
 
         setStockMap(fgStockMap);
