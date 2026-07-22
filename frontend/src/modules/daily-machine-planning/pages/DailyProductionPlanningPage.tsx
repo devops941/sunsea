@@ -112,6 +112,8 @@ const DailyProductionPlanningPage: React.FC = () => {
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [statusChangePlan, setStatusChangePlan] = useState<any>(null);
   const [statusChangingTo, setStatusChangingTo] = useState("");
+  const [statusModalTitle, setStatusModalTitle] = useState("");
+  const [statusModalMessage, setStatusModalMessage] = useState("");
 
   // Stop Production Modal State
   const [showStopModal, setShowStopModal] = useState(false);
@@ -151,7 +153,7 @@ const DailyProductionPlanningPage: React.FC = () => {
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
-  
+
   useEffect(() => {
     setCurrentPage(1);
   }, [filterDate, filterStatus, filterMachine]);
@@ -205,8 +207,10 @@ const DailyProductionPlanningPage: React.FC = () => {
   // ──────────────────────────────────────────────────────────────
   // Status Change Handler
   // ──────────────────────────────────────────────────────────────
-  const handleStatusAdvance = (plan: any, producedQty: number = 0) => {
-    const nextStatus = STATUS_FLOW[plan.status]?.next;
+  const handleStatusAdvance = (plan: any, producedQty: number = 0, dynamicTitle?: string, dynamicMessage?: string) => {
+    let nextStatus = STATUS_FLOW[plan.status]?.next;
+    console.log(plan, "plan");
+    console.log(nextStatus, "nextStatus");
     if (!nextStatus) return;
 
     if (nextStatus === "COMPLETED" && producedQty === 0) {
@@ -214,8 +218,15 @@ const DailyProductionPlanningPage: React.FC = () => {
       return;
     }
 
+    // Override the nextStatus if we are just advancing the step
+    if (dynamicTitle === "Advance to Next Step") {
+      nextStatus = "NEXT_STEP";
+    }
+
     setStatusChangePlan(plan);
     setStatusChangingTo(nextStatus);
+    setStatusModalTitle(dynamicTitle || NEXT_ACTION_LABELS[plan.status] || "Confirm Status Change");
+    setStatusModalMessage(dynamicMessage || `Change status of plan ${plan.dailyPlanId} from "${STATUS_FLOW[plan.status]?.label}" to "${STATUS_FLOW[nextStatus]?.label || nextStatus}"?`);
     setShowStatusModal(true);
   };
 
@@ -226,7 +237,16 @@ const DailyProductionPlanningPage: React.FC = () => {
         id: statusChangePlan.dailyPlanId,
         data: { status: statusChangingTo }
       })).unwrap();
-      toast.success(`Status updated to ${STATUS_FLOW[statusChangingTo]?.label || statusChangingTo}`);
+
+      const isDynamicAdvance = statusModalTitle.includes("Advance") || statusModalTitle.includes("Next Step");
+      const nextStepPart = statusModalMessage.split('move to ')[1]?.replace('?', '');
+
+      if (isDynamicAdvance && nextStepPart) {
+        toast.success(`Production advanced to ${nextStepPart}`);
+      } else {
+        toast.success(`Status updated to ${STATUS_FLOW[statusChangingTo]?.label || statusChangingTo}`);
+      }
+
       setShowStatusModal(false);
       setStatusChangePlan(null);
       loadDailyPlans();
@@ -379,7 +399,14 @@ const DailyProductionPlanningPage: React.FC = () => {
       width: "220px",
       render: (plan: any) => (
         <div>
-          <div className="font-semibold text-slate-800">{plan.productionOrderId}</div>
+          <div className="font-semibold text-slate-800 flex items-center gap-2">
+            {plan.productionOrderId}
+            {plan.productionOrder?.currentProductionStep && (
+              <span className="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded text-[10px] font-bold border border-indigo-100 uppercase tracking-wider">
+                {plan.productionOrder.currentProductionStep}
+              </span>
+            )}
+          </div>
           <div className="text-slate-500 text-xs mt-1 line-clamp-1" title={plan.productionOrder?.productItem?.productName || ""}>
             {plan.productionOrder?.productItem?.productName || "—"}
           </div>
@@ -465,20 +492,20 @@ const DailyProductionPlanningPage: React.FC = () => {
           ? plan.hourlyProductions.reduce((sum: number, h: any) => sum + Number(h.qtyProduced || 0), 0)
           : 0;
         const pendingQty = plannedQty > producedQty ? plannedQty - producedQty : 0;
-        
+
         return (
           <div className="flex">
             {producedQty > plannedQty ? (
-              <StatusBadge 
-                status="COMPLETED" 
-                customText={`+${producedQty - plannedQty} Extra`} 
-                customColor={{ bg: '#d1fae5', text: '#065f46' }} 
+              <StatusBadge
+                status="COMPLETED"
+                customText={`+${producedQty - plannedQty} Extra`}
+                customColor={{ bg: '#d1fae5', text: '#065f46' }}
               />
             ) : pendingQty > 0 ? (
-              <StatusBadge 
-                status="PENDING" 
-                customText={`${pendingQty} Pending`} 
-                customColor={{ bg: '#fee2e2', text: '#b91c1c' }} 
+              <StatusBadge
+                status="PENDING"
+                customText={`${pendingQty} Pending`}
+                customColor={{ bg: '#fee2e2', text: '#b91c1c' }}
               />
             ) : (
               <span className="text-slate-400 text-[11px] font-medium">—</span>
@@ -539,6 +566,34 @@ const DailyProductionPlanningPage: React.FC = () => {
         const alreadyCarriedForward = Array.isArray(plan.carryForwardTo) && plan.carryForwardTo.length > 0;
         const canCarryForward = (plan.status === "COMPLETED" || plan.status === "STOPPED") && pendingQty > 0 && !alreadyCarriedForward;
 
+        let dynamicActionTitle = NEXT_ACTION_LABELS[plan.status] || `Move to ${nextStatus}`;
+        let dynamicActionIcon = NEXT_ACTION_ICONS[plan.status] || FaArrowRight;
+        let dynamicModalTitle = "";
+        let dynamicModalMessage = "";
+
+        if (plan.status === "IN_PROGRESS") {
+          const customSteps = plan.productionOrder?.productItem?.productionSteps || [];
+          if (customSteps.length > 0) {
+            const totalStepsCount = 1 + customSteps.length;
+            const currentIndex = plan.productionOrder?.currentStepIndex || 0;
+            const currentStepName = currentIndex === 0 ? "Production" : (customSteps[currentIndex - 1]?.stepKey || "Current Step");
+            const isLastStep = currentIndex >= totalStepsCount - 1;
+
+            if (!isLastStep) {
+              const nextStepName = customSteps[currentIndex].stepKey;
+              dynamicActionTitle = `Next Step (${nextStepName})`;
+              dynamicActionIcon = FaArrowRight;
+              dynamicModalTitle = "Advance to Next Step";
+              dynamicModalMessage = `Complete ${currentStepName} and move to ${nextStepName}?`;
+            } else {
+              dynamicActionTitle = "Complete Production";
+              dynamicActionIcon = FaCheckCircle;
+              dynamicModalTitle = "Complete Production";
+              dynamicModalMessage = `Complete ${currentStepName} and move to Post Production?`;
+            }
+          }
+        }
+
         return (
           <div className="flex items-center justify-end gap-1" onClick={e => e.stopPropagation()}>
             <ViewButton onClick={() => { setViewPlan(plan); setShowViewModal(true); }} />
@@ -553,9 +608,9 @@ const DailyProductionPlanningPage: React.FC = () => {
             {canAdvance && (
               <IconButton
                 variant="success"
-                title={NEXT_ACTION_LABELS[plan.status] || `Move to ${nextStatus}`}
-                icon={NEXT_ACTION_ICONS[plan.status] || FaArrowRight}
-                onClick={() => handleStatusAdvance(plan, producedQty)}
+                title={dynamicActionTitle}
+                icon={dynamicActionIcon}
+                onClick={() => handleStatusAdvance(plan, producedQty, dynamicModalTitle, dynamicModalMessage)}
               />
             )}
             {plan.status === "IN_PROGRESS" && (
@@ -939,8 +994,8 @@ const DailyProductionPlanningPage: React.FC = () => {
           show={showStatusModal}
           onHide={() => { setShowStatusModal(false); setStatusChangePlan(null); }}
           onConfirm={confirmStatusChange}
-          title={NEXT_ACTION_LABELS[statusChangePlan?.status] || "Confirm Status Change"}
-          message={`Change status of plan ${statusChangePlan?.dailyPlanId} from "${STATUS_FLOW[statusChangePlan?.status]?.label}" to "${STATUS_FLOW[statusChangingTo]?.label}"?`}
+          title={statusModalTitle}
+          message={statusModalMessage}
           confirmText="Confirm"
           confirmVariant="success"
         />

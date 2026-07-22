@@ -771,48 +771,49 @@ const ProductEdit: React.FC = () => {
                                 error={errors.gstTaxRateId}
                                 disabled={gstLoading}
                             />
-                        </div>
 
-                        <TextInput
-                            label="MRP (₹)"
-                            name="mrp"
-                            type="number"
-                            step="0.01"
-                            value={formData.mrp}
-                            placeholder="0.00"
-                            onChange={handleChange}
-                            error={errors.mrp}
-                        />
-                        <TextInput
-                            label="B2B (₹)"
-                            name="b2b"
-                            type="number"
-                            step="0.01"
-                            value={formData.b2b}
-                            placeholder="0.00"
-                            onChange={handleChange}
-                            error={errors.b2b}
-                        />
-                        <TextInput
-                            label="B2C (₹)"
-                            name="b2c"
-                            type="number"
-                            step="0.01"
-                            value={formData.b2c}
-                            placeholder="0.00"
-                            onChange={handleChange}
-                            error={errors.b2c}
-                        />
-                        <TextInput
-                            label="Export Price (₹)"
-                            name="exportPrice"
-                            type="number"
-                            step="0.01"
-                            value={formData.exportPrice}
-                            placeholder="0.00"
-                            onChange={handleChange}
-                            error={errors.exportPrice}
-                        />
+
+                            <TextInput
+                                label="MRP (₹)"
+                                name="mrp"
+                                type="number"
+                                step="0.01"
+                                value={formData.mrp}
+                                placeholder="0.00"
+                                onChange={handleChange}
+                                error={errors.mrp}
+                            />
+                            <TextInput
+                                label="B2B (₹)"
+                                name="b2b"
+                                type="number"
+                                step="0.01"
+                                value={formData.b2b}
+                                placeholder="0.00"
+                                onChange={handleChange}
+                                error={errors.b2b}
+                            />
+                            <TextInput
+                                label="B2C (₹)"
+                                name="b2c"
+                                type="number"
+                                step="0.01"
+                                value={formData.b2c}
+                                placeholder="0.00"
+                                onChange={handleChange}
+                                error={errors.b2c}
+                            />
+                            <TextInput
+                                label="Export Price (₹)"
+                                name="exportPrice"
+                                type="number"
+                                step="0.01"
+                                value={formData.exportPrice}
+                                placeholder="0.00"
+                                onChange={handleChange}
+                                error={errors.exportPrice}
+                            />
+                        </div>
                     </div>
 
                     {/* Raw Materials Composition */}
