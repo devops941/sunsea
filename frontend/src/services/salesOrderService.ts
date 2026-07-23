@@ -47,6 +47,7 @@ export interface SalesOrder {
         displayName: string;
     };
     customerType?: string;
+    mobile?: string | null;
 
     paymentTermId?: number | null;
     billingAddressLine1: string;

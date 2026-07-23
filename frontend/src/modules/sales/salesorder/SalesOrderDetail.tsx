@@ -183,6 +183,7 @@ const SalesOrderDetail: React.FC = () => {
                                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                                     <DetailBox label="Name" value={order.customer?.displayName || order.customer?.firmName} />
                                     <DetailBox label="Type" value={order.customerType ? order.customerType.toLowerCase() : ''} />
+                                    <DetailBox label="Mobile Number" value={order.mobile || "—"} />
                                 </div>
                             </div>
 

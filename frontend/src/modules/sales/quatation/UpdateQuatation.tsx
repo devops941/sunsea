@@ -1,6 +1,6 @@
 // src/pages/sales/QuotationForm/QuotationReport.tsx
 import React, { useEffect, useState } from "react";
-import { FaArrowLeft, FaCheck, FaTimes, FaUser, FaMapMarkerAlt, FaBoxOpen, FaCalendarAlt, FaTruck, FaGlobe, FaFileAlt, FaCircleNotch, FaExclamationTriangle } from "react-icons/fa";
+import { FaArrowLeft, FaCheck, FaTimes, FaUser, FaMapMarkerAlt, FaBoxOpen, FaCalendarAlt, FaTruck, FaGlobe, FaFileAlt, FaCircleNotch, FaExclamationTriangle, FaPhone } from "react-icons/fa";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useSelector } from "react-redux";
@@ -162,6 +162,7 @@ const QuotationReport: React.FC = () => {
                         <DetailBox label="Valid Until" value={formatDate(order.expectedCompletionDate)} icon={<FaCalendarAlt />} />
                         <DetailBox label="Customer Type" value={order.customerType ? order.customerType.toLowerCase() : ""} icon={<FaUser />} />
                         {order.transportName ? <DetailBox label="Transport" value={order.transportName} icon={<FaTruck />} /> : null}
+                        <DetailBox label="Mobile Number" value={order.mobile || "—"} icon={<FaPhone />} />
                     </div>
 
                     {/* ── Billing ── */}

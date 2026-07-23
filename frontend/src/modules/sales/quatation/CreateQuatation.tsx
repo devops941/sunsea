@@ -1,6 +1,6 @@
 // src/pages/sales/QuotationForm/QuotationForm.tsx
 import React, { useEffect, useMemo, useState } from "react";
-import { FaSave, FaPaperPlane, FaCircleNotch, FaExclamationTriangle, FaUser, FaCalendarAlt, FaTruck, FaGlobe, FaMapMarkerAlt, FaFileAlt } from "react-icons/fa";
+import { FaSave, FaPaperPlane, FaCircleNotch, FaExclamationTriangle, FaUser, FaCalendarAlt, FaTruck, FaGlobe, FaMapMarkerAlt, FaFileAlt, FaPhone } from "react-icons/fa";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useForm, useFieldArray, Controller } from "react-hook-form";
@@ -148,6 +148,7 @@ const QuotationForm: React.FC = () => {
     const [quotationId, setQuotationId] = useState<number | null>(null);
     const [rejectionReason, setRejectionReason] = useState<string | null>(null);
     const [isSubmittingForApproval, setIsSubmittingForApproval] = useState(false);
+    const [mobile, setMobile] = useState<string | null>(null);
 
     // ── Read-only order metadata ──
     const [dispatchType, setDispatchType] = useState<string | null>(null);
@@ -303,6 +304,7 @@ const QuotationForm: React.FC = () => {
         setOrderType((order as any).orderType || null);
         setSalesPersonId((order as any).salesPersonId != null ? String((order as any).salesPersonId) : null);
         setTransportName(order.transportName || null);
+        setMobile(order.mobile || null);
     };
 
     // ── Load order ──
@@ -317,6 +319,7 @@ const QuotationForm: React.FC = () => {
             setDispatchType(null);
             setOrderType(null);
             setSalesPersonId(null);
+            setMobile(null);
             reset(defaultValues);
             setSelectedDraftId(null);
             return;
@@ -519,6 +522,7 @@ const QuotationForm: React.FC = () => {
             setOrderType(null);
             setSalesPersonId(null);
             setTransportName(null);
+            setMobile(null);
             reset(defaultValues);
             salesOrderService.getNextOrderNo().then((orderNo) => {
                 const qtNo = orderNo.replace('SO', 'QT');
@@ -705,6 +709,7 @@ const QuotationForm: React.FC = () => {
                                     {orderType === "salesperson" && (
                                         <DetailBox label="Sales Person" value={salesPersonName} icon={<FaUser />} />
                                     )}
+                                    <DetailBox label="Mobile Number" value={mobile || "—"} icon={<FaPhone />} />
                                 </div>
 
                                 {/* ── Billing ── */}

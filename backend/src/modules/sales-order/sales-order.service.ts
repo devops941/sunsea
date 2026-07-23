@@ -425,6 +425,7 @@ class SalesOrderService {
                 expectedCompletionDate: new Date(data.expectedCompletionDate),
                 isInterState,
                 customerId: data.customerId,
+                mobile: data.mobile || null,
                 customerType: data.customerType,
                 salesPersonName: data.salesPersonName || null,
                 transportName: data.transportName || null,
@@ -613,6 +614,7 @@ class SalesOrderService {
         }
 
         if (data.customerType !== undefined) updateData.customerType = data.customerType;
+        if (data.mobile !== undefined) updateData.mobile = data.mobile;
         if (data.salesPersonName !== undefined) updateData.salesPersonName = data.salesPersonName;
         if (data.transportName !== undefined) updateData.transportName = data.transportName;
         if (data.expectedCompletionDate) updateData.expectedCompletionDate = new Date(data.expectedCompletionDate);
