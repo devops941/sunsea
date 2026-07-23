@@ -1,6 +1,6 @@
 // src/pages/sales/SalesInvoiceView.tsx
 import React, { useEffect, useState, useMemo } from "react";
-import { FaArrowLeft, FaPrint, FaEye, FaDownload, FaCircleNotch, FaSearch } from "react-icons/fa";
+import { FaArrowLeft, FaPrint, FaDownload, FaCircleNotch } from "react-icons/fa";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useSelector, useDispatch } from "react-redux";
@@ -12,12 +12,32 @@ import { fetchCompany } from "../../features/company/companySlice";
 // ─── Formatting helpers ─────────────────────────────────────────────────
 const formatMoney = (val: string | number | null | undefined) => {
     const n = Number(val ?? 0);
-    return `₹${n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    return n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 };
 
 const formatDate = (val: string | null | undefined) => {
     if (!val) return "—";
-    return new Date(val).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+    return new Date(val).toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" });
+};
+
+// Basic number-to-words for Indian Rupees (integer part only, extend as needed)
+const numberToWords = (num: number): string => {
+    const a = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten",
+        "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
+    const b = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
+
+    const inWords = (n: number): string => {
+        if (n < 20) return a[n];
+        if (n < 100) return b[Math.floor(n / 10)] + (n % 10 ? " " + a[n % 10] : "");
+        if (n < 1000) return a[Math.floor(n / 100)] + " Hundred" + (n % 100 ? " " + inWords(n % 100) : "");
+        if (n < 100000) return inWords(Math.floor(n / 1000)) + " Thousand" + (n % 1000 ? " " + inWords(n % 1000) : "");
+        if (n < 10000000) return inWords(Math.floor(n / 100000)) + " Lakh" + (n % 100000 ? " " + inWords(n % 100000) : "");
+        return inWords(Math.floor(n / 10000000)) + " Crore" + (n % 10000000 ? " " + inWords(n % 10000000) : "");
+    };
+
+    const rounded = Math.round(num);
+    if (rounded === 0) return "Zero Only";
+    return inWords(rounded) + " Only";
 };
 
 // ─── Component ─────────────────────────────────────────────────────────
@@ -28,29 +48,22 @@ const SalesInvoiceView: React.FC = () => {
     const { id: idParam } = useParams<{ id: string }>();
 
     const [invoice, setInvoice] = useState<any | null>((location.state as any) || null);
-    console.log(invoice, "invoice")
     const [loading, setLoading] = useState(!location.state);
 
-    // Left pane list state
     const [invoicesList, setInvoicesList] = useState<any[]>([]);
     const [loadingList, setLoadingList] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
 
     const { data: company } = useSelector((state: any) => state.company);
 
-    // Fetch the company settings on mount
     useEffect(() => {
         dispatch(fetchCompany());
     }, [dispatch]);
 
-    // Fetch the list of all invoices
     useEffect(() => {
         const fetchList = async () => {
             try {
-                const response = await salesInvoiceService.fetchAll({
-                    page: 1,
-                    pageSize: 100, // Load a reasonable number of invoices for the list
-                });
+                const response = await salesInvoiceService.fetchAll({ page: 1, pageSize: 100 });
                 setInvoicesList(response.data || []);
             } catch (error) {
                 console.error("Failed to load invoice list", error);
@@ -61,11 +74,9 @@ const SalesInvoiceView: React.FC = () => {
         fetchList();
     }, []);
 
-    // Fetch details when idParam changes
     useEffect(() => {
         const id = idParam || (location.state as any)?.id;
         if (!id) {
-            // If no ID is specified, navigate to the first invoice in the list if available
             if (invoicesList.length > 0) {
                 navigate(`/sales-invoices/details/${invoicesList[0].id}`);
             }
@@ -88,7 +99,6 @@ const SalesInvoiceView: React.FC = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [idParam, invoicesList]);
 
-    // Filter invoices for the left panel search
     const filteredInvoices = useMemo(() => {
         const term = searchTerm.toLowerCase();
         return invoicesList.filter((inv) => {
@@ -98,18 +108,112 @@ const SalesInvoiceView: React.FC = () => {
         });
     }, [invoicesList, searchTerm]);
 
-    const totalIgst = useMemo(() => invoice?.items?.reduce((acc: number, curr: any) => acc + (Number(curr.igstAmount) || 0), 0) || 0, [invoice]);
-    const totalCgst = useMemo(() => invoice?.items?.reduce((acc: number, item: any) => acc + Number(item.cgstAmount || 0), 0) || 0, [invoice]);
-    const totalSgst = useMemo(() => invoice?.items?.reduce((acc: number, item: any) => acc + Number(item.sgstAmount || 0), 0) || 0, [invoice]);
+    // ─── Tax calculations per item (CGST/SGST or IGST) ─────────────────
+    const isInterState = useMemo(() => {
+        if (!invoice) return false;
+        return (invoice.items || []).some((item: any) => Number(item.igstAmount) > 0);
+    }, [invoice]);
 
-    const discountTotal = useMemo(() => invoice?.items?.reduce((acc: number, item: any) => acc + (Number(item.discountAmount) || 0), 0) || 0, [invoice]);
-    const subTotalBeforeDiscount = useMemo(() => (Number(invoice?.subTotal) || 0) + discountTotal, [invoice, discountTotal]);
+    const itemsWithTax = useMemo(() => {
+        if (!invoice?.items) return [];
+        return invoice.items.map((item: any) => {
+            const qty = Number(item.quantity ?? item.qty ?? 0);
+            const rate = Number(item.unitPrice ?? item.rate ?? 0);
+            const amount = Number(item.amount ?? qty * rate);
+            const taxPercent = Number(item.taxRate ?? item.taxPercent ?? item.tax ?? 0);
+
+            const cgstRate = Number(item.cgstRate ?? (isInterState ? 0 : taxPercent / 2));
+            const sgstRate = Number(item.sgstRate ?? (isInterState ? 0 : taxPercent / 2));
+            const igstRate = Number(item.igstRate ?? (isInterState ? taxPercent : 0));
+
+            const cgstAmount = Number(item.cgstAmount ?? (amount * cgstRate) / 100);
+            const sgstAmount = Number(item.sgstAmount ?? (amount * sgstRate) / 100);
+            const igstAmount = Number(item.igstAmount ?? (amount * igstRate) / 100);
+
+            const totalAmount = amount + cgstAmount + sgstAmount + igstAmount;
+
+            return {
+                ...item,
+                qty,
+                rate,
+                amount,
+                hsnCode: item.product?.hsnCode || item.hsnCode || "-",
+                unit: item.product?.uom?.uomName || item.unit || "Pcs.",
+                cgstRate,
+                sgstRate,
+                igstRate,
+                cgstAmount,
+                sgstAmount,
+                igstAmount,
+                totalAmount,
+            };
+        });
+    }, [invoice, isInterState]);
+
+    const totalCgst = useMemo(() => itemsWithTax.reduce((s, i) => s + i.cgstAmount, 0), [itemsWithTax]);
+    const totalSgst = useMemo(() => itemsWithTax.reduce((s, i) => s + i.sgstAmount, 0), [itemsWithTax]);
+    const totalIgst = useMemo(() => itemsWithTax.reduce((s, i) => s + i.igstAmount, 0), [itemsWithTax]);
+    const totalTaxable = useMemo(() => itemsWithTax.reduce((s, i) => s + i.amount, 0), [itemsWithTax]);
+    const grandTotal = Number(invoice?.grandTotal ?? (totalTaxable + totalCgst + totalSgst + totalIgst));
+
+    // Tax summary grouped by rate
+    const taxSummary = useMemo(() => {
+        const map = new Map<number, { taxRate: number; taxableAmt: number; cgstAmt: number; sgstAmt: number; totalTax: number }>();
+        itemsWithTax.forEach((item) => {
+            const rate = item.cgstRate + item.sgstRate + item.igstRate;
+            const existing = map.get(rate) || { taxRate: rate, taxableAmt: 0, cgstAmt: 0, sgstAmt: 0, totalTax: 0 };
+            existing.taxableAmt += item.amount;
+            existing.cgstAmt += item.cgstAmount;
+            existing.sgstAmt += item.sgstAmount;
+            existing.totalTax += item.cgstAmount + item.sgstAmount + item.igstAmount;
+            map.set(rate, existing);
+        });
+        return Array.from(map.values());
+    }, [itemsWithTax]);
+
+    const amountInWords = useMemo(() => numberToWords(grandTotal), [grandTotal]);
+
+    const handleDownloadPdf = async () => {
+        try {
+            const html2canvas = (await import("html2canvas-pro")).default;
+            const { jsPDF } = await import("jspdf");
+
+            const element = document.getElementById("printable-invoice-card");
+            if (!element) return;
+
+            const canvas = await html2canvas(element, { scale: 2, useCORS: true });
+            const imgData = canvas.toDataURL("image/png");
+
+            const pdf = new jsPDF("p", "mm", "a4");
+            const pageWidth = pdf.internal.pageSize.getWidth();
+            const pageHeight = pdf.internal.pageSize.getHeight();
+            const imgWidth = pageWidth;
+            const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+            let heightLeft = imgHeight;
+            let position = 0;
+
+            pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+            heightLeft -= pageHeight;
+
+            while (heightLeft > 0) {
+                position = heightLeft - imgHeight;
+                pdf.addPage();
+                pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+                heightLeft -= pageHeight;
+            }
+
+            pdf.save(`Invoice-${invoice?.invoiceNo || "invoice"}.pdf`);
+        } catch (err) {
+            console.error(err);
+            toast.error("Failed to generate PDF");
+        }
+    };
 
     return (
         <div className="flex bg-gray-100 overflow-hidden h-[calc(100vh-115px)]">
             {/* ── Left Sidebar (Invoice List) ── */}
-            <div className="hidden md:flex w-72 md:w-80 flex-shrink-0 bg-white border-r border-gray-200 flex-col h-full">
-                {/* Header with Title and Search Input */}
+            <div className="hidden md:flex w-72 md:w-80 flex-shrink-0 bg-white border-r border-gray-200 flex-col h-full no-print">
                 <div className="p-4 border-b border-gray-200 flex flex-col gap-3">
                     <div className="flex items-center justify-between">
                         <button
@@ -128,7 +232,6 @@ const SalesInvoiceView: React.FC = () => {
                     />
                 </div>
 
-                {/* List Content */}
                 <div className="flex-1 overflow-y-auto divide-y divide-gray-100">
                     {loadingList ? (
                         <div className="flex items-center justify-center py-8">
@@ -157,15 +260,13 @@ const SalesInvoiceView: React.FC = () => {
                                 </div>
                                 <div className="flex justify-between items-center text-xs text-gray-400">
                                     <span>{formatDate(inv.invoiceDate)}</span>
-                                    <span className="font-bold text-gray-900">{formatMoney(inv.grandTotal)}</span>
+                                    <span className="font-bold text-gray-900">₹{formatMoney(inv.grandTotal)}</span>
                                 </div>
                             </div>
                         );
                     })}
                     {!loadingList && filteredInvoices.length === 0 && (
-                        <div className="p-8 text-center text-gray-500 text-sm">
-                            No invoices found.
-                        </div>
+                        <div className="p-8 text-center text-gray-500 text-sm">No invoices found.</div>
                     )}
                 </div>
             </div>
@@ -180,21 +281,19 @@ const SalesInvoiceView: React.FC = () => {
                 ) : (
                     <div className="max-w-5xl mx-auto">
                         {/* Action buttons */}
-                        <div className="flex items-center justify-between gap-4 mb-6">
+                        <div className="flex items-center justify-between gap-4 mb-6 no-print">
                             <h2 className="text-xl font-bold text-gray-800 m-0">
                                 Sales Invoice #{invoice.invoiceNo}
                             </h2>
                             <div className="flex items-center gap-3">
                                 <CustomButton text="Print" icon={FaPrint} variant="primary" onClick={() => window.print()} />
-                                <CustomButton text="View PDF" icon={FaEye} variant="secondary" onClick={() => window.print()} />
-                                <CustomButton text="Download PDF" icon={FaDownload} variant="primary" onClick={() => window.print()} />
+                                <CustomButton text="Download PDF" icon={FaDownload} variant="secondary" onClick={handleDownloadPdf} />
                             </div>
                         </div>
 
                         {/* Print stylesheet */}
                         <style>{`
                             @media print {
-                                /* Hide parent containers and other sections */
                                 body * {
                                     visibility: hidden;
                                 }
@@ -206,15 +305,13 @@ const SalesInvoiceView: React.FC = () => {
                                     left: 0;
                                     top: 0;
                                     width: 100%;
-                                    background-color: #F4EFE6 !important;
-                                    -webkit-print-color-adjust: exact;
-                                    print-color-adjust: exact;
+                                    background: #fff !important;
                                     box-shadow: none !important;
-                                    border-radius: 0 !important;
                                     margin: 0 !important;
-                                    padding: 2rem !important;
                                 }
-                                /* Hide scrollbars and fix page size */
+                                .no-print {
+                                    display: none !important;
+                                }
                                 html, body {
                                     height: auto;
                                     overflow: visible !important;
@@ -222,193 +319,206 @@ const SalesInvoiceView: React.FC = () => {
                             }
                         `}</style>
 
-                        {/* Printable Invoice Card */}
-                        <div id="printable-invoice-card" className="bg-[#F4EFE6] shadow-lg border-t-4 border-primary rounded-b-lg overflow-hidden">
-                            <div className="p-8 sm:p-12">
-                                {/* Top Section */}
-                                <div className="flex flex-col md:flex-row justify-between items-start mb-12 gap-8">
-                                    <div>
-                                        {company?.logoUrl ? (
-                                            <img
-                                                src={company.logoUrl}
-                                                alt={company.legalName || "Logo"}
-                                                className="max-h-16 object-contain mb-1"
-                                            />
-                                        ) : (
-                                            <div className="text-3xl font-black text-primary tracking-tighter mb-1">
-                                                {company?.legalName || company?.companyName || "SUNSEA"}
-                                            </div>
-                                        )}
+                        {/* GST Tax Invoice Card */}
+                        <div
+                            id="printable-invoice-card"
+                            className="font-[Arial,sans-serif] text-black bg-white border-[1.5px] border-black w-full box-border text-[12px] shadow-lg"
+                        >
+                            {/* Top bar */}
+                            <div className="flex justify-between items-center px-3 pt-2 text-[11px] font-semibold">
+                                <div>GSTIN : {company?.gstin || "-"}</div>
+                                <div className="italic">Original Copy</div>
+                            </div>
+
+                            {/* Header */}
+                            <div className="text-center border-b-[1.5px] border-black px-3 pb-2">
+                                <div className="text-xs uppercase font-bold tracking-[2px]">Tax Invoice</div>
+                                <h1 className="text-2xl font-extrabold m-0 tracking-[1px] mt-1">
+                                    {company?.legalName || company?.companyName || "Company Name"}
+                                </h1>
+                                <div className="text-[11px] mt-1">
+                                    {company?.addressLine1}
+                                    {company?.city && `, ${company.city}`}
+                                    {company?.state && `, ${company.state}`}
+                                    {company?.pincode && ` - ${company.pincode}`}
+                                </div>
+                            </div>
+
+                            {/* Invoice meta block */}
+                            <div className="flex border-b-[1.5px] border-black">
+                                <div className="flex-1 border-r-[1.5px] border-black p-2 space-y-1">
+                                    <MetaRow label="Invoice No." value={invoice.invoiceNo} />
+                                    <MetaRow label="Dated" value={formatDate(invoice.invoiceDate)} />
+                                    <MetaRow label="Due Date" value={formatDate(invoice.dueDate)} />
+                                </div>
+                                <div className="flex-1 p-2 space-y-1">
+                                    <MetaRow label="Place of Supply" value={invoice.customer?.billingState || "-"} />
+                                    <MetaRow label="Reverse Charge" value="N" />
+                                    {invoice.salesOrder?.orderNo && (
+                                        <MetaRow label="Ref. Order No." value={invoice.salesOrder.orderNo} />
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Billed To / Shipped To */}
+                            <div className="flex border-b-[1.5px] border-black">
+                                <div className="flex-1 border-r-[1.5px] border-black p-2">
+                                    <div className="font-bold mb-1">Billed to :</div>
+                                    <div className="font-semibold">
+                                        {invoice.customer?.displayName || invoice.customer?.firmName || "N/A"}
                                     </div>
-
-                                    <div className="md:text-right flex flex-col md:items-end">
-                                        <h1 className="text-3xl font-bold text-gray-900 uppercase mb-6">
-                                            SALES INVOICE
-                                        </h1>
-
-                                        <div className="grid grid-cols-2 gap-x-8 gap-y-3 text-sm text-gray-700 text-left">
-                                            <div className="font-semibold text-gray-600">Invoice Number</div>
-                                            <div className="font-bold text-gray-900 text-right">{invoice.invoiceNo}</div>
-
-                                            <div className="font-semibold text-gray-600">Invoice Date</div>
-                                            <div className="font-bold text-gray-900 text-right">{formatDate(invoice.invoiceDate)}</div>
-
-                                            <div className="font-semibold text-gray-600">Due Date</div>
-                                            <div className="font-bold text-gray-900 text-right">{formatDate(invoice.dueDate)}</div>
-                                        </div>
-
-                                        <div className="w-full h-px bg-gray-300 mt-4 mb-1"></div>
+                                    <div className="text-slate-700">
+                                        {invoice.customer?.billingAddressLine1}<br />
+                                        {invoice.customer?.billingCity}, {invoice.customer?.billingState} - {invoice.customer?.billingPincode}
+                                    </div>
+                                    {invoice.customer?.gstin && (
+                                        <div className="mt-1">GSTIN / UIN : {invoice.customer.gstin}</div>
+                                    )}
+                                </div>
+                                <div className="flex-1 p-2">
+                                    <div className="font-bold mb-1">Shipped to :</div>
+                                    <div className="font-semibold">
+                                        {invoice.customer?.displayName || invoice.customer?.firmName || "N/A"}
+                                    </div>
+                                    <div className="text-slate-700">
+                                        {invoice.salesOrder?.shippingAddressLine1 || invoice.customer?.shippingAddressLine1 || invoice.customer?.billingAddressLine1}<br />
+                                        {invoice.salesOrder?.shippingCity || invoice.customer?.shippingCity || invoice.customer?.billingCity}, {invoice.salesOrder?.shippingState || invoice.customer?.shippingState || invoice.customer?.billingState} - {invoice.salesOrder?.shippingPincode || invoice.customer?.shippingPincode || invoice.customer?.billingPincode}
                                     </div>
                                 </div>
+                            </div>
 
-                                {/* Address Section */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-12 mb-12">
-                                    <div>
-                                        <div className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">
-                                            BILL TO
-                                        </div>
-                                        <div className="text-lg font-bold text-gray-900 mb-2">
-                                            {invoice.customer?.displayName || invoice.customer?.firmName || "N/A"}
-                                        </div>
-                                        <div className="text-sm text-gray-700 leading-relaxed">
-                                            {invoice.customer?.billingAddressLine1} <br />
-                                            {(invoice.customer?.billingCity || invoice.customer?.billingState) && (
-                                                <>
-                                                    {invoice.customer?.billingCity}, {invoice.customer?.billingState} — {invoice.customer?.billingPincode} <br />
-                                                </>
-                                            )}
-                                            {invoice.customer?.phone && `Phone: ${invoice.customer.phone}`}
-                                        </div>
-                                    </div>
-
-                                    <div>
-                                        <div className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">
-                                            SHIP TO
-                                        </div>
-                                        <div className="text-lg font-bold text-gray-900 mb-2">
-                                            {invoice.customer?.displayName || invoice.customer?.firmName || "N/A"}
-                                        </div>
-                                        <div className="text-sm text-gray-700 leading-relaxed">
-                                            {invoice.customer?.shippingAddressLine1 || "Same as Billing Address"} <br />
-                                            {(invoice.customer?.shippingCity || invoice.customer?.shippingState) && (
-                                                <>
-                                                    {invoice.customer?.shippingCity}, {invoice.customer?.shippingState} — {invoice.customer?.shippingPincode}
-                                                </>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Table Section */}
-                                <div className="mb-10">
-                                    <table className="w-full text-left border-collapse">
-                                        <thead>
-                                            <tr className="border-b-2 border-gray-800 text-xs font-bold text-gray-900 uppercase tracking-wider">
-                                                <th className="py-3 px-2 w-12 text-center">#</th>
-                                                <th className="py-3 px-2">ITEM DESCRIPTION</th>
-                                                <th className="py-3 px-2 w-24 text-right">QTY</th>
-                                                <th className="py-3 px-2 w-32 text-right">RATE</th>
-                                                <th className="py-3 px-2 w-32 text-right">AMOUNT</th>
-                                                <th className="py-3 px-2 w-24 text-right">TAX</th>
-
-                                            </tr>
-                                        </thead>
-                                        <tbody className="text-sm text-gray-800">
-                                            {invoice.items?.map((item: any, idx: number) => (
-                                                <tr key={item.id || idx} className="border-b border-gray-300">
-                                                    <td className="py-4 px-2 text-center font-medium text-gray-600">{idx + 1}</td>
-                                                    <td className="py-4 px-2">
-                                                        <div className="font-bold text-gray-900">
-                                                            {item.product?.productName || "Item Name"}
-                                                        </div>
-                                                        {item.product?.productCode && (
-                                                            <div className="text-xs text-gray-500 mt-0.5">
-                                                                SKU: {item.product.productCode}
-                                                            </div>
-                                                        )}
-                                                    </td>
-                                                    <td className="py-4 px-2 text-right font-semibold">{item.quantity ?? item.qty}</td>
-                                                    <td className="py-4 px-2 text-right">{formatMoney(item.unitPrice ?? item.rate)}</td>
-                                                    <td className="py-4 px-2 text-right font-bold text-gray-900">{formatMoney((item.quantity ?? item.qty) * (item.unitPrice ?? item.rate))}</td>
-                                                    <td className="py-4 px-2 text-right font-medium">
-                                                        {((item.taxRate ?? item.taxPercent ?? item.tax) !== undefined && (item.taxRate ?? item.taxPercent ?? item.tax) !== null) ? `${item.taxRate ?? item.taxPercent ?? item.tax}%` : "0%"}
-                                                    </td>
-
-                                                </tr>
-                                            ))}
-                                            {(!invoice.items || invoice.items.length === 0) && (
-                                                <tr>
-                                                    <td colSpan={6} className="py-8 text-center text-gray-500 text-sm">
-                                                        No items found for this invoice.
-                                                    </td>
-                                                </tr>
-                                            )}
-                                        </tbody>
-                                    </table>
-                                </div>
-
-                                {/* Totals Section */}
-                                <div className="flex flex-col items-end mb-8">
-                                    <div className="w-full md:w-1/2 lg:w-1/3 space-y-3">
-                                        <div className="flex justify-between text-sm font-semibold text-gray-700 px-2">
-                                            <span>Subtotal</span>
-                                            <span>{formatMoney(subTotalBeforeDiscount)}</span>
-                                        </div>
-
-                                        {totalIgst > 0 ? (
-                                            <div className="flex justify-between text-sm font-semibold text-emerald-600 px-2">
-                                                <span>IGST</span>
-                                                <span>+ {formatMoney(totalIgst)}</span>
-                                            </div>
-                                        ) : (totalCgst > 0 || totalSgst > 0) ? (
+                            {/* Items Table */}
+                            <table className="w-full border-collapse text-[11px]">
+                                <thead>
+                                    <tr>
+                                        <Th w="35px">S.N.</Th>
+                                        <Th>Description of Goods</Th>
+                                        <Th w="60px">HSN/SAC</Th>
+                                        <Th w="55px" align="right">Qty.</Th>
+                                        <Th w="45px">Unit</Th>
+                                        <Th w="60px" align="right">Price</Th>
+                                        {isInterState ? (
                                             <>
-                                                {totalCgst > 0 && (
-                                                    <div className="flex justify-between text-sm font-semibold text-emerald-600 px-2">
-                                                        <span>CGST</span>
-                                                        <span>+ {formatMoney(totalCgst)}</span>
-                                                    </div>
-                                                )}
-                                                {totalSgst > 0 && (
-                                                    <div className="flex justify-between text-sm font-semibold text-emerald-600 px-2">
-                                                        <span>SGST</span>
-                                                        <span>+ {formatMoney(totalSgst)}</span>
-                                                    </div>
-                                                )}
+                                                <Th w="50px">IGST Rate</Th>
+                                                <Th w="65px" align="right">IGST Amt</Th>
                                             </>
                                         ) : (
-                                            <div className="flex justify-between text-sm font-semibold text-emerald-600 px-2">
-                                                <span>Total Tax</span>
-                                                <span>+ {formatMoney(invoice.taxTotal)}</span>
-                                            </div>
+                                            <>
+                                                <Th w="50px">CGST Rate</Th>
+                                                <Th w="65px" align="right">CGST Amt</Th>
+                                                <Th w="50px">SGST Rate</Th>
+                                                <Th w="65px" align="right">SGST Amt</Th>
+                                            </>
                                         )}
+                                        <Th w="70px" align="right">Amount(Rs.)</Th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {itemsWithTax.map((item: any, idx: number) => (
+                                        <tr key={item.id || idx}>
+                                            <Td align="center">{idx + 1}.</Td>
+                                            <Td>{item.product?.productName || "N/A"}</Td>
+                                            <Td align="center">{item.hsnCode}</Td>
+                                            <Td align="right">{item.qty}</Td>
+                                            <Td align="center">{item.unit}</Td>
+                                            <Td align="right">{item.rate.toFixed(2)}</Td>
+                                            {isInterState ? (
+                                                <>
+                                                    <Td align="center">{item.igstRate}%</Td>
+                                                    <Td align="right">{item.igstAmount.toFixed(2)}</Td>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Td align="center">{item.cgstRate}%</Td>
+                                                    <Td align="right">{item.cgstAmount.toFixed(2)}</Td>
+                                                    <Td align="center">{item.sgstRate}%</Td>
+                                                    <Td align="right">{item.sgstAmount.toFixed(2)}</Td>
+                                                </>
+                                            )}
+                                            <Td align="right">{item.amount.toFixed(2)}</Td>
+                                        </tr>
+                                    ))}
+                                    {(!invoice.items || invoice.items.length === 0) && (
+                                        <tr>
+                                            <td colSpan={isInterState ? 8 : 9} className="border border-black px-2 py-4 text-center text-slate-500">
+                                                No items found for this invoice.
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                                <tfoot>
+                                    <tr>
+                                        <td colSpan={isInterState ? 7 : 8} className="border border-black px-2 py-1 text-right font-bold">
+                                            Grand Total
+                                        </td>
+                                        <td className="border border-black px-2 py-1 text-right font-bold">
+                                            {formatMoney(grandTotal)}
+                                        </td>
+                                    </tr>
+                                </tfoot>
+                            </table>
 
-                                        {discountTotal > 0 && (
-                                            <div className="flex justify-between text-sm font-semibold text-red-500 px-2">
-                                                <span>Discount</span>
-                                                <span>− {formatMoney(discountTotal)}</span>
-                                            </div>
-                                        )}
+                            {/* Tax Summary */}
+                            {taxSummary.length > 0 && (
+                                <table className="w-full border-collapse text-[11px] mt-2">
+                                    <thead>
+                                        <tr>
+                                            <Th w="60px">Tax Rate</Th>
+                                            <Th align="right">Taxable Amt.</Th>
+                                            <Th align="right">CGST Amt.</Th>
+                                            <Th align="right">SGST Amt.</Th>
+                                            <Th align="right">Total Tax</Th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {taxSummary.map((row, i) => (
+                                            <tr key={i}>
+                                                <Td align="center">{row.taxRate}%</Td>
+                                                <Td align="right">{row.taxableAmt.toFixed(2)}</Td>
+                                                <Td align="right">{row.cgstAmt.toFixed(2)}</Td>
+                                                <Td align="right">{row.sgstAmt.toFixed(2)}</Td>
+                                                <Td align="right">{row.totalTax.toFixed(2)}</Td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            )}
 
-                                        <div className="border-t border-gray-300 my-2"></div>
+                            {/* Amount in words */}
+                            <div className="px-2 py-2 border-t border-black text-[12px] font-medium">
+                                Rupees {amountInWords}
+                            </div>
 
-                                        <div className="flex justify-between text-lg font-bold text-blue-600 px-2">
-                                            <span>Net Amount</span>
-                                            <span>{formatMoney(invoice.grandTotal)}</span>
-                                        </div>
+                            {/* Bank details */}
+                            {company?.bankName && (
+                                <div className="px-2 py-2 border-t border-black text-[11px]">
+                                    <span className="font-bold">Bank Details :</span> BANK : {company.bankName}
+                                    &nbsp;&nbsp; BRANCH : {company.bankBranch} <br />
+                                    A/c No : {company.bankAccountNo} &nbsp;&nbsp; IFSC CODE : {company.bankIfsc}
+                                </div>
+                            )}
+
+                            {/* Notes */}
+                            {invoice.notes && (
+                                <div className="px-2 py-2 border-t border-black text-[11px]">
+                                    <span className="font-bold">Notes :</span> {invoice.notes}
+                                </div>
+                            )}
+
+                            {/* Footer: Terms + Signature */}
+                            <div className="flex border-t-[1.5px] border-black text-[11px]">
+                                <div className="flex-1 border-r border-black p-2">
+                                    <div className="font-bold mb-1">Terms &amp; Conditions</div>
+                                    <div>E &amp; O.E.</div>
+                                    <div>1. Goods once sold will not be taken back.</div>
+                                    <div>2. Interest @ 18% p.a. will be charged if the payment is not made within the stipulated time.</div>
+                                </div>
+                                <div className="flex-1 p-2 flex flex-col justify-between">
+                                    <div className="font-bold">Receiver's Signature :</div>
+                                    <div className="text-right font-bold mt-6">
+                                        For {company?.legalName || company?.companyName || "Company"}
                                     </div>
                                 </div>
-
-                                {/* Footer / Notes */}
-                                {invoice.notes && (
-                                    <div className="mt-12 pt-6 border-t border-gray-300">
-                                        <div className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
-                                            Notes / Payment Terms
-                                        </div>
-                                        <p className="text-sm text-gray-700 leading-relaxed max-w-2xl">
-                                            {invoice.notes}
-                                        </p>
-                                    </div>
-                                )}
                             </div>
                         </div>
                     </div>
@@ -417,5 +527,26 @@ const SalesInvoiceView: React.FC = () => {
         </div>
     );
 };
+
+// ─── Small table helpers ─────────────────────────────────────────────
+const MetaRow: React.FC<{ label: string; value: string }> = ({ label, value }) => (
+    <div className="flex text-[11px]">
+        <span className="w-[110px] font-bold">{label}</span>
+        <span>: {value}</span>
+    </div>
+);
+
+const Th: React.FC<{ children: React.ReactNode; w?: string; align?: "left" | "center" | "right" }> = ({ children, w, align = "left" }) => (
+    <th
+        className={`border border-black px-2 py-1 font-bold bg-[#f7f7f7] text-${align}`}
+        style={w ? { width: w } : undefined}
+    >
+        {children}
+    </th>
+);
+
+const Td: React.FC<{ children: React.ReactNode; align?: "left" | "center" | "right" }> = ({ children, align = "left" }) => (
+    <td className={`border border-black px-2 py-1 align-middle text-${align}`}>{children}</td>
+);
 
 export default SalesInvoiceView;

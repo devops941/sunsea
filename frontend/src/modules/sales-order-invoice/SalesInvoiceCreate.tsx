@@ -418,6 +418,7 @@ const SalesInvoiceForm: React.FC = () => {
         invoiceDate,
         dueDate: dueDate || null,
         notes,
+        salesOrderId: selectedSalesOrderId ? Number(selectedSalesOrderId) : null,
         items: lines
           .filter((l) => l.itemId && l.qty > 0)
           .map((l) => ({
