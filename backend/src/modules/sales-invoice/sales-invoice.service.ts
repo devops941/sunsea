@@ -143,6 +143,33 @@ class SalesInvoiceService {
         },
       });
 
+      // Update customer outstandingAmount
+      await tx.customer.update({
+        where: { id: data.customerId },
+        data: {
+          outstandingAmount: {
+            increment: grandTotal
+          }
+        }
+      });
+
+      // Update invoicedQty on SalesOrderItems (like receivedQty on PurchaseOrderItems)
+      if (data.salesOrderId) {
+        for (const item of data.items) {
+          const qty = Number(item.qty);
+          if (qty <= 0) continue;
+          await tx.salesOrderItem.updateMany({
+            where: {
+              salesOrderId: data.salesOrderId,
+              productId: BigInt(item.productId),
+            },
+            data: {
+              invoicedQty: { increment: qty },
+            },
+          });
+        }
+      }
+
       // Create an approved stock adjustment for the dispatched items
       const adjustmentPrefix = `ADJ-${new Date().getFullYear()}-`;
       const lastAdj = await tx.stockAdjustment.findFirst({

@@ -202,11 +202,6 @@ const SalesOrderForm: React.FC = () => {
     const { data: company } = useSelector((state: any) => state.company);
     const companyState = company?.state;
 
-    const [creditStatus, setCreditStatus] = useState<any | null>(null);
-    const [fetchingCredit, setFetchingCredit] = useState(false);
-    const [blockingOrder, setBlockingOrder] = useState<{ id: number; orderNo: string } | null>(null);
-    const [isBlocked, setIsBlocked] = useState(false);
-
     const handleBillingStateChange = (stateName: string) => {
         setValue("billingState", stateName, { shouldValidate: true });
         setValue("billingCity", "", { shouldValidate: true });
@@ -391,35 +386,6 @@ const SalesOrderForm: React.FC = () => {
         }
     };
 
-    useEffect(() => {
-        if (!selectedCustomerId) {
-            setCreditStatus(null);
-            setIsBlocked(false);
-            setBlockingOrder(null);
-            return;
-        }
-        setFetchingCredit(true);
-        customerService.fetchCreditStatus(selectedCustomerId)
-            .then((res) => {
-                setCreditStatus(res);
-            })
-            .catch((err) => {
-                console.error("Failed to fetch credit status:", err);
-            })
-            .finally(() => {
-                setFetchingCredit(false);
-            });
-
-        salesOrderService.checkCreditBlock(selectedCustomerId)
-            .then((res) => {
-                setIsBlocked(res.blocked);
-                setBlockingOrder(res.blockingOrder || null);
-            })
-            .catch((err) => {
-                console.error("Failed to check credit block:", err);
-            });
-    }, [selectedCustomerId]);
-
     const formItems = watch("items");
     const customerType = watch("customerType");
 
@@ -450,38 +416,6 @@ const SalesOrderForm: React.FC = () => {
         });
         return sum;
     }, [formItems, customerType, products]);
-    const limitExceeded = useMemo(() => {
-        if (!creditStatus) return false;
-        const totalExposure = creditStatus.outstanding + proposedTotal;
-        return totalExposure > creditStatus.creditLimit;
-    }, [creditStatus, proposedTotal]);
-
-    const lastExceededRef = useRef<boolean>(false);
-    const lastCustomerIdRef = useRef<string | null>(null);
-
-    useEffect(() => {
-        if (!selectedCustomerId) {
-            lastExceededRef.current = false;
-            lastCustomerIdRef.current = null;
-            return;
-        }
-
-        if (selectedCustomerId !== lastCustomerIdRef.current) {
-            lastExceededRef.current = false;
-            lastCustomerIdRef.current = selectedCustomerId;
-        }
-
-        if (limitExceeded && !lastExceededRef.current && creditStatus) {
-            const availableCredit = creditStatus.creditLimit - creditStatus.outstanding;
-            toast.warning(
-                `Credit Limit Exceeded! Available Credit: ₹${availableCredit.toLocaleString("en-IN", { minimumFractionDigits: 2 })}. Outstanding: ₹${creditStatus.outstanding.toLocaleString("en-IN", { minimumFractionDigits: 2 })}.`
-            );
-            lastExceededRef.current = true;
-        } else if (!limitExceeded) {
-            lastExceededRef.current = false;
-        }
-    }, [limitExceeded, selectedCustomerId, creditStatus]);
-
     // ─── Auto‑generate order number ──────────────────────────────────
     useEffect(() => {
         const state = location.state as any;
@@ -651,23 +585,7 @@ const SalesOrderForm: React.FC = () => {
                             )} />
                             <Err message={errors.customerId?.message} />
 
-                            {isBlocked && blockingOrder && (
-                                <div
-                                    className="alert alert-danger mt-2 mb-0 d-flex flex-column gap-2"
-                                    style={{ borderRadius: "var(--radius-md)" }}
-                                >
-                                    <span className="fw-semibold text-red-400">
-                                        ⚠️ This customer has a pending credit approval (Order #{blockingOrder.orderNo}) — new orders are blocked until it's resolved.
-                                    </span>
-                                    <div>
-                                        <CustomButton
-                                            text="View Pending Order"
-                                            className="btn-sm btn-danger text-white border-0"
-                                            onClick={() => navigate(`/pending-quotations/edit/${blockingOrder.id}`, { state: { id: blockingOrder.id } })}
-                                        />
-                                    </div>
-                                </div>
-                            )}
+
                         </div>
 
                         {customerTypeOptions.length >= 1 && (
@@ -833,16 +751,6 @@ const SalesOrderForm: React.FC = () => {
 
 
 
-                    {/* Credit block warning banner */}
-                    {isBlocked && (
-                        <div
-                            className="alert alert-danger d-flex align-items-center gap-2 mt-3"
-                            style={{ borderRadius: "var(--radius-md)" }}
-                        >
-                            <span>🚫</span>
-                            <span>Customer is currently blocked due to overdue payments. Please contact accounts.</span>
-                        </div>
-                    )}
 
                     {/* ── Form Actions ── */}
                     <div className="flex flex-wrap justify-end gap-3 mt-8 pt-4 border-t border-gray-200">

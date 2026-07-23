@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { FaSave, FaPlus, FaTrash, FaFileInvoiceDollar } from "react-icons/fa";
+import { FaSave, FaPlus, FaTrash, FaFileInvoiceDollar, FaExclamationTriangle } from "react-icons/fa";
 import { toast } from "react-toastify";
 import { useSelector, useDispatch } from "react-redux";
 
@@ -214,7 +214,26 @@ const SalesInvoiceForm: React.FC = () => {
         const ordersList = ordersResponse?.data || (ordersResponse as any)?.orders || [];
         setAllOrders(ordersList);
 
-        const salesOrdersList = salesOrdersResponse?.data || salesOrdersResponse || [];
+        const rawSalesOrdersList = salesOrdersResponse?.data || salesOrdersResponse || [];
+
+        // Use invoicedQty field on each SalesOrderItem (like receivedQty on PurchaseOrderItem)
+        // to compute remaining quantity and filter out fully-invoiced orders
+        const salesOrdersList = rawSalesOrdersList
+          .map((so: any) => {
+            const remainingItems = (so.items || [])
+              .map((item: any) => {
+                const ordered = Number(item.quantity || 0);
+                const invoiced = Number(item.invoicedQty || 0);
+                const remaining = ordered - invoiced;
+                if (remaining <= 0) return null;
+                return { ...item, quantity: remaining };
+              })
+              .filter(Boolean);
+
+            if (remainingItems.length === 0) return null; // fully invoiced
+            return { ...so, items: remainingItems };
+          })
+          .filter(Boolean);
 
         // Map Finished Goods Stock to onHandQty by productItemId
         const fgList: any[] = Array.isArray(fgStockResponse) ? fgStockResponse : (fgStockResponse as any).data || [];
@@ -279,13 +298,31 @@ const SalesInvoiceForm: React.FC = () => {
         const newLines = selectedOrder.items.map((item: any) => {
           const qty = Number(item.quantity || item.qty || 1);
           const discountAmount = Number(item.discountAmount || 0);
-          const totalTaxable = Number(item.taxableAmount || item.lineSubtotal || 0);
-          const rate = qty > 0 ? ((totalTaxable + discountAmount) / qty) : Number(item.b2b || item.b2c || item.mrp || 0);
+
+          // Derive unit price from the SO item's stored unit price fields.
+          // b2b/b2c/mrp/exportPrice hold the per-unit price; use lineSubtotal / original quantity
+          // as a last resort. Never divide by the remaining qty (which causes wrong prices for partial invoices).
+          let rate = 0;
+          if (Number(item.b2b) > 0) {
+            rate = Number(item.b2b);
+          } else if (Number(item.mrp) > 0) {
+            rate = Number(item.mrp);
+          } else if (Number(item.b2c) > 0) {
+            rate = Number(item.b2c);
+          } else if (Number(item.exportPrice) > 0) {
+            rate = Number(item.exportPrice);
+          } else {
+            // fallback: lineSubtotal / qty (taxable + discount) / qty  — using item's own qty not remaining
+            const originalQty = Number(item.originalQty || item.orderedQty || qty);
+            const totalTaxable = Number(item.taxableAmount || item.lineSubtotal || 0);
+            rate = originalQty > 0 ? (totalTaxable + discountAmount) / originalQty : 0;
+          }
+
           const taxPercent = Number(item.igstRate) > 0
             ? Number(item.igstRate)
             : (Number(item.cgstRate || 0) + Number(item.sgstRate || 0));
 
-          const amount = (qty * rate);
+          const amount = qty * rate;
           const taxableAmount = amount - discountAmount;
           const taxAmount = (taxableAmount * taxPercent) / 100;
           const total = taxableAmount + taxAmount;
@@ -381,6 +418,23 @@ const SalesInvoiceForm: React.FC = () => {
     return { subTotal, totalDiscount, taxTotal, grandTotal, cgst, sgst, igst };
   }, [lines, isInterState]);
 
+  // ---- Credit Limit Check ----
+  const limitExceeded = useMemo(() => {
+    const selectedCustomer = customersRaw.find((c) => String(c.id) === customerId);
+    if (!selectedCustomer) return false;
+
+    const creditLimit = Number(selectedCustomer.creditLimit || 0);
+    const reservedCredit = Number(selectedCustomer.reservedCredit || 0);
+    const outstandingAmount = Number(selectedCustomer.outstandingAmount || 0);
+    const remainingAmount = creditLimit - reservedCredit - outstandingAmount;
+    const exceededBy = totals.grandTotal - remainingAmount;
+
+    // Return how much is exceeded (positive number), or false if within limit
+    return exceededBy > 0 ? { exceededBy, remainingAmount } : false;
+  }, [customersRaw, customerId, totals.grandTotal]);
+
+
+
   // ---- Validation ----
   const validate = (): boolean => {
     const errs: Record<string, string> = {};
@@ -470,6 +524,27 @@ const SalesInvoiceForm: React.FC = () => {
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-8">
+
+          {limitExceeded !== false && (
+            <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-md shadow-sm">
+              <div className="flex items-start gap-3">
+                <FaExclamationTriangle className="text-red-500 mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="text-red-700 font-bold text-sm">Credit Limit Exceeded!</p>
+                  <p className="text-red-600 text-sm mt-0.5">
+                    This invoice exceeds the credit limit by{" "}
+                    <span className="font-bold">
+                      ₹{(limitExceeded as any).exceededBy.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                    </span>.
+                    {" "}Available credit remaining:{" "}
+                    <span className="font-bold">
+                      ₹{(limitExceeded as any).remainingAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                    </span>.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Main Details */}
           <div>
