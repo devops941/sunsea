@@ -92,6 +92,14 @@ const SupplierViewModal: React.FC<SupplierViewModalProps> = ({
                                     <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">GPay / PhonePe Number</span>
                                     <span className="text-sm font-medium text-slate-800 break-words">{bank.upiMobileNumber || "N/A"}</span>
                                 </div>
+                                {bank.qrImage && (
+                                    <div className="flex flex-col gap-1.5 col-span-1 sm:col-span-2 lg:col-span-3">
+                                        <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">QR Code</span>
+                                        <div className="mt-2">
+                                            <img src={bank.qrImage} alt="QR Code" className="max-h-48 max-w-full object-contain rounded-md border border-slate-200 shadow-sm" />
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     ))}
