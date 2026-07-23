@@ -5,6 +5,7 @@ interface Option {
   label: string;
   value: string;
   disabled?: boolean;
+  selectedLabel?: string;
 }
 
 interface SelectInputProps {
@@ -70,7 +71,9 @@ const SelectInput: React.FC<SelectInputProps> = ({
   };
 
   const selectedOption = options.find((o) => o.value === value);
-  const displayLabel = selectedOption ? selectedOption.label : defaultOptionLabel || "Select an option";
+  const displayLabel = selectedOption
+    ? (selectedOption.selectedLabel || selectedOption.label)
+    : defaultOptionLabel || "Select an option";
 
   const filteredOptions = searchable
     ? options.filter((opt) => opt.label.toLowerCase().includes(searchTerm.toLowerCase()))

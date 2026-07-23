@@ -202,6 +202,7 @@ const SalesOrderList: React.FC = () => {
                                 { label: "Order No", value: selectedItem.orderNo },
                                 { label: "Order Date", value: formatDate(selectedItem.orderDate) },
                                 { label: "Customer", value: selectedItem.customerName || selectedItem.customer?.displayName || selectedItem.customer?.firmName },
+                                { label: "Mobile Number", value: selectedItem.mobile || "N/A" },
                                 { label: "Sales Person", value: selectedItem.salesPersonName || "N/A" },
                                 { label: "Payment Term", value: selectedItem.paymentTermName || "N/A" },
                                 ...(selectedItem.transportName ? [{ label: "Transport", value: selectedItem.transportName }] : []),

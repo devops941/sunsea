@@ -185,6 +185,7 @@ const QuotationList: React.FC = () => {
                                                 selectedItem.customer?.firmName ||
                                                 "N/A",
                                         },
+                                        { label: "Mobile Number", value: selectedItem.mobile || "N/A" },
                                         ...(selectedItem.transportName ? [{ label: "Transport", value: selectedItem.transportName }] : []),
                                     ],
                                 },

@@ -37,6 +37,7 @@ const salesOrderSchema = z
         orderDate: z.string().min(1, "Order Date is required"),
         expectedCompletionDate: z.string().min(1, "Expected completion date is required"),
         customerId: z.string().min(1, "Customer is required"),
+        mobile: z.string().optional().nullable(),
         orderType: z.string().optional(),
         dispatchType: z.string().optional(),
         referenceText: z.string().optional(),
@@ -134,6 +135,7 @@ const defaultValues: SalesOrderFormValues = {
     orderDate: today,
     expectedCompletionDate: "",
     customerId: "",
+    mobile: "",
     salesPersonName: "",
     transportName: "",
     paymentTermId: "",
@@ -268,6 +270,7 @@ const SalesOrderForm: React.FC = () => {
                 orderType: state.orderType || "",
                 expectedCompletionDate: state.expectedCompletionDate?.split("T")[0] || "",
                 customerId: state.customerId != null ? String(state.customerId) : "",
+                mobile: state.mobile || "",
                 customerType: state.customerType ? String(state.customerType) : "",
                 referenceText: state.referenceText || "",
                 salesPersonName: state.salesPersonName || "",
@@ -338,6 +341,37 @@ const SalesOrderForm: React.FC = () => {
         if (!selectedCustomerId) return null;
         return customers.find(c => String(c.id) === selectedCustomerId);
     }, [selectedCustomerId, customers]);
+
+    const mobileOptions = useMemo(() => {
+        if (!selectedCustomer) return [];
+        const mobile = selectedCustomer.mobile;
+        if (Array.isArray(mobile)) {
+            return mobile.map((m: any) => ({
+                value: m.number,
+                label: `${m.label || 'Mobile'}: ${m.number}`,
+                selectedLabel: m.number,
+            }));
+        } else if (typeof mobile === "string" && mobile.trim()) {
+            return [{
+                value: mobile,
+                label: `Primary: ${mobile}`,
+                selectedLabel: mobile,
+            }];
+        }
+        return [];
+    }, [selectedCustomer]);
+
+    useEffect(() => {
+        if (isEditMode) return;
+        if (mobileOptions.length > 0) {
+            const currentMobile = watch("mobile");
+            if (!currentMobile || !mobileOptions.some(opt => opt.value === currentMobile)) {
+                setValue("mobile", mobileOptions[0].value, { shouldValidate: true });
+            }
+        } else {
+            setValue("mobile", "", { shouldValidate: true });
+        }
+    }, [mobileOptions, setValue, isEditMode]);
 
     const transportOptions = useMemo(() => {
         if (!selectedCustomerId) return [];
@@ -512,6 +546,7 @@ const SalesOrderForm: React.FC = () => {
                 orderDate: new Date(data.orderDate).toISOString(),
                 expectedCompletionDate: new Date(data.expectedCompletionDate).toISOString(),
                 customerId: data.customerId,
+                mobile: data.mobile || null,
                 customerType: data.customerType,
                 orderType: data.orderType,
                 dispatchType: data.dispatchType,
@@ -586,6 +621,13 @@ const SalesOrderForm: React.FC = () => {
                             <Err message={errors.customerId?.message} />
 
 
+                        </div>
+
+                        <div>
+                            <Controller name="mobile" control={control} render={({ field }) => (
+                                <SelectInput label="Mobile Number" name={field.name} value={field.value ?? ""} options={mobileOptions} defaultOptionLabel={mobileOptions.length > 0 ? "Select Mobile Number" : "No mobile numbers found"} onChange={field.onChange} disabled={!selectedCustomerId} />
+                            )} />
+                            <Err message={errors.mobile?.message} />
                         </div>
 
                         {customerTypeOptions.length >= 1 && (

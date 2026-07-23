@@ -16,6 +16,16 @@ import SearchInput from "../../components/ui/SearchInput/SearchInput";
 
 const ITEMS_PER_PAGE = 10;
 
+const getMobileFromCustomer = (cust: any) => {
+    if (!cust) return "";
+    const m = cust.mobile;
+    if (Array.isArray(m) && m.length > 0) {
+        return m[0].number || m[0].value || "";
+    }
+    if (typeof m === "string") return m;
+    return "";
+};
+
 const SalesInvoiceList: React.FC = () => {
     const navigate = useNavigate();
     const [data, setData] = useState<any[]>([]);
@@ -206,6 +216,7 @@ const SalesInvoiceList: React.FC = () => {
                                     { label: "Invoice No", value: selectedItem.invoiceNo },
                                     { label: "Invoice Date", value: formatDate(selectedItem.invoiceDate) },
                                     { label: "Due Date", value: formatDate(selectedItem.dueDate) },
+                                    { label: "Mobile Number", value: getMobileFromCustomer(selectedItem.customer) || "N/A" },
                                 ],
                             },
                             {

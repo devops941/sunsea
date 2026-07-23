@@ -97,6 +97,7 @@ const salesOrderBodyShape = z.object({
         .refine((val) => !isNaN(Date.parse(val)), "Invalid completion date")
         .refine((val) => new Date(val) > new Date(), "Expected completion date must be in the future"),
     customerId: z.string().uuid("Customer ID must be a valid UUID"),
+    mobile: z.string().optional().nullable(),
     customerType: CustomerTypeEnum,   // ← add this
     isInterState: z.boolean().default(false).optional(),
     paymentTermId: z.number().int().positive("...").optional().nullable(),

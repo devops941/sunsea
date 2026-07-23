@@ -321,6 +321,7 @@ class SalesInvoiceService {
               id: true,
               firmName: true,
               displayName: true,
+              mobile: true,
             },
           },
           items: {
@@ -365,6 +366,8 @@ class SalesInvoiceService {
             shippingCity: true,
             shippingState: true,
             shippingPincode: true,
+            mobile: true,
+            transports: true,
           },
         },
         salesOrder: {
@@ -376,6 +379,8 @@ class SalesInvoiceService {
             shippingState: true,
             shippingPincode: true,
             shippingCountry: true,
+            mobile: true,
+            transportName: true,
           },
         },
         items: {

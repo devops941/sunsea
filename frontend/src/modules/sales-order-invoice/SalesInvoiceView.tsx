@@ -20,6 +20,22 @@ const formatDate = (val: string | null | undefined) => {
     return new Date(val).toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" });
 };
 
+const getMobileFromCustomer = (cust: any) => {
+    if (!cust) return "";
+    const m = cust.mobile;
+    if (Array.isArray(m) && m.length > 0) {
+        return m[0].number || m[0].value || "";
+    }
+    if (typeof m === "string") return m;
+    return "";
+};
+
+const getTransportStation = (cust: any, transportName: string | null | undefined) => {
+    if (!cust || !transportName || !Array.isArray(cust.transports)) return "—";
+    const t = cust.transports.find((item: any) => item && item.transportName === transportName);
+    return t ? t.city || "—" : "—";
+};
+
 // Basic number-to-words for Indian Rupees (integer part only, extend as needed)
 const numberToWords = (num: number): string => {
     const a = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten",
@@ -327,7 +343,7 @@ const SalesInvoiceView: React.FC = () => {
                             {/* Top bar */}
                             <div className="flex justify-between items-center px-3 pt-2 text-[11px] font-semibold">
                                 <div>GSTIN : {company?.gstin || "-"}</div>
-                                <div className="italic">Original Copy</div>
+                                <div className="italic">Triplicate Copy</div>
                             </div>
 
                             {/* Header */}
@@ -349,11 +365,17 @@ const SalesInvoiceView: React.FC = () => {
                                 <div className="flex-1 border-r-[1.5px] border-black p-2 space-y-1">
                                     <MetaRow label="Invoice No." value={invoice.invoiceNo} />
                                     <MetaRow label="Dated" value={formatDate(invoice.invoiceDate)} />
+                                    <MetaRow label="Place of Supply" value={invoice.customer?.billingState || "-"} />
                                     <MetaRow label="Due Date" value={formatDate(invoice.dueDate)} />
+                                    <MetaRow label="Reverse Charge" value="N" />
+                                    <MetaRow label="GR/RR No" value="" />
                                 </div>
                                 <div className="flex-1 p-2 space-y-1">
-                                    <MetaRow label="Place of Supply" value={invoice.customer?.billingState || "-"} />
-                                    <MetaRow label="Reverse Charge" value="N" />
+
+                                    <MetaRow label="Transport" value={invoice.salesOrder?.transportName || "—"} />
+                                    <MetaRow label="Vehicle No" value="—" />
+                                    <MetaRow label="Station" value={getTransportStation(invoice.customer, invoice.salesOrder?.transportName)} />
+                                    <MetaRow label="E-way Bill no" value="—" />
                                     {invoice.salesOrder?.orderNo && (
                                         <MetaRow label="Ref. Order No." value={invoice.salesOrder.orderNo} />
                                     )}
@@ -367,12 +389,15 @@ const SalesInvoiceView: React.FC = () => {
                                     <div className="font-semibold">
                                         {invoice.customer?.displayName || invoice.customer?.firmName || "N/A"}
                                     </div>
-                                    <div className="text-slate-700">
+                                    <div className="font-semibold">
                                         {invoice.customer?.billingAddressLine1}<br />
                                         {invoice.customer?.billingCity}, {invoice.customer?.billingState} - {invoice.customer?.billingPincode}
                                     </div>
                                     {invoice.customer?.gstin && (
                                         <div className="mt-1">GSTIN / UIN : {invoice.customer.gstin}</div>
+                                    )}
+                                    {(invoice.salesOrder?.mobile || getMobileFromCustomer(invoice.customer)) && (
+                                        <div className="mt-1 font-semibold">Mobile: {invoice.salesOrder?.mobile || getMobileFromCustomer(invoice.customer)}</div>
                                     )}
                                 </div>
                                 <div className="flex-1 p-2">
@@ -380,7 +405,7 @@ const SalesInvoiceView: React.FC = () => {
                                     <div className="font-semibold">
                                         {invoice.customer?.displayName || invoice.customer?.firmName || "N/A"}
                                     </div>
-                                    <div className="text-slate-700">
+                                    <div className="font-semibold">
                                         {invoice.salesOrder?.shippingAddressLine1 || invoice.customer?.shippingAddressLine1 || invoice.customer?.billingAddressLine1}<br />
                                         {invoice.salesOrder?.shippingCity || invoice.customer?.shippingCity || invoice.customer?.billingCity}, {invoice.salesOrder?.shippingState || invoice.customer?.shippingState || invoice.customer?.billingState} - {invoice.salesOrder?.shippingPincode || invoice.customer?.shippingPincode || invoice.customer?.billingPincode}
                                     </div>
@@ -448,7 +473,7 @@ const SalesInvoiceView: React.FC = () => {
                                 </tbody>
                                 <tfoot>
                                     <tr>
-                                        <td colSpan={isInterState ? 7 : 8} className="border border-black px-2 py-1 text-right font-bold">
+                                        <td colSpan={isInterState ? 7 : 10} className="border border-black px-2 py-1 text-right font-bold">
                                             Grand Total
                                         </td>
                                         <td className="border border-black px-2 py-1 text-right font-bold">
@@ -490,13 +515,11 @@ const SalesInvoiceView: React.FC = () => {
                             </div>
 
                             {/* Bank details */}
-                            {company?.bankName && (
-                                <div className="px-2 py-2 border-t border-black text-[11px]">
-                                    <span className="font-bold">Bank Details :</span> BANK : {company.bankName}
-                                    &nbsp;&nbsp; BRANCH : {company.bankBranch} <br />
-                                    A/c No : {company.bankAccountNo} &nbsp;&nbsp; IFSC CODE : {company.bankIfsc}
-                                </div>
-                            )}
+                            <div className="px-2 py-2 border-t border-black text-[11px]">
+                                <span className="font-bold">Bank Details :</span> BANK NAME : {company?.bankName || "BANK OF BARODA"}
+                                &nbsp;&nbsp; BRANCH : {company?.bankBranch || "PALGHAR BRANCH"} <br />
+                                A/c No : {company?.bankAccountNo || "123456789012"} &nbsp;&nbsp; IFSC CODE : {company?.bankIfsc || "BARB0PALGHA"}
+                            </div>
 
                             {/* Notes */}
                             {invoice.notes && (
