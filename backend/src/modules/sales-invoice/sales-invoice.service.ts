@@ -137,8 +137,8 @@ class SalesInvoiceService {
                   productCode: true,
                   productName: true,
                 },
-               },
-             },
+              },
+            },
           },
         },
       });
@@ -338,6 +338,17 @@ class SalesInvoiceService {
             shippingCity: true,
             shippingState: true,
             shippingPincode: true,
+          },
+        },
+        salesOrder: {
+          select: {
+            id: true,
+            orderNo: true,
+            shippingAddressLine1: true,
+            shippingCity: true,
+            shippingState: true,
+            shippingPincode: true,
+            shippingCountry: true,
           },
         },
         items: {

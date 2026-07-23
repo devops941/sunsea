@@ -29,6 +29,24 @@ class InventoryController {
       limit: Number(limit),
     });
 
+    // If no snapshots exist for this date yet, auto-trigger a snapshot run and re-fetch
+    if (result.total === 0 && (!search && !category && !storeId)) {
+      try {
+        const dateStr = date ? (date as string) : targetDate.toISOString().split("T")[0];
+        await runEodStockSnapshot(dateStr);
+        result = await inventoryService.getEodStock({
+          date: targetDate,
+          category: category as string || undefined,
+          storeId: storeId as string || undefined,
+          search: search as string || undefined,
+          page: Number(page),
+          limit: Number(limit),
+        });
+      } catch (eodErr) {
+        console.error("Auto EOD snapshot run error:", eodErr);
+      }
+    }
+
     return res.status(200).json({
       success: true,
       asOf: targetDate,
