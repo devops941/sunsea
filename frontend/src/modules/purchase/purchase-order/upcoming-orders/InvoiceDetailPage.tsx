@@ -316,15 +316,30 @@ const InvoiceDetailPage: React.FC = () => {
                 mobileNumber: Array.isArray((sup as any)?.mobile) && (sup as any).mobile.length > 0 ? (sup as any).mobile[0].number : (typeof (sup as any)?.mobile === "string" ? (sup as any).mobile : ""),
                 email: (sup as any).email || "",
                 supplierAddress: [(sup as any).billingAddressLine1, (sup as any).billingCity, (sup as any).billingState].filter(Boolean).join(", "),
-                shippingAddressLine1: (sup as any).billingAddressLine1 || "",
-                shippingCity: (sup as any).billingCity || "",
-                shippingState: (sup as any).billingState || "",
-                shippingPincode: (sup as any).billingPincode || "",
+                billingAddressLine1: (sup as any).billingAddressLine1 || "",
+                billingCity: (sup as any).billingCity || "",
+                billingState: (sup as any).billingState || "",
+                billingPincode: (sup as any).billingPincode || "",
+                billingCountry: (sup as any).billingCountry || "India",
+            }));
+        } else {
+            setForm((prev) => ({
+                ...prev,
+                gstNumber: "",
+                contactName: "",
+                mobileNumber: "",
+                email: "",
+                supplierAddress: "",
+                billingAddressLine1: "",
+                billingCity: "",
+                billingState: "",
+                billingPincode: "",
+                billingCountry: "India",
             }));
         }
     }, [form.supplierId, form.poId, suppliers]);
 
-    // ── When store selected manually → auto-fill billing ──────────────────────
+    // ── When store selected manually → auto-fill shipping ──────────────────────
     useEffect(() => {
         if (form.poId) return;
         const storeObj = (stores || []).find((s: any) => String(s.storeId) === String(form.storeId));
@@ -332,10 +347,21 @@ const InvoiceDetailPage: React.FC = () => {
         if (locObj) {
             setForm((prev) => ({
                 ...prev,
-                billingAddressLine1: locObj.address || "",
-                billingCity: locObj.city || "",
-                billingState: locObj.state || "",
-                billingPincode: "625017",
+                shippingAddressLine1: locObj.address || "",
+                shippingCity: locObj.city || "",
+                shippingState: locObj.state || "",
+                shippingPincode: (locObj as any).pincode || "625017",
+                shippingCountry: locObj.country || "India",
+                sameAsBilling: false,
+            }));
+        } else {
+            setForm((prev) => ({
+                ...prev,
+                shippingAddressLine1: "",
+                shippingCity: "",
+                shippingState: "",
+                shippingPincode: "",
+                shippingCountry: "India",
             }));
         }
     }, [form.storeId, form.poId, stores, locations]);
@@ -448,7 +474,15 @@ const InvoiceDetailPage: React.FC = () => {
     // ── Options ───────────────────────────────────────────────────────────────────
     const poOptions = useMemo(() => [
         { value: "", label: "Select PO" },
-        ...approvedPOs.map((po: any) => ({ value: po.id || po.purchaseOrderId || "", label: po.poNumber || "" })),
+        ...approvedPOs.map((po: any) => {
+            const label = po.status === "PARTIALLY_RECEIVED"
+                ? `${po.poNumber || ""} (Partially Received)`
+                : (po.poNumber || "");
+            return {
+                value: po.id || po.purchaseOrderId || "",
+                label
+            };
+        }),
     ], [approvedPOs]);
 
     const supplierOptions = useMemo(() => [
@@ -936,7 +970,7 @@ const InvoiceDetailPage: React.FC = () => {
                                                     options={gstOptions}
                                                     value={String(item.tax || 0)}
                                                     onChange={(e) => updateItem(idx, "tax", Number(e.target.value))}
-                                                    disabled={true}
+                                                    // disabled={true}
                                                 />
                                             </td>
 

@@ -90,54 +90,6 @@ const PurchaseOrderCreatePage: React.FC = () => {
     (s) => String(s?.id) === String(formData.supplierId)
   ), [suppliers, formData.supplierId]);
 
-  const [selectedShippingIndex, setSelectedShippingIndex] = useState<string>("");
-
-  const shippingAddressOptions = useMemo(() => {
-    if (!selectedSupplier?.addresses || !Array.isArray(selectedSupplier.addresses) || selectedSupplier.addresses.length === 0) return [];
-    return selectedSupplier.addresses.map((addr: any, idx: number) => {
-      const a = addr.address || addr;
-      const addressParts = [a?.addressLine1, a?.addressLine2, a?.city, a?.state, a?.pincode].filter(Boolean);
-      const fullAddressStr = addressParts.join(", ");
-      return {
-        label: fullAddressStr || (addr.label && addr.label !== `Address ${idx + 1}` ? addr.label : `Address ${idx + 1}`),
-        value: String(idx),
-      };
-    });
-  }, [selectedSupplier]);
-
-  const handleShippingAddressSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const idxStr = e.target.value;
-    setSelectedShippingIndex(idxStr);
-    if (!idxStr) {
-      setFormData((prev) => ({
-        ...prev,
-        shippingAddressLine1: "",
-        shippingCity: "",
-        shippingState: "",
-        shippingPincode: "",
-      }));
-      return;
-    }
-    if (!selectedSupplier?.addresses) return;
-    const item = selectedSupplier.addresses[Number(idxStr)];
-    const addrObj: any = (item as any)?.address || item;
-    if (addrObj) {
-      setFormData((prev) => ({
-        ...prev,
-        shippingAddressLine1: addrObj.addressLine1 || "",
-        shippingCity: addrObj.city || "",
-        shippingState: addrObj.state || "",
-        shippingPincode: addrObj.pincode || "",
-      }));
-      setErrors((prev) => ({
-        ...prev,
-        shippingAddressLine1: "",
-        shippingCity: "",
-        shippingState: "",
-        shippingPincode: "",
-      }));
-    }
-  };
 
   // ============================================================
   // INTER-STATE CHECK
@@ -361,7 +313,6 @@ const PurchaseOrderCreatePage: React.FC = () => {
 
     if (name === "sameAsBilling") {
       const checked = (e.target as HTMLInputElement).checked;
-      if (checked) setSelectedShippingIndex("");
       setFormData((prev) => ({
         ...prev,
         sameAsBilling: checked,
@@ -374,7 +325,6 @@ const PurchaseOrderCreatePage: React.FC = () => {
     }
 
     if (name === "supplierId") {
-      setSelectedShippingIndex("");
       const selectedSup = suppliers.find((s) => String(s.id) === String(value));
       setFormData((prev) => ({
         ...prev,
@@ -384,10 +334,11 @@ const PurchaseOrderCreatePage: React.FC = () => {
         billingState: selectedSup?.billingState || "",
         billingPincode: selectedSup?.billingPincode || "",
         billingCountry: selectedSup?.billingCountry || "India",
-        shippingAddressLine1: prev.sameAsBilling ? (selectedSup?.billingAddressLine1 || "") : "",
-        shippingCity: prev.sameAsBilling ? (selectedSup?.billingCity || "") : "",
-        shippingState: prev.sameAsBilling ? (selectedSup?.billingState || "") : "",
-        shippingPincode: prev.sameAsBilling ? (selectedSup?.billingPincode || "") : "",
+        shippingAddressLine1: prev.sameAsBilling ? (selectedSup?.billingAddressLine1 || "") : prev.shippingAddressLine1,
+        shippingCity: prev.sameAsBilling ? (selectedSup?.billingCity || "") : prev.shippingCity,
+        shippingState: prev.sameAsBilling ? (selectedSup?.billingState || "") : prev.shippingState,
+        shippingPincode: prev.sameAsBilling ? (selectedSup?.billingPincode || "") : prev.shippingPincode,
+        shippingCountry: prev.sameAsBilling ? (selectedSup?.billingCountry || "India") : prev.shippingCountry,
         items: [],
         subtotal: 0,
         totalDiscount: 0,
@@ -409,10 +360,11 @@ const PurchaseOrderCreatePage: React.FC = () => {
       setFormData((prev) => ({
         ...prev,
         storeId: value,
-        billingAddressLine1: selectedLoc?.address || "",
-        billingCity: selectedLoc?.city || "",
-        billingState: selectedLoc?.state || "",
-        billingPincode: "625017",
+        shippingAddressLine1: selectedLoc?.address || "",
+        shippingCity: selectedLoc?.city || "",
+        shippingState: selectedLoc?.state || "",
+        shippingPincode: (selectedLoc as any)?.pincode || "625017",
+        shippingCountry: selectedLoc?.country || "India",
       }));
       if (errors.storeId) {
         setErrors((prev) => ({ ...prev, storeId: "" }));
@@ -866,6 +818,9 @@ const PurchaseOrderCreatePage: React.FC = () => {
 
   console.log(productOptions, "productOptions")
 
+  const todayStr = new Date().toISOString().split("T")[0];
+  const minDeliveryDate = formData.poDate && formData.poDate > todayStr ? formData.poDate : todayStr;
+
   // ============================================================
   // UI
   // ============================================================
@@ -903,14 +858,16 @@ const PurchaseOrderCreatePage: React.FC = () => {
                 onChange={(e) => handleChange(e as any)}
                 required
                 error={errors.expectedDeliveryDate}
+                minDate={minDeliveryDate}
               />
-            </div>
-            <div>
-              <SelectInput label="Store" name="storeId" value={formData.storeId} options={[{ label: "-- Select Store --", value: "" }, ...(stores || []).filter((s: any) => s.isActive).map((s: any) => ({ label: s.storeName, value: s.storeId }))]} required error={errors.storeId} onChange={handleChange} />
             </div>
             <div>
               <SelectInput label="Supplier" name="supplierId" value={formData.supplierId} options={[{ value: "", label: "-- Select Supplier --" }, ...supplierOptions]} onChange={handleChange} required />
               {errors.supplierId && <div className="text-red-500 mt-1 text-sm">{errors.supplierId}</div>}
+            </div>
+            <div>
+              <SelectInput label="Store" name="storeId" value={formData.storeId} options={[{ label: "-- Select Store --", value: "" }, ...(stores || []).filter((s: any) => s.isActive).map((s: any) => ({ label: s.storeName, value: s.storeId }))]} required onChange={handleChange} />
+               {errors.storeId && <div className="text-red-500 mt-1 text-sm">{errors.storeId}</div>}
             </div>
           </div>
 
@@ -945,18 +902,6 @@ const PurchaseOrderCreatePage: React.FC = () => {
                 </label>
               </div>
 
-              {!formData.sameAsBilling && (
-                <div className="mb-4">
-                  <SelectInput
-                    label="Select Saved Address"
-                    options={shippingAddressOptions}
-                    value={selectedShippingIndex}
-                    onChange={handleShippingAddressSelect}
-                    defaultOptionLabel={shippingAddressOptions.length > 0 ? "-- Select saved address --" : "No additional addresses saved"}
-                    disabled={shippingAddressOptions.length === 0}
-                  />
-                </div>
-              )}
               <AddressForm
                 addressValue={formData.shippingAddressLine1 || ""}
                 onAddressChange={(val) => setFormData(prev => ({ ...prev, shippingAddressLine1: val }))}

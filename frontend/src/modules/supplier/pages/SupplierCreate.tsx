@@ -61,7 +61,7 @@ const supplierFormSchema = z.object({
     billingAddressLine2: z.string().trim().optional().nullable(),
     billingAddressCity: z.string().trim().min(1, "City is required"),
     billingAddressState: z.string().trim().min(1, "State is required"),
-    billingAddressPincode: z.string().trim().min(1, "Pincode is required"),
+    billingAddressPincode: z.string().trim().regex(/^\d{6}$/, "Pincode must be exactly 6 digits"),
     billingAddressCountry: z.string().optional().nullable().default("India"),
     // stateCode: z.string().trim().length(2, "State code must be exactly 2 characters"),
     paymentTerms: z.enum(["Advance", "Net15", "Net30", "Net45", "Net60"]),
@@ -76,10 +76,32 @@ const supplierFormSchema = z.object({
                 accountNumber: z.string().trim().min(9, "Account Number must be 9-18 digits").max(18, "Account Number must be 9-18 digits"),
                 ifscCode: z.string().trim().min(11, "IFSC Code must be exactly 11 characters").max(11, "IFSC Code must be exactly 11 characters"),
                 branchName: z.string().trim().min(1, "Branch Name is required"),
-                // upiMobileNumber: z.string().trim().max(10, "GPay/PhonePe number must be 10 digits").optional().nullable().or(z.literal("")),
+                upiMobileNumber: z
+                    .string()
+                    .trim()
+                    .superRefine((val, ctx) => {
+                        const error = validatePhoneNumber(val, true);
+                        if (error) {
+                            ctx.addIssue({
+                                code: z.ZodIssueCode.custom,
+                                message: error,
+                            });
+                        }
+                    }),
             })
         )
-        .optional(),
+        .min(1, "At least one bank account is required"),
+    addresses: z.array(
+        z.object({
+            address: z.object({
+                addressLine1: z.string().trim().min(1, "Address Line 1 is required"),
+                addressLine2: z.string().trim().optional().nullable(),
+                city: z.string().trim().min(1, "City is required"),
+                state: z.string().trim().min(1, "State is required"),
+                pincode: z.string().trim().regex(/^\d{6}$/, "Pincode must be exactly 6 digits"),
+            })
+        })
+    ).min(1, "At least one delivery/plant address is required"),
     status: z.enum(["Active", "Backup", "Inactive", "Blacklisted"]),
 });
 
@@ -463,21 +485,13 @@ const SupplierCreate: React.FC = () => {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        const isBankEmpty = (b: any) =>
-            !b.bankHolderName?.trim() &&
-            !b.bankName?.trim() &&
-            !b.accountNumber?.trim() &&
-            !b.ifscCode?.trim() &&
-            !b.branchName?.trim();
-
-        const filteredBankAccounts = (formData.bankAccounts || []).filter(b => !isBankEmpty(b));
-
         const primaryMobile = phones && phones.length > 0 ? phones[0].number : "";
 
         const dataToValidate = {
             ...formData,
             mobile: primaryMobile,
-            bankAccounts: filteredBankAccounts,
+            bankAccounts: formData.bankAccounts,
+            addresses: addresses,
         };
 
         try {
@@ -528,7 +542,7 @@ const SupplierCreate: React.FC = () => {
             leadTimeDays: formData.leadTimeDays,
             minOrderQty: formData.minOrderQty,
             currency: formData.currency,
-            bankAccount: filteredBankAccounts,
+            bankAccount: formData.bankAccounts,
             status: formData.status,
             addresses,
             materialPrices: materialPrices.map((mp) => ({

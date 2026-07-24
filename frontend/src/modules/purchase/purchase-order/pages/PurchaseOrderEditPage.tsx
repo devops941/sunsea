@@ -161,54 +161,7 @@ const PurchaseOrderEditPage: React.FC = () => {
     (s) => String(s?.id) === String(formData.supplierId)
   ), [suppliers, formData.supplierId]);
 
-  const [selectedShippingIndex, setSelectedShippingIndex] = useState<string>("");
 
-  const shippingAddressOptions = useMemo(() => {
-    if (!selectedSupplier?.addresses || !Array.isArray(selectedSupplier.addresses) || selectedSupplier.addresses.length === 0) return [];
-    return selectedSupplier.addresses.map((addr: any, idx: number) => {
-      const a = addr.address || addr;
-      const addressParts = [a?.addressLine1, a?.addressLine2, a?.city, a?.state, a?.pincode].filter(Boolean);
-      const fullAddressStr = addressParts.join(", ");
-      return {
-        label: fullAddressStr || (addr.label && addr.label !== `Address ${idx + 1}` ? addr.label : `Address ${idx + 1}`),
-        value: String(idx),
-      };
-    });
-  }, [selectedSupplier]);
-
-  const handleShippingAddressSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const idxStr = e.target.value;
-    setSelectedShippingIndex(idxStr);
-    if (!idxStr) {
-      setFormData((prev) => ({
-        ...prev,
-        shippingAddressLine1: "",
-        shippingCity: "",
-        shippingState: "",
-        shippingPincode: "",
-      }));
-      return;
-    }
-    if (!selectedSupplier?.addresses) return;
-    const item = selectedSupplier.addresses[Number(idxStr)];
-    const addrObj: any = (item as any)?.address || item;
-    if (addrObj) {
-      setFormData((prev) => ({
-        ...prev,
-        shippingAddressLine1: addrObj.addressLine1 || "",
-        shippingCity: addrObj.city || "",
-        shippingState: addrObj.state || "",
-        shippingPincode: addrObj.pincode || "",
-      }));
-      setErrors((prev) => ({
-        ...prev,
-        shippingAddressLine1: "",
-        shippingCity: "",
-        shippingState: "",
-        shippingPincode: "",
-      }));
-    }
-  };
 
   const isInterState = useMemo(() => {
     if (!companyState || !selectedSupplier?.billingState) return false;
@@ -899,6 +852,9 @@ const PurchaseOrderEditPage: React.FC = () => {
 
   const isLocked = formData.status !== "DRAFT";
 
+  const todayStr = new Date().toISOString().split("T")[0];
+  const minDeliveryDate = formData.poDate && formData.poDate > todayStr ? formData.poDate : todayStr;
+
   // ============================================================
   // UI
   // ============================================================
@@ -928,7 +884,7 @@ const PurchaseOrderEditPage: React.FC = () => {
               {errors.poDate && <div className="text-red-500 mt-1 text-sm">{errors.poDate}</div>}
             </div>
             <div>
-              <TextInput label="Expected Delivery Date" name="expectedDeliveryDate" type="date" value={formData.expectedDeliveryDate} onChange={handleChange} required disabled={isLocked} />
+              <TextInput label="Expected Delivery Date" name="expectedDeliveryDate" type="date" value={formData.expectedDeliveryDate} onChange={handleChange} required disabled={isLocked} min={minDeliveryDate} />
               {errors.expectedDeliveryDate && <div className="text-red-500 mt-1 text-sm">{errors.expectedDeliveryDate}</div>}
             </div>
             {/* <div>
@@ -938,7 +894,8 @@ const PurchaseOrderEditPage: React.FC = () => {
               <TextInput label="Created by-on" name="createdByOn" value={createdOn || ""} onChange={() => { }} disabled />
             </div>
             <div>
-              <SelectInput label="Store" name="storeId" value={formData.storeId || ""} options={[{ label: "-- Select Store --", value: "" }, ...(stores || []).filter((s: any) => s.isActive).map((s: any) => ({ label: s.storeName, value: s.storeId }))]} required error={errors.storeId} onChange={handleChange} disabled={isLocked} />
+              <SelectInput label="Store" name="storeId" value={formData.storeId || ""} options={[{ label: "-- Select Store --", value: "" }, ...(stores || []).filter((s: any) => s.isActive).map((s: any) => ({ label: s.storeName, value: s.storeId }))]} required onChange={handleChange} disabled={isLocked} />
+              {errors.storeId && <div className="text-red-500 mt-1 text-sm">{errors.storeId}</div>}
             </div>
             <div>
               <SelectInput label="Supplier" name="supplierId" value={String(formData.supplierId || "")} options={[{ value: "", label: "-- Select Supplier --" }, ...supplierOptions]} onChange={handleChange} required disabled={isLocked} />
@@ -973,18 +930,7 @@ const PurchaseOrderEditPage: React.FC = () => {
               <div className="flex items-center justify-between mb-4">
                 <h6 className="text-lg font-semibold text-gray-800 mb-0">Shipping</h6>
               </div>
-              {!formData.sameAsBilling && (
-                <div className="mb-4">
-                  <SelectInput
-                    label="Select Saved Address"
-                    options={shippingAddressOptions}
-                    value={selectedShippingIndex}
-                    onChange={handleShippingAddressSelect}
-                    defaultOptionLabel={shippingAddressOptions.length > 0 ? "-- Select saved address --" : "No additional addresses saved"}
-                    disabled={shippingAddressOptions.length === 0 || isLocked}
-                  />
-                </div>
-              )}
+
               <AddressForm
                 addressValue={formData.shippingAddressLine1 || ""}
                 onAddressChange={(val) => setFormData(prev => ({ ...prev, shippingAddressLine1: val }))}

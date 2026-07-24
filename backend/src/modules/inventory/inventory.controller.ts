@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import { prisma } from "../../config/prisma";
 import inventoryService from "./inventory.service";
 import { runEodStockSnapshot } from "./jobs/eodStockSnapshot.job";
 import { asyncHandler } from "../../utils/asyncHandler";
@@ -17,9 +18,38 @@ class InventoryController {
       const [year, month, day] = date.split("T")[0].split("-").map(Number);
       targetDate = new Date(Date.UTC(year, month - 1, day));
     } else {
-      const now = new Date();
-      const parts = getISTDateParts(now);
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      const parts = getISTDateParts(yesterday);
       targetDate = new Date(Date.UTC(parts.year, parts.month, parts.day));
+    }
+
+    const now = new Date();
+    const nowParts = getISTDateParts(now);
+    const todayISTStart = new Date(Date.UTC(nowParts.year, nowParts.month, nowParts.day));
+
+    const isFuture = targetDate.getTime() > todayISTStart.getTime();
+    const isToday = targetDate.getTime() === todayISTStart.getTime();
+
+    const setting = await prisma.systemSetting.findFirst({
+      where: { key: "EOD_CUTOFF_TIME" },
+    });
+    const cutoffTime = setting?.value || "23:59";
+    const [cutoffHh, cutoffMm] = cutoffTime.split(":").map(Number);
+    const isPastCutoff = nowParts.hours > cutoffHh || (nowParts.hours === cutoffHh && nowParts.minutes >= cutoffMm);
+    const isBeforeCutoff = !isPastCutoff;
+
+    if (isFuture || (isToday && isBeforeCutoff)) {
+      return res.status(200).json({
+        success: true,
+        asOf: targetDate,
+        data: [],
+        pagination: {
+          page: Number(page),
+          limit: Number(limit),
+          total: 0,
+        },
+      });
     }
 
     let result = await inventoryService.getEodStock({
@@ -31,8 +61,10 @@ class InventoryController {
       limit: Number(limit),
     });
 
-    // If no snapshots exist for this date yet, auto-trigger a snapshot run and re-fetch
-    if (result.total === 0 && (!search && !category && !storeId)) {
+    const isEligibleForAutoRun = !isFuture && (!isToday || isPastCutoff);
+
+    // If no snapshots exist for this date yet, auto-trigger a snapshot run and re-fetch (only if past cutoff)
+    if (result.total === 0 && (!search && !category && !storeId) && isEligibleForAutoRun) {
       try {
         const dateStr = date ? (date as string) : targetDate.toISOString().split("T")[0];
         await runEodStockSnapshot(dateStr);
