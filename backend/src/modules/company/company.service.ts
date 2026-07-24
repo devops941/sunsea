@@ -86,7 +86,11 @@ class CompanyService {
       }
     }
 
-    // Ensure companyName is populated for backwards compatibility if needed
+    // Ensure mobile is stored as JSON string if passed as an object or array
+    if (companyData.mobile !== undefined && typeof companyData.mobile !== "string" && companyData.mobile !== null) {
+      companyData.mobile = JSON.stringify(companyData.mobile);
+    }
+
     const actualCompanyName = companyData.legalName || companyName || existingCompany.companyName;
 
     return prisma.$transaction(async (tx) => {

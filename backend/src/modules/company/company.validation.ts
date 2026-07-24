@@ -20,7 +20,7 @@ export const updateCompanySchema = z.object({
   gstin: z.string().max(15).optional().nullable(),
   currencyCode: z.string().max(3).optional().nullable(),
   phone: z.string().max(20).optional().nullable(),
-  mobile: z.string().max(1000).optional().nullable(),
+  mobile: z.any().optional().nullable(),
   email: z.string().email("Invalid email format").max(120).or(z.literal("")).optional().nullable(),
   website: z.string().url("Invalid URL format").max(200).or(z.literal("")).optional().nullable(),
   logoUrl: z.string().optional().nullable(),
