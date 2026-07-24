@@ -90,8 +90,8 @@ export const MachineAssignmentTab: React.FC<Props> = ({ machineId, machineName }
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {/* Operators */}
               <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
-                {currentAssignment.operators && currentAssignment.operators.length > 0 ? (
-                  currentAssignment.operators.map((op: any, index: number) => (
+                {(currentAssignment as any).operators && (currentAssignment as any).operators.length > 0 ? (
+                  (currentAssignment as any).operators.map((op: any, index: number) => (
                     <div key={index} className="p-4 bg-indigo-50/50 border border-indigo-100 rounded-xl">
                       <span className="text-[11px] uppercase tracking-wider font-semibold text-indigo-500">
                         Assigned Operator {index + 1}
@@ -140,10 +140,11 @@ export const MachineAssignmentTab: React.FC<Props> = ({ machineId, machineName }
                       ? currentAssignment.weekEndDate.split("T")[0]
                       : ""}
                   </p>
-                  {currentAssignment.shift && (
-                    <p className="mt-1 text-xs font-semibold text-indigo-600 bg-indigo-50 inline-block px-2 py-0.5 rounded">
-                      Shift: {currentAssignment.shift.shiftName}
-                    </p>
+                  {(currentAssignment as any).shift && (
+                    <div className="flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-slate-300"></span>
+                      Shift: {(currentAssignment as any).shift.shiftName}
+                    </div>
                   )}
                 </div>
                 <div className="mt-3 text-xs text-slate-500">
@@ -181,20 +182,20 @@ export const MachineAssignmentTab: React.FC<Props> = ({ machineId, machineName }
           <DataTable
             data={history}
             rowKey={(item: any) => item.id}
-            isLoading={loading}
+            loading={loading}
             columns={[
               {
                 header: "WEEK & SHIFT",
                 render: (item) => (
                   <div className="flex flex-col gap-1">
-                    <span className="font-semibold text-slate-800 text-sm">
-                      {item.weekStartDate ? item.weekStartDate.split("T")[0] : ""} to{" "}
-                      {item.weekEndDate ? item.weekEndDate.split("T")[0] : ""}
-                    </span>
-                    {item.shift ? (
-                      <span className="text-xs text-indigo-600 font-medium">
-                        {item.shift.shiftName}
-                      </span>
+                    {(item as any).shift ? (
+                        <div className="flex flex-col gap-0.5">
+                            <span className="font-semibold text-slate-800 text-sm">{(item as any).shift.shiftName}</span>
+                            <span className="text-xs text-slate-500">
+                                {item.weekStartDate ? item.weekStartDate.split("T")[0] : ""} to{" "}
+                                {item.weekEndDate ? item.weekEndDate.split("T")[0] : ""}
+                            </span>
+                        </div>
                     ) : (
                       <span className="text-xs text-slate-400 font-medium">All Shifts</span>
                     )}
@@ -205,9 +206,9 @@ export const MachineAssignmentTab: React.FC<Props> = ({ machineId, machineName }
                 header: "OPERATORS & ROLES",
                 render: (item) => (
                   <div>
-                    {item.operators && item.operators.length > 0 ? (
-                      <div className="flex flex-col gap-2">
-                        {item.operators.map((op: any, i: number) => (
+                    {(item as any).operators && (item as any).operators.length > 0 ? (
+                        <div className="flex flex-col gap-1.5">
+                            {(item as any).operators.map((op: any, i: number) => (
                           <div key={i}>
                             <div className="font-semibold text-slate-800 text-sm">
                               {op.employee?.fullName}

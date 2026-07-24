@@ -166,16 +166,16 @@ const SalesInvoiceView: React.FC = () => {
         });
     }, [invoice, isInterState]);
 
-    const totalCgst = useMemo(() => itemsWithTax.reduce((s, i) => s + i.cgstAmount, 0), [itemsWithTax]);
-    const totalSgst = useMemo(() => itemsWithTax.reduce((s, i) => s + i.sgstAmount, 0), [itemsWithTax]);
-    const totalIgst = useMemo(() => itemsWithTax.reduce((s, i) => s + i.igstAmount, 0), [itemsWithTax]);
-    const totalTaxable = useMemo(() => itemsWithTax.reduce((s, i) => s + i.amount, 0), [itemsWithTax]);
+    const totalCgst = useMemo(() => itemsWithTax.reduce((s: number, i: any) => s + i.cgstAmount, 0), [itemsWithTax]);
+    const totalSgst = useMemo(() => itemsWithTax.reduce((s: number, i: any) => s + i.sgstAmount, 0), [itemsWithTax]);
+    const totalIgst = useMemo(() => itemsWithTax.reduce((s: number, i: any) => s + i.igstAmount, 0), [itemsWithTax]);
+    const totalTaxable = useMemo(() => itemsWithTax.reduce((s: number, i: any) => s + i.amount, 0), [itemsWithTax]);
     const grandTotal = Number(invoice?.grandTotal ?? (totalTaxable + totalCgst + totalSgst + totalIgst));
 
     // Tax summary grouped by rate
     const taxSummary = useMemo(() => {
         const map = new Map<number, { taxRate: number; taxableAmt: number; cgstAmt: number; sgstAmt: number; totalTax: number }>();
-        itemsWithTax.forEach((item) => {
+        itemsWithTax.forEach((item: any) => {
             const rate = item.cgstRate + item.sgstRate + item.igstRate;
             const existing = map.get(rate) || { taxRate: rate, taxableAmt: 0, cgstAmt: 0, sgstAmt: 0, totalTax: 0 };
             existing.taxableAmt += item.amount;

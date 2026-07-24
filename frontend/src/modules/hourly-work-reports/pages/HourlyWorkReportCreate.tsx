@@ -985,7 +985,7 @@ const HourlyWorkReportCreate: React.FC = () => {
                                                                     <QuantityInput
                                                                         label=""
                                                                         hideLabel
-                                                                        noMargin
+                                                                        
                                                                         name={`quantity-${index}`}
                                                                         value={w.quantity}
                                                                         onChange={(e) => {

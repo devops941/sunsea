@@ -65,9 +65,9 @@ export const MaterialIssueModal: React.FC<MaterialIssueModalProps> = ({
                 }
                 const reservedQty = Number(calculatedRequiredQty);
                 const storeId = stockRm?.storeId || defaultStoreId || "";
-                const availableStock = stockRm ? (Number(stockRm.onHandQty || 0) - Number(stockRm.reservedQty || 0)) : Number(rm.availableStock || 0);
+                const availableStock = stockRm ? (Number(stockRm.onHandQty || 0) - Number(stockRm.reservedQty || 0)) : Number((rm as any).availableStock || 0);
                 
-                let displayUom = stockRm?.baseUom?.split(',')[0] || rm.uom || stockRm?.uom || "KG";
+                let displayUom = stockRm?.baseUom?.split(',')[0] || (rm as any).uom || stockRm?.uom || "KG";
                 if (displayUom.toLowerCase() === 'ea' || displayUom.toLowerCase() === 'each') {
                     displayUom = 'pcs';
                 }
