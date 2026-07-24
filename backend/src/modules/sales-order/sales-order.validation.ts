@@ -21,7 +21,7 @@ export type ApprovalStatus = z.infer<typeof ApprovalStatusEnum>;
 export const DispatchTypeEnum = z.enum(["priority", "standard"]);
 export type DispatchType = z.infer<typeof DispatchTypeEnum>;
 
-export const OrderTypeEnum = z.enum(["telephone", "website", "salesperson"]);
+export const OrderTypeEnum = z.enum(["telephone", "website", "salesperson", "reference"]);
 export type OrderType = z.infer<typeof OrderTypeEnum>;
 
 export const CustomerTypeEnum = z.enum(["B2B", "B2C", "EXPORT"]);
@@ -103,6 +103,7 @@ const salesOrderBodyShape = z.object({
     paymentTermId: z.number().int().positive("...").optional().nullable(),
     dispatchType: z.union([DispatchTypeEnum, z.literal("")]).optional().transform(val => val === "" ? undefined : val),
     orderType: z.union([OrderTypeEnum, z.literal("")]).optional().transform(val => val === "" ? undefined : val),
+    referenceText: z.string().optional().nullable(),
     salesPersonName: z.string().optional().nullable(),
     transportName: z.string().optional().nullable(),
     status: SalesOrderStatusEnum.default("DRAFT"),
@@ -160,6 +161,13 @@ const salesOrderBodyRefined = salesOrderBodyShape.superRefine((data, ctx) => {
             code: z.ZodIssueCode.custom,
             message: "Sales person name is required when order source is Sales Person",
             path: ["salesPersonName"],
+        });
+    }
+    if (data.orderType === "reference" && !data.referenceText) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Reference text is required when order source is Reference",
+            path: ["referenceText"],
         });
     }
     if (data.customerApprovalStatus === "REJECTED" && !data.customerRejectionReason) {

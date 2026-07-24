@@ -446,6 +446,7 @@ class SalesOrderService {
                 remarks: data.remarks,
                 dispatchType: data.dispatchType,
                 orderType: data.orderType,
+                referenceText: data.referenceText || null,
                 internalNotes: data.internalNotes,
                 createdBy: data.createdBy,
                 status: data.status,
@@ -625,6 +626,7 @@ class SalesOrderService {
         if (data.paymentTermId !== undefined) updateData.paymentTermId = data.paymentTermId;
         if (data.dispatchType !== undefined) updateData.dispatchType = data.dispatchType;
         if (data.orderType !== undefined) updateData.orderType = data.orderType;
+        if (data.referenceText !== undefined) updateData.referenceText = data.referenceText;
         if (data.sameAsBilling !== undefined) updateData.sameAsBilling = data.sameAsBilling;
         if (data.remarks !== undefined) updateData.remarks = data.remarks;
         if (data.internalNotes !== undefined) updateData.internalNotes = data.internalNotes;
