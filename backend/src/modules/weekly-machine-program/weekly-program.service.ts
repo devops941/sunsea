@@ -389,24 +389,7 @@ class WeeklyProgramService {
     return updatedProgram;
   }
 
-  async delete(weeklyProgramId: string, userId?: string) {
-    const existingProgram = await this.findById(weeklyProgramId);
 
-    if (existingProgram.productionOrder) {
-      const startedStatuses = ["IN_PROGRESS", "IN_PRODUCTION", "POST_PRODUCTION", "PARTIAL_COMPLETED", "COMPLETED", "ON_HOLD", "FG_RECEIVED", "READY_FOR_DISPATCH", "DISPATCHED"];
-      if (startedStatuses.includes(existingProgram.productionOrder.status) || startedStatuses.includes(existingProgram.status)) {
-        throw new ApiError(400, "Cannot delete schedule because the Production Order has already started or completed production.");
-      }
-    }
-
-    return prisma.$transaction(async (tx) => {
-      const deleted = await tx.weeklyMachineProgram.delete({
-        where: { weeklyProgramId },
-      });
-      await StatusSyncService.syncProductionOrderStatus(tx, existingProgram.productionOrderId, userId);
-      return deleted;
-    });
-  }
 
   async getNextWeeklyProgramId() {
     const lastItem = await prisma.weeklyMachineProgram.findFirst({
@@ -561,7 +544,7 @@ class WeeklyProgramService {
   async stopProgramAndCarryForward(weeklyProgramId: string, userId?: string) {
     return await prisma.$transaction(async (tx) => {
       return await this.stopProgramAndCarryForwardInternal(tx, weeklyProgramId, userId);
-    });
+    }, { timeout: 15000, maxWait: 10000 });
   }
 
   async stopProgramAndCarryForwardInternal(tx: any, weeklyProgramId: string, userId?: string) {
@@ -764,25 +747,24 @@ class WeeklyProgramService {
 
       // 3. Sync Production Order Status (reverts to READY_FOR_PLANNING if no schedules left)
       await StatusSyncService.syncProductionOrderStatus(tx, weeklyProgram.productionOrderId, userId);
-    });
+    }, { timeout: 15000, maxWait: 10000 });
   }
 
   async generateNextWeeklyProgramId(tx: any): Promise<string> {
-    const programs = await tx.weeklyMachineProgram.findMany({
+    const latest = await tx.weeklyMachineProgram.findFirst({
+      orderBy: { weeklyProgramId: "desc" },
       select: { weeklyProgramId: true }
     });
 
-    let maxNum = 0;
-    for (const p of programs) {
-      if (p.weeklyProgramId && p.weeklyProgramId.startsWith("WP")) {
-        const num = parseInt(p.weeklyProgramId.slice(2), 10);
-        if (!isNaN(num) && num > maxNum) {
-          maxNum = num;
-        }
-      }
+    if (!latest || !latest.weeklyProgramId) {
+      return "WP0001";
     }
 
-    return `WP${String(maxNum + 1).padStart(4, '0')}`;
+    const match = latest.weeklyProgramId.match(/\d+/);
+    if (!match) return "WP0001";
+
+    const nextNumber = parseInt(match[0], 10) + 1;
+    return `WP${String(nextNumber).padStart(4, "0")}`;
   }
 }
 

@@ -171,7 +171,7 @@ class DailyPlanService {
       }
 
       return created;
-    });
+    }, { timeout: 15000, maxWait: 10000 });
   }
 
   async update(dailyPlanId: string, data: UpdateDailyPlanInput, userId?: string) {

@@ -187,7 +187,7 @@ class ProductionOrderService {
       }
 
       return createdOrder;
-    });
+    }, { timeout: 15000, maxWait: 10000 });
 
     // STEP 2: Auto-check raw material availability immediately after creation
     try {
@@ -292,7 +292,7 @@ class ProductionOrderService {
         "MATERIAL_CHECK",
         { materialStatus }
       );
-    });
+    }, { timeout: 15000, maxWait: 10000 });
 
     return {
       status: newStatus,
@@ -681,7 +681,7 @@ class ProductionOrderService {
       }
 
       return resultOrder;
-    });
+    }, { timeout: 15000, maxWait: 10000 });
 
     return updatedOrder;
   }
@@ -729,7 +729,7 @@ class ProductionOrderService {
         await this.addHistory(tx, productionOrderId, "DAILY_PLANNED", "IN_PRODUCTION", userId,
           "Production started (materials already issued)", "PRODUCTION_START");
         return result;
-      });
+      }, { timeout: 15000, maxWait: 10000 });
       return updated;
     }
 
@@ -747,7 +747,7 @@ class ProductionOrderService {
         await this.addHistory(tx, productionOrderId, "DAILY_PLANNED", "IN_PRODUCTION", userId,
           "Production started (no raw materials configured)", "PRODUCTION_START");
         return result;
-      });
+      }, { timeout: 15000, maxWait: 10000 });
     }
 
     return prisma.$transaction(async (tx) => {
@@ -859,7 +859,7 @@ class ProductionOrderService {
       );
 
       return result;
-    });
+    }, { timeout: 15000, maxWait: 10000 });
   }
 
   // ── Complete Post-Production Step → READY_FOR_DISPATCH ───────────────────
@@ -903,7 +903,7 @@ class ProductionOrderService {
       }
 
       return result;
-    });
+    }, { timeout: 15000, maxWait: 10000 });
   }
 
   // ── Manual Material Issue (legacy/partial) ────────────────────────────────
