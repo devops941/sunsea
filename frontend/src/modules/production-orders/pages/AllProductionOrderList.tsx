@@ -251,6 +251,7 @@ const AllProductionOrderList: React.FC = () => {
                                     { label: "Scheduled", value: "SCHEDULED" },
                                     { label: "Schedule Deleted", value: "SCHEDULE_DELETED" },
                                     { label: "In Progress", value: "IN_PROGRESS" },
+                                    { label: "Ready For Dispatch", value: "READY_FOR_DISPATCH" },
                                     { label: "Completed", value: "COMPLETED" },
                                 ]}
                             />

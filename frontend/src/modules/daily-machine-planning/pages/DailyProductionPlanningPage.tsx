@@ -5,7 +5,7 @@ import { toast } from "react-toastify";
 import {
   FaPlus, FaPlay, FaStop, FaClipboardList, FaCalendarAlt, FaIndustry,
   FaCheckCircle, FaEdit, FaInfoCircle,
-  FaArrowRight, FaShare, FaThumbsUp
+  FaArrowRight, FaShare
 } from "react-icons/fa";
 
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
@@ -24,6 +24,8 @@ import CustomProgressBar from "../../../components/common/CustomProgressBar";
 import DataTable, { type DataTableColumn } from "../../../components/ui/table/DataTable";
 import FilterPopover from "../../../components/ui/FilterPopover/FilterPopover";
 import { oeeService } from "../../../services/oeeService";
+import { rawMaterialService } from "../../../services/rawMaterialService";
+import { MaterialIssueModal } from "../../production-orders/components/MaterialIssueModal";
 
 // ---------- helpers ----------
 const formatLocalDateString = (d: Date) => {
@@ -36,7 +38,8 @@ const formatLocalDateString = (d: Date) => {
 const STATUS_FLOW: Record<string, { label: string; next: string | null; color: string }> = {
   DRAFT: { label: "Draft", next: "PLANNED", color: "secondary" },
   PLANNED: { label: "Planned", next: "IN_PROGRESS", color: "info" },
-  IN_PROGRESS: { label: "In Progress", next: "COMPLETED", color: "success" },
+  IN_PROGRESS: { label: "In Progress", next: "POST_PRODUCTION", color: "success" },
+  POST_PRODUCTION: { label: "Post Production", next: "COMPLETED", color: "primary" },
   COMPLETED: { label: "Completed", next: null, color: "success" },
   CANCELLED: { label: "Cancelled", next: null, color: "danger" },
   STOPPED: { label: "Stopped", next: null, color: "danger" },
@@ -45,13 +48,15 @@ const STATUS_FLOW: Record<string, { label: string; next: string | null; color: s
 const NEXT_ACTION_LABELS: Record<string, string> = {
   DRAFT: "Mark as Planned",
   PLANNED: "Start Production",
-  IN_PROGRESS: "Mark Completed",
+  IN_PROGRESS: "Move to Post Production",
+  POST_PRODUCTION: "Mark Completed",
 };
 
 const NEXT_ACTION_ICONS: Record<string, any> = {
   DRAFT: FaCalendarAlt,
   PLANNED: FaPlay,
-  IN_PROGRESS: FaCheckCircle,
+  IN_PROGRESS: FaArrowRight,
+  POST_PRODUCTION: FaCheckCircle,
 };
 
 // ---------- Component ----------
@@ -120,6 +125,25 @@ const DailyProductionPlanningPage: React.FC = () => {
   const [stopPlan, setStopPlan] = useState<any>(null);
   const [stopReason, setStopReason] = useState("");
   const [isStopping, setIsStopping] = useState(false);
+
+  // Material Issue Modal State
+  const [showMaterialIssueModal, setShowMaterialIssueModal] = useState(false);
+  const [materialIssuePlan, setMaterialIssuePlan] = useState<any>(null);
+  const [rawMaterialsMap, setRawMaterialsMap] = useState<Map<string, any>>(new Map());
+
+  useEffect(() => {
+    rawMaterialService.fetchAll()
+      .then((res) => {
+        const map = new Map();
+        const list = res.data || res || [];
+        const dataList = Array.isArray(list) ? list : ((list as any).data || []);
+        dataList.forEach((rm: any) => {
+          map.set(rm.rawMaterialId?.toString(), rm);
+        });
+        setRawMaterialsMap(map);
+      })
+      .catch((err) => console.error("Failed to load raw materials map", err));
+  }, []);
 
 
 
@@ -207,10 +231,9 @@ const DailyProductionPlanningPage: React.FC = () => {
   // ──────────────────────────────────────────────────────────────
   // Status Change Handler
   // ──────────────────────────────────────────────────────────────
-  const handleStatusAdvance = (plan: any, producedQty: number = 0, dynamicTitle?: string, dynamicMessage?: string) => {
-    let nextStatus = STATUS_FLOW[plan.status]?.next;
-    console.log(plan, "plan");
-    console.log(nextStatus, "nextStatus");
+  const handleStatusAdvance = (plan: any, producedQty: number = 0, overrideNextStatus?: string, dynamicTitle?: string, dynamicMessage?: string) => {
+    const nextStatus = overrideNextStatus || STATUS_FLOW[plan.status]?.next;
+
     if (!nextStatus) return;
 
     if (nextStatus === "COMPLETED" && producedQty === 0) {
@@ -218,9 +241,12 @@ const DailyProductionPlanningPage: React.FC = () => {
       return;
     }
 
-    // Override the nextStatus if we are just advancing the step
-    if (dynamicTitle === "Advance to Next Step") {
-      nextStatus = "NEXT_STEP";
+    // Intercept when starting production (PLANNED -> IN_PROGRESS) if materials have not been issued
+    const bypassIssueStatuses = ["MATERIAL_ISSUED", "IN_PROGRESS", "COMPLETED"];
+    if (nextStatus === "IN_PROGRESS" && !bypassIssueStatuses.includes(plan.productionOrder?.status)) {
+      setMaterialIssuePlan(plan);
+      setShowMaterialIssueModal(true);
+      return;
     }
 
     setStatusChangePlan(plan);
@@ -228,6 +254,23 @@ const DailyProductionPlanningPage: React.FC = () => {
     setStatusModalTitle(dynamicTitle || NEXT_ACTION_LABELS[plan.status] || "Confirm Status Change");
     setStatusModalMessage(dynamicMessage || `Change status of plan ${plan.dailyPlanId} from "${STATUS_FLOW[plan.status]?.label}" to "${STATUS_FLOW[nextStatus]?.label || nextStatus}"?`);
     setShowStatusModal(true);
+  };
+
+  const handleMaterialIssueSuccess = async () => {
+    if (!materialIssuePlan) return;
+    try {
+      await dispatch(updateDailyPlan({
+        id: materialIssuePlan.dailyPlanId,
+        data: { status: "IN_PROGRESS" }
+      })).unwrap();
+      toast.success("Materials issued and production started!");
+      loadDailyPlans();
+    } catch (err: any) {
+      toast.error(err || "Failed to start production after material issue");
+    } finally {
+      setMaterialIssuePlan(null);
+      setShowMaterialIssueModal(false);
+    }
   };
 
   const confirmStatusChange = async () => {
@@ -527,9 +570,18 @@ const DailyProductionPlanningPage: React.FC = () => {
         const producedQty = Array.isArray(plan.hourlyProductions)
           ? plan.hourlyProductions.reduce((sum: number, h: any) => sum + Number(h.qtyProduced || 0), 0)
           : 0;
+
+        const customSteps = plan.productionOrder?.productItem?.productionSteps || [];
+        const activeStepName = plan.status === "POST_PRODUCTION"
+          ? (plan.productionOrder?.currentProductionStep || (customSteps[0]?.stepKey ? `Step: ${customSteps[0].stepKey}` : "Post Production"))
+          : null;
+
         return (
           <div className="flex items-center gap-2">
-            <StatusBadge status={plan.status === "COMPLETED" && producedQty < plannedQty ? "SHORT_CLOSED" : plan.status} />
+            <StatusBadge 
+              status={plan.status === "COMPLETED" && producedQty < plannedQty ? "SHORT_CLOSED" : plan.status} 
+              customText={activeStepName || undefined}
+            />
             {(plan.status === "STOPPED" || plan.status === "CANCELLED") && plan.remarks && (
               <div className="group relative flex items-center justify-center cursor-pointer">
                 <FaInfoCircle className="text-rose-500 text-[15px] opacity-85 hover:opacity-100 transition-opacity" />
@@ -559,39 +611,68 @@ const DailyProductionPlanningPage: React.FC = () => {
           : 0;
         const pendingQty = plannedQty > producedQty ? plannedQty - producedQty : 0;
         const nextStatus = STATUS_FLOW[plan.status]?.next;
-        const canAdvance = !!nextStatus && plan.status !== "COMPLETED" && plan.status !== "CANCELLED";
+        let canAdvance = !!nextStatus && plan.status !== "COMPLETED" && plan.status !== "CANCELLED";
+        if (plan.status === "IN_PROGRESS") {
+          canAdvance = canAdvance && (producedQty >= plannedQty);
+        }
         const canLog = plan.status === "IN_PROGRESS";
 
         // A plan can only be carried forward ONCE — check via the API-returned carryForwardTo array
         const alreadyCarriedForward = Array.isArray(plan.carryForwardTo) && plan.carryForwardTo.length > 0;
         const canCarryForward = (plan.status === "COMPLETED" || plan.status === "STOPPED") && pendingQty > 0 && !alreadyCarriedForward;
 
+        let targetNextStatus = STATUS_FLOW[plan.status]?.next;
         let dynamicActionTitle = NEXT_ACTION_LABELS[plan.status] || `Move to ${nextStatus}`;
         let dynamicActionIcon = NEXT_ACTION_ICONS[plan.status] || FaArrowRight;
+        let dynamicActionVariant: "info" | "primary" | "success" | "warning" | "danger" = "info";
         let dynamicModalTitle = "";
         let dynamicModalMessage = "";
 
-        if (plan.status === "IN_PROGRESS") {
+        if (plan.status === "POST_PRODUCTION") {
           const customSteps = plan.productionOrder?.productItem?.productionSteps || [];
           if (customSteps.length > 0) {
-            const totalStepsCount = 1 + customSteps.length;
-            const currentIndex = plan.productionOrder?.currentStepIndex || 0;
-            const currentStepName = currentIndex === 0 ? "Production" : (customSteps[currentIndex - 1]?.stepKey || "Current Step");
-            const isLastStep = currentIndex >= totalStepsCount - 1;
+            canAdvance = true;
+            
+            const totalStepsCount = customSteps.length;
+            const currentIndex = plan.productionOrder?.currentStepIndex || 1;
+            const currentStepName = currentIndex > 0 && currentIndex <= totalStepsCount ? customSteps[currentIndex - 1]?.stepKey : "Post Production";
+            const isLastStep = currentIndex >= totalStepsCount;
 
             if (!isLastStep) {
               const nextStepName = customSteps[currentIndex].stepKey;
-              dynamicActionTitle = `Next Step (${nextStepName})`;
+              targetNextStatus = "NEXT_STEP";
+              dynamicActionTitle = `Complete ${currentStepName} & Next (${nextStepName})`;
               dynamicActionIcon = FaArrowRight;
-              dynamicModalTitle = "Advance to Next Step";
-              dynamicModalMessage = `Complete ${currentStepName} and move to ${nextStepName}?`;
+              dynamicActionVariant = "info";
+              dynamicModalTitle = `Advance Step (${nextStepName})`;
+              dynamicModalMessage = `Complete step "${currentStepName}" and advance to "${nextStepName}"?`;
             } else {
+              targetNextStatus = "COMPLETED";
+              dynamicActionTitle = `Complete Final Step (${currentStepName}) & Finish Production`;
+              dynamicActionIcon = FaCheckCircle;
+              dynamicActionVariant = "success";
+              dynamicModalTitle = "Complete Production";
+              dynamicModalMessage = `Complete final post-production step "${currentStepName}" and mark production order as ready for dispatch?`;
+            }
+          } else {
+              targetNextStatus = "COMPLETED";
               dynamicActionTitle = "Complete Production";
               dynamicActionIcon = FaCheckCircle;
+              dynamicActionVariant = "success";
               dynamicModalTitle = "Complete Production";
-              dynamicModalMessage = `Complete ${currentStepName} and move to Post Production?`;
-            }
+              dynamicModalMessage = `Mark production order as ready for dispatch?`;
+              canAdvance = true;
           }
+        }
+        
+        if (plan.status === "IN_PROGRESS" && producedQty >= plannedQty) {
+           targetNextStatus = "POST_PRODUCTION";
+           dynamicActionTitle = "Move to Post Production";
+           dynamicActionIcon = FaArrowRight;
+           dynamicActionVariant = "info";
+           dynamicModalTitle = "Move to Post Production";
+           dynamicModalMessage = `Complete manufacturing and move to Post Production phase?`;
+           canAdvance = true;
         }
 
         return (
@@ -607,10 +688,10 @@ const DailyProductionPlanningPage: React.FC = () => {
             )}
             {canAdvance && (
               <IconButton
-                variant="success"
+                variant={dynamicActionVariant}
                 title={dynamicActionTitle}
                 icon={dynamicActionIcon}
-                onClick={() => handleStatusAdvance(plan, producedQty, dynamicModalTitle, dynamicModalMessage)}
+                onClick={() => handleStatusAdvance(plan, producedQty, targetNextStatus, dynamicModalTitle, dynamicModalMessage)}
               />
             )}
             {plan.status === "IN_PROGRESS" && (
@@ -1010,6 +1091,21 @@ const DailyProductionPlanningPage: React.FC = () => {
           confirmText="Delete"
           confirmVariant="danger"
         />
+
+        {/* ─────── Material Issue Modal for Daily Production Start ─────── */}
+        {showMaterialIssueModal && materialIssuePlan && (
+          <MaterialIssueModal
+            show={showMaterialIssueModal}
+            onHide={() => { setShowMaterialIssueModal(false); setMaterialIssuePlan(null); }}
+            productionOrderId={materialIssuePlan.productionOrderId}
+            rawMaterials={materialIssuePlan.productionOrder?.draftRawMaterials || materialIssuePlan.productionOrder?.rawMaterials || []}
+            rawMaterialsMap={rawMaterialsMap}
+            defaultStoreId={materialIssuePlan.productionOrder?.sourceStoreId}
+            dailyPlanQty={Number(materialIssuePlan.plannedQty || 0)}
+            totalTargetQty={Number(materialIssuePlan.productionOrder?.targetQty || 0)}
+            onSuccess={handleMaterialIssueSuccess}
+          />
+        )}
       </div>
     </div>
   );

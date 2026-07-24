@@ -74,13 +74,15 @@ const StockList: React.FC<StockListProps> = ({ storeId: propStoreId }) => {
 
     const formatExportQty = (qty: any, uom: string) => {
         const num = Number(qty) || 0;
-        const primaryUom = uom ? uom.split(',')[0] : "";
+        let primaryUom = uom ? uom.split(',')[0] : "";
+        if (primaryUom.toLowerCase() === "ea") primaryUom = "PCS";
         return `${num} ${primaryUom}`;
     };
 
     const formatDisplayQty = (qty: any, uom: string, prefix = "") => {
         const num = Number(qty) || 0;
-        const primaryUom = uom ? uom.split(',')[0] : "";
+        let primaryUom = uom ? uom.split(',')[0] : "";
+        if (primaryUom.toLowerCase() === "ea") primaryUom = "PCS";
         return (
             <>
                 {prefix}{num} {primaryUom}
@@ -151,9 +153,17 @@ const StockList: React.FC<StockListProps> = ({ storeId: propStoreId }) => {
                             header: "NAME",
                             render: (item) => {
                                 const matName = (item as any).materialName || item.rawMaterial?.materialName || "-";
+                                const isWastage = (item as any).itemType === "WASTAGE" || item.rawMaterial?.itemType === "WASTAGE";
                                 return (
                                     <div className="flex flex-col">
-                                        <span className="font-semibold text-slate-800">{matName}</span>
+                                        <div className="flex items-center gap-2">
+                                            <span className="font-semibold text-slate-800">{matName}</span>
+                                            {isWastage && (
+                                                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-orange-100 text-orange-700 uppercase tracking-wider">
+                                                    Wastage
+                                                </span>
+                                            )}
+                                        </div>
                                         <span className="text-xs text-slate-500">ID: {item.rawMaterialId}</span>
                                     </div>
                                 );
@@ -250,18 +260,16 @@ const StockList: React.FC<StockListProps> = ({ storeId: propStoreId }) => {
                             { label: "Material ID", value: selectedItem.rawMaterialId },
                             { label: "Material Name", value: (selectedItem as any).materialName || selectedItem.rawMaterial?.materialName || "N/A" },
                             { label: "Category", value: (selectedItem as any).category?.categoryName || selectedItem.rawMaterial?.category?.name || "N/A" },
-                            { label: "Base UOM", value: (selectedItem as any).baseUom || selectedItem.rawMaterial?.baseUom || "N/A" },
-                            { label: "Reorder Level", value: ((selectedItem as any).reorderLevel || selectedItem.rawMaterial?.reorderLevel) != null ? `${(selectedItem as any).reorderLevel || selectedItem.rawMaterial?.reorderLevel} ${(selectedItem as any).baseUom || selectedItem.rawMaterial?.baseUom || ""}` : "N/A" },
+                            { label: "Base UOM", value: ((selectedItem as any).baseUom || selectedItem.rawMaterial?.baseUom || "").toLowerCase() === 'ea' ? 'PCS' : ((selectedItem as any).baseUom || selectedItem.rawMaterial?.baseUom || "N/A") },
+                            { label: "Reorder Level", value: ((selectedItem as any).reorderLevel || selectedItem.rawMaterial?.reorderLevel) != null ? formatExportQty((selectedItem as any).reorderLevel || selectedItem.rawMaterial?.reorderLevel, (selectedItem as any).baseUom || selectedItem.rawMaterial?.baseUom || "") : "N/A" },
                             { label: "Minimum Stock", value: ((selectedItem as any).minimumStock || selectedItem.rawMaterial?.minimumStock) != null ? formatExportQty((selectedItem as any).minimumStock || selectedItem.rawMaterial?.minimumStock, (selectedItem as any).baseUom || selectedItem.rawMaterial?.baseUom || "") : "N/A" },
                             { label: "Store", value: selectedItem.store?.storeName || selectedItem.storeId || "N/A" },
                             { label: "Store Location", value: (selectedItem as any).storeLocation?.locationCode || (selectedItem as any).store?.location?.locationCode || (selectedItem as any).store?.location?.locationName || (selectedItem as any).store?.locationDesc || selectedItem.locationId || "N/A" },
-                            { label: "Batch No", value: selectedItem.batchNo || "N/A" },
                             { label: "Physical Stock", value: formatExportQty(selectedItem.onHandQty ?? 0, (selectedItem as any).baseUom || selectedItem.rawMaterial?.baseUom || "") },
                             { label: "Reserved Stock", value: formatExportQty(selectedItem.reservedQty ?? 0, (selectedItem as any).baseUom || selectedItem.rawMaterial?.baseUom || "") },
                             { label: "Available Stock", value: formatExportQty(Number(selectedItem.onHandQty ?? 0) - Number(selectedItem.reservedQty ?? 0), (selectedItem as any).baseUom || selectedItem.rawMaterial?.baseUom || "") },
                             { label: "Average Cost (₹)", value: selectedItem.avgCost != null ? String(selectedItem.avgCost) : "N/A" },
-                            { label: "Status", value: selectedItem.status || "Active" },
-                            { label: "Last Movement", value: selectedItem.lastMovementAt ? new Date(selectedItem.lastMovementAt).toLocaleString() : "-" }
+                            { label: "Status", value: selectedItem.status || "Active" }
                         ]
                     }
                 ] : []}

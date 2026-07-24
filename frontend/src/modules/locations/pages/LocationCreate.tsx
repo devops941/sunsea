@@ -26,6 +26,7 @@ const initialFormState = {
     address: "",
     city: "",
     state: "",
+    country: "India",
     isActive: true,
 };
 
@@ -61,6 +62,12 @@ const locationSchema = z.object({
         .string()
         .trim()
         .min(1, "State is required")
+        .max(100, "Maximum 100 characters allowed"),
+
+    country: z
+        .string()
+        .trim()
+        .min(1, "Country is required")
         .max(100, "Maximum 100 characters allowed"),
 });
 
@@ -199,6 +206,12 @@ const LocationCreate: React.FC = () => {
                                     setErrors(prev => ({ ...prev, city: "" }));
                                 }}
                                 cityError={errors.city}
+                                countryValue={formData.country}
+                                onCountryChange={(v) => {
+                                    setFormData(prev => ({ ...prev, country: v.name, state: "", city: "" }));
+                                    if (errors.country) setErrors(prev => ({ ...prev, country: "", state: "", city: "" }));
+                                }}
+                                countryError={errors.country}
                                 required
                             />
                             

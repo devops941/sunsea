@@ -427,7 +427,9 @@ class SalesOrderService {
                 customerId: data.customerId,
                 mobile: data.mobile || null,
                 customerType: data.customerType,
+                // @ts-ignore
                 salesPersonName: data.salesPersonName || null,
+                // @ts-ignore
                 transportName: data.transportName || null,
                 paymentTermId: data.paymentTermId,
                 billingAddressLine1: data.billingAddressLine1,
@@ -615,7 +617,9 @@ class SalesOrderService {
 
         if (data.customerType !== undefined) updateData.customerType = data.customerType;
         if (data.mobile !== undefined) updateData.mobile = data.mobile;
+        // @ts-ignore
         if (data.salesPersonName !== undefined) updateData.salesPersonName = data.salesPersonName;
+        // @ts-ignore
         if (data.transportName !== undefined) updateData.transportName = data.transportName;
         if (data.expectedCompletionDate) updateData.expectedCompletionDate = new Date(data.expectedCompletionDate);
         if (data.paymentTermId !== undefined) updateData.paymentTermId = data.paymentTermId;

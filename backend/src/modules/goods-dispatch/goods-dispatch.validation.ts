@@ -50,8 +50,8 @@ export const storeReceiveSchema = z.object({
     receivedItems: z
       .array(
         z.object({
-          itemId: z.number(),
-          receivedQty: z.number().positive(),
+          itemId: z.number().or(z.string()).transform(Number),
+          receivedQty: z.number().nonnegative(),
         })
       )
       .optional(),

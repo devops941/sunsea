@@ -72,7 +72,7 @@ const ProductList: React.FC = () => {
                 await removeProduct(productToDelete);
                 toast.success("Product deleted successfully!");
             } catch (err: any) {
-                toast.error(err.message || "Failed to delete product");
+                toast.error(err?.message || err || "Failed to delete product");
             } finally {
                 setShowDeleteModal(false);
                 setProductToDelete(null);
@@ -88,14 +88,16 @@ const ProductList: React.FC = () => {
 
     const columns: DataTableColumn<any>[] = [
         { header: "#", render: (_, index) => startIndex + index + 1, width: "60px", align: "center" },
-        { header: "Product Code", accessor: "productCode" },
         { header: "Product Name", accessor: "productName" },
         { header: "Category", render: (product) => product.category?.name || product.category?.categoryName || "N/A" },
         {
-            header: "Weight",
-            render: (product) => product.weightPerPiece != null
-                ? (Number(product.weightPerPiece) < 1 ? `${Number(product.weightPerPiece) * 1000} g` : `${product.weightPerPiece} kg`)
-                : "-"
+            header: "Price",
+            render: (product) => (
+                <div className="flex flex-col">
+                    <span className="text-sm text-slate-800">MRP: {product.mrp ? `₹${product.mrp}` : '-'}</span>
+                    <span className="text-xs text-slate-500">B2B: {product.b2b ? `₹${product.b2b}` : '-'}</span>
+                </div>
+            )
         },
         {
             header: "Stock (Min)",
@@ -187,7 +189,6 @@ const ProductList: React.FC = () => {
                                     })()
                                 },
                                 { label: "Category", value: selectedProduct.category?.name || selectedProduct.category?.categoryName || "N/A" },
-                                { label: "Class", value: selectedProduct.subCategory?.name || selectedProduct.subCategory?.subCategoryName || "N/A" },
                                 { label: "MRP", value: selectedProduct.mrp != null ? `₹${selectedProduct.mrp}` : "N/A" },
                                 { label: "B2B", value: selectedProduct.b2b != null ? `₹${selectedProduct.b2b}` : "N/A" },
                                 { label: "B2C", value: selectedProduct.b2c != null ? `₹${selectedProduct.b2c}` : "N/A" },
@@ -197,6 +198,65 @@ const ProductList: React.FC = () => {
                             ]
                         }
                     ] : []}
+                    customContent={
+                        selectedProduct?.billOfMaterials && selectedProduct.billOfMaterials.length > 0 ? (
+                            <div className="mt-6 flex flex-col gap-6">
+                                {/* BOM Section */}
+                                {selectedProduct.billOfMaterials.some((rm: any) => Number(rm.percentage) > 0) && (
+                                    <div>
+                                        <h6 className="text-sm font-semibold text-slate-800 mb-2">Raw Materials Composition (BOM)</h6>
+                                        <div className="border border-slate-200 rounded-lg overflow-hidden">
+                                            <table className="w-full text-left text-sm whitespace-nowrap">
+                                                <thead className="bg-slate-50 text-slate-600">
+                                                    <tr>
+                                                        <th className="px-4 py-2 font-semibold border-b border-slate-200">Raw Material</th>
+                                                        <th className="px-4 py-2 font-semibold border-b border-slate-200 text-right">Percentage (%)</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-slate-100 bg-white">
+                                                    {selectedProduct.billOfMaterials
+                                                        .filter((rm: any) => Number(rm.percentage) > 0)
+                                                        .map((rm: any, idx: number) => (
+                                                            <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
+                                                                <td className="px-4 py-2">{rm.rawMaterial?.materialName || rm.rawMaterialId}</td>
+                                                                <td className="px-4 py-2 text-right">{rm.percentage} %</td>
+                                                            </tr>
+                                                        ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Accessories Section */}
+                                {selectedProduct.billOfMaterials.some((rm: any) => Number(rm.requiredQuantity) > 0) && (
+                                    <div>
+                                        <h6 className="text-sm font-semibold text-slate-800 mb-2">Accessories / Additional Items</h6>
+                                        <div className="border border-slate-200 rounded-lg overflow-hidden">
+                                            <table className="w-full text-left text-sm whitespace-nowrap">
+                                                <thead className="bg-slate-50 text-slate-600">
+                                                    <tr>
+                                                        <th className="px-4 py-2 font-semibold border-b border-slate-200">Item</th>
+                                                        <th className="px-4 py-2 font-semibold border-b border-slate-200 text-right">Quantity</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-slate-100 bg-white">
+                                                    {selectedProduct.billOfMaterials
+                                                        .filter((rm: any) => Number(rm.requiredQuantity) > 0)
+                                                        .map((rm: any, idx: number) => (
+                                                            <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
+                                                                <td className="px-4 py-2">{rm.rawMaterial?.materialName || rm.rawMaterialId}</td>
+                                                                <td className="px-4 py-2 text-right">{rm.requiredQuantity}</td>
+                                                            </tr>
+                                                        ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        ) : null
+                    }
                 />
 
                 {/* Custom Delete Confirm Modal */}

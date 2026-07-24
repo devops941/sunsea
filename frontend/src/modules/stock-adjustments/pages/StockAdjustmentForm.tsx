@@ -28,7 +28,6 @@ import { formatDate } from "../../../utils/dateUtils";
 // Constants
 // ──────────────────────────────────────────
 const ADJUSTMENT_TYPES = [
-  { value: "PRODUCTION_MATERIAL_ISSUE", label: "Production Material Issue" },
   { value: "PRODUCTION_MATERIAL_RETURN", label: "Production Material Return" },
   { value: "STOCK_INCREASE", label: "Stock Increase" },
   { value: "STOCK_DECREASE", label: "Stock Decrease" },
@@ -52,7 +51,7 @@ const adjustmentItemSchema = z.object({
   difference: z.number(),
   remarks: z.string().optional().nullable(),
 }).refine(item => {
-  if (item.itemType === "RAW_MATERIAL") return !!item.rawMaterialId;
+  if (item.itemType === "RAW_MATERIAL" || item.itemType === "WASTAGE") return !!item.rawMaterialId;
   if (item.itemType === "FINISHED_GOODS") return !!item.productItemId;
   return true;
 }, { message: "Selection is required", path: ["itemSelection"] });
@@ -257,7 +256,7 @@ const StockAdjustmentForm: React.FC = () => {
     }
 
     if (
-      item.itemType === "RAW_MATERIAL" &&
+      (item.itemType === "RAW_MATERIAL" || item.itemType === "WASTAGE") &&
       (field === "rawMaterialId" || field === "itemType")
     ) {
       const selectedId = field === "rawMaterialId" ? value : item.rawMaterialId;
@@ -450,8 +449,9 @@ const StockAdjustmentForm: React.FC = () => {
             <h6 className="text-base font-semibold text-gray-800 mb-3">1. Adjustment Information</h6>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
               <TextInput
-                label="Adjustment Number*"
+                label="Adjustment Number"
                 name="adjustmentNumber"
+                required
                 value={formData.adjustmentNumber}
                 onChange={(e) =>
                   setFormData({ ...formData, adjustmentNumber: e.target.value })
@@ -460,7 +460,8 @@ const StockAdjustmentForm: React.FC = () => {
                 error={errors.adjustmentNumber}
               />
               <TextInput
-                label="Adjustment Date*"
+                label="Adjustment Date"
+                required
                 name="adjustmentDate"
                 type="date"
                 value={formData.adjustmentDate}
@@ -470,8 +471,9 @@ const StockAdjustmentForm: React.FC = () => {
                 error={errors.adjustmentDate}
               />
               <SelectInput
-                label="Adjustment Type*"
+                label="Adjustment Type"
                 name="adjustmentType"
+                required
                 value={formData.adjustmentType}
                 onChange={(e) => {
                   setFormData({
@@ -488,8 +490,9 @@ const StockAdjustmentForm: React.FC = () => {
                 options={ADJUSTMENT_TYPES}
               />
               <TextInput
-                label="Reason / Description*"
+                label="Reason / Description"
                 name="reason"
+                required
                 placeholder="Reason for this adjustment"
                 value={formData.reason}
                 onChange={(e) =>
@@ -497,6 +500,23 @@ const StockAdjustmentForm: React.FC = () => {
                 }
                 error={errors.reason}
               />
+              {!isPMI && (
+                <SelectInput
+                  label="Production Order (Optional)"
+                  name="productionOrderId"
+                  value={formData.productionOrderId}
+                  onChange={(e) =>
+                    setFormData({ ...formData, productionOrderId: e.target.value })
+                  }
+                  options={[
+                    { label: "-- Select Production Order (Optional) --", value: "" },
+                    ...productionOrdersForIssue.map((po: any) => ({
+                      label: `${po.productionOrderId} — ${po.productItem?.productName || ""}`,
+                      value: po.productionOrderId,
+                    })),
+                  ]}
+                />
+              )}
             </div>
           </div>
 
@@ -507,8 +527,9 @@ const StockAdjustmentForm: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-3 items-start">
                 <div className="lg:col-span-2">
                   <SelectInput
-                    label="Production Order*"
+                    label="Production Order"
                     name="productionOrderId"
+                required
                     value={formData.productionOrderId}
                     onChange={(e) => handlePOSelect(e.target.value)}
                     error={errors.productionOrderId}
@@ -690,6 +711,7 @@ const StockAdjustmentForm: React.FC = () => {
                                 options={[
                                   { label: "Raw Material", value: "RAW_MATERIAL" },
                                   { label: "Finished Goods", value: "FINISHED_GOODS" },
+                                  { label: "Wastage Product", value: "WASTAGE" },
                                 ]}
                                 onChange={(e) =>
                                   handleItemChange(index, "itemType", e.target.value)
@@ -697,7 +719,7 @@ const StockAdjustmentForm: React.FC = () => {
                               />
                             </td>
                             <td className="px-4 py-3 align-top">
-                              {item.itemType === "RAW_MATERIAL" ? (
+                              {item.itemType === "RAW_MATERIAL" || item.itemType === "WASTAGE" ? (
                                 <SelectInput
                                   label=""
                                   hideLabel
@@ -708,7 +730,7 @@ const StockAdjustmentForm: React.FC = () => {
                                   required
                                   options={[
                                     { label: "Select Material", value: "" },
-                                    ...rawMaterials.map((rm) => ({
+                                    ...rawMaterials.filter((rm: any) => item.itemType === "WASTAGE" ? rm.itemType === "WASTAGE" : rm.itemType !== "WASTAGE").map((rm) => ({
                                       label: `${rm.materialName} (${rm.rawMaterialId})`,
                                       value: rm.rawMaterialId,
                                     })),

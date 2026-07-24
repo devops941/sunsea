@@ -347,7 +347,7 @@ const RawMaterialCreate: React.FC = () => {
 
     return (
         <div className="w-full mx-auto">
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+            <div className="bg-white  shadow-sm border border-gray-200">
                 <div className="px-6 py-4 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <h2 className="text-xl font-bold text-gray-800">
                         Create Raw Material

@@ -88,12 +88,13 @@ const StoreTypeCreate: React.FC = () => {
         description: z
             .string()
             .trim()
-            .min(1, "Description is required")
             .max(255, "Maximum 255 characters allowed")
             .regex(
-                /^[A-Za-z0-9\s,./()&-]+$/,
+                /^[A-Za-z0-9\s,./()&-]*$/,
                 "Description contains invalid characters"
-            ),
+            )
+            .optional()
+            .nullable(),
     });
 
     const handleClear = () => {
@@ -179,7 +180,6 @@ const StoreTypeCreate: React.FC = () => {
                                 placeholder="e.g. Used for all raw materials..."
                                 error={errors.description}
                                 onChange={handleChange}
-                                required
                             />
                             <SelectInput
                                 label="Status"

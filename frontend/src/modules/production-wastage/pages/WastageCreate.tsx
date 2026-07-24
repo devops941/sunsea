@@ -73,6 +73,7 @@ const WastageForm: React.FC = () => {
     shiftId: "",
     productId: "",
     rawMaterialId: "",
+    targetWastageProductId: "",
     wastageType: "SCRAP",
     quantity: "",
     uom: "KG",
@@ -108,6 +109,7 @@ const WastageForm: React.FC = () => {
         shiftId: state.shiftId || "",
         productId: String(state.productId || ""),
         rawMaterialId: state.rawMaterialId || "",
+        targetWastageProductId: state.targetWastageProductId || "",
         wastageType: state.wastageType || "SCRAP",
         quantity: String(state.quantity || ""),
         uom: state.uom || "PCS",
@@ -223,11 +225,11 @@ const WastageForm: React.FC = () => {
         </div>
 
         {/* Form Card */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="bg-white overflow-hidden">
           <form onSubmit={handleSubmit} noValidate>
             
             {/* Section 1: Wastage Details */}
-            <div className="p-6 border-b border-slate-100">
+            <div className=" border-b border-slate-100">
               <h3 className="text-lg font-bold text-slate-800 mb-4">1. Wastage Details</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 <div>
@@ -329,7 +331,7 @@ const WastageForm: React.FC = () => {
                     value={formData.rawMaterialId}
                     options={[
                       { label: "Select Raw Material if wasted", value: "" },
-                      ...rawMaterials.map((rm) => ({
+                      ...rawMaterials.filter(rm => rm.itemType !== "WASTAGE").map((rm) => ({
                         label: rm.materialName,
                         value: rm.rawMaterialId,
                       })),
@@ -337,6 +339,22 @@ const WastageForm: React.FC = () => {
                     onChange={handleChange}
                   />
                   {errors.rawMaterialId && <span className="text-red-500 text-xs mt-1 block">{errors.rawMaterialId}</span>}
+                </div>
+                <div>
+                  <SelectInput
+                    label="Target Wastage Product (Optional)"
+                    name="targetWastageProductId"
+                    value={formData.targetWastageProductId}
+                    options={[
+                      { label: "Select Wastage Product to credit", value: "" },
+                      ...rawMaterials.filter(rm => rm.itemType === "WASTAGE").map((rm) => ({
+                        label: rm.materialName,
+                        value: rm.rawMaterialId,
+                      })),
+                    ]}
+                    onChange={handleChange}
+                  />
+                  {errors.targetWastageProductId && <span className="text-red-500 text-xs mt-1 block">{errors.targetWastageProductId}</span>}
                 </div>
                 <div className="flex gap-4">
                   <div className="flex-1">

@@ -7,6 +7,7 @@ import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import UOMSelect from "../../../components/form/SelectInput/UOMSelect";
 import MultiSelect from "../../../components/form/multiSelect/MultiSelect";
 import CustomButton from "../../../components/ui/Button/Button";
+import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
 import { useProducts } from "../../../hooks/useProducts";
 import { useCategories } from "../../../hooks/useCategories";
 import { useColors } from "../../../hooks/useColors";
@@ -87,7 +88,12 @@ const ProductEdit: React.FC = () => {
     // ✅ Raw Materials Composition
     type RawMaterialRow = { rawMaterialId: string; percentage: string; };
     const [rawMaterials, setRawMaterials] = useState<RawMaterialRow[]>([]);
-    const [rawMaterialOptions, setRawMaterialOptions] = useState<{ value: string, label: string }[]>([]);
+    
+    // ✅ Accessories / Additional Items
+    type AccessoryRow = { rawMaterialId: string; quantity: string; };
+    const [accessories, setAccessories] = useState<AccessoryRow[]>([]);
+
+    const [allRawMaterials, setAllRawMaterials] = useState<any[]>([]);
     const [productionSteps, setProductionSteps] = useState<string[]>([]);
 
     // Load dropdowns
@@ -114,7 +120,7 @@ const ProductEdit: React.FC = () => {
         rawMaterialService.fetchAll({})
             .then((res: any) => {
                 const data = Array.isArray(res?.rawMaterials) ? res.rawMaterials : Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
-                setRawMaterialOptions(data.map((rm: any) => ({ value: String(rm.rawMaterialId), label: rm.materialName })));
+                setAllRawMaterials(data);
             }).catch(() => { });
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -175,12 +181,17 @@ const ProductEdit: React.FC = () => {
 
 
         if (productData.billOfMaterials) {
-            setRawMaterials(productData.billOfMaterials.map((bom: any) => ({
+            setRawMaterials(productData.billOfMaterials.filter((bom: any) => bom.percentage !== null).map((bom: any) => ({
                 rawMaterialId: bom.rawMaterialId,
                 percentage: bom.percentage ? String(bom.percentage) : ""
             })));
+            setAccessories(productData.billOfMaterials.filter((bom: any) => bom.percentage === null).map((bom: any) => ({
+                rawMaterialId: bom.rawMaterialId,
+                quantity: bom.requiredQuantity ? String(bom.requiredQuantity) : ""
+            })));
         } else {
             setRawMaterials([]);
+            setAccessories([]);
         }
 
         if (productData.productionSteps) {
@@ -279,13 +290,35 @@ const ProductEdit: React.FC = () => {
 
         if (rawMaterials.length > 0) {
             const totalPercent = rawMaterials.reduce((acc, rm) => acc + Number(rm.percentage), 0);
-            if (Math.abs(totalPercent - 100) > 0.01) {
+            if (totalPercent !== 100) {
                 newErrors.rawMaterials = "Total percentage must be exactly 100%";
-                toast.error("Total Raw Material percentage must be 100%");
+                toast.error("Total Raw Material percentage must be exactly 100%");
             }
+
+            const selectedRmIds = rawMaterials.map(rm => rm.rawMaterialId).filter(Boolean);
+            const uniqueRmIds = new Set(selectedRmIds);
+            if (uniqueRmIds.size !== selectedRmIds.length) {
+                newErrors.rawMaterials = "Duplicate raw materials selected in BOM.";
+                toast.error("Duplicate raw materials selected in BOM");
+            }
+
             rawMaterials.forEach((rm, index) => {
                 if (!rm.rawMaterialId) newErrors[`rawMaterials.${index}.rawMaterialId`] = "Required";
                 if (!rm.percentage || Number(rm.percentage) <= 0) newErrors[`rawMaterials.${index}.percentage`] = "Invalid %";
+            });
+        }
+
+        if (accessories.length > 0) {
+            const selectedAccIds = accessories.map(a => a.rawMaterialId).filter(Boolean);
+            const uniqueAccIds = new Set(selectedAccIds);
+            if (uniqueAccIds.size !== selectedAccIds.length) {
+                newErrors.accessories = "Duplicate items selected in Accessories.";
+                toast.error("Duplicate items selected in Accessories");
+            }
+            
+            accessories.forEach((acc, index) => {
+                if (!acc.rawMaterialId) newErrors[`accessories.${index}.rawMaterialId`] = "Required";
+                if (!acc.quantity || Number(acc.quantity) <= 0) newErrors[`accessories.${index}.quantity`] = "Invalid Qty";
             });
         }
 
@@ -342,6 +375,25 @@ const ProductEdit: React.FC = () => {
         });
         if (errors[`rawMaterials.${index}.${field}`] || errors.rawMaterials) {
             setErrors(prev => ({ ...prev, [`rawMaterials.${index}.${field}`]: "", rawMaterials: "" }));
+        }
+    };
+
+    const handleAddAccessory = () => {
+        setAccessories(prev => [...prev, { rawMaterialId: "", quantity: "" }]);
+    };
+
+    const handleRemoveAccessory = (index: number) => {
+        setAccessories(prev => prev.filter((_, i) => i !== index));
+    };
+
+    const handleAccessoryChange = (index: number, field: keyof AccessoryRow, value: string) => {
+        setAccessories(prev => {
+            const newAcc = [...prev];
+            newAcc[index] = { ...newAcc[index], [field]: value };
+            return newAcc;
+        });
+        if (errors[`accessories.${index}.${field}`] || errors.accessories) {
+            setErrors(prev => ({ ...prev, [`accessories.${index}.${field}`]: "", accessories: "" }));
         }
     };
 
@@ -439,13 +491,20 @@ const ProductEdit: React.FC = () => {
             if (formData.b2c) payload.append("b2c", formData.b2c);
             if (formData.exportPrice) payload.append("exportPrice", formData.exportPrice);
 
-            if (rawMaterials.length > 0) {
-                payload.append("rawMaterials", JSON.stringify(
-                    rawMaterials.map(rm => ({
+            if (rawMaterials.length > 0 || accessories.length > 0) {
+                const combinedBOM = [
+                    ...rawMaterials.map(rm => ({
                         rawMaterialId: rm.rawMaterialId,
-                        percentage: Number(rm.percentage)
+                        percentage: rm.percentage,
+                        requiredQuantity: 0
+                    })),
+                    ...accessories.map(acc => ({
+                        rawMaterialId: acc.rawMaterialId,
+                        percentage: null,
+                        requiredQuantity: acc.quantity
                     }))
-                ));
+                ];
+                payload.append("rawMaterials", JSON.stringify(combinedBOM));
             } else {
                 payload.append("rawMaterials", "[]");
             }
@@ -520,8 +579,33 @@ const ProductEdit: React.FC = () => {
     );
 
     const hasAnyImage = existingImages.length > 0 || newImagePreviews.length > 0;
-
     // ─── Render ───────────────────────────────────────────────────────────
+    const bomOptions = useMemo(() => {
+        return allRawMaterials
+            .filter(rm => {
+                const uom = (rm.baseUom || "").split(',')[0].toLowerCase().trim();
+                return uom !== "ea" && uom !== "pcs";
+            })
+            .map(rm => ({
+                value: String(rm.rawMaterialId),
+                label: rm.materialName,
+                disabled: rawMaterials.some(r => String(r.rawMaterialId) === String(rm.rawMaterialId))
+            }));
+    }, [allRawMaterials, rawMaterials]);
+
+    const accessoryOptions = useMemo(() => {
+        return allRawMaterials
+            .filter(rm => {
+                const uom = (rm.baseUom || "").split(',')[0].toLowerCase().trim();
+                return uom === "ea" || uom === "pcs";
+            })
+            .map(rm => ({
+                value: String(rm.rawMaterialId),
+                label: rm.materialName,
+                disabled: accessories.some(a => String(a.rawMaterialId) === String(rm.rawMaterialId))
+            }));
+    }, [allRawMaterials, accessories]);
+
     if (loading) {
         return (
             <div className="flex justify-center items-center py-20">
@@ -825,13 +909,13 @@ const ProductEdit: React.FC = () => {
                     <div className="pt-2">
                         <div className="flex justify-between items-center mb-3">
                             <h6 className="text-base font-semibold text-gray-800 m-0">Raw Materials Composition (BOM)</h6>
-                            <button
-                                type="button"
+                            <CustomButton
+                                text="Add Raw Material"
+                                icon={FaPlus}
                                 onClick={handleAddRawMaterial}
-                                className="text-xs bg-indigo-50 text-indigo-600 hover:bg-indigo-100 px-3 py-1.5 rounded-lg font-medium transition-colors border border-indigo-100 flex items-center gap-1"
-                            >
-                                <FaPlus size={10} /> Add Raw Material
-                            </button>
+                                type="button"
+                                size="sm"
+                            />
                         </div>
                         {rawMaterials.length > 0 ? (
                             <div className="border border-slate-200 rounded-xl overflow-visible">
@@ -851,7 +935,7 @@ const ProductEdit: React.FC = () => {
                                                         label=""
                                                         name={`rm-${idx}`}
                                                         value={rm.rawMaterialId}
-                                                        options={[{ value: "", label: "-- Select --" }, ...rawMaterialOptions]}
+                                                        options={[{ value: "", label: "-- Select --" }, ...bomOptions]}
                                                         onChange={(e) => handleRawMaterialChange(idx, "rawMaterialId", e.target.value)}
                                                         error={errors[`rawMaterials.${idx}.rawMaterialId`]}
                                                     />
@@ -869,14 +953,7 @@ const ProductEdit: React.FC = () => {
                                                     />
                                                 </td>
                                                 <td className="px-4 py-3 align-top text-center">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleRemoveRawMaterial(idx)}
-                                                        className="text-red-500 hover:text-red-700 p-2"
-                                                        title="Remove"
-                                                    >
-                                                        <FaTimes size={14} />
-                                                    </button>
+                                                    <DeleteButton onClick={() => handleRemoveRawMaterial(idx)} />
                                                 </td>
                                             </tr>
                                         ))}
@@ -891,6 +968,74 @@ const ProductEdit: React.FC = () => {
                         ) : (
                             <div className="text-sm text-slate-500 italic bg-slate-50 p-4 rounded-xl border border-dashed border-slate-200 text-center">
                                 No raw materials added. Click "Add Raw Material" to specify the composition.
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Accessories / Additional Items */}
+                    <div className="pt-6">
+                        <div className="flex justify-between items-center mb-3">
+                            <h6 className="text-base font-semibold text-gray-800 m-0">Accessories / Additional Items (Optional)</h6>
+                            <CustomButton
+                                text="Add Item"
+                                icon={FaPlus}
+                                onClick={handleAddAccessory}
+                                type="button"
+                                size="sm"
+                                variant="secondary"
+                            />
+                        </div>
+                        {accessories.length > 0 ? (
+                            <div className="border border-slate-200 rounded-xl overflow-visible">
+                                <table className="w-full text-left text-sm whitespace-nowrap">
+                                    <thead className="bg-slate-50 text-slate-600">
+                                        <tr>
+                                            <th className="px-4 py-3 font-semibold border-b border-slate-200 w-[60%]">Raw Material (Item)</th>
+                                            <th className="px-4 py-3 font-semibold border-b border-slate-200 w-[30%]">Quantity</th>
+                                            <th className="px-4 py-3 font-semibold border-b border-slate-200 w-[10%] text-center">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {accessories.map((acc, idx) => (
+                                            <tr key={`acc-${idx}`} className="hover:bg-slate-50/50 transition-colors">
+                                                <td className="px-4 py-3 align-top">
+                                                    <SelectInput
+                                                        label=""
+                                                        name={`acc-rm-${idx}`}
+                                                        value={acc.rawMaterialId}
+                                                        options={[{ value: "", label: "-- Select --" }, ...accessoryOptions]}
+                                                        onChange={(e) => handleAccessoryChange(idx, "rawMaterialId", e.target.value)}
+                                                        error={errors[`accessories.${idx}.rawMaterialId`]}
+                                                    />
+                                                </td>
+                                                <td className="px-4 py-3 align-top">
+                                                    <TextInput
+                                                        label=""
+                                                        name={`acc-qty-${idx}`}
+                                                        type="number"
+                                                        step="any"
+                                                        value={acc.quantity}
+                                                        placeholder="0"
+                                                        onChange={(e) => handleAccessoryChange(idx, "quantity", e.target.value)}
+                                                        error={errors[`accessories.${idx}.quantity`]}
+                                                    />
+                                                </td>
+                                                <td className="px-4 py-3 align-top text-center">
+                                                    <DeleteButton onClick={() => handleRemoveAccessory(idx)} />
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                                {errors.accessories && (
+                                    <div className="px-4 py-2 bg-red-50 text-red-600 text-sm font-medium border-t border-slate-200">
+                                        {errors.accessories}
+                                    </div>
+                                )}
+                            </div>
+                        ) : (
+                            <div className="text-sm text-slate-500 italic bg-slate-50 p-4 rounded-xl border border-dashed border-slate-200 text-center">
+                                No accessories added. Click "Add Item" to specify additional quantities.
                             </div>
                         )}
                     </div>

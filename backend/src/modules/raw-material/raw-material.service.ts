@@ -30,7 +30,7 @@ class RawMaterialService {
           ...(data.storeId ? { store: { connect: { storeId: data.storeId } } } : {}),
           isActive: data.isActive ?? true,
           createdBy: userId,
-          // locationId: data.locationId ?? null,
+          ...(data.locationId ? { storeLocation: { connect: { id: data.locationId } } } : {}),
           batchNo: data.batchNo ?? null,
           onHandQty: data.onHandQty ?? 0,
           reservedQty: data.reservedQty ?? 0,
@@ -40,6 +40,7 @@ class RawMaterialService {
             ? new Date(data.lastMovementAt)
             : null,
           status: data.status ?? "Active",
+          itemType: data.itemType ?? null,
         }
       });
 
@@ -97,12 +98,20 @@ class RawMaterialService {
     await this.findById(rawMaterialId);
 
 
-    const { categoryId, gstTaxRateId, storeId, ...restData } = data;
+    const { categoryId, gstTaxRateId, storeId, locationId, ...restData } = data;
 
     const updateData: any = {
       ...restData,
       updatedBy: userId,
     };
+
+    if (locationId !== undefined) {
+      if (locationId === null) {
+        updateData.storeLocation = { disconnect: true };
+      } else {
+        updateData.storeLocation = { connect: { id: locationId } };
+      }
+    }
 
     if (categoryId !== undefined) {
       if (categoryId === null) {

@@ -137,38 +137,32 @@ const FinishedStockList: React.FC<FinishedStockListProps> = ({ storeId: propStor
                             header: "CATEGORY",
                             render: (item) => <span className="text-slate-600">{item.product?.category?.categoryName || "N/A"}</span>
                         },
-                        {
-                            header: "COLOR",
-                            render: (item) => <span className="text-slate-600">{item.product?.colors?.map((c: any) => c.color?.colorName).join(", ") || "N/A"}</span>
-                        },
-                        {
-                            header: "SIZE",
-                            render: (item) => <span className="text-slate-600">{item.product?.size?.sizeName ? `${item.product.size.sizeName} (${item.product.size.sizeCode})` : "N/A"}</span>
-                        },
+                        // {
+                        //     header: "COLOR",
+                        //     render: (item) => <span className="text-slate-600">{item.product?.colors?.map((c: any) => c.color?.colorName).join(", ") || "N/A"}</span>
+                        // },
+                        // {
+                        //     header: "SIZE",
+                        //     render: (item) => <span className="text-slate-600">{item.product?.size?.sizeName ? `${item.product.size.sizeName} (${item.product.size.sizeCode})` : "N/A"}</span>
+                        // },
                         {
                             header: "STORE / LOCATION",
                             render: (item) => <span className="font-medium text-slate-700">{item.store?.storeName || "N/A"}</span>
                         },
                         {
                             header: "PHYSICAL STOCK",
-                            render: (item) => (
-                                <div className="flex flex-col">
-                                    <StatusBadge 
-                                        status={(Number(item.onHandQty) || 0) < (Number((item.product as any)?.minimumQty) || 0) || (Number(item.onHandQty) || 0) <= 0 ? "danger" : "success"} 
-                                        customText={`${item.onHandQty} ${formatUom(item.product?.uom?.uomCode)}`} 
-                                    />
-                                    <span className="text-xs text-slate-500 mt-1">Min: {(item.product as any)?.minimumQty || "0"} | Max: {(item.product as any)?.maximumQty || "0"}</span>
-                                </div>
-                            )
-                        },
-                        {
-                            header: "DETAILS",
-                            render: (item) => (
-                                <div className="flex flex-col text-xs text-slate-600">
-                                    <span>Weight: {item.product?.weightPerPiece ? `${item.product.weightPerPiece} kg` : "N/A"}</span>
-                                    <span>Size/Dim: {item.product?.dimensions || "N/A"}</span>
-                                </div>
-                            )
+                            render: (item) => {
+                                const onHand = Number(item.onHandQty) || 0;
+                                const minQty = Number((item.product as any)?.minimumQty) || 0;
+                                return (
+                                    <div className="flex flex-col">
+                                        <span className={`font-semibold ${onHand <= minQty || onHand <= 0 ? "text-red-600" : "text-slate-800"}`}>
+                                            {item.onHandQty} {formatUom(item.product?.uom?.uomCode)}
+                                        </span>
+                                        <span className="text-xs text-slate-500 mt-1">Min: {minQty} | Max: {(item.product as any)?.maximumQty || "0"}</span>
+                                    </div>
+                                )
+                            }
                         },
                         {
                             header: "ACTIONS",

@@ -14,12 +14,15 @@ import type { RootState, AppDispatch } from '../../../app/store';
 import CommonLoader from "../../../components/ui/Loader/CommonLoader";
 import { fetchCompany, updateCompany } from '../../../features/company/companySlice';
 import type { UpdateCompanyDto } from '../../../features/company/types';
+import { validatePhoneEntries } from "../../../components/ui/PhoneInput/PhoneInput";
 
 const CompanySettings: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const dispatch = useDispatch<AppDispatch>();
   const { data: company, loading } = useSelector((state: RootState) => state.company);
+  
+  const [phones, setPhones] = useState<any[]>([]);
 
   const isEditMode = location.pathname.includes('edit') || location.pathname.includes('settings') || !!(company && company.isOnboarded);
 
@@ -32,6 +35,14 @@ const CompanySettings: React.FC = () => {
 
   useEffect(() => {
     if (company) {
+      let parsedPhones = [];
+      try {
+        parsedPhones = company.mobile ? JSON.parse(company.mobile) : [];
+      } catch {
+        parsedPhones = [];
+      }
+      setPhones(Array.isArray(parsedPhones) ? parsedPhones : []);
+
       setFormData({
         companyCode: company.companyCode || `CMP-${Math.floor(10000 + Math.random() * 90000)}`,
         legalName: company.legalName || company.companyName || "",
@@ -49,7 +60,7 @@ const CompanySettings: React.FC = () => {
         city: company.city || "",
         state: company.state || "",
         zipcode: company.zipcode || "",
-        country: company.country || "",
+        country: company.country || "India",
         isActive: company.isActive,
       });
     }
@@ -98,12 +109,15 @@ const CompanySettings: React.FC = () => {
     if (!formData.legalName?.trim()) newErrors.legalName = "Legal name is required";
     if (!formData.currencyCode?.trim()) newErrors.currencyCode = "Currency code is required";
     if (!formData.email?.trim()) newErrors.email = "Email is required";
-    if (!formData.phone?.trim()) newErrors.phone = "Phone number is required";
     if (!formData.addressLine1?.trim()) newErrors.addressLine1 = "Address Line 1 is required";
     if (!formData.city?.trim()) newErrors.city = "City is required";
     if (!formData.state?.trim()) newErrors.state = "State is required";
     if (!formData.zipcode?.trim()) newErrors.zipcode = "Zipcode is required";
     if (!formData.country?.trim()) newErrors.country = "Country is required";
+    
+    const phoneErr = validatePhoneEntries(phones, false);
+    if (phoneErr) newErrors.mobile = phoneErr;
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -125,6 +139,8 @@ const CompanySettings: React.FC = () => {
           }
         } else if (key === "businessPlaces") {
           submitData.append(key, JSON.stringify(value));
+        } else if (key === "mobile") {
+          submitData.append(key, JSON.stringify(phones));
         } else if (value !== undefined && value !== null) {
           submitData.append(key, String(value));
         }
@@ -245,20 +261,22 @@ const CompanySettings: React.FC = () => {
                   <div>
                     <TextInput label="Email Address" name="email" type="email" value={formData.email || ""} onChange={handleChange} placeholder="Enter Email" required error={errors.email} />
                   </div>
+
                   <div>
-                    <div className="mb-3 flex flex-col w-full group">
-                      <label className={`flex items-center gap-1.5 mb-2 text-xs font-bold uppercase tracking-[0.5px] transition-colors duration-250 ${errors.phone ? 'text-red-500' : 'text-slate-500'} group-focus-within:text-primary`}>Phone Number <span className="text-[#e53935] ml-0.5">*</span></label>
-                      <IndiaPhoneInput
-                        name="phone"
-                        value={formData.phone || ""}
-                        onChange={(e) => {
-                          setFormData(prev => ({ ...prev, phone: e.target.value }));
-                          if (errors.phone) setErrors((prev: any) => ({ ...prev, phone: undefined }));
-                        }}
-                        required={true}
-                      />
-                      {errors.phone && <div className="text-[#dc3545] text-sm font-medium mt-1">{errors.phone}</div>}
-                    </div>
+                    <IndiaPhoneInput
+                      multi
+                      label="Mobile Numbers"
+                      name="phones"
+                      value={phones}
+                      onChange={(e: any) => {
+                        setPhones(e.target.value);
+                        if (errors.mobile) {
+                          setErrors((prev: any) => ({ ...prev, mobile: undefined }));
+                        }
+                      }}
+                      maxNumbers={5}
+                      error={errors.mobile}
+                    />
                   </div>
                 </div>
               </div>
@@ -374,22 +392,23 @@ const CompanySettings: React.FC = () => {
               <div>
                 <TextInput label="Email Address" name="email" type="email" value={formData.email || ""} onChange={handleChange} placeholder="Enter Email" required error={errors.email} />
               </div>
+
               <div>
                 <IndiaPhoneInput
-                  label="Phone Number"
-                  name="phone"
-                  value={formData.phone || ""}
-                  onChange={(e) => {
-                    setFormData(prev => ({ ...prev, phone: e.target.value }));
-                    if (errors.phone) setErrors((prev: any) => ({ ...prev, phone: undefined }));
+                  multi
+                  label="Mobile Numbers"
+                  name="phones"
+                  value={phones}
+                  onChange={(e: any) => {
+                    setPhones(e.target.value);
+                    if (errors.mobile) {
+                      setErrors((prev: any) => ({ ...prev, mobile: undefined }));
+                    }
                   }}
-                  required={true}
-                  error={errors.phone}
+                  maxNumbers={5}
+                  error={errors.mobile}
                 />
               </div>
-              {/* <div>
-                <TextInput label="Mobile Number" name="mobile" value={formData.mobile || ""} onChange={handleChange} placeholder="Enter Mobile" />
-              </div> */}
               <div className="md:col-span-3 lg:col-span-1">
                 <TextInput label="Website" name="website" value={formData.website || ""} onChange={handleChange} placeholder="Enter Website (e.g. www.example.com)" />
               </div>

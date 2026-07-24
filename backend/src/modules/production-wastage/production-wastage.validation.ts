@@ -29,6 +29,7 @@ export const createProductionWastageSchema = z.object({
     shiftId: z.string().min(1, "Shift ID is required").max(20),
     productId: z.number().int().min(1, "Product ID is required"),
     rawMaterialId: z.string().max(20).optional().nullable(),
+    targetWastageProductId: z.string().max(20).optional().nullable(),
     wastageType: WastageTypeEnum,
     quantity: z.number().positive("Quantity must be greater than 0"),
     uom: z.string().min(1, "UOM is required").max(10),

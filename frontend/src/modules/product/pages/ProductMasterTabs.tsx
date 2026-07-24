@@ -11,6 +11,8 @@ import UomList from "./UOMList";
 import RawMaterialList from "../../raw-materials/pages/RawMaterialList";
 import RawMaterialCategoryList from "../../raw-material-categories/pages/RawMaterialCategoryList";
 
+import WastageStoreList from "../../wastage-store/pages/WastageStoreList";
+
 const ProductMasterTabs: React.FC = () => {
     const location = useLocation();
     const navigate = useNavigate();
@@ -21,7 +23,8 @@ const ProductMasterTabs: React.FC = () => {
         "/categories": "categories",
         "/uoms": "uoms",
         "/raw-materials": "raw_materials",
-        "/raw-material-categories": "raw_material_categories"
+        "/raw-material-categories": "raw_material_categories",
+        "/wastage-store": "wastage_store"
     };
 
     const keyToPath: Record<string, string> = {
@@ -29,7 +32,8 @@ const ProductMasterTabs: React.FC = () => {
         "categories": "/categories",
         "uoms": "/uoms",
         "raw_materials": "/raw-materials",
-        "raw_material_categories": "/raw-material-categories"
+        "raw_material_categories": "/raw-material-categories",
+        "wastage_store": "/wastage-store"
     };
 
     const activeTab = pathToKey[location.pathname] || "products";
@@ -39,6 +43,7 @@ const ProductMasterTabs: React.FC = () => {
         { key: "categories", label: "Categories", icon: <FaTags />, content: <CategoryList /> },
         { key: "raw_material_categories", label: "RM Categories", icon: <FaLayerGroup />, content: <RawMaterialCategoryList /> },
         { key: "raw_materials", label: "Raw Materials", icon: <FaBoxes />, content: <RawMaterialList /> },
+        { key: "wastage_store", label: "Wastage Store", icon: <FaLayerGroup />, content: <WastageStoreList /> },
         { key: "products", label: "Products", icon: <FaBox />, content: <ProductList /> }
     ];
 

@@ -166,7 +166,6 @@ const StorageStoreList: React.FC = () => {
                                 { header: "LOCATION", render: (item) => (item as any).location?.locationName ?? "N/A" },
                                 { header: "STORE TYPE", render: (item) => item.storeTypeRef?.name || "N/A" },
                                 { header: "INCHARGE", render: (item) => item.incharge?.fullName || "N/A" },
-                                { header: "GST PLACE", render: (item) => item.gstPlace || (item as any).location?.state || "N/A" },
                                 {
                                     header: "STATUS", render: (item) => (
                                         <span className={`px-3 py-1 rounded-full text-xs font-semibold ${item.isActive
@@ -208,23 +207,13 @@ const StorageStoreList: React.FC = () => {
                                 { label: "Store Name", value: selectedItem.storeName },
                                 { label: "Location", value: selectedItem.locationId || "N/A" },
                                 { label: "Store Type", value: selectedItem.storeTypeRef?.name || "N/A" },
-                            ]
-                        },
-                        {
-                            title: "Additional Details",
-                            fields: [
                                 { label: "Incharge", value: selectedItem.incharge?.fullName || "N/A" },
-                                { label: "Costing Method", value: selectedItem.costMethod || "N/A" },
-                                { label: "GST Place", value: selectedItem.gstPlace || "N/A" },
-                                { label: "Allow Negative", value: selectedItem.allowNegative ? "Yes" : "No" },
+                                { label: "Status", value: selectedItem.isActive ? "Active" : "Inactive" },
+
+
                             ]
                         },
-                        {
-                            title: "Status",
-                            fields: [
-                                { label: "Status", value: selectedItem.isActive ? "Active" : "Inactive" },
-                            ]
-                        }
+                       
                     ] : []}
                 />
 

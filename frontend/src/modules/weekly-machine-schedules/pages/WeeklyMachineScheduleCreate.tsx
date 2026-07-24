@@ -12,6 +12,7 @@ import { createWeeklyProgram } from "../../../features/weekly-programs/weeklyPro
 import { weeklyProgramService } from "../../../services/weeklyProgramService";
 import { productionOrderService } from "../../../services/productionOrderService";
 import BackButton from "../../../components/ui/BackButton/BackButton";
+import DatePickerCalendar from "../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 
 const WeeklyMachineScheduleCreate: React.FC = () => {
     const navigate = useNavigate();
@@ -211,23 +212,20 @@ const WeeklyMachineScheduleCreate: React.FC = () => {
                     <div className="p-4 md:p-6">
                         <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
                             <div className="md:col-span-6 lg:col-span-4">
-                                <TextInput
+                                <DatePickerCalendar
                                     label="Week Start Date"
                                     name="weekStartDate"
-                                    value={weekStartDate}
-                                    type="date"
+                                    value={weekStartDate ? new Date(weekStartDate) : null}
                                     required
-                                    onChange={handleDateChange}
+                                    onChange={(e: any) => handleDateChange(e)}
                                 />
                             </div>
                             <div className="md:col-span-6 lg:col-span-4">
-                                <TextInput
+                                <DatePickerCalendar
                                     label="Week End Date"
                                     name="weekEndDate"
-                                    value={weekEndDate}
-                                    type="date"
+                                    value={weekEndDate ? new Date(weekEndDate) : null}
                                     disabled
-                                    onChange={() => { }}
                                 />
                             </div>
                         </div>
@@ -237,17 +235,7 @@ const WeeklyMachineScheduleCreate: React.FC = () => {
                 {weekStartDate ? (
                     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 mb-6">
 
-                        {selectedCount > 0 && (
-                            <div className="flex justify-end items-center gap-3 p-6 border-b border-slate-200">
-                                <span className="font-bold text-primary">{selectedCount} Selected</span>
-                                <CustomButton
-                                    text={isSubmitting ? "Saving..." : "Confirm & Save Allocation"}
-                                    icon={FaSave}
-                                    onClick={handleSubmit}
-                                    disabled={isSubmitting}
-                                />
-                            </div>
-                        )}
+
                         <div className="p-0">
                             {loadingPo ? (
                                 <div className="text-center p-10 text-slate-500">Loading...</div>
@@ -314,6 +302,17 @@ const WeeklyMachineScheduleCreate: React.FC = () => {
                                 </div>
                             )}
                         </div>
+                        {selectedCount > 0 && (
+                            <div className="flex justify-end items-center gap-3 p-6 border-t border-slate-200 bg-slate-50 rounded-b-2xl">
+                                <span className="font-bold text-primary">{selectedCount} Selected</span>
+                                <CustomButton
+                                    text={isSubmitting ? "Saving..." : "Confirm & Save Allocation"}
+                                    icon={FaSave}
+                                    onClick={handleSubmit}
+                                    disabled={isSubmitting}
+                                />
+                            </div>
+                        )}
                     </div>
                 ) : (
                     <div className="text-center p-10 border-2 border-dashed border-slate-300 rounded-2xl bg-white text-slate-500 mb-6 shadow-sm">

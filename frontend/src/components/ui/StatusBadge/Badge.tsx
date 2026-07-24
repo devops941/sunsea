@@ -51,7 +51,7 @@ const statusColors: Record<string, { bg: string; text: string }> = {
     DISPATCHED: { bg: '#d1fae5', text: '#065f46' },                // Green - fully shipped
 
     // ========== FINAL STATES ==========
-    COMPLETED: { bg: '#ede9fe', text: '#5b21b6' },                 // Lavender/Purple - Post Production / Finishing Stage
+    COMPLETED: { bg: '#d1fae5', text: '#065f46' },                 // Green - Completed
     SHORT_CLOSED: { bg: '#ffedd5', text: '#c2410c' },              // Orange - closed without hitting target
     CANCELLED: { bg: '#f3e8ff', text: '#6b21a8' },                 // Purple - cancelled
 
@@ -85,7 +85,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, className = ''
     // Format display text: "PENDING_MD_APPROVAL" → "Pending MD Approval"
     let displayText = customText;
     if (!displayText) {
-        if (normalizedStatus === 'COMPLETED' || normalizedStatus === 'POST_PRODUCTION') {
+        if (normalizedStatus === 'POST_PRODUCTION') {
             displayText = "Post Production";
         } else {
             displayText = (status || 'UNKNOWN')

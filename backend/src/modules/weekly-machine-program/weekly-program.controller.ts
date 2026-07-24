@@ -76,8 +76,10 @@ class WeeklyProgramController {
   });
 
   delete = asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user?.userId;
     await weeklyProgramService.delete(
-      req.params.weeklyProgramId as string
+      req.params.weeklyProgramId as string,
+      userId
     );
 
     return res.status(200).json(

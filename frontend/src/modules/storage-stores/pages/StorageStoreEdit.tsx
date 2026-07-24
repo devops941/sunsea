@@ -60,7 +60,6 @@ const initialFormState = {
     inchargeId: "",
     gstPlace: "",
     status: "Active",
-    allowNegative: false,
     isActive: true,
 };
 
@@ -93,7 +92,6 @@ const StorageStoreEdit: React.FC = () => {
                 inchargeId: location.state.inchargeId ? location.state.inchargeId.toString() : "",
                 gstPlace: location.state.gstPlace || "",
                 status: location.state.status || "Active",
-                allowNegative: location.state.allowNegative || false,
                 isActive: location.state.isActive,
             });
         } else {
@@ -174,7 +172,6 @@ const StorageStoreEdit: React.FC = () => {
                         inchargeId: formData.inchargeId || undefined,
                         gstPlace: formData.gstPlace || undefined,
                         status: formData.status,
-                        allowNegative: formData.allowNegative,
                         isActive: formData.isActive,
                     },
                 })
@@ -281,21 +278,6 @@ const StorageStoreEdit: React.FC = () => {
                                 placeholder="e.g. Maharashtra"
                                 onChange={handleChange}
                             /> */}
-                            <div className="flex items-center gap-2 mt-8 h-10.5">
-                                <input
-                                    type="checkbox"
-                                    id="allowNegative"
-                                    name="allowNegative"
-                                    checked={formData.allowNegative}
-                                    onChange={handleChange}
-                                    className="w-4 h-4 text-indigo-600 bg-white border-slate-300 rounded focus:ring-indigo-500 cursor-pointer"
-                                />
-                                <label htmlFor="allowNegative" className="text-sm font-medium text-slate-700 cursor-pointer">
-                                    Allow Negative Stock
-                                </label>
-                            </div>
-                            
-                            
                         </div>
 
                         <div className="flex justify-end gap-3 pt-6 mt-6 border-t border-slate-200">

@@ -51,7 +51,7 @@ const CityStateSelect: React.FC<CityStateSelectProps> = ({
 
     // On mount, auto-select India if countryValue is empty, and load India states
     useEffect(() => {
-        if (!countryValue && onCountryChange) {
+        if ((!countryValue || countryValue === "India") && onCountryChange) {
             onCountryChange({ id: INDIA_COUNTRY_ID, name: "India" });
         }
 

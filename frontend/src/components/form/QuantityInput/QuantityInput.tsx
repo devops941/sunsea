@@ -122,7 +122,7 @@ const QuantityInput: React.FC<QuantityInputProps> = ({
         </label>
       )}
 
-      <div className="flex relative rounded-[10px] h-10 border border-slate-200 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 overflow-hidden transition-all bg-white">
+      <div className="flex relative rounded-md h-10 border border-slate-200 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 overflow-hidden transition-all bg-white">
         <input
           type="number"
           value={displayValue}
@@ -139,11 +139,14 @@ const QuantityInput: React.FC<QuantityInputProps> = ({
           className={`px-3 text-sm font-medium text-slate-700 bg-white focus:outline-none cursor-pointer hover:bg-slate-100 transition-colors max-w-[100px] min-w-[80px] h-full ${disabled ? "opacity-60 cursor-not-allowed" : ""}`}
         >
           {uomList.length > 0 ? (
-            uomList.map((u) => (
-              <option key={u} value={u}>
-                {u}
-              </option>
-            ))
+            uomList.map((u) => {
+              const displayLabel = u.toLowerCase() === 'ea' ? 'pcs' : u;
+              return (
+                <option key={u} value={u}>
+                  {displayLabel}
+                </option>
+              );
+            })
           ) : (
             <option value="">UOM</option>
           )}

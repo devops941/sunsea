@@ -14,10 +14,12 @@ import { createDailyPlan, updateDailyPlan } from "../../../features/daily-plans/
 import { weeklyProgramService } from "../../../services/weeklyProgramService";
 import { dailyPlanService } from "../../../services/dailyPlanService";
 import { oeeService } from "../../../services/oeeService";
+import { machineOperationAssignmentService } from "../../../services/machineOperationAssignmentService";
 
 import TextInput from "../../../components/form/TextInput/TextInput";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import TextArea from "../../../components/form/TextArea/TextArea";
+import DatePickerCalendar from "../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 
 import CustomButton from "../../../components/ui/Button/Button";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
@@ -68,6 +70,11 @@ const DailyPlanCreate: React.FC = () => {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
+  // ── Fetch active assignment ──────────────────────────────────────────────
+  const [operatorName, setOperatorName] = useState("");
+  const [loadingAssignment, setLoadingAssignment] = useState(false);
+  const [assignmentError, setAssignmentError] = useState<string | null>(null);
+
   // ── Carry Forward ─────────────────────────────────────────────────────────
   const [carryForwardFromPlanId, setCarryForwardFromPlanId] = useState<string | null>(null);
   const [carryForwardFromInfo, setCarryForwardFromInfo] = useState<any>(null);
@@ -108,6 +115,42 @@ const DailyPlanCreate: React.FC = () => {
       .catch(() => setMachineOeeSummary(null))
       .finally(() => setLoadingOee(false));
   }, [productionDate, machineId]);
+
+  useEffect(() => {
+    if (!machineId || !shiftId || !productionDate) {
+      setOperatorName("");
+      setAssignmentError(null);
+      return;
+    }
+
+    setLoadingAssignment(true);
+    setAssignmentError(null);
+
+    machineOperationAssignmentService.resolveAssignment({
+      machineId,
+      shiftId,
+      date: productionDate,
+    })
+      .then((res: any) => {
+        const assignment = res.data;
+        if (!assignment || !assignment.operators || assignment.operators.length === 0) {
+          setOperatorName("");
+          setAssignmentError("No operator is assigned to the selected machine for this shift. Please assign an operator before creating the Daily Production Plan.");
+          return;
+        }
+
+        setOperatorName(assignment.operators.map((op: any) => op.fullName).join(", "));
+        setAssignmentError(null);
+      })
+      .catch((err: any) => {
+        console.error("Failed to resolve machine assignment:", err);
+        setOperatorName("");
+        setAssignmentError("Error resolving machine shift assignment. Please check configurations.");
+      })
+      .finally(() => {
+        setLoadingAssignment(false);
+      });
+  }, [machineId, shiftId, productionDate]);
 
   const remainingShiftsHours = useMemo(() => {
     const hoursMap: Record<string, number> = {};
@@ -160,6 +203,19 @@ const DailyPlanCreate: React.FC = () => {
         if (p.status === "COMPLETED" || p.status === "CANCELLED") {
           return p.weeklyProgramId === stateWpId;
         }
+
+        const po = p.productionOrder;
+        if (po) {
+          const targetQty = Number(po.targetQty || 0);
+          const producedQty = Number(po.producedQty || 0);
+          if (producedQty >= targetQty && p.weeklyProgramId !== stateWpId) {
+            return false;
+          }
+          if (["COMPLETED", "DISPATCHED", "READY_FOR_DISPATCH"].includes(po.status) && p.weeklyProgramId !== stateWpId) {
+            return false;
+          }
+        }
+
         const isSelectedWeek = p.weekStartDate && p.weekStartDate.startsWith(selectedWeekPrefix);
         const isPending = ["PLANNED", "APPROVED", "IN_PROGRESS"].includes(p.status);
         return isSelectedWeek || isPending || p.weeklyProgramId === stateWpId;
@@ -233,7 +289,7 @@ const DailyPlanCreate: React.FC = () => {
           const produced = Array.isArray(p.hourlyProductions)
             ? p.hourlyProductions.reduce((s: number, h: any) => s + Number(h.qtyProduced || 0), 0)
             : 0;
-          if (p.status === "COMPLETED" || p.status === "STOPPED") {
+          if (p.status === "COMPLETED" || p.status === "STOPPED" || p.dailyPlanId === carryForwardFromPlanId) {
             return sum + produced;
           }
           return sum + Math.max(Number(p.plannedQty || 0), produced);
@@ -349,6 +405,19 @@ const DailyPlanCreate: React.FC = () => {
       return;
     }
 
+    if (assignmentError) {
+      setSubmitError(assignmentError);
+      toast.error(assignmentError);
+      return;
+    }
+
+    if (!operatorName) {
+      const errMsg = "No operator is assigned to the selected machine for this shift. Please assign an operator before creating the Daily Production Plan.";
+      setSubmitError(errMsg);
+      toast.error(errMsg);
+      return;
+    }
+
     if (!isEdit && overCapacity) {
       setFormErrors({ plannedQty: `Cannot exceed weekly remaining capacity (${remainingQty} pcs)` });
       return;
@@ -424,6 +493,16 @@ const DailyPlanCreate: React.FC = () => {
         </div>
       )}
 
+      {assignmentError && (
+        <div className="mx-6 mt-4 p-4 rounded-xl bg-red-50 border border-red-200 flex items-center gap-3">
+          <FaExclamationTriangle className="text-red-500" size={20} />
+          <div>
+            <p className="font-bold text-red-700 text-sm">Assignment Validation Failed</p>
+            <p className="text-red-600 text-xs">{assignmentError}</p>
+          </div>
+        </div>
+      )}
+
       {/* ── Carry Forward Banner ──────────────────────────── */}
       {carryForwardFromPlanId && (
         <div className="mx-6 mt-4 p-4 rounded-xl bg-amber-50 border border-amber-200 flex items-center gap-3">
@@ -471,7 +550,7 @@ const DailyPlanCreate: React.FC = () => {
             {/* Auto-filled info banner */}
             {selectedWeeklyProg && (
 
-              <div className="rounded-xl p-4  bg-green-50 border border-green-200">
+              <div className="rounded-xl p-4 mt-4 bg-green-50 border border-green-200">
                 <div className="grid grid-cols-2 xl:grid-cols-6 gap-4">
                   <div>
                     <div className="text-slate-500 text-xs font-bold uppercase mb-1">Production Order</div>
@@ -524,14 +603,13 @@ const DailyPlanCreate: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {/* Production Date */}
                 <div>
-                  <TextInput
-                    label="Production Date *"
+                  <DatePickerCalendar
+                    label="Production Date"
                     name="productionDate"
-                    type="date"
                     required
                     value={productionDate}
                     error={formErrors.productionDate}
-                    onChange={(e) => setProductionDate(e.target.value)}
+                    onChange={(e: any) => setProductionDate(e.target.value)}
                   />
                 </div>
 
@@ -644,6 +722,41 @@ const DailyPlanCreate: React.FC = () => {
                       )} */}
                 </div>
 
+                {/* Operators */}
+                <div>
+                  <label className="form-label text-sm font-semibold text-slate-700 mb-1 block">Operators</label>
+                  {loadingAssignment ? (
+                    <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-slate-500 text-sm">
+                      <div className="animate-pulse flex gap-2 items-center">
+                        <div className="w-4 h-4 bg-slate-200 rounded-full"></div>
+                        <div className="h-2 bg-slate-200 rounded w-24"></div>
+                      </div>
+                    </div>
+                  ) : operatorName ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-1">
+                      {operatorName.split(',').map((name, index) => (
+                        <div key={index} className="flex items-center gap-3 p-3 bg-indigo-50 border border-indigo-100 rounded-xl shadow-sm">
+                          <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-xs">
+                            {index + 1}
+                          </div>
+                          <div>
+                            <p className="text-[10px] text-indigo-400 font-bold uppercase tracking-wider mb-0.5 leading-none">Operator {index + 1}</p>
+                            <p className="text-sm text-slate-800 font-semibold mb-0 leading-none">{name.trim()}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm flex flex-col gap-1">
+                      <span className="font-semibold">No operator assigned</span>
+                      {assignmentError && <span className="text-xs text-amber-600">{assignmentError}</span>}
+                    </div>
+                  )}
+                  {assignmentError && assignmentError.includes("operator") && operatorName && (
+                    <div className="text-red-500 text-xs mt-1">{assignmentError}</div>
+                  )}
+                </div>
+
                 {/* Status (only for edit) */}
                 {isEdit && (
                   <div>
@@ -676,7 +789,7 @@ const DailyPlanCreate: React.FC = () => {
                 {/* Planned Qty */}
                 <div>
                   <TextInput
-                    label="Planned Quantity (pcs) *"
+                    label="Planned Quantity (pcs)"
                     name="plannedQty"
                     type="number"
                     required
