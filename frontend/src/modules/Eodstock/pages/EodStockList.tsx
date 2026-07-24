@@ -32,6 +32,17 @@ interface EodStockItem {
 
 const ITEMS_PER_PAGE = 10;
 
+// Convert date to IST string. Needed because server/browser timezone may not be IST.
+const getISTDateString = (d: Date = new Date()) => {
+  // Convert to IST regardless of server/browser timezone
+  const istString = d.toLocaleString("en-US", { timeZone: "Asia/Kolkata" });
+  const istDate = new Date(istString);
+  const year = istDate.getFullYear();
+  const month = String(istDate.getMonth() + 1).padStart(2, "0");
+  const day = String(istDate.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
 const EodStockList: React.FC = () => {
   const [data, setData] = useState<EodStockItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -41,7 +52,7 @@ const EodStockList: React.FC = () => {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("");
   const [storeIdFilter, setStoreIdFilter] = useState<string>("");
-  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split("T")[0]);
+  const [selectedDate, setSelectedDate] = useState(() => getISTDateString());
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [simulateEmptyState, setSimulateEmptyState] = useState(false);
@@ -172,16 +183,14 @@ const EodStockList: React.FC = () => {
     alert("Export feature is a cosmetic placeholder for EOD Stock list.");
   };
 
+  // In handleResetFilters, replace the manual y/m/d block:
   const handleResetFilters = () => {
     setSearchTerm("");
     setCategoryFilter("");
     setStoreIdFilter("");
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
-    const y = yesterday.getFullYear();
-    const m = String(yesterday.getMonth() + 1).padStart(2, "0");
-    const d = String(yesterday.getDate()).padStart(2, "0");
-    setSelectedDate(`${y}-${m}-${d}`);
+    setSelectedDate(getISTDateString(yesterday));
     setSimulateEmptyState(false);
     setCurrentPage(1);
   };
@@ -190,7 +199,7 @@ const EodStockList: React.FC = () => {
     <div className="p-4 md:p-6 bg-white">
       {/* Container Card */}
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        
+
         {/* Card Header Row */}
         <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-slate-200">
           {/* Left: Title + Orange Logo Badge */}
@@ -203,7 +212,7 @@ const EodStockList: React.FC = () => {
 
           {/* Right: Interactive Filter Controls */}
           <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
-            
+
             {/* Category Dropdown Filter */}
             <div className="w-full sm:w-44">
               <select
@@ -260,11 +269,10 @@ const EodStockList: React.FC = () => {
             {/* QA/Demo Empty State Toggle Button */}
             <button
               onClick={() => setSimulateEmptyState(!simulateEmptyState)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 border text-xs font-semibold rounded-lg transition-all duration-200 ${
-                simulateEmptyState
-                  ? "bg-orange-50 border-orange-200 text-orange-600"
-                  : "bg-white border-slate-200 text-slate-500 hover:bg-slate-50"
-              }`}
+              className={`flex items-center gap-1.5 px-3 py-1.5 border text-xs font-semibold rounded-lg transition-all duration-200 ${simulateEmptyState
+                ? "bg-orange-50 border-orange-200 text-orange-600"
+                : "bg-white border-slate-200 text-slate-500 hover:bg-slate-50"
+                }`}
               title="Toggle Empty State for QA"
             >
               <span>QA: {simulateEmptyState ? "Show Data" : "Empty State"}</span>
@@ -303,8 +311,8 @@ const EodStockList: React.FC = () => {
           <FaInfoCircle size={15} className="text-[#3B82F6] flex-shrink-0" />
           <span className="font-medium">
             Stock shown as of last EOD run: <span className="text-slate-900 font-semibold">
-              {data.length > 0 
-                ? formatDateTime(data[0].recordedAt) 
+              {data.length > 0
+                ? formatDateTime(data[0].recordedAt)
                 : `${asOfDate ? formatDate(asOfDate) : formatDate(selectedDate)}, 11:59 PM`}
             </span>
           </span>

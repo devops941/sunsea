@@ -1,4 +1,5 @@
 import { prisma } from "../../../config/prisma";
+import { getISTDateParts } from "../../../utils/dateUtils";
 
 /**
  * Helper to safely upsert EOD stock snapshots without triggering Postgres ON CONFLICT 42P10 errors
@@ -64,8 +65,9 @@ export const runEodStockSnapshot = async (targetDateStr?: string) => {
     const [year, month, day] = dateStr.split("-").map(Number);
     today = new Date(Date.UTC(year, month - 1, day));
   } else {
-    today = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
-    dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    const parts = getISTDateParts(now);
+    today = new Date(Date.UTC(parts.year, parts.month, parts.day));
+    dateStr = `${parts.year}-${String(parts.month + 1).padStart(2, "0")}-${String(parts.day).padStart(2, "0")}`;
   }
 
   // Construct a fixed recordedAt timestamp at 23:59:00 in India Standard Time (+05:30)

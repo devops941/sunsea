@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import inventoryService from "./inventory.service";
 import { runEodStockSnapshot } from "./jobs/eodStockSnapshot.job";
 import { asyncHandler } from "../../utils/asyncHandler";
+import { getISTDateParts } from "../../utils/dateUtils";
 
 class InventoryController {
   /**
@@ -17,7 +18,8 @@ class InventoryController {
       targetDate = new Date(Date.UTC(year, month - 1, day));
     } else {
       const now = new Date();
-      targetDate = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
+      const parts = getISTDateParts(now);
+      targetDate = new Date(Date.UTC(parts.year, parts.month, parts.day));
     }
 
     let result = await inventoryService.getEodStock({
