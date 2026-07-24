@@ -402,10 +402,10 @@ class HourlyProductionService {
                 itemType: "WASTAGE",
                 rawMaterialId: wastage.targetWastageProductId,
                 storeId: wastage.storeId || targetProduct.storeId,
-                currentQty: targetProduct.onHandQty ?? 0,
-                adjustedQty: (targetProduct.onHandQty ?? 0) + wastage.quantity,
-                difference: wastage.quantity,
-                unitCost: targetProduct.avgCost ?? 0,
+                currentQty: Number(targetProduct.onHandQty ?? 0),
+                adjustedQty: Number(targetProduct.onHandQty ?? 0) + Number(wastage.quantity),
+                difference: Number(wastage.quantity),
+                unitCost: Number(targetProduct.avgCost ?? 0),
               }
             });
           }

@@ -13,6 +13,7 @@ import { StatusSyncService } from "../../utils/status-sync.util";
 // ============================================================
 
 const VALID_TRANSITIONS: Record<string, string[]> = {
+  DRAFT: ["DRAFT", "PLANNED", "CREATED", "WAITING_FOR_MATERIAL", "READY_FOR_PLANNING", "CANCELLED"],
   CREATED: ["WAITING_FOR_MATERIAL", "READY_FOR_PLANNING", "CANCELLED"],
   WAITING_FOR_MATERIAL: ["READY_FOR_PLANNING", "CANCELLED"],
   READY_FOR_PLANNING: ["WAITING_FOR_MATERIAL", "WEEKLY_SCHEDULED", "CANCELLED"],
