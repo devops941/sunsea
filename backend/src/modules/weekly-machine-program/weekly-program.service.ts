@@ -215,7 +215,7 @@ class WeeklyProgramService {
       }
 
       return created;
-    });
+    }, { maxWait: 15000, timeout: 30000 });
 
     return program;
   }
