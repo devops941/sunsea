@@ -1059,7 +1059,7 @@ class ProductionOrderService {
       );
 
       return { adjustmentNumber, stockAdjustmentId: stockAdjustment.id.toString() };
-    });
+    }, { maxWait: 15000, timeout: 30000 });
   }
 
   // ── Delete ────────────────────────────────────────────────────────────────

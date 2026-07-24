@@ -310,7 +310,7 @@ const RawMaterialRowInner: React.FC<RawMaterialRowInnerProps> = React.memo(({
                             />
                             {loading && (
                                 <div className="text-slate-500 text-sm mt-1">
-                                    Fetching raw materialsâ€¦
+                                    Fetching raw materials
                                 </div>
                             )}
                             {showEmpty && (
@@ -1419,8 +1419,8 @@ const ProductionOrderCreate: React.FC = () => {
                                 text={
                                     isSubmitting
                                         ? isEditMode
-                                            ? "Updatingâ€¦"
-                                            : "Creatingâ€¦"
+                                            ? "Updating"
+                                            : "Creating"
                                         : isEditMode
                                             ? "Update Order"
                                             : "Create Production Order"
