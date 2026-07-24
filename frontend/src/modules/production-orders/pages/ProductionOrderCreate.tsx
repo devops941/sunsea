@@ -136,7 +136,7 @@ const defaultValues: ProductionOrderFormValues = {
     lotNo: "",
     sourceStoreId: "",
     destinationStoreId: "",
-    status: "PLANNED",
+    status: "READY_FOR_PLANNING",
     remarks: "",
 };
 
@@ -906,7 +906,7 @@ const ProductionOrderCreate: React.FC = () => {
                         lotNo: fullOrder.lotNo || "",
                         sourceStoreId: fullOrder.sourceStoreId?.toString() || "",
                         destinationStoreId: fullOrder.destinationStoreId?.toString() || "",
-                        status: fullOrder.status || "PLANNED",
+                        status: fullOrder.status || "READY_FOR_PLANNING",
                         remarks: fullOrder.remarks || "",
                         products: (fullOrder as any).products ? (fullOrder as any).products.map((p: any) => ({
                             productItemId: p.productItemId?.toString() || p.productId?.toString() || "",
@@ -1426,7 +1426,7 @@ const ProductionOrderCreate: React.FC = () => {
                                             : "Create Production Order"
                                 }
                                 icon={isSubmitting ? undefined : FaSave}
-                                onClick={handleSubmit((data) => onSubmit({ ...data, status: data.status === "DRAFT" ? "PLANNED" : data.status }))}
+                                onClick={handleSubmit((data) => onSubmit({ ...data, status: data.status === "DRAFT" ? "READY_FOR_PLANNING" : data.status }))}
                                 type="button"
                                 disabled={isSubmitting}
                             />
