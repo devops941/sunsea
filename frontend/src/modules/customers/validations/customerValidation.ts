@@ -147,6 +147,8 @@ export const validateCustomer = (
         newErrors.creditLimit = "Credit Limit is required";
     } else if (isNaN(Number(formData.creditLimit)) || Number(formData.creditLimit) < 0) {
         newErrors.creditLimit = "Credit Limit must be a valid non-negative number";
+    } else if (Number(formData.creditLimit) < 25000) {
+        newErrors.creditLimit = "Credit Limit must be at least ₹25000";
     }
 
     if (formData.creditDays === "" || isNaN(Number(formData.creditDays))) {
@@ -159,6 +161,8 @@ export const validateCustomer = (
 
     // ---- Bank Accounts ----
     if (formData.bankAccounts && Array.isArray(formData.bankAccounts)) {
+        let hasAtLeastOneBank = false;
+
         formData.bankAccounts.forEach((bank: any, index: number) => {
             const hasAnyField = !!(
                 bank.bankHolderName?.trim() ||
@@ -170,6 +174,7 @@ export const validateCustomer = (
             );
 
             if (hasAnyField) {
+                hasAtLeastOneBank = true;
                 if (!bank.bankHolderName?.trim()) {
                     newErrors[`bankAccounts.${index}.bankHolderName`] = "Account Holder Name is required";
                 }
@@ -195,6 +200,14 @@ export const validateCustomer = (
                 }
             }
         });
+
+        if (!hasAtLeastOneBank && formData.bankAccounts.length > 0) {
+            newErrors[`bankAccounts.0.bankHolderName`] = "Account Holder Name is required";
+            newErrors[`bankAccounts.0.bankName`] = "Bank Name is required";
+            newErrors[`bankAccounts.0.accountNumber`] = "Account Number is required";
+            newErrors[`bankAccounts.0.ifscCode`] = "IFSC Code is required";
+            newErrors[`bankAccounts.0.branchName`] = "Branch is required";
+        }
     }
 
     return newErrors;

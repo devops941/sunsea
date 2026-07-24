@@ -18,9 +18,9 @@ const UOMList: React.FC = () => {
     // Filter units based on the search term
     const filteredUnits = units.filter(u => {
         const searchLower = searchTerm.toLowerCase();
-        return (u.code || '').toLowerCase().includes(searchLower) || 
-               (u.label || '').toLowerCase().includes(searchLower) ||
-               (u.category || '').toLowerCase().includes(searchLower);
+        return (u.code || '').toLowerCase().includes(searchLower) ||
+            (u.label || '').toLowerCase().includes(searchLower) ||
+            (u.category || '').toLowerCase().includes(searchLower);
     });
 
     const totalPages = Math.ceil(filteredUnits.length / ITEMS_PER_PAGE);

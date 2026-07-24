@@ -437,12 +437,11 @@ class SalesOrderService {
                 billingState: data.billingState,
                 billingPincode: data.billingPincode,
                 billingCountry: data.billingCountry || "India",
-                shippingAddressLine1: data.sameAsBilling ? data.billingAddressLine1 : data.shippingAddressLine1,
-                shippingCity: data.sameAsBilling ? data.billingCity : data.shippingCity,
-                shippingState: data.sameAsBilling ? data.billingState : data.shippingState,
-                shippingPincode: data.sameAsBilling ? data.billingPincode : data.shippingPincode,
-                shippingCountry: data.sameAsBilling ? (data.billingCountry || "India") : (data.shippingCountry || "India"),
-                sameAsBilling: data.sameAsBilling,
+                shippingAddressLine1: data.shippingAddressLine1,
+                shippingCity: data.shippingCity,
+                shippingState: data.shippingState,
+                shippingPincode: data.shippingPincode,
+                shippingCountry: data.shippingCountry || "India",
                 remarks: data.remarks,
                 dispatchType: data.dispatchType,
                 orderType: data.orderType,
@@ -627,7 +626,7 @@ class SalesOrderService {
         if (data.dispatchType !== undefined) updateData.dispatchType = data.dispatchType;
         if (data.orderType !== undefined) updateData.orderType = data.orderType;
         if (data.referenceText !== undefined) updateData.referenceText = data.referenceText;
-        if (data.sameAsBilling !== undefined) updateData.sameAsBilling = data.sameAsBilling;
+
         if (data.remarks !== undefined) updateData.remarks = data.remarks;
         if (data.internalNotes !== undefined) updateData.internalNotes = data.internalNotes;
         if (data.status !== undefined) updateData.status = data.status;
@@ -685,9 +684,6 @@ class SalesOrderService {
             updateData.shippingCountry = data.shippingCountry;
         }
 
-        if (data.sameAsBilling !== undefined) {
-            updateData.sameAsBilling = data.sameAsBilling;
-        }
 
         if (data.remarks !== undefined) {
             updateData.remarks = data.remarks;

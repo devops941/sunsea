@@ -12,10 +12,11 @@ import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import DataTable from "../../../components/ui/table/DataTable";
 import SearchInput from "../../../components/ui/SearchInput/SearchInput";
 import { FaPrint, FaEye, FaDownload, FaTimes } from "react-icons/fa";
-import { FiFileText } from "react-icons/fi";
+import { FiClipboard } from "react-icons/fi";
 import CustomButton from "../../../components/ui/Button/Button";
 import { DocumentPrintLayout } from "../../../components/common/DocumentPrintLayout";
 import { SalesOrderEstimateContent } from "../../../components/salesOrder/SalesOrderEstimateContent";
+import { ReceiptText } from "lucide-react";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -174,11 +175,25 @@ const SalesOrderList: React.FC = () => {
                                 <div className="flex justify-end items-center gap-2">
                                     <ViewButton onClick={() => handleOpenView(item)} />
                                     <button
+                                        type="button"
                                         title="View Sales Order Estimate"
                                         onClick={() => handleOpenEstimate(item.id)}
-                                        className="w-12 h-10 border border-slate-200 rounded-full text-indigo-600 bg-white hover:bg-indigo-50/30 hover:border-indigo-300 hover:text-indigo-700 hover:-translate-y-[3px] active:scale-95 hover:shadow-md transition-all duration-200 flex items-center justify-center"
+                                        className="
+    w-10 h-10
+    flex items-center justify-center
+    rounded-xl
+    border-none
+    cursor-pointer
+    bg-violet-500/10
+    text-violet-600
+    transition-all duration-300 ease-in-out
+    hover:-translate-y-[3px]
+    hover:bg-violet-500/20
+    hover:shadow-[0_8px_18px_rgba(139,92,246,0.18)]
+    active:scale-95
+  "
                                     >
-                                        <FiFileText className="text-[18px]" />
+                                        <FiClipboard className="text-[18px]" />
                                     </button>
                                     <EditButton onClick={() => handleOpenEdit(item)} />
                                     <DeleteButton onClick={() => triggerDelete(item.id)} />
