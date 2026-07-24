@@ -12,6 +12,7 @@ import { fetchEmployees } from "../../../features/employee/employeeSlice";
 import { fetchStoreTypes } from "../../../features/store-types/storeTypeSlice";
 import { z } from "zod";
 import BackButton from "../../../components/ui/BackButton/BackButton";
+import { useRoles } from "../../../hooks/useRoles";
 
 const STATUS_OPTIONS = [
     { label: "Active", value: "Active" },
@@ -72,12 +73,15 @@ const StorageStoreEdit: React.FC = () => {
     const { data: locations } = useAppSelector(state => state.locations);
     const { employees } = useAppSelector((state: any) => state.employees || { employees: [] });
     const { data: storeTypes } = useAppSelector(state => state.storeTypes);
+    const { roles, loadRoles } = useRoles();
+    const [selectedRoleId, setSelectedRoleId] = useState("");
 
     useEffect(() => {
         dispatch(fetchLocations(undefined));
         dispatch(fetchEmployees(undefined));
         dispatch(fetchStoreTypes(undefined));
-    }, [dispatch]);
+        loadRoles();
+    }, [dispatch, loadRoles]);
 
     const [formData, setFormData] = useState(initialFormState);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -249,16 +253,32 @@ const StorageStoreEdit: React.FC = () => {
                             />
 
                             <SelectInput
+                                label="Filter Incharge by Role"
+                                name="selectedRoleId"
+                                value={selectedRoleId}
+                                options={[
+                                    { label: "Select a role", value: "" },
+                                    ...(roles || []).map(r => ({ label: r.name, value: String(r.id) }))
+                                ]}
+                                onChange={(e) => {
+                                    setSelectedRoleId(e.target.value);
+                                    setFormData(prev => ({ ...prev, inchargeId: "" }));
+                                }}
+                            />
+
+                            <SelectInput
                                 label="Store Incharge"
                                 name="inchargeId"
                                 error={errors.inchargeId}
                                 value={formData.inchargeId}
                                 options={[
                                     { label: "Select an incharge", value: "" },
-                                    ...(employees || []).map((emp: any) => ({
-                                        label: `${emp.fullName} (${emp.empCode})`,
-                                        value: emp.id?.toString() || ""
-                                    }))
+                                    ...(employees || [])
+                                        .filter((emp: any) => !selectedRoleId || String(emp.user?.roleId) === selectedRoleId)
+                                        .map((emp: any) => ({
+                                            label: `${emp.fullName} (${emp.empCode})`,
+                                            value: emp.id?.toString() || ""
+                                        }))
                                 ]}
                                 onChange={handleChange}
                             />

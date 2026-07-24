@@ -114,12 +114,15 @@ const EmployeeCreatePage: React.FC = () => {
         createdBy: user ? user?.userId : undefined,
       };
 
-      if (formData.createLoginAccount) {
+      // If a role is selected but they didn't toggle createLoginAccount, auto-create one
+      // because in the database, role belongs to the User (Login Account).
+      if (formData.createLoginAccount || formData.roleId) {
+        payload.createLoginAccount = true;
         payload.loginAccount = {
-          username: formData.username,
-          password: formData.password,
+          username: formData.createLoginAccount ? formData.username : formData.empCode,
+          password: formData.createLoginAccount ? formData.password : "Sunsea@123",
           roleId: Number(formData.roleId),
-          status: formData.userStatus,
+          status: formData.userStatus || "active",
         };
       }
 
@@ -139,7 +142,10 @@ const EmployeeCreatePage: React.FC = () => {
   }, [departments]);
 
   const roleOptions = useMemo(() => {
-    return roles.map(r => ({ value: String(r.id), label: r.name }));
+    const excludedRoles = ["ROLE_ADMIN", "Super Admin", "System Administrator"];
+    return roles
+      .filter((r) => !excludedRoles.includes(r.name))
+      .map(r => ({ value: String(r.id), label: r.name }));
   }, [roles]);
 
   interface FormErrors {
@@ -194,6 +200,10 @@ const EmployeeCreatePage: React.FC = () => {
       }
     }
 
+    if (!formData.roleId) {
+      newErrors.roleId = "Role is required";
+    }
+
     if (formData.createLoginAccount) {
       if (!formData.username.trim()) {
         newErrors.username = "Username is required";
@@ -202,9 +212,6 @@ const EmployeeCreatePage: React.FC = () => {
         newErrors.password = "Password is required";
       } else if (formData.password.length < 6) {
         newErrors.password = "Password must be at least 6 characters";
-      }
-      if (!formData.roleId) {
-        newErrors.roleId = "Role is required";
       }
     }
 
@@ -221,8 +228,8 @@ const EmployeeCreatePage: React.FC = () => {
   return (
     <div className="w-full  space-y-6">
       {/* Page Header */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-        <div className="px-6 py-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      <div className="">
+        <div className="px-3 py-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <h2 className="text-2xl font-bold text-slate-800">
               Create Employee
@@ -294,6 +301,17 @@ const EmployeeCreatePage: React.FC = () => {
                 error={errors.departmentId}
               />
 
+                <SelectInput
+                  label="Role"
+                  name="roleId"
+                  value={formData.roleId}
+                  options={roleOptions}
+                  defaultOptionLabel="Select Role"
+                  required
+                  onChange={handleChange}
+                  error={errors.roleId}
+                />
+
               <SelectInput
                 label="Status"
                 name="status"
@@ -364,16 +382,7 @@ const EmployeeCreatePage: React.FC = () => {
                   error={errors.password}
                 />
 
-                <SelectInput
-                  label="Role"
-                  name="roleId"
-                  value={formData.roleId}
-                  options={roleOptions}
-                  defaultOptionLabel="Select Role"
-                  required
-                  onChange={handleChange}
-                  error={errors.roleId}
-                />
+              
 
                 <SelectInput
                   label="User Status"

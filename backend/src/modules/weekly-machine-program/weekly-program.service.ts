@@ -51,13 +51,30 @@ class WeeklyProgramService {
       where: {
         productionOrderId: data.productionOrderId,
       },
+      include: {
+        productItem: {
+          include: { billOfMaterials: { include: { rawMaterial: true } } }
+        }
+      }
     });
 
     if (!productionOrder) {
       throw new ApiError(404, "Production Order not found");
     }
 
-    if (productionOrder.status === "COMPLETED" || productionOrder.status === "DISPATCHED" || productionOrder.status === "CANCELLED") {
+    const orderTargetQtyCheck = Number(productionOrder.targetQty || 0);
+    const orderProducedQtyCheck = Number(productionOrder.producedQty || 0);
+
+    // Auto-correct PO status if it was prematurely set to COMPLETED/DISPATCHED/READY_FOR_DISPATCH but target is not met
+    if (["COMPLETED", "DISPATCHED", "READY_FOR_DISPATCH"].includes(productionOrder.status) && orderTargetQtyCheck > 0 && orderProducedQtyCheck < orderTargetQtyCheck) {
+      await prisma.productionOrder.update({
+        where: { productionOrderId: data.productionOrderId },
+        data: { status: "PARTIAL_COMPLETED" }
+      });
+      (productionOrder as any).status = "PARTIAL_COMPLETED";
+    }
+
+    if (productionOrder.status === "COMPLETED" || (productionOrder.status === "DISPATCHED" && orderProducedQtyCheck >= orderTargetQtyCheck) || productionOrder.status === "CANCELLED") {
       throw new ApiError(400, `Cannot schedule a Weekly Program for a Production Order that is already ${productionOrder.status.toLowerCase()}`);
     }
 
@@ -71,7 +88,10 @@ class WeeklyProgramService {
       );
     }
 
-    const schedulableStatuses = ["READY_FOR_PLANNING", "WEEKLY_SCHEDULED", "PARTIALLY_PLANNED", "PLANNED", "SCHEDULED"];
+    const schedulableStatuses = [
+      "READY_FOR_PLANNING", "WEEKLY_SCHEDULED", "PARTIALLY_PLANNED", "PLANNED", "SCHEDULED",
+      "PARTIAL_COMPLETED", "IN_PRODUCTION", "POST_PRODUCTION", "DAILY_PLANNED", "READY_FOR_DISPATCH"
+    ];
     if (!schedulableStatuses.includes(productionOrder.status)) {
       throw new ApiError(
         400,
@@ -160,6 +180,40 @@ class WeeklyProgramService {
 
       await StatusSyncService.syncProductionOrderStatus(tx, data.productionOrderId, userId);
 
+      // Reserve raw materials for this scheduled quantity
+      const orderTargetQty = Number(productionOrder.targetQty);
+      const plannedQty = Number(data.plannedQty);
+      
+      if (orderTargetQty > 0 && plannedQty > 0) {
+        const rawMaterialsToCheck = Array.isArray((productionOrder as any).draftRawMaterials) && (productionOrder as any).draftRawMaterials.length > 0
+          ? ((productionOrder as any).draftRawMaterials as any[])
+          : ((productionOrder as any).productItem?.billOfMaterials || []).map((bi: any) => ({
+              rawMaterialId: bi.rawMaterialId,
+              requiredQty: Number(bi.requiredQuantity) * orderTargetQty,
+            }));
+
+        for (const rm of rawMaterialsToCheck) {
+          const totalReq = Number(rm.requiredQty);
+          const reserveAmount = (totalReq / orderTargetQty) * plannedQty;
+
+          if (reserveAmount > 0 && rm.rawMaterialId) {
+            try {
+              const stock = await tx.rawMaterial.findUnique({ where: { rawMaterialId: String(rm.rawMaterialId) } });
+              if (stock) {
+                await tx.rawMaterial.update({
+                  where: { rawMaterialId: String(rm.rawMaterialId) },
+                  data: {
+                    reservedQty: { increment: reserveAmount }
+                  }
+                });
+              }
+            } catch (e) {
+              console.error("Failed to reserve material", e);
+            }
+          }
+        }
+      }
+
       return created;
     });
 
@@ -193,7 +247,10 @@ class WeeklyProgramService {
       include: {
         productionOrder: {
           include: {
-            productItem: true
+            productItem: true,
+            dailyProductionPlans: {
+              include: { machine: true, shift: true }
+            }
           }
         },
         machine: true,
@@ -336,7 +393,7 @@ class WeeklyProgramService {
     const existingProgram = await this.findById(weeklyProgramId);
 
     if (existingProgram.productionOrder) {
-      const startedStatuses = ["IN_PROGRESS", "IN_PRODUCTION", "POST_PRODUCTION", "COMPLETED", "ON_HOLD", "FG_RECEIVED", "READY_FOR_DISPATCH", "DISPATCHED"];
+      const startedStatuses = ["IN_PROGRESS", "IN_PRODUCTION", "POST_PRODUCTION", "PARTIAL_COMPLETED", "COMPLETED", "ON_HOLD", "FG_RECEIVED", "READY_FOR_DISPATCH", "DISPATCHED"];
       if (startedStatuses.includes(existingProgram.productionOrder.status) || startedStatuses.includes(existingProgram.status)) {
         throw new ApiError(400, "Cannot delete schedule because the Production Order has already started or completed production.");
       }
@@ -514,53 +571,75 @@ class WeeklyProgramService {
 
     if (!existingProgram) return null;
 
-    // Determine the actual production date from the program's week/day fields
-    // dayOfWeek: 1=Monday ... 7=Sunday
+    // ── Step 1: How much was produced in THIS shift for THIS WP ──────────────
     const weekMonday = new Date(existingProgram.weekStartDate);
     const targetDate = new Date(weekMonday);
     targetDate.setUTCDate(weekMonday.getUTCDate() + (existingProgram.dayOfWeek - 1));
     const nextDay = new Date(targetDate);
     nextDay.setUTCDate(targetDate.getUTCDate() + 1);
 
-    const aggregates = await tx.hourlyProduction.aggregate({
+    const shiftAgg = await tx.hourlyProduction.aggregate({
       where: {
         productionOrderId: existingProgram.productionOrderId,
-        productionDate: {
-          gte: targetDate,
-          lt: nextDay
-        },
+        productionDate: { gte: targetDate, lt: nextDay },
         machineId: existingProgram.machineId || undefined,
         shiftId: existingProgram.shiftId || undefined,
       },
-      _sum: {
-        qtyProduced: true
+      _sum: { qtyProduced: true }
+    });
+    const shiftTotalProduced = Number(shiftAgg._sum.qtyProduced || 0);
+
+    // ── Step 2: Complete this WP (set plannedQty to what was actually produced) ──
+    const res = await tx.weeklyMachineProgram.update({
+      where: { weeklyProgramId },
+      data: {
+        status: "COMPLETED",
+        plannedQty: shiftTotalProduced > 0 ? shiftTotalProduced : existingProgram.plannedQty,
+        machineId: null,
+        shiftId: null,
+        updatedBy: userId,
+      },
+      include: {
+        productionOrder: true,
+        machine: true,
+        shift: true,
       }
     });
 
-    const totalProduced = Number(aggregates._sum.qtyProduced || 0);
-    const originalPlannedQty = Number(existingProgram.plannedQty || 0);
-    const pendingQty = originalPlannedQty - totalProduced;
+    // ── Step 3: Compute PO-level remaining qty ───────────────────────────────
+    // 3a. Total produced across ALL hourly logs for this PO (all shifts, all dates)
+    const allPoAgg = await tx.hourlyProduction.aggregate({
+      where: { productionOrderId: existingProgram.productionOrderId },
+      _sum: { qtyProduced: true }
+    });
+    const totalAllProduced = Number(allPoAgg._sum.qtyProduced || 0);
 
-    let res;
-    if (pendingQty > 0) {
-      // 1. Complete original program at actual produced qty
-      res = await tx.weeklyMachineProgram.update({
-        where: { weeklyProgramId },
-        data: {
-          status: "COMPLETED",
-          plannedQty: totalProduced,
-          machineId: null,
-          shiftId: null,
-          updatedBy: userId,
-        },
-        include: {
-          productionOrder: true,
-          machine: true,
-          shift: true,
-        }
-      });
+    // 3b. Total already planned in other ACTIVE (not-yet-completed) WPs
+    const activeWpAgg = await tx.weeklyMachineProgram.aggregate({
+      where: {
+        productionOrderId: existingProgram.productionOrderId,
+        status: { in: ["PLANNED", "IN_PROGRESS", "APPROVED", "RELEASED"] },
+        weeklyProgramId: { not: weeklyProgramId },
+      },
+      _sum: { plannedQty: true }
+    });
+    const alreadyActivePlanned = Number(activeWpAgg._sum.plannedQty || 0);
 
-      // 2. Find next shift and day
+    // 3c. Fetch PO target and status
+    const poData = await tx.productionOrder.findUnique({
+      where: { productionOrderId: existingProgram.productionOrderId },
+      select: { targetQty: true, status: true }
+    });
+    const poTargetQty = Number(poData?.targetQty || 0);
+    const poIsComplete = ["COMPLETED", "DISPATCHED", "READY_FOR_DISPATCH", "CANCELLED"].includes(poData?.status || "");
+
+    // poRemainingQty = how much the PO still needs, after accounting for all
+    // already-produced qty AND qty already scheduled in other active WPs.
+    const poRemainingQty = Math.max(0, poTargetQty - totalAllProduced - alreadyActivePlanned);
+
+    // ── Step 4: If PO still needs more, create a carry-forward WP ───────────
+    if (poRemainingQty > 0 && !poIsComplete) {
+      // Find next shift / day
       const shifts = await tx.shift.findMany({ where: { isActive: true } });
       shifts.sort((a: any, b: any) => a.startTime.localeCompare(b.startTime));
       const currentIndex = shifts.findIndex((s: any) => s.shiftCode === (existingProgram.shiftId || ""));
@@ -580,7 +659,7 @@ class WeeklyProgramService {
         }
       }
 
-      // 3. Conflict Check
+      // Conflict check: if the target machine/shift slot is busy, leave unassigned
       let targetMachineId = existingProgram.machineId;
       let targetShiftId = nextShiftId;
 
@@ -603,7 +682,7 @@ class WeeklyProgramService {
         targetShiftId = null;
       }
 
-      // 4. Create new WeeklyMachineProgram for pending qty
+      // Create carry-forward WP for the FULL PO remaining qty
       const nextWeeklyProgramId = await this.generateNextWeeklyProgramId(tx);
       await tx.weeklyMachineProgram.create({
         data: {
@@ -613,31 +692,79 @@ class WeeklyProgramService {
           machineId: targetMachineId,
           dayOfWeek: nextDayOfWeek,
           shiftId: targetShiftId,
-          plannedQty: pendingQty,
+          plannedQty: poRemainingQty,
           status: "PLANNED",
           productionOrderId: existingProgram.productionOrderId,
-        }
-      });
-    } else {
-      // If target met/exceeded, complete the run normally
-      res = await tx.weeklyMachineProgram.update({
-        where: { weeklyProgramId },
-        data: {
-          status: "COMPLETED",
-          machineId: null,
-          shiftId: null,
-          updatedBy: userId,
-        },
-        include: {
-          productionOrder: true,
-          machine: true,
-          shift: true,
         }
       });
     }
 
     await StatusSyncService.syncProductionOrderStatus(tx, existingProgram.productionOrderId, userId);
     return res;
+  }
+
+  async delete(weeklyProgramId: string, userId?: string) {
+    const weeklyProgram = await this.findById(weeklyProgramId);
+    
+    // Prevent deletion if production has started or daily planning is done
+    const lockedStatuses = ["DAILY_PLANNED", "IN_PROGRESS", "IN_PRODUCTION", "POST_PRODUCTION", "PARTIAL_COMPLETED", "READY_FOR_DISPATCH", "DISPATCHED", "COMPLETED"];
+    if (lockedStatuses.includes(weeklyProgram.status) || lockedStatuses.includes(weeklyProgram.productionOrder?.status || "")) {
+      throw new ApiError(400, "Cannot delete weekly program once production has started.");
+    }
+
+    await prisma.$transaction(async (tx) => {
+      // 1. Un-reserve raw materials
+      const productionOrder = await tx.productionOrder.findUnique({
+        where: { productionOrderId: weeklyProgram.productionOrderId },
+        include: {
+          productItem: {
+            include: { billOfMaterials: { include: { rawMaterial: true } } }
+          }
+        }
+      });
+
+      if (productionOrder) {
+        const orderTargetQty = Number(productionOrder.targetQty);
+        const plannedQty = Number(weeklyProgram.plannedQty);
+        
+        if (orderTargetQty > 0 && plannedQty > 0) {
+          const rawMaterialsToCheck = Array.isArray((productionOrder as any).draftRawMaterials) && (productionOrder as any).draftRawMaterials.length > 0
+            ? ((productionOrder as any).draftRawMaterials as any[])
+            : ((productionOrder as any).productItem?.billOfMaterials || []).map((bi: any) => ({
+                rawMaterialId: bi.rawMaterialId,
+                requiredQty: Number(bi.requiredQuantity) * orderTargetQty,
+              }));
+
+          for (const rm of rawMaterialsToCheck) {
+            const totalReq = Number(rm.requiredQty);
+            const reserveAmount = (totalReq / orderTargetQty) * plannedQty;
+
+            if (reserveAmount > 0 && rm.rawMaterialId) {
+              try {
+                const stock = await tx.rawMaterial.findUnique({ where: { rawMaterialId: String(rm.rawMaterialId) } });
+                if (stock) {
+                  const newReserved = Math.max(0, Number(stock.reservedQty) - reserveAmount);
+                  await tx.rawMaterial.update({
+                    where: { rawMaterialId: String(rm.rawMaterialId) },
+                    data: { reservedQty: newReserved }
+                  });
+                }
+              } catch (e) {
+                console.error("Failed to un-reserve material", e);
+              }
+            }
+          }
+        }
+      }
+
+      // 2. Delete the program
+      await tx.weeklyMachineProgram.delete({
+        where: { weeklyProgramId }
+      });
+
+      // 3. Sync Production Order Status (reverts to READY_FOR_PLANNING if no schedules left)
+      await StatusSyncService.syncProductionOrderStatus(tx, weeklyProgram.productionOrderId, userId);
+    });
   }
 
   async generateNextWeeklyProgramId(tx: any): Promise<string> {

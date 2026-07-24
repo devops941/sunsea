@@ -282,53 +282,11 @@ export const ProductionOrderViewModal: React.FC<ProductionOrderViewModalProps> =
                                         plans.push({
                                             id: plan.dailyPlanId,
                                             date: plan.productionDate ? new Date(plan.productionDate).toLocaleDateString() : '-',
-                                            shiftName: plan.shift?.shiftName || plan.shiftId || 'Shift 1',
+                                            shiftName: plan.shift?.shiftName || plan.shiftId || '-',
                                             machineName: plan.machine?.machineName || plan.machineId || fullOrder?.Machine?.machineName || (order as any)?.machineName || '-',
                                             plannedQty: Number(plan.plannedQty || 0),
                                             producedQty: producedForPlan,
                                             status: plan.status || 'PLANNED'
-                                        });
-                                    });
-                                }
-
-                                if (fullOrder?.weeklyMachinePrograms && fullOrder.weeklyMachinePrograms.length > 0) {
-                                    fullOrder.weeklyMachinePrograms.forEach((prog: any) => {
-                                        if (prog.weeklyProgramId && coveredWeeklyProgramIds.has(prog.weeklyProgramId)) {
-                                            return;
-                                        }
-
-                                        let producedForProg = 0;
-                                        const dPlans = prog.dailyProductionPlans || prog.dailyPlans;
-                                        if (dPlans && dPlans.length > 0) {
-                                            dPlans.forEach((dp: any) => {
-                                                const hSum = dp.hourlyProductions?.reduce((acc: number, curr: any) => acc + Number(curr.qtyProduced || 0), 0) || 0;
-                                                producedForProg += dp.status === 'COMPLETED' ? Math.max(Number(dp.plannedQty || 0), hSum) : hSum;
-                                            });
-                                        } else if (prog.status === 'COMPLETED' || fullOrder?.status === 'COMPLETED' || fullOrder?.status === 'READY_FOR_DISPATCH' || fullOrder?.status === 'DISPATCHED') {
-                                            producedForProg = Number(prog.plannedQty || 0);
-                                        } else if (Number(fullOrder?.producedQty || 0) > 0) {
-                                            producedForProg = Number(fullOrder?.producedQty || 0);
-                                        }
-                                        
-                                        let progDateStr = '-';
-                                        if (prog.weekStartDate) {
-                                            const dt = new Date(prog.weekStartDate);
-                                            if (prog.dayOfWeek !== undefined) {
-                                                dt.setDate(dt.getDate() + Number(prog.dayOfWeek));
-                                            }
-                                            progDateStr = dt.toLocaleDateString();
-                                        } else if (fullOrder?.orderDate) {
-                                            progDateStr = new Date(fullOrder.orderDate).toLocaleDateString();
-                                        }
-
-                                        plans.push({
-                                            id: prog.weeklyProgramId,
-                                            date: progDateStr,
-                                            shiftName: prog.shift?.shiftName || prog.shiftId || 'Shift 1',
-                                            machineName: prog.machine?.machineName || prog.machineId || fullOrder?.Machine?.machineName || (order as any)?.machineName || '-',
-                                            plannedQty: Number(prog.plannedQty || 0),
-                                            producedQty: producedForProg,
-                                            status: prog.status || 'PLANNED'
                                         });
                                     });
                                 }
