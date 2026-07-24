@@ -55,20 +55,28 @@ export class GoodsDispatchService {
     }
 
     const orders = await prisma.productionOrder.findMany({
-      where,
+      where: {
+        ...where,
+        // ✅ STEP 8: Only READY_FOR_DISPATCH or PARTIAL_COMPLETED orders are eligible for dispatch
+        // (COMPLETED tolerated for legacy)
+        status: { in: ["READY_FOR_DISPATCH", "COMPLETED", "PARTIAL_COMPLETED"] },
+      },
       include: {
-        productItem: { select: { id: true, productName: true, productCode: true, uom: true } },
-        Machine: { select: { machineId: true, machineName: true } },
+        productItem: true,
+        Machine: true,
         goodsDispatchItems: {
-          where: {
-            dispatch: {
-              status: {
-                notIn: ["GATE_REJECTED", "STORE_REJECTED"],
-              },
-            },
+          select: {
+            dispatchQty: true,
           },
-          select: { dispatchQty: true },
         },
+        dailyProductionPlans: {
+          select: {
+            status: true,
+            hourlyProductions: {
+              select: { qtyProduced: true }
+            }
+          }
+        }
       },
       orderBy: { orderDate: "desc" },
     });
@@ -78,7 +86,21 @@ export class GoodsDispatchService {
         (sum, item) => sum + Number(item.dispatchQty),
         0
       );
-      const pendingQty = Math.max(0, Number(o.producedQty) - totalDispatched);
+      
+      // Calculate dispatchable produced qty
+      let dispatchableProducedQty = 0;
+      if (o.status === "PARTIAL_COMPLETED") {
+        // For partial, only count quantities from plans that finished post-production
+        const finishedPlans = o.dailyProductionPlans.filter((p: any) => p.status === "COMPLETED" || p.status === "SHORT_CLOSED");
+        dispatchableProducedQty = finishedPlans.reduce((sum, p) => {
+          return sum + p.hourlyProductions.reduce((hSum: number, h: any) => hSum + Number(h.qtyProduced), 0);
+        }, 0);
+      } else {
+        // For fully completed, everything produced is dispatchable
+        dispatchableProducedQty = Number(o.producedQty);
+      }
+
+      const pendingQty = Math.max(0, dispatchableProducedQty - totalDispatched);
       return {
         productionOrderId: o.productionOrderId,
         orderDate: o.orderDate,
@@ -87,7 +109,7 @@ export class GoodsDispatchService {
         lotNo: o.lotNo,
         uom: o.uom,
         status: o.status,
-        producedQty: Number(o.producedQty),
+        producedQty: dispatchableProducedQty, // Provide the dispatchable qty instead of raw producedQty
         totalDispatchedQty: totalDispatched,
         pendingDispatchQty: pendingQty,
         productItem: o.productItem,
@@ -121,8 +143,8 @@ export class GoodsDispatchService {
         throw new ApiError(404, `Production Order ${item.productionOrderId} not found`);
       }
 
-      // ✅ STEP 8 RULE: Only READY_FOR_DISPATCH (or legacy COMPLETED) orders can be dispatched
-      if (!['READY_FOR_DISPATCH', 'COMPLETED'].includes(po.status)) {
+      // ✅ STEP 8 RULE: Only READY_FOR_DISPATCH, PARTIAL_COMPLETED (or legacy COMPLETED) orders can be dispatched
+      if (!['READY_FOR_DISPATCH', 'COMPLETED', 'PARTIAL_COMPLETED'].includes(po.status)) {
         throw new ApiError(
           400,
           `Production Order ${item.productionOrderId} is not eligible for dispatch. ` +
@@ -460,31 +482,50 @@ export class GoodsDispatchService {
           },
         });
 
-        // ✅ STEP 8 FINAL: Mark Production Order as DISPATCHED
+        // ✅ STEP 8 FINAL: Mark Production Order status (DISPATCHED if target met, PARTIAL_COMPLETED if partial)
         if (item.productionOrderId) {
           const poRecord = await tx.productionOrder.findUnique({
             where: { productionOrderId: item.productionOrderId },
           });
-          if (poRecord && ["READY_FOR_DISPATCH", "COMPLETED"].includes(poRecord.status)) {
-            await tx.productionOrder.update({
+          if (poRecord) {
+            const targetQty = Number(poRecord.targetQty || 0);
+            const producedQty = Number(poRecord.producedQty || 0);
+
+            // Sum up total dispatched quantity for this PO across all dispatch records
+            const allDispatches = await tx.goodsDispatchItem.aggregate({
               where: { productionOrderId: item.productionOrderId },
-              data: { status: "DISPATCHED", updatedBy: userId },
+              _sum: { dispatchQty: true },
             });
-            await tx.productionOrderHistory.create({
-              data: {
-                productionOrderId: item.productionOrderId,
-                fromStatus: poRecord.status,
-                toStatus: "DISPATCHED",
-                changedBy: userId,
-                remarks: `Goods dispatched and received at warehouse via ${dispatch.dispatchNumber}. Finished goods stock updated.`,
-                action: "DISPATCH_COMPLETE",
-                metadata: {
-                  dispatchNumber: dispatch.dispatchNumber,
-                  receivedQty,
-                  storeId,
+            const totalDispatched = Number(allDispatches._sum.dispatchQty || 0);
+
+            const isFullyDispatched = targetQty > 0 && (totalDispatched >= targetQty || (producedQty >= targetQty && totalDispatched >= producedQty));
+            const newPoStatus = isFullyDispatched ? "DISPATCHED" : "PARTIAL_COMPLETED";
+
+            if (poRecord.status !== newPoStatus) {
+              await tx.productionOrder.update({
+                where: { productionOrderId: item.productionOrderId },
+                data: { status: newPoStatus, updatedBy: userId },
+              });
+              await tx.productionOrderHistory.create({
+                data: {
+                  productionOrderId: item.productionOrderId,
+                  fromStatus: poRecord.status,
+                  toStatus: newPoStatus,
+                  changedBy: userId,
+                  remarks: isFullyDispatched
+                    ? `Goods fully dispatched (${totalDispatched}/${targetQty} pcs) via ${dispatch.dispatchNumber}.`
+                    : `Partial goods dispatched (${totalDispatched}/${targetQty} pcs) via ${dispatch.dispatchNumber}. Status updated to PARTIAL_COMPLETED.`,
+                  action: isFullyDispatched ? "DISPATCH_COMPLETE" : "DISPATCH_PARTIAL",
+                  metadata: {
+                    dispatchNumber: dispatch.dispatchNumber,
+                    receivedQty,
+                    totalDispatched,
+                    targetQty,
+                    storeId,
+                  },
                 },
-              },
-            });
+              });
+            }
           }
         }
       }

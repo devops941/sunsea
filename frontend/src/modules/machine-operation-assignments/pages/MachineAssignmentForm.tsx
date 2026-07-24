@@ -30,6 +30,23 @@ export const MachineAssignmentForm: React.FC = () => {
     };
   };
 
+  const getWeekRangeForDate = (dateString: string) => {
+    const d = new Date(dateString);
+    if (isNaN(d.getTime())) return null;
+    const day = d.getDay();
+    const diffToMonday = day === 0 ? -6 : 1 - day;
+    const monday = new Date(d);
+    monday.setDate(d.getDate() + diffToMonday);
+    
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+
+    return {
+      start: monday.toISOString().split("T")[0],
+      end: sunday.toISOString().split("T")[0],
+    };
+  };
+
   const currentWeek = getMondayAndSunday(0);
 
   const initialFormState = {
@@ -291,7 +308,7 @@ export const MachineAssignmentForm: React.FC = () => {
 
   return (
     <div className="w-full mx-auto">
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+      <div className="bg-white  shadow-sm border border-slate-200 overflow-hidden">
         <div className="px-6 py-5 border-b border-slate-200">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <h2 className="text-xl font-bold text-slate-800">
@@ -313,7 +330,14 @@ export const MachineAssignmentForm: React.FC = () => {
                 name="weekStartDate"
                 required
                 value={formData.weekStartDate}
-                onChange={(e: any) => setFormData({ ...formData, weekStartDate: e.target.value })}
+                onChange={(e: any) => {
+                  const range = getWeekRangeForDate(e.target.value);
+                  if (range) {
+                    setFormData({ ...formData, weekStartDate: range.start, weekEndDate: range.end });
+                  } else {
+                    setFormData({ ...formData, weekStartDate: e.target.value });
+                  }
+                }}
                 error={errors.weekStartDate}
               />
               <DatePickerCalendar
@@ -321,7 +345,14 @@ export const MachineAssignmentForm: React.FC = () => {
                 name="weekEndDate"
                 required
                 value={formData.weekEndDate}
-                onChange={(e: any) => setFormData({ ...formData, weekEndDate: e.target.value })}
+                onChange={(e: any) => {
+                  const range = getWeekRangeForDate(e.target.value);
+                  if (range) {
+                    setFormData({ ...formData, weekStartDate: range.start, weekEndDate: range.end });
+                  } else {
+                    setFormData({ ...formData, weekEndDate: e.target.value });
+                  }
+                }}
                 error={errors.weekEndDate}
               />
               <SelectInput

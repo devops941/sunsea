@@ -23,6 +23,7 @@ import { rawMaterialService } from "../../../services/rawMaterialService";
 import { productService } from "../../../services/productService";
 import { billOfMaterialService } from "../../../services/billOfMaterialService";
 import BackButton from "../../../components/ui/BackButton/BackButton";
+import CommonLoader from "../../../components/ui/Loader/CommonLoader";
 
 
 
@@ -125,7 +126,7 @@ const defaultValues: ProductionOrderFormValues = {
     id: undefined,
     sourceSalesOrderId: "",
     sourceSalesOrderLineId: "",
-    products: [{ productItemId: "", targetQty: 0, damageQty: 0, uom: "PCS", sourceSalesOrderLineId: "", rawMaterials: [{ rawMaterialId: "", requiredQty: "", uom: "", storeId: "", remarks: "" }] }],
+    products: [{ productItemId: "", targetQty: 0, damageQty: 0, uom: "ea", sourceSalesOrderLineId: "", rawMaterials: [{ rawMaterialId: "", requiredQty: "", uom: "", storeId: "", remarks: "" }] }],
     productionOrderId: "",
     orderDate: today,
     dueDate: nextWeek,
@@ -276,7 +277,7 @@ const RawMaterialRowInner: React.FC<RawMaterialRowInnerProps> = React.memo(({
                             value={field.value}
                             options={storeOptions}
                             defaultOptionLabel="Select Store"
-                            disabled={true}
+                            disabled={false}
                             onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
                                 field.onChange(e);
                                 onStoreChange(index, e.target.value);
@@ -300,7 +301,7 @@ const RawMaterialRowInner: React.FC<RawMaterialRowInnerProps> = React.memo(({
                                 value={field.value}
                                 options={filteredOptions}
                                 defaultOptionLabel={rmPlaceholder}
-                                disabled={true}
+                                disabled={rmDisabled}
                                 onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
                                     field.onChange(e);
                                     onRmChange(index, e.target.value);
@@ -335,7 +336,7 @@ const RawMaterialRowInner: React.FC<RawMaterialRowInnerProps> = React.memo(({
                             baseUoms={baseUoms}
                             error={errors?.requiredQty?.message || errors?.uom?.message}
                             onChange={(e: any) => field.onChange(e.target.value)}
-                            disabled={true}
+                            disabled={false}
                         />
                     )}
                 />
@@ -386,6 +387,7 @@ interface ProductRawMaterialsSectionProps {
     handleRmChange: (productIndex: number, idx: number, rmValue: string, fieldId: string) => void;
     fetchRawMaterialsForStore: (storeId: string, fieldId: string) => void;
     setValue: any;
+    isCalculatingRM?: boolean;
 }
 
 const ProductRawMaterialsSection: React.FC<ProductRawMaterialsSectionProps> = React.memo(({
@@ -400,6 +402,7 @@ const ProductRawMaterialsSection: React.FC<ProductRawMaterialsSectionProps> = Re
     handleRmChange,
     fetchRawMaterialsForStore,
     setValue,
+    isCalculatingRM,
 }) => {
     const { fields, append, remove } = useFieldArray({
         control,
@@ -407,11 +410,18 @@ const ProductRawMaterialsSection: React.FC<ProductRawMaterialsSectionProps> = Re
     });
 
     return (
-        <div className="md:col-span-12 mt-3">
+        <div className="md:col-span-12 mt-3 relative min-h-[150px]">
+            {isCalculatingRM && (
+                <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/70 backdrop-blur-[2px] rounded-lg overflow-hidden">
+                    <div className="scale-[0.6] origin-center -mt-6">
+                        <CommonLoader text="Calculating..." fullScreen={false} />
+                    </div>
+                </div>
+            )}
             <div className="flex justify-between items-center mb-2">
-                <h6 className="text-lg font-bold text-slate-800 mb-6">
+                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
                     Manual Raw Materials ({productName || `Product ${productIndex + 1}`})
-                </h6>
+                </h3>
                 <CustomButton
                     text="Add Material Row"
                     icon={FaPlus}
@@ -511,6 +521,7 @@ const ProductionOrderCreate: React.FC = () => {
     const [selectedSalesOrder, setSelectedSalesOrder] = useState<any>(null);
     const [selectedSalesOrderItems, setSelectedSalesOrderItems] = useState<any[]>([]);
     const [isFetchingSalesOrder, setIsFetchingSalesOrder] = useState(false);
+    const [isCalculatingRM, setIsCalculatingRM] = useState(false);
 
     // â”€â”€ Per-row raw material state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // Each element corresponds to one rawMaterials field-array row.
@@ -643,6 +654,7 @@ const ProductionOrderCreate: React.FC = () => {
     }, []);
 
     // â”€â”€ Sales Order watch â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ————————————————————————————————————————————————————————————————————————————————
     useEffect(() => {
         if (!watchSalesOrderId) {
             setSelectedSalesOrder(null);
@@ -713,122 +725,142 @@ const ProductionOrderCreate: React.FC = () => {
     const lastCalculatedProductStates = React.useRef<Record<number, string>>({});
     useEffect(() => {
         if (isEditMode && !initialTargetQtyLoaded) {
-            // First time it runs in edit mode, skip recalculation so we don't wipe draft RM qtys
             setInitialTargetQtyLoaded(true);
             return;
         }
 
         if (watchProducts && watchProducts.length > 0) {
+            let needsCalculation = false;
             watchProducts.forEach((prod, pIdx) => {
                 if (!prod.productItemId) return;
                 const targetQty = Number(prod.targetQty) || 0;
-
-                // Allow auto-fill even when target quantity is 0 (it will just show 0 or base damageQty required)
-                const product = products.find(p => p.id?.toString() === prod.productItemId);
                 const damageQty = prod.damageQty !== undefined ? Number(prod.damageQty) : 0;
-                const totalQty = targetQty + damageQty;
-
-                // Create a state key based on product ID and quantities
                 const currentStateKey = `${prod.productItemId}-${targetQty}-${damageQty}`;
-
-                // If the state key hasn't changed, skip recalculation (allows manual edits to requiredQty)
-                if (lastCalculatedProductStates.current[pIdx] === currentStateKey) {
-                    return;
+                if (lastCalculatedProductStates.current[pIdx] !== currentStateKey) {
+                    needsCalculation = true;
                 }
+            });
 
-                // Update the ref to the current state
-                lastCalculatedProductStates.current[pIdx] = currentStateKey;
+            if (!needsCalculation) return;
 
-                const currentRms = getValues(`products.${pIdx}.rawMaterials`) || [];
-                const productBoms = product?.billOfMaterials || [];
+            setIsCalculatingRM(true);
 
-                if (productBoms && productBoms.length > 0) {
-                    const weight = product ? (Number(product.weightPerPiece) || 0) : 0;
-                    const totalWeight = totalQty * weight;
+            setTimeout(() => {
+                watchProducts.forEach((prod, pIdx) => {
+                    if (!prod.productItemId) return;
+                    const targetQty = Number(prod.targetQty) || 0;
+                    const damageQty = prod.damageQty !== undefined ? Number(prod.damageQty) : 0;
+                    const totalQty = targetQty + damageQty;
+                    const currentStateKey = `${prod.productItemId}-${targetQty}-${damageQty}`;
                     
-                    const expectedRms = productBoms.map((bomItem: any) => {
-                        let reqQty = 0;
-                        const rawPercentage = Number(bomItem.percentage);
-                        if (rawPercentage > 0) {
-                            reqQty = totalWeight * (rawPercentage / 100);
-                        } else {
-                            const perPieceQty = Number(bomItem.requiredQuantity) || 0;
-                            reqQty = totalQty * perPieceQty;
+                    if (lastCalculatedProductStates.current[pIdx] === currentStateKey) {
+                        return;
+                    }
+                    lastCalculatedProductStates.current[pIdx] = currentStateKey;
+
+                    const product = products.find(p => p.id?.toString() === prod.productItemId);
+                    const currentRms = getValues(`products.${pIdx}.rawMaterials`) || [];
+                    const productBoms = product?.billOfMaterials || [];
+
+                    if (productBoms && productBoms.length > 0) {
+                        const weight = product ? (Number(product.weightPerPiece) || 0) : 0;
+                        const totalWeight = totalQty * weight;
+                        
+                        const expectedRms = productBoms.map((bomItem: any) => {
+                            let reqQty = 0;
+                            const rawPercentage = Number(bomItem.percentage);
+                            if (rawPercentage > 0) {
+                                reqQty = totalWeight * (rawPercentage / 100);
+                            } else {
+                                const perPieceQty = Number(bomItem.requiredQuantity) || 0;
+                                reqQty = totalQty * perPieceQty;
+                            }
+                            return {
+                                rawMaterialId: bomItem.rawMaterialId?.toString() || "",
+                                requiredQty: String(reqQty.toFixed(3)),
+                                uom: bomItem.rawMaterial?.baseUom || "KG",
+                                storeId: bomItem.rawMaterial?.storeId?.toString() || "",
+                                remarks: ""
+                            };
+                        });
+
+                        let updated = false;
+                        const newRms = [...currentRms];
+                        expectedRms.forEach((expected: any, idx: number) => {
+                            if (newRms[idx]) {
+                                if (newRms[idx].requiredQty !== expected.requiredQty || newRms[idx].remarks !== expected.remarks || newRms[idx].rawMaterialId !== expected.rawMaterialId || newRms[idx].storeId !== expected.storeId) {
+                                    setValue(`products.${pIdx}.rawMaterials.${idx}.requiredQty`, expected.requiredQty);
+                                    setValue(`products.${pIdx}.rawMaterials.${idx}.remarks`, expected.remarks);
+                                    if (newRms[idx].rawMaterialId !== expected.rawMaterialId) {
+                                        setValue(`products.${pIdx}.rawMaterials.${idx}.rawMaterialId`, expected.rawMaterialId);
+                                    }
+                                    if (newRms[idx].storeId !== expected.storeId) {
+                                        setValue(`products.${pIdx}.rawMaterials.${idx}.storeId`, expected.storeId);
+                                    }
+                                    updated = true;
+                                }
+                            } else {
+                                newRms.push({
+                                    rawMaterialId: expected.rawMaterialId,
+                                    requiredQty: expected.requiredQty,
+                                    uom: expected.uom,
+                                    storeId: expected.storeId,
+                                    remarks: expected.remarks
+                                });
+                                updated = true;
+                            }
+                        });
+
+                        if (newRms.length > expectedRms.length) {
+                            newRms.length = expectedRms.length;
+                            updated = true;
                         }
-                        return {
-                            rawMaterialId: bomItem.rawMaterialId?.toString() || "",
+
+                        if (updated) {
+                            setValue(`products.${pIdx}.rawMaterials`, newRms);
+                        }
+                    } else {
+                        const weight = product ? (Number(product.weightPerPiece) || 0) : 0;
+                        const reqQty = totalQty * weight;
+
+                        let updated = false;
+                        const newRms = [...currentRms];
+                        const expected = {
+                            rawMaterialId: "",
                             requiredQty: String(reqQty.toFixed(3)),
-                            uom: bomItem.rawMaterial?.baseUom || "KG",
-                            storeId: bomItem.rawMaterial?.storeId?.toString() || "",
+                            uom: "KG",
                             remarks: ""
                         };
-                    });
 
-                    let updated = false;
-                    const newRms = [...currentRms];
-                    expectedRms.forEach((expected: any, idx: number) => {
-                        if (newRms[idx]) {
-                            if (newRms[idx].requiredQty !== expected.requiredQty || newRms[idx].remarks !== expected.remarks || newRms[idx].rawMaterialId !== expected.rawMaterialId || newRms[idx].storeId !== expected.storeId) {
-                                setValue(`products.${pIdx}.rawMaterials.${idx}.requiredQty`, expected.requiredQty);
-                                setValue(`products.${pIdx}.rawMaterials.${idx}.remarks`, expected.remarks);
-                                if (newRms[idx].rawMaterialId !== expected.rawMaterialId) {
-                                    setValue(`products.${pIdx}.rawMaterials.${idx}.rawMaterialId`, expected.rawMaterialId);
-                                }
-                                if (newRms[idx].storeId !== expected.storeId) {
-                                    setValue(`products.${pIdx}.rawMaterials.${idx}.storeId`, expected.storeId);
-                                }
+                        if (newRms[0]) {
+                            if (newRms[0].requiredQty !== expected.requiredQty || newRms[0].remarks !== expected.remarks) {
+                                setValue(`products.${pIdx}.rawMaterials.0.requiredQty`, expected.requiredQty);
+                                setValue(`products.${pIdx}.rawMaterials.0.remarks`, expected.remarks);
                                 updated = true;
                             }
                         } else {
                             newRms.push({
-                                rawMaterialId: expected.rawMaterialId,
+                                rawMaterialId: "",
                                 requiredQty: expected.requiredQty,
                                 uom: expected.uom,
-                                storeId: expected.storeId,
+                                storeId: "",
                                 remarks: expected.remarks
                             });
                             updated = true;
                         }
-                    });
 
-                    if (updated) {
-                        setValue(`products.${pIdx}.rawMaterials`, newRms);
-                    }
-                } else {
-                    const weight = product ? (Number(product.weightPerPiece) || 0) : 0;
-                    const reqQty = totalQty * weight;
-
-                    let updated = false;
-                    const newRms = [...currentRms];
-                    const expected = {
-                        rawMaterialId: "",
-                        requiredQty: String(reqQty.toFixed(3)),
-                        uom: "KG",
-                        remarks: ""
-                    };
-
-                    if (newRms[0]) {
-                        if (newRms[0].requiredQty !== expected.requiredQty || newRms[0].remarks !== expected.remarks) {
-                            setValue(`products.${pIdx}.rawMaterials.0.requiredQty`, expected.requiredQty);
-                            setValue(`products.${pIdx}.rawMaterials.0.remarks`, expected.remarks);
+                        if (newRms.length > 1) {
+                            newRms.length = 1;
                             updated = true;
                         }
-                    } else {
-                        newRms.push({
-                            rawMaterialId: "",
-                            requiredQty: expected.requiredQty,
-                            uom: expected.uom,
-                            storeId: "",
-                            remarks: expected.remarks
-                        });
-                        updated = true;
-                    }
 
-                    if (updated) {
-                        setValue(`products.${pIdx}.rawMaterials`, newRms);
+                        if (updated) {
+                            setValue(`products.${pIdx}.rawMaterials`, newRms);
+                        }
                     }
-                }
-            });
+                });
+                setIsCalculatingRM(false);
+            }, 50);
         }
     }, [watchProducts, selectedSalesOrderItems, products, boms, watchSalesOrderId, setValue, getValues, initialTargetQtyLoaded, isEditMode]);
 
@@ -932,8 +964,12 @@ const ProductionOrderCreate: React.FC = () => {
 
 
 
+    const submitLock = React.useRef(false);
+
     // ── Submit ──────────────────────────────────────────────────────────────────
     const onSubmit = async (data: ProductionOrderFormValues) => {
+        if (submitLock.current) return;
+        submitLock.current = true;
         setIsSubmitting(true);
         try {
             if (isEditMode && orderId) {
@@ -1008,30 +1044,29 @@ const ProductionOrderCreate: React.FC = () => {
                 "Failed to save production order"
             );
         } finally {
+            submitLock.current = false;
             setIsSubmitting(false);
         }
     };
 
     return (
-        <div className="min-h-screen bg-white">
-            <div className="bg-white shadow-sm border border-slate-200">
+        <div className="w-full mx-auto">
+            <div className="bg-white shadow-sm border border-slate-200 overflow-hidden">
                 {/* Page Header */}
-                <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 ">
-                    <div>
-                        <h2 className="text-2xl font-bold text-slate-800">
+                <div className="px-6 py-5 border-b border-slate-200">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <h2 className="text-xl font-bold text-slate-800">
                             {isEditMode
                                 ? "Edit Production Order"
                                 : "Create Production Order"}
                         </h2>
-                    </div>
-                    <div>
                         <BackButton text="Back to List" to="/production-orders" />
                     </div>
                 </div>
 
                 <form
                     onSubmit={handleSubmit(onSubmit)}
-                    className="space-y-6 px-4 md:px-6 pb-6"
+                    className="px-6 py-5 space-y-6"
                     noValidate
                 >
                     <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
@@ -1040,9 +1075,9 @@ const ProductionOrderCreate: React.FC = () => {
                         {watchSalesOrderId && (
                             <>
                                 <div className="md:col-span-12">
-                                    <h6 className="text-lg font-bold text-slate-800 mb-6">
+                                    <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-4">
                                         1. Selected Sales Order
-                                    </h6>
+                                    </h3>
                                     <div className="p-0" >
                                         {isFetchingSalesOrder ? (
                                             <div className="text-slate-500">
@@ -1102,9 +1137,9 @@ const ProductionOrderCreate: React.FC = () => {
                                 </div>
                                 {selectedSalesOrderItems.length > 0 && (
                                     <div className="md:col-span-12 mt-3 mb-3">
-                                        <h6 className="font-semibold text-slate-800 mb-3">
+                                        <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
                                             Sales Order Items
-                                        </h6>
+                                        </h3>
                                         <div className="mt-2 mb-4 border rounded-lg border-slate-200 shadow-sm overflow-hidden">
                                             <DataTable
                                                 columns={salesOrderColumns}
@@ -1121,9 +1156,9 @@ const ProductionOrderCreate: React.FC = () => {
                         )}
                         <div className="md:col-span-12">
                             <div className="flex justify-between items-center mb-3">
-                                <h6 className="text-lg font-bold text-slate-800 mb-6 ">
+                                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
                                     {watchSalesOrderId ? "2. Production Item Details" : "1. Direct Production Item Details"}
-                                </h6>
+                                </h3>
                                 {!watchSalesOrderId && (
                                     <CustomButton
                                         text="Add Production"
@@ -1167,7 +1202,7 @@ const ProductionOrderCreate: React.FC = () => {
                                                                 field.onChange(e);
                                                                 const p = products.find((x) => x.id?.toString() === e.target.value);
                                                                 if (p) {
-                                                                    setValue(`products.${index}.uom` as any, p.uom?.name || p.uom?.uomCode || "PCS");
+                                                                    setValue(`products.${index}.uom` as any, p.uom?.name || p.uom?.uomCode || "ea");
                                                                 }
                                                             }}
                                                             required
@@ -1235,6 +1270,7 @@ const ProductionOrderCreate: React.FC = () => {
                                                 handleRmChange={handleRmChange}
                                                 fetchRawMaterialsForStore={fetchRawMaterialsForStore}
                                                 setValue={setValue}
+                                                isCalculatingRM={isCalculatingRM}
                                             />
                                         </div>
                                     </div>
@@ -1267,6 +1303,7 @@ const ProductionOrderCreate: React.FC = () => {
                                                     value={field.value ? field.value.substring(0, 10) : ""}
                                                     onChange={(e) => field.onChange(e.target.value)}
                                                     required
+                                                    minDate={watch("orderDate")}
                                                     error={errors.dueDate?.message}
                                                 />
                                             )}
@@ -1348,7 +1385,7 @@ const ProductionOrderCreate: React.FC = () => {
                                             label="Remarks"
                                             name={field.name}
                                             value={field.value ?? ""}
-                                            placeholder="Any remarks for this orderâ€¦"
+                                            placeholder="Any remarks for this order"
                                             rows={2}
                                             onChange={field.onChange}
                                         />

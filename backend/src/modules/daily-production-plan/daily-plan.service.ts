@@ -43,6 +43,14 @@ class DailyPlanService {
     if (!productionOrder) {
       throw new ApiError(404, `Production Order with ID ${data.productionOrderId} not found`);
     }
+    const targetQty = Number(productionOrder.targetQty || 0);
+    const producedQty = Number(productionOrder.producedQty || 0);
+    if (targetQty > 0 && producedQty >= targetQty) {
+      throw new ApiError(
+        400,
+        `Cannot create Daily Plan: Target quantity of ${targetQty} pcs has already been fully produced.`
+      );
+    }
 
     // ✅ STEP 4 RULE: Daily Planning only allowed for WEEKLY_SCHEDULED orders
     // Also allow legacy SCHEDULED and DAILY_PLANNED (for re-planning an existing day)
@@ -51,12 +59,15 @@ class DailyPlanService {
       "SCHEDULED",       // legacy alias
       "DAILY_PLANNED",   // already daily planned, adding another shift
       "IN_PROGRESS",     // allow creating plans for orders currently in progress (e.g. next shift/day)
+      "POST_PRODUCTION", // allow carrying forward production even if previous shifts are in post-production
+      "PARTIAL_COMPLETED", // allow planning remaining quantity for partially completed orders
+      "READY_FOR_DISPATCH", // allow planning remaining quantity if target is not yet fully met
     ];
     if (!dailyPlanAllowedStatuses.includes(productionOrder.status)) {
       throw new ApiError(
         400,
-        `Cannot create Daily Plan: Production Order must have status WEEKLY_SCHEDULED. Current status: ${productionOrder.status}. ` +
-        `Please create a Weekly Machine Program first.`
+        `Cannot create Daily Plan: Production Order status must be schedulable. Current status: ${productionOrder.status}. ` +
+        `Please ensure the Production Order is active.`
       );
     }
 
@@ -254,11 +265,11 @@ class DailyPlanService {
         data.status === "IN_PROGRESS" &&
         existingPlan.status !== "IN_PROGRESS"
       ) {
-        if (!["DAILY_PLANNED", "IN_PRODUCTION", "IN_PROGRESS", "WEEKLY_SCHEDULED", "MATERIAL_ISSUED"].includes(productionOrder.status)) {
+        if (!["DAILY_PLANNED", "IN_PRODUCTION", "IN_PROGRESS", "WEEKLY_SCHEDULED", "MATERIAL_ISSUED", "POST_PRODUCTION", "PARTIAL_COMPLETED"].includes(productionOrder.status)) {
           throw new ApiError(
             400,
             `Daily Plan cannot be started because the Production Order status is "${productionOrder.status}". ` +
-            `Please ensure the production order is in DAILY_PLANNED status and use the Start Production action.`
+            `Please ensure the production order is active and use the Start Production action.`
           );
         }
       }
@@ -294,53 +305,73 @@ class DailyPlanService {
           if (data.status === "POST_PRODUCTION" && existingPlan.status !== "POST_PRODUCTION") {
             // First time entering POST_PRODUCTION
             const firstStepName = totalCustomStepsCount > 0 ? customSteps[0].stepKey : "Post Production";
-            await tx.productionOrder.update({
-              where: { productionOrderId: checkProductionOrderId },
-              data: {
-                currentStepIndex: 1,
-                currentProductionStep: firstStepName,
-                status: "POST_PRODUCTION",
-              },
-            });
-            await StatusSyncService.logHistory(
-              tx, checkProductionOrderId, "IN_PRODUCTION", "POST_PRODUCTION", userId,
-              "Production completed. Entering post-production phase.", "POST_PRODUCTION_START"
-            );
+            
+            updateData.currentStepIndex = 1;
+            updateData.currentProductionStep = firstStepName;
             updateData.status = "POST_PRODUCTION";
+
+            if (productionOrderFull.status !== "POST_PRODUCTION" && productionOrderFull.status !== "READY_FOR_DISPATCH" && productionOrderFull.status !== "COMPLETED") {
+              await tx.productionOrder.update({
+                where: { productionOrderId: checkProductionOrderId },
+                data: { status: "POST_PRODUCTION" },
+              });
+              await StatusSyncService.logHistory(
+                tx, checkProductionOrderId, productionOrderFull.status, "POST_PRODUCTION", userId,
+                "Production completed. Entering post-production phase.", "POST_PRODUCTION_START"
+              );
+            }
           } 
           else if (data.status === "NEXT_STEP" && existingPlan.status === "POST_PRODUCTION") {
             // Advancing through custom steps within POST_PRODUCTION
-            const currentIndex = productionOrderFull.currentStepIndex || 1;
+            // Use the Daily Plan's current step
+            const currentIndex = existingPlan.currentStepIndex || 1;
             const nextIndex = currentIndex + 1;
             
             if (nextIndex <= totalCustomStepsCount) {
               const nextStepName = customSteps[nextIndex - 1].stepKey;
-              await tx.productionOrder.update({
-                where: { productionOrderId: checkProductionOrderId },
-                data: {
-                  currentStepIndex: nextIndex,
-                  currentProductionStep: nextStepName,
-                  status: "POST_PRODUCTION",
-                },
-              });
+              updateData.currentStepIndex = nextIndex;
+              updateData.currentProductionStep = nextStepName;
               updateData.status = "POST_PRODUCTION"; // Keep daily plan in POST_PRODUCTION
             }
           } 
           else if (data.status === "COMPLETED" && existingPlan.status !== "COMPLETED") {
             // ✅ STEP 7 → STEP 8: Transition to READY_FOR_DISPATCH
-            await tx.productionOrder.update({
-              where: { productionOrderId: checkProductionOrderId },
-              data: {
-                currentStepIndex: totalCustomStepsCount + 1,
-                currentProductionStep: "Completed",
-                status: "READY_FOR_DISPATCH",
-              },
-            });
-            await StatusSyncService.logHistory(
-              tx, checkProductionOrderId, productionOrderFull.status, "READY_FOR_DISPATCH", userId,
-              "All post-production steps completed. Ready for dispatch.", "READY_FOR_DISPATCH"
-            );
+            updateData.currentStepIndex = totalCustomStepsCount + 1;
+            updateData.currentProductionStep = "Completed";
             updateData.status = "COMPLETED";
+
+            // Check if all OTHER daily plans for this PO are completed or cancelled
+            const otherPlans = await tx.dailyProductionPlan.findMany({
+              where: { 
+                productionOrderId: checkProductionOrderId,
+                dailyPlanId: { not: dailyPlanId }
+              }
+            });
+            const allOthersFinished = otherPlans.every((p: any) => p.status === "COMPLETED" || p.status === "CANCELLED" || p.status === "STOPPED" || p.status === "SHORT_CLOSED");
+
+            const poTarget = Number(productionOrderFull.targetQty || 0);
+            const poProduced = Number(productionOrderFull.producedQty || 0);
+            const isTargetMet = poTarget > 0 && poProduced >= poTarget;
+
+            if (allOthersFinished && isTargetMet && productionOrderFull.status !== "READY_FOR_DISPATCH") {
+              await tx.productionOrder.update({
+                where: { productionOrderId: checkProductionOrderId },
+                data: { status: "READY_FOR_DISPATCH" },
+              });
+              await StatusSyncService.logHistory(
+                tx, checkProductionOrderId, productionOrderFull.status, "READY_FOR_DISPATCH", userId,
+                "All post-production steps completed and target quantity met. Ready for dispatch.", "READY_FOR_DISPATCH"
+              );
+            } else if (productionOrderFull.status !== "PARTIAL_COMPLETED" && productionOrderFull.status !== "DISPATCHED" && productionOrderFull.status !== "READY_FOR_DISPATCH") {
+              await tx.productionOrder.update({
+                where: { productionOrderId: checkProductionOrderId },
+                data: { status: "PARTIAL_COMPLETED" },
+              });
+              await StatusSyncService.logHistory(
+                tx, checkProductionOrderId, productionOrderFull.status, "PARTIAL_COMPLETED", userId,
+                "Partial post-production steps completed. Eligible for partial dispatch.", "PARTIAL_COMPLETED"
+              );
+            }
           }
         }
       }

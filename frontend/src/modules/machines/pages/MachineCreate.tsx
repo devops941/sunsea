@@ -66,8 +66,11 @@ const MachineCreate: React.FC = () => {
     useEffect(() => {
         const loadEmp = async () => {
             try {
-                const roleIdNum = inchargeRoleId ? Number(inchargeRoleId) : undefined;
-                const res = await machineOperationAssignmentService.getEmployeesByRole(roleIdNum);
+                if (!inchargeRoleId) {
+                    setEmployees([]);
+                    return;
+                }
+                const res = await machineOperationAssignmentService.getEmployeesByRole(Number(inchargeRoleId));
                 setEmployees(res.data || []);
             } catch (err) {
                 console.error(err);
@@ -153,7 +156,7 @@ const MachineCreate: React.FC = () => {
 
     return (
         <div className="w-full mx-auto">
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="bg-white shadow-sm border border-slate-200 overflow-hidden">
                 <div className="px-6 py-5 border-b border-slate-200">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <h2 className="text-xl font-bold text-slate-800">Create Machine</h2>
@@ -228,10 +231,10 @@ const MachineCreate: React.FC = () => {
                         </div>
                         <div>
                             <SelectInput
-                                label="Incharge Role Filter (Optional)"
+                                label="Incharge Role"
                                 name="inchargeRoleId"
                                 value={inchargeRoleId}
-                                defaultOptionLabel="-- All Roles --"
+                                defaultOptionLabel="-- Select Role First --"
                                 options={roles.map(r => ({ label: r.name, value: String(r.id) }))}
                                 onChange={(e) => {
                                     setInchargeRoleId(e.target.value);
@@ -244,8 +247,9 @@ const MachineCreate: React.FC = () => {
                                 label="Machine Incharge"
                                 name="operatorId"
                                 value={formData.operatorId}
-                                defaultOptionLabel="-- Select Machine Incharge -- "
+                                defaultOptionLabel={!inchargeRoleId ? "Select Role First" : "-- Select Machine Incharge -- "}
                                 required
+                                disabled={!inchargeRoleId}
                                 options={employees.map(emp => ({
                                     label: `${emp.fullName} (${emp.empCode})${emp.user?.role ? ` - ${emp.user.role.name}` : ""}`,
                                     value: emp.id

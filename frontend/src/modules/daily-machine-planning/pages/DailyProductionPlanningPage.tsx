@@ -5,7 +5,7 @@ import { toast } from "react-toastify";
 import {
   FaPlus, FaPlay, FaStop, FaClipboardList, FaCalendarAlt, FaIndustry,
   FaCheckCircle, FaEdit, FaInfoCircle,
-  FaArrowRight, FaShare
+  FaArrowRight, FaShare, FaTimes
 } from "react-icons/fa";
 
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
@@ -23,6 +23,8 @@ import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/Common
 import CustomProgressBar from "../../../components/common/CustomProgressBar";
 import DataTable, { type DataTableColumn } from "../../../components/ui/table/DataTable";
 import FilterPopover from "../../../components/ui/FilterPopover/FilterPopover";
+import type { ProductionOrder } from "../../../services/productionOrderService";
+import { ProductionOrderViewModal } from "../../production-orders/components/ProductionOrderViewModal";
 import { oeeService } from "../../../services/oeeService";
 import { rawMaterialService } from "../../../services/rawMaterialService";
 import { MaterialIssueModal } from "../../production-orders/components/MaterialIssueModal";
@@ -108,6 +110,10 @@ const DailyProductionPlanningPage: React.FC = () => {
   const [viewHourlyLogs, setViewHourlyLogs] = useState<any[]>([]);
   const [loadingViewLogs, setLoadingViewLogs] = useState(false);
   const [viewPlanOeeSummary, setViewPlanOeeSummary] = useState<any>(null);
+
+  // New state for viewing Production Order details
+  const [showPOViewModal, setShowPOViewModal] = useState(false);
+  const [selectedPOForView, setSelectedPOForView] = useState<any>(null);
 
   // Delete Modal
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -242,7 +248,7 @@ const DailyProductionPlanningPage: React.FC = () => {
     }
 
     // Intercept when starting production (PLANNED -> IN_PROGRESS) if materials have not been issued
-    const bypassIssueStatuses = ["MATERIAL_ISSUED", "IN_PROGRESS", "COMPLETED"];
+    const bypassIssueStatuses = ["MATERIAL_ISSUED", "IN_PROGRESS", "COMPLETED", "POST_PRODUCTION"];
     if (nextStatus === "IN_PROGRESS" && !bypassIssueStatuses.includes(plan.productionOrder?.status)) {
       setMaterialIssuePlan(plan);
       setShowMaterialIssueModal(true);
@@ -358,7 +364,7 @@ const DailyProductionPlanningPage: React.FC = () => {
         weeklyProgramId: plan.weeklyProgramId,
         machineId: plan.machineId,
         plannedQty: pendingQty,
-        remarks: `Carried forward from Daily Plan ${plan.dailyPlanId}`,
+        remarks: `Carried forward from Daily Plan ${plan.dailyPlanId}. Target: ${plan.plannedQty}, Produced: ${Number(plan.plannedQty) - pendingQty}, Pending: ${pendingQty}`,
         carryForwardFromPlanId: plan.dailyPlanId,
         carryForwardFromInfo: {
           shiftId: plan.shiftId,
@@ -443,15 +449,21 @@ const DailyProductionPlanningPage: React.FC = () => {
       render: (plan: any) => (
         <div>
           <div className="font-semibold text-slate-800 flex items-center gap-2">
-            {plan.productionOrderId}
-            {plan.productionOrder?.currentProductionStep && (
-              <span className="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded text-[10px] font-bold border border-indigo-100 uppercase tracking-wider">
-                {plan.productionOrder.currentProductionStep}
-              </span>
-            )}
+            <button 
+              className="text-primary hover:text-blue-700 hover:underline cursor-pointer bg-transparent border-none p-0 text-left"
+              onClick={() => {
+                setSelectedPOForView(plan.productionOrder);
+                setShowPOViewModal(true);
+              }}
+              title="Click to view full Production Order details"
+            >
+              {plan.productionOrderId}
+            </button>
           </div>
-          <div className="text-slate-500 text-xs mt-1 line-clamp-1" title={plan.productionOrder?.productItem?.productName || ""}>
-            {plan.productionOrder?.productItem?.productName || "—"}
+          <div className="text-slate-500 text-xs mt-1.5 flex flex-col gap-1.5 items-start">
+            <span className="line-clamp-1" title={plan.productionOrder?.productItem?.productName || ""}>
+              {plan.productionOrder?.productItem?.productName || "—"}
+            </span>
           </div>
         </div>
       )
@@ -572,29 +584,44 @@ const DailyProductionPlanningPage: React.FC = () => {
           : 0;
 
         const customSteps = plan.productionOrder?.productItem?.productionSteps || [];
-        const activeStepName = plan.status === "POST_PRODUCTION"
-          ? (plan.productionOrder?.currentProductionStep || (customSteps[0]?.stepKey ? `Step: ${customSteps[0].stepKey}` : "Post Production"))
-          : null;
+        let activeStepName = null;
+        
+        if (plan.status === "POST_PRODUCTION") {
+          const currentStepKey = plan.currentProductionStep || customSteps[0]?.stepKey;
+          
+          if (currentStepKey && customSteps.length > 0) {
+             const stepIndex = customSteps.findIndex((s: any) => s.stepKey === currentStepKey) + 1;
+             const displayIndex = stepIndex > 0 ? stepIndex : 1;
+             activeStepName = `Step: ${currentStepKey} (${displayIndex}/${customSteps.length})`;
+          } else {
+             activeStepName = currentStepKey ? `Step: ${currentStepKey}` : "Post Production";
+          }
+        }
 
         return (
-          <div className="flex items-center gap-2">
-            <StatusBadge 
-              status={plan.status === "COMPLETED" && producedQty < plannedQty ? "SHORT_CLOSED" : plan.status} 
-              customText={activeStepName || undefined}
-            />
-            {(plan.status === "STOPPED" || plan.status === "CANCELLED") && plan.remarks && (
-              <div className="group relative flex items-center justify-center cursor-pointer">
-                <FaInfoCircle className="text-rose-500 text-[15px] opacity-85 hover:opacity-100 transition-opacity" />
-                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-slate-800 text-white text-xs rounded-md opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10 text-center shadow-lg">
-                  <span className="font-bold text-amber-400 block mb-1 text-left">Reason:</span>
-                  <div className="text-left">
-                    {plan.remarks.includes("Stopped:") || plan.remarks.includes("Cancelled:")
-                      ? plan.remarks.split("|").pop()?.replace("Stopped:", "")?.replace("Cancelled:", "").trim()
-                      : plan.remarks}
+          <div className="flex flex-col items-start gap-1.5">
+            <div className="flex items-center gap-2">
+              <StatusBadge 
+                status={plan.status === "COMPLETED" && producedQty < plannedQty ? "SHORT_CLOSED" : plan.status} 
+              />
+              {(plan.status === "STOPPED" || plan.status === "CANCELLED") && plan.remarks && (
+                <div className="group relative flex items-center justify-center cursor-pointer">
+                  <FaInfoCircle className="text-rose-500 text-[15px] opacity-85 hover:opacity-100 transition-opacity" />
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-slate-800 text-white text-xs rounded-md opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10 text-center shadow-lg">
+                    <span className="font-bold text-amber-400 block mb-1 text-left">Reason:</span>
+                    <div className="text-left">
+                      {plan.remarks.includes("Stopped:") || plan.remarks.includes("Cancelled:")
+                        ? plan.remarks.split("|").pop()?.replace("Stopped:", "")?.replace("Cancelled:", "").trim()
+                        : plan.remarks}
+                    </div>
                   </div>
-                  <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800"></div>
                 </div>
-              </div>
+              )}
+            </div>
+            {activeStepName && (
+              <span className="bg-indigo-50/80 text-indigo-600 px-1.5 py-0.5 rounded-[4px] text-[9px] font-semibold border border-indigo-100 uppercase tracking-wider inline-block">
+                {activeStepName}
+              </span>
             )}
           </div>
         );
@@ -619,7 +646,7 @@ const DailyProductionPlanningPage: React.FC = () => {
 
         // A plan can only be carried forward ONCE — check via the API-returned carryForwardTo array
         const alreadyCarriedForward = Array.isArray(plan.carryForwardTo) && plan.carryForwardTo.length > 0;
-        const canCarryForward = (plan.status === "COMPLETED" || plan.status === "STOPPED") && pendingQty > 0 && !alreadyCarriedForward;
+        const canCarryForward = (plan.status === "COMPLETED" || plan.status === "STOPPED" || plan.status === "POST_PRODUCTION") && pendingQty > 0 && !alreadyCarriedForward;
 
         let targetNextStatus = STATUS_FLOW[plan.status]?.next;
         let dynamicActionTitle = NEXT_ACTION_LABELS[plan.status] || `Move to ${nextStatus}`;
@@ -634,7 +661,7 @@ const DailyProductionPlanningPage: React.FC = () => {
             canAdvance = true;
             
             const totalStepsCount = customSteps.length;
-            const currentIndex = plan.productionOrder?.currentStepIndex || 1;
+            const currentIndex = plan.currentStepIndex || 1;
             const currentStepName = currentIndex > 0 && currentIndex <= totalStepsCount ? customSteps[currentIndex - 1]?.stepKey : "Post Production";
             const isLastStep = currentIndex >= totalStepsCount;
 
@@ -672,6 +699,16 @@ const DailyProductionPlanningPage: React.FC = () => {
            dynamicActionVariant = "info";
            dynamicModalTitle = "Move to Post Production";
            dynamicModalMessage = `Complete manufacturing and move to Post Production phase?`;
+           canAdvance = true;
+        }
+        
+        if (plan.status === "STOPPED" && producedQty > 0) {
+           targetNextStatus = "POST_PRODUCTION";
+           dynamicActionTitle = "Move to Post Production";
+           dynamicActionIcon = FaArrowRight;
+           dynamicActionVariant = "info";
+           dynamicModalTitle = "Move to Post Production";
+           dynamicModalMessage = `Move to Post Production phase for the produced ${producedQty} pcs?`;
            canAdvance = true;
         }
 
@@ -855,34 +892,23 @@ const DailyProductionPlanningPage: React.FC = () => {
 
 
         {/* ─────── View Modal ─────── */}
-        <CommonModal
-          show={showViewModal}
-          onHide={() => { setShowViewModal(false); setViewPlan(null); }}
-          title={`Daily Plan — ${viewPlan?.dailyPlanId}`}
-          footer={
-            viewPlan && (
-              <div className="flex gap-2">
-                {(viewPlan.status === "APPROVED" || viewPlan.status === "IN_PROGRESS") && (
-                  <button
-                    className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium text-sm"
-                    onClick={() => { setShowViewModal(false); handleLogHourly(viewPlan); }}
-                  >
-                    <FaClipboardList /> Log Hourly Entry
-                  </button>
-                )}
-                <button
-                  className="px-4 py-2 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 transition-colors font-medium text-sm"
-                  onClick={() => setShowViewModal(false)}
-                >
-                  Close
+        {showViewModal && viewPlan && (
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh] overflow-hidden">
+              {/* Header */}
+              <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50/50">
+                <div>
+                  <h3 className="text-xl font-bold text-slate-800">Daily Plan — {viewPlan.dailyPlanId}</h3>
+                  <p className="text-sm text-slate-500 mt-1">Detailed view of production plan</p>
+                </div>
+                <button onClick={() => { setShowViewModal(false); setViewPlan(null); }} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors">
+                  <FaTimes size={20} />
                 </button>
               </div>
-            )
-          }
-        >
-          {viewPlan && (
-            <>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+
+              {/* Content */}
+              <div className="flex-1 overflow-y-auto p-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                 <div className="p-4 bg-white rounded-xl border border-slate-200">
                   <h6 className="font-bold text-xs text-slate-500 uppercase tracking-wider mb-3">Plan Details</h6>
                   <div className="flex flex-col gap-2 text-sm text-slate-700">
@@ -904,73 +930,126 @@ const DailyProductionPlanningPage: React.FC = () => {
                   </div>
                 </div>
               </div>
+              
+              {viewPlan.productionOrder?.productItem?.productionSteps && viewPlan.productionOrder.productItem.productionSteps.length > 0 && (
+                <div className="mb-6 border border-slate-200 rounded-xl overflow-hidden shadow-sm bg-white">
+                  <div className="px-4 py-3 bg-slate-50 border-b border-slate-200">
+                      <h6 className="font-bold text-xs text-slate-600 uppercase tracking-wider m-0">Post Production Steps</h6>
+                  </div>
+                  <div className="p-4 flex flex-wrap gap-2 items-center">
+                    {viewPlan.productionOrder.productItem.productionSteps.map((step: any, idx: number) => {
+                        const stepNum = idx + 1;
+                        const currentStep = viewPlan.currentStepIndex || 1;
+                        
+                        let isCompleted = false;
+                        let isActive = false;
 
-              <h6 className="font-bold text-xs text-primary uppercase tracking-wider mb-3">
+                        if (viewPlan.status === "COMPLETED" || viewPlan.status === "READY_FOR_DISPATCH") {
+                            isCompleted = true;
+                        } else if (viewPlan.status === "POST_PRODUCTION") {
+                            isCompleted = stepNum < currentStep;
+                            isActive = stepNum === currentStep;
+                        } else if (viewPlan.status === "STOPPED" || viewPlan.status === "CANCELLED") {
+                            isCompleted = stepNum < currentStep;
+                        }
+
+                        const badgeColors = isCompleted 
+                           ? "bg-emerald-50 text-emerald-700 border-emerald-200" 
+                           : isActive 
+                             ? "bg-indigo-50 text-indigo-700 border-indigo-200" 
+                             : "bg-slate-50 text-slate-500 border-slate-200";
+                             
+                        const dotColors = isCompleted
+                           ? "bg-emerald-500 text-white"
+                           : isActive
+                             ? "bg-indigo-600 text-white"
+                             : "bg-slate-300 text-slate-600";
+
+                        return (
+                          <React.Fragment key={step.id || idx}>
+                              <span className={`px-3 py-1.5 font-semibold text-xs rounded border flex items-center gap-1.5 ${badgeColors}`}>
+                                  <span className={`w-4 h-4 flex items-center justify-center rounded-full text-[9px] ${dotColors}`}>
+                                      {step.stepOrder || stepNum}
+                                  </span>
+                                  {step.stepKey}
+                              </span>
+                              {idx < viewPlan.productionOrder.productItem.productionSteps.length - 1 && (
+                                  <FaArrowRight className="text-slate-300 text-[10px]" />
+                              )}
+                          </React.Fragment>
+                        );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              <h6 className="font-bold text-sm text-primary uppercase tracking-wider mb-4">
                 Hourly Production Entries
               </h6>
               {loadingViewLogs ? (
-                <div className="text-center py-6">
-                  <div className="inline-block w-6 h-6 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-                  <p className="mt-2 text-slate-500 text-sm">Loading...</p>
+                <div className="text-center py-6 border border-slate-200 rounded-xl bg-slate-50">
+                  <div className="inline-block w-6 h-6 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+                  <p className="mt-2 text-slate-500 text-sm font-medium">Loading entries...</p>
                 </div>
               ) : viewHourlyLogs.length > 0 ? (
-                <div className="rounded-lg border border-slate-200 overflow-x-auto">
-                  <table className="w-full text-sm text-center border-collapse">
-                    <thead className="bg-slate-50 text-slate-600 border-b border-slate-200">
-                      <tr>
-                        <th className="px-2 py-2 font-semibold">Hour</th>
-                        <th className="px-2 py-2 font-semibold">Produced</th>
-                        <th className="px-2 py-2 font-semibold">Reject</th>
-                        <th className="px-2 py-2 font-semibold">Scrap</th>
-                        <th className="px-2 py-2 font-semibold">Downtime</th>
-                        <th className="px-2 py-2 font-semibold text-emerald-700">Avail%</th>
-                        <th className="px-2 py-2 font-semibold text-purple-700">Qual%</th>
-                        <th className="px-2 py-2 font-bold text-blue-700">OEE%</th>
-                        <th className="px-2 py-2 font-semibold">Operator</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 text-slate-700">
-                      {viewHourlyLogs.map((h: any) => (
-                        <tr key={h.hourlyProductionId} className="hover:bg-slate-50">
-                          <td className="px-2 py-2 font-bold font-mono">H{h.hourIndex}</td>
-                          <td className="px-2 py-2 font-bold text-emerald-600">{h.qtyProduced}</td>
-                          <td className="px-2 py-2 text-rose-600">{h.rejectQty || 0}</td>
-                          <td className="px-2 py-2 text-amber-500">{h.scrapQty || 0}</td>
-                          <td className="px-2 py-2 text-slate-500">{h.downtime > 0 ? `${h.downtime} min` : "—"}</td>
-                          <td className="px-2 py-2 font-semibold text-emerald-700">
-                            {h.availabilityPct !== undefined ? `${h.availabilityPct}%` : '—'}
-                          </td>
-                          <td className="px-2 py-2 font-semibold text-purple-700">
-                            {h.qualityPct !== undefined ? `${h.qualityPct}%` : '—'}
-                          </td>
-                          <td className="px-2 py-2 font-extrabold text-blue-700">
-                            {h.hourlyOEE !== undefined ? `${h.hourlyOEE}%` : '—'}
-                          </td>
-                          <td className="px-2 py-2 text-slate-500 text-xs">{h.operatorId || "—"}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                    <tfoot className="bg-white font-bold border-t border-slate-200">
-                      <tr>
-                        <td className="px-2 py-2">Total</td>
-                        <td className="px-2 py-2 text-emerald-600">{viewHourlyLogs.reduce((s, h) => s + Number(h.qtyProduced || 0), 0)}</td>
-                        <td className="px-2 py-2 text-rose-600">{viewHourlyLogs.reduce((s, h) => s + Number(h.rejectQty || 0), 0)}</td>
-                        <td className="px-2 py-2 text-amber-500">{viewHourlyLogs.reduce((s, h) => s + Number(h.scrapQty || 0), 0)}</td>
-                        <td className="px-2 py-2 text-slate-500">{(() => { const t = viewHourlyLogs.reduce((s, h) => s + Number(h.downtime || 0), 0); return t > 0 ? `${t} min` : "—"; })()}</td>
-                        <td colSpan={3} className="px-2 py-2 text-center text-slate-400 font-normal text-xs">Avg from OEE Summary below</td>
-                        <td></td>
-                      </tr>
-                    </tfoot>
-                  </table>
+                <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+                  <DataTable
+                    columns={[
+                      { header: "Hour", render: (h: any) => <span className="font-bold font-mono text-slate-700">H{h.hourIndex}</span> },
+                      { header: "Produced", render: (h: any) => <span className="font-bold text-emerald-600">{h.qtyProduced}</span> },
+                      { header: "Reject", render: (h: any) => <span className="text-rose-600">{h.rejectQty || 0}</span> },
+                      { header: "Scrap", render: (h: any) => <span className="text-amber-500">{h.scrapQty || 0}</span> },
+                      { header: "Downtime", render: (h: any) => <span className="text-slate-500">{h.downtime > 0 ? `${h.downtime} min` : "—"}</span> },
+                      { header: "Avail%", render: (h: any) => <span className="font-semibold text-emerald-700">{h.availabilityPct !== undefined ? `${h.availabilityPct}%` : '—'}</span> },
+                      { header: "Qual%", render: (h: any) => <span className="font-semibold text-purple-700">{h.qualityPct !== undefined ? `${h.qualityPct}%` : '—'}</span> },
+                      { header: "OEE%", render: (h: any) => <span className="font-extrabold text-blue-700">{h.hourlyOEE !== undefined ? `${h.hourlyOEE}%` : '—'}</span> },
+                      { header: "Operator", render: (h: any) => <span className="text-slate-600 font-medium text-xs truncate max-w-[120px] inline-block" title={h.operatorName || h.operatorId}>{h.operatorName || h.operatorId || "—"}</span> }
+                    ]}
+                    data={viewHourlyLogs}
+                    rowKey={(h: any) => h.hourlyProductionId}
+                    minHeightClassName="min-h-0"
+                  />
+                  <div className="bg-slate-50 p-4 border-t border-slate-200 flex flex-col gap-3">
+                    <div className="flex items-center justify-between text-sm font-bold">
+                        <span className="text-slate-700">Total:</span>
+                        <div className="flex flex-wrap gap-4">
+                            <span className="text-emerald-600">Produced: {viewHourlyLogs.reduce((s: any, h: any) => s + Number(h.qtyProduced || 0), 0)}</span>
+                            <span className="text-rose-600">Reject: {viewHourlyLogs.reduce((s: any, h: any) => s + Number(h.rejectQty || 0), 0)}</span>
+                            <span className="text-amber-500">Scrap: {viewHourlyLogs.reduce((s: any, h: any) => s + Number(h.scrapQty || 0), 0)}</span>
+                            <span className="text-slate-600">Downtime: {(() => { const t = viewHourlyLogs.reduce((s: any, h: any) => s + Number(h.downtime || 0), 0); return t > 0 ? `${t} min` : "—"; })()}</span>
+                        </div>
+                    </div>
+                    <div className="flex items-center justify-between text-sm pt-3 border-t border-slate-200 border-dashed">
+                        <div className="flex gap-6 font-bold">
+                            <span className="text-slate-700">Total Produced: <span className="text-emerald-600 ml-1">{viewPlanOeeSummary?.producedQty || viewHourlyLogs.reduce((s: any, h: any) => s + Number(h.qtyProduced || 0), 0)} pcs</span></span>
+                            <span className="text-slate-700">Pending: <span className="text-amber-600 ml-1">{viewPlanOeeSummary?.remainingQty ?? (Number(viewPlan.plannedQty) - viewHourlyLogs.reduce((s: any, h: any) => s + Number(h.qtyProduced || 0), 0))} pcs</span></span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <span className="text-slate-500 font-medium text-xs uppercase tracking-wider">Carried Forward To:</span>
+                            {viewPlan.carryForwardTo && viewPlan.carryForwardTo.length > 0 ? (
+                                <span className="text-indigo-700 font-bold bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100 shadow-sm flex items-center gap-1">
+                                    <FaShare className="text-[10px]" />
+                                    {viewPlan.carryForwardTo[0].dailyPlanId} 
+                                    <span className="text-indigo-400 font-normal ml-1">
+                                        ({viewPlan.carryForwardTo[0].productionDate?.split('T')[0]})
+                                    </span>
+                                </span>
+                            ) : (
+                                <span className="text-slate-400 font-mono text-xs bg-slate-100 px-2 py-0.5 rounded">NULL</span>
+                            )}
+                        </div>
+                    </div>
+                  </div>
                 </div>
               ) : (
-                <div className="text-center text-slate-500 p-6 border border-slate-200 rounded-lg bg-white">
-                  No hourly entries recorded yet for this plan.
+                <div className="text-center text-slate-500 p-8 border border-slate-200 rounded-xl bg-slate-50">
+                  <FaClipboardList className="mx-auto text-slate-300 text-3xl mb-3" />
+                  <span className="font-medium">No hourly entries recorded yet for this plan.</span>
                 </div>
               )}
 
               {/* ─── OEE & Production Summary ─────────────────────────────── */}
-              {viewPlanOeeSummary && (
+              {/* {viewPlanOeeSummary && (
                 <div className="mt-6 rounded-xl p-4 bg-linear-to-br from-slate-800 to-blue-900 text-white shadow-lg">
                   <div className="font-bold mb-4 text-[13px] tracking-wider uppercase opacity-90">
                     📊 Production OEE Summary
@@ -1017,10 +1096,29 @@ const DailyProductionPlanningPage: React.FC = () => {
                     ))}
                   </div>
                 </div>
-              )}
-            </>
-          )}
-        </CommonModal>
+              )} */}
+              </div>
+              
+              {/* Footer */}
+              <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-end gap-3">
+                {(viewPlan.status === "APPROVED" || viewPlan.status === "IN_PROGRESS") && (
+                  <button
+                    className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium text-sm shadow-sm"
+                    onClick={() => { setShowViewModal(false); handleLogHourly(viewPlan); }}
+                  >
+                    <FaClipboardList /> Log Hourly Entry
+                  </button>
+                )}
+                <button
+                  className="px-5 py-2.5 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium text-sm shadow-sm"
+                  onClick={() => { setShowViewModal(false); setViewPlan(null); }}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* ─────── Stop Production Modal ─────── */}
         <CommonModal
@@ -1106,6 +1204,13 @@ const DailyProductionPlanningPage: React.FC = () => {
             onSuccess={handleMaterialIssueSuccess}
           />
         )}
+
+        {/* ─────── Production Order View Modal ─────── */}
+        <ProductionOrderViewModal
+            show={showPOViewModal}
+            onHide={() => { setShowPOViewModal(false); setSelectedPOForView(null); }}
+            order={selectedPOForView}
+        />
       </div>
     </div>
   );

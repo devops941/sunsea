@@ -19,7 +19,8 @@ const VALID_TRANSITIONS: Record<string, string[]> = {
   WEEKLY_SCHEDULED: ["READY_FOR_PLANNING", "DAILY_PLANNED", "CANCELLED"],
   DAILY_PLANNED: ["WEEKLY_SCHEDULED", "IN_PRODUCTION", "CANCELLED"],
   IN_PRODUCTION: ["POST_PRODUCTION", "CANCELLED"],
-  POST_PRODUCTION: ["READY_FOR_DISPATCH"],
+  POST_PRODUCTION: ["READY_FOR_DISPATCH", "PARTIAL_COMPLETED"],
+  PARTIAL_COMPLETED: ["READY_FOR_DISPATCH", "DISPATCHED"],
   READY_FOR_DISPATCH: ["DISPATCHED"],
   DISPATCHED: [],
   CANCELLED: [],
@@ -156,7 +157,7 @@ class ProductionOrderService {
           billOfMaterialId: data.billOfMaterialId ? String(data.billOfMaterialId) : null,
           routingId: data.routingId,
           machineMachineId: data.machineMachineId,
-          status: "CREATED",  // ✅ Always CREATED — never set dynamically
+          status: data.status === "DRAFT" ? "DRAFT" : "CREATED",
           remarks: data.remarks,
           createdBy: userId,
           weightPerPieceUsed,
@@ -173,7 +174,7 @@ class ProductionOrderService {
         tx,
         data.productionOrderId,
         null,
-        "CREATED",
+        data.status === "DRAFT" ? "DRAFT" : "CREATED",
         userId,
         data.remarks ?? "Production order created",
         "CREATE"
@@ -189,7 +190,9 @@ class ProductionOrderService {
 
     // STEP 2: Auto-check raw material availability immediately after creation
     try {
-      await this.checkMaterialAvailability(result.productionOrderId, userId);
+      if (result.status !== "DRAFT") {
+        await this.checkMaterialAvailability(result.productionOrderId, userId);
+      }
       // Return the updated order with the new status
       const updatedOrder = await prisma.productionOrder.findUnique({
         where: { productionOrderId: result.productionOrderId },
@@ -575,7 +578,7 @@ class ProductionOrderService {
     const existing = await this.findById(productionOrderId);
 
     // Locked statuses — only allow status-only updates
-    const lockedStatuses = ["IN_PRODUCTION", "POST_PRODUCTION", "READY_FOR_DISPATCH", "DISPATCHED"];
+    const lockedStatuses = ["IN_PRODUCTION", "POST_PRODUCTION", "PARTIAL_COMPLETED", "READY_FOR_DISPATCH", "DISPATCHED"];
     if (lockedStatuses.includes(existing.status || "")) {
       const keys = Object.keys(data).filter((k) => (data as any)[k] !== undefined);
       const allowedExecutionKeys = ["status", "producedQty", "rejectedQty", "scrapQty", "remarks"];
@@ -586,7 +589,7 @@ class ProductionOrderService {
     }
 
     const updateData: any = {};
-    const editableStatuses = ["CREATED", "WAITING_FOR_MATERIAL", "READY_FOR_PLANNING", "WEEKLY_SCHEDULED", "DAILY_PLANNED"];
+    const editableStatuses = ["DRAFT", "CREATED", "WAITING_FOR_MATERIAL", "READY_FOR_PLANNING", "WEEKLY_SCHEDULED", "DAILY_PLANNED"];
 
     if (editableStatuses.includes(existing.status || "")) {
       if (data.orderDate !== undefined) updateData.orderDate = new Date(data.orderDate);
@@ -698,10 +701,11 @@ class ProductionOrderService {
       throw new ApiError(404, `Production Order ${productionOrderId} not found`);
     }
 
-    if (order.status !== "DAILY_PLANNED") {
+    const allowedStartStatuses = ["DAILY_PLANNED", "PARTIAL_COMPLETED", "IN_PRODUCTION", "IN_PROGRESS", "POST_PRODUCTION", "WEEKLY_SCHEDULED"];
+    if (!allowedStartStatuses.includes(order.status)) {
       throw new ApiError(
         400,
-        `Production can only be started for orders with status DAILY_PLANNED. Current status: ${order.status}`
+        `Production can only be started for active orders. Current status: ${order.status}`
       );
     }
 
@@ -917,7 +921,15 @@ class ProductionOrderService {
     if (!order) throw new ApiError(404, `Production Order with ID ${productionOrderId} not found`);
 
     // Status gate
-    const allowedForManualIssue = ["READY_FOR_PLANNING", "WEEKLY_SCHEDULED", "DAILY_PLANNED", "IN_PROGRESS"];
+    const allowedForManualIssue = [
+      "READY_FOR_PLANNING",
+      "WEEKLY_SCHEDULED",
+      "DAILY_PLANNED",
+      "IN_PROGRESS",
+      "PARTIAL_COMPLETED",
+      "POST_PRODUCTION",
+      "READY_FOR_DISPATCH",
+    ];
     if (!allowedForManualIssue.includes(order.status)) {
       throw new ApiError(
         400,
@@ -925,19 +937,55 @@ class ProductionOrderService {
       );
     }
 
-    // ✅ Duplicate guard: prevent issuing materials twice for the same PO
-    const existingIssue = await prisma.stockAdjustment.findFirst({
+    // Duplicate guard: prevent issuing materials if all requested materials have already been fully issued for this PO
+    const existingIssues = await prisma.stockAdjustment.findMany({
       where: {
         productionOrderId,
         adjustmentType: { in: ["RAW_MATERIAL_ISSUE", "PRODUCTION_MATERIAL_ISSUE"] },
         status: { not: "REJECTED" },
       },
+      include: { items: true }
     });
-    if (existingIssue) {
-      throw new ApiError(
-        400,
-        `Materials have already been issued for Production Order ${productionOrderId} (${existingIssue.adjustmentNumber}). Duplicate issue is not allowed.`
-      );
+
+    if (existingIssues.length > 0) {
+      // Calculate total issued quantity per raw material for this PO
+      const issuedQtyMap = new Map<string, number>();
+      for (const adj of existingIssues) {
+        for (const adjItem of adj.items) {
+          if (adjItem.rawMaterialId) {
+            const current = issuedQtyMap.get(adjItem.rawMaterialId) || 0;
+            issuedQtyMap.set(adjItem.rawMaterialId, current + Math.abs(Number(adjItem.difference || 0)));
+          }
+        }
+      }
+
+      // Check if all items being requested have already been issued up to the total required
+      let allItemsFullyIssued = items.length > 0;
+      for (const item of items) {
+        const alreadyIssued = issuedQtyMap.get(item.rawMaterialId) || 0;
+        // If already issued + current issue exceeds or equals requirement, check if already issued alone met it
+        // We block only if already issued alone already satisfied the full PO requirement for every item
+        if (alreadyIssued === 0) {
+          allItemsFullyIssued = false;
+          break;
+        }
+      }
+
+      // Only block if an issue was already done for the full PO requirement
+      const firstIssue = existingIssues[0];
+      const poTarget = Number(order.targetQty || 0);
+      // If there's an existing issue that covered the full PO target, block duplicate
+      const fullTargetAlreadyIssued = existingIssues.some((adj: any) => {
+        // If single issue had full target or total issued equals full target requirement
+        return adj.remarks?.includes("Full PO") || false;
+      });
+
+      if (fullTargetAlreadyIssued) {
+        throw new ApiError(
+          400,
+          `Materials have already been fully issued for Production Order ${productionOrderId} (${firstIssue.adjustmentNumber}). Duplicate issue is not allowed.`
+        );
+      }
     }
 
     return prisma.$transaction(async (tx) => {
@@ -1017,7 +1065,7 @@ class ProductionOrderService {
   async delete(productionOrderId: string) {
     const existing = await this.findById(productionOrderId);
 
-    const undeletableStatuses = ["IN_PRODUCTION", "POST_PRODUCTION", "READY_FOR_DISPATCH", "DISPATCHED", "WEEKLY_SCHEDULED", "DAILY_PLANNED"];
+    const undeletableStatuses = ["IN_PRODUCTION", "POST_PRODUCTION", "PARTIAL_COMPLETED", "READY_FOR_DISPATCH", "DISPATCHED", "WEEKLY_SCHEDULED", "DAILY_PLANNED"];
     if (undeletableStatuses.includes(existing.status)) {
       throw new ApiError(400, `Production Order cannot be deleted with status "${existing.status}". Only CREATED, WAITING_FOR_MATERIAL, or READY_FOR_PLANNING orders can be deleted.`);
     }
@@ -1040,7 +1088,7 @@ class ProductionOrderService {
       orderBy: { createdAt: "desc" },
     });
 
-    if (!lastItem) return "PO0001";
+    if (!lastItem) return "PRO0001";
 
     let lastId = lastItem.productionOrderId;
     if (lastId.includes("-")) lastId = lastId.split("-")[0];
@@ -1051,9 +1099,8 @@ class ProductionOrderService {
     const numberStr = match[0];
     const nextNumber = parseInt(numberStr, 10) + 1;
     const paddedNumber = String(nextNumber).padStart(numberStr.length, "0");
-    const prefix = lastId.substring(0, lastId.indexOf(numberStr));
     const suffix = lastId.substring(lastId.indexOf(numberStr) + numberStr.length);
-    return `${prefix}${paddedNumber}${suffix}`;
+    return `PRO${paddedNumber}${suffix}`;
   }
 
   // ── Get Production Order History ──────────────────────────────────────────

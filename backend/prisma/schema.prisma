@@ -1066,6 +1066,8 @@ model DailyProductionPlan {
   status                 String                @default("DRAFT") @db.VarChar(20)
   remarks                String?               @db.VarChar(255)
   carryForwardFromPlanId String?               @map("carry_forward_from_plan_id") @db.VarChar(50)
+  currentProductionStep  String?               @map("current_production_step") @db.VarChar(100)
+  currentStepIndex       Int?                  @map("current_step_index")
   createdAt              DateTime              @default(now()) @map("created_at")
   updatedAt              DateTime              @updatedAt @map("updated_at")
   createdBy              String?               @map("created_by") @db.VarChar(36)

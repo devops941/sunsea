@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { Form } from 'react-bootstrap';
 
 import { FaSave, FaEraser, FaInfoCircle, FaCheckCircle } from "react-icons/fa";
@@ -54,6 +54,9 @@ const HourlyWorkReportCreate: React.FC = () => {
     const [rejectReason, setRejectReason] = useState("");
     const [scrapReason, setScrapReason] = useState("");
     const [operatorId, setOperatorId] = useState("");
+    // Tracks whether the user manually chose an operator from the dropdown.
+    // When true, async useEffects must NOT overwrite the user's selection.
+    const userSelectedOperator = useRef(false);
 
     // Auto-loaded plan details
     const [activePlan, setActivePlan] = useState<any>(null);
@@ -173,7 +176,15 @@ const HourlyWorkReportCreate: React.FC = () => {
                     setOperatorName(plan.operators.map((op: any) => op.fullName).join(", "));
                     setAvailableOperators(plan.operators);
                     setShiftInchargeName(plan.shiftIncharge?.fullName || "");
-                    setOperatorId(plan.operators[0].id.toString());
+                    // Reset manual-selection flag since this is a plan change (new context)
+                    userSelectedOperator.current = false;
+                    // Only auto-select if there's exactly one operator (no choice to make).
+                    // If multiple operators exist, leave blank so user must explicitly select.
+                    if (plan.operators.length === 1) {
+                        setOperatorId(plan.operators[0].id.toString());
+                    } else {
+                        setOperatorId("");
+                    }
                     setPlanError(null);
                 }
 
@@ -185,6 +196,10 @@ const HourlyWorkReportCreate: React.FC = () => {
                     uom: (plan.productionOrder?.productItem?.uom?.uomCode?.toUpperCase() === "EA" ? "PCS" : plan.productionOrder?.productItem?.uom?.uomCode?.toUpperCase()) || "PCS",
                     weeklyProgramId: plan.weeklyProgramId,
                     productId: plan.productionOrder?.productItemId ? Number(plan.productionOrder.productItemId) : null,
+                    // Production order level data for carry-forward guard
+                    poTargetQty: Number(plan.productionOrder?.targetQty || 0),
+                    poProducedQty: Number(plan.productionOrder?.producedQty || 0),
+                    poStatus: plan.productionOrder?.status || "",
                 });
             })
             .catch((err: any) => {
@@ -258,6 +273,13 @@ const HourlyWorkReportCreate: React.FC = () => {
         fetchExistingLogs();
     }, [fetchExistingLogs]);
 
+    // When the user switches to a different hour, reset the manual-selection flag and
+    // clear the operator field so each hour starts with a fresh pick.
+    useEffect(() => {
+        userSelectedOperator.current = false;
+        setOperatorId("");
+    }, [hourIndex]);
+
     // Track chosen hour index to load/edit existing production values
     useEffect(() => {
         const matched = existingLogs.find(log => Number(log.hourIndex) === Number(hourIndex));
@@ -268,7 +290,13 @@ const HourlyWorkReportCreate: React.FC = () => {
             setDowntime(String(matched.downtime || 0));
             setRemarks(matched.remarks || "");
             setDowntimeReason(matched.downtimeReason || "");
-            setOperatorId(matched.operatorId || "");
+            
+            // Only load operator from saved log if user has NOT manually picked someone yet.
+            // Once the user selects an operator, their choice is locked in for this hour.
+            if (matched.operatorId && !userSelectedOperator.current) {
+                setOperatorId(matched.operatorId);
+            }
+            
             setEditingLogId(matched.hourlyProductionId);
         } else {
             setQtyProduced("0");
@@ -277,7 +305,7 @@ const HourlyWorkReportCreate: React.FC = () => {
             setDowntime("0");
             setRemarks("");
             setDowntimeReason("");
-            setOperatorId("");
+            // operatorId is already cleared by the hourIndex effect above
             setEditingLogId(null);
         }
     }, [hourIndex, existingLogs]);
@@ -481,14 +509,33 @@ const HourlyWorkReportCreate: React.FC = () => {
             }
 
 
-            if (isLastHour && pendingQty > 0 && activePlan?.weeklyProgramId) {
-                toast.info("Shift completed. Please carry forward the pending quantity.", { autoClose: 5000 });
+            // Guard: only carry forward if the production order itself still has remaining qty.
+            // If the PO's overall target is already met (e.g., over-produced in earlier shifts),
+            // never trigger carry forward even if this daily plan's own planned qty is short.
+            const poTargetQty = Number(activePlan?.poTargetQty || 0);
+            const poProducedQty = Number(activePlan?.poProducedQty || 0);
+            const poStatus = activePlan?.poStatus || "";
+            const isPOComplete = ["COMPLETED", "DISPATCHED", "READY_FOR_DISPATCH"].includes(poStatus);
+            // poProducedQty is the DB value BEFORE this submission; add current qty to get total
+            const poTotalAfterThisEntry = poProducedQty + (Number(qtyProduced) || 0);
+            const poStillHasRemaining = poTargetQty > 0 && poTotalAfterThisEntry < poTargetQty;
+
+            if (isLastHour && pendingQty > 0 && activePlan?.weeklyProgramId && !isPOComplete && poStillHasRemaining) {
+                toast.info(`Shift completed with ${pendingQty} pcs pending. Please create a carry-forward Daily Plan.`, { autoClose: 6000 });
                 navigate("/daily-production-plans/create", {
                     state: {
                         weeklyProgramId: activePlan.weeklyProgramId,
                         machineId: machineId,
                         plannedQty: pendingQty,
-                        remarks: `Carried forward from Daily Plan ${dailyPlanId}`
+                        remarks: `Carried forward from Daily Plan ${dailyPlanId}`,
+                        // Pass carry-forward info so DailyPlanCreate shows the banner
+                        carryForwardFromPlanId: dailyPlanId,
+                        carryForwardFromInfo: {
+                            shiftId: shiftId,
+                            shiftName: shifts.find((s: any) => s.shiftCode === shiftId)?.shiftName || locationState.state?.shiftName || shiftId,
+                            productionDate: productionDate,
+                            pendingQty: pendingQty,
+                        }
                     }
                 });
                 return;
@@ -665,7 +712,10 @@ const HourlyWorkReportCreate: React.FC = () => {
                                         label="Operator"
                                         name="operatorId"
                                         value={operatorId}
-                                        onChange={(e: any) => setOperatorId(e.target.value)}
+                                        onChange={(e: any) => {
+                                            userSelectedOperator.current = true;
+                                            setOperatorId(e.target.value);
+                                        }}
                                         error={planError && planError.includes("operator") ? planError : undefined}
                                         disabled={loadingPlan || availableOperators.length === 0}
                                         defaultOptionLabel={loadingPlan ? "Loading operator..." : "— Select Operator —"}

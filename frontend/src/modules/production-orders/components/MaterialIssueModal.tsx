@@ -3,7 +3,7 @@ import { FaTimes } from "react-icons/fa";
 import { toast } from "react-toastify";
 import { productionOrderService } from "../../../services/productionOrderService";
 import { storeService } from "../../../services/storeService";
-import Button from "../../../components/ui/custombutton/CustomButton";
+import CustomButton from "../../../components/ui/Button/Button";
 interface MaterialIssueModalProps {
     show: boolean;
     onHide: () => void;
@@ -244,7 +244,7 @@ export const MaterialIssueModal: React.FC<MaterialIssueModalProps> = ({
                                                     className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary disabled:bg-slate-100 disabled:opacity-75 disabled:cursor-not-allowed"
                                                     value={item.remarks}
                                                     onChange={(e) => handleRemarksChange(idx, e.target.value)}
-                                                    disabled={true}
+                                                    disabled={issuing}
                                                 />
                                             </td>
                                         </tr>
@@ -256,19 +256,18 @@ export const MaterialIssueModal: React.FC<MaterialIssueModalProps> = ({
 
                     {/* Footer */}
                     <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-end gap-3 rounded-b-xl">
-                        <Button
+                        <CustomButton
                             type="button"
                             onClick={onHide}
                             disabled={issuing}
                             text="Cancel"
-                            variant="outline"
+                            variant="secondary"
                         />
-                        <Button
+                        <CustomButton
                             type="submit"
                             disabled={issuing}
-                            loading={issuing}
                             text={issuing ? "Issuing..." : "Confirm Material Issue"}
-                            variant="success"
+                            variant="primary"
                         />
                     </div>
                 </form>

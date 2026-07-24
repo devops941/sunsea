@@ -71,8 +71,11 @@ const MachineEdit: React.FC = () => {
     useEffect(() => {
         const loadEmp = async () => {
             try {
-                const roleIdNum = inchargeRoleId ? Number(inchargeRoleId) : undefined;
-                const res = await machineOperationAssignmentService.getEmployeesByRole(roleIdNum);
+                if (!inchargeRoleId) {
+                    setEmployees([]);
+                    return;
+                }
+                const res = await machineOperationAssignmentService.getEmployeesByRole(Number(inchargeRoleId));
                 setEmployees(res.data || []);
             } catch (err) {
                 console.error(err);
@@ -292,10 +295,10 @@ const MachineEdit: React.FC = () => {
                         
                         <div>
                             <SelectInput
-                                label="Incharge Role Filter (Optional)"
+                                label="Incharge Role"
                                 name="inchargeRoleId"
                                 value={inchargeRoleId}
-                                defaultOptionLabel="-- All Roles --"
+                                defaultOptionLabel="-- Select Role First --"
                                 options={roles.map(r => ({ label: r.name, value: String(r.id) }))}
                                 onChange={(e) => {
                                     setInchargeRoleId(e.target.value);
@@ -308,8 +311,9 @@ const MachineEdit: React.FC = () => {
                                 label="Machine Incharge"
                                 name="operatorId"
                                 value={formData.operatorId}
-                                defaultOptionLabel="-- Select Machine Incharge -- "
+                                defaultOptionLabel={!inchargeRoleId ? "Select Role First" : "-- Select Machine Incharge -- "}
                                 required
+                                disabled={!inchargeRoleId}
                                 options={employees.map(emp => ({
                                     label: `${emp.fullName} (${emp.empCode})${emp.user?.role ? ` - ${emp.user.role.name}` : ""}`,
                                     value: emp.id

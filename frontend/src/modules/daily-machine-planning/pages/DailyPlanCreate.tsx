@@ -200,20 +200,36 @@ const DailyPlanCreate: React.FC = () => {
       const stateWpId = (location.state as any)?.weeklyProgramId;
 
       setWeeklyPrograms(list.filter((p: any) => {
-        if (p.status === "COMPLETED" || p.status === "CANCELLED") {
-          return p.weeklyProgramId === stateWpId;
-        }
+        if (p.status === "CANCELLED") return p.weeklyProgramId === stateWpId;
 
         const po = p.productionOrder;
         if (po) {
           const targetQty = Number(po.targetQty || 0);
           const producedQty = Number(po.producedQty || 0);
-          if (producedQty >= targetQty && p.weeklyProgramId !== stateWpId) {
+          const isTargetMet = targetQty > 0 && producedQty >= targetQty;
+          const poTerminal = po.status === "CANCELLED" || isTargetMet;
+
+          if (isTargetMet && p.weeklyProgramId !== stateWpId) {
             return false;
           }
-          if (["COMPLETED", "DISPATCHED", "READY_FOR_DISPATCH"].includes(po.status) && p.weeklyProgramId !== stateWpId) {
+
+          if (p.status === "COMPLETED") {
+            if (p.weeklyProgramId === stateWpId) return true;
+            const hasActiveWp = list.some(
+              (other: any) =>
+                other.productionOrderId === p.productionOrderId &&
+                other.weeklyProgramId !== p.weeklyProgramId &&
+                ["PLANNED", "APPROVED", "IN_PROGRESS"].includes(other.status)
+            );
+            if (!poTerminal && producedQty < targetQty && !hasActiveWp) return true;
             return false;
           }
+
+          if (poTerminal && p.weeklyProgramId !== stateWpId) {
+            return false;
+          }
+        } else if (p.status === "COMPLETED") {
+          return p.weeklyProgramId === stateWpId;
         }
 
         const isSelectedWeek = p.weekStartDate && p.weekStartDate.startsWith(selectedWeekPrefix);
@@ -222,6 +238,12 @@ const DailyPlanCreate: React.FC = () => {
       }).map((p: any) => {
         const isSelectedWeek = p.weekStartDate && p.weekStartDate.startsWith(selectedWeekPrefix);
         const isPending = ["PLANNED", "APPROVED", "IN_PROGRESS"].includes(p.status);
+        // Tag completed WPs with remaining PO qty so the label can show it
+        if (p.status === "COMPLETED" && p.weeklyProgramId !== stateWpId) {
+          const po = p.productionOrder;
+          const poRemaining = po ? Math.max(0, Number(po.targetQty || 0) - Number(po.producedQty || 0)) : 0;
+          return { ...p, _isBacklog: true, _poRemaining: poRemaining };
+        }
         if (!isSelectedWeek && isPending) {
           return { ...p, _isBacklog: true };
         }
@@ -289,14 +311,31 @@ const DailyPlanCreate: React.FC = () => {
           const produced = Array.isArray(p.hourlyProductions)
             ? p.hourlyProductions.reduce((s: number, h: any) => s + Number(h.qtyProduced || 0), 0)
             : 0;
-          if (p.status === "COMPLETED" || p.status === "STOPPED" || p.dailyPlanId === carryForwardFromPlanId) {
+          const isFinishedOrCarriedForward =
+            p.status === "COMPLETED" ||
+            p.status === "STOPPED" ||
+            p.status === "SHORT_CLOSED" ||
+            p.status === "POST_PRODUCTION" ||
+            p.dailyPlanId === carryForwardFromPlanId ||
+            (carryForwardFromPlanId && String(p.dailyPlanId) === String(carryForwardFromPlanId));
+
+          if (isFinishedOrCarriedForward) {
             return sum + produced;
           }
           return sum + Math.max(Number(p.plannedQty || 0), produced);
         }, 0);
       const poTarget = Number(wp.productionOrder?.targetQty || 0);
+      const poProduced = Number(wp.productionOrder?.producedQty || 0);
+      const poRemaining = poTarget > 0 ? Math.max(0, poTarget - poProduced) : 0;
 
-      const baseCapacity = Number(wp.plannedQty || 0) > 0 ? Number(wp.plannedQty) : poTarget;
+      // Base capacity for the plan cannot exceed what is actually left to produce for the Production Order
+      let baseCapacity: number;
+      if (wp.status === "COMPLETED" && wp._poRemaining !== undefined) {
+        baseCapacity = wp._poRemaining;
+      } else {
+        const wpPlanned = Number(wp.plannedQty || 0);
+        baseCapacity = (wpPlanned > 0 && poTarget > 0) ? Math.min(wpPlanned, poRemaining) : (poRemaining || wpPlanned);
+      }
       const remainingRaw = Math.max(0, baseCapacity - alreadyPlanned);
       const remaining = Math.round(remainingRaw * 1000) / 1000;
       setRemainingQty(remaining);
@@ -310,7 +349,7 @@ const DailyPlanCreate: React.FC = () => {
       }
     }).catch(() => setRemainingQty(null))
       .finally(() => setLoadingRemaining(false));
-  }, [weeklyProgramId, weeklyPrograms, editId, isEdit, location.state]);
+  }, [weeklyProgramId, weeklyPrograms, editId, isEdit, location.state, carryForwardFromPlanId]);
 
   // Handle location.state pre-fill
   useEffect(() => {
@@ -540,10 +579,25 @@ const DailyPlanCreate: React.FC = () => {
                 onChange={(e: any) => setWeeklyProgramId(e.target.value)}
                 error={formErrors.weeklyProgramId}
                 defaultOptionLabel="— Select Weekly Program —"
-                options={weeklyPrograms.map((wp: any) => ({
-                  value: wp.weeklyProgramId,
-                  label: `${wp.weeklyProgramId}  — ${wp.productionOrder?.productItem?.productName} ${wp._isBacklog ? "⚠️ [PENDING FROM PREVIOUS WEEK]" : ""}`
-                }))}
+                options={weeklyPrograms.map((wp: any) => {
+                  let tag = "";
+                  const po = wp.productionOrder;
+                  const poTarget = Number(po?.targetQty || 0);
+                  const poProduced = Number(po?.producedQty || 0);
+                  const poRemaining = poTarget > 0 ? Math.max(0, poTarget - poProduced) : 0;
+
+                  if (wp._poRemaining !== undefined) {
+                    tag = ` 🔄 [REMAINING: ${wp._poRemaining} pcs to produce]`;
+                  } else if (poRemaining > 0) {
+                    tag = ` 🔄 [REMAINING: ${poRemaining} pcs to produce]`;
+                  } else if (wp._isBacklog) {
+                    tag = " ⚠️ [PENDING FROM PREVIOUS WEEK]";
+                  }
+                  return {
+                    value: wp.weeklyProgramId,
+                    label: `${wp.weeklyProgramId}  — ${wp.productionOrder?.productItem?.productName}${tag}`
+                  };
+                })}
               />
             </div>
 
@@ -559,7 +613,7 @@ const DailyPlanCreate: React.FC = () => {
 
                   <div>
                     <div className="text-slate-500 text-xs font-bold uppercase mb-1">Weekly Target</div>
-                    <div className="font-bold text-slate-800">{selectedWeeklyProg.plannedQty} pcs</div>
+                    <div className="font-bold text-slate-800">{Number(selectedWeeklyProg.plannedQty) > 0 ? selectedWeeklyProg.plannedQty : (selectedWeeklyProg.productionOrder?.targetQty || 0)} pcs</div>
                   </div>
                   <div>
                     <div className="text-slate-500 text-xs font-bold uppercase mb-1">Remaining Capacity</div>

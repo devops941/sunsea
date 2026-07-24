@@ -196,15 +196,15 @@ const AllProductionOrderList: React.FC = () => {
                 );
             }
         },
-        {
-            header: "COLOR",
-            render: (item: any) => item.colorType ? (
-                <StatusBadge
-                    status={item.colorType === 'mc' ? 'MULTI COLOR' : 'SINGLE COLOR'}
-                    customColor={item.colorType === 'mc' ? { bg: '#e0e7ff', text: '#3730a3' } : { bg: '#fef3c7', text: '#92400e' }}
-                />
-            ) : <span className="text-slate-500">-</span>
-        },
+        // {
+        //     header: "COLOR",
+        //     render: (item: any) => item.colorType ? (
+        //         <StatusBadge
+        //             status={item.colorType === 'mc' ? 'MULTI COLOR' : 'SINGLE COLOR'}
+        //             customColor={item.colorType === 'mc' ? { bg: '#e0e7ff', text: '#3730a3' } : { bg: '#fef3c7', text: '#92400e' }}
+        //         />
+        //     ) : <span className="text-slate-500">-</span>
+        // },
         {
             header: "STATUS",
             render: (item: any) => <StatusBadge status={item.status === 'CANCELLED' ? 'DELETED' : (item.status || 'PLANNED')} />

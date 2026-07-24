@@ -85,8 +85,8 @@ const CustomSingleSelect = ({
         disabled={disabled}
         onClick={() => !disabled && setIsOpen(!isOpen)}
         className={`
-          w-full h-[35px] pl-4 pr-10
-          border rounded-[10px] outline-none
+          w-full h-10 pl-4 pr-10
+          border rounded-md outline-none
           text-[15px] font-medium flex items-center justify-between
           transition-all duration-250 text-left
           ${value ? "text-[#1f2937]" : "text-[#9ca3af]"}
@@ -225,7 +225,7 @@ export const UOMSelect: React.FC<UOMSelectProps> = ({
           <span className="text-[#e53935] ml-0.5">*</span>
         )}
       </label>
-      
+
       {loading ? (
         <div className="flex items-center gap-2 py-1">
           <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
@@ -248,8 +248,8 @@ export const UOMSelect: React.FC<UOMSelectProps> = ({
             if (isMulti) {
               const currentValueArray = field.value ? field.value.split(",").map((v: string) => v.trim()).filter(Boolean) : [];
               const firstSelectedCode = currentValueArray.length > 0 ? currentValueArray[0] : null;
-              const lockedCategory = firstSelectedCode 
-                ? filteredUnits.find((u) => u.code === firstSelectedCode)?.category 
+              const lockedCategory = firstSelectedCode
+                ? filteredUnits.find((u) => u.code === firstSelectedCode)?.category
                 : null;
 
               const options = filteredUnits
@@ -330,8 +330,8 @@ export const UOMSelect: React.FC<UOMSelectProps> = ({
             (() => {
               const currentValueArray = value ? value.split(",").map((v) => v.trim()).filter(Boolean) : [];
               const firstSelectedCode = currentValueArray.length > 0 ? currentValueArray[0] : null;
-              const lockedCategory = firstSelectedCode 
-                ? filteredUnits.find((u) => u.code === firstSelectedCode)?.category 
+              const lockedCategory = firstSelectedCode
+                ? filteredUnits.find((u) => u.code === firstSelectedCode)?.category
                 : null;
 
               const options = filteredUnits

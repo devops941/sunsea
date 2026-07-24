@@ -37,6 +37,7 @@ const WeeklyMachineScheduleList: React.FC = () => {
 
     const canDeleteSchedule = (schedule: any, orderStatus: string) => {
         const lockedStatuses = [
+            "DAILY_PLANNED",
             "IN_PROGRESS",
             "IN_PRODUCTION",
             "POST_PRODUCTION",
@@ -168,7 +169,7 @@ const WeeklyMachineScheduleList: React.FC = () => {
                     productionOrderId: poId,
                     productName: item.productionOrder?.productItem?.productName || "Unknown Product",
                     priority: item.priority || "MEDIUM",
-                    machineName: item.machine?.machineName || item.Machine?.machineName || item.machineName || (item.machineId ? `Machine ${item.machineId}` : "Injection Moulding Machine 350T"),
+                    machineName: item.machine?.machineName || item.Machine?.machineName || item.machineName || (item.machineId ? `Machine ${item.machineId}` : "Machine Not Assigned"),
                     plannedQty: 0,
                     uom: item.productionOrder?.uom || item.uom || "",
                     status: item.productionOrder?.status || item.status || "PLANNED",
@@ -206,6 +207,12 @@ const WeeklyMachineScheduleList: React.FC = () => {
     const triggerGroupDelete = useCallback((group: any) => {
         setItemToDelete(group);
         setIsGroupDelete(true);
+        setShowDeleteModal(true);
+    }, []);
+
+    const triggerSingleDelete = useCallback((schedule: any) => {
+        setItemToDelete(schedule.weeklyProgramId);
+        setIsGroupDelete(false);
         setShowDeleteModal(true);
     }, []);
 
@@ -301,15 +308,34 @@ const WeeklyMachineScheduleList: React.FC = () => {
                             <div className="mt-4 pt-3 border-t border-slate-100">
                                 <div className="text-[11px] font-semibold text-slate-500 mb-2 uppercase">Scheduled Machines</div>
                                 <div className="space-y-2">
-                                    {order.schedules.map((schedule: any) => (
+                                    {order.schedules
+                                        .filter((schedule: any) => Number(schedule.plannedQty) > 0)
+                                        .map((schedule: any) => {
+                                        const linkedDailyPlan = schedule.productionOrder?.dailyProductionPlans?.find(
+                                            (dp: any) => dp.weeklyProgramId === schedule.weeklyProgramId
+                                        ) || schedule.productionOrder?.dailyProductionPlans?.[0];
+                                        const assignedMachine = schedule.machine || schedule.Machine || linkedDailyPlan?.machine;
+                                        const assignedShift = schedule.shift || schedule.Shift || linkedDailyPlan?.shift;
+                                        const assignedMachineId = schedule.machineId || linkedDailyPlan?.machineId;
+                                        const assignedShiftId = schedule.shiftId || linkedDailyPlan?.shiftId;
+                                        
+                                        return (
                                         <div key={schedule.weeklyProgramId} className="flex items-center justify-between bg-slate-50 p-2 rounded-lg border border-slate-100">
                                             <div className="flex flex-col">
                                                 <span className="text-xs font-medium text-indigo-700">
-                                                    {schedule.machine?.machineName || schedule.Machine?.machineName || schedule.machineName || (schedule.machineId ? `Machine ${schedule.machineId}` : "Injection Moulding Machine 350T")}
+                                                    {assignedMachine?.machineName || schedule.machineName || (assignedMachineId ? `Machine ${assignedMachineId}` : "Machine Not Assigned")}
                                                 </span>
-                                                {(schedule.machine?.machineId || schedule.machineId) && (
-                                                    <span className="text-[10px] text-slate-400">ID: {schedule.machine?.machineId || schedule.machineId}</span>
-                                                )}
+                                                <div className="flex items-center gap-1 mt-0.5">
+                                                    {assignedMachineId && (
+                                                        <span className="text-[10px] text-slate-400">ID: {assignedMachineId}</span>
+                                                    )}
+                                                    {(assignedShift?.shiftName || assignedShiftId) && (
+                                                        <>
+                                                            <span className="text-[10px] text-slate-300 mx-1">|</span>
+                                                            <span className="text-[10px] text-slate-500 bg-slate-200/60 px-1 rounded">Shift: {assignedShift?.shiftName || assignedShiftId}</span>
+                                                        </>
+                                                    )}
+                                                </div>
                                             </div>
                                             <div className="flex items-center gap-2">
                                                 <div className="text-right">
@@ -318,12 +344,12 @@ const WeeklyMachineScheduleList: React.FC = () => {
                                                 {canDeleteSchedule(schedule, order.status) && (
                                                     <DeleteButton onClick={(e: any) => {
                                                         e.stopPropagation();
-                                                        triggerGroupDelete(schedule);
+                                                        triggerSingleDelete(schedule);
                                                     }} />
                                                 )}
                                             </div>
                                         </div>
-                                    ))}
+                                    )})}
                                 </div>
                             </div>
                         </div>

@@ -41,7 +41,7 @@ async function syncProductionOrderQuantities(tx: any, productionOrderId: string)
     if (newStatus === "IN_PROGRESS" || newStatus === "IN_PRODUCTION") {
       newStatus = "POST_PRODUCTION";
     }
-  } else if (!["COMPLETED", "POST_PRODUCTION", "READY_FOR_DISPATCH", "DISPATCHED", "FG_RECEIVED"].includes(newStatus)) {
+  } else if (!["COMPLETED", "POST_PRODUCTION", "PARTIAL_COMPLETED", "READY_FOR_DISPATCH", "DISPATCHED", "FG_RECEIVED"].includes(newStatus)) {
     newStatus = "IN_PROGRESS";
   }
 

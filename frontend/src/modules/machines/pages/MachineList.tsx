@@ -19,7 +19,7 @@ import { useEmployees } from "../../../hooks/useEmployees";
 // BUG-MAC: added permission guard utility
 import { hasPermission } from "../../../utils/permission";
 
-const ITEMS_PER_PAGE = 1;
+const ITEMS_PER_PAGE = 10;
 
 const MachineList: React.FC = () => {
     const navigate = useNavigate();

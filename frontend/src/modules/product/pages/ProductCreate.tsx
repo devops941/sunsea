@@ -564,16 +564,7 @@ const ProductCreatePage: React.FC = () => {
                                 required
                                 error={errors.minimumQty}
                             />
-                            <SelectInput
-                                label="Status"
-                                name="isActive"
-                                value={formData.isActive}
-                                options={[
-                                    { value: "true", label: "Active" },
-                                    { value: "false", label: "Inactive" },
-                                ]}
-                                onChange={handleChange}
-                            />
+                           
                             <TextInput
                                 label="Opening Stock Qty"
                                 name="openingStockQty"
@@ -583,6 +574,8 @@ const ProductCreatePage: React.FC = () => {
                                 onChange={handleChange}
                                 error={errors.openingStockQty}
                             />
+
+                            
                             <SelectInput
                                 label="Opening Stock Store"
                                 name="openingStockStoreId"
@@ -591,6 +584,17 @@ const ProductCreatePage: React.FC = () => {
                                 onChange={handleChange}
                                 error={errors.openingStockStoreId}
                             />
+                             <SelectInput
+                                label="Status"
+                                name="isActive"
+                                value={formData.isActive}
+                                options={[
+                                    { value: "true", label: "Active" },
+                                    { value: "false", label: "Inactive" },
+                                ]}
+                                onChange={handleChange}
+                            />
+                            
                             <div className="lg:col-span-2">
                                 <TextInput
                                     label="Description"

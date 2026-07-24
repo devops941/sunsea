@@ -15,6 +15,7 @@ import EditButton from "../../../components/ui/EditButton/EditButton";
 import ViewButton from "../../../components/ui/viewbutton/ViewButton";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import TextInput from "../../../components/form/TextInput/TextInput";
+import DatePickerCalendar from "../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 import { formatDate } from "../../../utils/dateUtils";
 
 import {
@@ -188,7 +189,7 @@ const MachineAssignmentList: React.FC = () => {
               Manage weekly operator assignments and review complete historical logs
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+          <div className="flex flex-wrap items-center justify-end gap-3 w-full lg:w-auto ml-auto">
             <CustomButton
               text="Export CSV"
               icon={FaFileCsv}
@@ -215,6 +216,8 @@ const MachineAssignmentList: React.FC = () => {
                 setFilterMachineId(e.target.value);
                 setCurrentPage(1);
               }}
+              hideLabel={true}
+              noMargin={true}
               options={[
                 { label: "-- All Machines --", value: "" },
                 ...machines.map((m) => ({
@@ -226,12 +229,10 @@ const MachineAssignmentList: React.FC = () => {
 
 
 
-            <TextInput
-              bottom={true}
-              type="date"
+            <DatePickerCalendar
               name="filterWeekDate"
               value={filterWeekDate}
-              onChange={(e) => {
+              onChange={(e: any) => {
                 setFilterWeekDate(e.target.value);
                 setCurrentPage(1);
               }}

@@ -3,7 +3,7 @@ import { PrismaClient } from "@prisma/client";
 // =====================================================================
 // PRODUCTION ORDER STATUS WORKFLOW (ERP Standard)
 // CREATED → READY_FOR_PLANNING → WEEKLY_SCHEDULED → DAILY_PLANNED
-// → IN_PRODUCTION → POST_PRODUCTION → READY_FOR_DISPATCH → DISPATCHED
+// → IN_PRODUCTION → POST_PRODUCTION → PARTIAL_COMPLETED → READY_FOR_DISPATCH → DISPATCHED
 // =====================================================================
 
 export const PRODUCTION_STATUS = {
@@ -14,6 +14,7 @@ export const PRODUCTION_STATUS = {
   DAILY_PLANNED: "DAILY_PLANNED",
   IN_PRODUCTION: "IN_PRODUCTION",
   POST_PRODUCTION: "POST_PRODUCTION",
+  PARTIAL_COMPLETED: "PARTIAL_COMPLETED",
   READY_FOR_DISPATCH: "READY_FOR_DISPATCH",
   DISPATCHED: "DISPATCHED",
   COMPLETED: "COMPLETED",       // legacy alias for READY_FOR_DISPATCH
@@ -25,6 +26,7 @@ export const LOCKED_STATUSES = [
   "DAILY_PLANNED",
   "IN_PRODUCTION",
   "POST_PRODUCTION",
+  "PARTIAL_COMPLETED",
   "READY_FOR_DISPATCH",
   "DISPATCHED",
   "CANCELLED",
@@ -187,7 +189,7 @@ export class StatusSyncService {
 
     if (statuses.some((s: string) => s === "DISPATCHED")) {
       newSoStatus = "DISPATCHED";
-    } else if (statuses.some((s: string) => s === "READY_FOR_DISPATCH")) {
+    } else if (statuses.some((s: string) => s === "READY_FOR_DISPATCH" || s === "PARTIAL_COMPLETED" || s === "DISPATCHED" || s === "COMPLETED")) {
       newSoStatus = "READY_FOR_DISPATCH";
     } else if (statuses.some((s: string) => s === "POST_PRODUCTION")) {
       newSoStatus = "IN_PROGRESS";
