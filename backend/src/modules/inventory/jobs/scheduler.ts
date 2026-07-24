@@ -1,6 +1,7 @@
 import cron from "node-cron";
 import { prisma } from "../../../config/prisma";
 import { runEodStockSnapshot } from "./eodStockSnapshot.job";
+import { getISTDateParts } from "../../../utils/dateUtils";
 
 /**
  * Checks if a snapshot already exists in the database for the given UTC date
@@ -31,19 +32,19 @@ const runEodCheckForDaysRange = async (daysToCheck: number, contextLabel: string
     const [cutoffHh, cutoffMm] = cutoffTime.split(":").map(Number);
 
     const now = new Date();
+    const nowParts = getISTDateParts(now);
 
     for (let i = daysToCheck; i >= 0; i--) {
-      // Get the local day to check
+      // Get the day to check in IST
       const checkDate = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
-      const year = checkDate.getFullYear();
-      const month = checkDate.getMonth();
-      const day = checkDate.getDate();
+      const parts = getISTDateParts(checkDate);
+      const { year, month, day } = parts;
 
-      // Construct local cutoff date
-      const cutoffDate = new Date(year, month, day, cutoffHh, cutoffMm, 0);
+      // Evaluate cutoff against IST clock time:
+      // Past days (i > 0) are always past cutoff. For today (i === 0), we check if current IST time >= cutoff time.
+      const isPastCutoff = i > 0 || (nowParts.hours > cutoffHh || (nowParts.hours === cutoffHh && nowParts.minutes >= cutoffMm));
 
-      // If the current time is past or equal to the cutoff time, check if the snapshot is missing
-      if (now >= cutoffDate) {
+      if (isPastCutoff) {
         const exists = await checkSnapshotExists(year, month, day);
         if (!exists) {
           const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
