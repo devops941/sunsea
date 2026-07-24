@@ -118,7 +118,7 @@ const salesOrderBodyShape = z.object({
     shippingState: z.string().optional().nullable(),
     shippingPincode: z.string().optional().nullable(),
     shippingCountry: z.string().optional().nullable().default("India"),
-    sameAsBilling: z.boolean().default(false).optional(),
+    // removed sameAsBilling
     remarks: z.string().max(500, "Remarks must be less than 500 characters").optional().nullable(),
     internalNotes: z.string().max(1000, "Internal notes must be less than 1000 characters").optional().nullable(),
     mdApprovalStatus: ApprovalStatusEnum.default("PENDING").optional(),
@@ -143,8 +143,12 @@ const salesOrderBodyRefined = salesOrderBodyShape.superRefine((data, ctx) => {
             ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Expected completion date must be after order date", path: ["expectedCompletionDate"] });
         }
     }
-    if (data.sameAsBilling === false && !data.shippingAddressLine1) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Shipping address is required when not same as billing", path: ["shippingAddressLine1"] });
+    if (!data.shippingAddressLine1) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Shipping address is required",
+            path: ["shippingAddressLine1"],
+        });
     }
     if (data.mdApprovalStatus === "APPROVED") {
         if (!data.mdApprovedBy) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Approved by is required when status is APPROVED", path: ["mdApprovedBy"] });

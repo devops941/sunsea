@@ -138,14 +138,14 @@ const mapCustomerToFormData = (customer: any): CustomerFormData => {
         : [{ bankHolderName: "", bankName: "", accountNumber: "", ifscCode: "", branchName: "", upiMobileNumber: "" }],
     transports: Array.isArray(customer.transports) && customer.transports.length > 0
       ? customer.transports.map((t: any) => ({
-          transportName: t.transportName || "",
-          phone: t.phone || "",
-          addressLine1: t.addressLine1 || "",
-          country: t.country || "India",
-          state: t.state || "",
-          city: t.city || "",
-          pincode: t.pincode || "",
-        }))
+        transportName: t.transportName || "",
+        phone: t.phone || "",
+        addressLine1: t.addressLine1 || "",
+        country: t.country || "India",
+        state: t.state || "",
+        city: t.city || "",
+        pincode: t.pincode || "",
+      }))
       : [{ transportName: "", phone: "", addressLine1: "", country: "India", state: "", city: "", pincode: "" }],
   };
 };
@@ -335,7 +335,7 @@ const CustomerEditPage: React.FC = () => {
       updatedTransports[index] = { ...updatedTransports[index], [field]: value };
       return { ...prev, transports: updatedTransports };
     });
-    
+
     const errorKey = `transports.${index}.${field}`;
     if (errors[errorKey]) {
       setErrors((prev) => ({ ...prev, [errorKey]: "" }));
@@ -345,13 +345,13 @@ const CustomerEditPage: React.FC = () => {
   const addTransport = () => {
     const lastTransport = formData.transports[formData.transports.length - 1];
     if (lastTransport) {
-      const isFilled = lastTransport.transportName?.trim() && 
-                       lastTransport.phone?.trim() && 
-                       lastTransport.addressLine1?.trim() && 
-                       lastTransport.state?.trim() && 
-                       lastTransport.city?.trim() && 
-                       lastTransport.pincode?.trim();
-                       
+      const isFilled = lastTransport.transportName?.trim() &&
+        lastTransport.phone?.trim() &&
+        lastTransport.addressLine1?.trim() &&
+        lastTransport.state?.trim() &&
+        lastTransport.city?.trim() &&
+        lastTransport.pincode?.trim();
+
       if (!isFilled) {
         toast.error("Please completely fill the current transport details before adding a new one.");
         return;
@@ -398,14 +398,14 @@ const CustomerEditPage: React.FC = () => {
     // Validate transports
     formData.transports.forEach((transport, index) => {
       const isPartiallyFilled = !!(
-        transport.transportName?.trim() || 
-        transport.phone?.trim() || 
-        transport.addressLine1?.trim() || 
-        transport.city?.trim() || 
-        transport.state?.trim() || 
+        transport.transportName?.trim() ||
+        transport.phone?.trim() ||
+        transport.addressLine1?.trim() ||
+        transport.city?.trim() ||
+        transport.state?.trim() ||
         transport.pincode?.trim()
       );
-      
+
       if (isPartiallyFilled) {
         if (!transport.transportName?.trim()) { mappedErrors[`transports.${index}.transportName`] = "Required"; hasCustomErrors = true; }
         if (!transport.phone?.trim()) { mappedErrors[`transports.${index}.phone`] = "Required"; hasCustomErrors = true; }
@@ -433,6 +433,10 @@ const CustomerEditPage: React.FC = () => {
         (transport) => transport.transportName?.trim() || transport.phone?.trim() || transport.addressLine1?.trim() || transport.city?.trim() || transport.state?.trim()
       );
 
+      const activeBankAccounts = formData.bankAccounts.filter(
+        (bank) => bank.bankHolderName?.trim() || bank.bankName?.trim() || bank.accountNumber?.trim() || bank.ifscCode?.trim() || bank.branchName?.trim() || bank.upiMobileNumber?.trim()
+      );
+
       await editCustomer(id, {
         firmName: formData.firmName,
         displayName: formData.displayName || undefined,
@@ -453,8 +457,8 @@ const CustomerEditPage: React.FC = () => {
         priceList: formData.priceList || "Standard",
         routeId: formData.routeId || null,
         collectionAgentId: formData.collectionAgentId || null,
-        bankAccount: formData.bankAccounts,
-        transports: activeTransports,
+        bankAccount: activeBankAccounts.length > 0 ? activeBankAccounts : undefined,
+        transports: activeTransports.length > 0 ? activeTransports : undefined,
         status: formData.isActive === "true" ? "Active" : "Inactive",
       });
       toast.success("Customer updated successfully!");
@@ -511,9 +515,9 @@ const CustomerEditPage: React.FC = () => {
                     onChange={handleChange}
                   />
                 </div>
-                <div>
+                {/* <div>
                   <TextInput label="Created by-on" name="createdByOn" value={formData.createdByOn} onChange={handleChange} disabled />
-                </div>
+                </div> */}
               </div>
             </div>
 
@@ -724,7 +728,7 @@ const CustomerEditPage: React.FC = () => {
               <h3 className="text-lg font-semibold text-slate-700 mb-2">Commercial Settings</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 <div>
-                  <TextInput label="Credit Limit ₹" name="creditLimit" type="number" value={formData.creditLimit} placeholder="300000" onChange={handleChange} preventNegative min={250000} error={errors.creditLimit} />
+                  <TextInput label="Credit Limit ₹" name="creditLimit" type="number" value={formData.creditLimit} placeholder="300000" onChange={handleChange} preventNegative error={errors.creditLimit} />
                 </div>
                 <div>
                   <TextInput label="Credit Days (Net)" name="creditDays" value={formData.creditDays} onChange={handleChange} type="number" placeholder="30 days" preventNegative error={errors.creditDays} />
@@ -818,22 +822,22 @@ const CustomerEditPage: React.FC = () => {
                           addressValue={transport.addressLine1}
                           onAddressChange={(v) => handleTransportAddressChange(index, "addressLine1", v)}
                           addressError={errors[`transports.${index}.addressLine1`]}
-                          
+
                           countryValue={transport.country || "India"}
                           onCountryChange={(v) => handleTransportAddressChange(index, "country", v)}
                           countryError={errors[`transports.${index}.country`]}
-                          
+
                           stateValue={transport.state}
                           onStateChange={(v) => {
                             handleTransportAddressChange(index, "state", v);
                             handleTransportAddressChange(index, "city", "");
                           }}
                           stateError={errors[`transports.${index}.state`]}
-                          
+
                           cityValue={transport.city}
                           onCityChange={(v) => handleTransportAddressChange(index, "city", v)}
                           cityError={errors[`transports.${index}.city`]}
-                          
+
                           pincodeValue={transport.pincode}
                           onPincodeChange={(v) => handleTransportAddressChange(index, "pincode", v)}
                           pincodeError={errors[`transports.${index}.pincode`]}

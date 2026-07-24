@@ -201,22 +201,25 @@ const SalesInvoiceView: React.FC = () => {
             const imgData = canvas.toDataURL("image/png");
 
             const pdf = new jsPDF("p", "mm", "a4");
+            const margin = 10;
             const pageWidth = pdf.internal.pageSize.getWidth();
             const pageHeight = pdf.internal.pageSize.getHeight();
-            const imgWidth = pageWidth;
+
+            const imgWidth = pageWidth - 2 * margin;
             const imgHeight = (canvas.height * imgWidth) / canvas.width;
+            const availableHeight = pageHeight - 2 * margin;
 
             let heightLeft = imgHeight;
-            let position = 0;
+            let position = margin;
 
-            pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-            heightLeft -= pageHeight;
+            pdf.addImage(imgData, "PNG", margin, position, imgWidth, imgHeight);
+            heightLeft -= availableHeight;
 
             while (heightLeft > 0) {
-                position = heightLeft - imgHeight;
+                position -= availableHeight;
                 pdf.addPage();
-                pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-                heightLeft -= pageHeight;
+                pdf.addImage(imgData, "PNG", margin, position, imgWidth, imgHeight);
+                heightLeft -= availableHeight;
             }
 
             pdf.save(`Invoice-${invoice?.invoiceNo || "invoice"}.pdf`);
@@ -227,7 +230,7 @@ const SalesInvoiceView: React.FC = () => {
     };
 
     return (
-        <div className="flex bg-gray-100 overflow-hidden h-[calc(100vh-115px)]">
+        <div className="flex bg-gray-100 overflow-hidden h-[calc(100vh-115px)] print:block print:h-auto print:overflow-visible print:bg-white">
             {/* ── Left Sidebar (Invoice List) ── */}
             <div className="hidden md:flex w-72 md:w-80 flex-shrink-0 bg-white border-r border-gray-200 flex-col h-full no-print">
                 <div className="p-4 border-b border-gray-200 flex flex-col gap-3">
@@ -288,7 +291,7 @@ const SalesInvoiceView: React.FC = () => {
             </div>
 
             {/* ── Right Content (Invoice Details) ── */}
-            <div className="flex-1 overflow-y-auto p-6 lg:p-8">
+            <div className="flex-1 overflow-y-auto p-6 lg:p-8 print:overflow-visible print:h-auto print:p-0 print:block">
                 {loading || !invoice ? (
                     <div className="flex flex-col items-center justify-center h-full min-h-[400px]">
                         <FaCircleNotch className="animate-spin text-primary text-4xl mb-4" />
@@ -338,21 +341,21 @@ const SalesInvoiceView: React.FC = () => {
                         {/* GST Tax Invoice Card */}
                         <div
                             id="printable-invoice-card"
-                            className="font-[Arial,sans-serif] text-black bg-white border-[1.5px] border-black w-full box-border text-[12px] shadow-lg"
+                            className="font-[Arial,sans-serif] text-black bg-white border-[1.5px] border-black w-full box-border text-[14px] shadow-lg font-medium"
                         >
                             {/* Top bar */}
-                            <div className="flex justify-between items-center px-3 pt-2 text-[11px] font-semibold">
+                            <div className="flex justify-between items-center px-3 pt-2 text-[13px] font-semibold">
                                 <div>GSTIN : {company?.gstin || "-"}</div>
                                 <div className="italic">Triplicate Copy</div>
                             </div>
 
                             {/* Header */}
                             <div className="text-center border-b-[1.5px] border-black px-3 pb-2">
-                                <div className="text-xs uppercase font-bold tracking-[2px]">Tax Invoice</div>
+                                <div className="text-sm uppercase font-bold tracking-[2px]">Tax Invoice</div>
                                 <h1 className="text-2xl font-extrabold m-0 tracking-[1px] mt-1">
                                     {company?.legalName || company?.companyName || "Company Name"}
                                 </h1>
-                                <div className="text-[11px] mt-1">
+                                <div className="text-[13px] mt-1">
                                     {company?.addressLine1}
                                     {company?.city && `, ${company.city}`}
                                     {company?.state && `, ${company.state}`}
@@ -413,7 +416,7 @@ const SalesInvoiceView: React.FC = () => {
                             </div>
 
                             {/* Items Table */}
-                            <table className="w-full border-collapse text-[11px]">
+                            <table className="w-full border-collapse text-[13px]">
                                 <thead>
                                     <tr>
                                         <Th w="35px">S.N.</Th>
@@ -485,7 +488,7 @@ const SalesInvoiceView: React.FC = () => {
 
                             {/* Tax Summary */}
                             {taxSummary.length > 0 && (
-                                <table className="w-full border-collapse text-[11px] mt-2">
+                                <table className="w-full border-collapse text-[13px] mt-2">
                                     <thead>
                                         <tr>
                                             <Th w="60px">Tax Rate</Th>
@@ -510,12 +513,12 @@ const SalesInvoiceView: React.FC = () => {
                             )}
 
                             {/* Amount in words */}
-                            <div className="px-2 py-2 border-t border-black text-[12px] font-medium">
+                            <div className="px-2 py-2 border-t border-black text-[14px] font-medium">
                                 Rupees {amountInWords}
                             </div>
 
                             {/* Bank details */}
-                            <div className="px-2 py-2 border-t border-black text-[11px]">
+                            <div className="px-2 py-2 border-t border-black text-[13px]">
                                 <span className="font-bold">Bank Details :</span> BANK NAME : {company?.bankName || "BANK OF BARODA"}
                                 &nbsp;&nbsp; BRANCH : {company?.bankBranch || "PALGHAR BRANCH"} <br />
                                 A/c No : {company?.bankAccountNo || "123456789012"} &nbsp;&nbsp; IFSC CODE : {company?.bankIfsc || "BARB0PALGHA"}
@@ -523,13 +526,13 @@ const SalesInvoiceView: React.FC = () => {
 
                             {/* Notes */}
                             {invoice.notes && (
-                                <div className="px-2 py-2 border-t border-black text-[11px]">
+                                <div className="px-2 py-2 border-t border-black text-[13px]">
                                     <span className="font-bold">Notes :</span> {invoice.notes}
                                 </div>
                             )}
 
                             {/* Footer: Terms + Signature */}
-                            <div className="flex border-t-[1.5px] border-black text-[11px]">
+                            <div className="flex border-t-[1.5px] border-black text-[13px]">
                                 <div className="flex-1 border-r border-black p-2">
                                     <div className="font-bold mb-1">Terms &amp; Conditions</div>
                                     <div>E &amp; O.E.</div>
@@ -553,7 +556,7 @@ const SalesInvoiceView: React.FC = () => {
 
 // ─── Small table helpers ─────────────────────────────────────────────
 const MetaRow: React.FC<{ label: string; value: string }> = ({ label, value }) => (
-    <div className="flex text-[11px]">
+    <div className="flex text-[13px]">
         <span className="w-[110px] font-bold">{label}</span>
         <span>: {value}</span>
     </div>

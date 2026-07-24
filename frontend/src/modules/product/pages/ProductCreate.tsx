@@ -69,7 +69,7 @@ const ProductCreatePage: React.FC = () => {
     // ✅ Raw Materials Composition
     type RawMaterialRow = { rawMaterialId: string; percentage: string; };
     const [rawMaterials, setRawMaterials] = useState<RawMaterialRow[]>([]);
-    
+
     // ✅ Accessories / Additional Items
     type AccessoryRow = { rawMaterialId: string; quantity: string; };
     const [accessories, setAccessories] = useState<AccessoryRow[]>([]);
@@ -222,7 +222,7 @@ const ProductCreatePage: React.FC = () => {
                 newErrors.accessories = "Duplicate items selected in Accessories.";
                 toast.error("Duplicate items selected in Accessories");
             }
-            
+
             accessories.forEach((acc, index) => {
                 if (!acc.rawMaterialId) newErrors[`accessories.${index}.rawMaterialId`] = "Required";
                 if (!acc.quantity || Number(acc.quantity) <= 0) newErrors[`accessories.${index}.quantity`] = "Invalid Qty";
@@ -797,7 +797,8 @@ const ProductCreatePage: React.FC = () => {
                                             <tr key={`rm-${idx}`} className="hover:bg-slate-50/50 transition-colors">
                                                 <td className="px-4 py-3 align-top">
                                                     <SelectInput
-                                                        label=""
+                                                        hideLabel={true}
+
                                                         name={`rm-${idx}`}
                                                         value={rm.rawMaterialId}
                                                         options={[{ value: "", label: "-- Select --" }, ...bomOptions]}
@@ -808,9 +809,11 @@ const ProductCreatePage: React.FC = () => {
                                                 <td className="px-4 py-3 align-top">
                                                     <TextInput
                                                         label=""
+                                                        bottom={true}
                                                         name={`percent-${idx}`}
                                                         type="number"
                                                         step="0.01"
+
                                                         value={rm.percentage}
                                                         placeholder="0.00"
                                                         onChange={(e) => handleRawMaterialChange(idx, "percentage", e.target.value)}
@@ -865,7 +868,8 @@ const ProductCreatePage: React.FC = () => {
                                             <tr key={`acc-${idx}`} className="hover:bg-slate-50/50 transition-colors">
                                                 <td className="px-4 py-3 align-top">
                                                     <SelectInput
-                                                        label=""
+                                                        hideLabel={true}
+
                                                         name={`acc-rm-${idx}`}
                                                         value={acc.rawMaterialId}
                                                         options={[{ value: "", label: "-- Select --" }, ...accessoryOptions]}
@@ -878,6 +882,7 @@ const ProductCreatePage: React.FC = () => {
                                                         label=""
                                                         name={`acc-qty-${idx}`}
                                                         type="number"
+                                                        bottom={true}
                                                         step="any"
                                                         value={acc.quantity}
                                                         placeholder="0"

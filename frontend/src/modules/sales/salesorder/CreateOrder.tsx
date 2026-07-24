@@ -52,7 +52,6 @@ const salesOrderSchema = z
         billingState: z.string().min(1, "State is required"),
         billingPincode: z.string().min(1, "Pincode is required").regex(/^\d{6}$/, "Must be a 6-digit pincode"),
 
-        sameAsBilling: z.boolean(),
         shippingAddressLine1: z.string().optional(),
         shippingCity: z.string().optional(),
         shippingState: z.string().optional(),
@@ -64,18 +63,16 @@ const salesOrderSchema = z
         internalNotes: z.string().optional(),
     })
     .superRefine((data, ctx) => {
-        if (!data.sameAsBilling) {
-            if (!data.shippingAddressLine1?.trim())
-                ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Shipping address is required", path: ["shippingAddressLine1"] });
-            if (!data.shippingCity?.trim())
-                ctx.addIssue({ code: z.ZodIssueCode.custom, message: "City is required", path: ["shippingCity"] });
-            if (!data.shippingState?.trim())
-                ctx.addIssue({ code: z.ZodIssueCode.custom, message: "State is required", path: ["shippingState"] });
-            if (!data.shippingPincode?.trim())
-                ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Pincode is required", path: ["shippingPincode"] });
-            else if (!/^\d{6}$/.test(data.shippingPincode))
-                ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Must be a 6-digit pincode", path: ["shippingPincode"] });
-        }
+        if (!data.shippingAddressLine1?.trim())
+            ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Shipping address is required", path: ["shippingAddressLine1"] });
+        if (!data.shippingCity?.trim())
+            ctx.addIssue({ code: z.ZodIssueCode.custom, message: "City is required", path: ["shippingCity"] });
+        if (!data.shippingState?.trim())
+            ctx.addIssue({ code: z.ZodIssueCode.custom, message: "State is required", path: ["shippingState"] });
+        if (!data.shippingPincode?.trim())
+            ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Pincode is required", path: ["shippingPincode"] });
+        else if (!/^\d{6}$/.test(data.shippingPincode))
+            ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Must be a 6-digit pincode", path: ["shippingPincode"] });
 
         if (data.expectedCompletionDate && data.orderDate && data.expectedCompletionDate < data.orderDate) {
             ctx.addIssue({
@@ -154,7 +151,6 @@ const defaultValues: SalesOrderFormValues = {
     orderType: "",
     referenceText: "",
     billingPincode: "",
-    sameAsBilling: false,
     shippingAddressLine1: "",
     shippingCity: "",
     shippingState: "",
@@ -288,7 +284,6 @@ const SalesOrderForm: React.FC = () => {
                 billingCity: state.billingCity || "",
                 billingState: state.billingState || "",
                 billingPincode: state.billingPincode || "",
-                sameAsBilling: state.sameAsBilling || false,
                 shippingAddressLine1: state.shippingAddressLine1 || "",
                 shippingCity: state.shippingCity || "",
                 shippingState: state.shippingState || "",
@@ -328,10 +323,6 @@ const SalesOrderForm: React.FC = () => {
     }, [products]);
 
     // ─── Watched fields ──────────────────────────────────────────────
-    const sameAsBilling = watch("sameAsBilling");
-    useEffect(() => {
-        setShippingResetKey((k) => k + 1);
-    }, [sameAsBilling]);
     const billingAddressLine1 = watch("billingAddressLine1");
     const billingCity = watch("billingCity");
     const billingState = watch("billingState");
@@ -511,16 +502,6 @@ const SalesOrderForm: React.FC = () => {
         setValue("shippingPincode", selected.shippingPincode || "", { shouldValidate: true });
     }, [selectedCustomerId, customers, setValue, isEditMode]);
 
-    // ─── Copy billing to shipping when checkbox toggled ──────────────
-    useEffect(() => {
-        if (sameAsBilling) {
-            setValue("shippingAddressLine1", billingAddressLine1, { shouldValidate: true });
-            setValue("shippingCity", billingCity, { shouldValidate: true });
-            setValue("shippingState", billingState, { shouldValidate: true });
-            setValue("shippingPincode", billingPincode, { shouldValidate: true });
-        }
-    }, [sameAsBilling, billingAddressLine1, billingCity, billingState, billingPincode, setValue]);
-
     // ─── Clear sales person when order type changes ──────────────────
     useEffect(() => {
         if (justResetRef.current) {
@@ -569,11 +550,10 @@ const SalesOrderForm: React.FC = () => {
                 billingCity: data.billingCity ?? '',
                 billingState: data.billingState ?? '',
                 billingPincode: data.billingPincode ?? '',
-                shippingAddressLine1: data.sameAsBilling ? (data.billingAddressLine1 ?? '') : (data.shippingAddressLine1 ?? ''),
-                shippingCity: data.sameAsBilling ? (data.billingCity ?? '') : (data.shippingCity ?? ''),
-                shippingState: data.sameAsBilling ? (data.billingState ?? '') : (data.shippingState ?? ''),
-                shippingPincode: data.sameAsBilling ? (data.billingPincode ?? '') : (data.shippingPincode ?? ''),
-                sameAsBilling: data.sameAsBilling,
+                shippingAddressLine1: data.shippingAddressLine1 ?? '',
+                shippingCity: data.shippingCity ?? '',
+                shippingState: data.shippingState ?? '',
+                shippingPincode: data.shippingPincode ?? '',
                 isInterState: data.isInterState,   // <-- include the flag
                 remarks: data.remarks,
                 internalNotes: data.internalNotes,
@@ -727,19 +707,9 @@ const SalesOrderForm: React.FC = () => {
                         <div>
                             <div className="flex items-center justify-between mb-4">
                                 <h6 className="text-lg font-semibold text-gray-800 mb-0">Shipping</h6>
-                                <Controller name="sameAsBilling" control={control} render={({ field }) => (
-                                    <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-700 mb-0">
-                                        <input type="checkbox" className="w-4 h-4 text-blue-600 rounded border-gray-300" checked={field.value} onChange={e => {
-                                            field.onChange(e.target.checked);
-                                            if (e.target.checked) setSelectedShippingIndex("");
-                                        }} />
-                                        <span>Same as billing</span>
-                                    </label>
-                                )} />
                             </div>
 
-                            {!sameAsBilling && (
-                                <div className="mb-4">
+                            <div className="mb-4">
                                     <SelectInput
                                         label="Select Saved Address"
                                         options={shippingAddressOptions}
@@ -749,7 +719,6 @@ const SalesOrderForm: React.FC = () => {
                                         disabled={shippingAddressOptions.length === 0}
                                     />
                                 </div>
-                            )}
 
                             <AddressForm
                                 addressValue={shippingAddressLine1 || ""}
@@ -764,8 +733,7 @@ const SalesOrderForm: React.FC = () => {
                                 pincodeValue={shippingPincode || ""}
                                 onPincodeChange={(val) => setValue("shippingPincode", val, { shouldValidate: true })}
                                 pincodeError={errors.shippingPincode?.message}
-                                required={!sameAsBilling}
-                                disabled={sameAsBilling}
+                                required
                                 resetKey={shippingResetKey}
                             />
                         </div>

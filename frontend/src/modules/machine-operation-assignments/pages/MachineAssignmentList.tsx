@@ -141,7 +141,7 @@ const MachineAssignmentList: React.FC = () => {
         const opString = item.operators && item.operators.length > 0
           ? item.operators.map((op: any) => `${op.employee?.fullName || "N/A"} (${op.role?.name || "N/A"})`).join(" | ")
           : "No operators";
-        
+
         const inchargeName = item.inchargeEmployee?.fullName || item.machine?.operatorName || item.machine?.operatorId || "N/A";
         const inchargeRole = item.inchargeRole?.name || (inchargeName !== "N/A" ? "Machine Operator" : "N/A");
 
@@ -182,7 +182,7 @@ const MachineAssignmentList: React.FC = () => {
         <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-slate-200">
           <div>
             <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-3">
-            Machine Operation Assignments
+              Machine Operation Assignments
             </h2>
             <p className="text-slate-500 text-sm mt-0.5">
               Manage weekly operator assignments and review complete historical logs
@@ -209,6 +209,7 @@ const MachineAssignmentList: React.FC = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <SelectInput
               name="filterMachineId"
+              hideLabel={true}
               value={filterMachineId}
               onChange={(e) => {
                 setFilterMachineId(e.target.value);
@@ -223,9 +224,10 @@ const MachineAssignmentList: React.FC = () => {
               ]}
             />
 
-           
+
 
             <TextInput
+              bottom={true}
               type="date"
               name="filterWeekDate"
               value={filterWeekDate}
@@ -361,11 +363,10 @@ const MachineAssignmentList: React.FC = () => {
                       type="button"
                       title={item.isActive ? "Close Assignment" : "Activate Assignment"}
                       onClick={() => handleToggleStatus(item)}
-                      className={`p-2 rounded-lg transition-colors ${
-                        item.isActive
-                          ? "bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
-                          : "bg-slate-100 text-slate-400 hover:bg-slate-200"
-                      }`}
+                      className={`p-2 rounded-lg transition-colors ${item.isActive
+                        ? "bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
+                        : "bg-slate-100 text-slate-400 hover:bg-slate-200"
+                        }`}
                     >
                       {item.isActive ? <FaToggleOn size={18} /> : <FaToggleOff size={18} />}
                     </button>

@@ -23,7 +23,6 @@ export interface CreateSalesOrderInput {
 
     billingAddress: AddressInput;
     shippingAddress?: AddressInput;
-    sameAsBilling: boolean;
 
     items: SalesOrderItemInput[];
 

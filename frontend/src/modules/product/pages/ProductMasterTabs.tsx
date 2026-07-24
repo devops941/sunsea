@@ -1,7 +1,7 @@
 import React from "react";
 import { Container } from "react-bootstrap";
 import { useLocation, useNavigate } from "react-router-dom";
-import { FaBox, FaTags, FaRulerCombined, FaPalette, FaWeightHanging, FaBoxes, FaLayerGroup } from "react-icons/fa";
+import { FaBox, FaTags, FaRulerCombined, FaPalette, FaWeightHanging, FaBoxes, FaLayerGroup, FaBalanceScale } from "react-icons/fa";
 import Tabs from "../../../components/ui/tab/Tabs";
 import type { TabItem } from "../../../components/ui/tab/Tabs";
 
@@ -39,7 +39,7 @@ const ProductMasterTabs: React.FC = () => {
     const activeTab = pathToKey[location.pathname] || "products";
 
     const tabs: TabItem[] = [
-        { key: "uoms", label: "UOM", icon: <FaWeightHanging />, content: <UomList /> },
+        { key: "uoms", label: "UOM", icon: <FaBalanceScale />, content: <UomList /> },
         { key: "categories", label: "Categories", icon: <FaTags />, content: <CategoryList /> },
         { key: "raw_material_categories", label: "RM Categories", icon: <FaLayerGroup />, content: <RawMaterialCategoryList /> },
         { key: "raw_materials", label: "Raw Materials", icon: <FaBoxes />, content: <RawMaterialList /> },

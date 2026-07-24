@@ -192,13 +192,13 @@ const CustomerCreatePage: React.FC = () => {
   const addTransport = () => {
     const lastTransport = formData.transports[formData.transports.length - 1];
     if (lastTransport) {
-      const isFilled = lastTransport.transportName?.trim() && 
-                       lastTransport.phone?.trim() && 
-                       lastTransport.addressLine1?.trim() && 
-                       lastTransport.state?.trim() && 
-                       lastTransport.city?.trim() && 
-                       lastTransport.pincode?.trim();
-                       
+      const isFilled = lastTransport.transportName?.trim() &&
+        lastTransport.phone?.trim() &&
+        lastTransport.addressLine1?.trim() &&
+        lastTransport.state?.trim() &&
+        lastTransport.city?.trim() &&
+        lastTransport.pincode?.trim();
+
       if (!isFilled) {
         toast.error("Please completely fill the current transport details before adding a new one.");
         return;
@@ -364,14 +364,14 @@ const CustomerCreatePage: React.FC = () => {
     // Validate transports
     formData.transports.forEach((transport, index) => {
       const isPartiallyFilled = !!(
-        transport.transportName?.trim() || 
-        transport.phone?.trim() || 
-        transport.addressLine1?.trim() || 
-        transport.city?.trim() || 
-        transport.state?.trim() || 
+        transport.transportName?.trim() ||
+        transport.phone?.trim() ||
+        transport.addressLine1?.trim() ||
+        transport.city?.trim() ||
+        transport.state?.trim() ||
         transport.pincode?.trim()
       );
-      
+
       if (isPartiallyFilled) {
         if (!transport.transportName?.trim()) { mappedErrors[`transports.${index}.transportName`] = "Required"; hasCustomErrors = true; }
         if (!transport.phone?.trim()) { mappedErrors[`transports.${index}.phone`] = "Required"; hasCustomErrors = true; }
@@ -468,9 +468,9 @@ const CustomerCreatePage: React.FC = () => {
                     onChange={handleChange}
                   />
                 </div>
-                <div>
+                {/* <div>
                   <TextInput label="Created by-on" name="createdByOn" value={formData.createdByOn} placeholder="" onChange={handleChange} disabled error={errors.createdByOn} />
-                </div>
+                </div> */}
               </div>
             </div>
 
@@ -688,7 +688,7 @@ const CustomerCreatePage: React.FC = () => {
               <h3 className="text-lg font-semibold text-slate-700 mb-2">Commercial Settings</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 <div>
-                  <TextInput label="Credit Limit ₹" name="creditLimit" type="number" value={formData.creditLimit} placeholder="30000" onChange={handleChange} preventNegative min={25000} error={errors.creditLimit} />
+                  <TextInput label="Credit Limit ₹" name="creditLimit" type="number" value={formData.creditLimit} placeholder="30000" onChange={handleChange} preventNegative error={errors.creditLimit} />
                 </div>
                 <div>
                   <TextInput label="Credit Days (Net)" name="creditDays" value={formData.creditDays} onChange={handleChange} type="number" placeholder="30 days" preventNegative error={errors.creditDays} />
