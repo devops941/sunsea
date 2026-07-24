@@ -96,7 +96,7 @@ const StockAdjustmentView: React.FC = () => {
                 <CustomButton
                   text="Approve (MD Approval)"
                   icon={FaCheckCircle}
-                  variant="success"
+                  variant="primary"
                   onClick={() => handleApprove("APPROVED")}
                 />
                 <CustomButton

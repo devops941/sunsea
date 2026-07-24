@@ -78,7 +78,7 @@ export const MachineAssignmentFormModal: React.FC<Props> = ({
         const roleList = rRes.data || [];
         setRoles(roleList);
 
-        const shiftList = Array.isArray(sRes) ? sRes : sRes.data || [];
+        const shiftList = Array.isArray(sRes) ? sRes : (sRes as any).data || [];
         setShifts(shiftList.filter((s: any) => s.isActive !== false));
       } catch (err: any) {
         console.error("Failed to load reference data:", err);

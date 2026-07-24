@@ -276,8 +276,8 @@ const WastageStoreList: React.FC = () => {
                 title="Delete Wastage Product"
                 message="Are you sure you want to delete this wastage product? This action cannot be undone."
                 confirmText="Delete"
-                cancelText="Cancel"
-                isDanger={true}
+                
+                
             />
         </div>
     );

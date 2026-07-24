@@ -533,7 +533,7 @@ const SalesOrderForm: React.FC = () => {
                 productId: Number(item.productCode),
                 quantity: Number(item.quantity)
             }));
-            const payload = {
+            const payload: any = {
                 orderNo: data.orderNo,
                 orderDate: new Date(data.orderDate).toISOString(),
                 expectedCompletionDate: new Date(data.expectedCompletionDate).toISOString(),

@@ -141,7 +141,7 @@ const DailyProductionPlanningPage: React.FC = () => {
     rawMaterialService.fetchAll()
       .then((res) => {
         const map = new Map();
-        const list = res.data || res || [];
+        const list = Array.isArray(res) ? res : (res as any).data || [];
         const dataList = Array.isArray(list) ? list : ((list as any).data || []);
         dataList.forEach((rm: any) => {
           map.set(rm.rawMaterialId?.toString(), rm);
@@ -728,7 +728,7 @@ const DailyProductionPlanningPage: React.FC = () => {
                 variant={dynamicActionVariant}
                 title={dynamicActionTitle}
                 icon={dynamicActionIcon}
-                onClick={() => handleStatusAdvance(plan, producedQty, targetNextStatus, dynamicModalTitle, dynamicModalMessage)}
+                onClick={() => handleStatusAdvance(plan, producedQty, targetNextStatus as any, dynamicModalTitle as any, dynamicModalMessage as any)}
               />
             )}
             {plan.status === "IN_PROGRESS" && (

@@ -216,7 +216,6 @@ const MachineAssignmentList: React.FC = () => {
                 setFilterMachineId(e.target.value);
                 setCurrentPage(1);
               }}
-              hideLabel={true}
               noMargin={true}
               options={[
                 { label: "-- All Machines --", value: "" },
@@ -272,7 +271,7 @@ const MachineAssignmentList: React.FC = () => {
                 render: (item) => (
                   <div>
                     <div className="font-bold text-slate-800 text-sm">
-                      {item.machine?.machineName || item.machineId}
+                      {(item as any).machine?.machineName || item.machineId}
                     </div>
                     <div className="text-xs text-blue-600 font-mono mt-0.5">
                       {item.machineId}
@@ -284,15 +283,15 @@ const MachineAssignmentList: React.FC = () => {
                 header: "SHIFT",
                 render: (item) => (
                   <div>
-                    {item.shift ? (
+                    {(item as any).shift ? (
                       <div>
-                        <div className="font-semibold text-slate-800 text-sm">{item.shift.shiftName}</div>
+                        <div className="font-semibold text-slate-800 text-sm">{(item as any).shift.shiftName}</div>
                         <div className="text-[11px] text-slate-500 mt-0.5">
-                          {item.shift.startTime} - {item.shift.endTime}
+                          {(item as any).shift.startTime} - {(item as any).shift.endTime}
                         </div>
                       </div>
-                    ) : item.shiftId ? (
-                      <span className="font-semibold text-slate-800 text-sm">{item.shiftId}</span>
+                    ) : (item as any).shiftId ? (
+                      <span className="font-semibold text-slate-800 text-sm">{(item as any).shiftId}</span>
                     ) : (
                       <span className="text-slate-400 text-sm">—</span>
                     )}
@@ -303,9 +302,9 @@ const MachineAssignmentList: React.FC = () => {
                 header: "OPERATORS",
                 render: (item) => (
                   <div>
-                    {item.operators && item.operators.length > 0 ? (
+                    {(item as any).operators && (item as any).operators.length > 0 ? (
                       <div className="flex flex-col gap-2">
-                        {item.operators.map((op: any, i: number) => (
+                        {(item as any).operators.map((op: any, i: number) => (
                           <div key={i} className="flex items-center gap-2">
                             <div className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs font-bold shrink-0">
                               {op.employee?.fullName?.charAt(0)?.toUpperCase() || "O"}
@@ -323,7 +322,7 @@ const MachineAssignmentList: React.FC = () => {
               {
                 header: "MACHINE INCHARGE",
                 render: (item) => {
-                  const inchargeName = item.inchargeEmployee?.fullName || item.machine?.operatorName || item.machine?.operatorId || null;
+                  const inchargeName = item.inchargeEmployee?.fullName || (item.machine as any)?.operatorName || (item.machine as any)?.operatorId || null;
                   return (
                     <div>
                       {inchargeName ? (

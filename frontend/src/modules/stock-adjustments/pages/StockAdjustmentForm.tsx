@@ -51,7 +51,7 @@ const adjustmentItemSchema = z.object({
   difference: z.number(),
   remarks: z.string().optional().nullable(),
 }).refine(item => {
-  if (item.itemType === "RAW_MATERIAL" || item.itemType === "WASTAGE") return !!item.rawMaterialId;
+  if ((item.itemType as string) === "RAW_MATERIAL" || (item.itemType as string) === "WASTAGE") return !!item.rawMaterialId;
   if (item.itemType === "FINISHED_GOODS") return !!item.productItemId;
   return true;
 }, { message: "Selection is required", path: ["itemSelection"] });
