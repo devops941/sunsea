@@ -10,15 +10,22 @@ export const validatePurchaseOrder = (data: PurchaseOrderFormData): Record<strin
   }
 
   // Expected Delivery Date
+  const todayStr = new Date().toISOString().split("T")[0];
   if (!data.expectedDeliveryDate) {
     errors.expectedDeliveryDate = "Expected Delivery Date is required";
+  } else if (data.expectedDeliveryDate < todayStr) {
+    errors.expectedDeliveryDate = "Expected Delivery Date must be today or in the future";
   } else if (data.poDate && data.expectedDeliveryDate < data.poDate) {
-    errors.expectedDeliveryDate = "Expected delivery date must be after PO date";
+    errors.expectedDeliveryDate = "Expected Delivery Date must be on or after PO Date";
   }
 
   // Supplier
   if (!data.supplierId) {
     errors.supplierId = "Supplier is required";
+  }
+
+  if (!data.storeId) {
+    errors.storeId = "store is required";
   }
 
   // Billing Address

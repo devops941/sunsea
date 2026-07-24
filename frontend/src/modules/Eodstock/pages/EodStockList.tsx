@@ -52,7 +52,11 @@ const EodStockList: React.FC = () => {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("");
   const [storeIdFilter, setStoreIdFilter] = useState<string>("");
-  const [selectedDate, setSelectedDate] = useState(() => getISTDateString());
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    return getISTDateString(yesterday);
+  });
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [simulateEmptyState, setSimulateEmptyState] = useState(false);
@@ -283,6 +287,7 @@ const EodStockList: React.FC = () => {
               <input
                 type="date"
                 value={selectedDate}
+                max={getISTDateString()}
                 onChange={(e) => {
                   setSelectedDate(e.target.value);
                   setCurrentPage(1);
@@ -395,14 +400,6 @@ const EodStockList: React.FC = () => {
                   render: (item) => (
                     <span className="font-bold text-slate-900 font-mono text-sm">
                       {item.eodQty.toLocaleString()}
-                    </span>
-                  )
-                },
-                {
-                  header: "TIME",
-                  render: (item) => (
-                    <span className="text-slate-500 text-xs font-medium">
-                      {formatDateTime(item.recordedAt)}
                     </span>
                   )
                 }
