@@ -23,14 +23,12 @@ const EmployeeViewModal: React.FC<EmployeeViewModalProps> = ({
             modalTitle="Employee Details"
             avatarText={employee.fullName.charAt(0).toUpperCase()}
             headerTitle={employee.fullName}
-            headerSubtitle={`${employee.empCode} | ${employee.designation?.name || "N/A"}`}
+            headerSubtitle={`${employee.empCode}`}
             sections={[
                 {
                     title: "Professional Info",
                     fields: [
                         { label: "Department", value: employee.department?.name || "N/A" },
-                        { label: "Designation", value: employee.designation?.name || "N/A" },
-                        { label: "Date of Joining", value: employee.dateOfJoining ? new Date(employee.dateOfJoining).toLocaleDateString() : "N/A" },
                         {
                             label: "Status",
                             value: <StatusBadge status={employee.status === "active" ? "ACTIVE" : "INACTIVE"} />

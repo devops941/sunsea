@@ -128,14 +128,16 @@ const ShiftExecutionBoard: React.FC = () => {
     return Math.round(total / hours);
   }, [activeOrder]);
 
-  // Filter production orders matching setup criteria
+  // Filter production orders matching setup criteria — only DAILY_PLANNED or IN_PRODUCTION
   const availableOrders = useMemo(() => {
     return productionOrders.filter(
-      (po) => 
+      (po) =>
         ((po as any).machineId === selectedMachineId || !selectedMachineId) &&
         ((po as any).shiftId === selectedShiftId || !selectedShiftId) &&
         po.status !== "POST_PRODUCTION" &&
+        po.status !== "READY_FOR_DISPATCH" &&
         po.status !== "COMPLETED" &&
+        po.status !== "DISPATCHED" &&
         po.status !== "CANCELLED"
     );
   }, [productionOrders, selectedMachineId, selectedShiftId]);
@@ -149,7 +151,8 @@ const ShiftExecutionBoard: React.FC = () => {
         status: newStatus,
       };
 
-      if (newStatus === "IN PROGRESS") {
+      // ✅ FIX: Use "IN_PRODUCTION" (underscore, no space) — correct backend status
+      if (newStatus === "IN_PRODUCTION") {
         payload.actualStartDateTime = new Date().toISOString();
         toast.info("Shift production started!");
       } else if (newStatus === "POST_PRODUCTION") {
@@ -486,10 +489,10 @@ const ShiftExecutionBoard: React.FC = () => {
                     <h6 className="fw-bold text-dark mb-3">Shift Status Controls</h6>
                     <div className="d-flex flex-column gap-2">
                       <Button 
-                        variant={activeOrder.status === "IN PROGRESS" ? "primary" : "outline-primary"}
-                        onClick={() => handleStatusChange("IN PROGRESS")}
+                        variant={activeOrder.status === "IN_PRODUCTION" ? "primary" : "outline-primary"}
+                        onClick={() => handleStatusChange("IN_PRODUCTION")}
                         className="d-flex align-items-center justify-content-center gap-2 py-2 fw-semibold"
-                        disabled={activeOrder.status === "IN PROGRESS"}
+                        disabled={activeOrder.status === "IN_PRODUCTION"}
                       >
                         <FaPlay size={14} /> Start Shift / Resume
                       </Button>

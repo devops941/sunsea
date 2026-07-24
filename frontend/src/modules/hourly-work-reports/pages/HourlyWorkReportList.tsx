@@ -17,7 +17,7 @@ import DatePickerCalendar from "../../../components/ui/DatePickerCalendar/DatePi
 import SearchInput from "../../../components/ui/SearchInput/SearchInput";
 import DataTable, { type DataTableColumn } from "../../../components/ui/table/DataTable";
 
-const ITEMS_PER_PAGE = 20;
+const ITEMS_PER_PAGE = 10;
 
 const HourlyWorkReportList: React.FC = () => {
     const navigate = useNavigate();
@@ -110,6 +110,7 @@ const HourlyWorkReportList: React.FC = () => {
                     productCode: item.productionOrder?.productItem?.productCode || "",
                     uom: (item.productionOrder?.productItem?.uom?.uomCode?.toUpperCase() === "EA" ? "PCS" : item.productionOrder?.productItem?.uom?.uomCode?.toUpperCase()) || "PCS",
                     plannedQty: Number(item.shiftPlannedQty || item.productionOrder?.targetQty || 0),
+                    dailyPlanId: item.dailyPlanId,
                     poTargetQty: Number(item.productionOrder?.targetQty || 0),
                     weeklyProgramStatus: item.weeklyProgramStatus || null,
                     weeklyProgramId: item.weeklyProgramId || null,
@@ -189,6 +190,7 @@ const HourlyWorkReportList: React.FC = () => {
                 productCode: group.productCode,
                 plannedQty: group.plannedQty,
                 uom: group.uom,
+                dailyPlanId: group.dailyPlanId,
                 hourIndex: nextHourIndex
             }
         });
@@ -291,15 +293,23 @@ const HourlyWorkReportList: React.FC = () => {
             render: (group) => {
                 return (
                     <div className="text-right" onClick={(e) => e.stopPropagation()}>
-                        {group.hours.length >= group.shiftTotalHours ? (
+                        {group.hours.length >= group.shiftTotalHours || group.weeklyProgramStatus === 'COMPLETED' || group.weeklyProgramStatus === 'STOPPED' || group.weeklyProgramStatus === 'CANCELLED' ? (
                             <div className="flex flex-col items-end justify-center gap-1">
                                 <div className="flex items-center justify-end gap-2">
                                     {group.totalQtyProduced >= group.plannedQty || group.hours.length >= group.shiftTotalHours || group.weeklyProgramStatus === 'COMPLETED' ? (
                                         <span className="font-bold text-xs text-green-600">
                                             Completed
                                         </span>
-                                    ) : (
+                                    ) : group.weeklyProgramStatus === 'STOPPED' ? (
                                         <span className="font-bold text-xs text-red-600">
+                                            Stopped
+                                        </span>
+                                    ) : group.weeklyProgramStatus === 'CANCELLED' ? (
+                                        <span className="font-bold text-xs text-red-600">
+                                            Cancelled
+                                        </span>
+                                    ) : (
+                                        <span className="font-bold text-xs text-amber-600">
                                             On Hold
                                         </span>
                                     )}
@@ -409,7 +419,7 @@ const HourlyWorkReportList: React.FC = () => {
                                             </div>
                                             <div>
                                                 <div className="text-[11px] font-bold tracking-wide uppercase text-slate-500 mb-1">Operator</div>
-                                                <div className="text-slate-800 text-sm font-medium truncate max-w-[120px]" title={h.operatorId}>{h.operatorId || "—"}</div>
+                                                <div className="text-slate-800 text-sm font-medium truncate max-w-[120px]" title={h.operatorName || h.operatorId}>{h.operatorName || h.operatorId || "—"}</div>
                                             </div>
                                         </div>
                                         <div className="ml-4 flex gap-2">
@@ -512,7 +522,7 @@ const HourlyWorkReportList: React.FC = () => {
                                     <div><strong>Machine:</strong> {selectedViewGroup.machineName}</div>
                                     <div><strong>Product:</strong> {selectedViewGroup.productName}</div>
                                     <div><strong>PO:</strong> {selectedViewGroup.productionOrderId}</div>
-                                    <div><strong>Operator:</strong> {selectedViewGroup.hours[0]?.operator?.name || selectedViewGroup.hours[0]?.operatorId || "N/A"}</div>
+                                    <div><strong>Operator:</strong> {selectedViewGroup.hours[0]?.operatorName || "N/A"}</div>
                                 </div>
                                 <div className="table-responsive">
                                     <table className="master-data-table text-center align-middle mb-0" style={{ minWidth: '800px' }}>
@@ -535,7 +545,7 @@ const HourlyWorkReportList: React.FC = () => {
                                                     <td className="text-danger fw-semibold py-3">{hour.rejectQty}</td>
                                                     <td className="text-warning fw-semibold py-3">{hour.scrapQty}</td>
                                                     <td className="text-muted py-3">{hour.downtime > 0 ? `${hour.downtime} m` : "-"}</td>
-                                                    <td className="py-3">{hour.operator?.name || hour.operatorId || "-"}</td>
+                                                    <td className="py-3">{hour.operatorName || "-"}</td>
                                                     <td className="py-3">{hour.remarks || "-"}</td>
                                                 </tr>
                                             ))}

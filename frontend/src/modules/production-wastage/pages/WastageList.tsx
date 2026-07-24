@@ -104,7 +104,7 @@ const WastageList: React.FC = () => {
   const displayWastages = Array.isArray(wastages) ? (wastages as any) : ((wastages as any)?.data && Array.isArray((wastages as any).data) ? (wastages as any).data : []);
 
   return (
-    <div className="p-4 md:p-6 min-h-screen bg-slate-50">
+    <div className="p-4 md:p-6 min-h-screen">
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
         {/* Page Header */}
         <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-slate-200">
@@ -154,7 +154,7 @@ const WastageList: React.FC = () => {
               header: "QUANTITY",
               render: (item: any) => (
                 <span className="font-bold text-slate-800">
-                  {item.quantity} {item.uom && item.uom.toUpperCase() === "PCS" ? "kg" : String(item.uom || "kg").toLowerCase()}
+                  {item.quantity} {item.uom && item.uom.toUpperCase() === "PCS" ? "kg" : String(item.uom || "kg").split(',')[0].toLowerCase()}
                 </span>
               ),
             },

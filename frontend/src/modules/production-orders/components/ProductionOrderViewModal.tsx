@@ -181,7 +181,7 @@ export const ProductionOrderViewModal: React.FC<ProductionOrderViewModalProps> =
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
                                             <div>
                                                 <div className="text-xs text-slate-500 font-medium mb-1 uppercase">Production Qty</div>
-                                                <div className="font-semibold text-slate-800">{prod.quantity} {prod.uom?.toLowerCase() === 'ea' ? 'pcs' : prod.uom}</div>
+                                                <div className="font-semibold text-slate-800">{prod.quantity} {prod.uom?.toLowerCase() === 'ea' || prod.uom?.toLowerCase() === 'each' ? 'pcs' : prod.uom}</div>
                                             </div>
                                             <div>
                                                 <div className="text-xs text-slate-500 font-medium mb-1 uppercase">Weight Used</div>
@@ -189,7 +189,7 @@ export const ProductionOrderViewModal: React.FC<ProductionOrderViewModalProps> =
                                             </div>
                                             <div>
                                                 <div className="text-xs text-slate-500 font-medium mb-1 uppercase">Unit (UOM)</div>
-                                                <div className="font-semibold text-slate-800">{prod.uom?.toLowerCase() === 'ea' ? 'pcs' : prod.uom}</div>
+                                                <div className="font-semibold text-slate-800">{prod.uom?.toLowerCase() === 'ea' || prod.uom?.toLowerCase() === 'each' ? 'pcs' : prod.uom}</div>
                                             </div>
                                         </div>
                                     </div>
@@ -221,12 +221,18 @@ export const ProductionOrderViewModal: React.FC<ProductionOrderViewModalProps> =
                                                         const materialName = rm.materialName || stockRm?.materialName || rm.rawMaterialId;
                                                         const isAvailable = rm.status ? rm.status === "AVAILABLE" : available >= required;
                                                         
+                                                        // Get correct UOM
+                                                        let displayUom = stockRm?.baseUom?.split(',')[0] || rm.uom || stockRm?.uom || "KG";
+                                                        if (displayUom.toLowerCase() === 'ea' || displayUom.toLowerCase() === 'each') {
+                                                            displayUom = 'pcs';
+                                                        }
+
                                                         return (
                                                             <tr key={rm.rawMaterialId} className="hover:bg-slate-50 transition-colors">
                                                                 <td className="px-4 py-3 font-medium text-slate-800">{rm.rawMaterialId}</td>
                                                                 <td className="px-4 py-3 text-slate-700">{materialName}</td>
-                                                                <td className="px-4 py-3 font-medium">{required.toFixed(2)} KG</td>
-                                                                <td className="px-4 py-3">{available.toFixed(2)} KG</td>
+                                                                <td className="px-4 py-3 font-medium">{required.toFixed(2)} {displayUom}</td>
+                                                                <td className="px-4 py-3">{available.toFixed(2)} {displayUom}</td>
                                                                 <td className="px-4 py-3">
                                                                     <StatusBadge status={isAvailable ? "AVAILABLE" : "INSUFFICIENT"} />
                                                                 </td>
@@ -260,6 +266,155 @@ export const ProductionOrderViewModal: React.FC<ProductionOrderViewModalProps> =
                                     </div>
                                 </div>
                             ))}
+
+                            {/* Shift / Daily Execution & Dispatch History */}
+                            {(() => {
+                                const plans: any[] = [];
+                                const coveredWeeklyProgramIds = new Set<string>();
+                                
+                                if (fullOrder?.dailyProductionPlans && fullOrder.dailyProductionPlans.length > 0) {
+                                    fullOrder.dailyProductionPlans.forEach((plan: any) => {
+                                        if (plan.weeklyProgramId) {
+                                            coveredWeeklyProgramIds.add(plan.weeklyProgramId);
+                                        }
+                                        const hourlySum = plan.hourlyProductions?.reduce((acc: number, curr: any) => acc + Number(curr.qtyProduced || 0), 0) || 0;
+                                        const producedForPlan = plan.status === 'COMPLETED' ? Math.max(Number(plan.plannedQty || 0), hourlySum) : hourlySum;
+                                        plans.push({
+                                            id: plan.dailyPlanId,
+                                            date: plan.productionDate ? new Date(plan.productionDate).toLocaleDateString() : '-',
+                                            shiftName: plan.shift?.shiftName || plan.shiftId || 'Shift 1',
+                                            machineName: plan.machine?.machineName || plan.machineId || fullOrder?.Machine?.machineName || (order as any)?.machineName || '-',
+                                            plannedQty: Number(plan.plannedQty || 0),
+                                            producedQty: producedForPlan,
+                                            status: plan.status || 'PLANNED'
+                                        });
+                                    });
+                                }
+
+                                if (fullOrder?.weeklyMachinePrograms && fullOrder.weeklyMachinePrograms.length > 0) {
+                                    fullOrder.weeklyMachinePrograms.forEach((prog: any) => {
+                                        if (prog.weeklyProgramId && coveredWeeklyProgramIds.has(prog.weeklyProgramId)) {
+                                            return;
+                                        }
+
+                                        let producedForProg = 0;
+                                        const dPlans = prog.dailyProductionPlans || prog.dailyPlans;
+                                        if (dPlans && dPlans.length > 0) {
+                                            dPlans.forEach((dp: any) => {
+                                                const hSum = dp.hourlyProductions?.reduce((acc: number, curr: any) => acc + Number(curr.qtyProduced || 0), 0) || 0;
+                                                producedForProg += dp.status === 'COMPLETED' ? Math.max(Number(dp.plannedQty || 0), hSum) : hSum;
+                                            });
+                                        } else if (prog.status === 'COMPLETED' || fullOrder?.status === 'COMPLETED' || fullOrder?.status === 'READY_FOR_DISPATCH' || fullOrder?.status === 'DISPATCHED') {
+                                            producedForProg = Number(prog.plannedQty || 0);
+                                        } else if (Number(fullOrder?.producedQty || 0) > 0) {
+                                            producedForProg = Number(fullOrder?.producedQty || 0);
+                                        }
+                                        
+                                        let progDateStr = '-';
+                                        if (prog.weekStartDate) {
+                                            const dt = new Date(prog.weekStartDate);
+                                            if (prog.dayOfWeek !== undefined) {
+                                                dt.setDate(dt.getDate() + Number(prog.dayOfWeek));
+                                            }
+                                            progDateStr = dt.toLocaleDateString();
+                                        } else if (fullOrder?.orderDate) {
+                                            progDateStr = new Date(fullOrder.orderDate).toLocaleDateString();
+                                        }
+
+                                        plans.push({
+                                            id: prog.weeklyProgramId,
+                                            date: progDateStr,
+                                            shiftName: prog.shift?.shiftName || prog.shiftId || 'Shift 1',
+                                            machineName: prog.machine?.machineName || prog.machineId || fullOrder?.Machine?.machineName || (order as any)?.machineName || '-',
+                                            plannedQty: Number(prog.plannedQty || 0),
+                                            producedQty: producedForProg,
+                                            status: prog.status || 'PLANNED'
+                                        });
+                                    });
+                                }
+
+                                const isDispatched = fullOrder?.status === 'DISPATCHED' || (fullOrder?.goodsDispatchItems && fullOrder.goodsDispatchItems.length > 0);
+
+                                return (
+                                    <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm mt-6">
+                                        <div className="bg-white border-b border-slate-200 p-4 flex justify-between items-center flex-wrap gap-2">
+                                            <h4 className="text-lg font-bold text-slate-800">
+                                                Shift-wise Production & Dispatch Details
+                                            </h4>
+                                            <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                                                Target: <span className="text-slate-800 font-bold">{fullOrder?.targetQty || order.targetQty}</span> | Produced: <span className="text-green-600 font-bold">{fullOrder?.producedQty || order.producedQty || 0}</span>
+                                            </div>
+                                        </div>
+                                        <div className="p-4 bg-slate-50 overflow-x-auto">
+                                            <div className="bg-white border border-slate-200 rounded-lg overflow-hidden min-w-[750px]">
+                                                <table className="w-full text-left text-sm text-slate-600">
+                                                    <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 font-semibold text-xs uppercase">
+                                                        <tr>
+                                                            <th className="px-4 py-3">Date</th>
+                                                            <th className="px-4 py-3">Shift</th>
+                                                            <th className="px-4 py-3">Machine</th>
+                                                            <th className="px-4 py-3">Planned Qty</th>
+                                                            <th className="px-4 py-3">Produced Qty</th>
+                                                            <th className="px-4 py-3">Production Status</th>
+                                                            <th className="px-4 py-3">Dispatch Status</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-slate-100">
+                                                        {plans.length > 0 ? (
+                                                            plans.map((plan: any, idx: number) => {
+                                                                const isReadyForDispatch = plan.status === 'COMPLETED' || fullOrder?.status === 'READY_FOR_DISPATCH' || fullOrder?.status === 'COMPLETED';
+
+                                                                let dispatchBadge = <span className="px-2.5 py-1 bg-slate-100 text-slate-600 rounded-full text-xs font-semibold">Not Dispatched</span>;
+                                                                if (isDispatched) {
+                                                                    dispatchBadge = <span className="px-2.5 py-1 bg-green-100 text-green-800 border border-green-200 rounded-full text-xs font-semibold">Dispatched</span>;
+                                                                } else if (isReadyForDispatch) {
+                                                                    dispatchBadge = <span className="px-2.5 py-1 bg-blue-100 text-blue-800 border border-blue-200 rounded-full text-xs font-semibold">Ready for Dispatch</span>;
+                                                                }
+
+                                                                return (
+                                                                    <tr key={plan.id || idx} className="hover:bg-slate-50 transition-colors">
+                                                                        <td className="px-4 py-3 font-medium text-slate-800">{plan.date}</td>
+                                                                        <td className="px-4 py-3 text-slate-700">{plan.shiftName}</td>
+                                                                        <td className="px-4 py-3 text-slate-700">{plan.machineName}</td>
+                                                                        <td className="px-4 py-3 font-semibold text-slate-700">{Number(plan.plannedQty || 0).toFixed(2)}</td>
+                                                                        <td className="px-4 py-3 font-bold text-green-600">{Number(plan.producedQty || 0).toFixed(2)}</td>
+                                                                        <td className="px-4 py-3">
+                                                                            <StatusBadge status={plan.status} />
+                                                                        </td>
+                                                                        <td className="px-4 py-3">
+                                                                            {dispatchBadge}
+                                                                        </td>
+                                                                    </tr>
+                                                                );
+                                                            })
+                                                        ) : (
+                                                            <tr className="hover:bg-slate-50 transition-colors">
+                                                                <td className="px-4 py-3 font-medium text-slate-800">{new Date(fullOrder?.orderDate || order.orderDate).toLocaleDateString()}</td>
+                                                                <td className="px-4 py-3 text-slate-700">General Shift</td>
+                                                                <td className="px-4 py-3 text-slate-700">{fullOrder?.Machine?.machineName || fullOrder?.machineMachineId || (order as any)?.machineName || (order as any)?.machineMachineId || '-'}</td>
+                                                                <td className="px-4 py-3 font-semibold text-slate-700">{Number(fullOrder?.targetQty || order.targetQty || 0).toFixed(2)}</td>
+                                                                <td className="px-4 py-3 font-bold text-green-600">{Number(fullOrder?.producedQty || order.producedQty || 0).toFixed(2)}</td>
+                                                                <td className="px-4 py-3">
+                                                                    <StatusBadge status={fullOrder?.status || order.status} />
+                                                                </td>
+                                                                <td className="px-4 py-3">
+                                                                    {fullOrder?.status === 'DISPATCHED' ? (
+                                                                        <span className="px-2.5 py-1 bg-green-100 text-green-800 border border-green-200 rounded-full text-xs font-semibold">Dispatched</span>
+                                                                    ) : (fullOrder?.status === 'READY_FOR_DISPATCH' || fullOrder?.status === 'COMPLETED') ? (
+                                                                        <span className="px-2.5 py-1 bg-blue-100 text-blue-800 border border-blue-200 rounded-full text-xs font-semibold">Ready for Dispatch</span>
+                                                                    ) : (
+                                                                        <span className="px-2.5 py-1 bg-slate-100 text-slate-600 rounded-full text-xs font-semibold">Not Dispatched</span>
+                                                                    )}
+                                                                </td>
+                                                            </tr>
+                                                        )}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })()}
                         </div>
                     )}
                 </div>

@@ -148,10 +148,16 @@ class ProductService {
         rawMaterialsList = typeof data.rawMaterials === "string"
           ? JSON.parse(data.rawMaterials)
           : data.rawMaterials;
+
+        const percentageItems = rawMaterialsList.filter(rm => rm.percentage !== null && rm.percentage !== undefined && String(rm.percentage).trim() !== "");
+        const totalPercent = percentageItems.reduce((acc, curr) => acc + Number(curr.percentage), 0);
+        if (percentageItems.length > 0 && totalPercent !== 100) {
+          throw new ApiError(400, "Total Raw Material percentage must be exactly 100%");
+        }
         
-        const totalPercent = rawMaterialsList.reduce((acc, curr) => acc + Number(curr.percentage), 0);
-        if (rawMaterialsList.length > 0 && Math.abs(totalPercent - 100) > 0.01) {
-          throw new ApiError(400, "Total raw material percentage must be exactly 100%");
+        const rmIds = rawMaterialsList.map(rm => String(rm.rawMaterialId));
+        if (new Set(rmIds).size !== rmIds.length) {
+          throw new ApiError(400, "Duplicate raw materials are not allowed");
         }
       } catch (e: any) {
         if (e instanceof ApiError) throw e;
@@ -175,32 +181,32 @@ class ProductService {
         ...payload,
         ...(data.openingStockQty && data.openingStockStoreId
           ? {
-              finishedGoodsStocks: {
-                create: [
-                  {
-                    storeId: String(data.openingStockStoreId),
-                    onHandQty: Number(data.openingStockQty),
-                  },
-                ],
-              },
-              finishedGoodsTransactions: {
-                create: [
-                  {
-                    txnDateTime: new Date(),
-                    storeId: String(data.openingStockStoreId),
-                    txnType: "OPENING_STOCK",
-                    qty: Number(data.openingStockQty),
-                    remarks: "Opening Stock during product creation",
-                  },
-                ],
-              },
-            }
+            finishedGoodsStocks: {
+              create: [
+                {
+                  storeId: String(data.openingStockStoreId),
+                  onHandQty: Number(data.openingStockQty),
+                },
+              ],
+            },
+            finishedGoodsTransactions: {
+              create: [
+                {
+                  txnDateTime: new Date(),
+                  storeId: String(data.openingStockStoreId),
+                  txnType: "OPENING_STOCK",
+                  qty: Number(data.openingStockQty),
+                  remarks: "Opening Stock during product creation",
+                },
+              ],
+            },
+          }
           : {}),
         ...(rawMaterialsList.length > 0 && {
           billOfMaterials: {
             create: rawMaterialsList.map((rm: any) => ({
               rawMaterialId: String(rm.rawMaterialId),
-              requiredQuantity: new Prisma.Decimal(0),
+              requiredQuantity: new Prisma.Decimal(rm.requiredQuantity || 0),
               percentage: toNumberOrNull(rm.percentage),
             })),
           },
@@ -325,11 +331,17 @@ class ProductService {
         rawMaterialsList = typeof data.rawMaterials === "string"
           ? JSON.parse(data.rawMaterials)
           : data.rawMaterials;
-        
+
         if (rawMaterialsList && rawMaterialsList.length > 0) {
-          const totalPercent = rawMaterialsList.reduce((acc, curr) => acc + Number(curr.percentage), 0);
-          if (Math.abs(totalPercent - 100) > 0.01) {
-            throw new ApiError(400, "Total raw material percentage must be exactly 100%");
+          const percentageItems = rawMaterialsList.filter(rm => rm.percentage !== null && rm.percentage !== undefined && String(rm.percentage).trim() !== "");
+          const totalPercent = percentageItems.reduce((acc, curr) => acc + Number(curr.percentage), 0);
+          if (percentageItems.length > 0 && totalPercent !== 100) {
+            throw new ApiError(400, "Total Raw Material percentage must be exactly 100%");
+          }
+
+          const rmIds = rawMaterialsList.map(rm => String(rm.rawMaterialId));
+          if (new Set(rmIds).size !== rmIds.length) {
+            throw new ApiError(400, "Duplicate raw materials are not allowed");
           }
         }
       } catch (e: any) {
@@ -429,7 +441,7 @@ class ProductService {
             data: rawMaterialsList.map((rm: any) => ({
               productId: id,
               rawMaterialId: String(rm.rawMaterialId),
-              requiredQuantity: new Prisma.Decimal(0),
+              requiredQuantity: new Prisma.Decimal(rm.requiredQuantity || 0),
               percentage: toNumberOrNull(rm.percentage)
             }))
           });
@@ -482,42 +494,42 @@ class ProductService {
       exportPrice: data.exportPrice !== undefined ? toNumberOrNull(data.exportPrice) : undefined,
       gstRate: data.gstRate !== undefined ? toNumberOrNull(data.gstRate) : undefined,
       cess: data.cess !== undefined ? toNumberOrNull(data.cess) : undefined,
-      
+
       ...(data.openingStockQty && data.openingStockStoreId
         ? {
-            finishedGoodsStocks: {
-              upsert: [
-                {
-                  where: {
-                    storeId_productItemId: {
-                      storeId: String(data.openingStockStoreId),
-                      productItemId: id,
-                    },
-                  },
-                  update: { onHandQty: Number(data.openingStockQty) },
-                  create: {
+          finishedGoodsStocks: {
+            upsert: [
+              {
+                where: {
+                  storeId_productItemId: {
                     storeId: String(data.openingStockStoreId),
-                    onHandQty: Number(data.openingStockQty),
+                    productItemId: id,
                   },
                 },
-              ],
-            },
-            ...(isStockChanged
-              ? {
-                  finishedGoodsTransactions: {
-                    create: [
-                      {
-                        txnDateTime: new Date(),
-                        storeId: String(data.openingStockStoreId),
-                        txnType: qtyDiff > 0 ? "STOCK_ADJUSTMENT_IN" : "STOCK_ADJUSTMENT_OUT",
-                        qty: Math.abs(qtyDiff),
-                        remarks: `Opening Stock updated (Difference: ${qtyDiff})`,
-                      },
-                    ],
+                update: { onHandQty: Number(data.openingStockQty) },
+                create: {
+                  storeId: String(data.openingStockStoreId),
+                  onHandQty: Number(data.openingStockQty),
+                },
+              },
+            ],
+          },
+          ...(isStockChanged
+            ? {
+              finishedGoodsTransactions: {
+                create: [
+                  {
+                    txnDateTime: new Date(),
+                    storeId: String(data.openingStockStoreId),
+                    txnType: qtyDiff > 0 ? "STOCK_ADJUSTMENT_IN" : "STOCK_ADJUSTMENT_OUT",
+                    qty: Math.abs(qtyDiff),
+                    remarks: `Opening Stock updated (Difference: ${qtyDiff})`,
                   },
-                }
-              : {}),
-          }
+                ],
+              },
+            }
+            : {}),
+        }
         : {}),
     };
 

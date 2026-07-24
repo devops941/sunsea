@@ -1,7 +1,7 @@
 import React from "react";
 import { Container } from "react-bootstrap";
 import { useLocation, useNavigate } from "react-router-dom";
-import { FaUsers, FaClock, FaUserTie, FaTruck, FaCogs } from "react-icons/fa";
+import { FaUsers, FaClock, FaUserTie, FaTruck, FaCogs, FaUserCheck, FaHistory } from "react-icons/fa";
 import Tabs from "../../../components/ui/tab/Tabs";
 import type { TabItem } from "../../../components/ui/tab/Tabs";
 
@@ -10,18 +10,19 @@ import ShiftList from "../../shifts/pages/ShiftList";
 import CustomerListPage from "../../customers/pages/CustomerListPage";
 import SupplierListPage from "../../supplier/pages/SupplierList";
 import MachineList from "../../machines/pages/MachineList";
+import MachineAssignmentList from "../../machine-operation-assignments/pages/MachineAssignmentList";
 
 const HROrganizationTabs: React.FC = () => {
     const location = useLocation();
     const navigate = useNavigate();
 
-    // Map pathnames to tab keys
     const pathToKey: Record<string, string> = {
         "/employees": "employees",
         "/shifts": "shifts",
         "/customers": "customers",
         "/suppliers": "suppliers",
-        "/machines": "machines"
+        "/machines": "machines",
+        "/machines/assignments": "assignments"
     };
 
     const keyToPath: Record<string, string> = {
@@ -29,13 +30,15 @@ const HROrganizationTabs: React.FC = () => {
         "shifts": "/shifts",
         "customers": "/customers",
         "suppliers": "/suppliers",
-        "machines": "/machines"
+        "machines": "/machines",
+        "assignments": "/machines/assignments"
     };
 
     const activeTab = pathToKey[location.pathname] || "employees";
 
     const tabs: TabItem[] = [
         { key: "machines", label: "Machines", icon: <FaCogs />, content: <MachineList /> },
+        { key: "assignments", label: "Machine Assignments", icon: <FaUserCheck />, content: <MachineAssignmentList /> },
         { key: "employees", label: "Employees", icon: <FaUsers />, content: <Employeelist /> },
         { key: "suppliers", label: "Suppliers", icon: <FaTruck />, content: <SupplierListPage /> },
         { key: "customers", label: "Customers", icon: <FaUserTie />, content: <CustomerListPage /> },

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { FaSave, FaEraser, FaArrowLeft, FaCheckCircle, FaInfoCircle } from "react-icons/fa";
+import { FaSave, FaEraser, FaCheckCircle, FaInfoCircle } from "react-icons/fa";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 import TextInput from "../../../components/form/TextInput/TextInput";
@@ -20,8 +20,6 @@ const HourlyWorkReportEdit: React.FC = () => {
     const [hourlyProductionId, setHourlyProductionId] = useState("");
     const [productionOrderId, setProductionOrderId] = useState("");
     const [productionDate, setProductionDate] = useState("");
-    const [shiftId, setShiftId] = useState("");
-    const [machineId, setMachineId] = useState("");
     const [hourIndex, setHourIndex] = useState("1");
     const [qtyProduced, setQtyProduced] = useState("");
     const [rejectQty, setRejectQty] = useState("0");
@@ -32,6 +30,7 @@ const HourlyWorkReportEdit: React.FC = () => {
     const [rejectReason, setRejectReason] = useState("");
     const [scrapReason, setScrapReason] = useState("");
     const [operatorId, setOperatorId] = useState("");
+    const [operatorName, setOperatorName] = useState("");
 
     // Display-only fields
     const [productName, setProductName] = useState("");
@@ -48,8 +47,6 @@ const HourlyWorkReportEdit: React.FC = () => {
             setHourlyProductionId(s.hourlyProductionId?.toString() || "");
             setProductionOrderId(s.productionOrderId || "");
             setProductionDate(s.productionDate ? s.productionDate.split("T")[0] : "");
-            setShiftId(s.shiftId || "");
-            setMachineId(s.machineId || "");
             setHourIndex(s.hourIndex?.toString() || "1");
             setQtyProduced(s.qtyProduced?.toString() || "");
             setRejectQty(s.rejectQty?.toString() || "0");
@@ -60,6 +57,7 @@ const HourlyWorkReportEdit: React.FC = () => {
             setRejectReason(s.rejectReason || "");
             setScrapReason(s.scrapReason || "");
             setOperatorId(s.operatorId || "");
+            setOperatorName(s.operatorName || "");
 
             setProductName(s.productionOrder?.productItem?.productName || "Unknown Product");
             setMachineName(s.machine?.machineName || s.machineId || "Unknown Machine");
@@ -185,12 +183,10 @@ const HourlyWorkReportEdit: React.FC = () => {
                                     onChange={(e) => setHourIndex(e.target.value)}
                                 />
                                 <TextInput
-                                    label="Operator ID (Optional)"
-                                    name="operatorId"
-                                    value={operatorId}
-                                    placeholder="Enter Operator ID"
-                                    disabled={isEditDisabled}
-                                    onChange={(e) => setOperatorId(e.target.value)}
+                                    label="Operator"
+                                    name="operatorName"
+                                    value={operatorName || operatorId || "—"}
+                                    disabled
                                 />
                                 <QuantityInput
                                     label="Produced Qty"

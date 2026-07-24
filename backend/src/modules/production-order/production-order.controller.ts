@@ -84,6 +84,53 @@ class ProductionOrderController {
     );
   });
 
+  checkMaterialAvailability = asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user?.userId;
+    const result = await productionOrderService.checkMaterialAvailability(
+      String(req.params.productionOrderId),
+      userId
+    );
+    return res.status(200).json(
+      new ApiResponse("Material availability checked", result)
+    );
+  });
+
+  startProduction = asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user?.userId;
+    const result = await productionOrderService.startProduction(
+      String(req.params.productionOrderId),
+      userId
+    );
+    return res.status(200).json(
+      new ApiResponse("Production started successfully. Raw materials issued.", result)
+    );
+  });
+
+  completePostProduction = asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user?.userId;
+    const { producedQty } = req.body;
+    if (!producedQty || isNaN(Number(producedQty))) {
+      return res.status(400).json(new ApiResponse("producedQty is required and must be a number"));
+    }
+    const result = await productionOrderService.completePostProduction(
+      String(req.params.productionOrderId),
+      Number(producedQty),
+      userId
+    );
+    return res.status(200).json(
+      new ApiResponse("Post-production completed. Order is ready for dispatch.", result)
+    );
+  });
+
+  getHistory = asyncHandler(async (req: Request, res: Response) => {
+    const history = await productionOrderService.getHistory(
+      String(req.params.productionOrderId)
+    );
+    return res.status(200).json(
+      new ApiResponse("Production order history fetched successfully", history)
+    );
+  });
+
   private parseSortBy(value: unknown): "orderDate" | "createdAt" | "dueDate" | "productionOrderId" | undefined {
     if (!value || typeof value !== 'string') return undefined;
 

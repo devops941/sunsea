@@ -81,6 +81,8 @@ const LocationEdit = lazy(() => import("../modules/locations/pages/LocationEdit"
 
 const MachineCreate = lazy(() => import("../modules/machines/pages/MachineCreate"));
 const MachineEdit = lazy(() => import("../modules/machines/pages/MachineEdit"));
+const MachineAssignmentList = lazy(() => import("../modules/machine-operation-assignments/pages/MachineAssignmentList"));
+const MachineAssignmentForm = lazy(() => import("../modules/machine-operation-assignments/pages/MachineAssignmentForm"));
 
 
 // shift
@@ -95,7 +97,8 @@ const RawMaterialEdit = lazy(() => import("../modules/raw-materials/pages/RawMat
 const RawMaterialCategoryCreate = lazy(() => import("../modules/raw-material-categories/pages/RawMaterialCategoryCreate"));
 const RawMaterialCategoryEdit = lazy(() => import("../modules/raw-material-categories/pages/RawMaterialCategoryEdit"));
 
-
+const WastageStoreList = lazy(() => import("../modules/wastage-store/pages/WastageStoreList"));
+const WastageStoreForm = lazy(() => import("../modules/wastage-store/pages/WastageStoreForm"));
 
 
 const StockAdjustmentForm = lazy(() => import("../modules/stock-adjustments/pages/StockAdjustmentForm"));
@@ -361,6 +364,7 @@ const AppRoutes = () => {
             {/* Machines */}
             <Route element={<ProtectedRoute permission="machines.view" />}>
               <Route path="/machines" element={<HROrganizationTabs />} />
+              <Route path="/machines/assignments" element={<HROrganizationTabs />} />
             </Route>
             {/* Machines Create Route */}
             <Route element={<ProtectedRoute permission="machines.create" />}>
@@ -369,6 +373,13 @@ const AppRoutes = () => {
             {/* Machines Edit :Id Route */}
             <Route element={<ProtectedRoute permission="machines.edit" />}>
               <Route path="/machines/edit/:id" element={<MachineEdit />} />
+            </Route>
+            {/* Machine Assignments Create/Edit Routes */}
+            <Route element={<ProtectedRoute permission="machines.create" />}>
+              <Route path="/machines/assignments/create" element={<MachineAssignmentForm />} />
+            </Route>
+            <Route element={<ProtectedRoute permission="machines.edit" />}>
+              <Route path="/machines/assignments/edit/:id" element={<MachineAssignmentForm />} />
             </Route>
 
             {/* Shifts */}
@@ -403,6 +414,17 @@ const AppRoutes = () => {
               <Route path="/raw-materials/edit/:id" element={<RawMaterialEdit />} />
               {/* Raw Material Categories Edit :Id Route */}
               <Route path="/raw-material-categories/edit/:id" element={<RawMaterialCategoryEdit />} />
+            </Route>
+
+            {/* Wastage Store */}
+            <Route element={<ProtectedRoute permission="raw_materials.view" />}>
+              <Route path="/wastage-store" element={<ProductMasterTabs />} />
+            </Route>
+            <Route element={<ProtectedRoute permission="raw_materials.create" />}>
+              <Route path="/wastage-store/create" element={<WastageStoreForm />} />
+            </Route>
+            <Route element={<ProtectedRoute permission="raw_materials.edit" />}>
+              <Route path="/wastage-store/edit/:id" element={<WastageStoreForm />} />
             </Route>
 
             {/* Stock */}

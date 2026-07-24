@@ -10,7 +10,7 @@ import CustomButton from "../../../components/ui/Button/Button";
 import { useAppDispatch } from "../../../hooks/reduxHooks";
 import { createMachine } from "../../../features/machines/machineSlice";
 import { machineService } from "../../../services/machineService";
-import { useEmployees } from "../../../hooks/useEmployees";
+import { machineOperationAssignmentService } from "../../../services/machineOperationAssignmentService";
 import BackButton from "../../../components/ui/BackButton/BackButton";
 
 const machineSchema = z.object({
@@ -24,7 +24,7 @@ const machineSchema = z.object({
     manufacturer: z.string().trim().min(1, "Manufacturer is required").max(100, "Maximum 100 characters allowed"),
     modelNumber: z.string().trim().min(1, "Model Number is required").max(50, "Maximum 50 characters allowed"),
     cycleTime: z.coerce.number().min(1, "Cycle Time is required"),
-    operatorId: z.string().trim().max(20, "Maximum 20 characters allowed").optional().nullable(),
+    operatorId: z.string().min(1, "Machine Incharge is required").max(20, "Maximum 20 characters allowed"),
     machineStatus: z.string().min(1, "Machine Status is required"),
     description: z.string().trim().max(255, "Maximum 255 characters allowed").optional().nullable(),
     isActive: z.boolean().optional(),
@@ -50,15 +50,31 @@ const initialFormState = {
 const MachineCreate: React.FC = () => {
     const navigate = useNavigate();
     const dispatch = useAppDispatch();
-    const { employees, loadEmployees } = useEmployees();
+
+    const [roles, setRoles] = useState<any[]>([]);
+    const [inchargeRoleId, setInchargeRoleId] = useState("");
+    const [employees, setEmployees] = useState<any[]>([]);
 
     const [formData, setFormData] = useState(initialFormState);
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     useEffect(() => {
-        loadEmployees();
-    }, [loadEmployees]);
+        machineOperationAssignmentService.getRoles().then(res => setRoles(res.data || []));
+    }, []);
+
+    useEffect(() => {
+        const loadEmp = async () => {
+            try {
+                const roleIdNum = inchargeRoleId ? Number(inchargeRoleId) : undefined;
+                const res = await machineOperationAssignmentService.getEmployeesByRole(roleIdNum);
+                setEmployees(res.data || []);
+            } catch (err) {
+                console.error(err);
+            }
+        };
+        loadEmp();
+    }, [inchargeRoleId]);
 
     useEffect(() => {
         const getNextId = async () => {
@@ -104,7 +120,7 @@ const MachineCreate: React.FC = () => {
             targetLoadPercent: formData.targetLoadPercent ? Number(formData.targetLoadPercent) : null,
             cycleTime: formData.cycleTime ? Number(formData.cycleTime) : null,
             description: formData.description || null,
-            operatorId: formData.operatorId || null,
+            operatorId: formData.operatorId,
         };
 
         try {
@@ -212,12 +228,26 @@ const MachineCreate: React.FC = () => {
                         </div>
                         <div>
                             <SelectInput
-                                label="Operator"
+                                label="Incharge Role Filter (Optional)"
+                                name="inchargeRoleId"
+                                value={inchargeRoleId}
+                                defaultOptionLabel="-- All Roles --"
+                                options={roles.map(r => ({ label: r.name, value: String(r.id) }))}
+                                onChange={(e) => {
+                                    setInchargeRoleId(e.target.value);
+                                    setFormData(prev => ({ ...prev, operatorId: "" }));
+                                }}
+                            />
+                        </div>
+                        <div>
+                            <SelectInput
+                                label="Machine Incharge"
                                 name="operatorId"
                                 value={formData.operatorId}
-                                defaultOptionLabel="-- Select Operator (Optional) -- "
+                                defaultOptionLabel="-- Select Machine Incharge -- "
+                                required
                                 options={employees.map(emp => ({
-                                    label: `${emp.fullName} (${emp.empCode})`,
+                                    label: `${emp.fullName} (${emp.empCode})${emp.user?.role ? ` - ${emp.user.role.name}` : ""}`,
                                     value: emp.id
                                 }))}
                                 error={errors.operatorId}

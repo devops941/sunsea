@@ -36,6 +36,7 @@ export interface RawMaterial {
 
   status?: string;
   isActive: boolean;
+  itemType?: string | null;
 
   createdAt?: string;
   updatedAt?: string;

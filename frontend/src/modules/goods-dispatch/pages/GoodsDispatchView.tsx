@@ -13,6 +13,7 @@ import {
 import CustomButton from "../../../components/ui/Button/Button";
 import BackButton from "../../../components/ui/BackButton/BackButton";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
+import TextInput from "../../../components/form/TextInput/TextInput";
 import { formatDate, formatDateTime } from "../../../utils/dateUtils";
 import { hasPermission } from "../../../utils/permission";
 
@@ -38,6 +39,17 @@ const GoodsDispatchView: React.FC = () => {
   const { user } = useAppSelector((state) => state.auth);
 
   const [remarks, setRemarks] = useState("");
+  const [receivedQuantities, setReceivedQuantities] = useState<Record<number, string>>({});
+
+  useEffect(() => {
+    if (dispatchData?.items && dispatchData.status === "PENDING_STORE_RECEIPT") {
+      const initial: Record<number, string> = {};
+      dispatchData.items.forEach((item: any) => {
+        initial[item.id] = String(item.receivedQty || item.dispatchQty);
+      });
+      setReceivedQuantities(initial);
+    }
+  }, [dispatchData]);
 
   const canEdit = hasPermission("production_orders.edit");
 
@@ -75,7 +87,17 @@ const GoodsDispatchView: React.FC = () => {
       return;
     }
     try {
-      await dispatch(storeReceiveDispatch({ id: dispatchData.id, data: { action, remarks } })).unwrap();
+      const receivedItems = action === "APPROVE" 
+        ? dispatchData.items?.map((item: any) => ({
+            itemId: Number(item.id),
+            receivedQty: Number(receivedQuantities[item.id] || item.dispatchQty)
+          }))
+        : undefined;
+
+      await dispatch(storeReceiveDispatch({ 
+        id: dispatchData.id, 
+        data: { action, remarks, receivedItems } 
+      })).unwrap();
       toast.success(`Store receipt ${action.toLowerCase()} processed`);
       setRemarks("");
     } catch (err: any) {
@@ -117,7 +139,7 @@ const GoodsDispatchView: React.FC = () => {
                 <table className="w-full text-sm">
                   <thead className="bg-slate-50 border-b border-slate-200">
                     <tr>
-                      {["PO No", "Product", "Batch", "Dispatch Qty", "Received Qty"].map((h, i) => (
+                      {["PO No", "Product", "Dispatch Qty", "Received Qty"].map((h, i) => (
                         <th key={h} className={`text-[11px] uppercase tracking-wider text-slate-500 font-semibold px-4 py-3 ${i >= 3 ? "text-right" : "text-left"}`}>{h}</th>
                       ))}
                     </tr>
@@ -132,12 +154,41 @@ const GoodsDispatchView: React.FC = () => {
                           <div className="font-semibold text-slate-700">{item.product?.productName}</div>
                           <div className="text-xs text-slate-400 font-mono mt-0.5">{item.product?.productCode}</div>
                         </td>
-                        <td className="px-4 py-3 text-sm text-slate-600">{item.productionOrder?.batchNo || "—"}</td>
                         <td className="px-4 py-3 text-sm text-right font-semibold text-slate-700">
                           {Number(item.dispatchQty)} {formatUOM(item.uom)}
                         </td>
                         <td className="px-4 py-3 text-sm text-right font-semibold text-blue-600">
-                          {item.receivedQty ? `${Number(item.receivedQty)} ${formatUOM(item.uom)}` : "—"}
+                          {dispatchData.status === "PENDING_STORE_RECEIPT" && canEdit ? (
+                            <div className="flex items-center justify-end gap-2">
+                              <div className="w-24">
+                                <TextInput
+                                  name={`receivedQty-${item.id}`}
+                                  type="number"
+                                  min={0}
+                                  max={Number(item.dispatchQty)}
+                                  bottom={true}
+                                  value={receivedQuantities[item.id] ?? ""}
+                                  onChange={(e: any) => {
+                                    let val = Number(e.target.value);
+                                    if (val > Number(item.dispatchQty)) {
+                                      val = Number(item.dispatchQty);
+                                    }
+                                    setReceivedQuantities(prev => ({ ...prev, [item.id]: String(val) }));
+                                  }}
+                                />
+                              </div>
+                              <span className="text-xs text-slate-500 font-normal">{formatUOM(item.uom)}</span>
+                            </div>
+                          ) : (
+                            <div className="flex flex-col items-end gap-1">
+                              <div>{item.receivedQty !== null && item.receivedQty !== undefined ? `${Number(item.receivedQty)} ${formatUOM(item.uom)}` : "—"}</div>
+                              {item.receivedQty !== null && item.receivedQty !== undefined && Number(item.receivedQty) < Number(item.dispatchQty) && (
+                                <span className="inline-flex items-center bg-red-50 text-red-600 px-2 py-0.5 rounded text-[10px] font-bold border border-red-200">
+                                  {Number(item.dispatchQty) - Number(item.receivedQty)} {formatUOM(item.uom)} Missing
+                                </span>
+                              )}
+                            </div>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -169,67 +220,73 @@ const GoodsDispatchView: React.FC = () => {
           <div className="lg:col-span-1 space-y-6">
             {/* Gate Approval Actions */}
             {dispatchData.status === "PENDING_GATE_APPROVAL" && canEdit && (
-              <div className="rounded-2xl border border-amber-200 bg-amber-50/50 p-5 shadow-sm">
-                <h3 className="text-lg font-bold text-amber-800 mb-4">Gate Approval</h3>
-                <textarea
-                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl mb-4 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors resize-none placeholder:text-slate-300 bg-white"
-                  placeholder="Approval/Rejection Remarks..."
-                  value={remarks}
-                  onChange={(e) => setRemarks(e.target.value)}
-                  rows={3}
-                />
-                <div className="flex gap-2">
-                  <CustomButton
-                    variant="primary"
-                    className="flex-1"
-                    icon={FaCheck}
-                    text="Approve"
-                    onClick={() => handleGateApproval("APPROVE")}
-                    disabled={loading}
+              <div className="rounded-2xl border border-slate-200 shadow-sm bg-white overflow-hidden">
+                <div className="flex items-center gap-3 px-5 py-4 bg-slate-50 border-b border-slate-200">
+                  <h3 className="font-bold text-slate-700 text-base">Gate Approval</h3>
+                </div>
+                <div className="p-5 space-y-4">
+                  <textarea
+                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#5D87FF]/30 focus:border-[#5D87FF] transition-colors resize-none placeholder:text-slate-400 bg-white"
+                    placeholder="Enter approval or rejection remarks here..."
+                    value={remarks}
+                    onChange={(e) => setRemarks(e.target.value)}
+                    rows={3}
                   />
-                  <CustomButton
-                    variant="danger"
-                    className="flex-1"
-                    icon={FaTimes}
-                    text="Reject"
-                    onClick={() => handleGateApproval("REJECT")}
-                    disabled={loading}
-                  />
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => handleGateApproval("APPROVE")}
+                      disabled={loading}
+                      className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white py-2.5 rounded-xl font-medium text-sm transition-all shadow-sm shadow-emerald-500/20 flex items-center justify-center gap-2 disabled:opacity-50"
+                    >
+                      <FaCheck className="w-4 h-4" /> Approve
+                    </button>
+                    <button
+                      onClick={() => handleGateApproval("REJECT")}
+                      disabled={loading}
+                      className="flex-1 bg-red-500 hover:bg-red-600 text-white py-2.5 rounded-xl font-medium text-sm transition-all shadow-sm shadow-red-500/20 flex items-center justify-center gap-2 disabled:opacity-50"
+                    >
+                      <FaTimes className="w-4 h-4" /> Reject
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
 
             {/* Store Receipt Actions */}
             {dispatchData.status === "PENDING_STORE_RECEIPT" && canEdit && (
-              <div className="rounded-2xl border border-blue-200 bg-blue-50/50 p-5 shadow-sm">
-                <h3 className="text-lg font-bold text-blue-800 mb-4">Store Receipt</h3>
-                <p className="text-sm text-blue-700 mb-4">
-                  Approving this will automatically update the Finished Goods Stock in {dispatchData.store?.storeName || "the destination store"}.
-                </p>
-                <textarea
-                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl mb-4 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors resize-none placeholder:text-slate-300 bg-white"
-                  placeholder="Receipt Remarks..."
-                  value={remarks}
-                  onChange={(e) => setRemarks(e.target.value)}
-                  rows={3}
-                />
-                <div className="flex gap-2">
-                  <CustomButton
-                    variant="primary"
-                    className="flex-1"
-                    icon={FaCheck}
-                    text="Receive Stock"
-                    onClick={() => handleStoreReceipt("APPROVE")}
-                    disabled={loading}
+              <div className="rounded-2xl border border-slate-200 shadow-sm bg-white overflow-hidden">
+                <div className="flex items-center gap-3 px-5 py-4 bg-slate-50 border-b border-slate-200">
+                  <h3 className="font-bold text-slate-700 text-base">Store Receipt</h3>
+                </div>
+                <div className="p-5 space-y-4">
+                  <div className="bg-blue-50 border border-blue-100 rounded-xl p-3">
+                    <p className="text-xs text-blue-700 leading-relaxed">
+                      Approving this will automatically update the Finished Goods Stock in <span className="font-semibold">{dispatchData.store?.storeName || "the destination store"}</span>.
+                    </p>
+                  </div>
+                  <textarea
+                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#5D87FF]/30 focus:border-[#5D87FF] transition-colors resize-none placeholder:text-slate-400 bg-white"
+                    placeholder="Enter receipt or rejection remarks here..."
+                    value={remarks}
+                    onChange={(e) => setRemarks(e.target.value)}
+                    rows={3}
                   />
-                  <CustomButton
-                    variant="danger"
-                    className="flex-1"
-                    icon={FaTimes}
-                    text="Reject"
-                    onClick={() => handleStoreReceipt("REJECT")}
-                    disabled={loading}
-                  />
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => handleStoreReceipt("APPROVE")}
+                      disabled={loading}
+                      className="flex-1 bg-[#5D87FF] hover:bg-[#4b6fe0] text-white py-2.5 rounded-xl font-medium text-sm transition-all shadow-sm shadow-[#5D87FF]/20 flex items-center justify-center gap-2 disabled:opacity-50"
+                    >
+                      <FaCheck className="w-4 h-4" /> Receive Stock
+                    </button>
+                    <button
+                      onClick={() => handleStoreReceipt("REJECT")}
+                      disabled={loading}
+                      className="flex-1 bg-red-500 hover:bg-red-600 text-white py-2.5 rounded-xl font-medium text-sm transition-all shadow-sm shadow-red-500/20 flex items-center justify-center gap-2 disabled:opacity-50"
+                    >
+                      <FaTimes className="w-4 h-4" /> Reject
+                    </button>
+                  </div>
                 </div>
               </div>
             )}

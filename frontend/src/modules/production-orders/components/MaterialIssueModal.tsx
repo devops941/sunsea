@@ -3,7 +3,7 @@ import { FaTimes } from "react-icons/fa";
 import { toast } from "react-toastify";
 import { productionOrderService } from "../../../services/productionOrderService";
 import { storeService } from "../../../services/storeService";
-
+import Button from "../../../components/ui/custombutton/CustomButton";
 interface MaterialIssueModalProps {
     show: boolean;
     onHide: () => void;
@@ -15,6 +15,8 @@ interface MaterialIssueModalProps {
     }>;
     rawMaterialsMap: Map<string, any>;
     defaultStoreId?: string | null;
+    dailyPlanQty?: number | null;
+    totalTargetQty?: number | null;
     onSuccess: () => void;
 }
 
@@ -25,6 +27,8 @@ export const MaterialIssueModal: React.FC<MaterialIssueModalProps> = ({
     rawMaterials,
     rawMaterialsMap,
     defaultStoreId,
+    dailyPlanQty,
+    totalTargetQty,
     onSuccess
 }) => {
     const [issuing, setIssuing] = useState(false);
@@ -34,8 +38,10 @@ export const MaterialIssueModal: React.FC<MaterialIssueModalProps> = ({
         materialName: string;
         reservedQty: number;
         qty: number;
+        availableStock: number;
         storeId: string;
         remarks: string;
+        uom: string;
     }>>([]);
 
     useEffect(() => {
@@ -51,20 +57,35 @@ export const MaterialIssueModal: React.FC<MaterialIssueModalProps> = ({
         if (show && rawMaterials) {
             const items = rawMaterials.map((rm) => {
                 const stockRm = rawMaterialsMap.get(rm.rawMaterialId?.toString());
-                const reservedQty = Number(rm.requiredQty || 0);
+                
+                // Calculate proportionate qty based on daily plan
+                let calculatedRequiredQty = Number(rm.requiredQty || 0);
+                if (dailyPlanQty && totalTargetQty && totalTargetQty > 0) {
+                    calculatedRequiredQty = (calculatedRequiredQty / totalTargetQty) * dailyPlanQty;
+                }
+                const reservedQty = Number(calculatedRequiredQty);
                 const storeId = stockRm?.storeId || defaultStoreId || "";
+                const availableStock = stockRm ? (Number(stockRm.onHandQty || 0) - Number(stockRm.reservedQty || 0)) : Number(rm.availableStock || 0);
+                
+                let displayUom = stockRm?.baseUom?.split(',')[0] || rm.uom || stockRm?.uom || "KG";
+                if (displayUom.toLowerCase() === 'ea' || displayUom.toLowerCase() === 'each') {
+                    displayUom = 'pcs';
+                }
+
                 return {
                     rawMaterialId: rm.rawMaterialId,
                     materialName: rm.materialName || stockRm?.materialName || rm.rawMaterialId,
                     reservedQty,
                     qty: reservedQty,
+                    availableStock,
                     storeId: storeId ? String(storeId) : "",
-                    remarks: ""
+                    remarks: "",
+                    uom: displayUom
                 };
             });
             setIssueItems(items);
         }
-    }, [show, rawMaterials, rawMaterialsMap, defaultStoreId]);
+    }, [show, rawMaterials, rawMaterialsMap, defaultStoreId, dailyPlanQty, totalTargetQty]);
 
     const handleQtyChange = (idx: number, val: string) => {
         const value = val === "" ? 0 : Number(val);
@@ -149,19 +170,29 @@ export const MaterialIssueModal: React.FC<MaterialIssueModalProps> = ({
 
                     {/* Body */}
                     <div className="p-6 overflow-y-auto flex-1">
-                        <div className="bg-blue-50 border border-blue-100 text-blue-800 rounded-lg p-4 mb-6 text-sm">
+                        <div className="bg-blue-50 border border-blue-100 text-blue-800 rounded-lg p-4 mb-4 text-sm">
                             Please review and confirm the quantity of raw materials you are taking from the store.
                             This will automatically update the Physical Stock (on hand) and log an approved Stock Adjustment.
                         </div>
+
+                        {dailyPlanQty !== undefined && dailyPlanQty !== null && (
+                            <div className="bg-slate-50 border border-slate-200 text-slate-800 rounded-xl p-4 mb-6 flex justify-between items-center text-sm font-semibold">
+                                <span className="text-slate-600 font-medium">Daily Plan Production Quantity:</span>
+                                <span className="text-lg text-primary font-bold">
+                                    {dailyPlanQty} pcs {totalTargetQty ? `/ ${totalTargetQty}` : ''}
+                                </span>
+                            </div>
+                        )}
 
                         <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
                             <table className="w-full text-left text-sm text-slate-600">
                                 <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 font-semibold">
                                     <tr>
                                         <th className="px-4 py-3">Raw Material</th>
-                                        <th className="px-4 py-3 w-32">Reserved Qty</th>
-                                        <th className="px-4 py-3 w-36">Issue Qty</th>
-                                        <th className="px-4 py-3 w-48">Store Location</th>
+                                        <th className="px-4 py-3 w-32">Req. Qty</th>
+                                        <th className="px-4 py-3 w-32">Available Stock</th>
+                                        <th className="px-4 py-3 w-32">Issue Qty</th>
+                                        <th className="px-4 py-3 w-40">Store Location</th>
                                         <th className="px-4 py-3">Remarks</th>
                                     </tr>
                                 </thead>
@@ -173,27 +204,30 @@ export const MaterialIssueModal: React.FC<MaterialIssueModalProps> = ({
                                                 <div className="text-xs text-slate-500 mt-0.5">{item.rawMaterialId}</div>
                                             </td>
                                             <td className="px-4 py-3 font-medium text-slate-700">
-                                                {item.reservedQty.toFixed(2)} KG
+                                                {item.reservedQty.toFixed(2)} {item.uom}
+                                            </td>
+                                            <td className="px-4 py-3 font-medium text-slate-700">
+                                                {item.availableStock.toFixed(2)} {item.uom}
                                             </td>
                                             <td className="px-4 py-3">
                                                 <input
                                                     type="number"
                                                     step="0.001"
                                                     min="0.001"
-                                                    className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary disabled:bg-slate-100"
+                                                    className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary disabled:bg-slate-100 disabled:opacity-75 disabled:cursor-not-allowed"
                                                     value={item.qty || ""}
                                                     onChange={(e) => handleQtyChange(idx, e.target.value)}
                                                     required
-                                                    disabled={issuing}
+                                                    disabled={true}
                                                 />
                                             </td>
                                             <td className="px-4 py-3">
                                                 <select
-                                                    className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary disabled:bg-slate-100"
+                                                    className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary disabled:bg-slate-100 disabled:opacity-75 disabled:cursor-not-allowed"
                                                     value={item.storeId}
                                                     onChange={(e) => handleStoreChange(idx, e.target.value)}
                                                     required
-                                                    disabled={issuing}
+                                                    disabled={true}
                                                 >
                                                     <option value="">-- Select Store --</option>
                                                     {stores.map((s) => (
@@ -207,10 +241,10 @@ export const MaterialIssueModal: React.FC<MaterialIssueModalProps> = ({
                                                 <input
                                                     type="text"
                                                     placeholder="e.g. Batch #1 issue"
-                                                    className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary disabled:bg-slate-100"
+                                                    className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary disabled:bg-slate-100 disabled:opacity-75 disabled:cursor-not-allowed"
                                                     value={item.remarks}
                                                     onChange={(e) => handleRemarksChange(idx, e.target.value)}
-                                                    disabled={issuing}
+                                                    disabled={true}
                                                 />
                                             </td>
                                         </tr>
@@ -222,28 +256,20 @@ export const MaterialIssueModal: React.FC<MaterialIssueModalProps> = ({
 
                     {/* Footer */}
                     <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-end gap-3 rounded-b-xl">
-                        <button
+                        <Button
                             type="button"
                             onClick={onHide}
                             disabled={issuing}
-                            className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 bg-white hover:bg-slate-50 font-medium disabled:opacity-50 transition-colors"
-                        >
-                            Cancel
-                        </button>
-                        <button
+                            text="Cancel"
+                            variant="outline"
+                        />
+                        <Button
                             type="submit"
                             disabled={issuing}
-                            className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium shadow-sm transition-colors flex items-center disabled:opacity-70"
-                        >
-                            {issuing ? (
-                                <>
-                                    <div className="animate-spin rounded-full border-b-2 border-white h-4 w-4 mr-2"></div>
-                                    Issuing...
-                                </>
-                            ) : (
-                                "Confirm Material Issue"
-                            )}
-                        </button>
+                            loading={issuing}
+                            text={issuing ? "Issuing..." : "Confirm Material Issue"}
+                            variant="success"
+                        />
                     </div>
                 </form>
             </div>

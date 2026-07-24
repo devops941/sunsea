@@ -56,6 +56,7 @@ const mapRawMaterial = (item: any): RawMaterial => ({
 
   status: item.status,
   isActive: item.isActive,
+  itemType: item.itemType,
 
   createdAt: item.createdAt,
   updatedAt: item.updatedAt,

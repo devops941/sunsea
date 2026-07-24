@@ -118,6 +118,12 @@ export const createRawMaterialSchema = z.object({
       .string()
       .max(20, "Status cannot exceed 20 characters")
       .optional(),
+
+    itemType: z
+      .string()
+      .max(50, "Item Type cannot exceed 50 characters")
+      .optional()
+      .nullable(),
   }),
 });
 

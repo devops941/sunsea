@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from "react";
-import { FaPlus, FaCalendarAlt, FaCheckCircle, FaShoppingCart, FaEye, FaChevronLeft, FaChevronRight } from "react-icons/fa";
+import { FaPlus, FaCalendarAlt, FaCheckCircle, FaShoppingCart, FaEye, FaChevronLeft, FaChevronRight, FaSyncAlt } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 
@@ -129,21 +129,36 @@ const ProductionOrderList: React.FC = () => {
 
                 if (associatedPOs.length > 0) {
                     primaryPO = associatedPOs[0];
-                    const hasPending = associatedPOs.some((po: any) => po.status === "RM_PENDING");
-                    const hasDraft = associatedPOs.some((po: any) => po.status === "DRAFT");
-                    const hasProgress = associatedPOs.some((po: any) => po.status === "IN_PROGRESS");
-                    const hasCompleted = associatedPOs.every((po: any) => po.status === "COMPLETED");
+                    const hasCreated = associatedPOs.some((po: any) => po.status === "CREATED");
+                    const hasWaiting = associatedPOs.some((po: any) => po.status === "WAITING_FOR_MATERIAL");
+                    const hasReady = associatedPOs.some((po: any) => po.status === "READY_FOR_PLANNING");
+                    const hasWeekly = associatedPOs.some((po: any) => po.status === "WEEKLY_SCHEDULED" || po.status === "SCHEDULED");
+                    const hasDaily = associatedPOs.some((po: any) => po.status === "DAILY_PLANNED");
+                    const hasProgress = associatedPOs.some((po: any) => po.status === "IN_PRODUCTION" || po.status === "IN_PROGRESS");
+                    const hasPostProd = associatedPOs.some((po: any) => po.status === "POST_PRODUCTION");
+                    const hasReadyDispatch = associatedPOs.some((po: any) => po.status === "READY_FOR_DISPATCH" || po.status === "COMPLETED");
+                    const hasDispatched = associatedPOs.every((po: any) => po.status === "DISPATCHED");
 
-                    if (hasCompleted) {
-                        status = "COMPLETED";
+                    if (hasDispatched) {
+                        status = "DISPATCHED";
+                    } else if (hasReadyDispatch) {
+                        status = "READY_FOR_DISPATCH";
+                    } else if (hasPostProd) {
+                        status = "POST_PRODUCTION";
                     } else if (hasProgress) {
-                        status = "IN_PROGRESS";
-                    } else if (hasPending) {
-                        status = "RM_PENDING";
-                    } else if (hasDraft) {
-                        status = "DRAFT";
+                        status = "IN_PRODUCTION";
+                    } else if (hasDaily) {
+                        status = "DAILY_PLANNED";
+                    } else if (hasWeekly) {
+                        status = "WEEKLY_SCHEDULED";
+                    } else if (hasReady) {
+                        status = "READY_FOR_PLANNING";
+                    } else if (hasWaiting) {
+                        status = "WAITING_FOR_MATERIAL";
+                    } else if (hasCreated) {
+                        status = "CREATED";
                     } else {
-                        status = associatedPOs.find((po: any) => po.status !== "COMPLETED")?.status || "PLANNED";
+                        status = associatedPOs[0]?.status || "CREATED";
                     }
                 } else {
                     // Check Finished Goods Stock
@@ -204,8 +219,8 @@ const ProductionOrderList: React.FC = () => {
             // Combine both mapped and directMapped
             let combinedList = [...mapped, ...directMapped];
 
-            // Filter out scheduled, completed, and cancelled items to make this an unscheduled backlog
-            combinedList = combinedList.filter(item => !["SCHEDULED", "IN_PROGRESS", "COMPLETED", "CANCELLED", "CANCELED", "DELETED"].includes(item.status?.toUpperCase()));
+            // Filter out DISPATCHED and CANCELLED items from the active board
+            combinedList = combinedList.filter(item => !["DISPATCHED", "CANCELLED", "CANCELED", "DELETED"].includes(item.status?.toUpperCase()));
 
             setTotalItems(combinedList.length);
 
@@ -230,6 +245,66 @@ const ProductionOrderList: React.FC = () => {
         navigate(`/production-orders/create`, {
             state: { sourceSalesOrderId: so.id }
         });
+    };
+
+    // STEP 2 & 3: Auto-check raw material availability when assigning to Weekly Schedule
+    const handleAssignWeekly = async (item: any) => {
+        const po = item.primaryPO;
+        if (!po) return;
+
+        // If status is already READY_FOR_PLANNING / PENDING_PLANNING, navigate directly!
+        const isAlreadyReady = ["READY_FOR_PLANNING", "PENDING_PLANNING"].includes(po.status) || 
+                               ["READY_FOR_PLANNING", "PENDING_PLANNING"].includes(item.status);
+        if (isAlreadyReady) {
+            navigate(`/weekly-machine-schedules/create?po=${po.productionOrderId}`);
+            return;
+        }
+
+        setLoading(true);
+        try {
+            // Check materials directly
+            const result = await productionOrderService.checkMaterialAvailability(po.productionOrderId);
+            if ((result as any).allAvailable) {
+                toast.success(`Raw materials verified. Navigating to Weekly Scheduling for ${po.productionOrderId}.`);
+                navigate(`/weekly-machine-schedules/create?po=${po.productionOrderId}`);
+            } else {
+                const insufficient = (result as any).materialStatus?.filter((m: any) => m.status === "INSUFFICIENT") || [];
+                toast.warning(
+                    `${insufficient.length} material(s) are insufficient for order ${po.productionOrderId}. ` +
+                    `Status set to WAITING FOR MATERIAL. Please create purchase orders for: ${insufficient.map((m: any) => m.materialName).join(", ")}`
+                );
+                fetchCombinedData();
+            }
+        } catch (error: any) {
+            console.error("Failed to check materials:", error);
+            toast.error(error?.response?.data?.message || error?.message || "Failed to verify material availability.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleRecheckMaterials = async (item: any) => {
+        const po = item.primaryPO;
+        if (!po) return;
+        setLoading(true);
+        try {
+            const result = await productionOrderService.checkMaterialAvailability(po.productionOrderId);
+            if ((result as any).allAvailable) {
+                toast.success(`Raw materials verified! Order ${po.productionOrderId} is now READY FOR PLANNING.`);
+            } else {
+                const insufficient = (result as any).materialStatus?.filter((m: any) => m.status === "INSUFFICIENT") || [];
+                toast.warning(
+                    `Raw materials still insufficient for order ${po.productionOrderId}. ` +
+                    `Please add stock for: ${insufficient.map((m: any) => m.materialName).join(", ")}`
+                );
+            }
+            fetchCombinedData();
+        } catch (error: any) {
+            console.error("Failed to check materials:", error);
+            toast.error(error?.response?.data?.message || error?.message || "Failed to verify material availability.");
+        } finally {
+            setLoading(false);
+        }
     };
 
     const handleOpenEdit = (po: any) => {
@@ -411,14 +486,27 @@ const ProductionOrderList: React.FC = () => {
             header: "ACTIONS",
             render: (item: any) => (
                 <div className="flex items-center gap-2 justify-start">
-                    {item.status === "PENDING_PLANNING" && (
+                    {/* Assign to Weekly Scheduling — acts as both Check Material and Assign */}
+                    {(item.status === "CREATED" || item.status === "PENDING_PLANNING" || item.status === "READY_FOR_PLANNING") && item.primaryPO && (
                         <IconButton
                             variant="success"
-                            title="Assign & Allocate Raw Materials"
-                            icon={FaCheckCircle}
-                            onClick={() => handleCreateProductionOrder(item)}
+                            title="Assign to Weekly Scheduling (Verifies Material)"
+                            icon={FaCalendarAlt}
+                            onClick={() => handleAssignWeekly(item)}
                         />
                     )}
+
+                    {/* WAITING_FOR_MATERIAL: Show Re-Check Raw Material button */}
+                    {item.status === "WAITING_FOR_MATERIAL" && item.primaryPO && (
+                        <IconButton
+                            variant="info"
+                            title="Re-Check Raw Material Stock Availability"
+                            icon={FaSyncAlt}
+                            onClick={() => handleRecheckMaterials(item)}
+                        />
+                    )}
+
+                    {/* Legacy RM_PENDING handler */}
                     {item.status === "RM_PENDING" && (
                         <IconButton
                             variant="success"
@@ -449,7 +537,7 @@ const ProductionOrderList: React.FC = () => {
                             }}
                         />
                     )}
-                    {item.primaryPO && !["SCHEDULED", "IN_PROGRESS", "COMPLETED", "CANCELLED", "CANCELED", "DELETED"].includes(item.primaryPO.status?.toUpperCase()) && (
+                    {item.primaryPO && !["IN_PRODUCTION", "POST_PRODUCTION", "READY_FOR_DISPATCH", "DISPATCHED", "CANCELLED", "CANCELED", "DELETED"].includes(item.primaryPO.status?.toUpperCase()) && (
                         <>
                             <EditButton onClick={() => handleOpenEdit(item.primaryPO)} />
                             {item.isDirect && (
@@ -526,7 +614,7 @@ const ProductionOrderList: React.FC = () => {
                         <div className="grid grid-cols-3 gap-4 mb-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
                             <div>
                                 <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Production Qty</div>
-                                <div className="text-sm font-bold text-slate-800 mt-1">{prod.quantity} {prod.uom?.toLowerCase() === 'ea' ? 'pcs' : prod.uom}</div>
+                                <div className="text-sm font-bold text-slate-800 mt-1">{prod.quantity} {prod.uom?.toLowerCase() === 'ea' || prod.uom?.toLowerCase() === 'each' ? 'pcs' : prod.uom}</div>
                             </div>
                             <div>
                                 <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Weight Used</div>
@@ -534,7 +622,7 @@ const ProductionOrderList: React.FC = () => {
                             </div>
                             <div>
                                 <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Unit (UOM)</div>
-                                <div className="text-sm font-bold text-slate-800 mt-1">{prod.uom?.toLowerCase() === 'ea' ? 'pcs' : prod.uom}</div>
+                                <div className="text-sm font-bold text-slate-800 mt-1">{prod.uom?.toLowerCase() === 'ea' || prod.uom?.toLowerCase() === 'each' ? 'pcs' : prod.uom}</div>
                             </div>
                         </div>
 
@@ -564,12 +652,18 @@ const ProductionOrderList: React.FC = () => {
                                         const materialName = rm.materialName || stockRm?.materialName || rm.rawMaterialId;
                                         const isAvailable = rm.status ? rm.status === "AVAILABLE" : available >= required;
                                         
+                                        // Get correct UOM
+                                        let displayUom = stockRm?.baseUom?.split(',')[0] || rm.uom || stockRm?.uom || "KG";
+                                        if (displayUom.toLowerCase() === 'ea' || displayUom.toLowerCase() === 'each') {
+                                            displayUom = 'pcs';
+                                        }
+
                                         return (
                                             <tr key={rm.rawMaterialId} className="hover:bg-slate-50 transition-colors">
                                                 <td className="p-2 font-semibold text-slate-700">{rm.rawMaterialId}</td>
                                                 <td className="p-2 text-slate-600">{materialName}</td>
-                                                <td className="p-2 text-right text-slate-700">{required.toFixed(2)} KG</td>
-                                                <td className="p-2 text-right text-slate-700">{available.toFixed(2)} KG</td>
+                                                <td className="p-2 text-right text-slate-700">{required.toFixed(2)} {displayUom}</td>
+                                                <td className="p-2 text-right text-slate-700">{available.toFixed(2)} {displayUom}</td>
                                                 <td className="p-2 text-center">
                                                     <StatusBadge status={isAvailable ? "AVAILABLE" : "INSUFFICIENT"} />
                                                 </td>
@@ -586,7 +680,7 @@ const ProductionOrderList: React.FC = () => {
                                 </tbody>
                             </table>
                         </div>
-                        {["RM_AVAILABLE", "READY_FOR_PLANNING", "SCHEDULED"].includes(prod.status || fullOrder?.status) && (
+                        {/* {["RM_AVAILABLE", "READY_FOR_PLANNING", "SCHEDULED"].includes(prod.status || fullOrder?.status) && (
                             <div className="flex justify-end mt-2">
                                 <button 
                                     type="button"
@@ -599,7 +693,7 @@ const ProductionOrderList: React.FC = () => {
                                     Issue Raw Materials
                                 </button>
                             </div>
-                        )}
+                        )} */}
                     </div>
                 ))
             )}
@@ -661,7 +755,7 @@ const ProductionOrderList: React.FC = () => {
                 customContent={modalCustomContent}
             />
 
-            {selectedProdForIssue && (
+            {/* {selectedProdForIssue && (
                 <MaterialIssueModal
                     show={showIssueModal}
                     onHide={() => {
@@ -679,7 +773,7 @@ const ProductionOrderList: React.FC = () => {
                         fetchCombinedData();
                     }}
                 />
-            )}
+            )} */}
 
             {/* DELETE PO MODAL */}
             <CommonConfirmModal

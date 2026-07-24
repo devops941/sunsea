@@ -122,4 +122,24 @@ export const productionOrderService = {
         const response = await apiClient.post(`${config.productionOrder.base}/${id}/issue-materials`, data);
         return response.data?.data || response.data;
     },
+
+    checkMaterialAvailability: async (id: number | string): Promise<any> => {
+        const response = await apiClient.post(`${config.productionOrder.base}/${id}/check-materials`);
+        return response.data?.data || response.data;
+    },
+
+    startProduction: async (id: number | string): Promise<any> => {
+        const response = await apiClient.post(`${config.productionOrder.base}/${id}/start-production`);
+        return response.data?.data || response.data;
+    },
+
+    completePostProduction: async (id: number | string, producedQty: number): Promise<any> => {
+        const response = await apiClient.post(`${config.productionOrder.base}/${id}/complete-post-production`, { producedQty });
+        return response.data?.data || response.data;
+    },
+
+    getHistory: async (id: number | string): Promise<any> => {
+        const response = await apiClient.get(`${config.productionOrder.base}/${id}/history`);
+        return response.data?.data || response.data;
+    },
 };

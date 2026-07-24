@@ -8,24 +8,26 @@ datasource db {
 }
 
 model Employee {
-  id                       BigInt         @id @default(autoincrement())
-  empCode                  String         @unique
-  fullName                 String
-  mobile                   String?        @db.VarChar(20)
-  email                    String?        @unique @db.VarChar(100)
-  dateOfJoining            DateTime?
-  departmentId             Int?
-  status                   EmployeeStatus @default(active)
-  createdAt                DateTime       @default(now()) @db.Timestamptz(6)
-  updatedAt                DateTime       @updatedAt @db.Timestamptz(6)
-  createdBy                String?
-  updatedBy                String?
-  collectionAgentCustomers Customer[]     @relation("EmployeeCollectionAgent")
-  createdByUser            User?          @relation("EmployeeCreatedBy", fields: [createdBy], references: [userId])
-  department               Department?    @relation(fields: [departmentId], references: [id])
-  updatedByUser            User?          @relation("EmployeeUpdatedBy", fields: [updatedBy], references: [userId])
-  stores                   Store[]
-  user                     User?
+  id                         BigInt                       @id @default(autoincrement())
+  empCode                    String                       @unique
+  fullName                   String
+  mobile                     String?                      @db.VarChar(20)
+  email                      String?                      @unique @db.VarChar(100)
+  dateOfJoining              DateTime?
+  departmentId               Int?
+  status                     EmployeeStatus               @default(active)
+  createdAt                  DateTime                     @default(now()) @db.Timestamptz(6)
+  updatedAt                  DateTime                     @updatedAt @db.Timestamptz(6)
+  createdBy                  String?
+  updatedBy                  String?
+  collectionAgentCustomers   Customer[]                   @relation("EmployeeCollectionAgent")
+  createdByUser              User?                        @relation("EmployeeCreatedBy", fields: [createdBy], references: [userId])
+  department                 Department?                  @relation(fields: [departmentId], references: [id])
+  updatedByUser              User?                        @relation("EmployeeUpdatedBy", fields: [updatedBy], references: [userId])
+  machineAssignmentOperators MachineAssignmentOperator[]
+  inchargeAssignments        MachineOperationAssignment[] @relation("InchargeEmployeeAssignments")
+  stores                     Store[]
+  user                       User?
 
   @@index([departmentId])
   @@index([status])
@@ -75,12 +77,12 @@ model User {
   auditLogs             AuditLog[]           @relation("ChangedBy")
   createdEmployees      Employee[]           @relation("EmployeeCreatedBy")
   updatedEmployees      Employee[]           @relation("EmployeeUpdatedBy")
+  expensesCreated       Expense[]            @relation("ExpenseCreatedBy")
   loginAttempts         LoginAttempt[]
   passwordResetTokens   PasswordResetToken[]
   createdSalesOrders    SalesOrder[]         @relation("SalesOrderCreatedBy")
   mdApprovedSalesOrders SalesOrder[]         @relation("SalesOrderMdApprover")
   sessions              UserSession[]
-  expensesCreated       Expense[]            @relation("ExpenseCreatedBy")
   employee              Employee?            @relation(fields: [employeeId], references: [id])
   role                  Role?                @relation(fields: [roleId], references: [id])
 
@@ -183,16 +185,18 @@ model Permission {
 }
 
 model Role {
-  id              Int              @id @default(autoincrement())
-  code            String           @unique @default("ADMIN")
-  name            String
-  description     String?
-  isSystem        Boolean          @default(true)
-  status          RoleStatus       @default(active)
-  createdAt       DateTime         @default(now()) @db.Timestamptz(6)
-  rolePermissions RolePermission[]
-  users           User[]
-  Admin           Admin[]
+  id                         Int                          @id @default(autoincrement())
+  code                       String                       @unique @default("ADMIN")
+  name                       String
+  description                String?
+  isSystem                   Boolean                      @default(true)
+  status                     RoleStatus                   @default(active)
+  createdAt                  DateTime                     @default(now()) @db.Timestamptz(6)
+  Admin                      Admin[]
+  machineAssignmentOperators MachineAssignmentOperator[]
+  inchargeRoleAssignments    MachineOperationAssignment[] @relation("InchargeRoleAssignments")
+  rolePermissions            RolePermission[]
+  users                      User[]
 
   @@map("roles")
 }
@@ -234,7 +238,6 @@ model Customer {
   aiRiskScore          Int?
   altPhone             String?                  @db.VarChar(15)
   bankAccount          Json?
-  transports           Json?
   billingAddressLine1  String                   @db.VarChar(255)
   billingCity          String                   @db.VarChar(100)
   billingState         String                   @db.VarChar(100)
@@ -266,12 +269,13 @@ model Customer {
   tdsSection           String?                  @db.VarChar(10)
   updatedBy            String?
   id                   String                   @id @default(uuid()) @db.Uuid
+  transports           Json?
+  addresses            CustomerAddress[]
   collectionAgent      Employee?                @relation("EmployeeCollectionAgent", fields: [collectionAgentId], references: [id])
   company              Company                  @relation(fields: [companyId], references: [id])
   route                Route?                   @relation(fields: [routeId], references: [id])
-  salesOrders          SalesOrder[]             @relation("CustomerSalesOrders")
   salesInvoices        SalesInvoice[]
-  addresses            CustomerAddress[]
+  salesOrders          SalesOrder[]             @relation("CustomerSalesOrders")
 
   @@unique([companyId, customerCode])
   @@index([companyId, status], map: "idx_cust_company_status")
@@ -300,7 +304,7 @@ model Company {
   gstin          String?         @db.VarChar(15)
   currencyCode   String          @default("INR") @db.VarChar(3)
   phone          String?         @db.VarChar(20)
-  mobile         String?         @db.VarChar(20)
+  mobile         String?         @db.VarChar(1000)
   email          String?         @db.VarChar(120)
   website        String?         @db.VarChar(200)
   logoUrl        String?
@@ -319,9 +323,9 @@ model Company {
   updatedAt      DateTime        @updatedAt @db.Timestamptz(6)
   businessPlaces BusinessPlace[]
   customers      Customer[]
-  whatsappConfig WhatsappConfig?
-  invoiceSetting InvoiceSetting?
   expenses       Expense[]
+  invoiceSetting InvoiceSetting?
+  whatsappConfig WhatsappConfig?
 
   @@map("companies")
 }
@@ -332,7 +336,7 @@ model WhatsappConfig {
   phoneNumberId String   @db.VarChar(50)
   wabaId        String   @db.VarChar(50)
   businessPhone String   @db.VarChar(20)
-  accessToken   String   @db.Text
+  accessToken   String
   createdAt     DateTime @default(now()) @db.Timestamptz(6)
   updatedAt     DateTime @updatedAt @db.Timestamptz(6)
   company       Company  @relation(fields: [companyId], references: [id])
@@ -429,10 +433,10 @@ model Supplier {
   whatsapp              String?                 @map("whatsapp") @db.VarChar(15)
   id                    Int                     @id @default(autoincrement())
   materialPrices        SupplierMaterialPrice[]
-  purchaseOrders        PurchaseOrder[]
-  addresses             SupplierAddress[]
   expenses              Expense[]
   grnInvoices           GrnInvoice[]
+  purchaseOrders        PurchaseOrder[]
+  addresses             SupplierAddress[]
 
   @@unique([companyId, supplierCode])
   @@index([legalName])
@@ -453,20 +457,21 @@ model SupplierAddress {
 }
 
 model Shift {
-  id                   Int                    @id @default(autoincrement())
-  shiftCode            String                 @unique
-  shiftName            String                 @unique
+  id                   Int                          @id @default(autoincrement())
+  shiftCode            String                       @unique
+  shiftName            String                       @unique
   startTime            String
   endTime              String
   breakDuration        Int?
   gracePeriod          Int?
-  isActive             Boolean                @default(true)
-  createdAt            DateTime               @default(now())
-  updatedAt            DateTime               @updatedAt
+  isActive             Boolean                      @default(true)
+  createdAt            DateTime                     @default(now())
+  updatedAt            DateTime                     @updatedAt
+  dailyProductionPlans DailyProductionPlan[]
   HourlyProduction     HourlyProduction[]
+  machineAssignments   MachineOperationAssignment[]
   productionWastages   ProductionWastage[]
   WeeklyMachineProgram WeeklyMachineProgram[]
-  dailyProductionPlans DailyProductionPlan[]
 
   @@map("shifts")
 }
@@ -548,19 +553,19 @@ model Product {
   billOfMaterials           BillOfMaterial[]
   finishedGoodsStocks       FinishedGoodsStock[]
   finishedGoodsTransactions FinishedGoodsTransaction[]
+  goodsDispatchItems        GoodsDispatchItem[]
   images                    ProductImage[]
   productionOrders          ProductionOrder[]
-  productionWastages        ProductionWastage[]
   productionSteps           ProductionStep[]
+  productionWastages        ProductionWastage[]
   category                  Category                   @relation(fields: [categoryId], references: [id])
   gstTaxRate                GstTaxRate?                @relation(fields: [gstTaxRateId], references: [id])
   subCategory               SubCategory?               @relation(fields: [subCategoryId, categoryId], references: [id, categoryId])
   uom                       UnitOfMeasure?             @relation(fields: [uomId], references: [id], onDelete: Restrict)
+  salesInvoiceItems         SalesInvoiceItem[]
   salesOrderItems           SalesOrderItem[]           @relation("SalesOrderItemProduct")
   StockAdjustmentItem       StockAdjustmentItem[]
   weeklyPrograms            WeeklyMachineProgram[]     @relation("ProductWeeklyPrograms")
-  salesInvoiceItems         SalesInvoiceItem[]
-  goodsDispatchItems        GoodsDispatchItem[]
 
   @@index([categoryId])
   @@index([subCategoryId])
@@ -571,12 +576,11 @@ model Product {
 }
 
 model ProductionStep {
-  id         BigInt  @id @default(autoincrement())
-  productId  BigInt  @map("product_id")
-  stepKey    String  @map("step_key")
-  stepOrder  Int     @map("step_order")
-
-  product    Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  id        BigInt  @id @default(autoincrement())
+  productId BigInt  @map("product_id")
+  stepKey   String  @map("step_key")
+  stepOrder Int     @map("step_order")
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@index([productId])
   @@map("production_steps")
@@ -617,30 +621,31 @@ model Location {
 }
 
 model Machine {
-  machineId             String                 @id @map("machine_id") @db.VarChar(20)
-  machineName           String                 @map("machine_name") @db.VarChar(100)
+  machineId             String                       @id @map("machine_id") @db.VarChar(20)
+  machineName           String                       @map("machine_name") @db.VarChar(100)
   technologyType        TechnologyType?
   machineType           MachineType?
-  capacity              Decimal?               @db.Decimal(10, 2)
-  targetTemperature     Decimal?               @map("target_temperature") @db.Decimal(5, 2)
-  targetLoadPercent     Decimal?               @map("target_load_percent") @db.Decimal(5, 2)
-  manufacturer          String?                @db.VarChar(100)
-  modelNumber           String?                @map("model_number") @db.VarChar(50)
-  cycleTime             Decimal?               @map("cycle_time") @db.Decimal(10, 2)
-  operatorId            String?                @map("operator_id") @db.VarChar(20)
-  machineStatus         MachineStatus          @default(IDLE)
-  isActive              Boolean                @default(true)
-  description           String?                @db.VarChar(255)
-  createdAt             DateTime               @default(now()) @map("created_at")
-  updatedAt             DateTime               @updatedAt @map("updated_at")
+  capacity              Decimal?                     @db.Decimal(10, 2)
+  targetTemperature     Decimal?                     @map("target_temperature") @db.Decimal(5, 2)
+  targetLoadPercent     Decimal?                     @map("target_load_percent") @db.Decimal(5, 2)
+  manufacturer          String?                      @db.VarChar(100)
+  modelNumber           String?                      @map("model_number") @db.VarChar(50)
+  cycleTime             Decimal?                     @map("cycle_time") @db.Decimal(10, 2)
+  operatorId            String?                      @map("operator_id") @db.VarChar(20)
+  machineStatus         MachineStatus                @default(IDLE)
+  isActive              Boolean                      @default(true)
+  description           String?                      @db.VarChar(255)
+  createdAt             DateTime                     @default(now()) @map("created_at")
+  updatedAt             DateTime                     @updatedAt @map("updated_at")
   businessPlaceId       BigInt?
+  dailyProductionPlans  DailyProductionPlan[]
   hourlyProductions     HourlyProduction[]
-  businessPlace         BusinessPlace?         @relation(fields: [businessPlaceId], references: [id])
+  oeeSnapshots          MachineOeeSnapshot[]
+  operationAssignments  MachineOperationAssignment[]
+  businessPlace         BusinessPlace?               @relation(fields: [businessPlaceId], references: [id])
   productionOrders      ProductionOrder[]
   productionWastages    ProductionWastage[]
   weeklyMachinePrograms WeeklyMachineProgram[]
-  dailyProductionPlans  DailyProductionPlan[]
-  oeeSnapshots          MachineOeeSnapshot[]
 
   @@map("machines")
 }
@@ -665,13 +670,14 @@ model Store {
   businessPlaceId           BigInt?
   finishedGoodsStocks       FinishedGoodsStock[]
   finishedGoodsTransactions FinishedGoodsTransaction[]
+  goodsDispatches           GoodsDispatch[]
+  grnInvoices               GrnInvoice[]
+  productionWastages        ProductionWastage[]
   rawMaterialTransactions   RawMaterialTransaction[]
   rawMaterials              RawMaterial[]              @relation("StoreToRawMaterial")
+  salesInvoices             SalesInvoice[]
   StockAdjustmentItem       StockAdjustmentItem[]
   storeLocations            StoreLocation[]
-  grnInvoices               GrnInvoice[]
-  goodsDispatches           GoodsDispatch[]
-  salesInvoices             SalesInvoice[]
   businessPlace             BusinessPlace?             @relation(fields: [businessPlaceId], references: [id])
   incharge                  Employee?                  @relation(fields: [inchargeId], references: [id])
   location                  Location?                  @relation(fields: [locationId], references: [locationId])
@@ -758,14 +764,15 @@ model RawMaterial {
   flaggedForReview        Boolean                  @default(false) @map("flagged_for_review")
   gstTaxRateId            String?                  @map("gst_tax_rate_id")
   billOfMaterials         BillOfMaterial[]
+  grnInvoiceItems         GrnInvoiceItem[]
   productionWastages      ProductionWastage[]
+  targetedWastages        ProductionWastage[]      @relation("TargetWastageProduct")
   rawMaterialTransactions RawMaterialTransaction[]
   category                RawMaterialCategory?     @relation(fields: [categoryId], references: [id])
+  gstTaxRate              GstTaxRate?              @relation(fields: [gstTaxRateId], references: [id])
   storeLocation           StoreLocation?           @relation(fields: [locationId], references: [id])
   store                   Store?                   @relation("StoreToRawMaterial", fields: [storeId], references: [storeId])
   StockAdjustmentItem     StockAdjustmentItem[]
-  gstTaxRate              GstTaxRate?              @relation(fields: [gstTaxRateId], references: [id], onDelete: SetNull)
-  grnInvoiceItems         GrnInvoiceItem[]
 
   @@index([categoryId])
   @@index([storeId])
@@ -841,7 +848,7 @@ model ProductionOrder {
   uom                       String                     @db.VarChar(10)
   sourceSalesOrderId        String?                    @map("source_sales_order_id") @db.VarChar(20)
   sourceSalesOrderLineId    BigInt?                    @map("source_sales_order_line_id")
-  status                    String                     @default("PLANNED") @db.VarChar(20)
+  status                    String                     @default("CREATED") @db.VarChar(30)
   remarks                   String?                    @db.VarChar(255)
   createdAt                 DateTime                   @default(now()) @map("created_at")
   updatedAt                 DateTime                   @updatedAt @map("updated_at")
@@ -867,16 +874,17 @@ model ProductionOrder {
   draftRawMaterials         Json?                      @map("draft_raw_materials")
   currentProductionStep     String?                    @map("current_production_step") @db.VarChar(100)
   currentStepIndex          Int?                       @map("current_step_index")
+  dailyProductionPlans      DailyProductionPlan[]
   finishedGoodsTransactions FinishedGoodsTransaction[]
+  goodsDispatchItems        GoodsDispatchItem[]
   hourlyProductions         HourlyProduction[]
-  rawMaterialTransactions   RawMaterialTransaction[]
+  productionOrderHistories  ProductionOrderHistory[]
   Machine                   Machine?                   @relation(fields: [machineMachineId], references: [machineId])
   productItem               Product                    @relation(fields: [productItemId], references: [id])
   productionWastages        ProductionWastage[]
-  weeklyMachinePrograms     WeeklyMachineProgram[]
-  dailyProductionPlans      DailyProductionPlan[]
+  rawMaterialTransactions   RawMaterialTransaction[]
   stockAdjustments          StockAdjustment[]
-  goodsDispatchItems        GoodsDispatchItem[]
+  weeklyMachinePrograms     WeeklyMachineProgram[]
 
   @@index([orderDate])
   @@index([dueDate])
@@ -915,6 +923,47 @@ model GoodsDispatch {
   @@map("goods_dispatches")
 }
 
+model MachineOperationAssignment {
+  id                 BigInt                      @id @default(autoincrement())
+  machineId          String                      @map("machine_id") @db.VarChar(20)
+  weekStartDate      DateTime                    @map("week_start_date") @db.Date
+  weekEndDate        DateTime                    @map("week_end_date") @db.Date
+  inchargeRoleId     Int?                        @map("incharge_role_id")
+  inchargeEmployeeId BigInt?                     @map("incharge_employee_id")
+  remarks            String?                     @db.VarChar(255)
+  isActive           Boolean                     @default(true) @map("is_active")
+  assignedBy         String?                     @map("assigned_by") @db.VarChar(36)
+  createdAt          DateTime                    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime                    @updatedAt @map("updated_at") @db.Timestamptz(6)
+  shiftId            String?                     @map("shift_id") @db.VarChar(20)
+  operators          MachineAssignmentOperator[]
+  inchargeEmployee   Employee?                   @relation("InchargeEmployeeAssignments", fields: [inchargeEmployeeId], references: [id])
+  inchargeRole       Role?                       @relation("InchargeRoleAssignments", fields: [inchargeRoleId], references: [id])
+  machine            Machine                     @relation(fields: [machineId], references: [machineId], onDelete: Cascade)
+  shift              Shift?                      @relation(fields: [shiftId], references: [shiftCode], onDelete: Cascade)
+
+  @@index([machineId])
+  @@index([weekStartDate, weekEndDate])
+  @@index([inchargeEmployeeId])
+  @@map("machine_operation_assignments")
+}
+
+model MachineAssignmentOperator {
+  id           BigInt                     @id @default(autoincrement())
+  assignmentId BigInt                     @map("assignment_id")
+  roleId       Int                        @map("role_id")
+  employeeId   BigInt                     @map("employee_id")
+  createdAt    DateTime                   @default(now()) @map("created_at") @db.Timestamptz(6)
+  assignment   MachineOperationAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  employee     Employee                   @relation(fields: [employeeId], references: [id])
+  role         Role                       @relation(fields: [roleId], references: [id])
+
+  @@unique([assignmentId, employeeId])
+  @@index([assignmentId])
+  @@index([employeeId])
+  @@map("machine_assignment_operators")
+}
+
 model GoodsDispatchItem {
   id                BigInt          @id @default(autoincrement())
   dispatchId        BigInt          @map("dispatch_id")
@@ -925,8 +974,8 @@ model GoodsDispatchItem {
   receivedQty       Decimal?        @map("received_qty") @db.Decimal(14, 3)
   remarks           String?         @db.VarChar(255)
   dispatch          GoodsDispatch   @relation(fields: [dispatchId], references: [id], onDelete: Cascade)
-  productionOrder   ProductionOrder @relation(fields: [productionOrderId], references: [productionOrderId])
   product           Product         @relation(fields: [productItemId], references: [id])
+  productionOrder   ProductionOrder @relation(fields: [productionOrderId], references: [productionOrderId])
 
   @@index([dispatchId])
   @@index([productionOrderId])
@@ -955,11 +1004,11 @@ model WeeklyMachineProgram {
   productionOrderId    String                @map("production_order_id") @db.VarChar(20)
   sequenceNo           Int                   @default(1) @map("sequence_no")
   setupHours           Decimal?              @map("setup_hours") @db.Decimal(10, 2)
+  dailyProductionPlans DailyProductionPlan[]
   machine              Machine?              @relation(fields: [machineId], references: [machineId])
   Product              Product?              @relation("ProductWeeklyPrograms", fields: [productId], references: [id])
   productionOrder      ProductionOrder       @relation(fields: [productionOrderId], references: [productionOrderId])
   shift                Shift?                @relation(fields: [shiftId], references: [shiftCode], onDelete: Cascade)
-  dailyProductionPlans DailyProductionPlan[]
 
   @@unique([machineId, shiftId, weekStartDate, dayOfWeek, sequenceNo])
   @@index([productionOrderId])
@@ -989,12 +1038,12 @@ model HourlyProduction {
   operatorId         String?              @map("operator_id") @db.VarChar(20)
   createdAt          DateTime             @default(now()) @map("created_at")
   updatedAt          DateTime             @updatedAt @map("updated_at")
+  dailyPlanId        String?              @map("daily_plan_id") @db.VarChar(50)
+  dailyPlan          DailyProductionPlan? @relation(fields: [dailyPlanId], references: [dailyPlanId])
   machine            Machine              @relation(fields: [machineId], references: [machineId], onDelete: Cascade)
   productionOrder    ProductionOrder      @relation(fields: [productionOrderId], references: [productionOrderId], onDelete: Cascade)
   shift              Shift                @relation(fields: [shiftId], references: [shiftCode], onDelete: Cascade)
   productionWastages ProductionWastage[]
-  dailyPlanId        String?              @map("daily_plan_id") @db.VarChar(50)
-  dailyPlan          DailyProductionPlan? @relation(fields: [dailyPlanId], references: [dailyPlanId])
 
   @@unique([productionDate, machineId, shiftId, hourIndex])
   @@index([productionOrderId])
@@ -1005,32 +1054,29 @@ model HourlyProduction {
 }
 
 model DailyProductionPlan {
-  dailyPlanId            String   @id @map("daily_plan_id") @db.VarChar(50)
-  weeklyProgramId        String   @map("weekly_program_id") @db.VarChar(20)
-  productionOrderId      String   @map("production_order_id") @db.VarChar(20)
-  productionDate         DateTime @map("production_date") @db.Date
-  machineId              String   @map("machine_id") @db.VarChar(20)
-  shiftId                String   @map("shift_id") @db.VarChar(20)
-  plannedQty             Decimal  @map("planned_qty") @db.Decimal(12, 3)
-  plannedHours           Decimal? @map("planned_hours") @db.Decimal(10, 2)
-  priority               String   @default("MEDIUM") @db.VarChar(20)
-  status                 String   @default("DRAFT") @db.VarChar(20)
-  remarks                String?  @db.VarChar(255)
-  carryForwardFromPlanId String?  @map("carry_forward_from_plan_id") @db.VarChar(50)
-  createdAt              DateTime @default(now()) @map("created_at")
-  updatedAt              DateTime @updatedAt @map("updated_at")
-  createdBy              String?  @map("created_by") @db.VarChar(36)
-  updatedBy              String?  @map("updated_by") @db.VarChar(36)
-
-  weeklyMachineProgram WeeklyMachineProgram @relation(fields: [weeklyProgramId], references: [weeklyProgramId], onDelete: Cascade)
-  productionOrder      ProductionOrder      @relation(fields: [productionOrderId], references: [productionOrderId], onDelete: Cascade)
-  machine              Machine              @relation(fields: [machineId], references: [machineId], onDelete: Cascade)
-  shift                Shift                @relation(fields: [shiftId], references: [shiftCode], onDelete: Cascade)
-  hourlyProductions    HourlyProduction[]
-
-  // Self-relation: the plan this was carried forward FROM
-  carryForwardFrom DailyProductionPlan?  @relation("CarryForwardChain", fields: [carryForwardFromPlanId], references: [dailyPlanId], onDelete: SetNull)
-  carryForwardTo   DailyProductionPlan[] @relation("CarryForwardChain")
+  dailyPlanId            String                @id @map("daily_plan_id") @db.VarChar(50)
+  weeklyProgramId        String                @map("weekly_program_id") @db.VarChar(20)
+  productionOrderId      String                @map("production_order_id") @db.VarChar(20)
+  productionDate         DateTime              @map("production_date") @db.Date
+  machineId              String                @map("machine_id") @db.VarChar(20)
+  shiftId                String                @map("shift_id") @db.VarChar(20)
+  plannedQty             Decimal               @map("planned_qty") @db.Decimal(12, 3)
+  plannedHours           Decimal?              @map("planned_hours") @db.Decimal(10, 2)
+  priority               String                @default("MEDIUM") @db.VarChar(20)
+  status                 String                @default("DRAFT") @db.VarChar(20)
+  remarks                String?               @db.VarChar(255)
+  carryForwardFromPlanId String?               @map("carry_forward_from_plan_id") @db.VarChar(50)
+  createdAt              DateTime              @default(now()) @map("created_at")
+  updatedAt              DateTime              @updatedAt @map("updated_at")
+  createdBy              String?               @map("created_by") @db.VarChar(36)
+  updatedBy              String?               @map("updated_by") @db.VarChar(36)
+  carryForwardFrom       DailyProductionPlan?  @relation("CarryForwardChain", fields: [carryForwardFromPlanId], references: [dailyPlanId])
+  carryForwardTo         DailyProductionPlan[] @relation("CarryForwardChain")
+  machine                Machine               @relation(fields: [machineId], references: [machineId], onDelete: Cascade)
+  productionOrder        ProductionOrder       @relation(fields: [productionOrderId], references: [productionOrderId], onDelete: Cascade)
+  shift                  Shift                 @relation(fields: [shiftId], references: [shiftCode], onDelete: Cascade)
+  weeklyMachineProgram   WeeklyMachineProgram  @relation(fields: [weeklyProgramId], references: [weeklyProgramId], onDelete: Cascade)
+  hourlyProductions      HourlyProduction[]
 
   @@index([weeklyProgramId])
   @@index([productionOrderId])
@@ -1052,9 +1098,9 @@ model RawMaterialTransaction {
   remarks           String?          @map("remarks") @db.VarChar(255)
   createdAt         DateTime         @default(now()) @map("created_at")
   productionOrderId String?          @map("production_order_id") @db.VarChar(20)
+  productionOrder   ProductionOrder? @relation(fields: [productionOrderId], references: [productionOrderId])
   rawMaterial       RawMaterial      @relation(fields: [rawMaterialId], references: [rawMaterialId], onDelete: Cascade)
   store             Store            @relation(fields: [storeId], references: [storeId], onDelete: Cascade)
-  productionOrder   ProductionOrder? @relation(fields: [productionOrderId], references: [productionOrderId], onDelete: SetNull)
 
   @@index([storeId])
   @@index([rawMaterialId])
@@ -1072,8 +1118,6 @@ model SalesOrder {
   customerId              String           @db.Uuid
   mobile                  String?          @db.VarChar(20)
   customerType            String?          @db.VarChar(20)
-  salesPersonName         String?          @db.VarChar(100)
-  transportName           String?          @db.VarChar(100)
   referenceText           String?          @db.VarChar(255)
   paymentTermId           Int?
   billingAddressLine1     String           @db.VarChar(255)
@@ -1115,8 +1159,10 @@ model SalesOrder {
   totalCgst               Decimal          @default(0) @db.Decimal(14, 2)
   totalSgst               Decimal          @default(0) @db.Decimal(14, 2)
   totalIgst               Decimal          @default(0) @db.Decimal(14, 2)
-  items                   SalesOrderItem[]
+  salesPersonName         String?          @db.VarChar(100)
+  transportName           String?          @db.VarChar(100)
   salesInvoices           SalesInvoice[]
+  items                   SalesOrderItem[]
   createdByUser           User?            @relation("SalesOrderCreatedBy", fields: [createdBy], references: [userId])
   customer                Customer         @relation("CustomerSalesOrders", fields: [customerId], references: [id])
   mdApprovedByUser        User?            @relation("SalesOrderMdApprover", fields: [mdApprovedBy], references: [userId])
@@ -1194,9 +1240,9 @@ model PurchaseOrder {
   storeId              String?             @map("store_id") @db.VarChar(20)
   discountType         DiscountType        @default(PERCENT) @map("discount_type")
   discountValue        Decimal             @default(0) @map("discount_value") @db.Decimal(12, 2)
+  grnInvoices          GrnInvoice[]
   items                PurchaseOrderItem[]
   supplier             Supplier            @relation(fields: [supplierId], references: [id])
-  grnInvoices          GrnInvoice[]
 
   @@index([supplierId])
   @@index([companyId])
@@ -1204,90 +1250,83 @@ model PurchaseOrder {
 }
 
 model PurchaseOrderItem {
-  id              String       @id @default(uuid()) @db.Uuid
-  purchaseOrderId String       @db.Uuid
+  id              String        @id @default(uuid()) @db.Uuid
+  purchaseOrderId String        @db.Uuid
   uom             String
-  quantity        Decimal      @db.Decimal(12, 3)
-  receivedQty     Decimal      @default(0) @db.Decimal(12, 3)
-  unitPrice       Decimal      @db.Decimal(12, 2)
-  discount        Decimal      @default(0) @db.Decimal(5, 2)
-  discountType    DiscountType @default(PERCENT)
-  discountValue   Decimal      @default(0) @db.Decimal(12, 2)
-  discountAmount  Decimal      @default(0) @db.Decimal(14, 2)
-  tax             Decimal      @default(0) @db.Decimal(5, 2)
-
-  taxableAmount Decimal       @default(0) @db.Decimal(14, 2)
-  cgstRate      Decimal       @default(0) @db.Decimal(5, 2)
-  cgstAmount    Decimal       @default(0) @db.Decimal(14, 2)
-  sgstRate      Decimal       @default(0) @db.Decimal(5, 2)
-  sgstAmount    Decimal       @default(0) @db.Decimal(14, 2)
-  igstRate      Decimal       @default(0) @db.Decimal(5, 2)
-  igstAmount    Decimal       @default(0) @db.Decimal(14, 2)
-  lineTotal     Decimal       @db.Decimal(12, 2)
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
-  productId     String
-  purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  quantity        Decimal       @db.Decimal(12, 3)
+  receivedQty     Decimal       @default(0) @db.Decimal(12, 3)
+  unitPrice       Decimal       @db.Decimal(12, 2)
+  discount        Decimal       @default(0) @db.Decimal(5, 2)
+  discountType    DiscountType  @default(PERCENT)
+  discountValue   Decimal       @default(0) @db.Decimal(12, 2)
+  discountAmount  Decimal       @default(0) @db.Decimal(14, 2)
+  tax             Decimal       @default(0) @db.Decimal(5, 2)
+  taxableAmount   Decimal       @default(0) @db.Decimal(14, 2)
+  cgstRate        Decimal       @default(0) @db.Decimal(5, 2)
+  cgstAmount      Decimal       @default(0) @db.Decimal(14, 2)
+  sgstRate        Decimal       @default(0) @db.Decimal(5, 2)
+  sgstAmount      Decimal       @default(0) @db.Decimal(14, 2)
+  igstRate        Decimal       @default(0) @db.Decimal(5, 2)
+  igstAmount      Decimal       @default(0) @db.Decimal(14, 2)
+  lineTotal       Decimal       @db.Decimal(12, 2)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  productId       String
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
 
   @@index([purchaseOrderId])
   @@map("purchase_order_items")
 }
 
 model GrnInvoice {
-  id                   String   @id @default(uuid()) @db.Uuid
-  grnNumber            String   @unique @map("grn_number")
-  invoiceNo            String   @map("invoice_no")
-  grnDate              DateTime @map("grn_date") @db.Date
-  supplierId           Int      @map("supplier_id")
-  storeId              String   @map("store_id") @db.VarChar(20)
-  billingAddressLine1  String   @map("billing_address_line1")
-  billingCity          String   @map("billing_city")
-  billingState         String   @map("billing_state")
-  billingPincode       String   @map("billing_pincode")
-  billingCountry       String?  @default("India") @map("billing_country")
-  sameAsBilling        Boolean  @default(false) @map("same_as_billing")
-  updateStock          Boolean  @default(false) @map("update_stock")
-  shippingAddressLine1 String   @map("shipping_address_line1")
-  shippingCity         String   @map("shipping_city")
-  shippingState        String   @map("shipping_state")
-  shippingPincode      String   @map("shipping_pincode")
-  shippingCountry      String?  @default("India") @map("shipping_country")
-
-  receiveDate  DateTime? @map("receive_date") @db.Date
-  billDueDate  DateTime? @map("bill_due_date") @db.Date
-  challanNo    String?   @map("challan_no")
-  transport    String?
-  eWayBill     String?   @map("eway_bill")
-  invoiceImage String?   @map("invoice_image")
-  remarks      String?
-
-  discountType   DiscountType @default(PERCENT) @map("discount_type")
-  discountValue  Decimal      @default(0) @map("discount_value") @db.Decimal(12, 2)
-  roundingAdjust Decimal      @default(0) @map("rounding_adjust") @db.Decimal(12, 2)
-
-  paymentStatus   String    @default("Unpaid") @map("payment_status")
-  paymentMethod   String?   @map("payment_method")
-  referenceNumber String?   @map("reference_number")
-  paymentDate     DateTime? @map("payment_date") @db.Date
-
-  subtotal      Decimal @default(0) @db.Decimal(12, 2)
-  totalDiscount Decimal @default(0) @db.Decimal(12, 2)
-  totalTax      Decimal @default(0) @db.Decimal(12, 2)
-  totalCgst     Decimal @default(0) @db.Decimal(12, 2)
-  totalSgst     Decimal @default(0) @db.Decimal(12, 2)
-  totalIgst     Decimal @default(0) @db.Decimal(12, 2)
-  netAmount     Decimal @default(0) @db.Decimal(12, 2)
-
-  companyId String   @map("company_id") @db.Uuid
-  createdBy String?  @map("created_by")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  poId          String?          @map("po_id") @db.Uuid
-  purchaseOrder PurchaseOrder?   @relation(fields: [poId], references: [id], onDelete: SetNull)
-  supplier      Supplier         @relation(fields: [supplierId], references: [id])
-  store         Store            @relation(fields: [storeId], references: [storeId])
-  items         GrnInvoiceItem[]
+  id                   String           @id @default(uuid()) @db.Uuid
+  grnNumber            String           @unique @map("grn_number")
+  invoiceNo            String           @map("invoice_no")
+  grnDate              DateTime         @map("grn_date") @db.Date
+  supplierId           Int              @map("supplier_id")
+  storeId              String           @map("store_id") @db.VarChar(20)
+  billingAddressLine1  String           @map("billing_address_line1")
+  billingCity          String           @map("billing_city")
+  billingState         String           @map("billing_state")
+  billingPincode       String           @map("billing_pincode")
+  billingCountry       String?          @default("India") @map("billing_country")
+  sameAsBilling        Boolean          @default(false) @map("same_as_billing")
+  updateStock          Boolean          @default(false) @map("update_stock")
+  shippingAddressLine1 String           @map("shipping_address_line1")
+  shippingCity         String           @map("shipping_city")
+  shippingState        String           @map("shipping_state")
+  shippingPincode      String           @map("shipping_pincode")
+  shippingCountry      String?          @default("India") @map("shipping_country")
+  receiveDate          DateTime?        @map("receive_date") @db.Date
+  billDueDate          DateTime?        @map("bill_due_date") @db.Date
+  challanNo            String?          @map("challan_no")
+  transport            String?
+  eWayBill             String?          @map("eway_bill")
+  invoiceImage         String?          @map("invoice_image")
+  remarks              String?
+  discountType         DiscountType     @default(PERCENT) @map("discount_type")
+  discountValue        Decimal          @default(0) @map("discount_value") @db.Decimal(12, 2)
+  roundingAdjust       Decimal          @default(0) @map("rounding_adjust") @db.Decimal(12, 2)
+  paymentStatus        String           @default("Unpaid") @map("payment_status")
+  paymentMethod        String?          @map("payment_method")
+  referenceNumber      String?          @map("reference_number")
+  paymentDate          DateTime?        @map("payment_date") @db.Date
+  subtotal             Decimal          @default(0) @db.Decimal(12, 2)
+  totalDiscount        Decimal          @default(0) @db.Decimal(12, 2)
+  totalTax             Decimal          @default(0) @db.Decimal(12, 2)
+  totalCgst            Decimal          @default(0) @db.Decimal(12, 2)
+  totalSgst            Decimal          @default(0) @db.Decimal(12, 2)
+  totalIgst            Decimal          @default(0) @db.Decimal(12, 2)
+  netAmount            Decimal          @default(0) @db.Decimal(12, 2)
+  companyId            String           @map("company_id") @db.Uuid
+  createdBy            String?          @map("created_by")
+  createdAt            DateTime         @default(now()) @map("created_at")
+  updatedAt            DateTime         @updatedAt @map("updated_at")
+  poId                 String?          @map("po_id") @db.Uuid
+  items                GrnInvoiceItem[]
+  purchaseOrder        PurchaseOrder?   @relation(fields: [poId], references: [id])
+  store                Store            @relation(fields: [storeId], references: [storeId])
+  supplier             Supplier         @relation(fields: [supplierId], references: [id])
 
   @@index([supplierId])
   @@index([storeId])
@@ -1297,27 +1336,26 @@ model GrnInvoice {
 }
 
 model GrnInvoiceItem {
-  id            String   @id @default(uuid()) @db.Uuid
-  grnInvoiceId  String   @map("grn_invoice_id") @db.Uuid
-  productId     String   @map("product_id")
+  id            String      @id @default(uuid()) @db.Uuid
+  grnInvoiceId  String      @map("grn_invoice_id") @db.Uuid
+  productId     String      @map("product_id")
   description   String
   uom           String
-  quantity      Decimal  @db.Decimal(12, 3)
-  unitPrice     Decimal  @map("unit_price") @db.Decimal(12, 2)
-  tax           Decimal  @default(0) @db.Decimal(5, 2)
-  taxableAmount Decimal  @default(0) @map("taxable_amount") @db.Decimal(14, 2)
-  cgstRate      Decimal  @default(0) @map("cgst_rate") @db.Decimal(5, 2)
-  cgstAmount    Decimal  @default(0) @map("cgst_amount") @db.Decimal(14, 2)
-  sgstRate      Decimal  @default(0) @map("sgst_rate") @db.Decimal(5, 2)
-  sgstAmount    Decimal  @default(0) @map("sgst_amount") @db.Decimal(14, 2)
-  igstRate      Decimal  @default(0) @map("igst_rate") @db.Decimal(5, 2)
-  igstAmount    Decimal  @default(0) @map("igst_amount") @db.Decimal(14, 2)
-  lineTotal     Decimal  @map("line_total") @db.Decimal(12, 2)
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
-
-  grnInvoice  GrnInvoice  @relation(fields: [grnInvoiceId], references: [id], onDelete: Cascade)
-  rawMaterial RawMaterial @relation(fields: [productId], references: [rawMaterialId])
+  quantity      Decimal     @db.Decimal(12, 3)
+  unitPrice     Decimal     @map("unit_price") @db.Decimal(12, 2)
+  tax           Decimal     @default(0) @db.Decimal(5, 2)
+  taxableAmount Decimal     @default(0) @map("taxable_amount") @db.Decimal(14, 2)
+  cgstRate      Decimal     @default(0) @map("cgst_rate") @db.Decimal(5, 2)
+  cgstAmount    Decimal     @default(0) @map("cgst_amount") @db.Decimal(14, 2)
+  sgstRate      Decimal     @default(0) @map("sgst_rate") @db.Decimal(5, 2)
+  sgstAmount    Decimal     @default(0) @map("sgst_amount") @db.Decimal(14, 2)
+  igstRate      Decimal     @default(0) @map("igst_rate") @db.Decimal(5, 2)
+  igstAmount    Decimal     @default(0) @map("igst_amount") @db.Decimal(14, 2)
+  lineTotal     Decimal     @map("line_total") @db.Decimal(12, 2)
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
+  grnInvoice    GrnInvoice  @relation(fields: [grnInvoiceId], references: [id], onDelete: Cascade)
+  rawMaterial   RawMaterial @relation(fields: [productId], references: [rawMaterialId])
 
   @@index([grnInvoiceId])
   @@index([productId])
@@ -1333,44 +1371,48 @@ model GstTaxRate {
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
   products        Product[]
-  salesOrderItems SalesOrderItem[]
   rawMaterials    RawMaterial[]
+  salesOrderItems SalesOrderItem[]
 
   @@map("gst_tax_rates")
 }
 
 model ProductionWastage {
-  id                 BigInt            @id @default(autoincrement())
-  wastageNo          String            @unique @map("wastage_no") @db.VarChar(30)
-  wastageDate        DateTime          @map("wastage_date") @db.Date
-  productionOrderId  String            @map("production_order_id") @db.VarChar(20)
-  hourlyProductionId BigInt?           @map("hourly_production_id")
-  machineId          String            @map("machine_id") @db.VarChar(20)
-  shiftId            String            @map("shift_id") @db.VarChar(20)
-  productId          BigInt            @map("product_id")
-  rawMaterialId      String?           @map("raw_material_id") @db.VarChar(20)
-  wastageType        WastageType       @map("wastage_type")
-  quantity           Decimal           @map("quantity") @db.Decimal(18, 3)
-  uom                String            @db.VarChar(10)
-  estimatedValue     Decimal?          @map("estimated_value") @db.Decimal(18, 2)
-  reason             String?           @db.VarChar(255)
-  correctiveAction   String?           @map("corrective_action") @db.VarChar(255)
-  remarks            String?           @db.VarChar(255)
-  isRecyclable       Boolean           @default(false) @map("is_recyclable")
-  sentForRework      Boolean           @default(false) @map("sent_for_rework")
-  approvedBy         String?           @map("approved_by") @db.VarChar(36)
-  approvedAt         DateTime?         @map("approved_at")
-  status             WastageStatus     @default(DRAFT)
-  createdBy          String            @map("created_by") @db.VarChar(36)
-  updatedBy          String?           @map("updated_by") @db.VarChar(36)
-  createdAt          DateTime          @default(now()) @map("created_at")
-  updatedAt          DateTime          @updatedAt @map("updated_at")
-  hourlyProduction   HourlyProduction? @relation(fields: [hourlyProductionId], references: [hourlyProductionId])
-  machine            Machine           @relation(fields: [machineId], references: [machineId], onDelete: Cascade)
-  product            Product           @relation(fields: [productId], references: [id], onDelete: Cascade)
-  productionOrder    ProductionOrder   @relation(fields: [productionOrderId], references: [productionOrderId], onDelete: Cascade)
-  rawMaterial        RawMaterial?      @relation(fields: [rawMaterialId], references: [rawMaterialId])
-  shift              Shift             @relation(fields: [shiftId], references: [shiftCode], onDelete: Cascade)
+  id                     BigInt            @id @default(autoincrement())
+  wastageNo              String            @unique @map("wastage_no") @db.VarChar(30)
+  wastageDate            DateTime          @map("wastage_date") @db.Date
+  productionOrderId      String            @map("production_order_id") @db.VarChar(20)
+  hourlyProductionId     BigInt?           @map("hourly_production_id")
+  machineId              String            @map("machine_id") @db.VarChar(20)
+  shiftId                String            @map("shift_id") @db.VarChar(20)
+  productId              BigInt            @map("product_id")
+  rawMaterialId          String?           @map("raw_material_id") @db.VarChar(20)
+  wastageType            WastageType       @map("wastage_type")
+  quantity               Decimal           @map("quantity") @db.Decimal(18, 3)
+  uom                    String            @db.VarChar(10)
+  estimatedValue         Decimal?          @map("estimated_value") @db.Decimal(18, 2)
+  reason                 String?           @db.VarChar(255)
+  correctiveAction       String?           @map("corrective_action") @db.VarChar(255)
+  remarks                String?           @db.VarChar(255)
+  isRecyclable           Boolean           @default(false) @map("is_recyclable")
+  sentForRework          Boolean           @default(false) @map("sent_for_rework")
+  approvedBy             String?           @map("approved_by") @db.VarChar(36)
+  approvedAt             DateTime?         @map("approved_at")
+  status                 WastageStatus     @default(DRAFT)
+  createdBy              String            @map("created_by") @db.VarChar(36)
+  updatedBy              String?           @map("updated_by") @db.VarChar(36)
+  createdAt              DateTime          @default(now()) @map("created_at")
+  updatedAt              DateTime          @updatedAt @map("updated_at")
+  targetWastageProductId String?           @map("target_wastage_product_id") @db.VarChar(20)
+  storeId                String?           @map("store_id") @db.VarChar(20)
+  hourlyProduction       HourlyProduction? @relation(fields: [hourlyProductionId], references: [hourlyProductionId])
+  machine                Machine           @relation(fields: [machineId], references: [machineId], onDelete: Cascade)
+  product                Product           @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productionOrder        ProductionOrder   @relation(fields: [productionOrderId], references: [productionOrderId], onDelete: Cascade)
+  rawMaterial            RawMaterial?      @relation(fields: [rawMaterialId], references: [rawMaterialId])
+  shift                  Shift             @relation(fields: [shiftId], references: [shiftCode], onDelete: Cascade)
+  store                  Store?            @relation(fields: [storeId], references: [storeId])
+  targetWastageProduct   RawMaterial?      @relation("TargetWastageProduct", fields: [targetWastageProductId], references: [rawMaterialId])
 
   @@index([productionOrderId])
   @@index([hourlyProductionId])
@@ -1399,8 +1441,8 @@ model StockAdjustment {
   autoGenerated     Boolean               @default(false) @map("auto_generated")
   type              String?               @map("type") @db.VarChar(50)
   productionOrderId String?               @map("production_order_id") @db.VarChar(20)
-  productionOrder   ProductionOrder?      @relation(fields: [productionOrderId], references: [productionOrderId])
   items             StockAdjustmentItem[]
+  productionOrder   ProductionOrder?      @relation(fields: [productionOrderId], references: [productionOrderId])
 
   @@index([adjustmentDate])
   @@index([status])
@@ -1430,6 +1472,178 @@ model StockAdjustmentItem {
   @@index([stockAdjustmentId])
   @@index([storeId])
   @@map("stock_adjustment_items")
+}
+
+model ProductionOrderHistory {
+  id                BigInt          @id @default(autoincrement())
+  productionOrderId String          @map("production_order_id") @db.VarChar(20)
+  fromStatus        String?         @map("from_status") @db.VarChar(30)
+  toStatus          String          @map("to_status") @db.VarChar(30)
+  changedAt         DateTime        @default(now()) @map("changed_at") @db.Timestamptz(6)
+  changedBy         String?         @map("changed_by") @db.VarChar(36)
+  remarks           String?         @db.VarChar(500)
+  action            String?         @map("action") @db.VarChar(100)
+  metadata          Json?           @map("metadata")
+  productionOrder   ProductionOrder @relation(fields: [productionOrderId], references: [productionOrderId], onDelete: Cascade)
+
+  @@index([productionOrderId])
+  @@index([changedAt])
+  @@map("production_order_history")
+}
+
+model Expense {
+  id              String    @id @default(uuid()) @db.Uuid
+  expenseNumber   String    @db.VarChar(30)
+  expenseCategory String    @db.VarChar(60)
+  date            DateTime  @db.Date
+  expense         String    @db.VarChar(120)
+  amount          Decimal   @db.Decimal(12, 2)
+  description     String?
+  paymentMethod   String    @db.VarChar(50)
+  status          String    @default("Draft") @db.VarChar(30)
+  notes           String?
+  receiptInvoice  String?   @db.VarChar(255)
+  companyId       String    @db.Uuid
+  supplierId      Int?
+  createdBy       String?
+  createdAt       DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt       DateTime  @updatedAt @db.Timestamptz(6)
+  company         Company   @relation(fields: [companyId], references: [id])
+  user            User?     @relation("ExpenseCreatedBy", fields: [createdBy], references: [userId])
+  supplier        Supplier? @relation(fields: [supplierId], references: [id])
+
+  @@unique([companyId, expenseNumber])
+  @@map("expenses")
+}
+
+model InvoiceSetting {
+  id                    String   @id @default(uuid()) @db.Uuid
+  companyId             String   @unique @db.Uuid
+  invoicePrefix         String   @default("INV") @map("invoice_prefix") @db.VarChar(20)
+  sequenceLength        Int      @default(4) @map("sequence_length")
+  currentSequenceNumber Int      @default(1) @map("current_sequence_number")
+  financialYearStart    DateTime @map("financial_year_start") @db.Date
+  financialYearEnd      DateTime @map("financial_year_end") @db.Date
+  autoFinancialYear     Boolean  @default(true) @map("auto_financial_year")
+  formatTemplate        String   @default("{PREFIX}-{FY}-{SEQ}") @map("format_template") @db.VarChar(100)
+  createdAt             DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  company               Company  @relation(fields: [companyId], references: [id])
+
+  @@map("invoice_settings")
+}
+
+model SalesInvoice {
+  id           String             @id @default(uuid()) @db.Uuid
+  invoiceNo    String             @unique @map("invoice_no")
+  invoiceDate  DateTime           @map("invoice_date") @db.Date
+  dueDate      DateTime?          @map("due_date") @db.Date
+  status       String             @default("DRAFT")
+  customerId   String             @map("customer_id") @db.Uuid
+  notes        String?
+  subTotal     Decimal            @map("sub_total") @db.Decimal(14, 2)
+  taxTotal     Decimal            @map("tax_total") @db.Decimal(14, 2)
+  grandTotal   Decimal            @map("grand_total") @db.Decimal(14, 2)
+  companyId    String             @map("company_id") @db.Uuid
+  createdBy    String?            @map("created_by")
+  createdAt    DateTime           @default(now()) @map("created_at")
+  updatedAt    DateTime           @updatedAt @map("updated_at")
+  salesOrderId Int?               @map("sales_order_id")
+  storeId      String?            @map("store_id") @db.VarChar(20)
+  items        SalesInvoiceItem[]
+  customer     Customer           @relation(fields: [customerId], references: [id])
+  salesOrder   SalesOrder?        @relation(fields: [salesOrderId], references: [id])
+  store        Store?             @relation(fields: [storeId], references: [storeId])
+
+  @@index([customerId])
+  @@index([companyId])
+  @@index([salesOrderId])
+  @@index([storeId])
+  @@map("sales_invoices")
+}
+
+model SalesInvoiceItem {
+  id             String       @id @default(uuid()) @db.Uuid
+  salesInvoiceId String       @map("sales_invoice_id") @db.Uuid
+  productId      BigInt       @map("product_id")
+  description    String?
+  uom            String?
+  quantity       Decimal      @db.Decimal(12, 3)
+  unitPrice      Decimal      @map("unit_price") @db.Decimal(12, 2)
+  tax            Decimal      @default(0) @db.Decimal(5, 2)
+  taxableAmount  Decimal      @default(0) @map("taxable_amount") @db.Decimal(14, 2)
+  cgstRate       Decimal      @default(0) @map("cgst_rate") @db.Decimal(5, 2)
+  cgstAmount     Decimal      @default(0) @map("cgst_amount") @db.Decimal(14, 2)
+  sgstRate       Decimal      @default(0) @map("sgst_rate") @db.Decimal(5, 2)
+  sgstAmount     Decimal      @default(0) @map("sgst_amount") @db.Decimal(14, 2)
+  igstRate       Decimal      @default(0) @map("igst_rate") @db.Decimal(5, 2)
+  igstAmount     Decimal      @default(0) @map("igst_amount") @db.Decimal(14, 2)
+  lineTotal      Decimal      @map("line_total") @db.Decimal(12, 2)
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+  discountAmount Decimal      @default(0) @map("discount_amount") @db.Decimal(14, 2)
+  product        Product      @relation(fields: [productId], references: [id])
+  salesInvoice   SalesInvoice @relation(fields: [salesInvoiceId], references: [id], onDelete: Cascade)
+
+  @@index([salesInvoiceId])
+  @@index([productId])
+  @@map("sales_invoice_items")
+}
+
+/// Stores calculated OEE metrics per machine per shift for historical lookup and reporting
+model MachineOeeSnapshot {
+  id             BigInt   @id @default(autoincrement())
+  machineId      String   @map("machine_id") @db.VarChar(20)
+  dailyPlanId    String?  @map("daily_plan_id") @db.VarChar(50)
+  productionDate DateTime @map("production_date") @db.Date
+  shiftId        String   @map("shift_id") @db.VarChar(20)
+  plannedRunTime Decimal  @map("planned_run_time") @db.Decimal(10, 2)
+  actualRunTime  Decimal  @map("actual_run_time") @db.Decimal(10, 2)
+  totalDowntime  Decimal  @map("total_downtime") @db.Decimal(10, 2)
+  totalProduced  Decimal  @map("total_produced") @db.Decimal(14, 3)
+  goodQty        Decimal  @map("good_qty") @db.Decimal(14, 3)
+  rejectQty      Decimal  @map("reject_qty") @db.Decimal(14, 3)
+  availability   Decimal  @map("availability") @db.Decimal(5, 2)
+  performance    Decimal  @map("performance") @db.Decimal(5, 2)
+  quality        Decimal  @map("quality") @db.Decimal(5, 2)
+  oeePercent     Decimal  @map("oee_percent") @db.Decimal(5, 2)
+  calculatedAt   DateTime @default(now()) @map("calculated_at")
+  machine        Machine  @relation(fields: [machineId], references: [machineId], onDelete: Cascade)
+
+  @@unique([machineId, productionDate, shiftId])
+  @@index([machineId, productionDate])
+  @@index([dailyPlanId])
+  @@map("machine_oee_snapshots")
+}
+
+model EodStockSnapshot {
+  id           BigInt          @id @default(autoincrement())
+  category     EodItemCategory @map("category")
+  itemId       String          @map("item_id") @db.VarChar(100)
+  itemCode     String          @map("item_code") @db.VarChar(100)
+  itemName     String          @map("item_name") @db.VarChar(255)
+  uom          String?         @map("uom") @db.VarChar(50)
+  storeId      String          @map("store_id") @db.VarChar(100)
+  snapshotDate DateTime        @map("snapshot_date") @db.Date
+  startQty     Decimal         @map("start_qty") @db.Decimal(14, 3)
+  eodQty       Decimal         @map("eod_qty") @db.Decimal(14, 3)
+  recordedAt   DateTime        @map("recorded_at")
+  createdAt    DateTime        @default(now()) @map("created_at")
+
+  @@unique([category, itemId, storeId, snapshotDate])
+  @@index([snapshotDate])
+  @@index([category])
+  @@index([storeId])
+  @@map("eod_stock_snapshots")
+}
+
+model SystemSetting {
+  id        Int      @id @default(autoincrement())
+  key       String   @unique @db.VarChar(100)
+  value     String   @db.VarChar(255)
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("system_settings")
 }
 
 enum BusinessPlaceType {
@@ -1582,169 +1796,10 @@ enum ItemCategoryType {
   FINISHED_GOODS
   SEMI_FINISHED
   CONSUMABLE
-}
-
-model Expense {
-  id              String   @id @default(uuid()) @db.Uuid
-  expenseNumber   String   @db.VarChar(30)
-  expenseCategory String   @db.VarChar(60)
-  date            DateTime @db.Date
-  expense         String   @db.VarChar(120)
-  amount          Decimal  @db.Decimal(12, 2)
-  description     String?  @db.Text
-  paymentMethod   String   @db.VarChar(50)
-  status          String   @default("Draft") @db.VarChar(30)
-  notes           String?  @db.Text
-  receiptInvoice  String?  @db.VarChar(255)
-  companyId       String   @db.Uuid
-  supplierId      Int?
-  createdBy       String?
-  createdAt       DateTime @default(now()) @db.Timestamptz(6)
-  updatedAt       DateTime @updatedAt @db.Timestamptz(6)
-
-  company  Company   @relation(fields: [companyId], references: [id])
-  supplier Supplier? @relation(fields: [supplierId], references: [id])
-  user     User?     @relation("ExpenseCreatedBy", fields: [createdBy], references: [userId])
-
-  @@unique([companyId, expenseNumber])
-  @@map("expenses")
-}
-
-model InvoiceSetting {
-  id                    String   @id @default(uuid()) @db.Uuid
-  companyId             String   @unique @db.Uuid
-  invoicePrefix         String   @default("INV") @map("invoice_prefix") @db.VarChar(20)
-  sequenceLength        Int      @default(4) @map("sequence_length")
-  currentSequenceNumber Int      @default(1) @map("current_sequence_number")
-  financialYearStart    DateTime @map("financial_year_start") @db.Date
-  financialYearEnd      DateTime @map("financial_year_end") @db.Date
-  autoFinancialYear     Boolean  @default(true) @map("auto_financial_year")
-  formatTemplate        String   @default("{PREFIX}-{FY}-{SEQ}") @map("format_template") @db.VarChar(100)
-  createdAt             DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt             DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
-  company               Company  @relation(fields: [companyId], references: [id])
-
-  @@map("invoice_settings")
-}
-
-model SalesInvoice {
-  id          String    @id @default(uuid()) @db.Uuid
-  invoiceNo   String    @unique @map("invoice_no")
-  invoiceDate DateTime  @map("invoice_date") @db.Date
-  dueDate     DateTime? @map("due_date") @db.Date
-  status      String    @default("DRAFT")
-  customerId  String    @map("customer_id") @db.Uuid
-  notes       String?
-  subTotal    Decimal   @map("sub_total") @db.Decimal(14, 2)
-  taxTotal    Decimal   @map("tax_total") @db.Decimal(14, 2)
-  grandTotal  Decimal   @map("grand_total") @db.Decimal(14, 2)
-
-  companyId String   @map("company_id") @db.Uuid
-  createdBy String?  @map("created_by")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  salesOrderId Int?               @map("sales_order_id")
-  storeId      String?            @map("store_id") @db.VarChar(20)
-  
-  salesOrder   SalesOrder?        @relation(fields: [salesOrderId], references: [id], onDelete: SetNull)
-  customer     Customer           @relation(fields: [customerId], references: [id])
-  store        Store?             @relation(fields: [storeId], references: [storeId])
-  items        SalesInvoiceItem[]
-
-  @@index([customerId])
-  @@index([companyId])
-  @@index([salesOrderId])
-  @@index([storeId])
-  @@map("sales_invoices")
-}
-
-model SalesInvoiceItem {
-  id             String   @id @default(uuid()) @db.Uuid
-  salesInvoiceId String   @map("sales_invoice_id") @db.Uuid
-  productId      BigInt   @map("product_id")
-  description    String?
-  uom            String?
-  quantity       Decimal  @db.Decimal(12, 3)
-  unitPrice      Decimal  @map("unit_price") @db.Decimal(12, 2)
-  discountAmount Decimal  @default(0) @map("discount_amount") @db.Decimal(14, 2)
-  tax            Decimal  @default(0) @db.Decimal(5, 2)
-  taxableAmount  Decimal  @default(0) @map("taxable_amount") @db.Decimal(14, 2)
-  cgstRate       Decimal  @default(0) @map("cgst_rate") @db.Decimal(5, 2)
-  cgstAmount     Decimal  @default(0) @map("cgst_amount") @db.Decimal(14, 2)
-  sgstRate       Decimal  @default(0) @map("sgst_rate") @db.Decimal(5, 2)
-  sgstAmount     Decimal  @default(0) @map("sgst_amount") @db.Decimal(14, 2)
-  igstRate       Decimal  @default(0) @map("igst_rate") @db.Decimal(5, 2)
-  igstAmount     Decimal  @default(0) @map("igst_amount") @db.Decimal(14, 2)
-  lineTotal      Decimal  @map("line_total") @db.Decimal(12, 2)
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
-
-  salesInvoice SalesInvoice @relation(fields: [salesInvoiceId], references: [id], onDelete: Cascade)
-  product      Product      @relation(fields: [productId], references: [id])
-
-  @@index([salesInvoiceId])
-  @@index([productId])
-  @@map("sales_invoice_items")
-}
-
-/// Stores calculated OEE metrics per machine per shift for historical lookup and reporting
-model MachineOeeSnapshot {
-  id             BigInt   @id @default(autoincrement())
-  machineId      String   @map("machine_id") @db.VarChar(20)
-  dailyPlanId    String?  @map("daily_plan_id") @db.VarChar(50)
-  productionDate DateTime @map("production_date") @db.Date
-  shiftId        String   @map("shift_id") @db.VarChar(20)
-  plannedRunTime Decimal  @map("planned_run_time") @db.Decimal(10, 2) // minutes
-  actualRunTime  Decimal  @map("actual_run_time") @db.Decimal(10, 2) // minutes
-  totalDowntime  Decimal  @map("total_downtime") @db.Decimal(10, 2) // minutes
-  totalProduced  Decimal  @map("total_produced") @db.Decimal(14, 3)
-  goodQty        Decimal  @map("good_qty") @db.Decimal(14, 3)
-  rejectQty      Decimal  @map("reject_qty") @db.Decimal(14, 3)
-  availability   Decimal  @map("availability") @db.Decimal(5, 2)
-  performance    Decimal  @map("performance") @db.Decimal(5, 2)
-  quality        Decimal  @map("quality") @db.Decimal(5, 2)
-  oeePercent     Decimal  @map("oee_percent") @db.Decimal(5, 2)
-  calculatedAt   DateTime @default(now()) @map("calculated_at")
-  machine        Machine  @relation(fields: [machineId], references: [machineId], onDelete: Cascade)
-
-  @@unique([machineId, productionDate, shiftId])
-  @@index([machineId, productionDate])
-  @@index([dailyPlanId])
-  @@map("machine_oee_snapshots")
+  WASTAGE
 }
 
 enum EodItemCategory {
   RAW_MATERIAL
   FINISHED_PRODUCT
-}
-
-model EodStockSnapshot {
-  id           BigInt          @id @default(autoincrement())
-  category     EodItemCategory @map("category")
-  itemId       String          @map("item_id") @db.VarChar(100)
-  itemCode     String          @map("item_code") @db.VarChar(100)
-  itemName     String          @map("item_name") @db.VarChar(255)
-  uom          String?         @map("uom") @db.VarChar(50)
-  storeId      String          @map("store_id") @db.VarChar(100)
-  snapshotDate DateTime        @map("snapshot_date") @db.Date
-  startQty     Decimal         @map("start_qty") @db.Decimal(14, 3)
-  eodQty       Decimal         @map("eod_qty") @db.Decimal(14, 3)
-  recordedAt   DateTime        @map("recorded_at")
-  createdAt    DateTime        @default(now()) @map("created_at")
-
-  @@unique([category, itemId, storeId, snapshotDate])
-  @@index([snapshotDate])
-  @@index([category])
-  @@index([storeId])
-  @@map("eod_stock_snapshots")
-}
-
-model SystemSetting {
-  id        Int      @id @default(autoincrement())
-  key       String   @unique @db.VarChar(100)
-  value     String   @db.VarChar(255)
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  @@map("system_settings")
 }

@@ -91,6 +91,7 @@ const Employeelist: React.FC = () => {
     { header: "Employee Name", accessor: "fullName" },
     { header: "Mobile", render: (emp) => emp.mobile || "N/A" },
     { header: "Department", render: (emp) => emp.department?.name || "N/A" },
+    { header: "Role", render: (emp) => emp.user?.role?.name || "N/A" },
     {
       header: "Status", render: (emp) => {
         const statusMap: Record<string, string> = {

@@ -10,6 +10,7 @@ import { toast } from "react-toastify";
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
 import {
   fetchStockAdjustmentById,
+  approveStockAdjustment,
   clearCurrent,
 } from "../../../features/stock-adjustments/stockAdjustmentSlice";
 import CustomButton from "../../../components/ui/Button/Button";
@@ -50,6 +51,21 @@ const StockAdjustmentView: React.FC = () => {
     return () => { dispatch(clearCurrent()); };
   }, [dispatch, id]);
 
+  const handleApprove = async (targetStatus: string) => {
+    if (!id) return;
+    try {
+      await dispatch(approveStockAdjustment({ id, status: targetStatus })).unwrap();
+      if (targetStatus === "APPROVED") {
+        toast.success("Stock Adjustment approved by MD/Management! Inventory stock has been updated.");
+      } else {
+        toast.info("Stock Adjustment rejected.");
+      }
+      dispatch(fetchStockAdjustmentById(id));
+    } catch (err: any) {
+      toast.error(err || "Failed to process approval");
+    }
+  };
+
   if (loading || !currentAdjustment) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -66,7 +82,7 @@ const StockAdjustmentView: React.FC = () => {
 
   return (
     <div className="p-4 md:p-6 min-h-screen bg-white">
-      <div className="w-full max-w-7xl mx-auto">
+      <div className="w-full mx-auto">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-6">
           <div>
             <h2 className="text-2xl font-bold text-slate-800">Stock Adjustment Details</h2>
@@ -76,12 +92,26 @@ const StockAdjustmentView: React.FC = () => {
           </div>
           <div className="flex items-center gap-2">
             {currentAdjustment.status === "DRAFT" && (
-              <CustomButton
-                text="Edit"
-                icon={FaEdit}
-                variant="secondary"
-                onClick={() => navigate(`/inventory/stock-adjustments/edit/${currentAdjustment.id}`)}
-              />
+              <>
+                <CustomButton
+                  text="Approve (MD Approval)"
+                  icon={FaCheckCircle}
+                  variant="success"
+                  onClick={() => handleApprove("APPROVED")}
+                />
+                <CustomButton
+                  text="Reject"
+                  icon={FaTimesCircle}
+                  variant="danger"
+                  onClick={() => handleApprove("REJECTED")}
+                />
+                <CustomButton
+                  text="Edit"
+                  icon={FaEdit}
+                  variant="secondary"
+                  onClick={() => navigate(`/inventory/stock-adjustments/edit/${currentAdjustment.id}`)}
+                />
+              </>
             )}
             <BackButton text="Back" to="/inventory/stock-adjustments" />
           </div>
@@ -127,9 +157,7 @@ const StockAdjustmentView: React.FC = () => {
 
         <div className="rounded-2xl border border-slate-200 shadow-sm mb-5 overflow-hidden">
           <div className="flex items-center gap-3 px-5 py-4 bg-slate-50 border-b border-slate-200">
-            <div className="h-8 w-8 rounded-lg bg-indigo-100 flex items-center justify-center">
-              <FaClipboardList className="text-indigo-600" size={15} />
-            </div>
+           
             <h3 className="font-bold text-slate-700 text-base">Adjustment Information</h3>
           </div>
           <div className="p-5 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-5">
@@ -194,9 +222,7 @@ const StockAdjustmentView: React.FC = () => {
 
         <div className="rounded-2xl border border-slate-200 shadow-sm mb-5 overflow-hidden">
           <div className="flex items-center gap-3 px-5 py-4 bg-slate-50 border-b border-slate-200">
-            <div className="h-8 w-8 rounded-lg bg-emerald-100 flex items-center justify-center">
-              <FaClipboardList className="text-emerald-600" size={15} />
-            </div>
+         
             <h3 className="font-bold text-slate-700 text-base">
               {isPMI ? "Issued Materials" : "Adjustment Items"}
             </h3>
@@ -239,8 +265,8 @@ const StockAdjustmentView: React.FC = () => {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-200">
-                    {["Item Type","Item Details","Store","Batch No","Unit Cost","Current Qty","Adjusted Qty","Difference","Remarks"].map((h, i) => (
-                      <th key={h} className={`text-[11px] uppercase tracking-wider text-slate-500 font-semibold px-4 py-3 ${i >= 4 && i <= 7 ? "text-right" : "text-left"}`}>{h}</th>
+                    {["Item Type","Item Details","Store","Current Qty","Adjusted Qty","Difference","Remarks"].map((h, i) => (
+                      <th key={h} className={`text-[11px] uppercase tracking-wider text-slate-500 font-semibold px-4 py-3 ${i >= 3 && i <= 5 ? "text-right" : "text-left"}`}>{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -257,8 +283,6 @@ const StockAdjustmentView: React.FC = () => {
                           <div className="text-xs text-slate-400 font-mono mt-0.5">{item.itemType === "RAW_MATERIAL" ? item.rawMaterialId : item.product?.productCode}</div>
                         </td>
                         <td className="px-4 py-3 text-slate-600">{item.store?.storeName || "—"}</td>
-                        <td className="px-4 py-3 text-slate-600">{item.batchNo || "—"}</td>
-                        <td className="px-4 py-3 text-right font-mono text-xs text-slate-600">{item.unitCost != null ? `Rs.${Number(item.unitCost).toFixed(2)}` : "—"}</td>
                         <td className="px-4 py-3 text-right font-mono text-xs text-slate-600">{Number(item.currentQty).toFixed(3)}</td>
                         <td className="px-4 py-3 text-right font-mono text-xs text-slate-600">{Number(item.adjustedQty).toFixed(3)}</td>
                         <td className="px-4 py-3 text-right">

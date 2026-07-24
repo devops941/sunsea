@@ -12,15 +12,19 @@ import CustomButton from "../../../components/ui/Button/Button";
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import DataTable from "../../../components/ui/table/DataTable";
+import ViewButton from "../../../components/ui/viewbutton/ViewButton";
+import MachineViewModal from "../components/MachineViewModal";
 import SearchInput from "../../../components/ui/SearchInput/SearchInput";
+import { useEmployees } from "../../../hooks/useEmployees";
 // BUG-MAC: added permission guard utility
 import { hasPermission } from "../../../utils/permission";
 
-const ITEMS_PER_PAGE = 10;
+const ITEMS_PER_PAGE = 1;
 
 const MachineList: React.FC = () => {
     const navigate = useNavigate();
     const dispatch = useAppDispatch();
+    const { employees, loadEmployees } = useEmployees();
 
     const { data, loading, error } = useAppSelector((state) => state.machines);
 
@@ -35,9 +39,13 @@ const MachineList: React.FC = () => {
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [itemToDelete, setItemToDelete] = useState<string | null>(null);
 
+    const [showViewModal, setShowViewModal] = useState(false);
+    const [selectedMachine, setSelectedMachine] = useState<any | null>(null);
+
     useEffect(() => {
         dispatch(fetchMachines());
-    }, [dispatch]);
+        loadEmployees();
+    }, [dispatch, loadEmployees]);
 
     useEffect(() => {
         if (error) {
@@ -132,8 +140,15 @@ const MachineList: React.FC = () => {
                         { header: "MACHINE NAME", accessor: "machineName" },
                         { header: "TECH TYPE", render: (item) => item.technologyType || "-" },
                         { header: "MACHINE TYPE", render: (item) => item.machineType || "-" },
+                        { 
+                            header: "MACHINE INCHARGE", 
+                            render: (item) => {
+                                if (!item.operatorId) return "-";
+                                const emp = employees.find(e => e.id === item.operatorId);
+                                return emp ? emp.fullName : item.operatorId;
+                            } 
+                        },
                         { header: "CAPACITY", render: (item) => item.capacity || "-" },
-                        // { header: "MACHINE STATUS", render: (item) => item.machineStatus || "-" },
                         {
                             header: "ACTIVE STATUS",
                             render: (item) => <StatusBadge status={item.isActive ? "ACTIVE" : "INACTIVE"} />
@@ -142,6 +157,10 @@ const MachineList: React.FC = () => {
                             header: "ACTIONS",
                             render: (item) => (
                                 <div className="flex items-center gap-2">
+                                    <ViewButton onClick={() => {
+                                        setSelectedMachine(item);
+                                        setShowViewModal(true);
+                                    }} />
                                     {/* BUG-MAC fix: guard edit/delete buttons with permissions */}
                                     {canEditMachine && <EditButton onClick={() => handleOpenEdit(item)} />}
                                     {canDeleteMachine && <DeleteButton onClick={() => triggerDelete(item.machineId)} />}
@@ -160,6 +179,12 @@ const MachineList: React.FC = () => {
                     message="Are you sure you want to delete this machine?"
                     confirmText="Delete"
                     confirmVariant="danger"
+                />
+
+                <MachineViewModal 
+                    show={showViewModal}
+                    onHide={() => setShowViewModal(false)}
+                    machine={selectedMachine}
                 />
             </div>
         </div>

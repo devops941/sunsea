@@ -35,6 +35,26 @@ const WeeklyMachineScheduleList: React.FC = () => {
         }
     };
 
+    const canDeleteSchedule = (schedule: any, orderStatus: string) => {
+        const lockedStatuses = [
+            "IN_PROGRESS",
+            "IN_PRODUCTION",
+            "POST_PRODUCTION",
+            "READY_FOR_DISPATCH",
+            "DISPATCHED",
+            "COMPLETED",
+            "ON_HOLD",
+            "FG_RECEIVED"
+        ];
+        const schedStatus = (schedule.status || "").toUpperCase();
+        const poStatus = (orderStatus || "").toUpperCase();
+
+        if (lockedStatuses.includes(schedStatus) || lockedStatuses.includes(poStatus)) {
+            return false;
+        }
+        return true;
+    };
+
     const { data, loading, error } = useAppSelector((state) => state.weeklyPrograms);
 
     const [searchTerm, setSearchTerm] = useState("");
@@ -148,7 +168,7 @@ const WeeklyMachineScheduleList: React.FC = () => {
                     productionOrderId: poId,
                     productName: item.productionOrder?.productItem?.productName || "Unknown Product",
                     priority: item.priority || "MEDIUM",
-                    machineName: item.machine?.machineName || item.machineId || "Unknown Machine",
+                    machineName: item.machine?.machineName || item.Machine?.machineName || item.machineName || (item.machineId ? `Machine ${item.machineId}` : "Injection Moulding Machine 350T"),
                     plannedQty: 0,
                     uom: item.productionOrder?.uom || item.uom || "",
                     status: item.productionOrder?.status || item.status || "PLANNED",
@@ -247,7 +267,7 @@ const WeeklyMachineScheduleList: React.FC = () => {
             accessor: "totalPlannedQty",
             render: (row) => (
                 <span className="font-bold text-emerald-600">
-                    {row.totalPlannedQty} {row.uom?.toLowerCase() === 'ea' ? 'pcs' : row.uom}
+                    {row.totalPlannedQty} {row.uom?.toLowerCase() === 'ea' || row.uom?.toLowerCase() === 'each' ? 'pcs' : row.uom}
                 </span>
             )
         }
@@ -274,7 +294,7 @@ const WeeklyMachineScheduleList: React.FC = () => {
                             <div className="mt-3 space-y-1">
                                 <div className="flex justify-between text-xs">
                                     <span className="text-slate-500">Planned Qty:</span>
-                                    <span className="font-medium text-slate-700">{order.plannedQty} {order.uom}</span>
+                                    <span className="font-medium text-slate-700">{order.plannedQty} {order.uom?.toLowerCase() === 'ea' || order.uom?.toLowerCase() === 'each' ? 'pcs' : order.uom}</span>
                                 </div>
                             </div>
 
@@ -285,20 +305,22 @@ const WeeklyMachineScheduleList: React.FC = () => {
                                         <div key={schedule.weeklyProgramId} className="flex items-center justify-between bg-slate-50 p-2 rounded-lg border border-slate-100">
                                             <div className="flex flex-col">
                                                 <span className="text-xs font-medium text-indigo-700">
-                                                    {schedule.machine?.machineName || "Unknown Machine"}
+                                                    {schedule.machine?.machineName || schedule.Machine?.machineName || schedule.machineName || (schedule.machineId ? `Machine ${schedule.machineId}` : "Injection Moulding Machine 350T")}
                                                 </span>
-                                                {schedule.machine?.machineId && (
-                                                    <span className="text-[10px] text-slate-400">ID: {schedule.machine.machineId}</span>
+                                                {(schedule.machine?.machineId || schedule.machineId) && (
+                                                    <span className="text-[10px] text-slate-400">ID: {schedule.machine?.machineId || schedule.machineId}</span>
                                                 )}
                                             </div>
                                             <div className="flex items-center gap-2">
                                                 <div className="text-right">
                                                     <div className="text-xs font-bold text-emerald-600">{schedule.plannedQty} {schedule.uom}</div>
                                                 </div>
-                                                <DeleteButton onClick={(e: any) => {
-                                                    e.stopPropagation();
-                                                    triggerGroupDelete(schedule);
-                                                }} />
+                                                {canDeleteSchedule(schedule, order.status) && (
+                                                    <DeleteButton onClick={(e: any) => {
+                                                        e.stopPropagation();
+                                                        triggerGroupDelete(schedule);
+                                                    }} />
+                                                )}
                                             </div>
                                         </div>
                                     ))}
@@ -307,14 +329,14 @@ const WeeklyMachineScheduleList: React.FC = () => {
                         </div>
                     ))}
                 </div>
-                <div className="mt-4 flex justify-end">
+                {/* <div className="mt-4 flex justify-end">
                     <button
                         className="text-xs font-semibold text-red-500 hover:text-red-700 hover:underline transition-colors flex items-center gap-1"
                         onClick={(e) => { e.stopPropagation(); triggerGroupDelete(row); }}
                     >
                         Delete Entire Week Schedule
                     </button>
-                </div>
+                </div> */}
             </div>
         );
     };

@@ -267,6 +267,7 @@ export const UOMSelect: React.FC<UOMSelectProps> = ({
                   <Select
                     isMulti
                     closeMenuOnSelect={false}
+                    blurInputOnSelect={false}
                     isDisabled={disabled}
                     options={options}
                     value={selectedOptions}
@@ -347,6 +348,7 @@ export const UOMSelect: React.FC<UOMSelectProps> = ({
                 <Select
                   isMulti
                   closeMenuOnSelect={false}
+                  blurInputOnSelect={false}
                   isDisabled={disabled}
                   options={options}
                   value={selectedOptions}

@@ -270,11 +270,13 @@ const RawMaterialRowInner: React.FC<RawMaterialRowInnerProps> = React.memo(({
                     control={control}
                     render={({ field }) => (
                         <SelectInput
-                            label=""
+                            hideLabel={true}
+                            noMargin={true}
                             name={field.name}
                             value={field.value}
                             options={storeOptions}
                             defaultOptionLabel="Select Store"
+                            disabled={true}
                             onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
                                 field.onChange(e);
                                 onStoreChange(index, e.target.value);
@@ -293,12 +295,12 @@ const RawMaterialRowInner: React.FC<RawMaterialRowInnerProps> = React.memo(({
                     render={({ field }) => (
                         <>
                             <SelectInput
-                                label=""
+                                hideLabel={true}
                                 name={field.name}
                                 value={field.value}
                                 options={filteredOptions}
                                 defaultOptionLabel={rmPlaceholder}
-                                disabled={rmDisabled}
+                                disabled={true}
                                 onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
                                     field.onChange(e);
                                     onRmChange(index, e.target.value);
@@ -327,12 +329,13 @@ const RawMaterialRowInner: React.FC<RawMaterialRowInnerProps> = React.memo(({
                     control={control}
                     render={({ field }) => (
                         <QuantityInput
-                            label=""
+                            hideLabel={true}
                             name={field.name}
                             value={field.value}
                             baseUoms={baseUoms}
                             error={errors?.requiredQty?.message || errors?.uom?.message}
                             onChange={(e: any) => field.onChange(e.target.value)}
+                            disabled={true}
                         />
                     )}
                 />
@@ -353,6 +356,7 @@ const RawMaterialRowInner: React.FC<RawMaterialRowInnerProps> = React.memo(({
                     render={({ field }) => (
                         <TextInput
                             label=""
+                            bottom={true}
                             name={field.name}
                             placeholder="Remarks"
                             value={field.value}
@@ -743,9 +747,14 @@ const ProductionOrderCreate: React.FC = () => {
                     const totalWeight = totalQty * weight;
                     
                     const expectedRms = productBoms.map((bomItem: any) => {
+                        let reqQty = 0;
                         const rawPercentage = Number(bomItem.percentage);
-                        const percentageToUse = rawPercentage > 0 ? rawPercentage : 100;
-                        const reqQty = totalWeight * (percentageToUse / 100);
+                        if (rawPercentage > 0) {
+                            reqQty = totalWeight * (rawPercentage / 100);
+                        } else {
+                            const perPieceQty = Number(bomItem.requiredQuantity) || 0;
+                            reqQty = totalQty * perPieceQty;
+                        }
                         return {
                             rawMaterialId: bomItem.rawMaterialId?.toString() || "",
                             requiredQty: String(reqQty.toFixed(3)),
@@ -1003,10 +1012,9 @@ const ProductionOrderCreate: React.FC = () => {
         }
     };
 
-    // â”€â”€ Render â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     return (
-        <div className="p-4 md:p-6 min-h-screen bg-white">
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200">
+        <div className="min-h-screen bg-white">
+            <div className="bg-white shadow-sm border border-slate-200">
                 {/* Page Header */}
                 <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 ">
                     <div>
@@ -1092,7 +1100,6 @@ const ProductionOrderCreate: React.FC = () => {
                                         )}
                                     </div>
                                 </div>
-                                {/* â”€â”€ Sales Order Items read-only table â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
                                 {selectedSalesOrderItems.length > 0 && (
                                     <div className="md:col-span-12 mt-3 mb-3">
                                         <h6 className="font-semibold text-slate-800 mb-3">
@@ -1309,43 +1316,45 @@ const ProductionOrderCreate: React.FC = () => {
 
 
                         {/* â”€â”€ 2. General Details â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
-                        <div className="md:col-span-12 lg:col-span-4 p-4 md:p-6">
+                        <div className="md:col-span-12 lg:col-span-12 p-4 md:p-6">
 
                             <h6 className="text-lg font-bold text-slate-800 mb-6">
                                 2. General Details
                             </h6>
 
-                            <Controller
-                                name="productionOrderId"
-                                control={control}
-                                render={({ field }) => (
-                                    <CtrlText
-                                        field={field}
-                                        label="Production Order ID"
-                                        placeholder="Auto Generated"
-                                        required
-                                        disabled
-                                        error={
-                                            errors.productionOrderId?.message
-                                        }
-                                    />
-                                )}
-                            />
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <Controller
+                                    name="productionOrderId"
+                                    control={control}
+                                    render={({ field }) => (
+                                        <CtrlText
+                                            field={field}
+                                            label="Production Order ID"
+                                            placeholder="Auto Generated"
+                                            required
+                                            disabled
+                                            error={
+                                                errors.productionOrderId?.message
+                                            }
+                                        />
+                                    )}
+                                />
 
-                            <Controller
-                                name="remarks"
-                                control={control}
-                                render={({ field }) => (
-                                    <TextArea
-                                        label="Remarks"
-                                        name={field.name}
-                                        value={field.value ?? ""}
-                                        placeholder="Any remarks for this orderâ€¦"
-                                        rows={2}
-                                        onChange={field.onChange}
-                                    />
-                                )}
-                            />
+                                <Controller
+                                    name="remarks"
+                                    control={control}
+                                    render={({ field }) => (
+                                        <TextArea
+                                            label="Remarks"
+                                            name={field.name}
+                                            value={field.value ?? ""}
+                                            placeholder="Any remarks for this orderâ€¦"
+                                            rows={2}
+                                            onChange={field.onChange}
+                                        />
+                                    )}
+                                />
+                            </div>
                         </div>
                     </div>
 

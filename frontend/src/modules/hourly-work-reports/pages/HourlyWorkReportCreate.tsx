@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Form } from 'react-bootstrap';
 
-import { FaSave, FaEraser, FaArrowLeft, FaInfoCircle, FaCheckCircle } from "react-icons/fa";
+import { FaSave, FaEraser, FaInfoCircle, FaCheckCircle } from "react-icons/fa";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 import TextInput from "../../../components/form/TextInput/TextInput";
@@ -9,30 +9,17 @@ import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import CustomButton from "../../../components/ui/Button/Button";
 import QuantityInput from "../../../components/form/QuantityInput/QuantityInput";
 import BackButton from "../../../components/ui/BackButton/BackButton";
+import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
 
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
 import { createHourlyProduction, updateHourlyProduction } from "../../../features/hourly-productions/hourlyProductionSlice";
 import { fetchMachines } from "../../../features/machines/machineSlice";
 import { fetchShifts } from "../../../features/shifts/shiftSlice";
-import { weeklyProgramService } from "../../../services/weeklyProgramService";
+import { dailyPlanService } from "../../../services/dailyPlanService";
 import apiClient from "../../../api/apiClient";
 import config from "../../../api/config";
 
-// Helper to get current week's Monday (UTC-safe)
-const getMonday = (d: Date) => {
-    const date = new Date(d);
-    const day = date.getUTCDay();
-    const diff = date.getUTCDate() - day + (day === 0 ? -6 : 1);
-    const monday = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), diff));
-    return monday;
-};
 
-const formatDateString = (d: Date) => {
-    const year = d.getUTCFullYear();
-    const month = String(d.getUTCMonth() + 1).padStart(2, '0');
-    const day = String(d.getUTCDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-};
 
 const formatLocalDateString = (d: Date) => {
     const year = d.getFullYear();
@@ -74,13 +61,20 @@ const HourlyWorkReportCreate: React.FC = () => {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [dailyPlanId, setDailyPlanId] = useState<string | null>(null);
 
+    // Added states for Daily Production Plan dropdown and Operator lookup
+    const [dailyPlans, setDailyPlans] = useState<any[]>([]);
+    const [selectedDailyPlanId, setSelectedDailyPlanId] = useState("");
+    const [operatorName, setOperatorName] = useState("");
+    const [availableOperators, setAvailableOperators] = useState<any[]>([]);
+    const [shiftInchargeName, setShiftInchargeName] = useState("");
+    const [planError, setPlanError] = useState<string | null>(null);
+
     // Wastage Audit State
     const [logWastage, setLogWastage] = useState(false);
-    const [wastageType, setWastageType] = useState("SCRAP");
-    const [wastageQuantity, setWastageQuantity] = useState("");
-    const [wastageUom, setWastageUom] = useState("");
-    const [wastageReason, setWastageReason] = useState("");
-    const [isRecyclable, setIsRecyclable] = useState(false);
+    const [wastages, setWastages] = useState<any[]>([]);
+    const [stores, setStores] = useState<any[]>([]);
+    const [rawMaterials, setRawMaterials] = useState<any[]>([]);
+    
     const [stopPlanEarly, setStopPlanEarly] = useState(false);
     const [stopPlanReason, setStopPlanReason] = useState("");
 
@@ -93,7 +87,119 @@ const HourlyWorkReportCreate: React.FC = () => {
     useEffect(() => {
         dispatch(fetchMachines());
         dispatch(fetchShifts());
+        // Fetch Stores and Raw Materials (Wastage Products)
+        apiClient.get(config.store.base, { params: { limit: 1000 } }).then(res => {
+            const data = res.data?.data;
+            if (Array.isArray(data)) setStores(data);
+            else if (data && Array.isArray(data.stores)) setStores(data.stores);
+            else if (res.data && Array.isArray(res.data.stores)) setStores(res.data.stores);
+        }).catch(err => console.error(err));
+        
+        apiClient.get(config.rawMaterial.base, { params: { limit: 1000 } }).then(res => {
+            const data = res.data?.data;
+            let list: any[] = [];
+            if (Array.isArray(data)) list = data;
+            else if (data && Array.isArray(data.rawMaterials)) list = data.rawMaterials;
+            else if (res.data && Array.isArray(res.data.rawMaterials)) list = res.data.rawMaterials;
+            setRawMaterials(list.filter((rm: any) => rm.itemType === "WASTAGE"));
+        }).catch(err => console.error(err));
     }, [dispatch]);
+
+    // Fetch daily plans list for dropdown (if not prefilled)
+    useEffect(() => {
+        if (isPreFilled) return;
+        dailyPlanService.getAll()
+            .then((res: any) => {
+                let list: any[] = [];
+                if (Array.isArray(res)) list = res;
+                else if (res && Array.isArray(res.data)) list = res.data;
+                else if (res && res.data && Array.isArray(res.data.dailyPlans)) list = res.data.dailyPlans;
+                else if (res && Array.isArray(res.dailyPlans)) list = res.dailyPlans;
+                
+                // Filter by active statuses: APPROVED, IN_PROGRESS
+                const activePlansList = list.filter((p: any) => 
+                    p.status === "APPROVED" || p.status === "IN_PROGRESS"
+                );
+                setDailyPlans(activePlansList);
+            })
+            .catch((err) => console.error("Failed to load daily plans:", err));
+    }, [isPreFilled]);
+
+    // Handle selection of Daily Production Plan
+    const handleDailyPlanSelect = (val: string) => {
+        setSelectedDailyPlanId(val);
+        setDailyPlanId(val);
+    };
+
+    // Unified useEffect to load plan details when dailyPlanId changes
+    useEffect(() => {
+        if (!dailyPlanId) {
+            setActivePlan(null);
+            setOperatorName("");
+            setAvailableOperators([]);
+            setShiftInchargeName("");
+            setOperatorId("");
+            setPlanError(null);
+            return;
+        }
+
+        setLoadingPlan(true);
+        setPlanError(null);
+
+        dailyPlanService.getById(dailyPlanId)
+            .then((res: any) => {
+                const plan = res.data;
+                if (!plan) {
+                    toast.error("Daily Production Plan not found");
+                    setActivePlan(null);
+                    setOperatorName("");
+                    setAvailableOperators([]);
+                    setShiftInchargeName("");
+                    setOperatorId("");
+                    return;
+                }
+
+                setMachineId(plan.machineId);
+                setShiftId(plan.shiftId);
+                setProductionDate(plan.productionDate?.split("T")[0]);
+                
+                if (!plan.operators || plan.operators.length === 0) {
+                    setOperatorName("");
+                    setAvailableOperators([]);
+                    setShiftInchargeName(plan.shiftIncharge?.fullName || "");
+                    setOperatorId("");
+                    setPlanError("The selected Daily Production Plan does not have an assigned operator.");
+                } else {
+                    setOperatorName(plan.operators.map((op: any) => op.fullName).join(", "));
+                    setAvailableOperators(plan.operators);
+                    setShiftInchargeName(plan.shiftIncharge?.fullName || "");
+                    setOperatorId(plan.operators[0].id.toString());
+                    setPlanError(null);
+                }
+
+                setActivePlan({
+                    productionOrderId: plan.productionOrderId,
+                    productName: plan.productionOrder?.productItem?.productName || "Unknown Product",
+                    productCode: plan.productionOrder?.productItem?.productCode || "",
+                    plannedQty: plan.plannedQty,
+                    uom: (plan.productionOrder?.productItem?.uom?.uomCode?.toUpperCase() === "EA" ? "PCS" : plan.productionOrder?.productItem?.uom?.uomCode?.toUpperCase()) || "PCS",
+                    weeklyProgramId: plan.weeklyProgramId,
+                    productId: plan.productionOrder?.productItemId ? Number(plan.productionOrder.productItemId) : null,
+                });
+            })
+            .catch((err: any) => {
+                console.error("Failed to fetch daily plan:", err);
+                toast.error("Failed to load daily plan details");
+                setActivePlan(null);
+                setOperatorName("");
+                setAvailableOperators([]);
+                setShiftInchargeName("");
+                setOperatorId("");
+            })
+            .finally(() => {
+                setLoadingPlan(false);
+            });
+    }, [dailyPlanId]);
 
     // Handle pre-filled state
     useEffect(() => {
@@ -102,18 +208,6 @@ const HourlyWorkReportCreate: React.FC = () => {
             setMachineId(s.machineId || "");
             setProductionDate(s.productionDate || formatLocalDateString(new Date()));
             setShiftId(s.shiftId || "");
-            setActivePlan({
-                productionOrderId: s.productionOrderId,
-                productName: s.productName,
-                productCode: s.productCode,
-                plannedQty: s.plannedQty,
-                uom: s.uom || "units",
-                weeklyProgramId: s.weeklyProgramId,
-                productId: s.productId,
-            });
-            if (s.uom) {
-                setWastageUom(prev => prev || s.uom);
-            }
             if (s.dailyPlanId) {
                 setDailyPlanId(s.dailyPlanId);
             }
@@ -268,88 +362,17 @@ const HourlyWorkReportCreate: React.FC = () => {
         }
     }, [hourOptions, hourIndex]);
 
-    // Fetch matching plan dynamically if selectors change (and not pre-filled)
-    useEffect(() => {
-        if (isPreFilled || !machineId || !productionDate || !shiftId) return;
-
-        const fetchMatchingPlan = async () => {
-            setLoadingPlan(true);
-            try {
-                const [yyyy, mm, dd] = productionDate.split("-").map(Number);
-                const parsedDate = new Date(Date.UTC(yyyy, mm - 1, dd));
-                const monday = getMonday(parsedDate);
-                const dayOfWeek = parsedDate.getUTCDay();
-                const normalizedDayOfWeek = dayOfWeek === 0 ? 7 : dayOfWeek;
-
-                const response = await weeklyProgramService.getDailyPlanningData({
-                    machineId,
-                    weekStartDate: formatDateString(monday),
-                });
-
-                const matchedDay = response.days.find((d: any) => d.dayOfWeek === normalizedDayOfWeek);
-                const matchedShift = matchedDay?.shifts.find((s: any) => s.shiftId === shiftId);
-                let matchedProgram = null;
-                if (matchedShift?.programs && matchedShift.programs.length > 0) {
-                    matchedProgram = matchedShift.programs.find((p: any) => p.status === "IN_PROGRESS") ||
-                        matchedShift.programs.find((p: any) => ["PLANNED", "APPROVED", "RELEASED"].includes(p.status)) ||
-                        matchedShift.programs[0];
-                }
-
-                if (matchedProgram) {
-                    setActivePlan(matchedProgram);
-                } else {
-                    setActivePlan(null);
-                    toast.warning("No weekly machine schedule exists for this machine, date, and shift");
-                }
-            } catch (err: any) {
-                console.error("Failed to load plan", err);
-                setActivePlan(null);
-            } finally {
-                setLoadingPlan(false);
-            }
-        };
-
-        fetchMatchingPlan();
-    }, [machineId, productionDate, shiftId, isPreFilled]);
-
-    // Fetch produced qty dynamically if pre-filled
-    useEffect(() => {
-        if (!isPreFilled || !machineId || !productionDate || !shiftId || !activePlan?.productionOrderId) return;
-
-        const fetchProducedQty = async () => {
-            try {
-                const [yyyy, mm, dd] = productionDate.split("-").map(Number);
-                const parsedDate = new Date(Date.UTC(yyyy, mm - 1, dd));
-                const monday = getMonday(parsedDate);
-                const dayOfWeek = parsedDate.getUTCDay();
-                const normalizedDayOfWeek = dayOfWeek === 0 ? 7 : dayOfWeek;
-
-                const response = await weeklyProgramService.getDailyPlanningData({
-                    machineId,
-                    weekStartDate: formatDateString(monday),
-                });
-
-                const matchedDay = response.days.find((d: any) => d.dayOfWeek === normalizedDayOfWeek);
-                const matchedShift = matchedDay?.shifts.find((s: any) => s.shiftId === shiftId);
-                const matchedProgram = matchedShift?.programs.find((p: any) => p.productionOrderId === activePlan.productionOrderId);
-
-                if (matchedProgram) {
-                    setActivePlan(matchedProgram);
-                }
-            } catch (err) {
-                console.error("Failed to sync produced quantity", err);
-            }
-        };
-
-        fetchProducedQty();
-    }, [isPreFilled, machineId, productionDate, shiftId, activePlan?.productionOrderId]);
-
     const handleClear = () => {
         if (!isPreFilled) {
             setMachineId("");
             setShiftId("");
             setProductionDate(formatLocalDateString(new Date()));
+            setSelectedDailyPlanId("");
+            setDailyPlanId("");
         }
+        setWastages([]);
+        setStopPlanEarly(false);
+        setStopPlanReason("");
         setHourIndex("1");
         setQtyProduced("");
         setRejectQty("0");
@@ -364,6 +387,14 @@ const HourlyWorkReportCreate: React.FC = () => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (planError) {
+            toast.error(planError);
+            return;
+        }
+        if (!operatorId) {
+            toast.error("The selected Daily Production Plan does not have an assigned operator.");
+            return;
+        }
         if (!activePlan) {
             toast.error("Cannot save: No active Daily Plan loaded.");
             return;
@@ -371,13 +402,19 @@ const HourlyWorkReportCreate: React.FC = () => {
 
         const isLastHour = hourOptions.length > 0 && (Number(hourIndex) === hourOptions.length || stopPlanEarly);
 
-        if (isLastHour) {
-            if (!logWastage) {
-                toast.error("Wastage collection is mandatory for the final hourly entry.");
+        if (isLastHour && !logWastage) {
+            toast.error("Wastage collection is mandatory for the final hourly entry.");
+            return;
+        }
+        
+        if (logWastage) {
+            if (wastages.length === 0) {
+                toast.error("Please add at least one Wastage Product, or uncheck the 'Log Wastage' option.");
                 return;
             }
-            if (!wastageType || wastageQuantity === "") {
-                toast.error("Please provide a Wastage Type and Quantity (enter 0 if none) for the final entry.");
+            const hasInvalidWastage = wastages.some(w => !w.storeId || !w.targetWastageProductId || w.quantity === "");
+            if (hasInvalidWastage) {
+                toast.error("Please fill in Store, Product, and Quantity for all added wastage products.");
                 return;
             }
         }
@@ -402,7 +439,11 @@ const HourlyWorkReportCreate: React.FC = () => {
                 downtimeReason: Number(downtime) > 0 ? downtimeReason : undefined,
                 rejectReason: numReject > 0 ? rejectReason : undefined,
                 scrapReason: numScrap > 0 ? scrapReason : undefined,
-                operatorId: operatorId || undefined,
+                operatorId: operatorId,
+                stopPlanEarly,
+                stopPlanReason: stopPlanEarly ? stopPlanReason : null,
+                logWastage,
+                wastages: logWastage ? wastages : [],
                 dailyPlanId: dailyPlanId || undefined,
             };
 
@@ -439,26 +480,6 @@ const HourlyWorkReportCreate: React.FC = () => {
                 }
             }
 
-            if (isLastHour && logWastage && Number(wastageQuantity) > 0 && actualProductId) {
-                try {
-                    await apiClient.post(config.productionWastage.base, {
-                        wastageDate: productionDate,
-                        productionOrderId: activePlan.productionOrderId,
-                        machineId: machineId,
-                        shiftId: shiftId,
-                        productId: Number(actualProductId),
-                        wastageType: wastageType,
-                        quantity: Number(wastageQuantity),
-                        uom: wastageUom || "KG",
-                        reason: wastageReason || undefined,
-                        isRecyclable: isRecyclable,
-                        status: "APPROVED"
-                    });
-                    toast.success("Shift Wastage logged successfully!");
-                } catch (err: any) {
-                    toast.error(err?.response?.data?.message || "Failed to log wastage");
-                }
-            }
 
             if (isLastHour && pendingQty > 0 && activePlan?.weeklyProgramId) {
                 toast.info("Shift completed. Please carry forward the pending quantity.", { autoClose: 5000 });
@@ -492,8 +513,8 @@ const HourlyWorkReportCreate: React.FC = () => {
 
     return (
 
-        <div className="p-4 md:p-6 min-h-screen bg-slate-50">
-            <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-sm border border-slate-200">
+        <div className="min-h-screen">
+            <form onSubmit={handleSubmit} className="bg-white  shadow-sm border border-slate-200">
                 <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 p-6 border-b border-slate-200">
                     <div>
                         <h2 className="text-2xl font-bold text-slate-800 m-0">Hourly Production Entry</h2>
@@ -502,6 +523,16 @@ const HourlyWorkReportCreate: React.FC = () => {
                         <BackButton to="/daily-machine-planning" text="Back to Planning" />
                     </div>
                 </div>
+
+                {planError && (
+                    <div className="mx-6 mt-4 p-4 rounded-xl bg-red-50 border border-red-200 flex items-center gap-3">
+                        <div className="text-red-500 font-bold text-lg">⚠️</div>
+                        <div>
+                            <p className="font-bold text-red-700 text-sm">Plan Verification Failed</p>
+                            <p className="text-red-600 text-xs">{planError}</p>
+                        </div>
+                    </div>
+                )}
                 <div className="flex flex-col md:flex-row gap-6 p-6">
 
                     {/* Left Side: Plan Details */}
@@ -511,40 +542,58 @@ const HourlyWorkReportCreate: React.FC = () => {
                         </div>
                         <div>
                             <div className="flex flex-col gap-4">
+                                {/* Daily Production Plan dropdown when not prefilled */}
+                                {!isPreFilled ? (
+                                    <div>
+                                        <SelectInput
+                                            label="Daily Production Plan"
+                                            name="selectedDailyPlanId"
+                                            value={selectedDailyPlanId}
+                                            required
+                                            options={dailyPlans.map((dp) => ({
+                                                label: `${dp.dailyPlanId} — PO: ${dp.productionOrderId} — Date: ${dp.productionDate?.split("T")[0]} — Machine: ${dp.machineId} — Shift: ${dp.shiftId}`,
+                                                value: dp.dailyPlanId
+                                            }))}
+                                            onChange={(e) => handleDailyPlanSelect(e.target.value)}
+                                            defaultOptionLabel="— Select Daily Production Plan —"
+                                        />
+                                    </div>
+                                ) : (
+                                    <div>
+                                        <TextInput
+                                            label="Daily Production Plan ID"
+                                            name="dailyPlanId"
+                                            value={dailyPlanId || ""}
+                                            disabled
+                                        />
+                                    </div>
+                                )}
 
                                 <div>
-                                    <SelectInput
+                                    <TextInput
                                         label="Machine"
                                         name="machineId"
-                                        value={machineId}
-                                        options={machines.map((m) => ({ label: m.machineName, value: m.machineId }))}
-                                        required
-                                        onChange={(e) => setMachineId(e.target.value)}
-                                        disabled={isPreFilled}
+                                        value={machines.find((m: any) => m.machineId === machineId)?.machineName || machineId || "—"}
+                                        disabled
                                     />
                                 </div>
                                 <div>
                                     <TextInput
                                         label="Production Date"
                                         name="productionDate"
-                                        value={productionDate}
-                                        type="date"
-                                        required
-                                        onChange={(e) => setProductionDate(e.target.value)}
-                                        disabled={isPreFilled}
+                                        value={productionDate || "—"}
+                                        disabled
                                     />
                                 </div>
                                 <div>
-                                    <SelectInput
+                                    <TextInput
                                         label="Shift"
                                         name="shiftId"
-                                        value={shiftId}
-                                        options={shifts.map((s: any) => ({ label: s.shiftName, value: s.shiftCode }))}
-                                        required
-                                        onChange={(e) => setShiftId(e.target.value)}
-                                        disabled={isPreFilled}
+                                        value={shifts.find((s: any) => s.shiftCode === shiftId)?.shiftName || shiftId || "—"}
+                                        disabled
                                     />
                                 </div>
+                              
                             </div>
 
                             <div className="mt-6 pt-6 border-t border-slate-200">
@@ -611,15 +660,21 @@ const HourlyWorkReportCreate: React.FC = () => {
                                     onChange={(e) => setHourIndex(e.target.value)}
                                 />
                             </div>
-                            <div>
-                                <TextInput
-                                    label="Operator ID (Optional)"
-                                    name="operatorId"
-                                    value={operatorId}
-                                    placeholder="Enter Operator ID"
-                                    onChange={(e) => setOperatorId(e.target.value)}
-                                />
-                            </div>
+                              <div>
+                                    <SelectInput
+                                        label="Operator"
+                                        name="operatorId"
+                                        value={operatorId}
+                                        onChange={(e: any) => setOperatorId(e.target.value)}
+                                        error={planError && planError.includes("operator") ? planError : undefined}
+                                        disabled={loadingPlan || availableOperators.length === 0}
+                                        defaultOptionLabel={loadingPlan ? "Loading operator..." : "— Select Operator —"}
+                                        options={availableOperators.map(op => ({
+                                            value: op.id.toString(),
+                                            label: op.fullName
+                                        }))}
+                                    />
+                                </div>
                             <div>
                                 <TextInput
                                     label="Produced Qty"
@@ -764,7 +819,7 @@ const HourlyWorkReportCreate: React.FC = () => {
                         {hourOptions.length > 0 && (Number(hourIndex) === hourOptions.length || stopPlanEarly) && (
                             <div className="mt-8 pt-6 border-t border-slate-200">
                                 <div className="bg-amber-50/50 border border-amber-200 p-5 flex items-start gap-4 rounded-xl mb-6">
-                                    <FaInfoCircle className="text-amber-600 mt-1 shrink-0 text-xl" />
+                                    {/* <FaInfoCircle className="text-amber-600 mt-1 shrink-0 text-xl" /> */}
                                     <div>
                                         <span className="text-base font-bold text-amber-900 block mb-2">
                                             {stopPlanEarly ? "Production Stopped: Log Final Wastage" : "Shift Completed: Log Shift Wastage"}
@@ -791,51 +846,122 @@ const HourlyWorkReportCreate: React.FC = () => {
 
                                 {logWastage && (
                                     <div className="bg-slate-50/50 p-5 rounded-xl border border-slate-100 mt-4">
-                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
-                                            <div>
-                                                <SelectInput
-                                                    label="Wastage Type"
-                                                    name="wastageType"
-                                                    value={wastageType}
-                                                    onChange={(e) => setWastageType(e.target.value)}
-                                                    options={[
-                                                        { label: "Scrap", value: "SCRAP" },
-                                                        { label: "Raw Material Waste", value: "RAW_MATERIAL_WASTE" },
-                                                        { label: "Quality Rejection", value: "QUALITY_REJECTION" },
-                                                        { label: "Machine Setup", value: "MACHINE_SETUP" },
-                                                        { label: "Rework", value: "REWORK" },
-                                                        { label: "Other", value: "OTHER" },
-                                                    ]}
-                                                />
-                                            </div>
-                                            <div>
-                                                <QuantityInput
-                                                    label="Total Wastage Quantity"
-                                                    name="wastageQuantity"
-                                                    value={wastageQuantity}
-                                                    onChange={(e) => setWastageQuantity(e.target.value)}
-                                                    baseUoms="KG,G"
-                                                    required
-                                                />
-                                            </div>
-                                            <div>
-                                                <TextInput
-                                                    label="Reason / Remarks"
-                                                    name="wastageReason"
-                                                    value={wastageReason}
-                                                    onChange={(e) => setWastageReason(e.target.value)}
-                                                />
-                                            </div>
-                                        </div>
-                                        <div className="mt-3 pt-3 border-t border-slate-100">
-                                            <Form.Check
-                                                type="checkbox"
-                                                id="is-recyclable-check"
-                                                label={<span className="text-slate-500 text-xs font-semibold ml-2">This wastage is recyclable</span>}
-                                                checked={isRecyclable}
-                                                onChange={(e) => setIsRecyclable(e.target.checked)}
+                                        <div className="flex justify-between items-center mb-4">
+                                            <h4 className="font-bold text-slate-700 text-sm m-0">Wastage Products</h4>
+                                            <CustomButton
+                                                text="Add Wastage Product"
+                                                icon={FaSave} // or any relevant icon, actually it's just 'Add', no icon needed or FaPlus if imported. But we can just use `text`. Let's just use CustomButton.
+                                                variant="secondary"
+                                                onClick={() => setWastages([...wastages, { storeId: "", targetWastageProductId: "", quantity: "" }])}
                                             />
                                         </div>
+                                        
+                                        {wastages.length === 0 ? (
+                                            <div className="text-center py-6 text-slate-500 text-sm border-2 border-dashed border-slate-200 rounded-lg">
+                                                No wastage products added yet. Click the button above to add one.
+                                            </div>
+                                        ) : (
+                                            <div className="overflow-visible pb-24">
+                                                <table className="w-full text-left border-collapse">
+                                                    <thead>
+                                                        <tr className="border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                                                            <th className="px-4 py-3 bg-slate-50">Store</th>
+                                                            <th className="px-4 py-3 bg-slate-50">Wastage Product</th>
+                                                            <th className="px-4 py-3 bg-slate-50 w-48">Quantity</th>
+                                                            <th className="px-4 py-3 bg-slate-50 w-20 text-center">Action</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-slate-100">
+                                                        {wastages.map((w, index) => (
+                                                            <tr key={index} className="hover:bg-slate-50/50 transition-colors">
+                                                                <td className="px-4 py-3 align-top">
+                                                                    <SelectInput
+                                                                        label=""
+                                                                        hideLabel
+                                                                        noMargin
+                                                                        name={`storeId-${index}`}
+                                                                        value={w.storeId}
+                                                                        onChange={(e) => {
+                                                                            const newW = [...wastages];
+                                                                            newW[index].storeId = e.target.value;
+                                                                            setWastages(newW);
+                                                                        }}
+                                                                        options={[
+                                                                            { label: "Select Store", value: "" },
+                                                                            ...stores.map((s: any) => ({ label: s.storeName, value: s.storeId }))
+                                                                        ]}
+                                                                        required
+                                                                    />
+                                                                </td>
+                                                                <td className="px-4 py-3 align-top">
+                                                                    <SelectInput
+                                                                        label=""
+                                                                        hideLabel
+                                                                        noMargin
+                                                                        name={`targetWastageProductId-${index}`}
+                                                                        value={w.targetWastageProductId}
+                                                                        onChange={(e) => {
+                                                                            const newW = [...wastages];
+                                                                            newW[index].targetWastageProductId = e.target.value;
+                                                                            const rm = rawMaterials.find(r => r.rawMaterialId === e.target.value);
+                                                                            if (rm) {
+                                                                                let uoms = rm.baseUom || "KG";
+                                                                                if (Array.isArray(rm.baseUom)) uoms = rm.baseUom.join(',');
+                                                                                else if (typeof rm.baseUom === "string" && rm.baseUom.startsWith("[")) {
+                                                                                    try { uoms = JSON.parse(rm.baseUom).join(','); } catch(e){}
+                                                                                }
+                                                                                newW[index].uom = uoms;
+                                                                            }
+                                                                            setWastages(newW);
+                                                                        }}
+                                                                        options={[
+                                                                            { label: "Select Product", value: "" },
+                                                                            ...rawMaterials
+                                                                                .filter((r: any) => !w.storeId || r.storeId === w.storeId)
+                                                                                .map((r: any) => {
+                                                                                    const isSelectedInOtherRow = wastages.some((otherW, otherIdx) => otherIdx !== index && otherW.targetWastageProductId === r.rawMaterialId);
+                                                                                    return { 
+                                                                                        label: `${r.materialName} (${r.rawMaterialId})`, 
+                                                                                        value: r.rawMaterialId,
+                                                                                        disabled: isSelectedInOtherRow
+                                                                                    };
+                                                                                })
+                                                                        ]}
+                                                                        disabled={!w.storeId}
+                                                                        required
+                                                                    />
+                                                                </td>
+                                                                <td className="px-4 py-3 align-top">
+                                                                    <QuantityInput
+                                                                        label=""
+                                                                        hideLabel
+                                                                        noMargin
+                                                                        name={`quantity-${index}`}
+                                                                        value={w.quantity}
+                                                                        onChange={(e) => {
+                                                                            const newW = [...wastages];
+                                                                            newW[index].quantity = Number(e.target.value);
+                                                                            setWastages(newW);
+                                                                        }}
+                                                                        baseUoms={w.uom || "KG"}
+                                                                        required
+                                                                    />
+                                                                </td>
+                                                                <td className="px-4 py-3 align-middle text-center">
+                                                                    <DeleteButton
+                                                                        onClick={() => {
+                                                                            const newW = [...wastages];
+                                                                            newW.splice(index, 1);
+                                                                            setWastages(newW);
+                                                                        }}
+                                                                    />
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
                             </div>

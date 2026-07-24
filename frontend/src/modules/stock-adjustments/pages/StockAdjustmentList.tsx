@@ -10,8 +10,9 @@ import {
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 
+import { FaCheckCircle } from "react-icons/fa";
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
-import { fetchStockAdjustments } from "../../../features/stock-adjustments/stockAdjustmentSlice";
+import { fetchStockAdjustments, approveStockAdjustment } from "../../../features/stock-adjustments/stockAdjustmentSlice";
 
 import CustomButton from "../../../components/ui/Button/Button";
 import DataTable from "../../../components/ui/table/DataTable";
@@ -19,6 +20,7 @@ import SearchInput from "../../../components/ui/SearchInput/SearchInput";
 import FilterPopover from "../../../components/ui/FilterPopover/FilterPopover";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import ViewButton from "../../../components/ui/viewbutton/ViewButton";
+import IconButton from "../../../components/ui/IconButton/IconButton";
 import { formatDate } from "../../../utils/dateUtils";
 
 const ITEMS_PER_PAGE = 10;
@@ -123,7 +125,7 @@ const StockAdjustmentList: React.FC = () => {
   };
 
   const getTypeBadgeClass = (type: string) => {
-    switch(ADJUSTMENT_TYPE_BADGE[type]) {
+    switch (ADJUSTMENT_TYPE_BADGE[type]) {
       case "primary": return "bg-blue-100 text-blue-800";
       case "info": return "bg-cyan-100 text-cyan-800";
       case "success": return "bg-green-100 text-green-800";
@@ -268,26 +270,49 @@ const StockAdjustmentList: React.FC = () => {
             },
             {
               header: "PRODUCTION ORDER",
-              render: (item) => item.productionOrderId ? (
-                <span className="text-blue-600 font-semibold">{item.productionOrderId}</span>
-              ) : (
-                <span className="text-slate-400">—</span>
-              )
+              render: (item) => {
+                const poId = item.productionOrderId;
+                if (poId) {
+                  return <span className="text-blue-600 font-semibold">{poId}</span>;
+                }
+                return <span className="text-slate-400">—</span>;
+              }
             },
             {
               header: "PRODUCT",
-              render: (item) => item.productionOrder?.productItem?.productName ? (
-                <div>
-                  <div className="font-semibold text-sm text-slate-800">
-                    {item.productionOrder.productItem.productName}
-                  </div>
-                  <div className="text-xs text-slate-500">
-                    {item.productionOrder.productItem.productCode}
-                  </div>
-                </div>
-              ) : (
-                <span className="text-slate-400">—</span>
-              )
+              render: (item) => {
+                const product = item.productionOrder?.productItem || item.items?.[0]?.product;
+                const rawMaterial = item.items?.[0]?.rawMaterial;
+
+                if (product?.productName) {
+                  return (
+                    <div>
+                      <div className="font-semibold text-sm text-slate-800">
+                        {product.productName}
+                      </div>
+                      <div className="text-xs text-slate-500">
+                        {product.productCode}
+                      </div>
+                      {item.items && item.items.length > 1 && (
+                        <div className="text-[10px] text-slate-400 mt-0.5">+{item.items.length - 1} more</div>
+                      )}
+                    </div>
+                  );
+                }
+                if (rawMaterial?.materialName) {
+                  return (
+                    <div>
+                      <div className="font-semibold text-sm text-slate-800">
+                        {rawMaterial.materialName}
+                      </div>
+                      {item.items && item.items.length > 1 && (
+                        <div className="text-[10px] text-slate-400 mt-0.5">+{item.items.length - 1} more</div>
+                      )}
+                    </div>
+                  );
+                }
+                return <span className="text-slate-400">—</span>;
+              }
             },
             {
               header: "DATE",
@@ -323,8 +348,24 @@ const StockAdjustmentList: React.FC = () => {
             {
               header: "ACTIONS",
               render: (item) => (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                   <ViewButton onClick={() => navigate(`/inventory/stock-adjustments/view/${item.id}`)} />
+                  {item.status === "DRAFT" && (
+                    <IconButton
+                      variant="success"
+                      title="Approve Adjustment (MD Approval)"
+                      icon={FaCheckCircle}
+                      onClick={async () => {
+                        try {
+                          await dispatch(approveStockAdjustment({ id: item.id, status: "APPROVED" })).unwrap();
+                          toast.success(`Adjustment ${item.adjustmentNumber} approved! Inventory stock updated.`);
+                          dispatch(fetchStockAdjustments({}));
+                        } catch (err: any) {
+                          toast.error(err || "Failed to approve adjustment");
+                        }
+                      }}
+                    />
+                  )}
                 </div>
               )
             },

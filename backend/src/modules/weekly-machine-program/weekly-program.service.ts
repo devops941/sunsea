@@ -25,13 +25,13 @@ class WeeklyProgramService {
       take: 1
     });
 
-    const nextSequenceNo = existingProgramsInShift.length > 0 
-      ? existingProgramsInShift[0].sequenceNo + 1 
+    const nextSequenceNo = existingProgramsInShift.length > 0
+      ? existingProgramsInShift[0].sequenceNo + 1
       : (data.sequenceNo || 1);
 
     // We allow multiple schedules for the same PO (auto-splitting across shifts)
     // so we skip the strict "already planned" validation here. We rely on total quantity validation instead.
-    
+
     if (data.machineId && data.shiftId && data.weekStartDate && data.dayOfWeek !== undefined) {
       const conflictingProgram = await prisma.weeklyMachineProgram.findFirst({
         where: {
@@ -42,9 +42,9 @@ class WeeklyProgramService {
           status: { in: ["PLANNED", "IN_PROGRESS", "APPROVED", "RELEASED"] }
         }
       });
-      
+
       if (conflictingProgram) {
-         throw new ApiError(409, "This Machine is already scheduled or running on the selected shift for today. Please select a different Machine or Shift.");
+        throw new ApiError(409, "This Machine is already scheduled or running on the selected shift for today. Please select a different Machine or Shift.");
       }
     }
     const productionOrder = await prisma.productionOrder.findUnique({
@@ -57,8 +57,26 @@ class WeeklyProgramService {
       throw new ApiError(404, "Production Order not found");
     }
 
-    if (productionOrder.status === "COMPLETED" || productionOrder.status === "CANCELLED") {
+    if (productionOrder.status === "COMPLETED" || productionOrder.status === "DISPATCHED" || productionOrder.status === "CANCELLED") {
       throw new ApiError(400, `Cannot schedule a Weekly Program for a Production Order that is already ${productionOrder.status.toLowerCase()}`);
+    }
+
+    // ✅ STEP 3 RULE: Weekly scheduling only allowed for READY_FOR_PLANNING orders
+    // WAITING_FOR_MATERIAL orders must first get their materials before scheduling
+    if (productionOrder.status === "WAITING_FOR_MATERIAL") {
+      throw new ApiError(
+        400,
+        `Cannot schedule a Weekly Program: Production Order ${data.productionOrderId} has status WAITING_FOR_MATERIAL. ` +
+        `Please ensure all raw materials are available and the order transitions to READY_FOR_PLANNING first.`
+      );
+    }
+
+    const schedulableStatuses = ["READY_FOR_PLANNING", "WEEKLY_SCHEDULED", "PARTIALLY_PLANNED", "PLANNED", "SCHEDULED"];
+    if (!schedulableStatuses.includes(productionOrder.status)) {
+      throw new ApiError(
+        400,
+        `Cannot create Weekly Schedule: Production Order must have status READY_FOR_PLANNING. Current status: ${productionOrder.status}`
+      );
     }
 
     // Validate that the total planned quantity across all weekly schedules (including this one)
@@ -92,7 +110,7 @@ class WeeklyProgramService {
         throw new ApiError(404, "Machine not found");
       }
     }
-    
+
     if (data.shiftId) {
       const shift = await prisma.shift.findUnique({
         where: {
@@ -105,6 +123,8 @@ class WeeklyProgramService {
       }
     }
 
+    const targetMachineId = data.machineId || null;
+
     const program = await prisma.$transaction(async (tx) => {
       const created = await tx.weeklyMachineProgram.create({
         data: {
@@ -114,7 +134,7 @@ class WeeklyProgramService {
           weekStartDate: new Date(data.weekStartDate),
           weekEndDate: new Date(data.weekEndDate),
 
-          machineId: data.machineId,
+          machineId: targetMachineId,
           shiftId: data.shiftId,
           dayOfWeek: data.dayOfWeek,
 
@@ -137,12 +157,12 @@ class WeeklyProgramService {
           shift: true,
         }
       });
-      
-      await StatusSyncService.syncProductionOrderStatus(tx, data.productionOrderId);
-      
+
+      await StatusSyncService.syncProductionOrderStatus(tx, data.productionOrderId, userId);
+
       return created;
     });
-    
+
     return program;
   }
 
@@ -182,11 +202,15 @@ class WeeklyProgramService {
     });
   }
 
-  // Fetch all programs that are PLANNED or IN_PROGRESS (pending/active across all weeks)
+  // Fetch all programs that are WEEKLY_SCHEDULED or IN_PRODUCTION (pending/active across all weeks)
   async findPending() {
     return prisma.weeklyMachineProgram.findMany({
       where: {
-        status: { in: ["PLANNED", "IN_PROGRESS"] }
+        status: { in: ["PLANNED", "IN_PROGRESS"] },
+        // Only show orders that are actually schedulable (exclude WAITING_FOR_MATERIAL)
+        productionOrder: {
+          status: { notIn: ["WAITING_FOR_MATERIAL", "CANCELLED", "DISPATCHED"] },
+        },
       },
       orderBy: { createdAt: "asc" },
       include: {
@@ -265,7 +289,7 @@ class WeeklyProgramService {
 
     // We skip strict validation checks for conflicting schedule and already planned orders
     // to allow splitting POs across multiple schedules. We rely on total quantity validation instead.
-    
+
     if (checkMachineId && checkShiftId && checkWeekStartDate && checkDayOfWeek !== null) {
       const conflictingProgram = await prisma.weeklyMachineProgram.findFirst({
         where: {
@@ -277,15 +301,15 @@ class WeeklyProgramService {
           status: { in: ["PLANNED", "IN_PROGRESS", "APPROVED", "RELEASED"] }
         }
       });
-      
+
       if (conflictingProgram) {
-         throw new ApiError(409, "This Machine is already scheduled or running on the selected shift for today. Please select a different Machine or Shift.");
+        throw new ApiError(409, "This Machine is already scheduled or running on the selected shift for today. Please select a different Machine or Shift.");
       }
     }
 
     const updatedProgram = await prisma.$transaction(async (tx) => {
       // Determine if program is being stopped/freed
-      const isStopping = existingProgram.status === "IN_PROGRESS" && 
+      const isStopping = existingProgram.status === "IN_PROGRESS" &&
         (data.status === "PLANNED" || data.status === "COMPLETED" || data.machineId === null);
 
       if (isStopping) {
@@ -301,20 +325,20 @@ class WeeklyProgramService {
           shift: true,
         }
       });
-      await StatusSyncService.syncProductionOrderStatus(tx, res.productionOrderId);
+      await StatusSyncService.syncProductionOrderStatus(tx, res.productionOrderId, userId);
       return res;
     });
-    
+
     return updatedProgram;
   }
 
-  async delete(weeklyProgramId: string) {
+  async delete(weeklyProgramId: string, userId?: string) {
     const existingProgram = await this.findById(weeklyProgramId);
 
     if (existingProgram.productionOrder) {
-      const startedStatuses = ["IN_PROGRESS", "IN_PRODUCTION", "COMPLETED", "ON_HOLD", "FG_RECEIVED", "READY_FOR_DISPATCH", "DISPATCHED"];
-      if (startedStatuses.includes(existingProgram.productionOrder.status)) {
-        throw new ApiError(400, "Cannot delete schedule because the Production Order has already started production.");
+      const startedStatuses = ["IN_PROGRESS", "IN_PRODUCTION", "POST_PRODUCTION", "COMPLETED", "ON_HOLD", "FG_RECEIVED", "READY_FOR_DISPATCH", "DISPATCHED"];
+      if (startedStatuses.includes(existingProgram.productionOrder.status) || startedStatuses.includes(existingProgram.status)) {
+        throw new ApiError(400, "Cannot delete schedule because the Production Order has already started or completed production.");
       }
     }
 
@@ -322,7 +346,7 @@ class WeeklyProgramService {
       const deleted = await tx.weeklyMachineProgram.delete({
         where: { weeklyProgramId },
       });
-      await StatusSyncService.syncProductionOrderStatus(tx, existingProgram.productionOrderId);
+      await StatusSyncService.syncProductionOrderStatus(tx, existingProgram.productionOrderId, userId);
       return deleted;
     });
   }
@@ -395,7 +419,7 @@ class WeeklyProgramService {
 
     // We will generate the 7 days (Monday to Sunday)
     const DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-    
+
     const days = await Promise.all(
       DAY_NAMES.map(async (dayName, index) => {
         const dayOfWeek = index + 1; // 1 = Monday, ..., 7 = Sunday
@@ -540,7 +564,7 @@ class WeeklyProgramService {
       const shifts = await tx.shift.findMany({ where: { isActive: true } });
       shifts.sort((a: any, b: any) => a.startTime.localeCompare(b.startTime));
       const currentIndex = shifts.findIndex((s: any) => s.shiftCode === (existingProgram.shiftId || ""));
-      
+
       let nextDayOfWeek = existingProgram.dayOfWeek;
       let nextShiftId = existingProgram.shiftId || (shifts[0] ? shifts[0].shiftCode : null);
       let nextWeekStartDate = new Date(existingProgram.weekStartDate);
@@ -612,7 +636,7 @@ class WeeklyProgramService {
       });
     }
 
-    await StatusSyncService.syncProductionOrderStatus(tx, existingProgram.productionOrderId);
+    await StatusSyncService.syncProductionOrderStatus(tx, existingProgram.productionOrderId, userId);
     return res;
   }
 

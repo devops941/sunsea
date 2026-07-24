@@ -46,7 +46,7 @@ export const createDailyPlanSchema = z.object({
       .optional(),
 
     status: z
-      .enum(["DRAFT", "PLANNED", "APPROVED", "IN_PROGRESS", "COMPLETED", "CANCELLED", "STOPPED"])
+      .enum(["DRAFT", "PLANNED", "APPROVED", "IN_PROGRESS", "COMPLETED", "CANCELLED", "STOPPED", "POST_PRODUCTION", "READY_FOR_DISPATCH"])
       .optional(),
 
     remarks: z
@@ -109,7 +109,7 @@ export const updateDailyPlanSchema = z.object({
       .optional(),
 
     status: z
-      .enum(["DRAFT", "PLANNED", "APPROVED", "IN_PROGRESS", "COMPLETED", "CANCELLED", "STOPPED", "NEXT_STEP"])
+      .enum(["DRAFT", "PLANNED", "APPROVED", "IN_PROGRESS", "COMPLETED", "CANCELLED", "STOPPED", "NEXT_STEP", "POST_PRODUCTION", "READY_FOR_DISPATCH"])
       .optional(),
 
     remarks: z

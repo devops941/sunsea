@@ -68,4 +68,37 @@ router.post(
   productionOrderController.issueMaterials
 );
 
+// STEP 2: Material availability check → READY_FOR_PLANNING or WAITING_FOR_MATERIAL
+router.post(
+  "/:productionOrderId/check-materials",
+  authMiddleware,
+  requirePermission("production_orders.edit"),
+  productionOrderController.checkMaterialAvailability
+);
+
+// STEP 5: Start production → auto-issue raw materials, set IN_PRODUCTION
+router.post(
+  "/:productionOrderId/start-production",
+  authMiddleware,
+  requirePermission("production_orders.edit"),
+  productionOrderController.startProduction
+);
+
+// STEP 7 → STEP 8: Complete post-production → READY_FOR_DISPATCH
+router.post(
+  "/:productionOrderId/complete-post-production",
+  authMiddleware,
+  requirePermission("production_orders.edit"),
+  productionOrderController.completePostProduction
+);
+
+// Status timeline / audit trail
+router.get(
+  "/:productionOrderId/history",
+  authMiddleware,
+  requirePermission("production_orders.view"),
+  productionOrderController.getHistory
+);
+
 export default router;
+

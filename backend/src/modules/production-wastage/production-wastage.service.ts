@@ -121,6 +121,8 @@ class ProductionWastageService {
         shiftId: data.shiftId,
         productId: BigInt(data.productId),
         rawMaterialId: data.rawMaterialId ?? null,
+        targetWastageProductId: data.targetWastageProductId ?? null,
+        storeId: data.storeId ?? null,
         wastageType: data.wastageType as any,
         quantity: data.quantity,
         uom: data.uom,
@@ -220,6 +222,8 @@ class ProductionWastageService {
     if (data.shiftId) updatedData.shiftId = data.shiftId;
     if (data.productId) updatedData.productId = BigInt(data.productId);
     if (data.rawMaterialId !== undefined) updatedData.rawMaterialId = data.rawMaterialId ?? null;
+    if (data.targetWastageProductId !== undefined) updatedData.targetWastageProductId = data.targetWastageProductId ?? null;
+    if (data.storeId !== undefined) updatedData.storeId = data.storeId ?? null;
     if (data.wastageType) updatedData.wastageType = data.wastageType;
     if (data.quantity !== undefined) updatedData.quantity = data.quantity;
     if (data.uom) updatedData.uom = data.uom;
@@ -262,20 +266,57 @@ class ProductionWastageService {
       throw new ApiError(400, "Only records in DRAFT status can be approved");
     }
 
-    return prisma.productionWastage.update({
-      where: { id },
-      data: {
-        status: "APPROVED",
-        approvedBy: userId,
-        approvedAt: new Date()
-      },
-      include: {
-        productionOrder: true,
-        machine: true,
-        shift: true,
-        product: true,
-        rawMaterial: true
+    return prisma.$transaction(async (tx) => {
+      // 1. Update status
+      const updatedWastage = await tx.productionWastage.update({
+        where: { id },
+        data: {
+          status: "APPROVED",
+          approvedBy: userId,
+          approvedAt: new Date()
+        },
+        include: {
+          productionOrder: true,
+          machine: true,
+          shift: true,
+          product: true,
+          rawMaterial: true,
+          targetWastageProduct: true,
+        }
+      });
+
+      // 2. Increase Stock for Target Wastage Product
+      if (existing.targetWastageProductId) {
+        const targetProduct = await tx.rawMaterial.findUnique({
+          where: { rawMaterialId: existing.targetWastageProductId }
+        });
+
+        if (targetProduct) {
+          const qty = existing.quantity;
+
+          await tx.rawMaterial.update({
+            where: { rawMaterialId: existing.targetWastageProductId },
+            data: {
+              onHandQty: { increment: qty },
+              lastMovementAt: new Date()
+            }
+          });
+
+          // 3. Record Stock Ledger Transaction
+          await tx.rawMaterialTransaction.create({
+            data: {
+              storeId: existing.storeId || targetProduct.storeId || "STORE-001", // Fallback if no store
+              rawMaterialId: existing.targetWastageProductId,
+              txnType: "WASTAGE_RECEIPT",
+              qty: qty,
+              remarks: `Received from Wastage Audit Log #${existing.wastageNo}`,
+              productionOrderId: existing.productionOrderId,
+            }
+          });
+        }
       }
+
+      return updatedWastage;
     });
   }
 
