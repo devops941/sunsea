@@ -85,7 +85,15 @@ const salesOrderSchema = z
             });
         }
 
-        if ((data.orderType === "salesperson" || data.orderType === "reference") && !data.referenceText?.trim()) {
+        if (data.orderType === "salesperson" && !data.salesPersonName?.trim()) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: "Salesperson name is required",
+                path: ["salesPersonName"],
+            });
+        }
+
+        if (data.orderType === "reference" && !data.referenceText?.trim()) {
             ctx.addIssue({
                 code: z.ZodIssueCode.custom,
                 message: "Reference text is required",
@@ -519,7 +527,10 @@ const SalesOrderForm: React.FC = () => {
             justResetRef.current = false;
             return;
         }
-        if (orderType !== "salesperson" && orderType !== "reference") {
+        if (orderType !== "salesperson") {
+            setValue("salesPersonName", "", { shouldValidate: true });
+        }
+        if (orderType !== "reference") {
             setValue("referenceText", "", { shouldValidate: true });
         }
     }, [orderType, setValue]);
