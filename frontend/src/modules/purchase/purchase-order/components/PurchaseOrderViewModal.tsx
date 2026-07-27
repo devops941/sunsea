@@ -1,10 +1,11 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useMemo } from "react";
 import type { PurchaseOrder } from "../../../../features/purchaseOrder/types";
 import { useSelector, useDispatch } from "react-redux";
 import { fetchRawMaterials } from "../../../../features/raw-materials/rawMaterialSlice";
 import type { AppDispatch } from "../../../../app/store";
 import CommonViewModal from "../../../../components/ui/CommonViewModal/CommonViewModal";
 import StatusBadge from "../../../../components/ui/StatusBadge/Badge";
+import { useUsers } from "../../../../hooks/useUsers";
 
 interface PurchaseOrderViewModalProps {
   show: boolean;
@@ -32,14 +33,27 @@ const PurchaseOrderViewModal: React.FC<PurchaseOrderViewModalProps> = ({
   const dispatch = useDispatch<AppDispatch>();
   const rawMaterials = useSelector((state: any) => state.rawMaterials?.data || []);
   const user = useSelector((state: any) => state?.auth?.user);
+  const { users, loadUsers } = useUsers();
+  const company = useSelector((state: any) => state.company?.data);
+  const companyState = company?.state;
 
   useEffect(() => {
-    if (show && rawMaterials.length === 0) {
-      dispatch(fetchRawMaterials(undefined));
+    if (show) {
+      if (rawMaterials.length === 0) {
+        dispatch(fetchRawMaterials(undefined));
+      }
+      loadUsers();
     }
-  }, [show, dispatch, rawMaterials.length]);
+  }, [show, dispatch, rawMaterials.length, loadUsers]);
 
   if (!purchaseOrder) return null;
+
+  const createdByUser = users.find((u: any) => u.userId === purchaseOrder.createdBy || u.id === purchaseOrder.createdBy);
+  const createdByName = createdByUser?.username || (purchaseOrder.createdBy?.startsWith("admin_") ? "admin" : (purchaseOrder.createdBy || "NA"));
+
+  const isInterState = companyState && purchaseOrder.billingState
+    ? companyState.toLowerCase().trim() !== purchaseOrder.billingState.toLowerCase().trim()
+    : (Number(purchaseOrder.totalIgst) > 0);
 
   const sections = [
     {
@@ -98,7 +112,7 @@ const PurchaseOrderViewModal: React.FC<PurchaseOrderViewModalProps> = ({
   sections.push({
     title: "Timestamps",
     fields: [
-      { label: "Created By", value: user?.username || "NA" },
+      { label: "Created By", value: createdByName },
       { label: "Created At", value: safeDate(purchaseOrder.createdAt) },
     ],
   });
@@ -117,8 +131,14 @@ const PurchaseOrderViewModal: React.FC<PurchaseOrderViewModalProps> = ({
               <th className="p-4 text-right">Qty</th>
               <th className="p-4 text-right">Unit Price</th>
               <th className="p-4 text-right">Tax %</th>
-              <th className="p-4 text-right">CGST</th>
-              <th className="p-4 text-right">SGST</th>
+              {isInterState ? (
+                <th className="p-4 text-right">IGST</th>
+              ) : (
+                <>
+                  <th className="p-4 text-right">CGST</th>
+                  <th className="p-4 text-right">SGST</th>
+                </>
+              )}
               <th className="p-4 text-right">Total</th>
             </tr>
           </thead>
@@ -139,6 +159,9 @@ const PurchaseOrderViewModal: React.FC<PurchaseOrderViewModalProps> = ({
                 const sgstAmt = item.sgstAmount !== undefined
                   ? safeNumber(item.sgstAmount)
                   : taxAmt / 2;
+                const igstAmt = item.igstAmount !== undefined
+                  ? safeNumber(item.igstAmount)
+                  : taxAmt;
 
                 const matchedMaterial = rawMaterials.find(
                   (rm: any) => String(rm.rawMaterialId) === String(item.productId)
@@ -152,8 +175,14 @@ const PurchaseOrderViewModal: React.FC<PurchaseOrderViewModalProps> = ({
                     <td className="p-4 text-right">{qty}</td>
                     <td className="p-4 text-right">₹{price.toFixed(2)}</td>
                     <td className="p-4 text-right">{tax}%</td>
-                    <td className="p-4 text-right text-blue-600">₹{cgstAmt.toFixed(2)}</td>
-                    <td className="p-4 text-right text-purple-600">₹{sgstAmt.toFixed(2)}</td>
+                    {isInterState ? (
+                      <td className="p-4 text-right text-blue-600">₹{igstAmt.toFixed(2)}</td>
+                    ) : (
+                      <>
+                        <td className="p-4 text-right text-blue-600">₹{cgstAmt.toFixed(2)}</td>
+                        <td className="p-4 text-right text-purple-600">₹{sgstAmt.toFixed(2)}</td>
+                      </>
+                    )}
                     <td className="p-4 text-right font-medium">₹{total.toFixed(2)}</td>
                   </tr>
                 );
@@ -183,14 +212,29 @@ const PurchaseOrderViewModal: React.FC<PurchaseOrderViewModalProps> = ({
             <span>Tax:</span>
             <span>+₹{safeNumber(purchaseOrder.totalTax).toFixed(2)}</span>
           </div> */}
-          <div className="flex justify-between text-blue-600">
-            <span>CGST:</span>
-            <span>+₹{safeNumber(purchaseOrder.totalCgst).toFixed(2)}</span>
-          </div>
-          <div className="flex justify-between text-purple-600">
-            <span>SGST:</span>
-            <span>+₹{safeNumber(purchaseOrder.totalSgst).toFixed(2)}</span>
-          </div>
+          {isInterState ? (
+            <div className="flex justify-between text-green-600">
+              <span>IGST:</span>
+              <span>+₹{safeNumber(purchaseOrder.totalIgst).toFixed(2)}</span>
+            </div>
+          ) : (
+            <>
+              <div className="flex justify-between text-blue-600">
+                <span>CGST:</span>
+                <span>+₹{safeNumber(purchaseOrder.totalCgst).toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-purple-600">
+                <span>SGST:</span>
+                <span>+₹{safeNumber(purchaseOrder.totalSgst).toFixed(2)}</span>
+              </div>
+            </>
+          )}
+          {Number((purchaseOrder as any).roundingAdjust || 0) !== 0 && (
+            <div className="flex justify-between text-slate-600">
+              <span>Round Off:</span>
+              <span>{Number((purchaseOrder as any).roundingAdjust) > 0 ? "+" : ""}₹{safeNumber((purchaseOrder as any).roundingAdjust).toFixed(2)}</span>
+            </div>
+          )}
           <div className="border-t border-slate-200 pt-2 mt-2 flex justify-between font-bold text-slate-900 text-base">
             <span>Net Amount:</span>
             <span>₹{safeNumber(purchaseOrder.netAmount).toFixed(2)}</span>

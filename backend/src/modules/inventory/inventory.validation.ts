@@ -10,7 +10,7 @@ export const getEodStockSchema = z.object({
       .refine((val) => !isNaN(Date.parse(val)), "Invalid date format")
       .optional(),
     category: z
-      .enum(["RAW_MATERIAL", "FINISHED_PRODUCT"])
+      .enum(["RAW_MATERIAL", "FINISHED_PRODUCT", "WASTAGE"])
       .optional(),
     storeId: z.string().optional(),
     search: z.string().optional(),

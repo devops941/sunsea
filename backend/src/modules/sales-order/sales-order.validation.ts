@@ -95,13 +95,19 @@ const salesOrderBodyShape = z.object({
         .refine((val) => !isNaN(Date.parse(val)), "Invalid order date"),
     expectedCompletionDate: z.string().datetime({ message: "Invalid completion date format" })
         .refine((val) => !isNaN(Date.parse(val)), "Invalid completion date")
-        .refine((val) => new Date(val) > new Date(), "Expected completion date must be in the future"),
+        .refine((val) => {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const inputDate = new Date(val);
+            inputDate.setHours(0, 0, 0, 0);
+            return inputDate >= today;
+        }, "Expected completion date must be today or a future date"),
     customerId: z.string().uuid("Customer ID must be a valid UUID"),
     mobile: z.string().optional().nullable(),
     customerType: CustomerTypeEnum,   // ← add this
     isInterState: z.boolean().default(false).optional(),
     paymentTermId: z.number().int().positive("...").optional().nullable(),
-    dispatchType: z.union([DispatchTypeEnum, z.literal("")]).optional().transform(val => val === "" ? undefined : val),
+    dispatchType: z.string().min(1, "Dispatch Type is required"),
     orderType: z.union([OrderTypeEnum, z.literal("")]).optional().transform(val => val === "" ? undefined : val),
     referenceText: z.string().optional().nullable(),
     salesPersonName: z.string().optional().nullable(),
@@ -267,7 +273,7 @@ export const salesOrderQuerySchema = z.object({
             .transform(parseStatuses),
 
         mdApprovalStatus: ApprovalStatusEnum.optional(),
-        dispatchType: DispatchTypeEnum.optional(),
+        dispatchType: z.string().optional(),
         orderType: OrderTypeEnum.optional(),
 
         customerApprovalStatus: ApprovalStatusEnum.optional(),

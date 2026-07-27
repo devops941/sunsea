@@ -1,7 +1,7 @@
 import React from "react";
 import { Container } from "react-bootstrap";
 import { useLocation, useNavigate } from "react-router-dom";
-import { FaFileInvoiceDollar, FaUserCheck, FaCalendarAlt } from "react-icons/fa";
+import { FaFileInvoiceDollar, FaUserCheck, FaCalendarAlt, FaTruck } from "react-icons/fa";
 import Tabs from "../../../components/ui/tab/Tabs";
 import type { TabItem } from "../../../components/ui/tab/Tabs";
 
@@ -10,6 +10,7 @@ import POMDApproval from "../purchase-order/purchaseordeappovals/PurchaseOrderap
 import UpComingOrderList from "../purchase-order/upcoming-orders/UpComingOrderList";
 import ExpensesList from "../../expenses/ExpensesList";
 import InvoiceList from "../purchase-order/invoice/InvoiceList";
+import SupplierListPage from "../../supplier/pages/SupplierList";
 
 const PurchaseTabs: React.FC = () => {
     const location = useLocation();
@@ -19,7 +20,7 @@ const PurchaseTabs: React.FC = () => {
     const pathToKey: Record<string, string> = {
         "/purchase-orders": "orders",
         "/purchase-order-approvals": "approvals",
-
+        "/suppliers": "suppliers",
         "/expenses": "expense",
         "/invoice": "invoice"
     };
@@ -27,7 +28,7 @@ const PurchaseTabs: React.FC = () => {
     const keyToPath: Record<string, string> = {
         "orders": "/purchase-orders",
         "approvals": "/purchase-order-approvals",
-
+        "suppliers": "/suppliers",
         "expense": "/expenses",
         "invoice": "/invoice"
     };
@@ -36,11 +37,10 @@ const PurchaseTabs: React.FC = () => {
 
     const tabs: TabItem[] = [
         { key: "orders", label: "Purchase Orders", icon: <FaFileInvoiceDollar />, content: <PurchaseOrderListPage /> },
+        { key: "suppliers", label: "Suppliers", icon: <FaTruck />, content: <SupplierListPage /> },
         { key: "approvals", label: "MD Approvals", icon: <FaUserCheck />, content: <POMDApproval /> },
         { key: "invoice", label: "Bill & Invoice", icon: <FaCalendarAlt />, content: <InvoiceList /> },
-
         { key: "expense", label: "Expenses", icon: <FaCalendarAlt />, content: <ExpensesList /> },
-
     ];
 
     const handleTabChange = (key: string) => {

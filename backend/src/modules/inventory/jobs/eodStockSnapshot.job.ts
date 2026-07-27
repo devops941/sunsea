@@ -5,7 +5,7 @@ import { getISTDateParts } from "../../../utils/dateUtils";
  * Helper to safely upsert EOD stock snapshots without triggering Postgres ON CONFLICT 42P10 errors
  */
 const upsertEodSnapshot = async (data: {
-  category: "RAW_MATERIAL" | "FINISHED_PRODUCT";
+  category: "RAW_MATERIAL" | "FINISHED_PRODUCT" | "WASTAGE";
   itemId: string;
   itemCode: string;
   itemName: string;
@@ -18,7 +18,7 @@ const upsertEodSnapshot = async (data: {
 }) => {
   const existing = await prisma.eodStockSnapshot.findFirst({
     where: {
-      category: data.category,
+      category: data.category as any,
       itemId: data.itemId,
       storeId: data.storeId,
       snapshotDate: data.snapshotDate,
@@ -37,7 +37,7 @@ const upsertEodSnapshot = async (data: {
   } else {
     await prisma.eodStockSnapshot.create({
       data: {
-        category: data.category,
+        category: data.category as any,
         itemId: data.itemId,
         itemCode: data.itemCode,
         itemName: data.itemName,
@@ -82,10 +82,11 @@ export const runEodStockSnapshot = async (targetDateStr?: string) => {
   const rawMaterials = await prisma.rawMaterial.findMany({ where: { isActive: true } });
   for (const rm of rawMaterials) {
     const storeId = rm.storeId || "DEFAULT";
+    const category = rm.itemType === "WASTAGE" ? "WASTAGE" : "RAW_MATERIAL";
 
     const prev = await prisma.eodStockSnapshot.findFirst({
       where: {
-        category: "RAW_MATERIAL",
+        category: category as any,
         itemId: rm.rawMaterialId,
         storeId,
         snapshotDate: yesterday,
@@ -96,7 +97,7 @@ export const runEodStockSnapshot = async (targetDateStr?: string) => {
     const startQty = prev ? Number(prev.eodQty) : currentQty;
 
     await upsertEodSnapshot({
-      category: "RAW_MATERIAL",
+      category: category as any,
       itemId: rm.rawMaterialId,
       itemCode: rm.rawMaterialId,
       itemName: rm.materialName,

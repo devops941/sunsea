@@ -1234,6 +1234,7 @@ model PurchaseOrder {
   totalCgst            Decimal             @default(0) @db.Decimal(12, 2)
   totalSgst            Decimal             @default(0) @db.Decimal(12, 2)
   totalIgst            Decimal             @default(0) @db.Decimal(12, 2)
+  roundingAdjust       Decimal             @default(0) @map("rounding_adjust") @db.Decimal(12, 2)
   netAmount            Decimal             @default(0) @db.Decimal(12, 2)
   companyId            String              @db.Uuid
   createdBy            String?
@@ -1805,4 +1806,5 @@ enum ItemCategoryType {
 enum EodItemCategory {
   RAW_MATERIAL
   FINISHED_PRODUCT
+  WASTAGE
 }

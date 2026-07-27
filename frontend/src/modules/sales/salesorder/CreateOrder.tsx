@@ -39,13 +39,13 @@ const salesOrderSchema = z
         customerId: z.string().min(1, "Customer is required"),
         mobile: z.string().optional().nullable(),
         orderType: z.string().optional(),
-        dispatchType: z.string().optional(),
+        dispatchType: z.string().min(1, "Dispatch Type is required"),
         referenceText: z.string().optional(),
         salesPersonName: z.string().optional(),
         transportName: z.string().optional(),
         paymentTermId: z.string().optional(),
         customerType: z.string().min(1, "Customer type is required"),
-        isInterState: z.boolean(),  // <-- new field
+        isInterState: z.boolean(),
 
         billingAddressLine1: z.string().min(1, "Billing address is required"),
         billingCity: z.string().min(1, "City is required"),
@@ -74,12 +74,21 @@ const salesOrderSchema = z
         else if (!/^\d{6}$/.test(data.shippingPincode))
             ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Must be a 6-digit pincode", path: ["shippingPincode"] });
 
-        if (data.expectedCompletionDate && data.orderDate && data.expectedCompletionDate < data.orderDate) {
-            ctx.addIssue({
-                code: z.ZodIssueCode.custom,
-                message: "Must be on or after the order date",
-                path: ["expectedCompletionDate"],
-            });
+        const currentToday = new Date().toISOString().split("T")[0];
+        if (data.expectedCompletionDate) {
+            if (data.expectedCompletionDate < currentToday) {
+                ctx.addIssue({
+                    code: z.ZodIssueCode.custom,
+                    message: "Expected completion date must be today or a future date",
+                    path: ["expectedCompletionDate"],
+                });
+            } else if (data.orderDate && data.expectedCompletionDate < data.orderDate) {
+                ctx.addIssue({
+                    code: z.ZodIssueCode.custom,
+                    message: "Must be on or after the order date",
+                    path: ["expectedCompletionDate"],
+                });
+            }
         }
 
         if (data.orderType === "salesperson" && !data.salesPersonName?.trim()) {
@@ -607,11 +616,9 @@ const SalesOrderForm: React.FC = () => {
 
                         <div>
                             <Controller name="customerId" control={control} render={({ field }) => (
-                                <SelectInput label="Customer" name={field.name} value={field.value} options={customerOptions} required onChange={field.onChange} defaultOptionLabel="Select Customer" disabled={isEditMode} />
+                                <SelectInput label="Customer" name={field.name} value={field.value} options={customerOptions} required searchable onChange={field.onChange} defaultOptionLabel="Select Customer" disabled={isEditMode} />
                             )} />
                             <Err message={errors.customerId?.message} />
-
-
                         </div>
 
                         <div>
@@ -645,8 +652,9 @@ const SalesOrderForm: React.FC = () => {
 
                         <div>
                             <Controller name="dispatchType" control={control} render={({ field }) => (
-                                <SelectInput label="Dispatch Type" name={field.name} value={field.value || ''} options={DISPATCH_TYPE_OPTIONS} defaultOptionLabel="select dispatch type" onChange={field.onChange} />
+                                <SelectInput label="Dispatch Type" name={field.name} value={field.value || ''} options={DISPATCH_TYPE_OPTIONS} required defaultOptionLabel="select dispatch type" onChange={field.onChange} />
                             )} />
+                            <Err message={errors.dispatchType?.message} />
                         </div>
 
                         <div>

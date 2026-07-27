@@ -16,11 +16,13 @@ import TextInput from "../../../../components/form/TextInput/TextInput";
 import EditButton from "../../../../components/ui/EditButton/EditButton";
 import DataTable from "../../../../components/ui/table/DataTable";
 import SearchInput from "../../../../components/ui/SearchInput/SearchInput";
+import { useUsers } from "../../../../hooks/useUsers";
 
 const ITEMS_PER_PAGE = 10;
 
 const POMDApproval: React.FC = () => {
     const user = useSelector((state: any) => state?.auth?.user);
+    const { users, loadUsers } = useUsers();
     const navigate = useNavigate();
     const [data, setData] = useState<PurchaseOrder[]>([]);
     const [loading, setLoading] = useState(false);
@@ -62,7 +64,8 @@ const POMDApproval: React.FC = () => {
 
     useEffect(() => {
         fetchOrders();
-    }, [fetchOrders]);
+        loadUsers();
+    }, [fetchOrders, loadUsers]);
 
     const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
         setSearchTerm(e.target.value);
@@ -201,88 +204,100 @@ const POMDApproval: React.FC = () => {
                 />
 
                 {/* View Modal */}
-                <CommonViewModal
-                    show={showViewModal}
-                    onHide={() => setShowViewModal(false)}
-                    modalTitle="Purchase order details"
-                    avatarText={selectedItem ? selectedItem.poNumber.charAt(0).toUpperCase() : ""}
-                    headerTitle={selectedItem ? selectedItem.poNumber : ""}
-                    headerSubtitle={
-                        selectedItem ? `Supplier: ${selectedItem.supplier?.supplierName || "N/A"}` : ""
-                    }
-                    sections={
-                        selectedItem
-                            ? [
-                                {
-                                    fields: [
-                                        { label: "PO No", value: selectedItem.poNumber },
-                                        { label: "PO Date", value: formatDate(selectedItem.poDate) },
+                {(() => {
+                    const viewCreatedByUser = selectedItem ? users.find((u: any) => u.userId === selectedItem.createdBy || u.id === selectedItem.createdBy) : null;
+                    const viewCreatedByName = viewCreatedByUser?.username || (selectedItem?.createdBy?.startsWith("admin_") ? "admin" : (selectedItem?.createdBy || "N/A"));
+                    return (
+                        <CommonViewModal
+                            show={showViewModal}
+                            onHide={() => setShowViewModal(false)}
+                            modalTitle="Purchase order details"
+                            avatarText={selectedItem ? selectedItem.poNumber.charAt(0).toUpperCase() : ""}
+                            headerTitle={selectedItem ? selectedItem.poNumber : ""}
+                            headerSubtitle={
+                                selectedItem ? `Supplier: ${selectedItem.supplier?.supplierName || "N/A"}` : ""
+                            }
+                            sections={
+                                selectedItem
+                                    ? [
                                         {
-                                            label: "Expected Delivery",
-                                            value: formatDate(selectedItem.expectedDeliveryDate),
+                                            fields: [
+                                                { label: "PO No", value: selectedItem.poNumber },
+                                                { label: "PO Date", value: formatDate(selectedItem.poDate) },
+                                                {
+                                                    label: "Expected Delivery",
+                                                    value: formatDate(selectedItem.expectedDeliveryDate),
+                                                },
+                                                {
+                                                    label: "Supplier",
+                                                    value: selectedItem.supplier?.supplierName || "N/A",
+                                                },
+                                            ],
                                         },
                                         {
-                                            label: "Supplier",
-                                            value: selectedItem.supplier?.supplierName || "N/A",
+                                            title: "Address details",
+                                            fields: [
+                                                {
+                                                    label: "Billing address",
+                                                    value: [
+                                                        selectedItem.billingAddressLine1,
+                                                        selectedItem.billingCity,
+                                                        selectedItem.billingState,
+                                                        selectedItem.billingPincode,
+                                                    ]
+                                                        .filter(Boolean)
+                                                        .join(", ") || "N/A",
+                                                },
+                                                {
+                                                    label: "Shipping address",
+                                                    value: selectedItem.sameAsBilling
+                                                        ? "Same as billing"
+                                                        : [
+                                                            selectedItem.shippingAddressLine1,
+                                                            selectedItem.shippingCity,
+                                                            selectedItem.shippingState,
+                                                            selectedItem.shippingPincode,
+                                                        ]
+                                                            .filter(Boolean)
+                                                            .join(", ") || "N/A",
+                                                },
+                                            ],
                                         },
-                                    ],
-                                },
-                                {
-                                    title: "Address details",
-                                    fields: [
                                         {
-                                            label: "Billing address",
-                                            value: [
-                                                selectedItem.billingAddressLine1,
-                                                selectedItem.billingCity,
-                                                selectedItem.billingState,
-                                                selectedItem.billingPincode,
-                                            ]
-                                                .filter(Boolean)
-                                                .join(", ") || "N/A",
+                                            title: "Order summary",
+                                            fields: [
+                                                { label: "Total items", value: String(selectedItem.items?.length ?? 0) },
+                                                { label: "Subtotal", value: formatCurrency(selectedItem.subtotal) },
+                                                { label: "Total discount", value: formatCurrency(selectedItem.totalDiscount) },
+                                                { label: "Total tax", value: formatCurrency(selectedItem.totalTax) },
+                                                ...(Number((selectedItem as any).roundingAdjust || 0) !== 0 ? [
+                                                    {
+                                                        label: "Round Off",
+                                                        value: `${Number((selectedItem as any).roundingAdjust) > 0 ? "+" : ""}${formatCurrency((selectedItem as any).roundingAdjust)}`
+                                                    }
+                                                ] : []),
+                                                { label: "Net amount", value: formatCurrency(selectedItem.netAmount) },
+                                                { label: "Status", value: selectedItem.status || "Draft" },
+                                                { label: "Remarks", value: selectedItem.remarks || "N/A" },
+                                                ...(selectedItem.status === "REJECTED" ? [
+                                                    { label: "Rejection Reason", value: selectedItem.rejectReason || "N/A" }
+                                                ] : []),
+                                            ],
                                         },
                                         {
-                                            label: "Shipping address",
-                                            value: selectedItem.sameAsBilling
-                                                ? "Same as billing"
-                                                : [
-                                                    selectedItem.shippingAddressLine1,
-                                                    selectedItem.shippingCity,
-                                                    selectedItem.shippingState,
-                                                    selectedItem.shippingPincode,
-                                                ]
-                                                    .filter(Boolean)
-                                                    .join(", ") || "N/A",
+                                            title: "Timestamps",
+                                            fields: [
+                                                { label: "Created at", value: formatDate(selectedItem.createdAt) },
+                                                { label: "Last updated", value: formatDate(selectedItem.updatedAt) },
+                                                { label: "Created by", value: viewCreatedByName },
+                                            ],
                                         },
-                                    ],
-                                },
-                                {
-                                    title: "Order summary",
-                                    fields: [
-                                        { label: "Total items", value: String(selectedItem.items?.length ?? 0) },
-                                        { label: "Subtotal", value: formatCurrency(selectedItem.subtotal) },
-                                        { label: "Total discount", value: formatCurrency(selectedItem.totalDiscount) },
-                                        { label: "Total tax", value: formatCurrency(selectedItem.totalTax) },
-                                        { label: "Net amount", value: formatCurrency(selectedItem.netAmount) },
-                                        { label: "Status", value: selectedItem.status || "Draft" },
-                                        { label: "Remarks", value: selectedItem.remarks || "N/A" },
-                                        ...(selectedItem.status === "REJECTED" ? [
-                                            { label: "Rejection Reason", value: selectedItem.rejectReason || "N/A" }
-                                        ] : []),
-                                    ],
-                                },
-                                {
-                                    title: "Timestamps",
-                                    fields: [
-                                        { label: "Created at", value: formatDate(selectedItem.createdAt) },
-                                        { label: "Last updated", value: formatDate(selectedItem.updatedAt) },
-                                        { label: "Created by", value: user?.username || "N/A" },
-                                    ],
-                                },
-                            ]
-                            : []
-                    }
-                />
+                                    ]
+                                    : []
+                            }
+                        />
+                    );
+                })()}
 
                 {/* Delete Modal */}
                 <CommonConfirmModal

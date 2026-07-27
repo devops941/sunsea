@@ -216,10 +216,10 @@ const GrnInvoiceViewPage: React.FC = () => {
                         <style>{`
                             @media print {
                                 body * {
-                                    visibility: hidden;
+                                    visibility: hidden !important;
                                 }
                                 #printable-grn-invoice-card, #printable-grn-invoice-card * {
-                                    visibility: visible;
+                                    visibility: visible !important;
                                 }
                                 #printable-grn-invoice-card {
                                     position: absolute;

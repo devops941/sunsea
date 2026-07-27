@@ -41,6 +41,7 @@ export const CreatePurchaseOrderSchema = z.object({
     storeId: z.string().optional(),
     discountType: z.enum(["PERCENT", "FLAT"]).optional(),
     discountValue: z.coerce.number().min(0).optional(),
+    roundingAdjust: z.coerce.number().optional(),
     remarks: z.string().optional(),
     items: z.array(ItemSchema).min(1, "At least one item is required"),
     status: z.string().optional(),

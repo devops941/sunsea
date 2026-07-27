@@ -89,6 +89,7 @@ export interface PurchaseOrder {
     totalCgst?: number;
     totalSgst?: number;
     totalIgst?: number;
+    roundingAdjust?: number;
     netAmount: number;
 
     companyId?: string;
@@ -131,6 +132,7 @@ export interface PurchaseOrderFormData {
     totalCgst?: number;
     totalSgst?: number;
     totalIgst?: number;
+    roundingAdjust?: number;
     netAmount: number;
 }
 
@@ -174,6 +176,7 @@ export interface CreatePurchaseOrderDto {
     totalCgst?: number;
     totalSgst?: number;
     totalIgst?: number;
+    roundingAdjust?: number;
     netAmount?: number;
 }
 

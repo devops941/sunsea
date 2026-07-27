@@ -194,7 +194,7 @@ const AppRoutes = () => {
 
             {/* Customers */}
             <Route element={<ProtectedRoute permission="customers.view" />}>
-              <Route path="/customers" element={<HROrganizationTabs />} />
+              <Route path="/customers" element={<SalesTabs />} />
             </Route>
             {/* Customers Create Route */}
             <Route element={<ProtectedRoute permission="customers.create" />}>
@@ -205,9 +205,8 @@ const AppRoutes = () => {
               <Route path="/customers/edit/:id" element={<CustomerEditPage />} />
             </Route>
 
-            {/* Suppliers */}
             <Route element={<ProtectedRoute permission="suppliers.view" />}>
-              <Route path="/suppliers" element={<HROrganizationTabs />} />
+              <Route path="/suppliers" element={<PurchaseTabs />} />
             </Route>
             {/* Suppliers Create Route */}
             <Route element={<ProtectedRoute permission="suppliers.create" />}>

@@ -174,13 +174,14 @@ const SalesInvoiceView: React.FC = () => {
 
     // Tax summary grouped by rate
     const taxSummary = useMemo(() => {
-        const map = new Map<number, { taxRate: number; taxableAmt: number; cgstAmt: number; sgstAmt: number; totalTax: number }>();
+        const map = new Map<number, { taxRate: number; taxableAmt: number; cgstAmt: number; sgstAmt: number; igstAmt: number; totalTax: number }>();
         itemsWithTax.forEach((item: any) => {
             const rate = item.cgstRate + item.sgstRate + item.igstRate;
-            const existing = map.get(rate) || { taxRate: rate, taxableAmt: 0, cgstAmt: 0, sgstAmt: 0, totalTax: 0 };
+            const existing = map.get(rate) || { taxRate: rate, taxableAmt: 0, cgstAmt: 0, sgstAmt: 0, igstAmt: 0, totalTax: 0 };
             existing.taxableAmt += item.amount;
             existing.cgstAmt += item.cgstAmount;
             existing.sgstAmt += item.sgstAmount;
+            existing.igstAmt += item.igstAmount;
             existing.totalTax += item.cgstAmount + item.sgstAmount + item.igstAmount;
             map.set(rate, existing);
         });
@@ -314,10 +315,10 @@ const SalesInvoiceView: React.FC = () => {
                         <style>{`
                             @media print {
                                 body * {
-                                    visibility: hidden;
+                                    visibility: hidden !important;
                                 }
                                 #printable-invoice-card, #printable-invoice-card * {
-                                    visibility: visible;
+                                    visibility: visible !important;
                                 }
                                 #printable-invoice-card {
                                     position: absolute;
@@ -493,8 +494,14 @@ const SalesInvoiceView: React.FC = () => {
                                         <tr>
                                             <Th w="60px">Tax Rate</Th>
                                             <Th align="right">Taxable Amt.</Th>
-                                            <Th align="right">CGST Amt.</Th>
-                                            <Th align="right">SGST Amt.</Th>
+                                            {isInterState ? (
+                                                <Th align="right">IGST Amt.</Th>
+                                            ) : (
+                                                <>
+                                                    <Th align="right">CGST Amt.</Th>
+                                                    <Th align="right">SGST Amt.</Th>
+                                                </>
+                                            )}
                                             <Th align="right">Total Tax</Th>
                                         </tr>
                                     </thead>
@@ -503,8 +510,14 @@ const SalesInvoiceView: React.FC = () => {
                                             <tr key={i}>
                                                 <Td align="center">{row.taxRate}%</Td>
                                                 <Td align="right">{row.taxableAmt.toFixed(2)}</Td>
-                                                <Td align="right">{row.cgstAmt.toFixed(2)}</Td>
-                                                <Td align="right">{row.sgstAmt.toFixed(2)}</Td>
+                                                {isInterState ? (
+                                                    <Td align="right">{row.igstAmt.toFixed(2)}</Td>
+                                                ) : (
+                                                    <>
+                                                        <Td align="right">{row.cgstAmt.toFixed(2)}</Td>
+                                                        <Td align="right">{row.sgstAmt.toFixed(2)}</Td>
+                                                    </>
+                                                )}
                                                 <Td align="right">{row.totalTax.toFixed(2)}</Td>
                                             </tr>
                                         ))}

@@ -26,8 +26,8 @@ interface EodStockItem {
   storeId: string;
   snapshotDate: string;
   startQty: number;
-  eodQty: number;
-  recordedAt: string;
+  eodQty: number | null;
+  recordedAt: string | null;
 }
 
 const ITEMS_PER_PAGE = 10;
@@ -52,11 +52,7 @@ const EodStockList: React.FC = () => {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("");
   const [storeIdFilter, setStoreIdFilter] = useState<string>("");
-  const [selectedDate, setSelectedDate] = useState(() => {
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    return getISTDateString(yesterday);
-  });
+  const [selectedDate, setSelectedDate] = useState(() => getISTDateString());
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [simulateEmptyState, setSimulateEmptyState] = useState(false);
@@ -192,9 +188,7 @@ const EodStockList: React.FC = () => {
     setSearchTerm("");
     setCategoryFilter("");
     setStoreIdFilter("");
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    setSelectedDate(getISTDateString(yesterday));
+    setSelectedDate(getISTDateString());
     setSimulateEmptyState(false);
     setCurrentPage(1);
   };
@@ -315,11 +309,30 @@ const EodStockList: React.FC = () => {
         <div className="px-6 py-3.5 bg-slate-50/70 border-b border-slate-200 flex items-center gap-2.5 text-slate-700 text-sm">
           <FaInfoCircle size={15} className="text-[#3B82F6] flex-shrink-0" />
           <span className="font-medium">
-            Stock shown as of last EOD run: <span className="text-slate-900 font-semibold">
-              {data.length > 0
-                ? formatDateTime(data[0].recordedAt)
-                : `${asOfDate ? formatDate(asOfDate) : formatDate(selectedDate)}, 11:59 PM`}
-            </span>
+            {(() => {
+              const isTodaySelected = selectedDate === getISTDateString();
+              const isEodPending = isTodaySelected && (data.length === 0 || data.some(item => item.recordedAt === null));
+              if (isEodPending) {
+                return (
+                  <>
+                    Showing today's opening stock (EOD pending):{" "}
+                    <span className="text-slate-900 font-semibold">
+                      {formatDate(selectedDate)}
+                    </span>
+                  </>
+                );
+              }
+              return (
+                <>
+                  Stock shown as of last EOD run:{" "}
+                  <span className="text-slate-900 font-semibold">
+                    {data.length > 0 && data[0].recordedAt
+                      ? formatDateTime(data[0].recordedAt)
+                      : `${asOfDate ? formatDate(asOfDate) : formatDate(selectedDate)}, 11:59 PM`}
+                  </span>
+                </>
+              );
+            })()}
           </span>
         </div>
 
@@ -399,7 +412,7 @@ const EodStockList: React.FC = () => {
                   align: "right",
                   render: (item) => (
                     <span className="font-bold text-slate-900 font-mono text-sm">
-                      {item.eodQty.toLocaleString()}
+                      {item.eodQty !== null && item.eodQty !== undefined ? item.eodQty.toLocaleString() : "—"}
                     </span>
                   )
                 }
