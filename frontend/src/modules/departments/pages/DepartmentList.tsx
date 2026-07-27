@@ -33,6 +33,9 @@ const DepartmentList: React.FC = () => {
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [deptToDelete, setDeptToDelete] = useState<number | null>(null);
 
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
+
     const [formErrors, setFormErrors] = useState<{ name?: string }>({});
 
     const validateForm = () => {
@@ -120,7 +123,8 @@ const DepartmentList: React.FC = () => {
     }, []);
 
     const handleDeleteConfirm = async () => {
-        if (deptToDelete !== null) {
+        if (deptToDelete !== null && !isDeleting) {
+            setIsDeleting(true);
             try {
                 await removeDepartment(deptToDelete);
                 toast.success("Department deleted successfully!");
@@ -130,6 +134,7 @@ const DepartmentList: React.FC = () => {
             } finally {
                 setShowDeleteModal(false);
                 setDeptToDelete(null);
+                setIsDeleting(false);
             }
         }
     };
@@ -149,9 +154,10 @@ const DepartmentList: React.FC = () => {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        if (!validateForm()) {
+        if (!validateForm() || isSubmitting) {
             return;
         }
+        setIsSubmitting(true);
 
         try {
             if (editMode) {
@@ -166,6 +172,8 @@ const DepartmentList: React.FC = () => {
         } catch (err: any) {
             const errorMessage = typeof err === 'string' ? err : err?.message || "Operation failed";
             toast.error(errorMessage);
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -187,7 +195,7 @@ const DepartmentList: React.FC = () => {
     ];
 
     return (
-        <div className="p-4 md:p-6 min-h-screen bg-white">
+        <div className="p-4 md:p-1 min-h-screen bg-white">
             <div className="">
                 <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                     {/* Page Header */}
@@ -251,10 +259,10 @@ const DepartmentList: React.FC = () => {
                                 })}
                             />
                             <CustomButton
-                                text={editMode ? "Update" : "Save"}
+                                text={isSubmitting ? (editMode ? "Updating..." : "Saving...") : (editMode ? "Update" : "Save")}
                                 icon={FaSave}
                                 onClick={handleSubmit}
-                                disabled={loading}
+                                disabled={loading || isSubmitting}
                             />
                         </div>
                     }

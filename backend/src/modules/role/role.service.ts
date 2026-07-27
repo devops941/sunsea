@@ -74,6 +74,12 @@ export const updateRole = async (
 export const deleteRole = async (
   id: number
 ) => {
+  const assignedUsers = await prisma.user.findFirst({ where: { roleId: id } });
+  if (assignedUsers) throw new Error("Cannot delete role because it is assigned to one or more users.");
+
+  const assignedAdmins = await prisma.admin.findFirst({ where: { roleId: id } });
+  if (assignedAdmins) throw new Error("Cannot delete role because it is assigned to one or more admins.");
+
   return prisma.role.delete({
     where: {
       id,

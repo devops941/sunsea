@@ -8,9 +8,10 @@ export interface CommonModalProps {
     children: React.ReactNode;
     footer?: React.ReactNode;
     overflowVisible?: boolean;
+    maxWidth?: "sm" | "md" | "lg" | "xl" | "2xl" | "3xl" | "4xl" | "5xl" | "full";
 }
 
-const CommonModal: React.FC<CommonModalProps> = ({ show, onHide, title, children, footer, overflowVisible }) => {
+const CommonModal: React.FC<CommonModalProps> = ({ show, onHide, title, children, footer, overflowVisible, maxWidth = "lg" }) => {
     // Handle escape key to close
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -25,7 +26,7 @@ const CommonModal: React.FC<CommonModalProps> = ({ show, onHide, title, children
     return (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200">
             <div
-                className={`bg-white rounded-xl shadow-xl w-full max-w-lg animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh] ${overflowVisible ? 'overflow-visible' : 'overflow-hidden'}`}
+                className={`bg-white rounded-xl shadow-xl w-full max-w-${maxWidth} animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh] ${overflowVisible ? 'overflow-visible' : 'overflow-hidden'}`}
                 role="dialog"
                 aria-modal="true"
             >

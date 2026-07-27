@@ -38,6 +38,7 @@ const WastageStoreList: React.FC = () => {
 
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [itemToDelete, setItemToDelete] = useState<string | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     const [showViewModal, setShowViewModal] = useState(false);
     const [selectedItem, setSelectedItem] = useState<any>(null);
@@ -114,12 +115,14 @@ const WastageStoreList: React.FC = () => {
 
     const handleDeleteConfirm = async () => {
         if (itemToDelete !== null) {
+            setIsDeleting(true);
             try {
                 await dispatch(deleteRawMaterial(itemToDelete)).unwrap();
                 toast.success("Wastage product deleted successfully!");
             } catch (err: any) {
                 toast.error(err || "Failed to delete wastage product");
             } finally {
+                setIsDeleting(false);
                 setShowDeleteModal(false);
                 setItemToDelete(null);
             }
@@ -267,17 +270,15 @@ const WastageStoreList: React.FC = () => {
             />
 
             <CommonConfirmModal
-                show={showDeleteModal}
-                onHide={() => {
-                    setShowDeleteModal(false);
-                    setItemToDelete(null);
-                }}
+                isOpen={showDeleteModal}
+                onClose={() => setShowDeleteModal(false)}
                 onConfirm={handleDeleteConfirm}
-                title="Delete Wastage Product"
-                message="Are you sure you want to delete this wastage product? This action cannot be undone."
-                confirmText="Delete"
-                
-                
+                title="Confirm Delete"
+                message="Are you sure you want to delete this wastage product?"
+                confirmText={isDeleting ? "Deleting..." : "Delete"}
+                cancelText="Cancel"
+                isDangerous={true}
+                isLoading={isDeleting}
             />
         </div>
     );

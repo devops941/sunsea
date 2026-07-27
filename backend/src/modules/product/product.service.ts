@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../config/prisma";
 import { ApiError } from "../../utils/ApiError";
+import { executeDeleteWithValidation } from "../../utils/deleteValidation";
 import { standardConverter } from "../../utils/convert.util";
 import { uploadToImageKit } from "../../utils/Imagekit";
 import fs from "fs";
@@ -549,14 +550,34 @@ class ProductService {
 
   async delete(id: bigint) {
     await this.findById(id);
-    const [salesCount, stockCount] = await Promise.all([
+    const [salesCount, prodOrderCount, dispatchCount, quotationCount, realTxnCount] = await Promise.all([
       prisma.salesOrderItem.count({ where: { productId: id } }),
-      prisma.finishedGoodsStock.count({ where: { productItemId: id } })
+      prisma.productionOrder.count({ where: { productItemId: id } }),
+      prisma.goodsDispatchItem.count({ where: { productItemId: id } }),
+      prisma.quotationItem.count({ where: { productId: id } }),
+      prisma.finishedGoodsTransaction.count({
+        where: {
+          productItemId: id,
+          txnType: { not: "OPENING_STOCK" },
+        },
+      }),
     ]);
-    if (salesCount > 0 || stockCount > 0) {
-      throw new ApiError(400, "Cannot delete product as it is referenced in sales orders or stock");
+
+    if (salesCount > 0 || prodOrderCount > 0 || dispatchCount > 0 || quotationCount > 0 || realTxnCount > 0) {
+      throw new ApiError(400, "Cannot delete product as it is referenced in sales orders, production orders, quotations, dispatch, or stock transactions.");
     }
-    return prisma.product.delete({ where: { id } });
+
+    return executeDeleteWithValidation(
+      () => prisma.$transaction(async (tx) => {
+        await tx.finishedGoodsTransaction.deleteMany({ where: { productItemId: id } });
+        await tx.finishedGoodsStock.deleteMany({ where: { productItemId: id } });
+        await tx.billOfMaterial.deleteMany({ where: { productId: id } });
+        await tx.productionStep.deleteMany({ where: { productId: id } });
+        await tx.productImage.deleteMany({ where: { productId: id } });
+        return tx.product.delete({ where: { id } });
+      }),
+      "Product"
+    );
   }
 
   async getNextProductId() {

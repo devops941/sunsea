@@ -537,7 +537,6 @@ const RawMaterialCreate: React.FC = () => {
                                 label="Remarks"
                                 name="remarks"
                                 value={formData.remarks}
-                                required
                                 error={errors.remarks}
                                 onChange={handleChange}
                             />

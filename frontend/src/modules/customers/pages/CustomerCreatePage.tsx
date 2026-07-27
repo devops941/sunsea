@@ -104,6 +104,7 @@ const CustomerCreatePage: React.FC = () => {
 
   const [formData, setFormData] = useState<CustomerFormData>(initialFormData);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [addresses, setAddresses] = useState<any[]>([
     {
@@ -340,6 +341,8 @@ const CustomerCreatePage: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
+    setIsSubmitting(true);
 
     const validationData = {
       ...formData,
@@ -384,7 +387,9 @@ const CustomerCreatePage: React.FC = () => {
 
     if (Object.keys(validationErrors).length > 0 || hasCustomErrors) {
       setErrors(mappedErrors);
-      toast.error("Please fix the highlighted errors");
+      const errorKeys = Object.keys(mappedErrors).map(k => k.split('.').pop() || k).join(", ");
+      toast.error(`Please fix errors in: ${errorKeys}`);
+      setIsSubmitting(false);
       return;
     }
 
@@ -426,28 +431,26 @@ const CustomerCreatePage: React.FC = () => {
       setErrors({});
     } catch (error: any) {
       toast.error(error?.message || "Failed to create customer");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="p-4 md:p-6 min-h-screen bg-white">
-      <div className=" space-y-3">
+        <div className="w-full mx-auto">
+            <div className="bg-white shadow-sm border border-slate-200 overflow-visible">
+                <div className="px-6 py-5 border-b border-slate-200">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <h2 className="text-xl font-bold text-slate-800">Create Customer</h2>
+                        <CustomButton
+                            text="Back to List"
+                            icon={FaArrowLeft}
+                            onClick={() => navigate("/customers")}
+                        />
+                    </div>
+                </div>
 
-        {/* Main Form Card */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200">
-
-          {/* Header */}
-          <div className="p-6 border-b border-slate-200 flex items-center justify-between">
-            <h2 className="text-2xl font-bold text-slate-800">Create Customer</h2>
-            <CustomButton
-              text="Back"
-              icon={FaArrowLeft}
-              onClick={() => navigate("/customers")}
-
-            />
-          </div>
-
-          <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4" noValidate>
 
             {/* Identification & Status */}
             <div>
@@ -815,14 +818,17 @@ const CustomerCreatePage: React.FC = () => {
                 icon={FaEraser}
                 onClick={handleClear}
                 type="button"
-
               />
-              <CustomButton text="Save Customer" icon={FaSave} type="submit" />
+              <CustomButton 
+                text={isSubmitting ? "Saving..." : "Save Customer"} 
+                icon={FaSave} 
+                type="submit" 
+                disabled={isSubmitting} 
+              />
             </div>
           </form>
         </div>
       </div>
-    </div>
   );
 };
 

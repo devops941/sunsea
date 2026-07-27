@@ -110,15 +110,7 @@ export const updateDepartmentService =
 
     await getDepartmentByIdService(id);
 
-    const employeesWithDepartment = await prisma.employee.findFirst({
-      where: {
-        departmentId: id,
-      },
-    });
 
-    if (employeesWithDepartment) {
-      throw new ApiError(400, "This department is currently assigned to one or more employees and cannot be edited.");
-    }
 
     const existingDepartment =
       await prisma.department.findFirst({

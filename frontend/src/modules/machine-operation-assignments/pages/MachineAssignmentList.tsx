@@ -17,6 +17,7 @@ import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import TextInput from "../../../components/form/TextInput/TextInput";
 import DatePickerCalendar from "../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 import { formatDate } from "../../../utils/dateUtils";
+import SearchInput from "../../../components/ui/SearchInput/SearchInput";
 
 import {
   machineOperationAssignmentService,
@@ -32,6 +33,9 @@ const MachineAssignmentList: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
+
+  // Search state
+  const [searchTerm, setSearchTerm] = useState("");
 
   // View modal state
   const [viewModalData, setViewModalData] = useState<any>(null);
@@ -58,6 +62,11 @@ const MachineAssignmentList: React.FC = () => {
     loadFiltersData();
   }, []);
 
+  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchTerm(e.target.value);
+    setCurrentPage(1);
+  };
+
   // Load assignments
   const loadAssignments = useCallback(async () => {
     setLoading(true);
@@ -68,6 +77,7 @@ const MachineAssignmentList: React.FC = () => {
       };
       if (filterMachineId) params.machineId = filterMachineId;
       if (filterWeekDate) params.weekStartDate = filterWeekDate;
+      if (searchTerm) params.search = searchTerm;
 
       const res = await machineOperationAssignmentService.getAssignments(params);
       setAssignments(res.data || res.assignments || []);
@@ -77,14 +87,18 @@ const MachineAssignmentList: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [currentPage, filterMachineId, filterWeekDate]);
+  }, [currentPage, filterMachineId, filterWeekDate, searchTerm]);
 
   useEffect(() => {
-    loadAssignments();
+    const timer = setTimeout(() => {
+      loadAssignments();
+    }, 300);
+    return () => clearTimeout(timer);
   }, [loadAssignments]);
 
   // Pagination
   const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE) || 1;
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
   const paginatedData = assignments; // Data is already paginated by the backend
 
   const handleOpenCreate = () => {
@@ -114,6 +128,7 @@ const MachineAssignmentList: React.FC = () => {
       };
       if (filterMachineId) params.machineId = filterMachineId;
       if (filterWeekDate) params.weekStartDate = filterWeekDate;
+      if (searchTerm) params.search = searchTerm;
 
       const res = await machineOperationAssignmentService.getAssignments(params);
       const dataToExport = res.assignments || res.data || [];
@@ -190,6 +205,11 @@ const MachineAssignmentList: React.FC = () => {
             </p>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-3 w-full lg:w-auto ml-auto">
+            <SearchInput
+              value={searchTerm}
+              onChange={handleSearch}
+              placeholder="Search assignments..."
+            />
             <CustomButton
               text="Export CSV"
               icon={FaFileCsv}
@@ -246,12 +266,18 @@ const MachineAssignmentList: React.FC = () => {
             data={paginatedData}
             rowKey={(item: any) => item.id}
             loading={loading}
+            emptyMessage="No machine operation assignments found."
             pagination={{
               currentPage,
               totalPages,
               onPageChange: (page) => setCurrentPage(page),
             }}
             columns={[
+              {
+                header: "#",
+                width: "60px",
+                render: (_item, index) => startIndex + index + 1,
+              },
               {
                 header: "WEEK PERIOD",
                 render: (item) => (

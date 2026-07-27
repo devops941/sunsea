@@ -119,7 +119,6 @@ export const MachineAssignmentFormModal: React.FC<Props> = ({
         inchargeRoleId: "",
         inchargeEmployeeId: "",
         operators: [
-          { roleId: "", employeeId: "" },
           { roleId: "", employeeId: "" }
         ],
         remarks: "",
@@ -189,7 +188,7 @@ export const MachineAssignmentFormModal: React.FC<Props> = ({
   };
 
   const handleRemoveOperator = (index: number) => {
-    if (formData.operators.length <= 2) return;
+    if (formData.operators.length <= 1) return;
     setFormData(prev => ({
       ...prev,
       operators: prev.operators.filter((_, i) => i !== index)
@@ -227,8 +226,8 @@ export const MachineAssignmentFormModal: React.FC<Props> = ({
         newErrors.weekEndDate = "Week End Date must be after Week Start Date";
       }
     }
-    if (formData.operators.length < 2) {
-      newErrors.operators = "At least two operators are required";
+    if (formData.operators.length < 1) {
+      newErrors.operators = "At least one operator is required";
     } else {
       const empIds = new Set<string>();
       formData.operators.forEach((op, idx) => {
@@ -402,7 +401,7 @@ export const MachineAssignmentFormModal: React.FC<Props> = ({
               <div key={index} className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-4 relative group">
                 <div className="flex justify-between items-center">
                   <h5 className="text-sm font-medium text-slate-700">Operator {index + 1}</h5>
-                  {formData.operators.length > 2 && (
+                  {formData.operators.length > 1 && (
                     <button
                       type="button"
                       onClick={() => handleRemoveOperator(index)}

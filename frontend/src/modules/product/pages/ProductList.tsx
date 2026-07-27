@@ -31,6 +31,7 @@ const ProductList: React.FC = () => {
     // Custom confirm delete state
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [productToDelete, setProductToDelete] = useState<string | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -68,12 +69,15 @@ const ProductList: React.FC = () => {
 
     const handleDeleteConfirm = async () => {
         if (productToDelete !== null) {
+            setIsDeleting(true);
             try {
                 await removeProduct(productToDelete);
                 toast.success("Product deleted successfully!");
             } catch (err: any) {
-                toast.error(err?.message || err || "Failed to delete product");
+                const errorMessage = typeof err === 'string' ? err : err?.message || "Failed to delete product";
+                toast.error(errorMessage);
             } finally {
+                setIsDeleting(false);
                 setShowDeleteModal(false);
                 setProductToDelete(null);
             }
@@ -261,13 +265,15 @@ const ProductList: React.FC = () => {
 
                 {/* Custom Delete Confirm Modal */}
                 <CommonConfirmModal
-                    show={showDeleteModal}
-                    onHide={() => setShowDeleteModal(false)}
+                    isOpen={showDeleteModal}
+                    onClose={() => setShowDeleteModal(false)}
                     onConfirm={handleDeleteConfirm}
                     title="Confirm Delete"
                     message="Are you sure you want to delete this product?"
-                    confirmText="Delete"
-                    confirmVariant="danger"
+                    confirmText={isDeleting ? "Deleting..." : "Delete"}
+                    cancelText="Cancel"
+                    isDangerous={true}
+                    isLoading={isDeleting}
                 />
             </div>
         </div>

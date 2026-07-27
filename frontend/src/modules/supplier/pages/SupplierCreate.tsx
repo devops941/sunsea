@@ -109,6 +109,7 @@ const SupplierCreate: React.FC = () => {
     const navigate = useNavigate();
     const { addSupplier, loading } = useSuppliers();
     const user = useSelector((state: any) => state.auth.user);
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     const [categoryOptions, setCategoryOptions] = useState<{ value: string; label: string }[]>([]);
     const [allRawMaterials, setAllRawMaterials] = useState<any[]>([]);
@@ -484,6 +485,8 @@ const SupplierCreate: React.FC = () => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (isSubmitting) return;
+        setIsSubmitting(true);
 
         const primaryMobile = phones && phones.length > 0 ? phones[0].number : "";
 
@@ -506,6 +509,7 @@ const SupplierCreate: React.FC = () => {
                 });
                 setErrors(formattedErrors);
                 toast.error("Please fill all required fields correctly.");
+                setIsSubmitting(false);
                 return;
             }
         }
@@ -559,13 +563,15 @@ const SupplierCreate: React.FC = () => {
             navigate("/suppliers");
         } catch (err: any) {
             toast.error(err || "Failed to create supplier");
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
     return (
-        <div className="p-4 md:p-6 min-h-screen bg-white">
+        <div className="p-4 md:p-1 min-h-screen bg-white">
             <div className=" space-y-3">
-                <div className="bg-white rounded-2xl shadow-sm border border-slate-200">
+                <div className="bg-white  ">
                     <div className="p-6 border-b border-slate-200 flex items-center justify-between">
                         <h2 className="text-2xl font-bold text-slate-800">Add New Supplier</h2>
                         <BackButton text="Back" />
@@ -1063,10 +1069,10 @@ const SupplierCreate: React.FC = () => {
                                 type="button"
                             />
                             <CustomButton
-                                text="Save Supplier"
+                                text={isSubmitting ? "Saving..." : "Save Supplier"}
                                 icon={FaSave}
                                 type="submit"
-                                disabled={loading}
+                                disabled={isSubmitting || loading}
                             />
                         </div>
                     </form>

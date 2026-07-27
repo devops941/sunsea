@@ -80,6 +80,7 @@ const ShiftCreate: React.FC = () => {
 
     const [formData, setFormData] = useState(initialFormState);
     const [errors, setErrors] = useState<FormErrors>({});
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     useEffect(() => {
         const getNextId = async () => {
@@ -145,8 +146,10 @@ const ShiftCreate: React.FC = () => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (isSubmitting) return;
 
         if (!validate()) return;
+        setIsSubmitting(true);
 
         const payload = {
             ...formData,
@@ -160,29 +163,25 @@ const ShiftCreate: React.FC = () => {
             navigate("/shifts");
         } catch (err: any) {
             toast.error(err || "Failed to create shift");
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
     return (
-        <div className="w-full  space-y-6">
-            {/* Page Header */}
-           <div className="bg-white rounded-2xl shadow-sm border border-slate-200">
-                <div className="px-6 py-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                        <h2 className="text-2xl font-bold text-slate-800">
-                            Create Shift
-                        </h2>
+        <div className="w-full mx-auto">
+            <div className="bg-white shadow-sm border border-slate-200 overflow-visible">
+                <div className="px-6 py-5 border-b border-slate-200">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <h2 className="text-xl font-bold text-slate-800">Create Shift</h2>
+                        <BackButton text="Back to List" to="/shifts" />
                     </div>
-                    <BackButton />
                 </div>
-            </div>
 
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-                <form onSubmit={handleSubmit} className="px-6 py-6 space-y-8" noValidate>
+                <form onSubmit={handleSubmit} className="px-6 py-5 space-y-8" noValidate>
                     {/* General Info */}
                     <div>
                         <div className="flex items-center gap-2 mb-6 pb-2 border-b border-gray-100">
-                            <FaClock className="text-primary text-xl" />
                             <h3 className="text-lg font-semibold text-gray-700">Shift Details</h3>
                         </div>
 
@@ -270,10 +269,10 @@ const ShiftCreate: React.FC = () => {
 
                         />
                         <CustomButton
-                            text={loading ? "Saving..." : "Save Shift"}
+                            text={isSubmitting || loading ? "Saving..." : "Save Shift"}
                             icon={FaSave}
                             type="submit"
-                            disabled={loading}
+                            disabled={isSubmitting || loading}
                         />
                     </div>
                 </form>

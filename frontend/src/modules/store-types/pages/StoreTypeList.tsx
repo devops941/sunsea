@@ -1,10 +1,12 @@
 import React, { useState, useCallback, useEffect } from "react";
-import { FaSearch, FaPlus } from "react-icons/fa";
+import { FaSearch, FaPlus, FaSave, FaEraser } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
+import { z } from "zod";
 
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
-import { fetchStoreTypes, deleteStoreType } from "../../../features/store-types/storeTypeSlice";
+import { fetchStoreTypes, deleteStoreType, createStoreType, updateStoreType } from "../../../features/store-types/storeTypeSlice";
+import { storeTypeService } from "../../../services/storeTypeService";
 import type { StoreType } from "../../../features/store-types/types";
 
 import ViewButton from "../../../components/ui/viewbutton/ViewButton";
@@ -13,9 +15,57 @@ import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
 import CustomButton from "../../../components/ui/Button/Button";
 import CommonViewModal from "../../../components/ui/CommonViewModal/CommonViewModal";
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
+import CommonModal from "../../../components/ui/Modal/CommonModal";
+import TextInput from "../../../components/form/TextInput/TextInput";
+import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import DataTable from "../../../components/ui/table/DataTable";
 
 const ITEMS_PER_PAGE = 10;
+
+const initialFormState = {
+    id: 0,
+    code: "",
+    name: "",
+    description: "",
+    isActive: true,
+};
+
+const storeTypeSchema = z.object({
+    code: z
+        .string()
+        .trim()
+        .min(1, "Store Type Code is required")
+        .max(20, "Maximum 20 characters allowed")
+        .regex(
+            /^[A-Z0-9_-]+$/,
+            "Only uppercase letters, numbers, hyphen (-) and underscore (_) are allowed"
+        ),
+
+    name: z
+        .string()
+        .trim()
+        .min(1, "Store Type Name is required")
+        .max(100, "Maximum 100 characters allowed")
+        .regex(
+            /^[A-Za-z0-9\s&()-]+$/,
+            "Store Type Name contains invalid characters"
+        )
+        .refine(
+            (value) => /[A-Za-z]/.test(value),
+            "Store Type Name must contain at least one alphabet"
+        ),
+
+    description: z
+        .string()
+        .trim()
+        .max(255, "Maximum 255 characters allowed")
+        .regex(
+            /^[A-Za-z0-9\s,./()&-]*$/,
+            "Description contains invalid characters"
+        )
+        .optional()
+        .nullable(),
+});
 
 const StoreTypeList: React.FC = () => {
     const navigate = useNavigate();
@@ -37,6 +87,14 @@ const StoreTypeList: React.FC = () => {
 
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [itemToDelete, setItemToDelete] = useState<number | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
+
+    // Form Modal State
+    const [showFormModal, setShowFormModal] = useState(false);
+    const [editMode, setEditMode] = useState(false);
+    const [formData, setFormData] = useState(initialFormState);
+    const [errors, setErrors] = useState<Record<string, string>>({});
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     useEffect(() => {
         const delayDebounce = setTimeout(() => {
@@ -64,13 +122,33 @@ const StoreTypeList: React.FC = () => {
         setShowViewModal(true);
     }, []);
 
-    const handleOpenAdd = () => {
-        navigate("/store-types/create");
+    const handleOpenAdd = async () => {
+        setEditMode(false);
+        setErrors({});
+        
+        let nextCode = "";
+        try {
+            nextCode = await storeTypeService.fetchNextId();
+        } catch (err) {
+            console.error("Failed to fetch next store type code:", err);
+        }
+        
+        setFormData({ ...initialFormState, code: nextCode });
+        setShowFormModal(true);
     };
 
     const handleOpenEdit = useCallback((item: StoreType) => {
-        navigate(`/store-types/edit/${item.id}`, { state: item });
-    }, [navigate]);
+        setEditMode(true);
+        setErrors({});
+        setFormData({
+            id: item.id,
+            code: item.code,
+            name: item.name,
+            description: item.description || "",
+            isActive: item.isActive,
+        });
+        setShowFormModal(true);
+    }, []);
 
     const triggerDelete = useCallback((id: number) => {
         setItemToDelete(id);
@@ -79,6 +157,7 @@ const StoreTypeList: React.FC = () => {
 
     const handleDeleteConfirm = async () => {
         if (itemToDelete !== null) {
+            setIsDeleting(true);
             try {
                 await dispatch(deleteStoreType(itemToDelete)).unwrap();
                 toast.success("Store Type deleted successfully!");
@@ -86,6 +165,7 @@ const StoreTypeList: React.FC = () => {
                 const errorMessage = typeof err === 'string' ? err : err?.message || "Failed to delete store type";
                 toast.error(errorMessage);
             } finally {
+                setIsDeleting(false);
                 setShowDeleteModal(false);
                 setItemToDelete(null);
             }
@@ -97,6 +177,74 @@ const StoreTypeList: React.FC = () => {
             toast.error(error);
         }
     }, [error]);
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+        const target = e.target;
+        const { name, value } = target;
+        const type = (target as any).type;
+
+        const checked =
+            type === "checkbox"
+                ? (target as HTMLInputElement).checked
+                : undefined;
+
+        setFormData(prev => ({
+            ...prev,
+            [name]: type === "checkbox" ? checked : value
+        }));
+
+        if (errors[name]) {
+            setErrors(prev => ({
+                ...prev,
+                [name]: ""
+            }));
+        }
+    };
+
+    const handleClear = () => {
+        setFormData(prev => ({
+            ...initialFormState,
+            code: prev.code
+        }));
+        setErrors({});
+    };
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+
+        try {
+            storeTypeSchema.parse(formData);
+            setErrors({});
+        } catch (error) {
+            if (error instanceof z.ZodError) {
+                const fieldErrors = error.flatten().fieldErrors as Record<string, string[] | undefined>;
+                const formattedErrors: Record<string, string> = {};
+                Object.keys(fieldErrors).forEach((key) => {
+                    const message = fieldErrors[key]?.[0];
+                    if (message) formattedErrors[key] = message;
+                });
+                setErrors(formattedErrors);
+                return;
+            }
+        }
+
+        setIsSubmitting(true);
+        try {
+            if (editMode) {
+                await dispatch(updateStoreType({ id: formData.id, data: formData })).unwrap();
+                toast.success("Store Type updated successfully!");
+            } else {
+                await dispatch(createStoreType(formData)).unwrap();
+                toast.success("Store Type created successfully!");
+            }
+            setShowFormModal(false);
+        } catch (err: any) {
+            const errorMessage = typeof err === 'string' ? err : err?.message || "Failed to save store type";
+            toast.error(errorMessage);
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
 
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
 
@@ -174,6 +322,75 @@ const StoreTypeList: React.FC = () => {
                         />
                     </div>
                 </div>
+                
+                {/* Form Modal (Add / Edit) */}
+                <CommonModal
+                    show={showFormModal}
+                    onHide={() => setShowFormModal(false)}
+                    title={editMode ? "Edit Store Type" : "Add New Store Type"}
+
+                    footer={
+                        <div className="flex items-center justify-end gap-2 w-full">
+                            <CustomButton
+                                text="Clear"
+                                icon={FaEraser}
+                                onClick={handleClear}
+                                disabled={isSubmitting}
+                            />
+                            <CustomButton
+                                type="submit"
+                                text={editMode ? "Update Type" : "Save Type"}
+                                icon={FaSave}
+                                variant="primary"
+                                disabled={isSubmitting}
+                                onClick={handleSubmit}
+                            />
+                        </div>
+                    }
+                >
+                    <form onSubmit={handleSubmit} className="space-y-4 p-2">
+                        <div className="grid grid-cols-1 gap-4">
+                            <TextInput
+                                label="Store Type Code"
+                                name="code"
+                                value={formData.code}
+                                placeholder="e.g. ST001"
+                                required
+                                onChange={handleChange}
+                                disabled
+                                error={errors.code}
+                            />
+                            <TextInput
+                                label="Store Type Name"
+                                name="name"
+                                value={formData.name}
+                                placeholder="e.g. Raw Material Store"
+                                required
+                                onChange={handleChange}
+                                error={errors.name}
+                            />
+                            <TextInput
+                                label="Description"
+                                name="description"
+                                value={formData.description || ""}
+                                placeholder="Enter description..."
+                                onChange={handleChange}
+                                error={errors.description}
+                            />
+                            <SelectInput
+                                label="Status"
+                                name="isActive"
+                                value={formData.isActive.toString()}
+                                options={[
+                                    { label: "Active", value: "true" },
+                                    { label: "Inactive", value: "false" }
+                                ]}
+                                required
+                                onChange={(e) => setFormData(prev => ({ ...prev, isActive: e.target.value === "true" }))}
+                            />
+                        </div>
+                    </form>
+                </CommonModal>
 
                 <CommonViewModal
                     show={showViewModal}
@@ -200,13 +417,15 @@ const StoreTypeList: React.FC = () => {
                 />
 
                 <CommonConfirmModal
-                    show={showDeleteModal}
-                    onHide={() => setShowDeleteModal(false)}
+                    isOpen={showDeleteModal}
+                    onClose={() => setShowDeleteModal(false)}
                     onConfirm={handleDeleteConfirm}
                     title="Confirm Delete"
                     message="Are you sure you want to delete this store type?"
-                    confirmText="Delete"
-                    confirmVariant="danger"
+                    confirmText={isDeleting ? "Deleting..." : "Delete"}
+                    cancelText="Cancel"
+                    isDangerous={true}
+                    isLoading={isDeleting}
                 />
             </div>
         </div>

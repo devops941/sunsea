@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { z } from "zod";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -15,6 +15,7 @@ import { weeklyProgramService } from "../../../services/weeklyProgramService";
 import { dailyPlanService } from "../../../services/dailyPlanService";
 import { oeeService } from "../../../services/oeeService";
 import { machineOperationAssignmentService } from "../../../services/machineOperationAssignmentService";
+import MultiSelect from "../../../components/form/multiSelect/MultiSelect";
 
 import TextInput from "../../../components/form/TextInput/TextInput";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
@@ -71,7 +72,19 @@ const DailyPlanCreate: React.FC = () => {
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   // ── Fetch active assignment ──────────────────────────────────────────────
-  const [operatorName, setOperatorName] = useState("");
+  const loadedPlanRef = useRef<{ machineId?: string; shiftId?: string; prodDate?: string } | null>(null);
+  const [availableOperators, setAvailableOperators] = useState<any[]>([]);
+  const [selectedOperators, setSelectedOperators] = useState<string[]>([]);
+  const operatorName = useMemo(() => {
+    return selectedOperators
+      .map((id) => {
+        const op = availableOperators.find((o: any) => (o.id || o.employeeId)?.toString() === id);
+        return op ? op.fullName : id;
+      })
+      .filter(Boolean)
+      .join(", ");
+  }, [selectedOperators, availableOperators]);
+
   const [loadingAssignment, setLoadingAssignment] = useState(false);
   const [assignmentError, setAssignmentError] = useState<string | null>(null);
 
@@ -118,7 +131,8 @@ const DailyPlanCreate: React.FC = () => {
 
   useEffect(() => {
     if (!machineId || !shiftId || !productionDate) {
-      setOperatorName("");
+      setAvailableOperators([]);
+      setSelectedOperators([]);
       setAssignmentError(null);
       return;
     }
@@ -134,18 +148,29 @@ const DailyPlanCreate: React.FC = () => {
       .then((res: any) => {
         const assignment = res.data;
         if (!assignment || !assignment.operators || assignment.operators.length === 0) {
-          setOperatorName("");
-          setAssignmentError("No operator is assigned to the selected machine for this shift. Please assign an operator before creating the Daily Production Plan.");
+          setAvailableOperators([]);
+          setSelectedOperators([]);
+          setAssignmentError("No operator is assigned to the selected machine for this shift in Weekly Machine Assignment.");
           return;
         }
 
-        setOperatorName(assignment.operators.map((op: any) => op.fullName).join(", "));
+        const isInitialEditLoad = isEdit &&
+          loadedPlanRef.current &&
+          loadedPlanRef.current.machineId === machineId &&
+          loadedPlanRef.current.shiftId === shiftId &&
+          loadedPlanRef.current.prodDate === productionDate;
+
+        setAvailableOperators(assignment.operators);
+        if (!isInitialEditLoad) {
+          setSelectedOperators(assignment.operators.map((op: any) => (op.id || op.employeeId)?.toString()).filter(Boolean));
+        }
         setAssignmentError(null);
       })
       .catch((err: any) => {
         console.error("Failed to resolve machine assignment:", err);
-        setOperatorName("");
-        setAssignmentError("Error resolving machine shift assignment. Please check configurations.");
+        setAvailableOperators([]);
+        setSelectedOperators([]);
+        setAssignmentError("Error resolving machine shift assignment. Please check Weekly Machine Assignment.");
       })
       .finally(() => {
         setLoadingAssignment(false);
@@ -273,6 +298,16 @@ const DailyPlanCreate: React.FC = () => {
       setPriority(plan.priority || "MEDIUM");
       setStatus(plan.status || "DRAFT");
       setRemarks(plan.remarks || "");
+      loadedPlanRef.current = {
+        machineId: plan.machineId,
+        shiftId: plan.shiftId,
+        prodDate: plan.productionDate?.split("T")[0]
+      };
+      if (plan.selectedOperatorIds && plan.selectedOperatorIds.trim() !== "") {
+        setSelectedOperators(plan.selectedOperatorIds.split(",").map((id: string) => id.trim()).filter(Boolean));
+      } else if (plan.operators && Array.isArray(plan.operators)) {
+        setSelectedOperators(plan.operators.map((op: any) => (op.id || op.employeeId)?.toString()).filter(Boolean));
+      }
     }).catch(() => toast.error("Failed to load plan for editing"));
   }, [isEdit, editId]);
 
@@ -444,14 +479,14 @@ const DailyPlanCreate: React.FC = () => {
       return;
     }
 
-    if (assignmentError) {
+    if (selectedOperators.length === 0 && assignmentError) {
       setSubmitError(assignmentError);
       toast.error(assignmentError);
       return;
     }
 
-    if (!operatorName) {
-      const errMsg = "No operator is assigned to the selected machine for this shift. Please assign an operator before creating the Daily Production Plan.";
+    if (selectedOperators.length === 0) {
+      const errMsg = "Please assign or manually select at least one operator before creating the Daily Production Plan.";
       setSubmitError(errMsg);
       toast.error(errMsg);
       return;
@@ -479,6 +514,7 @@ const DailyPlanCreate: React.FC = () => {
         remarks: remarks.trim() || null,
         productionOrderId: selectedWeeklyProg?.productionOrderId,
         carryForwardFromPlanId: carryForwardFromPlanId || null,
+        selectedOperatorIds: selectedOperators.join(","),
       };
 
       if (isEdit && editId) {
@@ -778,36 +814,41 @@ const DailyPlanCreate: React.FC = () => {
 
                 {/* Operators */}
                 <div>
-                  <label className="form-label text-sm font-semibold text-slate-700 mb-1 block">Operators</label>
                   {loadingAssignment ? (
-                    <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-slate-500 text-sm">
-                      <div className="animate-pulse flex gap-2 items-center">
-                        <div className="w-4 h-4 bg-slate-200 rounded-full"></div>
-                        <div className="h-2 bg-slate-200 rounded w-24"></div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">
+                        Operators <span className="text-red-500">*</span>
+                      </label>
+                      <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-slate-500 text-sm">
+                        <div className="animate-pulse flex gap-2 items-center">
+                          <div className="w-4 h-4 bg-slate-200 rounded-full"></div>
+                          <div className="h-2 bg-slate-200 rounded w-24"></div>
+                        </div>
                       </div>
                     </div>
-                  ) : operatorName ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-1">
-                      {operatorName.split(',').map((name, index) => (
-                        <div key={index} className="flex items-center gap-3 p-3 bg-indigo-50 border border-indigo-100 rounded-xl shadow-sm">
-                          <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-xs">
-                            {index + 1}
-                          </div>
-                          <div>
-                            <p className="text-[10px] text-indigo-400 font-bold uppercase tracking-wider mb-0.5 leading-none">Operator {index + 1}</p>
-                            <p className="text-sm text-slate-800 font-semibold mb-0 leading-none">{name.trim()}</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
                   ) : (
-                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm flex flex-col gap-1">
-                      <span className="font-semibold">No operator assigned</span>
-                      {assignmentError && <span className="text-xs text-amber-600">{assignmentError}</span>}
-                    </div>
+                    <MultiSelect
+                      label="Operators"
+                      name="operators"
+                      required={true}
+                      options={availableOperators.map((op: any) => ({
+                        value: (op.id || op.employeeId)?.toString(),
+                        label: op.fullName + (op.empCode ? ` (${op.empCode})` : "") + (op.role?.name ? ` • ${op.role.name}` : ""),
+                      }))}
+                      value={selectedOperators}
+                      onChange={(_name, vals) => {
+                        setSelectedOperators(vals);
+                        setAssignmentError(null);
+                      }}
+                      placeholder={availableOperators.length === 0 ? "No operators assigned to this machine..." : "-- Select Assigned Operators --"}
+                      error={selectedOperators.length === 0 && assignmentError ? assignmentError : undefined}
+                    />
                   )}
-                  {assignmentError && assignmentError.includes("operator") && operatorName && (
-                    <div className="text-red-500 text-xs mt-1">{assignmentError}</div>
+                  {availableOperators.length === 0 && !loadingAssignment && (
+                    <div className="mt-2 p-2.5 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-xs flex items-center gap-2">
+                      <FaExclamationTriangle className="text-amber-500 flex-shrink-0" size={12} />
+                      <span>No operator assigned to this machine in Weekly Machine Operator Assignment.</span>
+                    </div>
                   )}
                 </div>
 

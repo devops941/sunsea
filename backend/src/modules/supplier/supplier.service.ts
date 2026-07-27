@@ -328,6 +328,13 @@ class SupplierService {
     id: string
   ) {
     await this.getSupplierById(id);
+
+    const linkedPurchaseOrders = await prisma.purchaseOrder.findFirst({ where: { supplierId: Number(id) } });
+    if (linkedPurchaseOrders) throw new ApiError(400, "Cannot delete supplier because they have associated Purchase Orders.");
+
+    const linkedGrnInvoices = await prisma.grnInvoice.findFirst({ where: { supplierId: Number(id) } });
+    if (linkedGrnInvoices) throw new ApiError(400, "Cannot delete supplier because they have associated GRN Invoices.");
+
     return supplierRepository.delete(id);
   }
 }

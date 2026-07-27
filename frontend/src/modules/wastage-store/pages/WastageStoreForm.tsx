@@ -217,6 +217,7 @@ const WastageStoreForm: React.FC = () => {
                             defaultOptionLabel="Select Store"
                             error={errors.storeId}
                             required
+                            disabled={isEdit}
                         />
                         <SelectInput
                             label="Raw Material Category"
@@ -227,6 +228,7 @@ const WastageStoreForm: React.FC = () => {
                             defaultOptionLabel="Select Category"
                             error={errors.categoryId}
                             required
+                            disabled={isEdit}
                         />
                         <UOMSelect
                             name="baseUom"
@@ -248,6 +250,7 @@ const WastageStoreForm: React.FC = () => {
                                 }
                             }}
                             error={errors.baseUom}
+                            disabled={isEdit}
                         />
                         <QuantityInput
                             label="Opening Stock"
@@ -257,6 +260,7 @@ const WastageStoreForm: React.FC = () => {
                             onChange={handleChange}
                             error={errors.onHandQty}
                             required
+                            disabled={isEdit}
                         />
                         <SelectInput
                             label="Status"

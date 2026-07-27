@@ -29,6 +29,7 @@ const Employeelist: React.FC = () => {
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [employeeToDelete, setEmployeeToDelete] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
@@ -70,15 +71,17 @@ const Employeelist: React.FC = () => {
   }, []);
 
   const handleDeleteConfirm = async () => {
-    if (employeeToDelete) {
+    if (employeeToDelete && !isDeleting) {
+      setIsDeleting(true);
       try {
         await removeEmployee(employeeToDelete);
         toast.success("Employee deleted successfully!");
       } catch (err: any) {
-        toast.error(err.message || "Failed to delete employee");
+        toast.error(err?.response?.data?.message || err.message || err || "Failed to delete employee");
       } finally {
         setShowDeleteModal(false);
         setEmployeeToDelete(null);
+        setIsDeleting(false);
       }
     }
   };
@@ -182,7 +185,7 @@ const Employeelist: React.FC = () => {
           onConfirm={handleDeleteConfirm}
           title="Confirm Delete"
           message="Are you sure you want to delete this employee?"
-          confirmText="Delete"
+          confirmText={isDeleting ? "Deleting..." : "Delete"}
           confirmVariant="danger"
         />
       </div>

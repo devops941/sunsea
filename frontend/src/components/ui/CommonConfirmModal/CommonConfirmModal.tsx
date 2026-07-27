@@ -5,30 +5,39 @@ import type { CommonConfirmModalProps } from "./common-confirm-modal.types";
 
 const CommonConfirmModal: React.FC<CommonConfirmModalProps> = ({
   show,
+  isOpen,
   onHide,
+  onClose,
   onConfirm,
   title = "Confirm Action",
   message = "Are you sure you want to perform this action?",
   confirmText = "Confirm",
+  cancelText = "Cancel",
   confirmVariant = "danger",
   confirmDisabled = false,
+  isLoading = false,
+  isDangerous,
 }) => {
+  // Support both prop naming conventions
+  const isVisible = show ?? isOpen ?? false;
+  const handleClose = onHide ?? onClose ?? (() => {});
+  const dangerMode = isDangerous ?? confirmVariant === "danger";
+
   // Handle escape key to close
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && show) onHide();
+      if (e.key === "Escape" && isVisible) handleClose();
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [show, onHide]);
+  }, [isVisible, handleClose]);
 
-  if (!show) return null;
+  if (!isVisible) return null;
 
   // Determine colors based on variant
-  const isDanger = confirmVariant === "danger";
-  const iconBgClass = isDanger ? "bg-red-100" : "bg-primary/10";
-  const iconColorClass = isDanger ? "text-red-500" : "text-primary";
-  const titleColorClass = isDanger ? "text-red-600" : "text-gray-900";
+  const iconBgClass = dangerMode ? "bg-red-100" : "bg-primary/10";
+  const iconColorClass = dangerMode ? "text-red-500" : "text-primary";
+  const titleColorClass = dangerMode ? "text-red-600" : "text-gray-900";
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200">
@@ -56,17 +65,18 @@ const CommonConfirmModal: React.FC<CommonConfirmModalProps> = ({
 
           <div className="flex justify-center gap-3 mt-8">
             <CustomButton
-              text="Cancel"
+              text={cancelText}
               icon={FaTimes}
-              onClick={onHide}
+              onClick={handleClose}
+              disabled={isLoading}
               className="!bg-gray-100 !text-gray-700 hover:!bg-gray-200 !border-transparent px-6"
             />
             <CustomButton
-              text={confirmText}
+              text={isLoading ? "Deleting..." : confirmText}
               icon={FaTrash}
               onClick={onConfirm}
-              disabled={confirmDisabled}
-              className={isDanger ? "!bg-red-500 hover:!bg-red-600 !text-white !border-red-500 px-6" : "px-6"}
+              disabled={confirmDisabled || isLoading}
+              className={dangerMode ? "!bg-red-500 hover:!bg-red-600 !text-white !border-red-500 px-6" : "px-6"}
             />
           </div>
         </div>

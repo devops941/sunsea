@@ -19,6 +19,7 @@ import { useSizes } from "../../../hooks/useSizes";
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
 import { fetchGstTaxes, selectActiveGstTaxes } from "../../../features/gst/gstSlice";
 import FlowInput from "../../../components/ui/FlowInput/FlowInput";
+import BackButton from "../../../components/ui/BackButton/BackButton";
 
 const ProductCreatePage: React.FC = () => {
     const navigate = useNavigate();
@@ -37,6 +38,7 @@ const ProductCreatePage: React.FC = () => {
     const [imagePreviews, setImagePreviews] = useState<string[]>([]);
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [stores, setStores] = useState<any[]>([]);
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     const [formData, setFormData] = useState({
         productCode: "",
@@ -139,10 +141,24 @@ const ProductCreatePage: React.FC = () => {
                 newErrors.bundleQty = "Bundle Qty must be a positive whole number.";
         }
 
-        if (formData.weightPerPiece) {
+        if (!formData.weightPerPiece.toString().trim()) {
+            newErrors.weightPerPiece = "Weight Per Piece is required.";
+        } else {
             const weight = Number(formData.weightPerPiece);
             if (isNaN(weight) || weight <= 0)
                 newErrors.weightPerPiece = "Weight must be greater than 0.";
+        }
+
+        if (!formData.openingStockQty.toString().trim()) {
+            newErrors.openingStockQty = "Opening Stock Qty is required.";
+        } else {
+            const qty = Number(formData.openingStockQty);
+            if (isNaN(qty) || qty < 0)
+                newErrors.openingStockQty = "Must be 0 or greater.";
+        }
+
+        if (!formData.openingStockStoreId.toString().trim()) {
+            newErrors.openingStockStoreId = "Opening Stock Store is required.";
         }
 
         // ── Minimum / Maximum Stock Qty ────────────────────────────────
@@ -384,10 +400,12 @@ const ProductCreatePage: React.FC = () => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (isSubmitting) return;
 
         if (!validateForm()) return;
 
         try {
+            setIsSubmitting(true);
             const payload = new FormData();
             payload.append("productCode", formData.productCode);
             payload.append("productName", formData.productName);
@@ -454,6 +472,8 @@ const ProductCreatePage: React.FC = () => {
             navigate("/products");
         } catch (err: any) {
             toast.error(err.message || "Failed to create product");
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -519,6 +539,7 @@ const ProductCreatePage: React.FC = () => {
                 <div className="px-6 py-4 border-b border-gray-100">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <h2 className="text-xl font-bold text-gray-800">Create Product</h2>
+                        <BackButton text="Back to List" to="/products" />
                     </div>
                 </div>
 
@@ -554,6 +575,18 @@ const ProductCreatePage: React.FC = () => {
                                 onChange={handleChange}
                                 error={errors.categoryId}
                             />
+                            
+                           
+                            <TextInput
+                                label="Opening Stock Qty"
+                                name="openingStockQty"
+                                type="number"
+                                placeholder="0"
+                                required
+                                value={formData.openingStockQty}
+                                onChange={handleChange}
+                                error={errors.openingStockQty}
+                            />
                             <TextInput
                                 label="Minimum Stock Qty"
                                 name="minimumQty"
@@ -564,21 +597,12 @@ const ProductCreatePage: React.FC = () => {
                                 required
                                 error={errors.minimumQty}
                             />
-                           
-                            <TextInput
-                                label="Opening Stock Qty"
-                                name="openingStockQty"
-                                type="number"
-                                placeholder="0"
-                                value={formData.openingStockQty}
-                                onChange={handleChange}
-                                error={errors.openingStockQty}
-                            />
 
                             
                             <SelectInput
                                 label="Opening Stock Store"
                                 name="openingStockStoreId"
+                                required
                                 value={formData.openingStockStoreId}
                                 options={storeOptions}
                                 onChange={handleChange}
@@ -685,6 +709,7 @@ const ProductCreatePage: React.FC = () => {
                                 name="weightPerPiece"
                                 value={formData.weightPerPiece}
                                 baseUoms="kg,g"
+                                required
                                 onChange={handleChange}
                                 error={errors.weightPerPiece}
                             />
@@ -925,8 +950,8 @@ const ProductCreatePage: React.FC = () => {
 
                     {/* Form Actions */}
                     <div className="flex justify-end gap-3 pt-4 border-t border-gray-100 mt-4">
-                        <CustomButton text="Clear" icon={FaEraser} onClick={handleClear} variant="secondary" />
-                        <CustomButton text="Save Product" icon={FaSave} type="submit" />
+                        <CustomButton text="Clear" icon={FaEraser} onClick={handleClear} variant="secondary" disabled={isSubmitting} />
+                        <CustomButton text={isSubmitting ? "Saving..." : "Save Product"} icon={FaSave} type="submit" disabled={isSubmitting} />
                     </div>
                 </form>
             </div>

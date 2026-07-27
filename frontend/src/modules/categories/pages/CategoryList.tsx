@@ -29,6 +29,8 @@ const CategoryList: React.FC = () => {
     const [errors, setErrors] = useState({ code: "", name: "" });
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [itemToDelete, setItemToDelete] = useState<number | null>(null);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     const [formData, setFormData] = useState({
         id: "",
@@ -126,12 +128,14 @@ const CategoryList: React.FC = () => {
 
     const handleDeleteConfirm = async () => {
         if (itemToDelete !== null) {
+            setIsDeleting(true);
             try {
                 await removeCategory(itemToDelete);
                 toast.success("Category deleted successfully!");
             } catch (err: any) {
                 toast.error("Failed to delete category! as it is already assigned in product");
             } finally {
+                setIsDeleting(false);
                 setShowDeleteModal(false);
                 setItemToDelete(null);
             }
@@ -148,6 +152,7 @@ const CategoryList: React.FC = () => {
         e.preventDefault();
         if (!validateForm()) return;
 
+        setIsSubmitting(true);
         try {
             const payload = {
                 code: formData.code,
@@ -166,6 +171,8 @@ const CategoryList: React.FC = () => {
             setShowFormModal(false);
         } catch (err: any) {
             toast.error(err || "Operation failed");
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -253,10 +260,12 @@ const CategoryList: React.FC = () => {
                                 })}
                             />
                             <CustomButton
-                                text={editMode ? "Update" : "Save"}
+                                type="submit"
+                                text={editMode ? "Update Category" : "Save Category"}
                                 icon={FaSave}
+                                variant="primary"
+                                disabled={isSubmitting}
                                 onClick={handleSubmit}
-                                disabled={loading}
                             />
                         </div>
                     }
@@ -330,8 +339,10 @@ const CategoryList: React.FC = () => {
                     onConfirm={handleDeleteConfirm}
                     title="Confirm Delete"
                     message="Are you sure you want to delete this category?"
-                    confirmText="Delete"
-                    confirmVariant="danger"
+                    confirmText={isDeleting ? "Deleting..." : "Delete"}
+                    cancelText="Cancel"
+                    isDangerous={true}
+                    isLoading={isDeleting}
                 />
             </div>
         </div>

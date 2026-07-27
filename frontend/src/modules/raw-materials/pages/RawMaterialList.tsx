@@ -38,6 +38,7 @@ const RawMaterialList: React.FC = () => {
 
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [itemToDelete, setItemToDelete] = useState<string | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     const [showViewModal, setShowViewModal] = useState(false);
     const [selectedItem, setSelectedItem] = useState<any>(null);
@@ -116,12 +117,15 @@ const RawMaterialList: React.FC = () => {
 
     const handleDeleteConfirm = async () => {
         if (itemToDelete !== null) {
+            setIsDeleting(true);
             try {
                 await dispatch(deleteRawMaterial(itemToDelete)).unwrap();
                 toast.success("Raw material deleted successfully!");
             } catch (err: any) {
-                toast.error(err || "Failed to delete raw material");
+                const errorMessage = typeof err === 'string' ? err : err?.message || "Failed to delete raw material";
+                toast.error(errorMessage);
             } finally {
+                setIsDeleting(false);
                 setShowDeleteModal(false);
                 setItemToDelete(null);
             }
@@ -300,13 +304,15 @@ const RawMaterialList: React.FC = () => {
             />
 
             <CommonConfirmModal
-                show={showDeleteModal}
-                onHide={() => setShowDeleteModal(false)}
+                isOpen={showDeleteModal}
+                onClose={() => setShowDeleteModal(false)}
                 onConfirm={handleDeleteConfirm}
                 title="Confirm Delete"
                 message="Are you sure you want to delete this raw material?"
-                confirmText="Delete"
-                confirmVariant="danger"
+                confirmText={isDeleting ? "Deleting..." : "Delete"}
+                cancelText="Cancel"
+                isDangerous={true}
+                isLoading={isDeleting}
             />
         </div>
     );
