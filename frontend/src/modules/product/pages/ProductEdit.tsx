@@ -20,6 +20,7 @@ import { getImageUrl } from "../../../utils/ImageUrls";
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
 import { fetchGstTaxes, selectActiveGstTaxes } from "../../../features/gst/gstSlice";
 import FlowInput from "../../../components/ui/FlowInput/FlowInput";
+import BackButton from "../../../components/ui/BackButton/BackButton";
 
 const MAX_IMAGES = 3;
 
@@ -55,6 +56,7 @@ const ProductEdit: React.FC = () => {
     const [newImagePreviews, setNewImagePreviews] = useState<string[]>([]);
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [stores, setStores] = useState<any[]>([]);
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     // ─── Form state (no flat pricing fields) ────────────────────────────
     const [formData, setFormData] = useState({
@@ -235,10 +237,24 @@ const ProductEdit: React.FC = () => {
                 newErrors.bundleQty = "Bundle Qty must be a positive whole number.";
         }
 
-        if (formData.weightPerPiece) {
+        if (!formData.weightPerPiece.toString().trim()) {
+            newErrors.weightPerPiece = "Weight Per Piece is required.";
+        } else {
             const weight = Number(formData.weightPerPiece);
             if (isNaN(weight) || weight <= 0)
                 newErrors.weightPerPiece = "Weight must be greater than 0.";
+        }
+
+        if (!formData.openingStockQty.toString().trim()) {
+            newErrors.openingStockQty = "Opening Stock Qty is required.";
+        } else {
+            const qty = Number(formData.openingStockQty);
+            if (isNaN(qty) || qty < 0)
+                newErrors.openingStockQty = "Must be 0 or greater.";
+        }
+
+        if (!formData.openingStockStoreId.toString().trim()) {
+            newErrors.openingStockStoreId = "Opening Stock Store is required.";
         }
 
         // --- Minimum / Maximum Stock Qty (same as Create) ---
@@ -444,11 +460,12 @@ const ProductEdit: React.FC = () => {
     // ─── Submit ───────────────────────────────────────────────────────────
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!id) return;
+        if (!id || isSubmitting) return;
 
         if (!validateForm()) return;
 
         try {
+            setIsSubmitting(true);
             const payload = new FormData();
             // Basic info
             payload.append("productCode", formData.productCode);
@@ -535,6 +552,8 @@ const ProductEdit: React.FC = () => {
             navigate("/products");
         } catch (err: any) {
             toast.error(err.message || "Failed to update product");
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -621,6 +640,7 @@ const ProductEdit: React.FC = () => {
                 <div className="px-6 py-4 border-b border-gray-100">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <h2 className="text-xl font-bold text-gray-800">Edit Product</h2>
+                        <BackButton text="Back to List" to="/products" />
                     </div>
                 </div>
 
@@ -655,6 +675,7 @@ const ProductEdit: React.FC = () => {
                                 required
                                 onChange={handleChange}
                                 error={errors.categoryId}
+                                  disabled={true}
                             />
                             <TextInput
                                 label="Minimum Stock Qty"
@@ -666,7 +687,31 @@ const ProductEdit: React.FC = () => {
                                 required
                                 error={errors.minimumQty}
                             />
+                          
+                            <TextInput
+                                label="Opening Stock Qty"
+                                name="openingStockQty"
+                                type="number"
+                                placeholder="0"
+                                required
+                                value={formData.openingStockQty}
+                                onChange={handleChange}
+                                error={errors.openingStockQty}
+                                  disabled={true}
+
+                            />
                             <SelectInput
+                                label="Opening Stock Store"
+                                name="openingStockStoreId"
+                                required
+                                value={formData.openingStockStoreId}
+                                options={storeOptions}
+                                onChange={handleChange}
+                                error={errors.openingStockStoreId}
+                                  disabled={true}
+
+                            />
+                              <SelectInput
                                 label="Status"
                                 name="isActive"
                                 value={formData.isActive}
@@ -675,23 +720,6 @@ const ProductEdit: React.FC = () => {
                                     { value: "false", label: "Inactive" },
                                 ]}
                                 onChange={handleChange}
-                            />
-                            <TextInput
-                                label="Opening Stock Qty"
-                                name="openingStockQty"
-                                type="number"
-                                placeholder="0"
-                                value={formData.openingStockQty}
-                                onChange={handleChange}
-                                error={errors.openingStockQty}
-                            />
-                            <SelectInput
-                                label="Opening Stock Store"
-                                name="openingStockStoreId"
-                                value={formData.openingStockStoreId}
-                                options={storeOptions}
-                                onChange={handleChange}
-                                error={errors.openingStockStoreId}
                             />
                             <div className="lg:col-span-2">
                                 <TextInput
@@ -802,6 +830,8 @@ const ProductEdit: React.FC = () => {
                                     }
                                 }}
                                 error={errors.uomId}
+                                  disabled={true}
+
                             />
                             <TextInput
                                 label="Bundle/Package size"
@@ -817,6 +847,7 @@ const ProductEdit: React.FC = () => {
                                 name="weightPerPiece"
                                 value={formData.weightPerPiece}
                                 baseUoms="kg,g"
+                                required
                                 onChange={handleChange}
                                 error={errors.weightPerPiece}
                             />
@@ -1051,7 +1082,7 @@ const ProductEdit: React.FC = () => {
 
                     {/* Form Actions */}
                     <div className="flex justify-end gap-3 pt-4 border-t border-gray-100 mt-4">
-                        <CustomButton text="Save Changes" icon={FaSave} type="submit" />
+                        <CustomButton text={isSubmitting ? "Saving..." : "Save Changes"} icon={FaSave} type="submit" disabled={isSubmitting} />
                     </div>
                 </form>
             </div>

@@ -38,6 +38,7 @@ const SupplierList: React.FC = () => {
     // Custom confirm delete state
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [supplierToDelete, setSupplierToDelete] = useState<string | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -78,15 +79,17 @@ const SupplierList: React.FC = () => {
     }, []);
 
     const handleDeleteConfirm = async () => {
-        if (supplierToDelete !== null) {
+        if (supplierToDelete !== null && !isDeleting) {
+            setIsDeleting(true);
             try {
                 await removeSupplier(supplierToDelete);
                 toast.success("Supplier deleted successfully!");
             } catch (err: any) {
-                toast.error(err.message || "Failed to delete supplier");
+                toast.error(err?.response?.data?.message || err.message || err || "Failed to delete supplier");
             } finally {
                 setShowDeleteModal(false);
                 setSupplierToDelete(null);
+                setIsDeleting(false);
             }
         }
     };
@@ -191,7 +194,7 @@ const SupplierList: React.FC = () => {
                     onConfirm={handleDeleteConfirm}
                     title="Confirm Delete"
                     message="Are you sure you want to delete this supplier?"
-                    confirmText="Delete"
+                    confirmText={isDeleting ? "Deleting..." : "Delete"}
                     confirmVariant="danger"
                 />
             </div>

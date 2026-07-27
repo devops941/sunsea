@@ -37,6 +37,9 @@ const RoleList: React.FC = () => {
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [roleToDelete, setRoleToDelete] = useState<number | null>(null);
 
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
+
     const [formData, setFormData] = useState({
         id: "",
         code: "",
@@ -127,7 +130,8 @@ const RoleList: React.FC = () => {
     }, []);
 
     const handleDeleteConfirm = async () => {
-        if (roleToDelete !== null) {
+        if (roleToDelete !== null && !isDeleting) {
+            setIsDeleting(true);
             try {
                 await removeRole(roleToDelete);
                 toast.success("Role deleted successfully!");
@@ -137,6 +141,7 @@ const RoleList: React.FC = () => {
             } finally {
                 setShowDeleteModal(false);
                 setRoleToDelete(null);
+                setIsDeleting(false);
             }
         }
     };
@@ -159,7 +164,8 @@ const RoleList: React.FC = () => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!validateRoleForm()) return;
+        if (!validateRoleForm() || isSubmitting) return;
+        setIsSubmitting(true);
         try {
             const payload = {
                 code: formData.code,
@@ -180,6 +186,8 @@ const RoleList: React.FC = () => {
         } catch (err: any) {
             const errorMessage = typeof err === 'string' ? err : (err?.message || "Operation failed");
             toast.error(errorMessage);
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -203,7 +211,7 @@ const RoleList: React.FC = () => {
     ];
 
     return (
-        <div className="p-4 md:p-6 min-h-screen bg-white">
+        <div className="p-4 md:p-1 min-h-screen bg-white">
             <div className="">
                 <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                     {/* Page Header */}
@@ -267,10 +275,10 @@ const RoleList: React.FC = () => {
                                 })}
                             />
                             <CustomButton
-                                text={editMode ? "Update" : "Save"}
+                                text={isSubmitting ? (editMode ? "Updating..." : "Saving...") : (editMode ? "Update" : "Save")}
                                 icon={FaSave}
                                 onClick={handleSubmit}
-                                disabled={loading}
+                                disabled={loading || isSubmitting}
                             />
                         </div>
                     }

@@ -232,15 +232,19 @@ class CustomerService {
   async deleteCustomer(id: string) {
     await this.getCustomerById(id);
 
-    // Block delete if sales orders are linked
+    // Block delete if sales orders or invoices are linked
     const linkedOrders = await prisma.salesOrder.count({
       where: { customerId: id },
     });
 
-    if (linkedOrders > 0) {
+    const linkedInvoices = await prisma.salesInvoice.count({
+      where: { customerId: id },
+    });
+
+    if (linkedOrders > 0 || linkedInvoices > 0) {
       throw new ApiError(
         409,
-        `Cannot delete customer — ${linkedOrders} sales order(s) are linked to this customer`
+        `Cannot delete customer — ${linkedOrders} sales order(s) and ${linkedInvoices} sales invoice(s) are linked to this customer`
       );
     }
 

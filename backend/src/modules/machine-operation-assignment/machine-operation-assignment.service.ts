@@ -359,10 +359,12 @@ export class MachineOperationAssignmentService {
     const startDate = weekStartDate ? new Date(weekStartDate) : existing.weekStartDate;
     const endDate = weekEndDate ? new Date(weekEndDate) : existing.weekEndDate;
 
+    const newMachineId = data.machineId || existing.machineId;
+
     const existingOverlap = await prisma.machineOperationAssignment.findFirst({
       where: {
         id: { not: targetId },
-        machineId: existing.machineId,
+        machineId: newMachineId,
         shiftId: shiftId !== undefined ? (shiftId || null) : existing.shiftId,
         isActive: true,
         OR: [
@@ -383,6 +385,7 @@ export class MachineOperationAssignmentService {
     }
 
     const updateData: any = {};
+    if (data.machineId) updateData.machineId = data.machineId;
     if (data.weekStartDate) updateData.weekStartDate = startDate;
     if (data.weekEndDate) updateData.weekEndDate = endDate;
     if (shiftId !== undefined) updateData.shiftId = shiftId || null;

@@ -1,11 +1,17 @@
 import React, { useState, useCallback, useEffect } from "react";
-import { FaSearch, FaPlus } from "react-icons/fa";
+import { FaSearch, FaPlus, FaSave, FaEraser } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
+import { z } from "zod";
 
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
-import { fetchStores, deleteStore } from "../../../features/stores/storeSlice";
+import { fetchStores, deleteStore, createStore, updateStore } from "../../../features/stores/storeSlice";
+import { fetchLocations } from "../../../features/locations/locationSlice";
+import { fetchEmployees } from "../../../features/employee/employeeSlice";
+import { fetchStoreTypes } from "../../../features/store-types/storeTypeSlice";
+import { storeService } from "../../../services/storeService";
 import type { Store } from "../../../features/stores/types";
+import { useRoles } from "../../../hooks/useRoles";
 
 import ViewButton from "../../../components/ui/viewbutton/ViewButton";
 import EditButton from "../../../components/ui/EditButton/EditButton";
@@ -13,18 +19,72 @@ import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
 import CustomButton from "../../../components/ui/Button/Button";
 import CommonViewModal from "../../../components/ui/CommonViewModal/CommonViewModal";
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
+import CommonModal from "../../../components/ui/Modal/CommonModal";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
+import TextInput from "../../../components/form/TextInput/TextInput";
 import DataTable from "../../../components/ui/table/DataTable";
 
 const ITEMS_PER_PAGE = 10;
+
+
+
+const initialFormState = {
+    storeId: "",
+    storeName: "",
+    storeTypeId: "",
+    locationId: "",
+    inchargeId: "",
+    gstPlace: "",
+    isActive: true,
+};
+
+const storeSchema = z.object({
+    storeName: z
+        .string()
+        .trim()
+        .min(1, "Store Name is required")
+        .max(100, "Maximum 100 characters allowed")
+        .regex(
+            /^[A-Za-z0-9\s&()-]+$/,
+            "Store Name can only contain letters, numbers, spaces, &, (, ), and -"
+        ),
+
+    storeTypeId: z
+        .string()
+        .trim()
+        .min(1, "Store Type is required"),
+
+    inchargeId: z
+        .string()
+        .trim()
+        .min(1, "Store Incharge is required"),
+
+    locationId: z
+        .string()
+        .trim()
+        .min(1, "Location is required"),
+
+    gstPlace: z
+        .string()
+        .trim()
+        .optional()
+        .or(z.literal(""))
+});
 
 const StorageStoreList: React.FC = () => {
     const navigate = useNavigate();
     const dispatch = useAppDispatch();
 
     const { data, loading, error, totalPages } = useAppSelector(state => state.stores);
+    
+    // For form dependencies
+    const { data: locations } = useAppSelector(state => state.locations);
+    const { employees } = useAppSelector((state: any) => state.employees || { employees: [] });
+    const { data: storeTypes } = useAppSelector(state => state.storeTypes);
+    const { roles, loadRoles } = useRoles();
+
     useEffect(() => { if (error) toast.error(error); }, [error]);
-    const [storeType, setStoreType] = useState("");
+    const [storeTypeFilter, setStoreTypeFilter] = useState("");
     const storeTypeOptions = [
         { label: "All Store Types", value: "" },
         { label: "Raw Material Store", value: "1" },
@@ -39,13 +99,30 @@ const StorageStoreList: React.FC = () => {
 
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [itemToDelete, setItemToDelete] = useState<string | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
+
+    // Form Modal State
+    const [showFormModal, setShowFormModal] = useState(false);
+    const [editMode, setEditMode] = useState(false);
+    const [formData, setFormData] = useState(initialFormState);
+    const [errors, setErrors] = useState<Record<string, string>>({});
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [selectedRoleId, setSelectedRoleId] = useState("");
+
+    // Initial loading for list and dependencies
+    useEffect(() => {
+        dispatch(fetchLocations(undefined));
+        dispatch(fetchEmployees(undefined));
+        dispatch(fetchStoreTypes(undefined));
+        loadRoles();
+    }, [dispatch, loadRoles]);
 
     useEffect(() => {
         const timer = setTimeout(() => {
             dispatch(
                 fetchStores({
                     search: searchTerm,
-                    storeTypeId: storeType,
+                    storeTypeId: storeTypeFilter,
                     page: currentPage,
                     limit: ITEMS_PER_PAGE,
                     sortBy: "storeId",
@@ -55,7 +132,7 @@ const StorageStoreList: React.FC = () => {
         }, 300);
 
         return () => clearTimeout(timer);
-    }, [dispatch, searchTerm, storeType, currentPage]);
+    }, [dispatch, searchTerm, storeTypeFilter, currentPage]);
 
     const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
         setSearchTerm(e.target.value);
@@ -70,13 +147,38 @@ const StorageStoreList: React.FC = () => {
         setShowViewModal(true);
     }, []);
 
-    const handleOpenAdd = () => {
-        navigate("/storage-stores/create");
+    const handleOpenAdd = async () => {
+        setEditMode(false);
+        setErrors({});
+        setSelectedRoleId("");
+        
+        let nextId = "";
+        try {
+            nextId = await storeService.fetchNextId();
+        } catch (err) {
+            console.error("Failed to fetch next store ID", err);
+        }
+        
+        setFormData({ ...initialFormState, storeId: nextId });
+        setShowFormModal(true);
     };
 
     const handleOpenEdit = useCallback((item: Store) => {
-        navigate(`/storage-stores/edit/${item.storeId}`, { state: item });
-    }, [navigate]);
+        setEditMode(true);
+        setErrors({});
+        setSelectedRoleId("");
+
+        setFormData({
+            storeId: item.storeId,
+            storeName: item.storeName || "",
+            storeTypeId: item.storeTypeId ? item.storeTypeId.toString() : "",
+            locationId: item.locationId || "",
+            inchargeId: item.inchargeId ? item.inchargeId.toString() : "",
+            gstPlace: item.gstPlace || "",
+            isActive: item.isActive,
+        });
+        setShowFormModal(true);
+    }, []);
 
     const triggerDelete = useCallback((id: string) => {
         setItemToDelete(id);
@@ -85,6 +187,7 @@ const StorageStoreList: React.FC = () => {
 
     const handleDeleteConfirm = async () => {
         if (itemToDelete !== null) {
+            setIsDeleting(true);
             try {
                 await dispatch(deleteStore(itemToDelete)).unwrap();
                 toast.success("Store deleted successfully!");
@@ -92,15 +195,91 @@ const StorageStoreList: React.FC = () => {
                 const errorMessage = typeof err === 'string' ? err : err?.message || "Failed to delete store";
                 toast.error(errorMessage);
             } finally {
+                setIsDeleting(false);
                 setShowDeleteModal(false);
                 setItemToDelete(null);
             }
         }
     };
 
-    if (error) {
-        toast.error(error);
-    }
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+        const target = e.target;
+        const { name, value } = target;
+        const type = (target as any).type;
+
+        const checked =
+            type === "checkbox"
+                ? (target as HTMLInputElement).checked
+                : undefined;
+
+        setFormData(prev => {
+            const updated = {
+                ...prev,
+                [name]: type === "checkbox" ? checked : value
+            };
+            return updated;
+        });
+
+        if (errors[name]) {
+            setErrors(prev => ({ ...prev, [name]: "" }));
+        }
+    };
+
+    const handleClear = () => {
+        setFormData(prev => ({
+            ...initialFormState,
+            storeId: prev.storeId
+        }));
+        setSelectedRoleId("");
+        setErrors({});
+    };
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+
+        try {
+            storeSchema.parse(formData);
+            setErrors({});
+        } catch (error) {
+            if (error instanceof z.ZodError) {
+                const fieldErrors = error.flatten().fieldErrors as Record<string, string[] | undefined>;
+                const formattedErrors: Record<string, string> = {};
+                Object.keys(fieldErrors).forEach((key) => {
+                    const message = fieldErrors[key]?.[0];
+                    if (message) formattedErrors[key] = message;
+                });
+                setErrors(formattedErrors);
+                return;
+            }
+        }
+
+        setIsSubmitting(true);
+        try {
+            const payload = {
+                storeId: formData.storeId,
+                storeName: formData.storeName,
+                storeTypeId: formData.storeTypeId ? Number(formData.storeTypeId) : undefined,
+                locationId: formData.locationId || undefined,
+                inchargeId: formData.inchargeId || undefined,
+                gstPlace: formData.gstPlace || undefined,
+                isActive: formData.isActive
+            };
+
+            if (editMode) {
+                await dispatch(updateStore({ id: formData.storeId, data: payload as any })).unwrap();
+                toast.success("Store updated successfully!");
+            } else {
+                await dispatch(createStore(payload as any)).unwrap();
+                toast.success("Store created successfully!");
+            }
+            setShowFormModal(false);
+        } catch (err: any) {
+            const errorMessage = typeof err === 'string' ? err : err?.message || "Failed to save store";
+            toast.error(errorMessage);
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
 
     return (
         <div>
@@ -116,11 +295,11 @@ const StorageStoreList: React.FC = () => {
                                 <SelectInput
                                     label="Store Type"
                                     hideLabel={true}
-                                    name="storeType"
-                                    value={storeType}
+                                    name="storeTypeFilter"
+                                    value={storeTypeFilter}
                                     options={storeTypeOptions}
                                     onChange={(e) => {
-                                        setStoreType(e.target.value);
+                                        setStoreTypeFilter(e.target.value);
                                         setCurrentPage(1);
                                     }}
                                 />
@@ -161,10 +340,10 @@ const StorageStoreList: React.FC = () => {
                             }
                             columns={[
                                 { header: "#", width: "60px", render: (_item, index) => startIndex + index + 1, align: "center" },
-                                { header: "CODE", accessor: "storeId" },
+                                { header: "STORE ID", accessor: "storeId" },
                                 { header: "STORE NAME", accessor: "storeName" },
-                                { header: "LOCATION", render: (item) => (item as any).location?.locationName ?? "N/A" },
                                 { header: "STORE TYPE", render: (item) => item.storeTypeRef?.name || "N/A" },
+                                { header: "LOCATION", render: (item) => (item as any).location?.locationName || "N/A" },
                                 { header: "INCHARGE", render: (item) => item.incharge?.fullName || "N/A" },
                                 {
                                     header: "STATUS", render: (item) => (
@@ -192,40 +371,173 @@ const StorageStoreList: React.FC = () => {
                     </div>
                 </div>
 
+                {/* Form Modal (Add / Edit) */}
+                <CommonModal
+                    show={showFormModal}
+                    onHide={() => setShowFormModal(false)}
+                    title={editMode ? "Edit Storage Store" : "Add New Storage Store"}
+                    maxWidth="3xl"
+                    footer={
+                        <div className="flex items-center justify-end gap-2 w-full">
+                            <CustomButton
+                                text="Clear"
+                                icon={FaEraser}
+                                onClick={handleClear}
+                                disabled={isSubmitting}
+                            />
+                            <CustomButton
+                                type="submit"
+                                text={editMode ? "Update Store" : "Save Store"}
+                                icon={FaSave}
+                                variant="primary"
+                                disabled={isSubmitting}
+                                onClick={handleSubmit}
+                            />
+                        </div>
+                    }
+                >
+                    <form onSubmit={handleSubmit} className="space-y-4 p-2">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
+                            <TextInput
+                                label="Store ID"
+                                name="storeId"
+                                value={formData.storeId}
+                                placeholder="e.g. STR001"
+                                required
+                                disabled={true}
+                                onChange={handleChange}
+                            />
+                            
+                            <TextInput
+                                label="Store Name"
+                                name="storeName"
+                                value={formData.storeName}
+                                placeholder="e.g. Main Warehouse"
+                                required
+                                error={errors.storeName}
+                                onChange={handleChange}
+                            />
+                            
+                            <SelectInput
+                                label="Store Type"
+                                name="storeTypeId"
+                                value={formData.storeTypeId}
+                                options={[
+                                    { label: "Select a store type", value: "" },
+                                    ...storeTypes.filter(st => st.isActive).map(st => ({
+                                        label: st.name,
+                                        value: st.id.toString()
+                                    }))
+                                ]}
+                                required
+                                error={errors.storeTypeId}
+                                onChange={handleChange}
+                            />
+                            
+                            <SelectInput
+                                label="Location"
+                                name="locationId"
+                                value={formData.locationId}
+                                options={[
+                                    { label: "Select a location", value: "" },
+                                    ...locations.filter(loc => loc.isActive).map(loc => ({
+                                        label: `${loc.locationName} (${loc.locationCode})`,
+                                        value: loc.locationId
+                                    }))
+                                ]}
+                                required
+                                error={errors.locationId}
+                                onChange={handleChange}
+                            />
+
+                            <SelectInput
+                                label="Filter Incharge by Role"
+                                name="selectedRoleId"
+                                value={selectedRoleId}
+                                options={[
+                                    { label: "Select a role", value: "" },
+                                    ...(roles || []).map(r => ({ label: r.name, value: String(r.id) }))
+                                ]}
+                                onChange={(e) => {
+                                    setSelectedRoleId(e.target.value);
+                                    setFormData(prev => ({ ...prev, inchargeId: "" }));
+                                }}
+                            />
+
+                            <SelectInput
+                                label="Store Incharge"
+                                name="inchargeId"
+                                value={formData.inchargeId}
+                                options={[
+                                    { label: "Select an incharge", value: "" },
+                                    ...(employees || [])
+                                        .filter((emp: any) => !selectedRoleId || String(emp.user?.roleId) === selectedRoleId)
+                                        .map((emp: any) => ({
+                                            label: `${emp.fullName} (${emp.empCode})`,
+                                            value: emp.id?.toString() || ""
+                                        }))
+                                ]}
+                                required
+                                error={errors.inchargeId}
+                                onChange={handleChange}
+                            />
+
+                            <SelectInput
+                                label="Status"
+                                name="isActive"
+                                value={formData.isActive.toString()}
+                                options={[
+                                    { label: "Active", value: "true" },
+                                    { label: "Inactive", value: "false" }
+                                ]}
+                                required
+                                onChange={(e) => setFormData(prev => ({ ...prev, isActive: e.target.value === "true" }))}
+                            />
+                        </div>
+                    </form>
+                </CommonModal>
+
                 {/* View Modal */}
                 <CommonViewModal
                     show={showViewModal}
                     onHide={() => setShowViewModal(false)}
-                    modalTitle="Store Details"
-                    avatarText={selectedItem ? selectedItem.storeName.charAt(0).toUpperCase() : ""}
+                    modalTitle="Storage Store Details"
+                    avatarText={selectedItem ? selectedItem.storeName?.charAt(0).toUpperCase() : ""}
                     headerTitle={selectedItem ? selectedItem.storeName : ""}
-                    headerSubtitle={selectedItem ? `Code: ${selectedItem.storeId}` : ""}
+                    headerSubtitle={selectedItem ? `ID: ${selectedItem.storeId}` : ""}
                     sections={selectedItem ? [
                         {
                             fields: [
-                                { label: "Store Code", value: selectedItem.storeId },
+                                { label: "Store ID", value: selectedItem.storeId },
                                 { label: "Store Name", value: selectedItem.storeName },
-                                { label: "Location", value: selectedItem.locationId || "N/A" },
                                 { label: "Store Type", value: selectedItem.storeTypeRef?.name || "N/A" },
+                                { label: "Location", value: (selectedItem as any).location?.locationName || "N/A" },
                                 { label: "Incharge", value: selectedItem.incharge?.fullName || "N/A" },
-                                { label: "Status", value: selectedItem.isActive ? "Active" : "Inactive" },
-
-
+                                { label: "Cost Method", value: selectedItem.costMethod || "N/A" },
                             ]
                         },
-                       
+                        {
+                            title: "Status Information",
+                            fields: [
+                                { label: "Status", value: selectedItem.status },
+                                { label: "Active", value: selectedItem.isActive ? "Yes" : "No" },
+                                { label: "GST Place", value: selectedItem.gstPlace || "N/A" },
+                            ]
+                        }
                     ] : []}
                 />
 
                 {/* Delete Modal */}
                 <CommonConfirmModal
-                    show={showDeleteModal}
-                    onHide={() => setShowDeleteModal(false)}
+                    isOpen={showDeleteModal}
+                    onClose={() => setShowDeleteModal(false)}
                     onConfirm={handleDeleteConfirm}
                     title="Confirm Delete"
                     message="Are you sure you want to delete this store?"
-                    confirmText="Delete"
-                    confirmVariant="danger"
+                    confirmText={isDeleting ? "Deleting..." : "Delete"}
+                    cancelText="Cancel"
+                    isDangerous={true}
+                    isLoading={isDeleting}
                 />
             </div>
         </div>

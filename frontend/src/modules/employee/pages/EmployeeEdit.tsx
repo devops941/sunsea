@@ -24,6 +24,7 @@ const EmployeeEdit: React.FC = () => {
   const { departments, loadDepartments } = useDepartments();
   const { roles, loadRoles } = useRoles();
   const user = useSelector((state: any) => state.auth.user);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [formData, setFormData] = useState({
     empCode: "",
@@ -161,8 +162,9 @@ const EmployeeEdit: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!validate()) return;
+    if (!validate() || isSubmitting) return;
     if (!id) return;
+    setIsSubmitting(true);
 
     try {
       const payload: any = {
@@ -192,6 +194,8 @@ const EmployeeEdit: React.FC = () => {
       navigate("/employees");
     } catch (err: any) {
       toast.error(err?.message || err || "Failed to update employee");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -387,10 +391,11 @@ const EmployeeEdit: React.FC = () => {
               type="button"
             />
             <CustomButton
-              text="Save Changes"
+              text={isSubmitting ? "Saving..." : "Save Changes"}
               icon={FaSave}
               type="submit"
               variant="primary"
+              disabled={isSubmitting}
             />
           </div>
         </form>

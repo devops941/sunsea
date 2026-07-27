@@ -384,7 +384,7 @@ const RawMaterialEdit: React.FC = () => {
 
     return (
         <div className="w-full mx-auto">
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+            <div className="bg-white shadow-sm border border-gray-200">
                 <div className="px-6 py-4 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <h2 className="text-xl font-bold text-gray-800">
                         Edit Raw Material
@@ -428,6 +428,8 @@ const RawMaterialEdit: React.FC = () => {
                                 required
                                 error={errors.storeId}
                                 onChange={handleChange}
+                                disabled={true}
+
                             />
                             <SelectInput
                                 label="Raw Material Category"
@@ -443,6 +445,8 @@ const RawMaterialEdit: React.FC = () => {
                                 required
                                 error={errors.categoryId}
                                 onChange={handleChange}
+                                disabled={true}
+
                             />
                             <UOMSelect
                                 name="baseUom"
@@ -464,6 +468,8 @@ const RawMaterialEdit: React.FC = () => {
                                     }
                                 }}
                                 error={errors.baseUom}
+                                disabled={true}
+
                             />
                             <TextInput
                                 label="HSN Code"
@@ -500,6 +506,7 @@ const RawMaterialEdit: React.FC = () => {
                                 required
                                 error={errors.onHandQty}
                                 onChange={handleChange}
+                                disabled={true}
                             />
                             <QuantityInput
                                 label="Minimum Stock"
@@ -574,7 +581,7 @@ const RawMaterialEdit: React.FC = () => {
                                 label="Remarks"
                                 name="remarks"
                                 value={formData.remarks}
-                                required
+                                
                                 error={errors.remarks}
                                 onChange={handleChange}
                             />

@@ -74,6 +74,7 @@ const ShiftList: React.FC = () => {
 
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [itemToDelete, setItemToDelete] = useState<number | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     useEffect(() => {
         dispatch(fetchShifts());
@@ -114,15 +115,17 @@ const ShiftList: React.FC = () => {
     }, []);
 
     const handleDeleteConfirm = async () => {
-        if (itemToDelete !== null) {
+        if (itemToDelete !== null && !isDeleting) {
+            setIsDeleting(true);
             try {
                 await dispatch(deleteShift(itemToDelete)).unwrap();
                 toast.success("Shift deleted successfully!");
             } catch (err: any) {
-                toast.error(err || "Failed to delete shift");
+                toast.error(err?.response?.data?.message || err.message || err || "Failed to delete shift");
             } finally {
                 setShowDeleteModal(false);
                 setItemToDelete(null);
+                setIsDeleting(false);
             }
         }
     };
@@ -239,7 +242,7 @@ const ShiftList: React.FC = () => {
                     onConfirm={handleDeleteConfirm}
                     title="Confirm Delete"
                     message="Are you sure you want to delete this shift?"
-                    confirmText="Delete"
+                    confirmText={isDeleting ? "Deleting..." : "Delete"}
                     confirmVariant="danger"
                 />
             </div>

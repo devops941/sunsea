@@ -8,7 +8,9 @@ import DataTable, { type DataTableColumn } from "../../components/ui/table/DataT
 import GstTaxModal, { type GstTaxFormValues } from "./GstModal";
 import type { GstTax } from "../../services/gstTaxService";
 import { useAppDispatch, useAppSelector } from "../../hooks/reduxHooks";
-import { createGstTax, fetchGstTaxes, updateGstTax } from "../../features/gst/gstSlice";
+import { createGstTax, fetchGstTaxes, updateGstTax, deleteGstTax } from "../../features/gst/gstSlice";
+import CommonConfirmModal from "../../components/ui/CommonConfirmModal/CommonConfirmModal";
+import DeleteButton from "../../components/ui/DeleteButton/DeleteButton";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -21,6 +23,10 @@ const GstTaxList: React.FC = () => {
     // ─── Modal state (Add / Edit) ──────────────────────────────
     const [showModal, setShowModal] = useState(false);
     const [editingTax, setEditingTax] = useState<GstTaxFormValues | null>(null);
+
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [taxToDelete, setTaxToDelete] = useState<string | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     // ─── Fetch list (debounced) ──────────────────────────────
     const loadGstTaxes = useCallback(() => {
@@ -94,6 +100,28 @@ const GstTaxList: React.FC = () => {
         }
     };
 
+    const triggerDelete = (id: string) => {
+        setTaxToDelete(id);
+        setShowDeleteModal(true);
+    };
+
+    const handleDeleteConfirm = async () => {
+        if (taxToDelete && !isDeleting) {
+            setIsDeleting(true);
+            try {
+                await dispatch(deleteGstTax(taxToDelete)).unwrap();
+                toast.success("GST Tax deleted successfully!");
+            } catch (err: any) {
+                const errorMessage = typeof err === 'string' ? err : err?.message || err || "Failed to delete GST Tax";
+                toast.error(errorMessage);
+            } finally {
+                setShowDeleteModal(false);
+                setTaxToDelete(null);
+                setIsDeleting(false);
+            }
+        }
+    };
+
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
 
     const columns: DataTableColumn<any>[] = [
@@ -106,6 +134,7 @@ const GstTaxList: React.FC = () => {
             render: (tax) => (
                 <div className="flex items-center gap-2">
                     <EditButton onClick={() => handleEditClick(tax)} />
+                    <DeleteButton onClick={() => triggerDelete(tax.id)} />
                 </div>
             ),
             align: "right"
@@ -156,14 +185,25 @@ const GstTaxList: React.FC = () => {
                         />
                     </div>
                 </div>
-            </div>
+                {/* Add/Edit Modal */}
+                <GstTaxModal
+                    show={showModal}
+                    onClose={handleClose}
+                    onSave={handleSave}
+                    initialData={editingTax}
+                />
 
-            <GstTaxModal
-                show={showModal}
-                onClose={handleClose}
-                onSave={handleSave}
-                initialData={editingTax}
-            />
+                {/* Delete Confirm Modal */}
+                <CommonConfirmModal
+                    show={showDeleteModal}
+                    onHide={() => setShowDeleteModal(false)}
+                    onConfirm={handleDeleteConfirm}
+                    title="Confirm Delete"
+                    message="Are you sure you want to delete this GST Tax Rate?"
+                    confirmText="Delete"
+                    confirmVariant="danger"
+                />
+            </div>
         </div>
     );
 };

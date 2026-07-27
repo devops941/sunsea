@@ -67,8 +67,9 @@ class MachineService {
 
     const weeklyProgramCount = await prisma.weeklyMachineProgram.count({ where: { machineId } });
     const productionOrderCount = await prisma.productionOrder.count({ where: { machineMachineId: machineId } });
+    const assignmentCount = await prisma.machineOperationAssignment.count({ where: { machineId } });
 
-    if (weeklyProgramCount > 0 || productionOrderCount > 0) {
+    if (weeklyProgramCount > 0 || productionOrderCount > 0 || assignmentCount > 0) {
       throw new ApiError(
         400,
         "Unable to delete this machine because it is linked to other records in the system."

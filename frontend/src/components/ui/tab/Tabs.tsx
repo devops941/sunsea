@@ -72,14 +72,13 @@ const Tabs: React.FC<TabsProps> = ({
                 }`;
         }
 
-        // default primary — matches the sidebar's active-item look:
-        // solid color fill + white bold text when active, plain gray box when not
-        return `flex items-center gap-2 whitespace-nowrap rounded-sm px-5 py-2.5
-            text-[15px] leading-[1.334rem] transition-all duration-300
+        // default primary — matches the segmented control look from screenshot
+        return `flex items-center gap-2 whitespace-nowrap rounded-md px-5 py-2
+            text-sm font-semibold transition-all duration-200
             disabled:opacity-45 disabled:cursor-not-allowed
             ${isActive
-                ? "bg-gradient-to-r from-blue-400 to-primary text-white font-semibold shadow-sm "
-                : "bg-gray-100 text-[#2A3547] hover:bg-gray-200 font-normal"
+                ? "bg-white text-slate-800 shadow-sm"
+                : "text-slate-500 hover:text-slate-700 hover:bg-slate-100/50"
             }`;
     };
 
@@ -89,7 +88,7 @@ const Tabs: React.FC<TabsProps> = ({
             ? "flex items-center gap-4 border-b-2 border-black/5 w-full min-w-max"
             : pill
                 ? "inline-flex items-center gap-0 bg-gray-100 p-1.5 rounded-lg min-w-max"
-                : "inline-flex items-center gap-2 min-w-max";
+                : "inline-flex items-center gap-1.5 bg-slate-50 p-1.5 rounded-lg border border-slate-100 min-w-max";
 
     return (
         <div className={`w-full ${className}`}>

@@ -110,15 +110,7 @@ async findAll(params: {
   }
 
   async update(id: number, data: UpdateStoreTypeInput) {
-    const existingType = await this.findById(id);
-
-    const storesUsingType = await prisma.store.count({
-      where: { storeTypeId: id },
-    });
-
-    if (storesUsingType > 0) {
-      throw new ApiError(400, `Cannot update Store Type as it is associated with ${storesUsingType} store(s)`);
-    }
+    await this.findById(id);
 
     // If code is updated, check for conflicts
     if (data.code) {
@@ -146,7 +138,7 @@ async findAll(params: {
     });
 
     if (storesUsingType > 0) {
-      throw new ApiError(400, `Cannot delete Store Type as it is associated with ${storesUsingType} store(s)`);
+      throw new ApiError(400, `Cannot delete Store Type because it is already assigned in Storage Store Management.`);
     }
 
     return prisma.storeType.delete({

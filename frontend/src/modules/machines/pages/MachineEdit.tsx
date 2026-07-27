@@ -19,13 +19,13 @@ const machineSchema = z.object({
     technologyType: z.string().min(1, "Technology Type is required"),
     machineType: z.string().min(1, "Machine Type is required"),
     capacity: z.coerce.number().min(1, "Capacity is required"),
-    targetTemperature: z.coerce.number().min(1, "Target Temperature is required"),
-    targetLoadPercent: z.coerce.number().min(1, "Target Load Percent is required"),
-    manufacturer: z.string().trim().min(1, "Manufacturer is required").max(100, "Maximum 100 characters allowed"),
-    modelNumber: z.string().trim().min(1, "Model Number is required").max(50, "Maximum 50 characters allowed"),
-    cycleTime: z.coerce.number().min(1, "Cycle Time is required"),
+    targetTemperature: z.coerce.number().optional().nullable(),
+    targetLoadPercent: z.coerce.number().optional().nullable(),
+    manufacturer: z.string().trim().max(100, "Maximum 100 characters allowed").optional().nullable(),
+    modelNumber: z.string().trim().max(50, "Maximum 50 characters allowed").optional().nullable(),
+    cycleTime: z.coerce.number().optional().nullable(),
     operatorId: z.string().min(1, "Machine Incharge is required").max(20, "Maximum 20 characters allowed"),
-    machineStatus: z.string().min(1, "Machine Status is required"),
+    machineStatus: z.string().optional().nullable(),
     description: z.string().trim().max(255, "Maximum 255 characters allowed").optional().nullable(),
     isActive: z.boolean().optional(),
 });
@@ -158,6 +158,7 @@ const MachineEdit: React.FC = () => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (isSubmitting) return;
 
         const payload = {
             ...formData,
@@ -221,7 +222,7 @@ const MachineEdit: React.FC = () => {
             </div>
         ) : (
         <div className="w-full mx-auto">
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="bg-white  shadow-sm border border-slate-200 overflow-hidden">
                 <div className="px-6 py-5 border-b border-slate-200">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <h2 className="text-xl font-bold text-slate-800">Edit Machine</h2>
@@ -238,7 +239,6 @@ const MachineEdit: React.FC = () => {
                                 value={formData.machineId}
                                 placeholder="e.g. MAC-01"
                                 required
-                                disabled={true}
                                 error={errors.machineId}
                                 onChange={handleChange}
                             />
@@ -343,7 +343,6 @@ const MachineEdit: React.FC = () => {
                                 type="number"
                                 value={formData.targetTemperature}
                                 placeholder="e.g. 220"
-                                required
                                 error={errors.targetTemperature}
                                 onChange={handleChange}
                             />
@@ -356,7 +355,6 @@ const MachineEdit: React.FC = () => {
                                 type="number"
                                 value={formData.targetLoadPercent}
                                 placeholder="e.g. 85"
-                                required
                                 error={errors.targetLoadPercent}
                                 onChange={handleChange}
                             />
@@ -368,7 +366,6 @@ const MachineEdit: React.FC = () => {
                                 name="manufacturer"
                                 value={formData.manufacturer}
                                 placeholder="Manufacturer Name"
-                                required
                                 error={errors.manufacturer}
                                 onChange={handleChange}
                             />
@@ -380,7 +377,6 @@ const MachineEdit: React.FC = () => {
                                 name="modelNumber"
                                 value={formData.modelNumber}
                                 placeholder="e.g. X100"
-                                required
                                 error={errors.modelNumber}
                                 onChange={handleChange}
                             />
@@ -393,7 +389,6 @@ const MachineEdit: React.FC = () => {
                                 type="number"
                                 value={formData.cycleTime}
                                 placeholder="e.g. 60"
-                                required
                                 error={errors.cycleTime}
                                 onChange={handleChange}
                             />
@@ -411,7 +406,6 @@ const MachineEdit: React.FC = () => {
                                     { label: 'Breakdown', value: 'BREAKDOWN' },
                                     { label: 'Maintenance', value: 'MAINTENANCE' }
                                 ]}
-                                required
                                 error={errors.machineStatus}
                                 onChange={handleChange}
                             />

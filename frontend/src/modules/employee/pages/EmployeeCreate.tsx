@@ -20,6 +20,7 @@ const EmployeeCreatePage: React.FC = () => {
   const { departments, loadDepartments } = useDepartments();
   const { roles, loadRoles } = useRoles();
   const user = useSelector((state: any) => state.auth.user);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [formData, setFormData] = useState({
     empCode: "",
@@ -100,7 +101,8 @@ const EmployeeCreatePage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!validate()) return;
+    if (!validate() || isSubmitting) return;
+    setIsSubmitting(true);
 
     try {
       const payload: any = {
@@ -131,6 +133,8 @@ const EmployeeCreatePage: React.FC = () => {
       navigate("/employees");
     } catch (err: any) {
       toast.error(err || "Failed to create employee");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -172,8 +176,9 @@ const EmployeeCreatePage: React.FC = () => {
       newErrors.fullName = "Employee name is required";
     }
 
-    // BUG-EMP-001 fix: mobile is optional — only validate format if a value is entered
-    if (formData.mobile) {
+    if (!formData.mobile) {
+      newErrors.mobile = "Mobile number is required";
+    } else {
       const mobileError = validatePhoneNumber(formData.mobile, true);
       if (mobileError) {
         newErrors.mobile = mobileError;
@@ -185,8 +190,9 @@ const EmployeeCreatePage: React.FC = () => {
       newErrors.departmentId = "Department is required";
     }
 
-    // BUG-EMP-002 fix: email is optional — only validate format/duplicate if a value is entered
-    if (formData.email) {
+    if (!formData.email) {
+      newErrors.email = "Email address is required";
+    } else {
       const emailFormatValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim());
       if (!emailFormatValid) {
         newErrors.email = "Enter a valid email address";
@@ -226,25 +232,20 @@ const EmployeeCreatePage: React.FC = () => {
   };
 
   return (
-    <div className="w-full  space-y-6">
-      {/* Page Header */}
-      <div className="">
-        <div className="px-3 py-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <h2 className="text-2xl font-bold text-slate-800">
-              Create Employee
-            </h2>
+    <div className="w-full mx-auto">
+      <div className="bg-white shadow-sm border border-slate-200 overflow-hidden">
+        <div className="px-6 py-5 border-b border-slate-200">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <h2 className="text-xl font-bold text-slate-800">Create Employee</h2>
+            <BackButton />
           </div>
-          <BackButton />
         </div>
-      </div>
 
-      <div className="bg-white  border border-gray-200">
-        <form onSubmit={handleSubmit} className="px-6 py-6 space-y-8" noValidate>
+        <form onSubmit={handleSubmit} className="px-6 py-5 space-y-8" noValidate>
           {/* General Info */}
           <div>
             <div className="flex items-center gap-2 mb-6 pb-2 border-b border-gray-100">
-              <FaUser className="text-primary text-xl" />
+              {/* <FaUser className="text-primary text-xl" /> */}
               <h3 className="text-lg font-semibold text-gray-700">Basic & Professional Information</h3>
             </div>
 
@@ -275,7 +276,7 @@ const EmployeeCreatePage: React.FC = () => {
                 name="mobile"
                 value={formData.mobile}
                 placeholder="Enter Mobile Number"
-                required={false}
+                required
                 onChange={(e) => handleChange(e as any)}
                 error={errors.mobile}
               />
@@ -286,6 +287,7 @@ const EmployeeCreatePage: React.FC = () => {
                 type="email"
                 value={formData.email}
                 placeholder="Enter Email Address"
+                required
                 onChange={handleChange}
                 error={errors.email}
               />
@@ -340,7 +342,7 @@ const EmployeeCreatePage: React.FC = () => {
           <div>
             <div className="flex items-center justify-between mb-6 pb-2 border-b border-gray-100">
               <div className="flex items-center gap-2">
-                <FaKey className="text-primary text-xl" />
+                {/* <FaKey className="text-primary text-xl" /> */}
                 <h3 className="text-lg font-semibold text-gray-700">Login Account Details</h3>
               </div>
               <label className="flex items-center gap-2 cursor-pointer">
@@ -407,9 +409,10 @@ const EmployeeCreatePage: React.FC = () => {
 
             />
             <CustomButton
-              text="Save Employee"
+              text={isSubmitting ? "Saving..." : "Save Employee"}
               icon={FaSave}
               type="submit"
+              disabled={isSubmitting}
             />
           </div>
         </form>

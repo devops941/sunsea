@@ -68,6 +68,7 @@ const ShiftEdit: React.FC = () => {
     const [formData, setFormData] = useState(initialFormState);
     const [errors, setErrors] = useState<FormErrors>({});
     const [isAssigned, setIsAssigned] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
     // BUG-SHF-002 fix: track whether we are still loading shift data from API
     const [fetchingData, setFetchingData] = useState(false);
 
@@ -175,7 +176,9 @@ const ShiftEdit: React.FC = () => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (isSubmitting) return;
         if (!validate()) return;
+        setIsSubmitting(true);
         const payload = {
             shiftCode: formData.shiftCode,
             shiftName: formData.shiftName,
@@ -191,6 +194,8 @@ const ShiftEdit: React.FC = () => {
             navigate("/shifts");
         } catch (err: any) {
             toast.error(err || "Failed to update shift");
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -203,33 +208,19 @@ const ShiftEdit: React.FC = () => {
     }
 
     return (
-        <div className="w-full  space-y-6">
-            {/* Page Header */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-                <div className="px-6 py-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                        <h2 className="text-2xl font-bold text-slate-800">Edit Shift</h2>
+        <div className="w-full mx-auto">
+            <div className="bg-white shadow-sm border border-slate-200 overflow-visible">
+                <div className="px-6 py-5 border-b border-slate-200">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <h2 className="text-xl font-bold text-slate-800">Edit Shift</h2>
+                        <BackButton text="Back to List" to="/shifts" />
                     </div>
-                    <BackButton />
                 </div>
-            </div>
 
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-                <form onSubmit={handleSubmit} className="px-6 py-6 space-y-8" noValidate>
-                    {isAssigned && (
-                        <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-lg p-4 flex items-start gap-3 text-sm">
-                            <span className="mt-0.5 text-amber-600">⚠️</span>
-                            <div>
-                                This shift is currently assigned to production plans or logs. You can only
-                                toggle its Active/Inactive status.
-                            </div>
-                        </div>
-                    )}
-
+                <form onSubmit={handleSubmit} className="px-6 py-5 space-y-8" noValidate>
                     {/* General Info */}
                     <div>
                         <div className="flex items-center gap-2 mb-6 pb-2 border-b border-gray-100">
-                            <FaClock className="text-primary text-xl" />
                             <h3 className="text-lg font-semibold text-gray-700">Shift Details</h3>
                         </div>
 
@@ -252,7 +243,6 @@ const ShiftEdit: React.FC = () => {
                                 required
                                 onChange={handleChange}
                                 error={errors.shiftName}
-                                disabled={isAssigned}
                             />
 
                             <TimePickerInput
@@ -267,7 +257,6 @@ const ShiftEdit: React.FC = () => {
                                     }
                                 }}
                                 error={errors.startTime}
-                                disabled={isAssigned}
                             />
 
                             <TimePickerInput
@@ -282,7 +271,6 @@ const ShiftEdit: React.FC = () => {
                                     }
                                 }}
                                 error={errors.endTime}
-                                disabled={isAssigned}
                             />
 
                             {/* BUG-SHF-003 fix: min={0} prevents negative values via browser number spinner */}
@@ -295,7 +283,6 @@ const ShiftEdit: React.FC = () => {
                                 placeholder="e.g. 30"
                                 onChange={handleChange}
                                 error={errors.breakDuration}
-                                disabled={isAssigned}
                             />
 
                             {/* BUG-SHF-003 fix: min={0} prevents negative values via browser number spinner */}
@@ -308,51 +295,9 @@ const ShiftEdit: React.FC = () => {
                                 placeholder="e.g. 15"
                                 onChange={handleChange}
                                 error={errors.gracePeriod}
-                                disabled={isAssigned}
                             />
 
-                            <div className="flex flex-col gap-2">
-                                <label className="text-xs font-bold uppercase tracking-[0.5px] text-slate-500">
-                                    Status
-                                </label>
-                                <div className="flex items-center gap-3">
-                                    <div className="relative inline-block w-12 mr-2 align-middle select-none transition duration-200 ease-in">
-                                        <input
-                                            type="checkbox"
-                                            name="isActive"
-                                            id="isActiveSwitch"
-                                            checked={formData.isActive}
-                                            onChange={(e) =>
-                                                setFormData((prev) => ({ ...prev, isActive: e.target.checked }))
-                                            }
-                                            className="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer border-slate-300 checked:border-primary checked:right-0 transition-all duration-200"
-                                            style={{
-                                                right: formData.isActive ? "0" : "1.5rem",
-                                                top: 0,
-                                                bottom: 0,
-                                                margin: "auto",
-                                            }}
-                                        />
-                                        <label
-                                            htmlFor="isActiveSwitch"
-                                            className={`toggle-label block overflow-hidden h-6 rounded-full bg-slate-300 cursor-pointer ${
-                                                formData.isActive ? "bg-primary" : ""
-                                            }`}
-                                        ></label>
-                                    </div>
-                                    <span className="text-sm font-medium text-slate-700">
-                                        {formData.isActive ? "Active" : "Inactive"}
-                                    </span>
-                                </div>
-                                <style
-                                    dangerouslySetInnerHTML={{
-                                        __html: `
-                                    .toggle-checkbox:checked { right: 0; border-color: var(--color-primary, #6366f1); }
-                                    .toggle-checkbox:checked + .toggle-label { background-color: var(--color-primary, #6366f1); }
-                                `,
-                                    }}
-                                />
-                            </div>
+
                         </div>
                     </div>
 
@@ -364,10 +309,10 @@ const ShiftEdit: React.FC = () => {
                             disabled={loading}
                         />
                         <CustomButton
-                            text={loading ? "Saving..." : "Update Shift"}
+                            text={isSubmitting || loading ? "Saving..." : "Update Shift"}
                             icon={FaSave}
                             type="submit"
-                            disabled={loading}
+                            disabled={isSubmitting || loading}
                         />
                     </div>
                 </form>

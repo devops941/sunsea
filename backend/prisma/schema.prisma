@@ -1065,6 +1065,7 @@ model DailyProductionPlan {
   priority               String                @default("MEDIUM") @db.VarChar(20)
   status                 String                @default("DRAFT") @db.VarChar(20)
   remarks                String?               @db.VarChar(255)
+  selectedOperatorIds    String?               @map("selected_operator_ids") @db.VarChar(255)
   carryForwardFromPlanId String?               @map("carry_forward_from_plan_id") @db.VarChar(50)
   currentProductionStep  String?               @map("current_production_step") @db.VarChar(100)
   currentStepIndex       Int?                  @map("current_step_index")

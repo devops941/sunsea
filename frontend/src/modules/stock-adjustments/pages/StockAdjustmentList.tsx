@@ -146,7 +146,7 @@ const StockAdjustmentList: React.FC = () => {
   const totalPages = meta?.totalPages || Math.ceil((data?.length || 0) / ITEMS_PER_PAGE);
 
   return (
-    <div className="p-4 md:p-6 min-h-screen bg-slate-50/50">
+    <div className="p-4 md:p-1 min-h-screen ">
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
         {/* Page Header */}
         <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-slate-200">
@@ -312,6 +312,52 @@ const StockAdjustmentList: React.FC = () => {
                   );
                 }
                 return <span className="text-slate-400">—</span>;
+              }
+            },
+            {
+              header: "ORIGINAL QTY",
+              render: (item) => {
+                const firstItem = item.items?.[0];
+                if (!firstItem || firstItem.currentQty == null) return <span className="text-slate-400">—</span>;
+                const qty = Number(firstItem.currentQty);
+                const uom = firstItem.product?.baseUom || firstItem.rawMaterial?.baseUom || firstItem.uom || "";
+                const uomStr = uom ? ` ${uom}` : "";
+                return (
+                  <div>
+                    <span className="font-semibold text-slate-700 text-sm">{qty}{uomStr}</span>
+                    {item.items && item.items.length > 1 && (
+                      <div className="text-[10px] text-slate-400 mt-0.5">+{item.items.length - 1} more</div>
+                    )}
+                  </div>
+                );
+              }
+            },
+            {
+              header: "ADJUSTED QTY",
+              render: (item) => {
+                const firstItem = item.items?.[0];
+                if (!firstItem || firstItem.adjustedQty == null) return <span className="text-slate-400">—</span>;
+                const qty = Number(firstItem.adjustedQty);
+                const diff = Number(firstItem.difference || 0);
+                const uom = firstItem.product?.baseUom || firstItem.rawMaterial?.baseUom || firstItem.uom || "";
+                const uomStr = uom ? ` ${uom}` : "";
+                const diffColor = diff > 0 ? "text-green-600 bg-green-50 border border-green-200" : diff < 0 ? "text-red-600 bg-red-50 border border-red-200" : "text-slate-500 bg-slate-50";
+                const diffSign = diff > 0 ? `+${diff}` : `${diff}`;
+                return (
+                  <div>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="font-bold text-slate-800 text-sm">{qty}{uomStr}</span>
+                      {diff !== 0 && (
+                        <span className={`text-[11px] font-bold px-1.5 py-0.5 rounded ${diffColor}`}>
+                          {diffSign}
+                        </span>
+                      )}
+                    </div>
+                    {item.items && item.items.length > 1 && (
+                      <div className="text-[10px] text-slate-400 mt-0.5">+{item.items.length - 1} more</div>
+                    )}
+                  </div>
+                );
               }
             },
             {

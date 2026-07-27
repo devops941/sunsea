@@ -39,9 +39,11 @@ export class StockAdjustmentService {
       }
     }
 
-    return prisma.stockAdjustment.create({
+    const targetStatus = adjustmentData.status || "DRAFT";
+    const created = await prisma.stockAdjustment.create({
       data: {
         ...adjustmentData,
+        status: "DRAFT",
         adjustmentDate: adjustmentDate ? new Date(adjustmentDate) : new Date(),
         adjustmentType: adjustmentType || "STOCK_INCREASE",
         productionOrderId: productionOrderId || null,
@@ -64,6 +66,12 @@ export class StockAdjustmentService {
         items: true,
       },
     });
+
+    if (targetStatus === "APPROVED") {
+      return await this.approveStockAdjustment(created.id, "APPROVED", "Auto-approved on creation", userId);
+    }
+
+    return created;
   }
 
   static async getStockAdjustments(filters: any) {

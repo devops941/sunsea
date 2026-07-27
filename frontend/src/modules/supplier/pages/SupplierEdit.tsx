@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useSelector } from "react-redux";
 
 import { FaSave, FaEraser, FaPlus, FaTrash, FaArrowLeft, FaTimes } from "react-icons/fa";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
@@ -96,6 +97,9 @@ const SupplierEdit: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const location = useLocation();
     const { editSupplier, loading } = useSuppliers();
+
+    const user = useSelector((state: any) => state.auth.user);
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     const supplierData = location.state;
 
@@ -594,6 +598,9 @@ const SupplierEdit: React.FC = () => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (isSubmitting) return;
+        setIsSubmitting(true);
+
         if (!id) return;
 
         const primaryMobile = phones && phones.length > 0 ? phones[0].number : "";
@@ -617,6 +624,7 @@ const SupplierEdit: React.FC = () => {
                 });
                 setErrors(formattedErrors);
                 toast.error("Please fill all required fields correctly.");
+                setIsSubmitting(false);
                 return;
             }
         }
@@ -675,6 +683,8 @@ const SupplierEdit: React.FC = () => {
             navigate("/suppliers");
         } catch (err: any) {
             toast.error(err || "Failed to update supplier");
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -1173,10 +1183,10 @@ const SupplierEdit: React.FC = () => {
                                 type="button"
                             />
                             <CustomButton
-                                text="Save Supplier"
+                                text={isSubmitting ? "Saving..." : "Update Supplier"}
                                 icon={FaSave}
                                 type="submit"
-                                disabled={loading}
+                                disabled={isSubmitting || loading}
                             />
                         </div>
                     </form>

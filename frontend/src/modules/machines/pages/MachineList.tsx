@@ -38,6 +38,7 @@ const MachineList: React.FC = () => {
 
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [itemToDelete, setItemToDelete] = useState<string | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     const [showViewModal, setShowViewModal] = useState(false);
     const [selectedMachine, setSelectedMachine] = useState<any | null>(null);
@@ -83,15 +84,17 @@ const MachineList: React.FC = () => {
     }, []);
 
     const handleDeleteConfirm = async () => {
-        if (itemToDelete !== null) {
+        if (itemToDelete !== null && !isDeleting) {
+            setIsDeleting(true);
             try {
                 await dispatch(deleteMachine(itemToDelete)).unwrap();
                 toast.success("Machine deleted successfully!");
             } catch (err: any) {
-                toast.error(err || "Failed to delete machine");
+                toast.error(err?.response?.data?.message || err.message || err || "Failed to delete machine");
             } finally {
                 setShowDeleteModal(false);
                 setItemToDelete(null);
+                setIsDeleting(false);
             }
         }
     };
@@ -177,7 +180,7 @@ const MachineList: React.FC = () => {
                     onConfirm={handleDeleteConfirm}
                     title="Confirm Delete"
                     message="Are you sure you want to delete this machine?"
-                    confirmText="Delete"
+                    confirmText={isDeleting ? "Deleting..." : "Delete"}
                     confirmVariant="danger"
                 />
 

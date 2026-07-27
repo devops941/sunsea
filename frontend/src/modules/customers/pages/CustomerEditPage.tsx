@@ -159,6 +159,7 @@ const CustomerEditPage: React.FC = () => {
   const [formData, setFormData] = useState<CustomerFormData>(initialFormData);
   const [addresses, setAddresses] = useState<any[]>([]);
   const [phones, setPhones] = useState<PhoneEntry[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
   const user = useSelector((state: any) => state.auth.user);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -205,6 +206,16 @@ const CustomerEditPage: React.FC = () => {
 
     fetchCustomer();
   }, [id, location.state]);
+
+  useEffect(() => {
+    if (formData.gstin && formData.gstin.length >= 2) {
+      const extractedStateCode = formData.gstin.substring(0, 2);
+      if (/^[0-9]{2}$/.test(extractedStateCode)) {
+        setFormData(prev => ({ ...prev, stateCode: extractedStateCode }));
+        setErrors(prev => ({ ...prev, stateCode: "" }));
+      }
+    }
+  }, [formData.gstin]);
 
   const handleMultiSelectChange = (name: string, values: string[]) => {
     setFormData((prev) => ({ ...prev, [name]: values }));
@@ -376,6 +387,8 @@ const CustomerEditPage: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     if (!id) return;
 
     const validationData = {
@@ -389,10 +402,7 @@ const CustomerEditPage: React.FC = () => {
     const mappedErrors: Record<string, string> = {};
 
     Object.keys(validationErrors).forEach((key) => {
-      if (key === "billingState") mappedErrors.billingAddressState = validationErrors.billingState;
-      else if (key === "billingCity") mappedErrors.billingAddressCity = validationErrors.billingCity;
-      else if (key === "billingPincode") mappedErrors.billingAddressPincode = validationErrors.billingPincode;
-      else mappedErrors[key] = validationErrors[key];
+      mappedErrors[key] = validationErrors[key];
     });
 
     // Validate transports
@@ -418,7 +428,9 @@ const CustomerEditPage: React.FC = () => {
 
     if (Object.keys(validationErrors).length > 0 || hasCustomErrors) {
       setErrors(mappedErrors);
-      toast.error("Please fix the highlighted errors");
+      const errorKeys = Object.keys(mappedErrors).map(k => k.split('.').pop() || k).join(", ");
+      toast.error(`Please fix errors in: ${errorKeys}`);
+      setIsSubmitting(false);
       return;
     }
 
@@ -446,6 +458,7 @@ const CustomerEditPage: React.FC = () => {
         mobile: phones,
         email: formData.email || undefined,
         gstin: formData.gstin || undefined,
+        stateCode: formData.stateCode,
         billingAddressLine1: formData.billingAddressLine1,
         billingCountry: formData.billingCountry || "India",
         billingCity: formData.billingCity,
@@ -457,14 +470,17 @@ const CustomerEditPage: React.FC = () => {
         priceList: formData.priceList || "Standard",
         routeId: formData.routeId || null,
         collectionAgentId: formData.collectionAgentId || null,
-        bankAccount: activeBankAccounts.length > 0 ? activeBankAccounts : undefined,
-        transports: activeTransports.length > 0 ? activeTransports : undefined,
+        bankAccount: activeBankAccounts,
+        transports: activeTransports,
         status: formData.isActive === "true" ? "Active" : "Inactive",
       });
-      toast.success("Customer updated successfully!");
-      navigate("/customers");
-    } catch (err: any) {
-      toast.error(err.message || "Failed to update customer");
+      toast.success("Customer updated successfully");
+      navigate('/customers');
+      setErrors({});
+    } catch (error: any) {
+      toast.error(error?.message || "Failed to update customer");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -477,24 +493,20 @@ const CustomerEditPage: React.FC = () => {
   }
 
   return (
-    <div className="p-4 md:p-6 min-h-screen bg-white">
-      <div className=" space-y-3">
+        <div className="w-full mx-auto">
+            <div className="bg-white shadow-sm border border-slate-200 overflow-visible">
+                <div className="px-6 py-5 border-b border-slate-200">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <h2 className="text-xl font-bold text-slate-800">Edit Customer</h2>
+                        <CustomButton
+                            text="Back to List"
+                            icon={FaArrowLeft}
+                            onClick={() => navigate("/customers")}
+                        />
+                    </div>
+                </div>
 
-        {/* Main Form Card */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200">
-
-          {/* Header */}
-          <div className="p-6 border-b border-slate-200 flex items-center justify-between">
-            <h2 className="text-2xl font-bold text-slate-800">Edit Customer</h2>
-            <CustomButton
-              text="Back"
-              icon={FaArrowLeft}
-              onClick={() => navigate("/customers")}
-
-            />
-          </div>
-
-          <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4" noValidate>
 
             {/* Identification & Status */}
             <div>
@@ -602,9 +614,15 @@ const CustomerEditPage: React.FC = () => {
 
                     countryValue={formData.billingCountry}
                     onCountryChange={(v) => {
-                      setFormData(prev => ({
-                        ...prev, billingCountry: v, billingState: "", billingCity: "",
-                      }));
+                      setFormData(prev => {
+                        if (prev.billingCountry === v) return prev;
+                        return {
+                          ...prev,
+                          billingCountry: v,
+                          billingState: "",
+                          billingCity: "",
+                        };
+                      });
                       setErrors(prev => ({ ...prev, billingCountry: "", billingState: "", billingCity: "" }));
                     }}
                     countryError={errors.billingCountry}
@@ -857,12 +875,11 @@ const CustomerEditPage: React.FC = () => {
                 type="button"
 
               />
-              <CustomButton text="Update Customer" icon={FaSave} type="submit" />
+              <CustomButton text={isSubmitting ? "Saving..." : "Update Customer"} icon={FaSave} type="submit" disabled={isSubmitting} />
             </div>
           </form>
         </div>
       </div>
-    </div>
   );
 };
 

@@ -66,19 +66,6 @@ const ProductPricing = lazy(() => import("../modules/product-pricing/pages/Produ
 const ProductImageUpload = lazy(() => import("../modules/product-images/pages/ProductImageUpload"));
 
 // New modules
-
-const StorageStoreCreate = lazy(() => import("../modules/storage-stores/pages/StorageStoreCreate"));
-const StorageStoreEdit = lazy(() => import("../modules/storage-stores/pages/StorageStoreEdit"));
-
-
-const StoreTypeCreate = lazy(() => import("../modules/store-types/pages/StoreTypeCreate"));
-const StoreTypeEdit = lazy(() => import("../modules/store-types/pages/StoreTypeEdit"));
-
-
-const LocationCreate = lazy(() => import("../modules/locations/pages/LocationCreate"));
-const LocationEdit = lazy(() => import("../modules/locations/pages/LocationEdit"));
-
-
 const MachineCreate = lazy(() => import("../modules/machines/pages/MachineCreate"));
 const MachineEdit = lazy(() => import("../modules/machines/pages/MachineEdit"));
 const MachineAssignmentList = lazy(() => import("../modules/machine-operation-assignments/pages/MachineAssignmentList"));
@@ -92,10 +79,8 @@ const ShiftEdit = lazy(() => import("../modules/shifts/pages/ShiftEdit"));
 
 
 const RawMaterialCreate = lazy(() => import("../modules/raw-materials/pages/RawMaterialCreate"));
+const RawMaterialCategoryList = lazy(() => import("../modules/raw-material-categories/pages/RawMaterialCategoryList"));
 const RawMaterialEdit = lazy(() => import("../modules/raw-materials/pages/RawMaterialEdit"));
-
-const RawMaterialCategoryCreate = lazy(() => import("../modules/raw-material-categories/pages/RawMaterialCategoryCreate"));
-const RawMaterialCategoryEdit = lazy(() => import("../modules/raw-material-categories/pages/RawMaterialCategoryEdit"));
 
 const WastageStoreList = lazy(() => import("../modules/wastage-store/pages/WastageStoreList"));
 const WastageStoreForm = lazy(() => import("../modules/wastage-store/pages/WastageStoreForm"));
@@ -326,39 +311,16 @@ const AppRoutes = () => {
             <Route element={<ProtectedRoute permission="stores.view" />}>
               <Route path="/storage-stores" element={<StoreLocationTabs />} />
             </Route>
-            {/* Storage Stores Create Route */}
-            <Route element={<ProtectedRoute permission="stores.create" />}>
-              <Route path="/storage-stores/create" element={<StorageStoreCreate />} />
-            </Route>
-            {/* Storage Stores Edit :Id Route */}
-            <Route element={<ProtectedRoute permission="stores.edit" />}>
-              <Route path="/storage-stores/edit/:id" element={<StorageStoreEdit />} />
-            </Route>
+
 
             {/* Store Types */}
             <Route element={<ProtectedRoute permission="store-types.view" />}>
               <Route path="/store-types" element={<StoreLocationTabs />} />
             </Route>
-            {/* Store Types Create Route */}
-            <Route element={<ProtectedRoute permission="store-types.create" />}>
-              <Route path="/store-types/create" element={<StoreTypeCreate />} />
-            </Route>
-            {/* Store Types Edit :Id Route */}
-            <Route element={<ProtectedRoute permission="store-types.edit" />}>
-              <Route path="/store-types/edit/:id" element={<StoreTypeEdit />} />
-            </Route>
 
             {/* Locations */}
             <Route element={<ProtectedRoute permission="locations.view" />}>
               <Route path="/locations" element={<StoreLocationTabs />} />
-            </Route>
-            {/* Locations Create Route */}
-            <Route element={<ProtectedRoute permission="locations.create" />}>
-              <Route path="/locations/create" element={<LocationCreate />} />
-            </Route>
-            {/* Locations Edit :Id Route */}
-            <Route element={<ProtectedRoute permission="locations.edit" />}>
-              <Route path="/locations/edit/:id" element={<LocationEdit />} />
             </Route>
 
             {/* Machines */}
@@ -406,14 +368,10 @@ const AppRoutes = () => {
             {/* Raw Materials Create Route */}
             <Route element={<ProtectedRoute permission="raw_materials.create" />}>
               <Route path="/raw-materials/create" element={<RawMaterialCreate />} />
-              {/* Raw Material Categories Create Route */}
-              <Route path="/raw-material-categories/create" element={<RawMaterialCategoryCreate />} />
             </Route>
             {/* Raw Materials Edit :Id Route */}
             <Route element={<ProtectedRoute permission="raw_materials.edit" />}>
               <Route path="/raw-materials/edit/:id" element={<RawMaterialEdit />} />
-              {/* Raw Material Categories Edit :Id Route */}
-              <Route path="/raw-material-categories/edit/:id" element={<RawMaterialCategoryEdit />} />
             </Route>
 
             {/* Wastage Store */}

@@ -101,7 +101,13 @@ class DailyPlanService {
     if (!assignment || !assignment.operators || assignment.operators.length === 0) {
       throw new ApiError(400, "No operator is assigned to the selected machine for this shift. Please assign an operator before creating the Daily Production Plan.");
     }
-    const inactiveOp = assignment.operators.find(op => op.status !== "active");
+    const opsToCheckCreate = (data.selectedOperatorIds && data.selectedOperatorIds.trim() !== "")
+      ? assignment.operators.filter(op => {
+          const ids = data.selectedOperatorIds!.split(",").map(id => id.trim());
+          return ids.includes(op.id?.toString()) || ids.includes((op as any).employeeId?.toString()) || ids.includes(op.fullName) || ids.includes(op.empCode);
+        })
+      : assignment.operators;
+    const inactiveOp = opsToCheckCreate.find(op => op.status !== "active");
     if (inactiveOp) {
       throw new ApiError(400, `Operator ${inactiveOp.fullName} is currently inactive.`);
     }
@@ -148,6 +154,7 @@ class DailyPlanService {
           status: data.status ?? "DRAFT",
           remarks: data.remarks ?? null,
           carryForwardFromPlanId: data.carryForwardFromPlanId ?? null,
+          selectedOperatorIds: data.selectedOperatorIds ?? null,
           createdBy: userId,
         },
         tx
@@ -170,7 +177,12 @@ class DailyPlanService {
         );
       }
 
-      return created;
+      const operators = await this.filterOperators(assignment?.operators || [], created.selectedOperatorIds);
+      return {
+        ...created,
+        operators,
+        shiftIncharge: assignment?.shiftIncharge || null,
+      };
     }, { timeout: 15000, maxWait: 10000 });
   }
 
@@ -238,7 +250,13 @@ class DailyPlanService {
     if (!assignment || !assignment.operators || assignment.operators.length === 0) {
       throw new ApiError(400, "No operator is assigned to the selected machine for this shift. Please assign an operator before creating the Daily Production Plan.");
     }
-    const inactiveOp = assignment.operators.find(op => op.status !== "active");
+    const opsToCheckUpdate = (data.selectedOperatorIds && data.selectedOperatorIds.trim() !== "")
+      ? assignment.operators.filter(op => {
+          const ids = data.selectedOperatorIds!.split(",").map(id => id.trim());
+          return ids.includes(op.id?.toString()) || ids.includes((op as any).employeeId?.toString()) || ids.includes(op.fullName) || ids.includes(op.empCode);
+        })
+      : assignment.operators;
+    const inactiveOp = opsToCheckUpdate.find(op => op.status !== "active");
     if (inactiveOp) {
       throw new ApiError(400, `Operator ${inactiveOp.fullName} is currently inactive.`);
     }
@@ -286,6 +304,7 @@ class DailyPlanService {
         priority: data.priority || existingPlan.priority,
         status: data.status === "NEXT_STEP" ? "IN_PROGRESS" : (data.status || existingPlan.status),
         remarks: data.remarks !== undefined ? data.remarks : existingPlan.remarks,
+        selectedOperatorIds: data.selectedOperatorIds !== undefined ? data.selectedOperatorIds : existingPlan.selectedOperatorIds,
         updatedBy: userId,
       };
 
@@ -378,7 +397,12 @@ class DailyPlanService {
 
       const updatedPlan = await dailyPlanRepository.update(dailyPlanId, updateData, tx);
 
-      return updatedPlan;
+      const operators = await this.filterOperators(assignment?.operators || [], updatedPlan.selectedOperatorIds);
+      return {
+        ...updatedPlan,
+        operators,
+        shiftIncharge: assignment?.shiftIncharge || null,
+      };
     }, { timeout: 15000, maxWait: 10000 });
   }
 
@@ -420,6 +444,57 @@ class DailyPlanService {
     return dailyPlanRepository.delete(dailyPlanId);
   }
 
+  private async filterOperators(assignedOperators: any[], selectedOperatorIds?: string | null) {
+    if (!selectedOperatorIds || selectedOperatorIds.trim() === "") {
+      return assignedOperators || [];
+    }
+    const selectedIds = selectedOperatorIds.split(",").map((id: string) => id.trim()).filter(Boolean);
+    const filtered = (assignedOperators || []).filter((op: any) => 
+      selectedIds.includes(op.id?.toString()) || 
+      selectedIds.includes(op.employeeId?.toString()) || 
+      selectedIds.includes(op.fullName) ||
+      selectedIds.includes(op.empCode)
+    );
+    if (filtered.length < selectedIds.length) {
+      const existingIds = new Set(filtered.map((op: any) => op.id?.toString()));
+      const existingNames = new Set(filtered.map((op: any) => op.fullName));
+      const existingCodes = new Set(filtered.map((op: any) => op.empCode));
+      const missingIds = selectedIds.filter((id: string) => !existingIds.has(id) && !existingNames.has(id) && !existingCodes.has(id));
+      if (missingIds.length > 0) {
+        try {
+          const numericIds = missingIds.filter((id: string) => /^\d+$/.test(id));
+          const stringValues = missingIds.filter((id: string) => !/^\d+$/.test(id));
+          const whereClauses: any[] = [];
+          if (numericIds.length > 0) {
+            whereClauses.push({ id: { in: numericIds.map((id: string) => BigInt(id)) } });
+          }
+          if (stringValues.length > 0) {
+            whereClauses.push({ fullName: { in: stringValues } });
+            whereClauses.push({ empCode: { in: stringValues } });
+          }
+          if (whereClauses.length > 0) {
+            const missingEmps = await prisma.employee.findMany({
+              where: { OR: whereClauses }
+            });
+            for (const emp of missingEmps) {
+              if (!filtered.some((f: any) => f.id === emp.id.toString())) {
+                filtered.push({
+                  id: emp.id.toString(),
+                  empCode: emp.empCode,
+                  fullName: emp.fullName,
+                  status: emp.status,
+                });
+              }
+            }
+          }
+        } catch (e) {
+          console.error("Error fetching missing employee details:", e);
+        }
+      }
+    }
+    return filtered;
+  }
+
   async findById(dailyPlanId: string) {
     const plan = await dailyPlanRepository.findById(dailyPlanId);
     if (!plan) {
@@ -427,10 +502,11 @@ class DailyPlanService {
     }
 
     const assignment = await MachineOperationAssignmentService.resolveAssignment(plan.machineId, plan.shiftId, plan.productionDate);
+    const operators = await this.filterOperators(assignment?.operators || [], plan.selectedOperatorIds);
 
     return {
       ...plan,
-      operators: assignment?.operators || [],
+      operators,
       shiftIncharge: assignment?.shiftIncharge || null,
     };
   }
@@ -465,14 +541,16 @@ class DailyPlanService {
     const plansWithAssignments = await Promise.all(result.dailyPlans.map(async (plan: any) => {
       try {
         const assignment = await MachineOperationAssignmentService.resolveAssignment(plan.machineId, plan.shiftId, plan.productionDate);
+        const operators = await this.filterOperators(assignment?.operators || [], plan.selectedOperatorIds);
         return {
           ...plan,
-          operators: assignment?.operators || [],
+          operators,
           shiftIncharge: assignment?.shiftIncharge || null,
         };
       } catch (err) {
         return {
           ...plan,
+          operators: [],
           operator: null,
           shiftIncharge: null,
         };

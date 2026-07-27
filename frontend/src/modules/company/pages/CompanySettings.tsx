@@ -181,7 +181,7 @@ const CompanySettings: React.FC = () => {
                   <div>
                     <TextInput label="Legal Company Name" name="legalName" value={formData.legalName || ""} onChange={handleChange} placeholder="Enter Legal Name" required error={errors.legalName} />
                   </div>
-                  <div>
+                  <div className="hidden">
                     <TextInput label="Company Code (Auto Generated)" name="companyCode" value={formData.companyCode || ""} onChange={handleChange} placeholder="Auto Generated" disabled error={errors.companyCode} />
                   </div>
                   <div>
@@ -294,7 +294,7 @@ const CompanySettings: React.FC = () => {
   // Normal Settings/Edit Screen Design (Matches CreateOrder.tsx)
   return (
     <div className="w-full mx-auto">
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+      <div className="bg-white rounded-lg  border-gray-200">
         {/* Page Header */}
         <div className="px-6 py-4 border-b border-gray-100">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -311,13 +311,13 @@ const CompanySettings: React.FC = () => {
           {/* General Information */}
           <div>
             <h6 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-              <FaInfoCircle className="text-gray-500 text-sm" /> General Information
+              General Information
             </h6>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
               <div>
                 <TextInput label="Legal Name" name="legalName" value={formData.legalName || ""} onChange={handleChange} placeholder="Enter Legal Name" required error={errors.legalName} />
               </div>
-              <div>
+              <div className="hidden">
                 <TextInput label="Company Code" name="companyCode" value={formData.companyCode || ""} onChange={handleChange} placeholder="Auto Generated" disabled error={errors.companyCode} />
               </div>
               {/* <div>
@@ -334,7 +334,7 @@ const CompanySettings: React.FC = () => {
           {/* Registration Details */}
           <div>
             <h6 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-              <FaFileAlt className="text-gray-500 text-sm" /> Registration Details
+              Registration Details
             </h6>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
               <div className="md:col-span-2">
@@ -346,7 +346,7 @@ const CompanySettings: React.FC = () => {
           {/* Address Information */}
           <div>
             <h6 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-              <FaMapMarkerAlt className="text-gray-500 text-sm" /> Address Information
+               Address Information
             </h6>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
@@ -386,7 +386,7 @@ const CompanySettings: React.FC = () => {
           {/* Contact Information */}
           <div>
             <h6 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-              <FaPhoneAlt className="text-gray-500 text-sm" /> Contact Information
+              Contact Information
             </h6>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <div>
@@ -418,7 +418,7 @@ const CompanySettings: React.FC = () => {
           {/* System Information */}
           <div>
             <h6 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-              <FaCogs className="text-gray-500 text-sm" /> System Information
+             System Information
             </h6>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 items-center">
               <div className="md:col-span-3">
@@ -427,21 +427,7 @@ const CompanySettings: React.FC = () => {
                   <ImageUpload label="Favicon" name="faviconFile" currentImageUrl={formData.faviconUrl || undefined} onChange={handleChange as any} />
                 </div>
               </div>
-              <div>
-                <div className="flex items-center gap-3">
-                  <label className="relative inline-flex items-center cursor-pointer group/toggle">
-                    <input
-                      type="checkbox"
-                      className="sr-only peer"
-                      name="isActive"
-                      checked={!!formData.isActive}
-                      onChange={handleChange as any}
-                    />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary shadow-inner"></div>
-                    <span className="ml-3 text-sm font-bold text-gray-700">Active Company</span>
-                  </label>
-                </div>
-              </div>
+
             </div>
           </div>
 

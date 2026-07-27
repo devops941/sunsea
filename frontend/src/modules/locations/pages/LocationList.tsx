@@ -1,10 +1,12 @@
 import React, { useState, useCallback, useEffect } from "react";
-import { FaSearch, FaPlus } from "react-icons/fa";
+import { FaSearch, FaPlus, FaSave, FaEraser } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
+import { z } from "zod";
 
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
-import { fetchLocations, deleteLocation } from "../../../features/locations/locationSlice";
+import { fetchLocations, deleteLocation, createLocation, updateLocation } from "../../../features/locations/locationSlice";
+import { locationService } from "../../../services/locationService";
 import type { Location } from "../../../features/locations/types";
 
 import ViewButton from "../../../components/ui/viewbutton/ViewButton";
@@ -13,7 +15,10 @@ import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
 import CustomButton from "../../../components/ui/Button/Button";
 import CommonViewModal from "../../../components/ui/CommonViewModal/CommonViewModal";
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
+import CommonModal from "../../../components/ui/Modal/CommonModal";
+import TextInput from "../../../components/form/TextInput/TextInput";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
+import CityStateSelect from "../../../components/ui/CityStateSelect/CityStateSelect";
 import DataTable from "../../../components/ui/table/DataTable";
 
 const ITEMS_PER_PAGE = 10;
@@ -25,6 +30,67 @@ const locationTypeOptions = [
     { label: "Factory", value: "Factory" },
     { label: "Office", value: "Office" },
 ];
+
+const LOCATION_TYPE_FORM_OPTIONS = [
+    { label: "Warehouse", value: "Warehouse" },
+    { label: "Office", value: "Office" },
+    { label: "Factory", value: "Factory" },
+    { label: "Retail", value: "Retail" },
+    { label: "Store", value: "Store" },
+];
+
+const initialFormState = {
+    locationId: "",
+    locationCode: "",
+    locationName: "",
+    locationType: "",
+    address: "",
+    city: "",
+    state: "",
+    country: "India",
+    isActive: true,
+};
+
+const locationSchema = z.object({
+    locationName: z
+        .string()
+        .trim()
+        .min(1, "Location Name is required")
+        .max(100, "Maximum 100 characters allowed")
+        .regex(
+            /^[A-Za-z0-9\s&()-]+$/,
+            "Location Name contains invalid characters"
+        ),
+
+    locationType: z
+        .string()
+        .trim()
+        .min(1, "Location Type is required"),
+
+    address: z
+        .string()
+        .trim()
+        .min(1, "Address is required")
+        .max(255, "Maximum 255 characters allowed"),
+
+    city: z
+        .string()
+        .trim()
+        .min(1, "City is required")
+        .max(100, "Maximum 100 characters allowed"),
+
+    state: z
+        .string()
+        .trim()
+        .min(1, "State is required")
+        .max(100, "Maximum 100 characters allowed"),
+
+    country: z
+        .string()
+        .trim()
+        .min(1, "Country is required")
+        .max(100, "Maximum 100 characters allowed"),
+});
 
 const LocationList: React.FC = () => {
     const navigate = useNavigate();
@@ -41,8 +107,16 @@ const LocationList: React.FC = () => {
 
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [itemToDelete, setItemToDelete] = useState<string | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     const [locationType, setLocationType] = useState("");
+
+    // Form Modal State
+    const [showFormModal, setShowFormModal] = useState(false);
+    const [editMode, setEditMode] = useState(false);
+    const [formData, setFormData] = useState(initialFormState);
+    const [errors, setErrors] = useState<Record<string, string>>({});
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     useEffect(() => {
         const delayDebounceFn = setTimeout(() => {
@@ -69,13 +143,37 @@ const LocationList: React.FC = () => {
         setShowViewModal(true);
     }, []);
 
-    const handleOpenAdd = () => {
-        navigate("/locations/create");
+    const handleOpenAdd = async () => {
+        setEditMode(false);
+        setErrors({});
+        
+        let nextCode = "";
+        try {
+            nextCode = await locationService.fetchNextId();
+        } catch (err) {
+            console.error("Failed to fetch next location code:", err);
+        }
+        
+        setFormData({ ...initialFormState, locationId: nextCode, locationCode: nextCode });
+        setShowFormModal(true);
     };
 
     const handleOpenEdit = useCallback((item: Location) => {
-        navigate(`/locations/edit/${item.locationId}`, { state: item });
-    }, [navigate]);
+        setEditMode(true);
+        setErrors({});
+        setFormData({
+            locationId: item.locationId,
+            locationCode: item.locationCode,
+            locationName: item.locationName,
+            locationType: item.locationType,
+            address: item.address || "",
+            city: item.city || "",
+            state: item.state || "",
+            country: item.country || "India",
+            isActive: item.isActive,
+        });
+        setShowFormModal(true);
+    }, []);
 
     const triggerDelete = useCallback((id: string) => {
         setItemToDelete(id);
@@ -84,20 +182,90 @@ const LocationList: React.FC = () => {
 
     const handleDeleteConfirm = async () => {
         if (itemToDelete !== null) {
+            setIsDeleting(true);
             try {
                 await dispatch(deleteLocation(itemToDelete)).unwrap();
                 toast.success("Location deleted successfully!");
             } catch (err: any) {
+                console.log("Delete Location Error:", err);
                 const errorMessage = typeof err === 'string' ? err : err?.message || "Failed to delete location";
                 toast.error(errorMessage);
             } finally {
+                setIsDeleting(false);
                 setShowDeleteModal(false);
                 setItemToDelete(null);
             }
         }
     };
 
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+        const target = e.target;
+        const { name, value } = target;
+        const type = (target as any).type;
 
+        const checked =
+            type === "checkbox"
+                ? (target as HTMLInputElement).checked
+                : undefined;
+
+        setFormData(prev => ({
+            ...prev,
+            [name]: type === "checkbox" ? checked : value
+        }));
+
+        if (errors[name]) {
+            setErrors(prev => ({
+                ...prev,
+                [name]: ""
+            }));
+        }
+    };
+
+    const handleClear = () => {
+        setFormData(prev => ({
+            ...initialFormState,
+            locationId: prev.locationId,
+            locationCode: prev.locationCode
+        }));
+        setErrors({});
+    };
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+
+        try {
+            locationSchema.parse(formData);
+            setErrors({});
+        } catch (error) {
+            if (error instanceof z.ZodError) {
+                const fieldErrors = error.flatten().fieldErrors as Record<string, string[] | undefined>;
+                const formattedErrors: Record<string, string> = {};
+                Object.keys(fieldErrors).forEach((key) => {
+                    const message = fieldErrors[key]?.[0];
+                    if (message) formattedErrors[key] = message;
+                });
+                setErrors(formattedErrors);
+                return;
+            }
+        }
+
+        setIsSubmitting(true);
+        try {
+            if (editMode) {
+                await dispatch(updateLocation({ id: formData.locationId, data: formData })).unwrap();
+                toast.success("Location updated successfully!");
+            } else {
+                await dispatch(createLocation(formData)).unwrap();
+                toast.success("Location created successfully!");
+            }
+            setShowFormModal(false);
+        } catch (err: any) {
+            const errorMessage = typeof err === 'string' ? err : err?.message || "Failed to save location";
+            toast.error(errorMessage);
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
 
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
 
@@ -115,6 +283,7 @@ const LocationList: React.FC = () => {
                                 <SelectInput
                                     label="Location Type"
                                     hideLabel={true}
+                                    name="locationTypeFilter"
                                     value={locationType}
                                     options={locationTypeOptions}
                                     onChange={(e) => {
@@ -189,6 +358,111 @@ const LocationList: React.FC = () => {
                     </div>
                 </div>
 
+                {/* Form Modal (Add / Edit) */}
+                <CommonModal
+                    show={showFormModal}
+                    onHide={() => setShowFormModal(false)}
+                    title={editMode ? "Edit Location" : "Add New Location"}
+                    maxWidth="3xl"
+                    footer={
+                        <div className="flex items-center justify-end gap-2 w-full">
+                            <CustomButton
+                                text="Clear"
+                                icon={FaEraser}
+                                onClick={handleClear}
+                                disabled={isSubmitting}
+                            />
+                            <CustomButton
+                                type="submit"
+                                text={editMode ? "Update Location" : "Save Location"}
+                                icon={FaSave}
+                                variant="primary"
+                                disabled={isSubmitting}
+                                onClick={handleSubmit}
+                            />
+                        </div>
+                    }
+                >
+                    <form onSubmit={handleSubmit} className="space-y-4 p-2">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <TextInput
+                                label="Location ID"
+                                name="locationId"
+                                value={formData.locationId}
+                                placeholder="e.g. LOC001"
+                                required
+                                disabled
+                                onChange={handleChange}
+                                error={errors.locationId}
+                            />
+                            <TextInput
+                                label="Location Name"
+                                name="locationName"
+                                value={formData.locationName}
+                                placeholder="e.g. Main Warehouse"
+                                required
+                                onChange={handleChange}
+                                error={errors.locationName}
+                            />
+                            <SelectInput
+                                label="Location Type"
+                                name="locationType"
+                                value={formData.locationType}
+                                options={[
+                                    { label: "Select Type", value: "" },
+                                    ...LOCATION_TYPE_FORM_OPTIONS
+                                ]}
+                                required
+                                onChange={handleChange}
+                                error={errors.locationType}
+                            />
+                            <div className="col-span-1 md:col-span-2">
+                                <TextInput
+                                    label="Address"
+                                    name="address"
+                                    value={formData.address}
+                                    placeholder="Enter full street address"
+                                    required
+                                    onChange={handleChange}
+                                    error={errors.address}
+                                />
+                            </div>
+                            <CityStateSelect
+                                cityValue={formData.city}
+                                stateValue={formData.state}
+                                onCityChange={(val) => {
+                                    setFormData((prev) => ({ ...prev, city: val.name }));
+                                    if (errors.city) setErrors((prev) => ({ ...prev, city: "" }));
+                                }}
+                                onStateChange={(val) => {
+                                    setFormData((prev) => ({ ...prev, state: val.name, city: "" }));
+                                    if (errors.state) setErrors((prev) => ({ ...prev, state: "", city: "" }));
+                                }}
+                                cityError={errors.city}
+                                stateError={errors.state}
+                                countryValue={formData.country}
+                                onCountryChange={(val) => {
+                                    setFormData((prev) => ({ ...prev, country: val.name }));
+                                    if (errors.country) setErrors((prev) => ({ ...prev, country: "" }));
+                                }}
+                                countryError={errors.country}
+                                required
+                            />
+                            <SelectInput
+                                label="Status"
+                                name="isActive"
+                                value={formData.isActive.toString()}
+                                options={[
+                                    { label: "Active", value: "true" },
+                                    { label: "Inactive", value: "false" }
+                                ]}
+                                required
+                                onChange={(e) => setFormData(prev => ({ ...prev, isActive: e.target.value === "true" }))}
+                            />
+                        </div>
+                    </form>
+                </CommonModal>
+
                 {/* View Modal */}
                 <CommonViewModal
                     show={showViewModal}
@@ -225,13 +499,15 @@ const LocationList: React.FC = () => {
 
                 {/* Delete Modal */}
                 <CommonConfirmModal
-                    show={showDeleteModal}
-                    onHide={() => setShowDeleteModal(false)}
+                    isOpen={showDeleteModal}
+                    onClose={() => setShowDeleteModal(false)}
                     onConfirm={handleDeleteConfirm}
                     title="Confirm Delete"
                     message="Are you sure you want to delete this location?"
-                    confirmText="Delete"
-                    confirmVariant="danger"
+                    confirmText={isDeleting ? "Deleting..." : "Delete"}
+                    cancelText="Cancel"
+                    isDangerous={true}
+                    isLoading={isDeleting}
                 />
             </div>
         </div>

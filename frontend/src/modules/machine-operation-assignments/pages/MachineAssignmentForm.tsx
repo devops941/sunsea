@@ -57,7 +57,6 @@ export const MachineAssignmentForm: React.FC = () => {
     inchargeRoleId: "",
     inchargeEmployeeId: "",
     operators: [
-      { roleId: "", employeeId: "" },
       { roleId: "", employeeId: "" }
     ],
     remarks: "",
@@ -197,7 +196,7 @@ export const MachineAssignmentForm: React.FC = () => {
   };
 
   const handleRemoveOperator = (index: number) => {
-    if (formData.operators.length <= 2) return;
+    if (formData.operators.length <= 1) return;
     setFormData(prev => ({
       ...prev,
       operators: prev.operators.filter((_, i) => i !== index)
@@ -232,8 +231,8 @@ export const MachineAssignmentForm: React.FC = () => {
         newErrors.weekEndDate = "Week End Date must be after Week Start Date";
       }
     }
-    if (formData.operators.length < 2) {
-      newErrors.operators = "At least two operators are required";
+    if (formData.operators.length < 1) {
+      newErrors.operators = "At least one operator is required";
     } else {
       const empIds = new Set<string>();
       formData.operators.forEach((op, idx) => {
@@ -260,6 +259,7 @@ export const MachineAssignmentForm: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
     if (!validate()) return;
 
     setLoading(true);
@@ -362,7 +362,6 @@ export const MachineAssignmentForm: React.FC = () => {
                 value={formData.machineId}
                 onChange={(e) => handleMachineSelect(e.target.value)}
                 error={errors.machineId}
-                disabled={isEdit}
                 options={[
                   { label: "-- Select Machine --", value: "" },
                   ...machines.map((m) => ({
@@ -378,7 +377,6 @@ export const MachineAssignmentForm: React.FC = () => {
                 value={formData.shiftId}
                 onChange={(e) => setFormData({ ...formData, shiftId: e.target.value })}
                 error={errors.shiftId}
-                disabled={!formData.machineId || !formData.weekStartDate}
                 options={[
                   { label: "-- Select Shift --", value: "" },
                   ...shifts.map((s) => ({
@@ -412,7 +410,7 @@ export const MachineAssignmentForm: React.FC = () => {
                 <div key={index} className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-4 relative group">
                   <div className="flex justify-between items-center">
                     <span className="text-sm font-semibold text-slate-700">Operator {index + 1}</span>
-                    {formData.operators.length > 2 && (
+                    {formData.operators.length > 1 && (
                       <button
                         type="button"
                         onClick={() => handleRemoveOperator(index)}

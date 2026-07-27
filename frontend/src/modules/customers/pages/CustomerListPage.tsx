@@ -45,6 +45,7 @@ const CustomerListPage: React.FC = () => {
   // Custom confirm delete state
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [customerToDelete, setCustomerToDelete] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     if (error) {
@@ -74,17 +75,19 @@ const CustomerListPage: React.FC = () => {
   }, []);
 
   const handleDeleteConfirm = async () => {
-    if (customerToDelete !== null) {
+    if (customerToDelete !== null && !isDeleting) {
+      setIsDeleting(true);
       try {
         await removeCustomer(customerToDelete);
         toast.success("Customer deleted successfully!");
         // Reload current page after deletion
         loadCustomers({ search: searchTerm, page: currentPage, limit: ITEMS_PER_PAGE });
       } catch (err: any) {
-        toast.error(err.message || "Failed to delete customer");
+        toast.error(err?.response?.data?.message || err.message || err || "Failed to delete customer");
       } finally {
         setShowDeleteModal(false);
         setCustomerToDelete(null);
+        setIsDeleting(false);
       }
     }
   };
@@ -182,7 +185,7 @@ const CustomerListPage: React.FC = () => {
           onConfirm={handleDeleteConfirm}
           title="Confirm Delete"
           message="Are you sure you want to delete this customer?"
-          confirmText="Delete"
+          confirmText={isDeleting ? "Deleting..." : "Delete"}
           confirmVariant="danger"
         />
       </div>
