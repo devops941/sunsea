@@ -7,8 +7,6 @@ import type { TabItem } from "../../../components/ui/tab/Tabs";
 
 import Employeelist from "../../employee/pages/EmployeeList";
 import ShiftList from "../../shifts/pages/ShiftList";
-import CustomerListPage from "../../customers/pages/CustomerListPage";
-import SupplierListPage from "../../supplier/pages/SupplierList";
 import MachineList from "../../machines/pages/MachineList";
 import MachineAssignmentList from "../../machine-operation-assignments/pages/MachineAssignmentList";
 
@@ -19,8 +17,6 @@ const HROrganizationTabs: React.FC = () => {
     const pathToKey: Record<string, string> = {
         "/employees": "employees",
         "/shifts": "shifts",
-        "/customers": "customers",
-        "/suppliers": "suppliers",
         "/machines": "machines",
         "/machines/assignments": "assignments"
     };
@@ -28,8 +24,6 @@ const HROrganizationTabs: React.FC = () => {
     const keyToPath: Record<string, string> = {
         "employees": "/employees",
         "shifts": "/shifts",
-        "customers": "/customers",
-        "suppliers": "/suppliers",
         "machines": "/machines",
         "assignments": "/machines/assignments"
     };
@@ -40,8 +34,6 @@ const HROrganizationTabs: React.FC = () => {
         { key: "machines", label: "Machines", icon: <FaCogs />, content: <MachineList /> },
         { key: "assignments", label: "Machine Assignments", icon: <FaUserCheck />, content: <MachineAssignmentList /> },
         { key: "employees", label: "Employees", icon: <FaUsers />, content: <Employeelist /> },
-        { key: "suppliers", label: "Suppliers", icon: <FaTruck />, content: <SupplierListPage /> },
-        { key: "customers", label: "Customers", icon: <FaUserTie />, content: <CustomerListPage /> },
         { key: "shifts", label: "Shift Management", icon: <FaClock />, content: <ShiftList /> }
     ];
 

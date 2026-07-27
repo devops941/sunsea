@@ -1,7 +1,7 @@
 import React from "react";
 
 import { useLocation, useNavigate } from "react-router-dom";
-import { FaFileInvoice, FaFileAlt, FaFileSignature, FaUserCheck } from "react-icons/fa";
+import { FaFileInvoice, FaFileAlt, FaFileSignature, FaUserCheck, FaUserTie } from "react-icons/fa";
 import Tabs from "../../../components/ui/tab/Tabs";
 import type { TabItem } from "../../../components/ui/tab/Tabs";
 
@@ -10,6 +10,7 @@ import SalesOrderList from "../salesorder/SalesOrderList";
 import QuotationList from "../quatation/QuatationList";
 import PendingQuatationList from "../quatation/PendingQuatation";
 import SalesInvoiceList from "../../sales-order-invoice/SalesInvoiceList";
+import CustomerListPage from "../../customers/pages/CustomerListPage";
 
 const SalesTabs: React.FC = () => {
     const location = useLocation();
@@ -19,6 +20,7 @@ const SalesTabs: React.FC = () => {
     const pathToKey: Record<string, string> = {
         "/sales-order": "orders",
         "/draft-order": "drafts",
+        "/customers": "customers",
         "/quatation-order": "quotations",
         "/pending-quotations": "approvals",
         "/sales-invoices": "salesorderinvoice",
@@ -28,6 +30,7 @@ const SalesTabs: React.FC = () => {
     const keyToPath: Record<string, string> = {
         "orders": "/sales-order",
         "drafts": "/draft-order",
+        "customers": "/customers",
         "quotations": "/quatation-order",
         "approvals": "/pending-quotations",
         "salesorderinvoice": "/sales-invoices"
@@ -37,6 +40,7 @@ const SalesTabs: React.FC = () => {
 
     const tabs: TabItem[] = [
         { key: "orders", label: "Sales Orders", icon: <FaFileInvoice />, content: <AllSalesOrderList /> },
+        { key: "customers", label: "Customers", icon: <FaUserTie />, content: <CustomerListPage /> },
         { key: "drafts", label: "Draft Orders", icon: <FaFileAlt />, content: <SalesOrderList /> },
         { key: "quotations", label: "Quotations", icon: <FaFileSignature />, content: <QuotationList /> },
         { key: "approvals", label: "MD Approvals", icon: <FaUserCheck />, content: <PendingQuatationList /> },

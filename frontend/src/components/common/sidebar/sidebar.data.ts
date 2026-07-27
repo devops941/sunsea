@@ -44,8 +44,6 @@ export const sidebarItems: SidebarItem[] = [
     path: "/employees",
     activePaths: [
       "/employees",
-      "/customers",
-      "/suppliers",
       "/machines",
       "/shifts",
     ],
@@ -73,6 +71,7 @@ export const sidebarItems: SidebarItem[] = [
     icon: FiShoppingBag,
     path: "/purchase-orders",
     activePaths: [
+      "/suppliers",
       "/purchase-orders",
       "/purchase-order-approvals",
       "/expenses",
@@ -85,6 +84,7 @@ export const sidebarItems: SidebarItem[] = [
     icon: FiShoppingCart,
     path: "/sales-order",
     activePaths: [
+      "/customers",
       "/sales-order",
       "/draft-order",
       "/quatation-order",

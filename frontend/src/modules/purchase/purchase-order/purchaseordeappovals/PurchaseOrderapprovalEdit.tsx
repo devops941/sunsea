@@ -139,7 +139,8 @@ const PurchaseOrderViewPage: React.FC = () => {
     }
 
     const supplier = suppliers.find((s) => String(s.id) === String(po.supplierId));
-    const createdByUser = users.find((u: any) => u.userId === po.createdBy);
+    const createdByUser = users.find((u: any) => u.userId === po.createdBy || u.id === po.createdBy);
+    const createdByName = createdByUser?.username || (po.createdBy?.startsWith("admin_") ? "admin" : (po.createdBy || "—"));
     const isInterState = companyState && supplier?.billingState
         ? companyState.toLowerCase().trim() !== supplier.billingState.toLowerCase().trim()
         : false;
@@ -187,7 +188,7 @@ const PurchaseOrderViewPage: React.FC = () => {
                                     <DetailBox label="PO Number" value={po.poNumber} icon={<FaFileAlt />} />
                                     <DetailBox label="PO Date" value={formatDate(po.poDate)} icon={<FaCalendarAlt />} />
                                     <DetailBox label="Expected Delivery" value={formatDate(po.expectedDeliveryDate)} icon={<FaCalendarAlt />} />
-                                    <DetailBox label="Created By" value={createdByUser?.username || "—"} icon={<FaUser />} />
+                                    <DetailBox label="Created By" value={createdByName} icon={<FaUser />} />
                                     <DetailBox label="Store" value={po.store?.storeName || po.storeId || "—"} icon={<FaInfoCircle />} />
                                     {po.remarks && <DetailBox label="Remarks" value={po.remarks} />}
                                 </div>
@@ -370,6 +371,13 @@ const PurchaseOrderViewPage: React.FC = () => {
                                         <div className="flex justify-between text-red-600 pt-1 border-t border-gray-100 mt-2">
                                             <span>Discount</span>
                                             <span>− {formatMoney(po.totalDiscount)}</span>
+                                        </div>
+                                    )}
+
+                                    {Number(po.roundingAdjust) !== 0 && (
+                                        <div className="flex justify-between text-gray-600 pt-1">
+                                            <span>Round Off</span>
+                                            <span>{Number(po.roundingAdjust) > 0 ? "+" : ""} {formatMoney(po.roundingAdjust)}</span>
                                         </div>
                                     )}
 

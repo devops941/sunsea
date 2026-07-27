@@ -132,9 +132,9 @@ const InvoiceDetailPage: React.FC = () => {
 
     const [items, setItems] = useState<GRNItem[]>([]);
     const isInterState = useMemo(() => {
-        if (!companyState || !form.shippingState) return false;
-        return companyState.toLowerCase().trim() !== form.shippingState.toLowerCase().trim();
-    }, [companyState, form.shippingState]);
+        if (!companyState || !form.billingState) return false;
+        return companyState.toLowerCase().trim() !== form.billingState.toLowerCase().trim();
+    }, [companyState, form.billingState]);
     const [errors, setErrors] = useState<Record<string, string>>({});
 
     // ── Fetch on mount ────────────────────────────────────────────────────────────
@@ -737,11 +737,11 @@ const InvoiceDetailPage: React.FC = () => {
                             />
                         </div>
                         <div>
-                            <SelectInput label="Supplier" name="supplierId" value={form.supplierId} options={supplierOptions} onChange={handleChange} required disabled={isPOSelected} />
+                            <SelectInput label="Supplier" name="supplierId" value={form.supplierId} options={supplierOptions} onChange={handleChange} required disabled={isPOSelected} searchable />
                             {errors.supplierId && <div className="text-red-500 text-sm mt-1">{errors.supplierId}</div>}
                         </div>
                         <div>
-                            <SelectInput label="Store" name="storeId" value={form.storeId} options={storeOptions} onChange={handleChange} required disabled={isPOSelected} />
+                            <SelectInput label="Store" name="storeId" value={form.storeId} options={storeOptions} onChange={handleChange} required disabled={isPOSelected} searchable />
                             {errors.storeId && <div className="text-red-500 text-sm mt-1">{errors.storeId}</div>}
                         </div>
                     </div>
@@ -775,7 +775,7 @@ const InvoiceDetailPage: React.FC = () => {
                         <div>
                             <div className="flex items-center justify-between mb-4">
                                 <h6 className="text-lg font-semibold text-gray-800 mb-0">Shipping Address</h6>
-                                <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-700 mb-0">
+                                {/* <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-700 mb-0">
                                     <input
                                         type="checkbox"
                                         className="w-4 h-4 text-blue-600 rounded border-gray-300"
@@ -784,7 +784,7 @@ const InvoiceDetailPage: React.FC = () => {
                                         disabled={isPOSelected}
                                     />
                                     <span>Same as billing</span>
-                                </label>
+                                </label> */}
                             </div>
                             <AddressForm
                                 addressValue={form.shippingAddressLine1}

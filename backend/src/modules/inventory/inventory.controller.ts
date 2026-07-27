@@ -39,7 +39,7 @@ class InventoryController {
     const isPastCutoff = nowParts.hours > cutoffHh || (nowParts.hours === cutoffHh && nowParts.minutes >= cutoffMm);
     const isBeforeCutoff = !isPastCutoff;
 
-    if (isFuture || (isToday && isBeforeCutoff)) {
+    if (isFuture) {
       return res.status(200).json({
         success: true,
         asOf: targetDate,
@@ -52,7 +52,24 @@ class InventoryController {
       });
     }
 
-    let result = await inventoryService.getEodStock({
+    const isEligibleForAutoRun = !isFuture && (!isToday || isPastCutoff);
+
+    // If no snapshots exist for this date yet, auto-trigger a snapshot run (only if past cutoff/eligible and no filters)
+    if (isEligibleForAutoRun && (!search && !category && !storeId)) {
+      const daySnapshotCount = await prisma.eodStockSnapshot.count({
+        where: { snapshotDate: targetDate }
+      });
+      if (daySnapshotCount === 0) {
+        try {
+          const dateStr = date ? (date as string) : targetDate.toISOString().split("T")[0];
+          await runEodStockSnapshot(dateStr);
+        } catch (eodErr) {
+          console.error("Auto EOD snapshot run error:", eodErr);
+        }
+      }
+    }
+
+    const result = await inventoryService.getEodStock({
       date: targetDate,
       category: category as string || undefined,
       storeId: storeId as string || undefined,
@@ -60,26 +77,6 @@ class InventoryController {
       page: Number(page),
       limit: Number(limit),
     });
-
-    const isEligibleForAutoRun = !isFuture && (!isToday || isPastCutoff);
-
-    // If no snapshots exist for this date yet, auto-trigger a snapshot run and re-fetch (only if past cutoff)
-    if (result.total === 0 && (!search && !category && !storeId) && isEligibleForAutoRun) {
-      try {
-        const dateStr = date ? (date as string) : targetDate.toISOString().split("T")[0];
-        await runEodStockSnapshot(dateStr);
-        result = await inventoryService.getEodStock({
-          date: targetDate,
-          category: category as string || undefined,
-          storeId: storeId as string || undefined,
-          search: search as string || undefined,
-          page: Number(page),
-          limit: Number(limit),
-        });
-      } catch (eodErr) {
-        console.error("Auto EOD snapshot run error:", eodErr);
-      }
-    }
 
     return res.status(200).json({
       success: true,

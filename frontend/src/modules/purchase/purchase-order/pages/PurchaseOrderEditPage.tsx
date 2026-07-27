@@ -164,9 +164,66 @@ const PurchaseOrderEditPage: React.FC = () => {
 
 
   const isInterState = useMemo(() => {
-    if (!companyState || !selectedSupplier?.billingState) return false;
-    return companyState.toLowerCase().trim() !== selectedSupplier.billingState.toLowerCase().trim();
-  }, [companyState, selectedSupplier]);
+    if (!companyState || !formData.billingState) return false;
+    return companyState.toLowerCase().trim() !== formData.billingState.toLowerCase().trim();
+  }, [companyState, formData.billingState]);
+
+  // ============================================================
+  // RECOMPUTE ITEM-LEVEL TAX SPLIT WHENEVER isInterState CHANGES
+  // (e.g. billing state edited after items were already added)
+  // ============================================================
+  useEffect(() => {
+    setFormData((prev) => {
+      if (prev.items.length === 0) return prev;
+
+      const updatedItems = prev.items.map((item) => {
+        const qty = Number(item.quantity) || 0;
+        const price = Number(item.unitPrice) || 0;
+        const lineSubtotal = qty * price;
+
+        const taxableAmount = lineSubtotal;
+        const totalGstRate = Number(item.tax) || 0;
+        const totalGstAmount = (taxableAmount * totalGstRate) / 100;
+
+        let cgstRate = 0;
+        let cgstAmount = 0;
+        let sgstRate = 0;
+        let sgstAmount = 0;
+        let igstRate = 0;
+        let igstAmount = 0;
+
+        if (isInterState) {
+          igstRate = totalGstRate;
+          igstAmount = totalGstAmount;
+        } else {
+          cgstRate = totalGstRate / 2;
+          sgstRate = totalGstRate / 2;
+          cgstAmount = totalGstAmount / 2;
+          sgstAmount = totalGstAmount / 2;
+        }
+
+        return {
+          ...item,
+          taxableAmount,
+          cgstRate,
+          cgstAmount,
+          sgstRate,
+          sgstAmount,
+          igstRate,
+          igstAmount,
+          lineTotal: taxableAmount + totalGstAmount,
+          discount: 0,
+        };
+      });
+
+      return {
+        ...prev,
+        items: updatedItems,
+        ...recalculateTotals(updatedItems),
+      };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isInterState]);
 
   const gstRateBreakdown = useMemo(() => {
     const map = new Map<number, number>();
@@ -777,6 +834,7 @@ const PurchaseOrderEditPage: React.FC = () => {
         totalCgst: formData.totalCgst,
         totalSgst: formData.totalSgst,
         totalIgst: formData.totalIgst,
+        roundingAdjust: roundingSign === "+" ? roundingValue : -roundingValue,
         netAmount: formData.netAmount,
         status: submitStatus,
       });
@@ -894,11 +952,11 @@ const PurchaseOrderEditPage: React.FC = () => {
               <TextInput label="Created by-on" name="createdByOn" value={createdOn || ""} onChange={() => { }} disabled />
             </div>
             <div>
-              <SelectInput label="Store" name="storeId" value={formData.storeId || ""} options={[{ label: "-- Select Store --", value: "" }, ...(stores || []).filter((s: any) => s.isActive).map((s: any) => ({ label: s.storeName, value: s.storeId }))]} required onChange={handleChange} disabled={isLocked} />
+              <SelectInput label="Store" name="storeId" value={formData.storeId || ""} options={[{ label: "-- Select Store --", value: "" }, ...(stores || []).filter((s: any) => s.isActive).map((s: any) => ({ label: s.storeName, value: s.storeId }))]} required onChange={handleChange} disabled={isLocked} searchable />
               {errors.storeId && <div className="text-red-500 mt-1 text-sm">{errors.storeId}</div>}
             </div>
             <div>
-              <SelectInput label="Supplier" name="supplierId" value={String(formData.supplierId || "")} options={[{ value: "", label: "-- Select Supplier --" }, ...supplierOptions]} onChange={handleChange} required disabled={isLocked} />
+              <SelectInput label="Supplier" name="supplierId" value={String(formData.supplierId || "")} options={[{ value: "", label: "-- Select Supplier --" }, ...supplierOptions]} onChange={handleChange} required disabled={isLocked} searchable />
               {errors.supplierId && <div className="text-red-500 mt-1 text-sm">{errors.supplierId}</div>}
             </div>
           </div>

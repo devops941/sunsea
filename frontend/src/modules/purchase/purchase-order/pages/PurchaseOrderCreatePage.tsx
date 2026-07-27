@@ -93,17 +93,17 @@ const PurchaseOrderCreatePage: React.FC = () => {
 
   // ============================================================
   // INTER-STATE CHECK
-  // Rule requested: compare COMPANY state vs SHIPPING address state.
+  // Rule requested: compare COMPANY state vs BILLING address state.
   // Same state  -> CGST + SGST
   // Diff state  -> IGST
   // ============================================================
   const isInterState = useMemo(() => {
-    if (!companyState || !formData.shippingState) return false;
+    if (!companyState || !formData.billingState) return false;
     return (
       companyState.toLowerCase().trim() !==
-      formData.shippingState.toLowerCase().trim()
+      formData.billingState.toLowerCase().trim()
     );
-  }, [companyState, formData.shippingState]);
+  }, [companyState, formData.billingState]);
 
   const gstRateBreakdown = useMemo(() => {
     const map = new Map<number, number>();
@@ -758,6 +758,7 @@ const PurchaseOrderCreatePage: React.FC = () => {
         totalCgst: formData.totalCgst,
         totalSgst: formData.totalSgst,
         totalIgst: formData.totalIgst,
+        roundingAdjust: roundingSign === "+" ? roundingValue : -roundingValue,
         netAmount: formData.netAmount,
 
         status: submitStatus,
@@ -862,11 +863,11 @@ const PurchaseOrderCreatePage: React.FC = () => {
               />
             </div>
             <div>
-              <SelectInput label="Supplier" name="supplierId" value={formData.supplierId} options={[{ value: "", label: "-- Select Supplier --" }, ...supplierOptions]} onChange={handleChange} required />
+              <SelectInput label="Supplier" name="supplierId" value={formData.supplierId} options={[{ value: "", label: "-- Select Supplier --" }, ...supplierOptions]} onChange={handleChange} required searchable />
               {errors.supplierId && <div className="text-red-500 mt-1 text-sm">{errors.supplierId}</div>}
             </div>
             <div>
-              <SelectInput label="Store" name="storeId" value={formData.storeId} options={[{ label: "-- Select Store --", value: "" }, ...(stores || []).filter((s: any) => s.isActive).map((s: any) => ({ label: s.storeName, value: s.storeId }))]} required onChange={handleChange} />
+              <SelectInput label="Store" name="storeId" value={formData.storeId} options={[{ label: "-- Select Store --", value: "" }, ...(stores || []).filter((s: any) => s.isActive).map((s: any) => ({ label: s.storeName, value: s.storeId }))]} required onChange={handleChange} searchable />
                {errors.storeId && <div className="text-red-500 mt-1 text-sm">{errors.storeId}</div>}
             </div>
           </div>
@@ -896,10 +897,10 @@ const PurchaseOrderCreatePage: React.FC = () => {
             <div>
               <div className="flex items-center justify-between mb-4">
                 <h6 className="text-lg font-semibold text-gray-800 mb-0">Shipping</h6>
-                <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-700 mb-0">
+                {/* <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-700 mb-0">
                   <input type="checkbox" className="w-4 h-4 text-blue-600 rounded border-gray-300" name="sameAsBilling" checked={formData.sameAsBilling} onChange={handleChange} />
                   <span>Same as billing</span>
-                </label>
+                </label> */}
               </div>
 
               <AddressForm

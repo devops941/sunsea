@@ -30,7 +30,8 @@ class PurchaseOrderService {
         items: CreatePurchaseOrderInput["items"],
         isInterState: boolean,
         poDiscountType: "PERCENT" | "FLAT" = "PERCENT",
-        poDiscountValue: number = 0
+        poDiscountValue: number = 0,
+        roundingAdjust: number = 0
     ) {
         let subtotal = 0;
         let totalTax = 0;
@@ -114,7 +115,7 @@ class PurchaseOrderService {
             totalCgst,
             totalSgst,
             totalIgst,
-            netAmount: subtotal - totalDiscount + totalTax,
+            netAmount: subtotal - totalDiscount + totalTax + Number(roundingAdjust),
         };
     }
 
@@ -144,9 +145,10 @@ class PurchaseOrderService {
         const poNumber = await this.getNextPONumber();
         const poDiscountType = data.discountType || "PERCENT";
         const poDiscountValue = Number(data.discountValue) || 0;
+        const roundingAdjust = Number(data.roundingAdjust) || 0;
 
         const { itemsWithTotals, subtotal, totalDiscount, totalTax, totalCgst, totalSgst, totalIgst, netAmount } =
-            this.calculateTotals(data.items, isInterState, poDiscountType, poDiscountValue);
+            this.calculateTotals(data.items, isInterState, poDiscountType, poDiscountValue, roundingAdjust);
 
         return prisma.purchaseOrder.create({
             data: {
@@ -174,6 +176,7 @@ class PurchaseOrderService {
                 subtotal,
                 discountType: poDiscountType,
                 discountValue: poDiscountValue,
+                roundingAdjust,
                 totalDiscount,
                 totalTax,
                 totalCgst,
@@ -359,6 +362,12 @@ class PurchaseOrderService {
             ...(data.discountValue !== undefined && { discountValue: data.discountValue }),
         };
 
+        if (data.roundingAdjust !== undefined && (!data.items || data.items.length === 0)) {
+            const roundingAdjust = Number(data.roundingAdjust) || 0;
+            updateData.roundingAdjust = roundingAdjust;
+            updateData.netAmount = Number(po.subtotal) - Number(po.totalDiscount) + Number(po.totalTax) + roundingAdjust;
+        }
+
         // If items are updated — delete old and recreate
         if (data.items && data.items.length > 0) {
             const supplierId = data.supplierId ? Number(data.supplierId) : Number(po.supplierId);
@@ -376,19 +385,20 @@ class PurchaseOrderService {
 
             const poDiscountType = data.discountType !== undefined ? data.discountType : po.discountType;
             const poDiscountValue = data.discountValue !== undefined ? Number(data.discountValue) : Number(po.discountValue || 0);
+            const roundingAdjust = data.roundingAdjust !== undefined ? Number(data.roundingAdjust) : Number(po.roundingAdjust || 0);
 
             const { itemsWithTotals, subtotal, totalDiscount, totalTax, totalCgst, totalSgst, totalIgst, netAmount } =
-                this.calculateTotals(data.items, isInterState, poDiscountType as any, poDiscountValue);
+                this.calculateTotals(data.items, isInterState, poDiscountType as any, poDiscountValue, roundingAdjust);
 
             updateData.subtotal = subtotal;
             updateData.discountType = poDiscountType;
             updateData.discountValue = poDiscountValue;
+            updateData.roundingAdjust = roundingAdjust;
             updateData.totalDiscount = totalDiscount;
             updateData.totalTax = totalTax;
             updateData.totalCgst = totalCgst;
             updateData.totalSgst = totalSgst;
             updateData.totalIgst = totalIgst;
-
             updateData.netAmount = netAmount;
 
             updateData.items = {
