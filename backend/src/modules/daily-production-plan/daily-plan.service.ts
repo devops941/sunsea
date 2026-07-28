@@ -354,7 +354,6 @@ class DailyPlanService {
             }
           } 
           else if (data.status === "COMPLETED" && existingPlan.status !== "COMPLETED") {
-            // ✅ STEP 7 → STEP 8: Transition to READY_FOR_DISPATCH
             updateData.currentStepIndex = totalCustomStepsCount + 1;
             updateData.currentProductionStep = "Completed";
             updateData.status = "COMPLETED";
@@ -372,24 +371,42 @@ class DailyPlanService {
             const poProduced = Number(productionOrderFull.producedQty || 0);
             const isTargetMet = poTarget > 0 && poProduced >= poTarget;
 
-            if (allOthersFinished && isTargetMet && productionOrderFull.status !== "READY_FOR_DISPATCH") {
-              await tx.productionOrder.update({
-                where: { productionOrderId: checkProductionOrderId },
-                data: { status: "READY_FOR_DISPATCH" },
-              });
-              await StatusSyncService.logHistory(
-                tx, checkProductionOrderId, productionOrderFull.status, "READY_FOR_DISPATCH", userId,
-                "All post-production steps completed and target quantity met. Ready for dispatch.", "READY_FOR_DISPATCH"
-              );
-            } else if (productionOrderFull.status !== "PARTIAL_COMPLETED" && productionOrderFull.status !== "DISPATCHED" && productionOrderFull.status !== "READY_FOR_DISPATCH") {
-              await tx.productionOrder.update({
-                where: { productionOrderId: checkProductionOrderId },
-                data: { status: "PARTIAL_COMPLETED" },
-              });
-              await StatusSyncService.logHistory(
-                tx, checkProductionOrderId, productionOrderFull.status, "PARTIAL_COMPLETED", userId,
-                "Partial post-production steps completed. Eligible for partial dispatch.", "PARTIAL_COMPLETED"
-              );
+            // Only advance PO if all other plans are finished
+            if (allOthersFinished) {
+              const isShortClosed = existingPlan.status !== "POST_PRODUCTION";
+
+              if (!isShortClosed) {
+                // Normal flow: came from POST_PRODUCTION
+                if (isTargetMet && productionOrderFull.status !== "READY_FOR_DISPATCH") {
+                  await tx.productionOrder.update({
+                    where: { productionOrderId: checkProductionOrderId },
+                    data: { status: "READY_FOR_DISPATCH" },
+                  });
+                  await StatusSyncService.logHistory(
+                    tx, checkProductionOrderId, productionOrderFull.status, "READY_FOR_DISPATCH", userId,
+                    "All post-production steps completed and target quantity met. Ready for dispatch.", "READY_FOR_DISPATCH"
+                  );
+                } else if (productionOrderFull.status !== "PARTIAL_COMPLETED" && productionOrderFull.status !== "DISPATCHED" && productionOrderFull.status !== "READY_FOR_DISPATCH") {
+                  await tx.productionOrder.update({
+                    where: { productionOrderId: checkProductionOrderId },
+                    data: { status: "PARTIAL_COMPLETED" },
+                  });
+                  await StatusSyncService.logHistory(
+                    tx, checkProductionOrderId, productionOrderFull.status, "PARTIAL_COMPLETED", userId,
+                    "Partial post-production steps completed. Eligible for partial dispatch.", "PARTIAL_COMPLETED"
+                  );
+                }
+              } else if (isTargetMet && !["READY_FOR_DISPATCH", "DISPATCHED"].includes(productionOrderFull.status)) {
+                // Short-closed but target qty is met: advance PO directly to READY_FOR_DISPATCH
+                await tx.productionOrder.update({
+                  where: { productionOrderId: checkProductionOrderId },
+                  data: { status: "READY_FOR_DISPATCH" },
+                });
+                await StatusSyncService.logHistory(
+                  tx, checkProductionOrderId, productionOrderFull.status, "READY_FOR_DISPATCH", userId,
+                  "Production completed (short-closed). Target quantity met. Ready for dispatch.", "READY_FOR_DISPATCH"
+                );
+              }
             }
           }
         }

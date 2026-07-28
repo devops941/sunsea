@@ -104,7 +104,7 @@ const WastageList: React.FC = () => {
   const displayWastages = Array.isArray(wastages) ? (wastages as any) : ((wastages as any)?.data && Array.isArray((wastages as any).data) ? (wastages as any).data : []);
 
   return (
-    <div className="p-4 md:p-6 min-h-screen">
+    <div className="p-4 md:p-1 min-h-screen">
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
         {/* Page Header */}
         <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-slate-200">
@@ -146,11 +146,7 @@ const WastageList: React.FC = () => {
               header: "SHIFT",
               render: (item: any) => <span className="text-slate-600">{item.shift?.shiftName || item.shiftId}</span>,
             },
-            {
-              header: "WASTAGE TYPE",
-              render: (item: any) => <StatusBadge status={item.wastageType} />,
-            },
-            {
+{
               header: "QUANTITY",
               render: (item: any) => (
                 <span className="font-bold text-slate-800">

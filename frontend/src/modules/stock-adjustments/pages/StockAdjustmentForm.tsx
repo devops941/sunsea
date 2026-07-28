@@ -427,15 +427,6 @@ const StockAdjustmentForm: React.FC = () => {
     ])
   ) as string[];
 
-  const getBaseUoms = (uomStr: string = "kg") => {
-    const u = uomStr.toLowerCase().trim();
-    if (u === "kg" || u === "g" || u === "t" || u === "ton") return "kg,g,t";
-    if (u === "l" || u === "ltr" || u === "ml") return "l,ml";
-    if (u === "pcs" || u === "ea" || u === "dz" || u === "each") return "pcs,dz";
-    if (u === "m" || u === "cm") return "m,cm";
-    return uomStr;
-  };
-
   const getPrimaryUom = (uomStr?: string) => {
     if (!uomStr) return "pcs";
     const first = uomStr.split(",")[0].trim();
@@ -509,7 +500,6 @@ const StockAdjustmentForm: React.FC = () => {
       typeLabel: "Finished Goods",
       category: p.category?.name || p.category?.categoryName || "",
       uom: getPrimaryUom(p.uom?.code || p.uom?.uomCode || "pcs"),
-      baseUoms: getBaseUoms(p.uom?.code || p.uom?.uomCode || "pcs"),
     })),
     ...rawMaterials
       .filter((rm) => rm.itemType !== "WASTAGE")
@@ -522,7 +512,6 @@ const StockAdjustmentForm: React.FC = () => {
         typeLabel: "Raw Material",
         category: rm.category?.name || "",
         uom: getPrimaryUom(rm.baseUom || "kg"),
-        baseUoms: getBaseUoms(rm.baseUom || "kg"),
       })),
     ...rawMaterials
       .filter((rm) => rm.itemType === "WASTAGE")
@@ -535,7 +524,6 @@ const StockAdjustmentForm: React.FC = () => {
         typeLabel: "Wastage Product",
         category: rm.category?.name || "",
         uom: getPrimaryUom(rm.baseUom || "kg"),
-        baseUoms: getBaseUoms(rm.baseUom || "kg"),
       })),
   ];
 
@@ -600,7 +588,6 @@ const StockAdjustmentForm: React.FC = () => {
           itemCode: item.itemCode,
           categoryName: item.category,
           uom: getPrimaryUom(item.uom),
-          baseUoms: item.baseUoms || getBaseUoms(item.uom),
         },
       ],
     });
@@ -889,6 +876,7 @@ const StockAdjustmentForm: React.FC = () => {
                               onChange={(e) =>
                                 handlePMIItemChange(index, "storeId", e.target.value)
                               }
+                              error={errors[`items.${index}.storeId`]}
                             />
                           </td>
                           <td className="px-4 py-3 align-top">
@@ -901,6 +889,7 @@ const StockAdjustmentForm: React.FC = () => {
                               onChange={(e: any) =>
                                 handlePMIItemChange(index, "issueQty", Number(e.target.value))
                               }
+                              error={errors[`items.${index}.issueQty`]}
                             />
                           </td>
                           <td className="px-4 py-3 align-top">
@@ -920,6 +909,9 @@ const StockAdjustmentForm: React.FC = () => {
                   </tbody>
                 </table>
               </div>
+              {errors.items && (
+                <div className="mt-2 text-sm text-red-500 font-medium">{errors.items}</div>
+              )}
             </div>
           )}
 
@@ -1075,6 +1067,9 @@ const StockAdjustmentForm: React.FC = () => {
                               <div className="text-xs text-slate-400 font-mono mt-0.5 uppercase tracking-wide">
                                 {item.itemCode || ""} • {item.categoryName || item.itemType || "ITEM"}
                               </div>
+                              {errors[`items.${index}.itemSelection`] && (
+                                <div className="text-xs text-red-500 font-medium mt-1">{errors[`items.${index}.itemSelection`]}</div>
+                              )}
                             </td>
 
                             {/* Store */}
@@ -1094,6 +1089,7 @@ const StockAdjustmentForm: React.FC = () => {
                                     })),
                                   ]}
                                   onChange={(e: any) => handleItemChange(index, "storeId", e.target.value)}
+                                  error={errors[`items.${index}.storeId`]}
                                 />
                               </div>
                             </td>
@@ -1121,7 +1117,7 @@ const StockAdjustmentForm: React.FC = () => {
                                     hideLabel={true}
                                     name={`difference-${index}`}
                                     value={diff === 0 ? "" : diff}
-                                    baseUoms={item.baseUoms || item.uom || "kg,g"}
+                                    baseUoms={item.uom || "pcs"}
                                     onChange={(e: any) =>
                                       handleItemDifferenceChange(
                                         index,
@@ -1129,6 +1125,7 @@ const StockAdjustmentForm: React.FC = () => {
                                       )
                                     }
                                     disabled={false}
+                                    error={errors[`items.${index}.adjustedQty`]}
                                   />
                                 </div>
                                 <CustomButton
@@ -1217,6 +1214,9 @@ const StockAdjustmentForm: React.FC = () => {
                   </tbody>
                 </table>
               </div>
+              {errors.items && (
+                <div className="mt-2 text-sm text-red-500 font-medium">{errors.items}</div>
+              )}
             </div>
           )}
 

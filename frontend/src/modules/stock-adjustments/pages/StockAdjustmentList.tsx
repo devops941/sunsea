@@ -1,18 +1,12 @@
 import React, { useState, useEffect } from "react";
 import {
-  FaSearch,
   FaPlus,
-  FaChevronLeft,
-  FaChevronRight,
-  FaEye,
-  FaFilter,
 } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 
-import { FaCheckCircle } from "react-icons/fa";
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
-import { fetchStockAdjustments, approveStockAdjustment } from "../../../features/stock-adjustments/stockAdjustmentSlice";
+import { fetchStockAdjustments } from "../../../features/stock-adjustments/stockAdjustmentSlice";
 
 import CustomButton from "../../../components/ui/Button/Button";
 import DataTable from "../../../components/ui/table/DataTable";
@@ -20,7 +14,6 @@ import SearchInput from "../../../components/ui/SearchInput/SearchInput";
 import FilterPopover from "../../../components/ui/FilterPopover/FilterPopover";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import ViewButton from "../../../components/ui/viewbutton/ViewButton";
-import IconButton from "../../../components/ui/IconButton/IconButton";
 import { formatDate } from "../../../utils/dateUtils";
 
 const ITEMS_PER_PAGE = 10;
@@ -47,6 +40,14 @@ const ADJUSTMENT_TYPE_BADGE: Record<string, string> = {
   OPENING_STOCK: "dark",
   MANUAL_CORRECTION: "light",
   OTHER: "secondary",
+};
+
+const getPrimaryUom = (uomStr?: string) => {
+  if (!uomStr) return "";
+  const first = uomStr.split(",")[0].trim();
+  const l = first.toLowerCase();
+  if (l === "ea" || l === "each" || l === "piece" || l === "pcs") return "pcs";
+  return first;
 };
 
 const StockAdjustmentList: React.FC = () => {
@@ -321,7 +322,7 @@ const StockAdjustmentList: React.FC = () => {
                 if (!firstItem || firstItem.currentQty == null) return <span className="text-slate-400">—</span>;
                 const qty = Number(firstItem.currentQty);
                 const uom = firstItem.product?.baseUom || firstItem.rawMaterial?.baseUom || firstItem.uom || "";
-                const uomStr = uom ? ` ${uom}` : "";
+                const uomStr = uom ? ` ${getPrimaryUom(uom)}` : "";
                 return (
                   <div>
                     <span className="font-semibold text-slate-700 text-sm">{qty}{uomStr}</span>
@@ -340,7 +341,7 @@ const StockAdjustmentList: React.FC = () => {
                 const qty = Number(firstItem.adjustedQty);
                 const diff = Number(firstItem.difference || 0);
                 const uom = firstItem.product?.baseUom || firstItem.rawMaterial?.baseUom || firstItem.uom || "";
-                const uomStr = uom ? ` ${uom}` : "";
+                const uomStr = uom ? ` ${getPrimaryUom(uom)}` : "";
                 const diffColor = diff > 0 ? "text-green-600 bg-green-50 border border-green-200" : diff < 0 ? "text-red-600 bg-red-50 border border-red-200" : "text-slate-500 bg-slate-50";
                 const diffSign = diff > 0 ? `+${diff}` : `${diff}`;
                 return (
@@ -385,7 +386,7 @@ const StockAdjustmentList: React.FC = () => {
             },
             {
               header: "CREATED BY",
-              render: (item) => <span className="text-slate-500 text-sm">{item.createdBy || "—"}</span>
+              render: (item) => <span className="text-slate-500 text-sm">{item.createdByUser?.fullName || item.createdBy || "—"}</span>
             },
             {
               header: "STATUS",
@@ -393,25 +394,9 @@ const StockAdjustmentList: React.FC = () => {
             },
             {
               header: "ACTIONS",
-              render: (item) => (
+              render: (item: any) => (
                 <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                   <ViewButton onClick={() => navigate(`/inventory/stock-adjustments/view/${item.id}`)} />
-                  {item.status === "DRAFT" && (
-                    <IconButton
-                      variant="success"
-                      title="Approve Adjustment (MD Approval)"
-                      icon={FaCheckCircle}
-                      onClick={async () => {
-                        try {
-                          await dispatch(approveStockAdjustment({ id: item.id, status: "APPROVED" })).unwrap();
-                          toast.success(`Adjustment ${item.adjustmentNumber} approved! Inventory stock updated.`);
-                          dispatch(fetchStockAdjustments({}));
-                        } catch (err: any) {
-                          toast.error(err || "Failed to approve adjustment");
-                        }
-                      }}
-                    />
-                  )}
                 </div>
               )
             },

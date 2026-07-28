@@ -125,6 +125,9 @@ const ProductionOrderTabs = lazy(() => import("../modules/production-orders/page
 const GoodsDispatchList = lazy(() => import("../modules/goods-dispatch/pages/GoodsDispatchList"));
 const GoodsDispatchCreate = lazy(() => import("../modules/goods-dispatch/pages/GoodsDispatchCreate"));
 const GoodsDispatchView = lazy(() => import("../modules/goods-dispatch/pages/GoodsDispatchView"));
+const GoodsDispatchDetail = lazy(() => import("../modules/goods-dispatch/pages/GoodsDispatchDetail"));
+const GoodsDispatchGateApproval = lazy(() => import("../modules/goods-dispatch/pages/GoodsDispatchGateApproval"));
+const GoodsDispatchStoreApproval = lazy(() => import("../modules/goods-dispatch/pages/GoodsDispatchStoreApproval"));
 
 // OEE Dashboard
 const BillOfMaterialList = lazy(() => import("../modules/bill-of-material/pages/BillOfMaterialList"));
@@ -528,6 +531,11 @@ const AppRoutes = () => {
             <Route element={<ProtectedRoute permission="production_orders.view" />}>
               <Route path="/production/goods-dispatch" element={<ProductionOrderTabs />} />
               <Route path="/production/goods-dispatch/view/:id" element={<GoodsDispatchView />} />
+              <Route path="/production/goods-dispatch/detail/:id" element={<GoodsDispatchDetail />} />
+            </Route>
+            <Route element={<ProtectedRoute permission="production_orders.edit" />}>
+              <Route path="/production/goods-dispatch/gate-approval/:id" element={<GoodsDispatchGateApproval />} />
+              <Route path="/production/goods-dispatch/store-approval/:id" element={<GoodsDispatchStoreApproval />} />
             </Route>
             <Route element={<ProtectedRoute permission="production_orders.create" />}>
               <Route path="/production/goods-dispatch/create" element={<GoodsDispatchCreate />} />

@@ -80,6 +80,7 @@ const HourlyWorkReportCreate: React.FC = () => {
     
     const [stopPlanEarly, setStopPlanEarly] = useState(false);
     const [stopPlanReason, setStopPlanReason] = useState("");
+    const [stopOption, setStopOption] = useState<"CARRY_FORWARD" | "FORCE_COMPLETE">("CARRY_FORWARD");
 
 
     // Is the form pre-filled from Daily Planning?
@@ -121,7 +122,7 @@ const HourlyWorkReportCreate: React.FC = () => {
                 
                 // Filter by active statuses: APPROVED, IN_PROGRESS
                 const activePlansList = list.filter((p: any) => 
-                    p.status === "APPROVED" || p.status === "IN_PROGRESS"
+                    p.status === "APPROVED" || p.status === "IN_PROGRESS" || p.status === "STOPPED" || p.status === "CANCELLED" || (p.status === "COMPLETED" && p.producedQty < p.plannedQty)
                 );
                 setDailyPlans(activePlansList);
             })
@@ -401,6 +402,7 @@ const HourlyWorkReportCreate: React.FC = () => {
         setWastages([]);
         setStopPlanEarly(false);
         setStopPlanReason("");
+        setStopOption("CARRY_FORWARD");
         setHourIndex("1");
         setQtyProduced("");
         setRejectQty("0");
@@ -496,49 +498,24 @@ const HourlyWorkReportCreate: React.FC = () => {
                         ? `${activePlan.remarks} | Stopped: ${stopPlanReason.trim()}`
                         : `Stopped: ${stopPlanReason.trim()}`;
 
+                    // CARRY_FORWARD → status STOPPED (carry forward arrow will appear on planning page)
+                    // FORCE_COMPLETE → status COMPLETED (short-closed, no carry forward)
+                    const stopStatus = stopOption === "CARRY_FORWARD" ? "STOPPED" : "COMPLETED";
+
                     await apiClient.put(`/daily-production-plans/${dailyPlanId}`, {
-                        status: "STOPPED",
+                        status: stopStatus,
                         remarks: stopRemarks,
                         plannedHours: Number(hourIndex)
                     });
-                    toast.success("Production plan stopped and capacity released.");
+                    toast.success(
+                        stopOption === "CARRY_FORWARD"
+                            ? "Production stopped. You can carry forward the remaining quantity from the planning page."
+                            : "Production plan short-closed successfully."
+                    );
                 } catch (err: any) {
                     console.error("Failed to stop production plan early", err);
                     toast.error(err?.response?.data?.message || "Failed to stop production plan early");
                 }
-            }
-
-
-            // Guard: only carry forward if the production order itself still has remaining qty.
-            // If the PO's overall target is already met (e.g., over-produced in earlier shifts),
-            // never trigger carry forward even if this daily plan's own planned qty is short.
-            const poTargetQty = Number(activePlan?.poTargetQty || 0);
-            const poProducedQty = Number(activePlan?.poProducedQty || 0);
-            const poStatus = activePlan?.poStatus || "";
-            const isPOComplete = ["COMPLETED", "DISPATCHED", "READY_FOR_DISPATCH"].includes(poStatus);
-            // poProducedQty is the DB value BEFORE this submission; add current qty to get total
-            const poTotalAfterThisEntry = poProducedQty + (Number(qtyProduced) || 0);
-            const poStillHasRemaining = poTargetQty > 0 && poTotalAfterThisEntry < poTargetQty;
-
-            if (isLastHour && pendingQty > 0 && activePlan?.weeklyProgramId && !isPOComplete && poStillHasRemaining) {
-                toast.info(`Shift completed with ${pendingQty} pcs pending. Please create a carry-forward Daily Plan.`, { autoClose: 6000 });
-                navigate("/daily-production-plans/create", {
-                    state: {
-                        weeklyProgramId: activePlan.weeklyProgramId,
-                        machineId: machineId,
-                        plannedQty: pendingQty,
-                        remarks: `Carried forward from Daily Plan ${dailyPlanId}`,
-                        // Pass carry-forward info so DailyPlanCreate shows the banner
-                        carryForwardFromPlanId: dailyPlanId,
-                        carryForwardFromInfo: {
-                            shiftId: shiftId,
-                            shiftName: shifts.find((s: any) => s.shiftCode === shiftId)?.shiftName || locationState.state?.shiftName || shiftId,
-                            productionDate: productionDate,
-                            pendingQty: pendingQty,
-                        }
-                    }
-                });
-                return;
             }
 
             navigate("/daily-machine-planning");
@@ -849,7 +826,7 @@ const HourlyWorkReportCreate: React.FC = () => {
                                     }}
                                 />
                                 {stopPlanEarly && (
-                                    <div className="mt-3 bg-slate-50/50 p-5 rounded-xl border border-slate-100 w-full">
+                                    <div className="mt-3 bg-slate-50/50 p-5 rounded-xl border border-slate-100 w-full flex flex-col gap-4">
                                         <div className="w-full">
                                             <TextInput
                                                 label="Reason for Stopping"
@@ -860,6 +837,58 @@ const HourlyWorkReportCreate: React.FC = () => {
                                                 onChange={(e) => setStopPlanReason(e.target.value)}
                                                 width="100%"
                                             />
+                                        </div>
+                                        <div className="w-full">
+                                            <label className="block text-xs font-bold text-slate-500 uppercase mb-2">
+                                                Stop Action Type
+                                            </label>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-1">
+                                                <div
+                                                    className={`cursor-pointer border rounded-xl p-3 flex flex-col transition-all ${
+                                                        stopOption === "FORCE_COMPLETE"
+                                                            ? "border-rose-500 bg-rose-50/50 ring-2 ring-rose-500/20"
+                                                            : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+                                                    }`}
+                                                    onClick={() => setStopOption("FORCE_COMPLETE")}
+                                                >
+                                                    <div className="flex items-center gap-2 font-semibold text-slate-800 text-sm">
+                                                        <input
+                                                            type="radio"
+                                                            name="stopOption"
+                                                            checked={stopOption === "FORCE_COMPLETE"}
+                                                            onChange={() => setStopOption("FORCE_COMPLETE")}
+                                                            className="text-rose-600 focus:ring-rose-500"
+                                                        />
+                                                        Completed Stop
+                                                    </div>
+                                                    <span className="text-[11px] text-slate-500 mt-1 pl-5">
+                                                        Stop production without carrying forward any quantity.
+                                                    </span>
+                                                </div>
+
+                                                <div
+                                                    className={`cursor-pointer border rounded-xl p-3 flex flex-col transition-all ${
+                                                        stopOption === "CARRY_FORWARD"
+                                                            ? "border-amber-500 bg-amber-50/50 ring-2 ring-amber-500/20"
+                                                            : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+                                                    }`}
+                                                    onClick={() => setStopOption("CARRY_FORWARD")}
+                                                >
+                                                    <div className="flex items-center gap-2 font-semibold text-slate-800 text-sm">
+                                                        <input
+                                                            type="radio"
+                                                            name="stopOption"
+                                                            checked={stopOption === "CARRY_FORWARD"}
+                                                            onChange={() => setStopOption("CARRY_FORWARD")}
+                                                            className="text-amber-600 focus:ring-amber-500"
+                                                        />
+                                                        Stop & Carry Forward
+                                                    </div>
+                                                    <span className="text-[11px] text-slate-500 mt-1 pl-5">
+                                                        Carry forward the remaining <strong>{Math.max(0, remainingQtyForShift - (Number(qtyProduced) || 0))} pcs</strong> to a new daily plan.
+                                                    </span>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 )}

@@ -522,7 +522,7 @@ const HourlyWorkReportList: React.FC = () => {
                                     <div><strong>Machine:</strong> {selectedViewGroup.machineName}</div>
                                     <div><strong>Product:</strong> {selectedViewGroup.productName}</div>
                                     <div><strong>PO:</strong> {selectedViewGroup.productionOrderId}</div>
-                                    <div><strong>Operator:</strong> {selectedViewGroup.hours[0]?.operatorName || "N/A"}</div>
+                                    <div><strong>Operator:</strong> {selectedViewGroup.hours && selectedViewGroup.hours.length > 0 ? [...new Set(selectedViewGroup.hours.map((h: any) => h.operatorName || h.operatorId).filter(Boolean))].join(", ") : "N/A"}</div>
                                 </div>
                                 <div className="table-responsive">
                                     <table className="master-data-table text-center align-middle mb-0" style={{ minWidth: '800px' }}>

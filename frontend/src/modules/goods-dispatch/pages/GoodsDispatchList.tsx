@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { FaSearch, FaPlus, FaChevronLeft, FaChevronRight } from "react-icons/fa";
+import { FaPlus } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
@@ -9,9 +9,11 @@ import CustomButton from "../../../components/ui/Button/Button";
 import DataTable from "../../../components/ui/table/DataTable";
 import type { DataTableColumn } from "../../../components/ui/table/DataTable";
 import SearchInput from "../../../components/ui/SearchInput/SearchInput";
-import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import ViewButton from "../../../components/ui/viewbutton/ViewButton";
+import EditButton from "../../../components/ui/EditButton/EditButton";
+import FilterPopover from "../../../components/ui/FilterPopover/FilterPopover";
+import DatePickerCalendar from "../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 import { formatDate } from "../../../utils/dateUtils";
 
 const ITEMS_PER_PAGE = 10;
@@ -24,8 +26,21 @@ const GoodsDispatchList: React.FC = () => {
 
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [status, setStatus] = useState("");
+
+  // Filter states (applied)
+  const [filterStatus, setFilterStatus] = useState("");
+  const [filterDateFrom, setFilterDateFrom] = useState("");
+  const [filterDateTo, setFilterDateTo] = useState("");
+
+  // Draft filter states (for popover)
+  const [draftFilterStatus, setDraftFilterStatus] = useState("");
+  const [draftFilterDateFrom, setDraftFilterDateFrom] = useState("");
+  const [draftFilterDateTo, setDraftFilterDateTo] = useState("");
+
   const [currentPage, setCurrentPage] = useState(1);
+
+  const hasActiveFilters = !!(filterStatus || filterDateFrom || filterDateTo);
+  const activeFilterCount = [filterStatus, filterDateFrom, filterDateTo].filter(Boolean).length;
 
   // Handle search debouncing
   useEffect(() => {
@@ -36,20 +51,50 @@ const GoodsDispatchList: React.FC = () => {
     return () => clearTimeout(handler);
   }, [searchTerm]);
 
+  // Backend-driven fetch
   useEffect(() => {
     dispatch(
       fetchGoodsDispatches({
         page: currentPage,
         limit: ITEMS_PER_PAGE,
         search: debouncedSearch,
-        status,
+        status: filterStatus || undefined,
+        dateFrom: filterDateFrom || undefined,
+        dateTo: filterDateTo || undefined,
       })
     );
-  }, [dispatch, currentPage, debouncedSearch, status]);
+  }, [dispatch, currentPage, debouncedSearch, filterStatus, filterDateFrom, filterDateTo]);
+
+  const handleApplyFilters = () => {
+    setFilterStatus(draftFilterStatus);
+    setFilterDateFrom(draftFilterDateFrom);
+    setFilterDateTo(draftFilterDateTo);
+    setCurrentPage(1);
+  };
+
+  const handleClearFilters = () => {
+    setDraftFilterStatus("");
+    setDraftFilterDateFrom("");
+    setDraftFilterDateTo("");
+    setFilterStatus("");
+    setFilterDateFrom("");
+    setFilterDateTo("");
+    setCurrentPage(1);
+  };
+
+  const handleOpenFilter = () => {
+    setDraftFilterStatus(filterStatus);
+    setDraftFilterDateFrom(filterDateFrom);
+    setDraftFilterDateTo(filterDateTo);
+  };
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
   };
+
+  // Stats computed from current filtered data on current page (showing what's on screen)
+  // Or we could compute from allData if we had it. For now use meta totals.
+  // const totalCount = meta?.total || 0;
 
   const columns: DataTableColumn<any>[] = [
     {
@@ -88,21 +133,87 @@ const GoodsDispatchList: React.FC = () => {
       header: "Action",
       accessor: "id",
       render: (item: any) => (
-        <ViewButton onClick={() => navigate(`/production/goods-dispatch/view/${item.id}`)} />
+        <div className="flex items-center gap-2">
+          <ViewButton onClick={() => navigate(`/production/goods-dispatch/detail/${item.id}`)} />
+          {item.status === "PENDING_GATE_APPROVAL" && (
+            <EditButton onClick={() => navigate(`/production/goods-dispatch/gate-approval/${item.id}`)} />
+          )}
+          {item.status === "PENDING_STORE_RECEIPT" && (
+            <EditButton onClick={() => navigate(`/production/goods-dispatch/store-approval/${item.id}`)} />
+          )}
+        </div>
       ),
     },
   ];
 
   return (
-    <div className="p-4 md:p-6 min-h-screen ">
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        {/* Header section */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center p-6 border-b border-slate-200 gap-4">
+    <div className="p-4 md:p-6 min-h-screen bg-white">
+      <div className="w-full">
+        {/* Page Header */}
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 mb-6">
           <div>
             <h2 className="text-2xl font-bold text-slate-800">Goods Dispatch</h2>
             <div className="text-sm text-slate-500 mt-1">Manage finished goods dispatches to warehouse</div>
           </div>
-          <div className="flex items-center space-x-4">
+
+          <div className="flex flex-wrap items-center gap-3 relative w-full lg:w-auto">
+            <div className="w-full lg:w-auto">
+              <SearchInput
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Search by Dispatch No, Vehicle, Driver..."
+              />
+            </div>
+            <FilterPopover
+              activeFilterCount={activeFilterCount}
+              hasActiveFilters={hasActiveFilters}
+              onApply={handleApplyFilters}
+              onClear={handleClearFilters}
+              onOpen={handleOpenFilter}
+            >
+              <div className="mb-3">
+                <label className="block mb-1 text-[11px] uppercase tracking-wider text-gray-500 font-semibold">
+                  Status
+                </label>
+                <select
+                  className="w-full border border-gray-200 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary bg-white"
+                  value={draftFilterStatus}
+                  onChange={(e) => setDraftFilterStatus(e.target.value)}
+                >
+                  <option value="">All Statuses</option>
+                  <option value="PENDING_GATE_APPROVAL">Pending Gate Approval</option>
+                  <option value="PENDING_STORE_RECEIPT">Pending Store Receipt</option>
+                  <option value="WAREHOUSE_RECEIVED">Warehouse Received</option>
+                  <option value="GATE_REJECTED">Gate Rejected</option>
+                  <option value="STORE_REJECTED">Store Rejected</option>
+                </select>
+              </div>
+
+              <div className="mb-3">
+                <label className="block mb-1 text-[11px] uppercase tracking-wider text-gray-500 font-semibold">
+                  Date From
+                </label>
+                <DatePickerCalendar
+                  name="dateFrom"
+                  value={draftFilterDateFrom}
+                  onChange={(e) => setDraftFilterDateFrom(e.target.value)}
+                  placeholder="Select date"
+                />
+              </div>
+
+              <div className="mb-4">
+                <label className="block mb-1 text-[11px] uppercase tracking-wider text-gray-500 font-semibold">
+                  Date To
+                </label>
+                <DatePickerCalendar
+                  name="dateTo"
+                  value={draftFilterDateTo}
+                  onChange={(e) => setDraftFilterDateTo(e.target.value)}
+                  placeholder="Select date"
+                />
+              </div>
+            </FilterPopover>
+
             <CustomButton
               text="Create Dispatch"
               icon={FaPlus}
@@ -111,94 +222,28 @@ const GoodsDispatchList: React.FC = () => {
           </div>
         </div>
 
-        {/* Filters section */}
-        <div className="p-6 border-b border-slate-100 bg-slate-50/50">
-        <div className="flex flex-col md:flex-row gap-6">
-          <div className="flex-1">
-            <SearchInput
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search by Dispatch No, Vehicle, Driver..."
-            />
+        {/* Error State */}
+        {error && (
+          <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-6">
+            <p className="text-red-700">{error}</p>
           </div>
-          <div className="w-full md:w-64">
-            <SelectInput
-              name="status"
-              value={status}
-              onChange={(e) => {
-                setStatus(e.target.value);
-                setCurrentPage(1);
-              }}
-              options={[
-                { value: "", label: "All Statuses" },
-                { value: "PENDING_GATE_APPROVAL", label: "Pending Gate Approval" },
-                { value: "PENDING_STORE_RECEIPT", label: "Pending Store Receipt" },
-                { value: "WAREHOUSE_RECEIVED", label: "Warehouse Received" },
-                { value: "GATE_REJECTED", label: "Gate Rejected" },
-                { value: "STORE_REJECTED", label: "Store Rejected" },
-              ]}
-              label=""
-            />
-          </div>
-        </div>
-      </div>
+        )}
 
-      {/* Error State */}
-      {error && (
-        <div className="bg-red-50 border-l-4 border-red-500 p-4 m-6">
-          <p className="text-red-700">{error}</p>
+        {/* Data Table */}
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+          <DataTable
+            columns={columns}
+            data={dispatches || []}
+            loading={loading}
+            rowKey={(item) => item.id.toString()}
+            emptyMessage="No dispatches found"
+            pagination={meta && meta.totalPages > 1 ? {
+              currentPage,
+              totalPages: meta.totalPages,
+              onPageChange: handlePageChange
+            } : undefined}
+          />
         </div>
-      )}
-
-      {/* Data Table */}
-      <div className="overflow-x-auto">
-        <DataTable
-          columns={columns}
-          data={dispatches || []}
-          loading={loading}
-          rowKey={(item) => item.id.toString()}
-          emptyMessage="No dispatches found"
-        />
-      </div>
-
-      {/* Pagination */}
-      {!loading && meta && meta.totalPages > 1 && (
-        <div className="flex items-center justify-between px-6 py-4 bg-slate-50/50 border-t border-slate-100">
-          <div className="text-sm text-slate-500">
-            Showing {(meta.page - 1) * meta.limit + 1} to{" "}
-            {Math.min(meta.page * meta.limit, meta.total)} of {meta.total} entries
-          </div>
-          <div className="flex space-x-2">
-            <button
-              onClick={() => handlePageChange(currentPage - 1)}
-              disabled={currentPage === 1}
-              className="p-2 rounded-md border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              <FaChevronLeft className="w-4 h-4" />
-            </button>
-            {Array.from({ length: meta.totalPages }, (_, i) => i + 1).map((page) => (
-              <button
-                key={page}
-                onClick={() => handlePageChange(page)}
-                className={`px-4 py-2 rounded-md border text-sm font-medium transition-colors ${
-                  currentPage === page
-                    ? "bg-primary text-white border-primary hover:bg-primary-dark"
-                    : "bg-white text-slate-700 border-slate-300 hover:bg-slate-50"
-                }`}
-              >
-                {page}
-              </button>
-            ))}
-            <button
-              onClick={() => handlePageChange(currentPage + 1)}
-              disabled={currentPage === meta.totalPages}
-              className="p-2 rounded-md border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              <FaChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      )}
       </div>
     </div>
   );
