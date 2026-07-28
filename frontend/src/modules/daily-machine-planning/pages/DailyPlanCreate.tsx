@@ -231,6 +231,40 @@ const DailyPlanCreate: React.FC = () => {
         if (po) {
           const targetQty = Number(po.targetQty || 0);
           const producedQty = Number(po.producedQty || 0);
+
+          // Calculate short-closed quantity
+          const plans = po.dailyProductionPlans || [];
+          const shortClosedQty = plans
+            .filter((dp: any) => dp.status === "COMPLETED")
+            .reduce((sum: number, dp: any) => {
+              const planned = Number(dp.plannedQty || 0);
+              const produced = Array.isArray(dp.hourlyProductions)
+                ? dp.hourlyProductions.reduce((s: number, h: any) => s + Number(h.qtyProduced || 0), 0)
+                : 0;
+              return sum + Math.max(0, planned - produced);
+            }, 0);
+
+          const poRemaining = targetQty > 0 ? Math.max(0, targetQty - producedQty - shortClosedQty) : 0;
+
+          // Only count ACTIVE plans (not yet finished) — finished plan quantities
+          // are already reflected in poProducedQty, so counting them again would double-subtract.
+          const alreadyPlanned = plans
+            .filter((dp: any) => ["PLANNED", "APPROVED", "IN_PROGRESS"].includes(dp.status))
+            .reduce((sum: number, dp: any) => {
+              const produced = Array.isArray(dp.hourlyProductions)
+                ? dp.hourlyProductions.reduce((s: number, h: any) => s + Number(h.qtyProduced || 0), 0)
+                : 0;
+              return sum + Math.max(Number(dp.plannedQty || 0), produced);
+            }, 0);
+
+          const wpPlanned = Number(p.plannedQty || 0);
+          const baseCapacity = (wpPlanned > 0 && targetQty > 0) ? Math.min(wpPlanned, poRemaining) : (poRemaining || wpPlanned);
+          const remaining = Math.max(0, baseCapacity - alreadyPlanned);
+
+          if (remaining <= 0 && p.weeklyProgramId !== stateWpId) {
+            return false;
+          }
+
           const isTargetMet = targetQty > 0 && producedQty >= targetQty;
           const poTerminal = po.status === "CANCELLED" || isTargetMet;
 
@@ -340,28 +374,34 @@ const DailyPlanCreate: React.FC = () => {
       else if (res && Array.isArray(res.content)) existingPlans = res.content;
 
       const safePlans = Array.isArray(existingPlans) ? existingPlans : [];
+      // Only count ACTIVE plans (not yet finished). Finished plan quantities are
+      // already reflected in poProducedQty — counting them again would double-subtract.
+      // Also exclude the source carry-forward plan (it is STOPPED, so already excluded).
       const alreadyPlanned = safePlans
-        .filter((p: any) => p.status !== "CANCELLED" && p.dailyPlanId !== editId)
+        .filter((p: any) =>
+          ["PLANNED", "APPROVED", "IN_PROGRESS"].includes(p.status) &&
+          p.dailyPlanId !== editId &&
+          p.dailyPlanId !== carryForwardFromPlanId
+        )
         .reduce((sum: number, p: any) => {
           const produced = Array.isArray(p.hourlyProductions)
             ? p.hourlyProductions.reduce((s: number, h: any) => s + Number(h.qtyProduced || 0), 0)
             : 0;
-          const isFinishedOrCarriedForward =
-            p.status === "COMPLETED" ||
-            p.status === "STOPPED" ||
-            p.status === "SHORT_CLOSED" ||
-            p.status === "POST_PRODUCTION" ||
-            p.dailyPlanId === carryForwardFromPlanId ||
-            (carryForwardFromPlanId && String(p.dailyPlanId) === String(carryForwardFromPlanId));
-
-          if (isFinishedOrCarriedForward) {
-            return sum + produced;
-          }
           return sum + Math.max(Number(p.plannedQty || 0), produced);
         }, 0);
       const poTarget = Number(wp.productionOrder?.targetQty || 0);
       const poProduced = Number(wp.productionOrder?.producedQty || 0);
-      const poRemaining = poTarget > 0 ? Math.max(0, poTarget - poProduced) : 0;
+      const plans = wp.productionOrder?.dailyProductionPlans || [];
+      const shortClosedQty = plans
+        .filter((p: any) => p.status === "COMPLETED")
+        .reduce((sum: number, p: any) => {
+          const planned = Number(p.plannedQty || 0);
+          const produced = Array.isArray(p.hourlyProductions)
+            ? p.hourlyProductions.reduce((s: number, h: any) => s + Number(h.qtyProduced || 0), 0)
+            : 0;
+          return sum + Math.max(0, planned - produced);
+        }, 0);
+      const poRemaining = poTarget > 0 ? Math.max(0, poTarget - poProduced - shortClosedQty) : 0;
 
       // Base capacity for the plan cannot exceed what is actually left to produce for the Production Order
       let baseCapacity: number;
@@ -620,12 +660,35 @@ const DailyPlanCreate: React.FC = () => {
                   const po = wp.productionOrder;
                   const poTarget = Number(po?.targetQty || 0);
                   const poProduced = Number(po?.producedQty || 0);
-                  const poRemaining = poTarget > 0 ? Math.max(0, poTarget - poProduced) : 0;
+                  const plans = po?.dailyProductionPlans || [];
+                  const shortClosedQty = plans
+                    .filter((p: any) => p.status === "COMPLETED")
+                    .reduce((sum: number, p: any) => {
+                      const planned = Number(p.plannedQty || 0);
+                      const produced = Array.isArray(p.hourlyProductions)
+                        ? p.hourlyProductions.reduce((s: number, h: any) => s + Number(h.qtyProduced || 0), 0)
+                        : 0;
+                      return sum + Math.max(0, planned - produced);
+                    }, 0);
+                  const poRemaining = poTarget > 0 ? Math.max(0, poTarget - poProduced - shortClosedQty) : 0;
+
+                  const alreadyPlanned = plans
+                    .filter((p: any) => ["PLANNED", "APPROVED", "IN_PROGRESS"].includes(p.status))
+                    .reduce((sum: number, p: any) => {
+                      const produced = Array.isArray(p.hourlyProductions)
+                        ? p.hourlyProductions.reduce((s: number, h: any) => s + Number(h.qtyProduced || 0), 0)
+                        : 0;
+                      return sum + Math.max(Number(p.plannedQty || 0), produced);
+                    }, 0);
+
+                  const wpPlanned = Number(wp.plannedQty || 0);
+                  const baseCapacity = (wpPlanned > 0 && poTarget > 0) ? Math.min(wpPlanned, poRemaining) : (poRemaining || wpPlanned);
+                  const remaining = Math.max(0, baseCapacity - alreadyPlanned);
 
                   if (wp._poRemaining !== undefined) {
                     tag = ` 🔄 [REMAINING: ${wp._poRemaining} pcs to produce]`;
-                  } else if (poRemaining > 0) {
-                    tag = ` 🔄 [REMAINING: ${poRemaining} pcs to produce]`;
+                  } else if (remaining > 0) {
+                    tag = ` 🔄 [REMAINING: ${remaining} pcs to produce]`;
                   } else if (wp._isBacklog) {
                     tag = " ⚠️ [PENDING FROM PREVIOUS WEEK]";
                   }

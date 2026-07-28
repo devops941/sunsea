@@ -34,7 +34,7 @@ export const createStockAdjustment = createAsyncThunk(
   async (data: any, { rejectWithValue }) => {
     try {
       const response = await stockAdjustmentService.create(data);
-      return response.data;
+      return response.data.data;
     } catch (error: any) {
       return rejectWithValue(
         error.response?.data?.message || "Failed to create stock adjustment"
@@ -48,7 +48,7 @@ export const updateStockAdjustment = createAsyncThunk(
   async ({ id, data }: { id: string | number, data: any }, { rejectWithValue }) => {
     try {
       const response = await stockAdjustmentService.update(id, data);
-      return response.data;
+      return response.data.data;
     } catch (error: any) {
       return rejectWithValue(
         error.response?.data?.message || "Failed to update stock adjustment"
@@ -62,7 +62,7 @@ export const approveStockAdjustment = createAsyncThunk(
   async ({ id, status, reason }: { id: string | number, status: string, reason?: string }, { rejectWithValue }) => {
     try {
       const response = await stockAdjustmentService.approve(id, status, reason);
-      return response.data;
+      return response.data.data;
     } catch (error: any) {
       return rejectWithValue(
         error.response?.data?.message || "Failed to update status"

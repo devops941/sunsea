@@ -1,5 +1,4 @@
 import React, { useState, useCallback, useEffect, useMemo } from "react";
-import { FaSearch, FaChevronLeft, FaChevronRight } from "react-icons/fa";
 import { toast } from "react-toastify";
 
 import ViewButton from "../../../components/ui/viewbutton/ViewButton";
