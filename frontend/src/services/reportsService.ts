@@ -17,4 +17,27 @@ export const reportsService = {
     const response = await apiClient.get(`/reports/production-orders/${productionOrderId}`);
     return response.data;
   },
+
+  getSalesOrderReport: async (params?: { page?: number; limit?: number; [key: string]: any }) => {
+    const response = await apiClient.get("/reports/sales-orders", { params });
+    return response.data;
+  },
+
+  getPurchaseOrderReport: async (params?: { page?: number; limit?: number; [key: string]: any }) => {
+    const response = await apiClient.get("/reports/purchase-orders", { params });
+    return response.data;
+  },
+
+  getInventoryReport: async (params?: { page?: number; limit?: number; date?: string; category?: string; storeId?: string; search?: string }) => {
+    const cleanParams: any = {};
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== "" && value !== undefined && value !== null) {
+          cleanParams[key] = value;
+        }
+      });
+    }
+    const response = await apiClient.get("/inventory/eod-stock", { params: cleanParams });
+    return response.data;
+  },
 };

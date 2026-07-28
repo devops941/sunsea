@@ -35,4 +35,24 @@ router.get(
   reportsController.getProductionOrderReport
 );
 
+/**
+ * Sales Order Report
+ */
+router.get(
+  "/sales-orders",
+  authMiddleware,
+  requirePermission("reports.view"),
+  reportsController.getSalesOrderReport
+);
+
+/**
+ * Purchase Order Report
+ */
+router.get(
+  "/purchase-orders",
+  authMiddleware,
+  requirePermission("reports.view"),
+  reportsController.getPurchaseOrderReport
+);
+
 export default router;
