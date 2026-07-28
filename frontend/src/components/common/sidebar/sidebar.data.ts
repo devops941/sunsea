@@ -135,17 +135,16 @@ export const sidebarItems: SidebarItem[] = [
     permission: "storage_stores.view",
   },
   // 10. Reports
-  // {
-  //   title: "Reports",
-  //   icon: FiBarChart2,
-  //   path: "/reports/sales",
-  //   activePaths: [
-  //     "/reports/sales",
-  //     "/reports/purchase",
-  //     "/reports/inventory",
-  //     "/reports/production",
-  //     "/reports/audit",
-  //   ],
-  //   permission: "reports.view",
-  // }
+  {
+    title: "Reports",
+    icon: FiBarChart2,
+    path: "/reports/sales",
+    activePaths: [
+      "/reports/sales",
+      "/reports/purchase",
+      "/reports/inventory",
+      "/reports/production",
+    ],
+    permission: "reports.view",
+  }
 ];

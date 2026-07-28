@@ -6,14 +6,10 @@ import Tabs from "../../../components/ui/tab/Tabs";
 import type { TabItem } from "../../../components/ui/tab/Tabs";
 
 import ProductionReportsCenter from "./ProductionReportsCenter";
-
-const PlaceholderTab: React.FC<{ name: string }> = ({ name }) => (
-    <div className="p-5 text-center bg-light rounded shadow-sm border mt-4">
-        <h4 className="text-muted fw-bold mb-3">{name}</h4>
-        <p className="text-secondary mb-0">This report module is currently under development. Stay tuned!</p>
-    </div>
-);
-
+import SalesReportsCenter from "./SalesReportsCenter";
+import PurchaseReportsCenter from "./PurchaseReportsCenter";
+import InventoryReportsCenter from "./InventoryReportsCenter";
+                                                                                   
 const ReportsTabs: React.FC = () => {
     const location = useLocation();
     const navigate = useNavigate();
@@ -38,11 +34,10 @@ const ReportsTabs: React.FC = () => {
     const activeTab = pathToKey[location.pathname] || "production";
 
     const tabs: TabItem[] = [
-        { key: "sales", label: "Sales Reports", icon: <FaChartLine />, content: <PlaceholderTab name="Sales Reports" /> },
-        { key: "purchase", label: "Purchase Reports", icon: <FaShoppingBag />, content: <PlaceholderTab name="Purchase Reports" /> },
-        { key: "inventory", label: "Inventory Reports", icon: <FaWarehouse />, content: <PlaceholderTab name="Inventory Reports" /> },
+        { key: "sales", label: "Sales Reports", icon: <FaChartLine />, content: <SalesReportsCenter /> },
+        { key: "purchase", label: "Purchase Reports", icon: <FaShoppingBag />, content: <PurchaseReportsCenter /> },
+        { key: "inventory", label: "Inventory Reports", icon: <FaWarehouse />, content: <InventoryReportsCenter /> },
         { key: "production", label: "Production Reports", icon: <FaIndustry />, content: <ProductionReportsCenter /> },
-        { key: "audit", label: "Audit Reports", icon: <FaHistory />, content: <PlaceholderTab name="Audit Reports" /> }
     ];
 
     const handleTabChange = (key: string) => {
