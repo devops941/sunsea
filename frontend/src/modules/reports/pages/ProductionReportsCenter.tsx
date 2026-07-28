@@ -1,21 +1,20 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Container, Row, Col, Card } from "react-bootstrap";
+import { toast } from "react-toastify";
+import DatePickerCalendar from "../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
 import { fetchProductionOrders } from "../../../features/production-orders/productionOrderSlice";
 import { fetchMachines } from "../../../features/machines/machineSlice";
 import { fetchProducts } from "../../../features/product/productSlice";
 import { fetchShifts } from "../../../features/shifts/shiftSlice";
 import { fetchHourlyProductions } from "../../../features/hourly-productions/hourlyProductionSlice";
+import { fetchEmployees } from "../../../features/employee/employeeSlice";
 import { reportsService } from "../../../services/reportsService";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import ExportCSVButton from "../../../components/ui/ExportCSVButton/ExportCSVButton";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
-
-const REPORT_TYPES = [
-  { label: "1. Daily Production Report", value: "daily" },
-  { label: "2. Weekly Production Report", value: "weekly" },
-  { label: "3. Hourly Production Report", value: "hourly" },
-];
+import DataTable from "../../../components/ui/table/DataTable";
+import type { DataTableColumn } from "../../../components/ui/table/DataTable";
+import { DATE_RANGE_OPTIONS } from "../../../constants/selectOption";
 
 const ProductionReportsCenter: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -23,18 +22,26 @@ const ProductionReportsCenter: React.FC = () => {
   // Redux state
   const { data: productionOrders, loading: loadingOrders } = useAppSelector((state) => state.productionOrders);
   const { data: machines } = useAppSelector((state) => state.machines);
-  const { products } = useAppSelector((state: any) => state.products || { products: [] });
+  const { data: shifts } = useAppSelector((state) => state.shifts);
   const { data: hourlyProductions, loading: loadingHourly } = useAppSelector((state) => state.hourlyProductions || { data: [], loading: false });
+  const { employees } = useAppSelector((state) => state.employees || { employees: [] });
 
   // Filters state
   const [selectedReportType, setSelectedReportType] = useState("daily");
-  const [startDate, setStartDate] = useState(() =>
-    new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0] // 30 days ago
-  );
-  const [endDate, setEndDate] = useState(() => new Date().toISOString().split("T")[0]);
+
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [selectedMachine, setSelectedMachine] = useState("");
   const [selectedShift, setSelectedShift] = useState("");
-  const [selectedProduct, setSelectedProduct] = useState("");
+
+  const [draftStartDate, setDraftStartDate] = useState("");
+  const [draftEndDate, setDraftEndDate] = useState("");
+  const [dateRangePreset, setDateRangePreset] = useState("custom");
+  const [draftMachine, setDraftMachine] = useState(selectedMachine);
+  const [draftShift, setDraftShift] = useState(selectedShift);
+
+  const [page, setPage] = useState(1);
+  const limit = 10;
 
   // Backend direct reports loading
   const [backendReports, setBackendReports] = useState<any[]>([]);
@@ -43,8 +50,8 @@ const ProductionReportsCenter: React.FC = () => {
   useEffect(() => {
     dispatch(fetchProductionOrders());
     dispatch(fetchMachines());
-    dispatch(fetchProducts());
     dispatch(fetchShifts());
+    dispatch(fetchEmployees());
     dispatch(fetchHourlyProductions(undefined));
   }, [dispatch]);
 
@@ -71,80 +78,168 @@ const ProductionReportsCenter: React.FC = () => {
   // Dynamic filter utility for local calculations (Production Orders)
   const filteredOrders = useMemo(() => {
     return productionOrders.filter((po) => {
-      // Filter by Date Range
-      if (po.orderDate) {
+      if (po.orderDate && (startDate || endDate)) {
         const d = new Date(po.orderDate).getTime();
-        const start = new Date(startDate).getTime();
-        const end = new Date(endDate + "T23:59:59").getTime();
-        if (d < start || d > end) return false;
+        if (startDate) {
+          const start = new Date(startDate).getTime();
+          if (d < start) return false;
+        }
+        if (endDate) {
+          const end = new Date(endDate + "T23:59:59").getTime();
+          if (d > end) return false;
+        }
       }
-      
-      // Filter by Machine
-      if (selectedMachine && po?.machineId !== selectedMachine) return false;
-      
-      // Filter by Shift
-      if (selectedShift && po?.shiftId !== selectedShift) return false;
-      
-      // Filter by Product
-      if (selectedProduct && po.productItemId?.toString() !== selectedProduct) return false;
-
+      if (selectedMachine) {
+        if (po?.machineId === selectedMachine || po?.machineMachineId === selectedMachine) {
+          // matched
+        } else {
+          const safeHourly = Array.isArray(hourlyProductions) ? hourlyProductions : [];
+          const hourly = safeHourly.find(hp => hp.productionOrderId === po.productionOrderId || hp.productionOrderId === po.id);
+          if (!hourly || hourly.machineId !== selectedMachine) {
+            return false;
+          }
+        }
+      }
+      if (selectedShift) {
+        if (po?.shiftId === selectedShift) {
+          // matched
+        } else {
+          const safeHourly = Array.isArray(hourlyProductions) ? hourlyProductions : [];
+          const hourly = safeHourly.find(hp => hp.productionOrderId === po.productionOrderId || hp.productionOrderId === po.id);
+          if (!hourly || hourly.shiftId !== selectedShift) {
+            return false;
+          }
+        }
+      }
       return true;
     });
-  }, [productionOrders, startDate, endDate, selectedMachine, selectedShift, selectedProduct]);
+  }, [productionOrders, startDate, endDate, selectedMachine, selectedShift, hourlyProductions]);
 
   // Dynamic filter utility for local calculations (Hourly Productions)
   const filteredHourly = useMemo(() => {
     const safeHourly = Array.isArray(hourlyProductions) ? hourlyProductions : [];
     return safeHourly.filter((hp: any) => {
-      // Filter by Date Range
-      if (hp.productionDate) {
+      if (hp.productionDate && (startDate || endDate)) {
         const d = new Date(hp.productionDate).getTime();
-        const start = new Date(startDate).getTime();
-        const end = new Date(endDate + "T23:59:59").getTime();
-        if (d < start || d > end) return false;
+        if (startDate) {
+          const start = new Date(startDate).getTime();
+          if (d < start) return false;
+        }
+        if (endDate) {
+          const end = new Date(endDate + "T23:59:59").getTime();
+          if (d > end) return false;
+        }
       }
-      
-      // Filter by Machine
-      if (selectedMachine && hp?.machineId !== selectedMachine) return false;
-      
-      // Filter by Shift
+      if (selectedMachine && hp?.machineId !== selectedMachine && hp?.machineMachineId !== selectedMachine) return false;
       if (selectedShift && hp?.shiftId !== selectedShift) return false;
-      
-      // Filter by Product
-      if (selectedProduct && hp.productionOrder?.productItemId?.toString() !== selectedProduct) return false;
-
       return true;
     });
-  }, [hourlyProductions, startDate, endDate, selectedMachine, selectedShift, selectedProduct]);
+  }, [hourlyProductions, startDate, endDate, selectedMachine, selectedShift]);
 
+  const { tableData, totalPages, csvAllData } = useMemo(() => {
+    let data: any[] = [];
+    if (selectedReportType === "daily") {
+      const grouped: Record<string, { date: string, machineName: string, shiftName: string, target: number; produced: number; rejected: number; scrap: number }> = {};
+      filteredOrders.forEach((po) => {
+        if (!po.orderDate) return;
+        const date = po.orderDate.split("T")[0];
+        let mName = "Unknown";
+        let sName = "Unknown";
 
-  const { csvData, csvColumns, csvFilename } = useMemo(() => {
+        if (po.Machine?.machineName) {
+          mName = po.Machine.machineName;
+        } else if (po.machine?.machineName) {
+          mName = po.machine.machineName;
+        } else {
+          const poMachineId = po.machineId || po.machineMachineId;
+          let machine = machines.find(m => m.id === poMachineId || m.machineId === poMachineId);
+
+          if (!machine) {
+            const safeHourly = Array.isArray(hourlyProductions) ? hourlyProductions : [];
+            const hourly = safeHourly.find(hp => hp.productionOrderId === po.productionOrderId || hp.productionOrderId === po.id);
+            if (hourly && hourly.machineId) {
+              machine = machines.find(m => m.id === hourly.machineId || m.machineId === hourly.machineId);
+            }
+          }
+
+          if (machine) mName = machine.machineName;
+        }
+
+        if (po.shift?.shiftName) {
+          sName = po.shift.shiftName;
+        } else {
+          let shift;
+          if (po.shiftId) {
+            shift = shifts.find(s => s.id === po.shiftId || s.shiftCode === po.shiftId);
+          }
+
+          if (!shift) {
+            const safeHourly = Array.isArray(hourlyProductions) ? hourlyProductions : [];
+            const hourly = safeHourly.find(hp => hp.productionOrderId === po.productionOrderId || hp.productionOrderId === po.id);
+            if (hourly && hourly.shiftId) {
+              shift = shifts.find(s => s.id === hourly.shiftId || s.shiftCode === hourly.shiftId);
+            }
+          }
+
+          if (shift) sName = shift.shiftName;
+        }
+
+        let oName = "Unknown";
+        const safeHourly = Array.isArray(hourlyProductions) ? hourlyProductions : [];
+        const hourly = safeHourly.find(hp => hp.productionOrderId === po.productionOrderId || hp.productionOrderId === po.id);
+        if (hourly && hourly.operatorId) {
+          const operatorIdStr = String(hourly.operatorId);
+          const emp = employees.find((e: any) => String(e.id) === operatorIdStr);
+          if (emp) {
+            oName = emp.fullName || emp.firstName || operatorIdStr;
+          } else {
+            oName = operatorIdStr;
+          }
+        }
+
+        const key = `${date}_${mName}_${sName}_${oName}`;
+        if (!grouped[key]) {
+          grouped[key] = { date, machineName: mName, shiftName: sName, operatorName: oName, target: 0, produced: 0, rejected: 0, scrap: 0 };
+        }
+        grouped[key].target += Number(po.targetQty) || 0;
+        grouped[key].produced += Number(po.producedQty) || 0;
+        grouped[key].rejected += Number(po.rejectedQty) || 0;
+        grouped[key].scrap += Number(po.scrapQty) || 0;
+      });
+
+      const sortedKeys = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
+      data = sortedKeys.map(key => {
+        const vals = grouped[key];
+        const eff = vals.target > 0 ? ((vals.produced / vals.target) * 100).toFixed(1) : "0.0";
+        return { id: key, ...vals, eff };
+      });
+    } else if (selectedReportType === "weekly") {
+      data = backendReports;
+    } else if (selectedReportType === "hourly") {
+      data = filteredHourly;
+    }
+
+    const pages = Math.ceil(data.length / limit) || 1;
+    const paginated = data.slice((page - 1) * limit, page * limit);
+    return { tableData: paginated, totalPages: pages, csvAllData: data };
+  }, [selectedReportType, filteredOrders, backendReports, filteredHourly, page]);
+
+  // CSV Data Configuration
+  const { csvColumns, csvFilename } = useMemo(() => {
     switch (selectedReportType) {
       case "daily": {
-        const grouped: Record<string, { target: number; produced: number; rejected: number; scrap: number }> = {};
-        filteredOrders.forEach((po) => {
-          if (!po.orderDate) return;
-          const date = po.orderDate.split("T")[0];
-          if (!grouped[date]) {
-            grouped[date] = { target: 0, produced: 0, rejected: 0, scrap: 0 };
-          }
-          grouped[date].target += Number(po.targetQty) || 0;
-          grouped[date].produced += Number(po.producedQty) || 0;
-          grouped[date].rejected += Number(po.rejectedQty) || 0;
-          grouped[date].scrap += Number(po.scrapQty) || 0;
-        });
-        const sortedDates = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
-        const data = sortedDates.map(date => ({ date, ...grouped[date] }));
-        
         const columns = [
           { header: "Date", accessor: (item: any) => item.date },
-          { header: "Target Quantity", accessor: (item: any) => item.target },
-          { header: "Actual Quantity Produced", accessor: (item: any) => item.produced },
-          { header: "Rejected Quantity", accessor: (item: any) => item.rejected },
-          { header: "Scrap Quantity", accessor: (item: any) => item.scrap },
-          { header: "Efficiency Rate (%)", accessor: (item: any) => item.target > 0 ? ((item.produced / item.target) * 100).toFixed(1) : "0.0" }
+          { header: "Machine", accessor: (item: any) => item.machineName },
+          { header: "Shift", accessor: (item: any) => item.shiftName },
+          { header: "Operator", accessor: (item: any) => item.operatorName },
+          { header: "Target Qty", accessor: (item: any) => item.target },
+          { header: "Produced Qty", accessor: (item: any) => item.produced },
+          { header: "Rejected Qty", accessor: (item: any) => item.rejected },
+          { header: "Scrap Qty", accessor: (item: any) => item.scrap },
+          { header: "Efficiency %", accessor: (item: any) => item.eff }
         ];
-        return { csvData: data, csvColumns: columns, csvFilename: `Daily_Production_Report_${startDate}_${endDate}.csv` };
+        return { csvColumns: columns, csvFilename: `Daily_Production_${startDate}_${endDate}.csv` };
       }
       case "weekly": {
         const columns = [
@@ -157,302 +252,233 @@ const ProductionReportsCenter: React.FC = () => {
           { header: "Progress %", accessor: (item: any) => item.progressPercentage },
           { header: "Status", accessor: (item: any) => item.status }
         ];
-        return { csvData: backendReports, csvColumns: columns, csvFilename: `Weekly_Production_Report_${startDate}_${endDate}.csv` };
+        return { csvColumns: columns, csvFilename: `Weekly_Production_${startDate}_${endDate}.csv` };
       }
       case "hourly": {
         const columns = [
           { header: "Order ID", accessor: (item: any) => item.productionOrderId },
           { header: "Machine", accessor: (item: any) => item.machine?.machineName || item.machineId },
           { header: "Shift", accessor: (item: any) => item.shiftId },
+          {
+            header: "Operator", accessor: (item: any) => {
+              if (!item.operatorId) return "-";
+              const emp = employees.find((e: any) => String(e.id) === String(item.operatorId));
+              return emp ? (emp.fullName || emp.firstName) : item.operatorId;
+            }
+          },
           { header: "Hour Index", accessor: (item: any) => `Hour ${item.hourIndex}` },
           { header: "Qty Produced", accessor: (item: any) => item.qtyProduced },
           { header: "Reject Qty", accessor: (item: any) => item.rejectQty },
           { header: "Scrap Qty", accessor: (item: any) => item.scrapQty },
           { header: "Logged At", accessor: (item: any) => new Date(item.createdAt || Date.now()).toLocaleTimeString() }
         ];
-        return { csvData: filteredHourly, csvColumns: columns, csvFilename: `Hourly_Production_Report_${startDate}_${endDate}.csv` };
+        return { csvColumns: columns, csvFilename: `Hourly_Production_${startDate}_${endDate}.csv` };
       }
       default:
-        return { csvData: [], csvColumns: [], csvFilename: 'report.csv' };
+        return { csvColumns: [], csvFilename: 'report.csv' };
     }
-  }, [selectedReportType, filteredOrders, backendReports, filteredHourly, startDate, endDate]);
+  }, [selectedReportType, startDate, endDate]);
 
-  // Renders the correct table content based on the selected report type
-  const renderReportTable = () => {
-    if (loadingOrders || loadingBackend || loadingHourly) {
-      return (
-        <div className="text-center py-5">
-          <div className="animate-spin rounded-full border-b-2 border-indigo-600 h-8 w-8"></div>
-          <p className="mt-2 text-muted">Preparing report grid data...</p>
-        </div>
-      );
+  const handleApplyFilters = () => {
+    if (draftStartDate && draftEndDate && new Date(draftStartDate) > new Date(draftEndDate)) {
+      toast.error("Start Date cannot be after End Date");
+      return;
+    }
+    setStartDate(draftStartDate);
+    setEndDate(draftEndDate);
+    setSelectedMachine(draftMachine);
+    setSelectedShift(draftShift);
+    setPage(1);
+  };
+
+  const handleClearFilters = () => {
+    setDraftStartDate("");
+    setDraftEndDate("");
+    setDateRangePreset("custom");
+    setDraftMachine("");
+    setDraftShift("");
+
+    setStartDate("");
+    setEndDate("");
+    setSelectedMachine("");
+    setSelectedShift("");
+    setPage(1);
+  };
+
+  const handleDateRangeChange = (val: string) => {
+    setDateRangePreset(val);
+    if (val === "custom") return;
+
+    const today = new Date();
+    let start = new Date();
+    let end = new Date();
+
+    if (val === "today") {
+      // both today
+    } else if (val === "yesterday") {
+      start.setDate(today.getDate() - 1);
+      end.setDate(today.getDate() - 1);
+    } else if (val === "last_week") {
+      start.setDate(today.getDate() - 7);
+    } else if (val === "last_month") {
+      start.setMonth(today.getMonth() - 1);
+    } else if (val === "last_6_months") {
+      start.setMonth(today.getMonth() - 6);
+    } else if (val === "last_year") {
+      start.setFullYear(today.getFullYear() - 1);
     }
 
-    switch (selectedReportType) {
-      case "daily": {
-        // Group by Date
-        const grouped: Record<string, { target: number; produced: number; rejected: number; scrap: number }> = {};
-        filteredOrders.forEach((po) => {
-          if (!po.orderDate) return;
-          const date = po.orderDate.split("T")[0];
-          if (!grouped[date]) {
-            grouped[date] = { target: 0, produced: 0, rejected: 0, scrap: 0 };
+    setDraftStartDate(start.toISOString().split("T")[0]);
+    setDraftEndDate(end.toISOString().split("T")[0]);
+  };
+
+  const getTableColumns = (): DataTableColumn<any>[] => {
+    if (selectedReportType === "daily") {
+      return [
+        { header: "DATE", render: (item: any) => <span className="font-semibold text-gray-800">{item.date}</span> },
+        { header: "MACHINE", render: (item: any) => item.machineName },
+        { header: "SHIFT", render: (item: any) => item.shiftName },
+        { header: "OPERATOR", render: (item: any) => item.operatorName },
+        { header: "TARGET QTY", render: (item: any) => item.target },
+        { header: "PRODUCED", render: (item: any) => <span className="text-emerald-600 font-semibold">{item.produced}</span> },
+        { header: "REJECTED", render: (item: any) => <span className="text-red-500 font-medium">{item.rejected}</span> },
+        { header: "SCRAP", render: (item: any) => <span className="text-amber-500 font-medium">{item.scrap}</span> },
+        { header: "EFFICIENCY", render: (item: any) => <StatusBadge status={Number(item.eff) > 90 ? "COMPLETED" : "IN_PROGRESS"} customText={`${item.eff}%`} /> }
+      ];
+    }
+    if (selectedReportType === "weekly") {
+      return [
+        { header: "SCHEDULE ID", render: (item: any) => <span className="font-semibold text-gray-800">{item.weeklyProgramId}</span> },
+        { header: "WEEK STARTING", render: (item: any) => item.weekStartDate?.split("T")[0] },
+        { header: "MACHINE", render: (item: any) => item.machineName },
+        { header: "PLANNED PRODUCT", render: (item: any) => item.productName || "Various" },
+        { header: "TARGET QTY", render: (item: any) => item.plannedQty },
+        { header: "PRODUCED", render: (item: any) => <span className="text-emerald-600 font-semibold">{item.totalActualQty}</span> },
+        { header: "PROGRESS", render: (item: any) => <StatusBadge status={Number(item.progressPercentage) > 85 ? "COMPLETED" : "IN_PROGRESS"} customText={`${item.progressPercentage}%`} /> },
+        { header: "STATUS", render: (item: any) => <StatusBadge status={item.status} /> }
+      ];
+    }
+    if (selectedReportType === "hourly") {
+      return [
+        { header: "ORDER ID", render: (item: any) => <span className="font-semibold text-gray-800">{item.productionOrderId}</span> },
+        { header: "MACHINE", render: (item: any) => item.machine?.machineName || item.machineId },
+        { header: "SHIFT", render: (item: any) => <StatusBadge status={item.shiftId} /> },
+        {
+          header: "OPERATOR", render: (item: any) => {
+            if (!item.operatorId) return "-";
+            const emp = employees.find((e: any) => String(e.id) === String(item.operatorId));
+            return emp ? (emp.fullName || emp.firstName) : item.operatorId;
           }
-          grouped[date].target += Number(po.targetQty) || 0;
-          grouped[date].produced += Number(po.producedQty) || 0;
-          grouped[date].rejected += Number(po.rejectedQty) || 0;
-          grouped[date].scrap += Number(po.scrapQty) || 0;
-        });
-
-        const sortedDates = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
-
-        return (
-          <div className="table-responsive">
-            <table className="master-data-table text-center align-middle mb-0" style={{ minWidth: '800px' }}>
-              <thead>
-                <tr>
-                  <th className="py-3 px-3 text-uppercase text-muted" style={{ letterSpacing: '0.5px', fontSize: '11px' }}>Date</th>
-                  <th className="py-3 px-3 text-uppercase text-muted" style={{ letterSpacing: '0.5px', fontSize: '11px' }}>Target Quantity</th>
-                  <th className="py-3 px-3 text-uppercase text-muted" style={{ letterSpacing: '0.5px', fontSize: '11px' }}>Actual Quantity Produced</th>
-                  <th className="py-3 px-3 text-uppercase text-muted" style={{ letterSpacing: '0.5px', fontSize: '11px' }}>Rejected Quantity</th>
-                  <th className="py-3 px-3 text-uppercase text-muted" style={{ letterSpacing: '0.5px', fontSize: '11px' }}>Scrap Quantity</th>
-                  <th className="py-3 px-3 text-uppercase text-muted" style={{ letterSpacing: '0.5px', fontSize: '11px' }}>Efficiency Rate</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sortedDates.length > 0 ? (
-                  sortedDates.map((date) => {
-                    const vals = grouped[date];
-                    const eff = vals.target > 0 ? ((vals.produced / vals.target) * 100).toFixed(1) : "0.0";
-                    return (
-                      <tr key={date} className="bg-white border-bottom">
-                        <td className="fw-bold py-3">{date}</td>
-                        <td className="py-3">{vals.target}</td>
-                        <td className="text-success fw-bold py-3">{vals.produced}</td>
-                        <td className="text-danger py-3">{vals.rejected}</td>
-                        <td className="text-warning py-3">{vals.scrap}</td>
-                        <td className="py-3">
-                          <StatusBadge status={Number(eff) > 90 ? "COMPLETED" : "IN_PROGRESS"} customText={`${eff}%`} />
-                        </td>
-                      </tr>
-                    );
-                  })
-                ) : (
-                  <tr>
-                    <td colSpan={6} className="text-muted py-3">No production data found for date range.</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        );
-      }
-
-      case "weekly": {
-        return (
-          <div className="table-responsive">
-            <table className="master-data-table text-center align-middle mb-0" style={{ minWidth: '800px' }}>
-              <thead>
-                <tr>
-                  <th className="py-3 px-3 text-uppercase text-muted" style={{ letterSpacing: '0.5px', fontSize: '11px' }}>Schedule ID</th>
-                  <th className="py-3 px-3 text-uppercase text-muted" style={{ letterSpacing: '0.5px', fontSize: '11px' }}>Week Starting</th>
-                  <th className="py-3 px-3 text-uppercase text-muted" style={{ letterSpacing: '0.5px', fontSize: '11px' }}>Machine</th>
-                  <th className="py-3 px-3 text-uppercase text-muted" style={{ letterSpacing: '0.5px', fontSize: '11px' }}>Planned Product</th>
-                  <th className="py-3 px-3 text-uppercase text-muted" style={{ letterSpacing: '0.5px', fontSize: '11px' }}>Target Qty</th>
-                  <th className="py-3 px-3 text-uppercase text-muted" style={{ letterSpacing: '0.5px', fontSize: '11px' }}>Produced Qty</th>
-                  <th className="py-3 px-3 text-uppercase text-muted" style={{ letterSpacing: '0.5px', fontSize: '11px' }}>Progress %</th>
-                  <th className="py-3 px-3 text-uppercase text-muted" style={{ letterSpacing: '0.5px', fontSize: '11px' }}>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {backendReports.length > 0 ? (
-                  backendReports.map((wp, idx) => (
-                    <tr key={idx} className="bg-white border-bottom">
-                      <td className="fw-bold py-3">{wp.weeklyProgramId}</td>
-                      <td className="font-monospace py-3">{wp.weekStartDate.split("T")[0]}</td>
-                      <td className="py-3">{wp.machineName}</td>
-                      <td className="py-3">{wp.productName || "Various"}</td>
-                      <td className="py-3">{wp.plannedQty}</td>
-                      <td className="text-success fw-bold py-3">{wp.totalActualQty}</td>
-                      <td className="py-3">
-                        <StatusBadge status={Number(wp.progressPercentage) > 85 ? "COMPLETED" : "IN_PROGRESS"} customText={`${wp.progressPercentage}%`} />
-                      </td>
-                      <td className="py-3">
-                        <StatusBadge status={wp.status} />
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={8} className="text-muted py-3">No weekly schedule data found in date range.</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        );
-      }
-
-      case "hourly": {
-        return (
-          <div className="table-responsive">
-            <table className="master-data-table text-center align-middle mb-0" style={{ minWidth: '800px' }}>
-              <thead>
-                <tr>
-                  <th className="py-3 px-3 text-uppercase text-muted" style={{ letterSpacing: '0.5px', fontSize: '11px' }}>Order ID</th>
-                  <th className="py-3 px-3 text-uppercase text-muted" style={{ letterSpacing: '0.5px', fontSize: '11px' }}>Machine</th>
-                  <th className="py-3 px-3 text-uppercase text-muted" style={{ letterSpacing: '0.5px', fontSize: '11px' }}>Shift</th>
-                  <th className="py-3 px-3 text-uppercase text-muted" style={{ letterSpacing: '0.5px', fontSize: '11px' }}>Hour Index</th>
-                  <th className="py-3 px-3 text-uppercase text-muted" style={{ letterSpacing: '0.5px', fontSize: '11px' }}>Qty Produced</th>
-                  <th className="py-3 px-3 text-uppercase text-muted" style={{ letterSpacing: '0.5px', fontSize: '11px' }}>Reject Qty</th>
-                  <th className="py-3 px-3 text-uppercase text-muted" style={{ letterSpacing: '0.5px', fontSize: '11px' }}>Scrap Qty</th>
-                  <th className="py-3 px-3 text-uppercase text-muted" style={{ letterSpacing: '0.5px', fontSize: '11px' }}>Logged At</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredHourly.length > 0 ? (
-                  filteredHourly.map((hp: any, idx: number) => (
-                    <tr key={hp.hourlyProductionId || idx} className="bg-white border-bottom">
-                      <td className="fw-bold py-3">{hp.productionOrderId}</td>
-                      <td className="py-3">{hp.machine?.machineName || hp.machineId}</td>
-                      <td className="py-3"><StatusBadge status={hp.shiftId} /></td>
-                      <td className="py-3 fw-bold">Hour {hp.hourIndex}</td>
-                      <td className="text-success fw-bold py-3">{hp.qtyProduced}</td>
-                      <td className="text-danger fw-semibold py-3">{hp.rejectQty}</td>
-                      <td className="text-warning fw-semibold py-3">{hp.scrapQty}</td>
-                      <td className="small text-muted py-3">{new Date(hp.createdAt || Date.now()).toLocaleTimeString()}</td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={8} className="text-muted py-3">No hourly logs reported.</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        );
-      }
-
-      default:
-        return <div>Unknown report type.</div>;
+        },
+        { header: "HOUR INDEX", render: (item: any) => <span className="font-semibold">Hour {item.hourIndex}</span> },
+        { header: "PRODUCED", render: (item: any) => <span className="text-emerald-600 font-semibold">{item.qtyProduced}</span> },
+        { header: "REJECTED", render: (item: any) => <span className="text-red-500 font-medium">{item.rejectQty}</span> },
+        { header: "SCRAP", render: (item: any) => <span className="text-amber-500 font-medium">{item.scrapQty}</span> },
+        { header: "LOGGED AT", render: (item: any) => new Date(item.createdAt || Date.now()).toLocaleTimeString() }
+      ];
     }
+    return [];
   };
 
   return (
-    <div className="inner-container">
-      <Container fluid className="px-4 py-3">
-        {/* Header */}
-        <div className="page-header mb-4 print-hide">
-          <Row className="align-items-center g-3">
-            <Col lg={6} md={12}>
-              <div className="page-header-info">
-                <h2 className="page-title">Production & Scheduling Reports Center</h2>
-                
-              </div>
-            </Col>
-            <Col lg={6} md={12}>
-              <div className="d-flex flex-wrap gap-2 justify-content-lg-end">
-                <ExportCSVButton
-                  data={csvData}
-                  columns={csvColumns}
-                  filename={csvFilename}
-                  text="Export CSV"
-                />
-               
-              </div>
-            </Col>
-          </Row>
+    <div className="w-full">
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-slate-200">
+          <div>
+            <h2 className="text-2xl font-bold text-slate-800">Production Reports</h2>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3 relative w-full lg:w-auto">
+            <ExportCSVButton
+              data={csvAllData}
+              columns={csvColumns}
+              filename={csvFilename}
+              text="Export CSV"
+            />
+          </div>
         </div>
 
-        {/* Filter Toolbar (Hidden on print) */}
-        <Card className="border-0 shadow-sm rounded-3 p-4 mb-4 print-hide">
-          <h5 className="fw-bold mb-3 text-dark d-flex align-items-center gap-2">
-            <span >Filter Report Specifications</span>
-          </h5>
-          <Row className="g-3">
-            <Col lg={4} md={6}>
+        <div className="p-6 border-b border-slate-200 bg-slate-50">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-7 gap-4">
+            <div>
+              <label className="block mb-1 text-[11px] uppercase tracking-wider text-slate-500 font-bold">Date Range</label>
               <SelectInput
-                label="Report Type"
-                name="selectedReportType"
-                value={selectedReportType}
-                options={REPORT_TYPES}
-                required
-                onChange={(e) => setSelectedReportType(e.target.value)}
+                name="dateRangePreset"
+                value={dateRangePreset}
+                options={DATE_RANGE_OPTIONS}
+                hideLabel={true}
+                onChange={(e) => handleDateRangeChange(e.target.value)}
               />
-            </Col>
-            <Col lg={4} md={6}>
-              <div className="form-group">
-                <label className="form-label small fw-semibold text-secondary">Start Date</label>
-                <input
-                  type="date"
-                  className="form-control"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                />
-              </div>
-            </Col>
-            <Col lg={4} md={6}>
-              <div className="form-group">
-                <label className="form-label small fw-semibold text-secondary">End Date</label>
-                <input
-                  type="date"
-                  className="form-control"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                />
-              </div>
-            </Col>
-            <Col lg={4} md={6}>
+            </div>
+            <div>
+              <label className="block mb-1 text-[11px] uppercase tracking-wider text-slate-500 font-bold">Start Date</label>
+              <DatePickerCalendar
+                name="draftStartDate"
+                value={draftStartDate}
+                onChange={(e) => { setDraftStartDate(e.target.value); setDateRangePreset("custom"); }}
+              />
+            </div>
+            <div>
+              <label className="block mb-1 text-[11px] uppercase tracking-wider text-slate-500 font-bold">End Date</label>
+              <DatePickerCalendar
+                name="draftEndDate"
+                value={draftEndDate}
+                onChange={(e) => { setDraftEndDate(e.target.value); setDateRangePreset("custom"); }}
+              />
+            </div>
+            <div>
+              <label className="block mb-1 text-[11px] uppercase tracking-wider text-slate-500 font-bold">Machine</label>
               <SelectInput
-                label="Machine Filter (Optional)"
-                name="selectedMachine"
-                value={selectedMachine}
-                options={[{ label: "All Machines", value: "" }, ...machines.map(m => ({ label: m.machineName, value: m?.machineId }))]}
-                onChange={(e) => setSelectedMachine(e.target.value)}
+                name="draftMachine"
+                value={draftMachine}
+                options={machines.map(m => ({ label: m.machineName, value: m?.machineId || "" }))}
+                defaultOptionLabel="All Machines"
+                hideLabel={true}
+                onChange={(e) => setDraftMachine(e.target.value)}
               />
-            </Col>
-            <Col lg={4} md={6}>
+            </div>
+            <div>
+              <label className="block mb-1 text-[11px] uppercase tracking-wider text-slate-500 font-bold">Shift</label>
               <SelectInput
-                label="Shift Filter (Optional)"
-                name="selectedShift"
-                value={selectedShift}
-                options={[
-                  { label: "All Shifts", value: "" },
-                  { label: "Morning Shift", value: "MORNING" },
-                  { label: "Evening Shift", value: "EVENING" }
-                ]}
-                onChange={(e) => setSelectedShift(e.target.value)}
+                name="draftShift"
+                value={draftShift}
+                options={shifts.map(s => ({ label: s.shiftName, value: s.shiftCode }))}
+                defaultOptionLabel="All Shifts"
+                hideLabel={true}
+                onChange={(e) => setDraftShift(e.target.value)}
               />
-            </Col>
-            <Col lg={4} md={6}>
-              <SelectInput
-                label="Product Filter (Optional)"
-                name="selectedProduct"
-                value={selectedProduct}
-                options={[{ label: "All Products", value: "" }, ...products.map((p: any) => ({ label: p.productName, value: p.id.toString() }))]}
-                onChange={(e) => setSelectedProduct(e.target.value)}
-              />
-            </Col>
-          </Row>
-        </Card>
-
-        {/* Report Data Card */}
-        <Card className="border-0 shadow-sm rounded-3 overflow-hidden p-4">
-          <div className="d-flex justify-content-between align-items-center mb-3 border-bottom pb-3">
-            <h4 className="fw-bold mb-0 text-dark d-flex align-items-center gap-2">
-              <span>{REPORT_TYPES.find(r => r.value === selectedReportType)?.label}</span>
-            </h4>
-            <span className="small text-muted font-monospace">
-              Range: {startDate} to {endDate}
-            </span>
+            </div>
           </div>
 
-          <div className="report-print-container">
-            {renderReportTable()}
+          <div className="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-slate-200">
+            <button
+              onClick={handleClearFilters}
+              className="px-4 py-2 text-sm font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-md transition-colors"
+            >
+              Clear All
+            </button>
+            <button
+              onClick={handleApplyFilters}
+              className="px-6 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-md shadow-sm transition-colors"
+            >
+              Apply Filters
+            </button>
           </div>
-        </Card>
-      </Container>
+        </div>
+
+        <DataTable
+          columns={getTableColumns()}
+          data={tableData}
+          rowKey={(item: any, i) => item.id || item.weeklyProgramId || item.date || item.productionOrderId || i.toString()}
+          loading={loadingOrders || loadingBackend || loadingHourly}
+          emptyMessage="No production data found for selected filters."
+          pagination={{
+            currentPage: page,
+            totalPages: totalPages,
+            onPageChange: (newPage) => setPage(newPage)
+          }}
+        />
+      </div>
     </div>
   );
 };

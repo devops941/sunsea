@@ -294,6 +294,7 @@ export const ProductionOrderViewModal: React.FC<ProductionOrderViewModalProps> =
                                 const isDispatched = fullOrder?.status === 'DISPATCHED' || (fullOrder?.goodsDispatchItems && fullOrder.goodsDispatchItems.length > 0);
 
                                 return (
+                                    <>
                                     <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm mt-6">
                                         <div className="bg-white border-b border-slate-200 p-4 flex justify-between items-center flex-wrap gap-2">
                                             <h4 className="text-lg font-bold text-slate-800">
@@ -371,6 +372,55 @@ export const ProductionOrderViewModal: React.FC<ProductionOrderViewModalProps> =
                                             </div>
                                         </div>
                                     </div>
+
+                                    {/* Dispatch History Section */}
+                                    {fullOrder?.goodsDispatchItems && fullOrder.goodsDispatchItems.length > 0 && (
+                                        <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm mt-6">
+                                            <div className="bg-white border-b border-slate-200 p-4">
+                                                <h4 className="text-lg font-bold text-slate-800">Dispatch History</h4>
+                                            </div>
+                                            <div className="p-4 bg-slate-50 overflow-x-auto">
+                                                <div className="bg-white border border-slate-200 rounded-lg overflow-hidden min-w-[700px]">
+                                                    <table className="w-full text-left text-sm text-slate-600">
+                                                        <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 font-semibold text-xs uppercase">
+                                                            <tr>
+                                                                <th className="px-4 py-3">Dispatch No</th>
+                                                                <th className="px-4 py-3">Date</th>
+                                                                <th className="px-4 py-3">Vehicle</th>
+                                                                <th className="px-4 py-3">Driver</th>
+                                                                <th className="px-4 py-3">Dispatch Qty</th>
+                                                                <th className="px-4 py-3">Received Qty</th>
+                                                                <th className="px-4 py-3">Status</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody className="divide-y divide-slate-100">
+                                                            {fullOrder.goodsDispatchItems?.map((item: any) => {
+                                                                const dispatch = item?.dispatch || {};
+                                                                const status = dispatch?.status || "PENDING_GATE_APPROVAL";
+                                                                const dispatchDate = dispatch.dispatchDate
+                                                                    ? new Date(dispatch.dispatchDate).toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" })
+                                                                    : "-";
+                                                                return (
+                                                                    <tr key={item.id} className="hover:bg-slate-50 transition-colors">
+                                                                        <td className="px-4 py-3 font-semibold text-slate-800">{dispatch.dispatchNumber || "-"}</td>
+                                                                        <td className="px-4 py-3 text-slate-600">{dispatchDate}</td>
+                                                                        <td className="px-4 py-3 text-slate-700">{dispatch.vehicleNumber || "-"}</td>
+                                                                        <td className="px-4 py-3 text-slate-700">{dispatch.driverName || "-"}</td>
+                                                                        <td className="px-4 py-3 font-semibold text-slate-700">{Number(item.dispatchQty || 0).toFixed(2)}</td>
+                                                                        <td className="px-4 py-3 font-semibold text-blue-600">
+                                                                            {item.receivedQty !== null && item.receivedQty !== undefined ? Number(item.receivedQty).toFixed(2) : "-"}
+                                                                        </td>
+                                                                        <td className="px-4 py-3"><StatusBadge status={status} /></td>
+                                                                    </tr>
+                                                                );
+                                                            })}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </>
                                 );
                             })()}
                         </div>

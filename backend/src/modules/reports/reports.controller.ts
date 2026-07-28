@@ -36,6 +36,55 @@ class ReportsController {
       new ApiResponse("Production order detailed report fetched successfully", report)
     );
   });
+  getSalesOrderReport = asyncHandler(async (req: Request, res: Response) => {
+    const { 
+      startDate, endDate, orderNo, customerId, status, 
+      mdApprovalStatus, customerApprovalStatus, salesPersonName, 
+      dispatchType, orderType, productionStatus,
+      page, limit 
+    } = req.query;
+
+    const report = await reportsService.getSalesOrderReport(
+      startDate ? String(startDate) : undefined,
+      endDate ? String(endDate) : undefined,
+      orderNo ? String(orderNo) : undefined,
+      customerId ? String(customerId) : undefined,
+      status ? String(status) : undefined,
+      mdApprovalStatus ? String(mdApprovalStatus) : undefined,
+      customerApprovalStatus ? String(customerApprovalStatus) : undefined,
+      salesPersonName ? String(salesPersonName) : undefined,
+      dispatchType ? String(dispatchType) : undefined,
+      orderType ? String(orderType) : undefined,
+      productionStatus ? String(productionStatus) : undefined,
+      page ? parseInt(String(page)) : 1,
+      limit ? parseInt(String(limit)) : 10
+    );
+
+    return res.status(200).json(
+      new ApiResponse("Sales order report fetched successfully", report)
+    );
+  });
+
+  getPurchaseOrderReport = asyncHandler(async (req: Request, res: Response) => {
+    const { 
+      startDate, endDate, poNumber, supplierId, status, 
+      page, limit 
+    } = req.query;
+
+    const report = await reportsService.getPurchaseOrderReport(
+      startDate ? String(startDate) : undefined,
+      endDate ? String(endDate) : undefined,
+      poNumber ? String(poNumber) : undefined,
+      supplierId ? parseInt(String(supplierId)) : undefined,
+      status ? String(status) : undefined,
+      page ? parseInt(String(page)) : 1,
+      limit ? parseInt(String(limit)) : 10
+    );
+
+    return res.status(200).json(
+      new ApiResponse("Purchase order report fetched successfully", report)
+    );
+  });
 }
 
 export default new ReportsController();

@@ -113,9 +113,11 @@ export class StockAdjustmentService {
               id: true,
               itemType: true,
               rawMaterialId: true,
+              currentQty: true,
+              adjustedQty: true,
               difference: true,
               storeId: true,
-              rawMaterial: { select: { materialName: true } },
+              rawMaterial: { select: { materialName: true, baseUom: true } },
               store: { select: { storeName: true } },
               product: { select: { productName: true, productCode: true } },
             },
@@ -125,8 +127,19 @@ export class StockAdjustmentService {
       prisma.stockAdjustment.count({ where }),
     ]);
 
+    // Attach createdBy user names
+    const userIds = [...new Set(data.map((d) => d.createdBy).filter(Boolean) as string[])];
+    const users = userIds.length > 0
+      ? await prisma.user.findMany({ where: { userId: { in: userIds } }, select: { userId: true, fullName: true } })
+      : [];
+    const userMap = new Map(users.map((u) => [u.userId, u.fullName]));
+    const enriched = data.map((d) => ({
+      ...d,
+      createdByUser: d.createdBy && userMap.has(d.createdBy) ? { fullName: userMap.get(d.createdBy) } : null,
+    }));
+
     return {
-      data,
+      data: enriched,
       meta: {
         total,
         page: Number(page),
@@ -166,6 +179,17 @@ export class StockAdjustmentService {
 
     if (!adjustment) {
       throw new ApiError(404, "Stock Adjustment not found");
+    }
+
+    // Attach createdBy user name
+    if (adjustment.createdBy) {
+      const user = await prisma.user.findUnique({
+        where: { userId: adjustment.createdBy },
+        select: { fullName: true },
+      });
+      (adjustment as any).createdByUser = user ? { fullName: user.fullName } : null;
+    } else {
+      (adjustment as any).createdByUser = null;
     }
 
     return adjustment;

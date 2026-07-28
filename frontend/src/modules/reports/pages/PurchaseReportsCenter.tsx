@@ -1,0 +1,295 @@
+import React, { useState, useEffect, useMemo } from "react";
+import { toast } from "react-toastify";
+import DatePickerCalendar from "../../../components/ui/DatePickerCalendar/DatePickerCalendar";
+import { FaFilter } from "react-icons/fa";
+import { reportsService } from "../../../services/reportsService";
+import { supplierService } from "../../../services/supplierService";
+import { DATE_RANGE_OPTIONS } from "../../../constants/selectOption";
+import SelectInput from "../../../components/form/SelectInput/SelectInput";
+import StatusBadge from "../../../components/ui/StatusBadge/Badge";
+import ExportCSVButton from "../../../components/ui/ExportCSVButton/ExportCSVButton";
+import type { DataTableColumn } from "../../../components/ui/table/DataTable";
+import DataTable from "../../../components/ui/table/DataTable";
+
+const PurchaseReportsCenter: React.FC = () => {
+  // Filters state
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [poNumber, setPoNumber] = useState("");
+  const [supplierId, setSupplierId] = useState("");
+  const [status, setStatus] = useState("");
+
+  const [draftStartDate, setDraftStartDate] = useState(startDate);
+  const [draftEndDate, setDraftEndDate] = useState(endDate);
+  const [dateRangePreset, setDateRangePreset] = useState("custom");
+  const [draftPoNumber, setDraftPoNumber] = useState(poNumber);
+  const [draftSupplierId, setDraftSupplierId] = useState(supplierId);
+  const [draftStatus, setDraftStatus] = useState(status);
+
+  // Backend direct reports loading
+  const [backendReports, setBackendReports] = useState<any[]>([]);
+  const [loadingBackend, setLoadingBackend] = useState(false);
+  const [suppliers, setSuppliers] = useState<any[]>([]);
+  console.log(suppliers, 'kjlkjlk')
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+
+  useEffect(() => {
+    const loadSuppliers = async () => {
+      try {
+        const res = await supplierService.fetchAll();
+        setSuppliers(res || []);
+      } catch (err) {
+        console.error("Failed to load suppliers", err);
+      }
+    };
+    loadSuppliers();
+  }, []);
+
+  // Load report data from backend
+  useEffect(() => {
+    const loadReport = async () => {
+      setLoadingBackend(true);
+      try {
+        const res = await reportsService.getPurchaseOrderReport({
+          startDate,
+          endDate,
+          poNumber,
+          supplierId,
+          status,
+          page,
+          limit: 10
+        });
+        setBackendReports(res?.data?.data || []);
+        setTotalPages(res?.data?.totalPages || 1);
+      } catch (err) {
+        console.error("Failed to load backend report", err);
+        setBackendReports([]);
+        setTotalPages(1);
+      } finally {
+        setLoadingBackend(false);
+      }
+    };
+    loadReport();
+  }, [startDate, endDate, poNumber, supplierId, status, page]);
+
+  const { csvData, csvColumns, csvFilename } = useMemo(() => {
+    const columns = [
+      { header: "PO Number", accessor: (item: any) => item.poNumber },
+      { header: "PO Date", accessor: (item: any) => item.poDate?.split("T")[0] },
+      { header: "Supplier", accessor: (item: any) => item.supplierName },
+      { header: "Items Count", accessor: (item: any) => item.itemsCount },
+      { header: "Net Amount", accessor: (item: any) => item.netAmount },
+      { header: "Status", accessor: (item: any) => item.status }
+    ];
+    return { csvData: backendReports, csvColumns: columns, csvFilename: `Purchase_Order_Report_${startDate}_${endDate}.csv` };
+  }, [backendReports, startDate, endDate]);
+
+  const handleApplyFilters = () => {
+    if (draftStartDate && draftEndDate && new Date(draftStartDate) > new Date(draftEndDate)) {
+      toast.error("Start Date cannot be after End Date");
+      return;
+    }
+
+    setStartDate(draftStartDate);
+    setEndDate(draftEndDate);
+    setPoNumber(draftPoNumber);
+    setSupplierId(draftSupplierId);
+    setStatus(draftStatus);
+    setPage(1);
+  };
+
+  const handleClearFilters = () => {
+    setDraftStartDate("");
+    setDraftEndDate("");
+    setDateRangePreset("custom");
+    setDraftPoNumber("");
+    setDraftSupplierId("");
+    setDraftStatus("");
+
+    setStartDate("");
+    setEndDate("");
+    setPoNumber("");
+    setSupplierId("");
+    setStatus("");
+    setPage(1);
+  };
+
+  const handleDateRangeChange = (val: string) => {
+    setDateRangePreset(val);
+    if (val === "custom") return;
+    
+    const today = new Date();
+    let start = new Date();
+    let end = new Date();
+
+    if (val === "today") {
+      // both today
+    } else if (val === "yesterday") {
+      start.setDate(today.getDate() - 1);
+      end.setDate(today.getDate() - 1);
+    } else if (val === "last_week") {
+      start.setDate(today.getDate() - 7);
+    } else if (val === "last_month") {
+      start.setMonth(today.getMonth() - 1);
+    } else if (val === "last_6_months") {
+      start.setMonth(today.getMonth() - 6);
+    } else if (val === "last_year") {
+      start.setFullYear(today.getFullYear() - 1);
+    }
+
+    setDraftStartDate(start.toISOString().split("T")[0]);
+    setDraftEndDate(end.toISOString().split("T")[0]);
+  };
+
+  const tableColumns: DataTableColumn<any>[] = [
+    {
+      header: "#",
+      width: "60px",
+      render: (_item, index) => index + 1,
+    },
+    {
+      header: "PO NUMBER",
+      render: (item: any) => <span className="font-semibold text-gray-800">{item.poNumber || "-"}</span>
+    },
+    {
+      header: "PO DATE",
+      render: (item: any) => item.poDate ? new Date(item.poDate).toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" }) : "-"
+    },
+    {
+      header: "SUPPLIER",
+      render: (item: any) => item.supplierName || "N/A"
+    },
+    {
+      header: "ITEMS COUNT",
+      render: (item: any) => item.itemsCount || 0
+    },
+    {
+      header: "NET AMOUNT",
+      render: (item: any) => `₹${(item.netAmount ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+    },
+    {
+      header: "STATUS",
+      render: (item: any) => <StatusBadge status={item.status} />
+    }
+  ];
+
+  return (
+    <div className="w-full">
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-slate-200">
+          <div>
+            <h2 className="text-2xl font-bold text-slate-800">Purchase Order Report</h2>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3 relative w-full lg:w-auto">
+            <ExportCSVButton
+              data={csvData}
+              columns={csvColumns}
+              filename={csvFilename}
+              text="Export CSV"
+            />
+          </div>
+        </div>
+
+        <div className="p-6 border-b border-slate-200 bg-slate-50">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
+            <div>
+              <label className="block mb-1 text-[11px] uppercase tracking-wider text-slate-500 font-bold">Date Range</label>
+              <SelectInput
+                name="dateRangePreset"
+                value={dateRangePreset}
+                options={DATE_RANGE_OPTIONS}
+                hideLabel={true}
+                onChange={(e) => handleDateRangeChange(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="block mb-1 text-[11px] uppercase tracking-wider text-slate-500 font-bold">Start Date</label>
+              <DatePickerCalendar
+                name="draftStartDate"
+                value={draftStartDate}
+                onChange={(e) => { setDraftStartDate(e.target.value); setDateRangePreset("custom"); }}
+              />
+            </div>
+            <div>
+              <label className="block mb-1 text-[11px] uppercase tracking-wider text-slate-500 font-bold">End Date</label>
+              <DatePickerCalendar
+                name="draftEndDate"
+                value={draftEndDate}
+                onChange={(e) => { setDraftEndDate(e.target.value); setDateRangePreset("custom"); }}
+              />
+            </div>
+            <div>
+              <label className="block mb-1 text-[11px] uppercase tracking-wider text-slate-500 font-bold">PO No</label>
+              <input type="text" className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary shadow-sm" value={draftPoNumber} onChange={(e) => setDraftPoNumber(e.target.value)} placeholder="Search PO No..." />
+            </div>
+            <div>
+              <label className="block mb-1 text-[11px] uppercase tracking-wider text-slate-500 font-bold">Supplier</label>
+              <SelectInput
+                name="draftSupplierId"
+                value={draftSupplierId}
+                options={suppliers.map(s => ({ label: s.displayName, value: s.id.toString() }))}
+                defaultOptionLabel="All Suppliers"
+                hideLabel={true}
+                onChange={(e) => setDraftSupplierId(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="block mb-1 text-[11px] uppercase tracking-wider text-slate-500 font-bold">Status</label>
+              <SelectInput
+                name="draftStatus"
+                value={draftStatus}
+                options={[
+                  { label: "Draft", value: "DRAFT" },
+                  { label: "Pending", value: "PENDING" },
+                  { label: "Open", value: "OPEN" },
+                  { label: "Approved", value: "APPROVED" },
+                  { label: "Rejected", value: "REJECTED" },
+                  { label: "Partially Received", value: "PARTIALLY_RECEIVED" },
+                  { label: "Received", value: "RECEIVED" },
+                  { label: "Completed", value: "COMPLETED" },
+                  { label: "Closed", value: "CLOSED" },
+                  { label: "Cancelled", value: "CANCELLED" }
+                ]}
+                defaultOptionLabel="All Statuses"
+                hideLabel={true}
+                onChange={(e) => setDraftStatus(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-slate-200">
+            <button
+              onClick={handleClearFilters}
+              className="px-4 py-2 text-sm font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-md transition-colors"
+            >
+              Clear All
+            </button>
+            <button
+              onClick={handleApplyFilters}
+              className="px-6 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-md shadow-sm transition-colors"
+            >
+              Apply Filters
+            </button>
+          </div>
+        </div>
+
+        <DataTable
+          columns={tableColumns}
+          data={backendReports}
+          rowKey={(item: any) => item.id || item.poNumber}
+          loading={loadingBackend}
+          emptyMessage="No purchase order data found in date range."
+          pagination={{
+            currentPage: page,
+            totalPages: totalPages,
+            onPageChange: (newPage) => setPage(newPage)
+          }}
+        />
+      </div>
+    </div>
+  );
+};
+
+export default PurchaseReportsCenter;

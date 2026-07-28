@@ -40,6 +40,8 @@ async function syncProductionOrderQuantities(tx: any, productionOrderId: string)
   if (aggregates._sum.qtyProduced && order?.targetQty && Number(aggregates._sum.qtyProduced) >= Number(order.targetQty)) {
     if (newStatus === "IN_PROGRESS" || newStatus === "IN_PRODUCTION") {
       newStatus = "POST_PRODUCTION";
+    } else if (newStatus === "PARTIAL_COMPLETED") {
+      newStatus = "READY_FOR_DISPATCH";
     }
   } else if (!["COMPLETED", "POST_PRODUCTION", "PARTIAL_COMPLETED", "READY_FOR_DISPATCH", "DISPATCHED", "FG_RECEIVED"].includes(newStatus)) {
     newStatus = "IN_PROGRESS";
@@ -109,8 +111,28 @@ class HourlyProductionService {
         throw new ApiError(400, "The selected Daily Production Plan does not have an assigned operator.");
       }
 
-      // Auto-assign operatorId
-      data.operatorId = assignment.operators[0].id;
+      // Resolve selected operator IDs from the daily plan
+      const selectedOperatorIds = dailyPlan.selectedOperatorIds
+        ? dailyPlan.selectedOperatorIds.split(",").map((id: string) => id.trim()).filter(Boolean)
+        : [];
+
+      const assignmentOperatorIds = assignment.operators.map((op: any) => op.id.toString());
+
+      // Check if the provided operatorId is valid (either in the selected daily plan operators, or if none selected, in the weekly assignment)
+      const isValidOperator = data.operatorId && (
+        selectedOperatorIds.length > 0
+          ? selectedOperatorIds.includes(data.operatorId.toString())
+          : assignmentOperatorIds.includes(data.operatorId.toString())
+      );
+
+      // Auto-assign operatorId if not provided or invalid
+      if (!isValidOperator) {
+        if (selectedOperatorIds.length > 0) {
+          data.operatorId = selectedOperatorIds[0];
+        } else {
+          data.operatorId = assignment.operators[0].id;
+        }
+      }
 
       // Auto-link dailyPlanId in the reference object
       data.dailyPlanId = dailyPlan.dailyPlanId;

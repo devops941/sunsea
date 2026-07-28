@@ -249,7 +249,7 @@ class WeeklyProgramService {
           include: {
             productItem: true,
             dailyProductionPlans: {
-              include: { machine: true, shift: true }
+              include: { machine: true, shift: true, hourlyProductions: true }
             }
           }
         },

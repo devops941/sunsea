@@ -234,6 +234,156 @@ class ReportsService {
       hourlyBreakdown,
     };
   }
+  /**
+   * Sales Order Report.
+   */
+  async getSalesOrderReport(
+    startDate?: string,
+    endDate?: string,
+    orderNo?: string,
+    customerId?: string,
+    status?: string,
+    mdApprovalStatus?: string,
+    customerApprovalStatus?: string,
+    salesPersonName?: string,
+    dispatchType?: string,
+    orderType?: string,
+    productionStatus?: string,
+    page: number = 1,
+    limit: number = 10
+  ) {
+    const start = startDate ? new Date(startDate) : undefined;
+    const end = endDate ? new Date(endDate) : undefined;
+
+    const whereClause: any = {};
+
+    if (start || end) {
+      whereClause.orderDate = {};
+      if (start) whereClause.orderDate.gte = start;
+      if (end) whereClause.orderDate.lte = end;
+    }
+
+    if (orderNo) whereClause.orderNo = { contains: orderNo, mode: 'insensitive' };
+    if (customerId) whereClause.customerId = customerId;
+    if (status) whereClause.status = status;
+    if (mdApprovalStatus) whereClause.mdApprovalStatus = mdApprovalStatus;
+    if (customerApprovalStatus) whereClause.customerApprovalStatus = customerApprovalStatus;
+    if (salesPersonName) whereClause.salesPersonName = { contains: salesPersonName, mode: 'insensitive' };
+    if (dispatchType) whereClause.dispatchType = { contains: dispatchType, mode: 'insensitive' };
+    if (orderType) whereClause.orderType = { contains: orderType, mode: 'insensitive' };
+    if (productionStatus) whereClause.productionStatus = productionStatus;
+
+    const skip = (page - 1) * limit;
+
+    const [total, salesOrders] = await Promise.all([
+      prisma.salesOrder.count({ where: whereClause }),
+      prisma.salesOrder.findMany({
+        where: whereClause,
+        orderBy: { orderDate: "desc" },
+        skip,
+        take: limit,
+        include: {
+          customer: {
+            select: {
+              displayName: true,
+              firmName: true,
+              customerCode: true,
+            }
+          },
+          items: true,
+        },
+      })
+    ]);
+
+    const mappedData = salesOrders.map((so) => {
+      return {
+        id: so.id,
+        orderNo: so.orderNo,
+        orderDate: so.orderDate,
+        customerName: so.customer?.displayName || so.customer?.firmName || "Unknown",
+        customerCode: so.customer?.customerCode || "Unknown",
+        itemsCount: so.items.length,
+        netAmount: Number(so.netAmount),
+        status: so.status,
+        dispatchType: so.dispatchType,
+        mdApprovalStatus: so.mdApprovalStatus,
+        customerApprovalStatus: so.customerApprovalStatus,
+        totalQty: so.items.reduce((sum, item) => sum + Number(item.quantity), 0)
+      };
+    });
+
+    return {
+      data: mappedData,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit)
+    };
+  }
+
+  async getPurchaseOrderReport(
+    startDate?: string,
+    endDate?: string,
+    poNumber?: string,
+    supplierId?: number,
+    status?: string,
+    page: number = 1,
+    limit: number = 10
+  ) {
+    const start = startDate ? new Date(startDate) : undefined;
+    const end = endDate ? new Date(endDate) : undefined;
+
+    const whereClause: any = {};
+
+    if (start || end) {
+      whereClause.poDate = {};
+      if (start) whereClause.poDate.gte = start;
+      if (end) whereClause.poDate.lte = end;
+    }
+
+    if (poNumber) whereClause.poNumber = { contains: poNumber, mode: 'insensitive' };
+    if (supplierId) whereClause.supplierId = supplierId;
+    if (status) whereClause.status = status;
+
+    const skip = (page - 1) * limit;
+
+    const [total, purchaseOrders] = await Promise.all([
+      prisma.purchaseOrder.count({ where: whereClause }),
+      prisma.purchaseOrder.findMany({
+        where: whereClause,
+        orderBy: { poDate: "desc" },
+        skip,
+        take: limit,
+        include: {
+          supplier: {
+            select: {
+              displayName: true,
+              legalName: true,
+            }
+          },
+          items: true,
+        },
+      })
+    ]);
+
+    const mappedData = purchaseOrders.map((po) => {
+      return {
+        id: po.id,
+        poNumber: po.poNumber,
+        poDate: po.poDate,
+        supplierName: po.supplier?.displayName || po.supplier?.legalName || "Unknown",
+        itemsCount: po.items.length,
+        netAmount: Number(po.netAmount),
+        status: po.status,
+      };
+    });
+
+    return {
+      data: mappedData,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit)
+    };
+  }
 }
 
 export default new ReportsService();

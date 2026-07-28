@@ -170,7 +170,7 @@ const StockAdjustmentView: React.FC = () => {
                 customText={ADJUSTMENT_TYPE_LABELS[currentAdjustment.adjustmentType] || currentAdjustment.adjustmentType} />
             } />
             <InfoField label="Status" value={<StatusBadge status={currentAdjustment.status} />} />
-            <InfoField label="Created By" value={currentAdjustment.createdBy} />
+            <InfoField label="Created By" value={currentAdjustment.createdByUser?.fullName || currentAdjustment.createdBy} />
             {currentAdjustment.reason && (
               <div className="col-span-2 sm:col-span-3 lg:col-span-6">
                 <InfoField label="Reason / Notes" value={currentAdjustment.reason} />

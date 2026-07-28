@@ -28,3 +28,13 @@ export const CUSTOMER_TYPE_OPTIONS = [
     { value: "B2C", label: "B2C (Consumer)" },
     { value: "EXPORT", label: "Export" },
 ];
+
+export const DATE_RANGE_OPTIONS = [
+  { label: "Custom Range", value: "custom" },
+  { label: "Today", value: "today" },
+  { label: "Yesterday", value: "yesterday" },
+  { label: "Last 7 Days", value: "last_week" },
+  { label: "Last 30 Days", value: "last_month" },
+  { label: "Last 6 Months", value: "last_6_months" },
+  { label: "Last Year", value: "last_year" },
+];

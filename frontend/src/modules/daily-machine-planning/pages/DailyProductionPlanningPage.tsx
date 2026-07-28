@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import CommonModal from "../../../components/ui/Modal/CommonModal";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 import {
   FaPlus, FaPlay, FaStop, FaClipboardList, FaCalendarAlt, FaIndustry,
@@ -64,6 +64,7 @@ const NEXT_ACTION_ICONS: Record<string, any> = {
 // ---------- Component ----------
 const DailyProductionPlanningPage: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const dispatch = useAppDispatch();
 
   const { data: machines } = useAppSelector((state) => state.machines);
@@ -131,6 +132,7 @@ const DailyProductionPlanningPage: React.FC = () => {
   const [stopPlan, setStopPlan] = useState<any>(null);
   const [stopReason, setStopReason] = useState("");
   const [isStopping, setIsStopping] = useState(false);
+  const [stopOption, setStopOption] = useState<"carry_forward" | "completed_stop">("completed_stop");
 
   // Material Issue Modal State
   const [showMaterialIssueModal, setShowMaterialIssueModal] = useState(false);
@@ -171,7 +173,7 @@ const DailyProductionPlanningPage: React.FC = () => {
 
   useEffect(() => {
     loadDailyPlans();
-  }, [loadDailyPlans]);
+  }, [loadDailyPlans, location.key]);
 
   // ──────────────────────────────────────────────────────────────
   // Filtered data
@@ -320,6 +322,7 @@ const DailyProductionPlanningPage: React.FC = () => {
   const handleStopProductionClick = (plan: any) => {
     setStopPlan(plan);
     setStopReason("");
+    setStopOption("completed_stop");
     setShowStopModal(true);
   };
 
@@ -334,6 +337,7 @@ const DailyProductionPlanningPage: React.FC = () => {
         ? stopPlan.hourlyProductions.filter((h: any) => Number(h.hourIndex) > 0).length
         : 0;
 
+      const targetStatus = stopOption === "completed_stop" ? "COMPLETED" : "STOPPED";
       const updatedRemarks = stopPlan.remarks
         ? `${stopPlan.remarks} | Stopped: ${stopReason.trim()}`
         : `Stopped: ${stopReason.trim()}`;
@@ -341,16 +345,29 @@ const DailyProductionPlanningPage: React.FC = () => {
       await dispatch(updateDailyPlan({
         id: stopPlan.dailyPlanId,
         data: {
-          status: "STOPPED",
+          status: targetStatus,
           remarks: updatedRemarks,
           plannedHours: loggedHoursCount > 0 ? loggedHoursCount : stopPlan.plannedHours
         }
       })).unwrap();
 
-      toast.success("Production stopped successfully!");
+      toast.success(targetStatus === "COMPLETED" ? "Production completed and closed successfully!" : "Production stopped successfully!");
+      
+      const plannedQty = Number(stopPlan.plannedQty || 0);
+      const producedQty = Array.isArray(stopPlan.hourlyProductions)
+        ? stopPlan.hourlyProductions.reduce((sum: number, h: any) => sum + Number(h.qtyProduced || 0), 0)
+        : 0;
+      const pendingQty = plannedQty > producedQty ? plannedQty - producedQty : 0;
+
       setShowStopModal(false);
+      const currentPlan = stopPlan;
       setStopPlan(null);
-      loadDailyPlans();
+
+      if (stopOption === "carry_forward" && pendingQty > 0) {
+        handleCarryForward(currentPlan, pendingQty);
+      } else {
+        loadDailyPlans();
+      }
     } catch (err: any) {
       toast.error(err || "Failed to stop production");
     } finally {
@@ -556,7 +573,7 @@ const DailyProductionPlanningPage: React.FC = () => {
                 customText={`+${producedQty - plannedQty} Extra`}
                 customColor={{ bg: '#d1fae5', text: '#065f46' }}
               />
-            ) : pendingQty > 0 ? (
+            ) : (pendingQty > 0 && plan.status !== "COMPLETED" && plan.status !== "CANCELLED") ? (
               <StatusBadge
                 status="PENDING"
                 customText={`${pendingQty} Pending`}
@@ -604,7 +621,7 @@ const DailyProductionPlanningPage: React.FC = () => {
               <StatusBadge 
                 status={plan.status === "COMPLETED" && producedQty < plannedQty ? "SHORT_CLOSED" : plan.status} 
               />
-              {(plan.status === "STOPPED" || plan.status === "CANCELLED") && plan.remarks && (
+              {(plan.status === "STOPPED" || plan.status === "CANCELLED" || (plan.status === "COMPLETED" && producedQty < plannedQty)) && plan.remarks && (
                 <div className="group relative flex items-center justify-center cursor-pointer">
                   <FaInfoCircle className="text-rose-500 text-[15px] opacity-85 hover:opacity-100 transition-opacity" />
                   <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-slate-800 text-white text-xs rounded-md opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10 text-center shadow-lg">
@@ -646,7 +663,7 @@ const DailyProductionPlanningPage: React.FC = () => {
 
         // A plan can only be carried forward ONCE — check via the API-returned carryForwardTo array
         const alreadyCarriedForward = Array.isArray(plan.carryForwardTo) && plan.carryForwardTo.length > 0;
-        const canCarryForward = (plan.status === "COMPLETED" || plan.status === "STOPPED" || plan.status === "POST_PRODUCTION") && pendingQty > 0 && !alreadyCarriedForward;
+        const canCarryForward = (plan.status === "STOPPED" || plan.status === "POST_PRODUCTION") && pendingQty > 0 && !alreadyCarriedForward;
 
         let targetNextStatus = STATUS_FLOW[plan.status]?.next;
         let dynamicActionTitle = NEXT_ACTION_LABELS[plan.status] || `Move to ${nextStatus}`;
@@ -1144,28 +1161,94 @@ const DailyProductionPlanningPage: React.FC = () => {
             </div>
           }
         >
-          <div className="text-slate-700 text-sm">
-            <p className="mb-2">You are about to stop the production plan <strong className="text-slate-900">{stopPlan?.dailyPlanId}</strong> prematurely.</p>
-            <p className="text-xs text-slate-500 bg-white p-3 rounded-lg border border-slate-200 mb-4">
-              The number of logged hourly productions is <strong>{
-                Array.isArray(stopPlan?.hourlyProductions)
-                  ? stopPlan.hourlyProductions.filter((h: any) => Number(h.hourIndex) > 0).length
-                  : 0
-              }</strong>.
-              The planned hours for this plan will be adjusted to match the logged hours to release the remaining shift capacity.
-            </p>
-            <div className="flex flex-col gap-1.5">
-              <label className="font-bold text-slate-800 text-sm">Reason for Stopping <span className="text-rose-500">*</span></label>
-              <textarea
-                className="w-full border border-slate-300 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent"
-                rows={3}
-                placeholder="e.g. Urgent production order PO-XXX required on this machine"
-                value={stopReason}
-                onChange={(e) => setStopReason(e.target.value)}
-                required
-              />
-            </div>
-          </div>
+          {(() => {
+            const plannedQty = Number(stopPlan?.plannedQty || 0);
+            const producedQty = Array.isArray(stopPlan?.hourlyProductions)
+              ? stopPlan.hourlyProductions.reduce((sum: number, h: any) => sum + Number(h.qtyProduced || 0), 0)
+              : 0;
+            const pendingQty = plannedQty > producedQty ? plannedQty - producedQty : 0;
+
+            return (
+              <div className="text-slate-700 text-sm flex flex-col gap-4">
+                <div>
+                  <p className="mb-2">You are about to stop the production plan <strong className="text-slate-900">{stopPlan?.dailyPlanId}</strong> prematurely.</p>
+                  <p className="text-xs text-slate-500 bg-white p-3 rounded-lg border border-slate-200">
+                    The number of logged hourly productions is <strong>{
+                      Array.isArray(stopPlan?.hourlyProductions)
+                        ? stopPlan.hourlyProductions.filter((h: any) => Number(h.hourIndex) > 0).length
+                        : 0
+                    }</strong>.
+                    The planned hours for this plan will be adjusted to match the logged hours to release the remaining shift capacity.
+                  </p>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="font-bold text-slate-800 text-sm">Reason for Stopping <span className="text-rose-500">*</span></label>
+                  <textarea
+                    className="w-full border border-slate-300 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent"
+                    rows={3}
+                    placeholder="e.g. Urgent production order PO-XXX required on this machine"
+                    value={stopReason}
+                    onChange={(e) => setStopReason(e.target.value)}
+                    required
+                  />
+                </div>
+
+                {pendingQty > 0 && (
+                  <div className="flex flex-col gap-2">
+                    <label className="font-bold text-slate-800 text-sm">Stop Action Type</label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div
+                        className={`cursor-pointer border rounded-xl p-3 flex flex-col transition-all ${
+                          stopOption === "completed_stop"
+                            ? "border-rose-500 bg-rose-50/50 ring-2 ring-rose-500/20"
+                            : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+                        }`}
+                        onClick={() => setStopOption("completed_stop")}
+                      >
+                        <div className="flex items-center gap-2 font-semibold text-slate-800 text-sm">
+                          <input
+                            type="radio"
+                            name="stopOption"
+                            checked={stopOption === "completed_stop"}
+                            onChange={() => setStopOption("completed_stop")}
+                            className="text-rose-600 focus:ring-rose-500"
+                          />
+                          Completed Stop
+                        </div>
+                        <span className="text-[11px] text-slate-500 mt-1 pl-5">
+                          Stop production without carrying forward any quantity.
+                        </span>
+                      </div>
+
+                      <div
+                        className={`cursor-pointer border rounded-xl p-3 flex flex-col transition-all ${
+                          stopOption === "carry_forward"
+                            ? "border-amber-500 bg-amber-50/50 ring-2 ring-amber-500/20"
+                            : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+                        }`}
+                        onClick={() => setStopOption("carry_forward")}
+                      >
+                        <div className="flex items-center gap-2 font-semibold text-slate-800 text-sm">
+                          <input
+                            type="radio"
+                            name="stopOption"
+                            checked={stopOption === "carry_forward"}
+                            onChange={() => setStopOption("carry_forward")}
+                            className="text-amber-600 focus:ring-amber-500"
+                          />
+                          Stop & Carry Forward
+                        </div>
+                        <span className="text-[11px] text-slate-500 mt-1 pl-5">
+                          Carry forward the remaining <strong>{pendingQty} pcs</strong> to a new daily plan.
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </CommonModal>
 
         {/* ─────── Status Advance Confirm Modal ─────── */}
