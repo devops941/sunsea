@@ -2,7 +2,8 @@ import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
-import { fetchProductionWastages, deleteProductionWastage, approveProductionWastage, rejectProductionWastage } from "../../../features/production-wastage/productionWastageSlice";
+import { fetchProductionWastages, deleteProductionWastage, approveProductionWastage, rejectProductionWastage, productionWastageCreated, productionWastageUpdated, productionWastageDeleted } from "../../../features/production-wastage/productionWastageSlice";
+import { useSocketSync } from "../../../hooks/useSocketSync";
 import { fetchMachines } from "../../../features/machines/machineSlice";
 import { fetchProducts } from "../../../features/product/productSlice";
 import { fetchShifts } from "../../../features/shifts/shiftSlice";
@@ -45,6 +46,12 @@ const WastageList: React.FC = () => {
       limit: ITEMS_PER_PAGE,
     }));
   }, [dispatch, currentPage]);
+
+  useSocketSync<any>("productionWastage", {
+    created: productionWastageCreated,
+    updated: productionWastageUpdated,
+    deleted: productionWastageDeleted,
+  });
 
   useEffect(() => {
     dispatch(fetchMachines());

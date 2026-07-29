@@ -2,12 +2,12 @@ import apiClient from "../api/apiClient";
 import config from "../api/config";
 import type { Category, CreateCategoryDto, UpdateCategoryDto } from "../features/categories/types";
 
-const mapCategory = (item: any): Category => ({
+export const mapCategory = (item: any): Category => ({
   id: item.id,
-  code: item.categoryCode,
-  name: item.categoryName,
+  code: item.categoryCode || item.code,
+  name: item.categoryName || item.name,
   description: item.description || "",
-  status: item.isActive ? "ACTIVE" : "INACTIVE",
+  status: item.isActive !== undefined ? (item.isActive ? "ACTIVE" : "INACTIVE") : item.status,
   createdAt: item.createdAt,
   updatedAt: item.updatedAt
 });

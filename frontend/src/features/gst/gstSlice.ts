@@ -105,6 +105,29 @@ const gstTaxSlice = createSlice({
         clearGstTaxError: (state) => {
             state.error = null;
         },
+        gstTaxCreated: (state, action: PayloadAction<GstTax>) => {
+            const exists = state.data.find((item) => String(item.id) === String(action.payload.id));
+            if (!exists) {
+                state.data.unshift(action.payload);
+                state.total += 1;
+            }
+        },
+        gstTaxUpdated: (state, action: PayloadAction<GstTax>) => {
+            const index = state.data.findIndex((item) => String(item.id) === String(action.payload.id));
+            if (index !== -1) {
+                state.data[index] = action.payload;
+            }
+            if (state.selected && String(state.selected.id) === String(action.payload.id)) {
+                state.selected = action.payload;
+            }
+        },
+        gstTaxDeleted: (state, action: PayloadAction<number | string>) => {
+            const index = state.data.findIndex((item) => String(item.id) === String(action.payload));
+            if (index !== -1) {
+                state.data.splice(index, 1);
+                state.total = Math.max(0, state.total - 1);
+            }
+        },
     },
     extraReducers: (builder) => {
         builder
@@ -142,8 +165,11 @@ const gstTaxSlice = createSlice({
 
             // create
             .addCase(createGstTax.fulfilled, (state, action: PayloadAction<GstTax>) => {
-                state.data.unshift(action.payload);
-                state.total += 1;
+                const exists = state.data.find((item) => String(item.id) === String(action.payload.id));
+                if (!exists) {
+                    state.data.unshift(action.payload);
+                    state.total += 1;
+                }
             })
             .addCase(createGstTax.rejected, (state, action) => {
                 state.error = action.payload as string;
@@ -174,7 +200,7 @@ const gstTaxSlice = createSlice({
     },
 });
 
-export const { clearSelectedGstTax, clearGstTaxError } = gstTaxSlice.actions;
+export const { clearSelectedGstTax, clearGstTaxError, gstTaxCreated, gstTaxUpdated, gstTaxDeleted } = gstTaxSlice.actions;
 const selectGstTaxData = (state: RootState) => state.gst.data;
 
 export const selectActiveGstTaxes = createSelector(

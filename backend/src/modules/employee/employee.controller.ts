@@ -2,10 +2,10 @@ import { Request, Response } from "express";
 
 import employeeService from "./employee.service";
 import { prisma } from "../../config/prisma";
-
 import { asyncHandler } from "../../utils/asyncHandler";
 import { ApiResponse } from "../../utils/ApiResponse";
 import { ApiError } from "../../utils/ApiError";
+import { getIO } from "../../socket/socket";
 
 class EmployeeController {
   create = asyncHandler(
@@ -14,6 +14,8 @@ class EmployeeController {
         await employeeService.create(
           req.body
         );
+
+      getIO().emit("employee:created", employee);
 
       return res.status(201).json(
         new ApiResponse(
@@ -136,6 +138,8 @@ class EmployeeController {
           req.body
         );
 
+      getIO().emit("employee:updated", employee);
+
       return res.status(200).json(
         new ApiResponse(
           "Employee updated successfully",
@@ -152,6 +156,8 @@ class EmployeeController {
       );
 
       await employeeService.delete(id);
+
+      getIO().emit("employee:deleted", { id: id.toString() });
 
       return res.status(200).json(
         new ApiResponse(

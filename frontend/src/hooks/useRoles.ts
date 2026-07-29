@@ -1,7 +1,8 @@
-import { useCallback } from "react";
+import React, { useCallback } from "react";
 import { useAppDispatch, useAppSelector } from "./reduxHooks";
-import { fetchRoles, createRole, updateRole, deleteRole } from "../features/roles/roleSlice";
-import type { CreateRoleDto, UpdateRoleDto } from "../features/roles/types";
+import { fetchRoles, createRole, updateRole, deleteRole, roleCreated, roleUpdated, roleDeleted } from "../features/roles/roleSlice";
+import type { Role, CreateRoleDto, UpdateRoleDto } from "../features/roles/types";
+import { useSocketSync } from "./useSocketSync";
 
 export const useRoles = () => {
   const dispatch = useAppDispatch();
@@ -10,6 +11,13 @@ export const useRoles = () => {
   const loadRoles = useCallback((page?: number, limit?: number, search?: string) => {
     dispatch(fetchRoles({ page, limit, search }));
   }, [dispatch]);
+
+  // Listen for real-time updates from other clients
+  useSocketSync<Role>("role", {
+    created: roleCreated,
+    updated: roleUpdated,
+    deleted: roleDeleted,
+  });
 
   const addRole = useCallback(
     async (data: CreateRoleDto) => {

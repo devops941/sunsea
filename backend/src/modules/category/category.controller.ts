@@ -4,12 +4,15 @@ import categoryService from "./category.service";
 
 import { asyncHandler } from "../../utils/asyncHandler";
 import { ApiResponse } from "../../utils/ApiResponse";
+import { getIO } from "../../socket/socket";
 
 class CategoryController {
   create = asyncHandler(
     async (req: Request, res: Response) => {
       const category =
         await categoryService.create(req.body);
+
+      getIO().emit("category:created", category);
 
       return res.status(201).json(
         new ApiResponse(
@@ -70,6 +73,8 @@ class CategoryController {
           req.body
         );
 
+      getIO().emit("category:updated", category);
+
       return res.status(200).json(
         new ApiResponse(
           "Category updated successfully",
@@ -86,6 +91,8 @@ class CategoryController {
       );
 
       await categoryService.delete(id);
+
+      getIO().emit("category:deleted", { id });
 
       return res.status(200).json(
         new ApiResponse(

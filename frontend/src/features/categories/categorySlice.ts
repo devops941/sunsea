@@ -1,6 +1,6 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import type { PayloadAction } from "@reduxjs/toolkit";
-import { categoryService } from "../../services/categoryService";
+import { categoryService, mapCategory } from "../../services/categoryService";
 import type { Category, CategoryState, CreateCategoryDto, UpdateCategoryDto } from "./types";
 
 export const fetchCategories = createAsyncThunk("categories/fetchAll", async (
@@ -49,7 +49,28 @@ const initialState: CategoryState = {
 const categorySlice = createSlice({
   name: "categories",
   initialState,
-  reducers: {},
+  reducers: {
+    categoryCreated: (state, action: PayloadAction<any>) => {
+      const mapped = mapCategory(action.payload);
+      const exists = state.data.find((item) => String(item.id) === String(mapped.id));
+      if (!exists) {
+        state.data.unshift(mapped);
+      }
+    },
+    categoryUpdated: (state, action: PayloadAction<any>) => {
+      const mapped = mapCategory(action.payload);
+      const index = state.data.findIndex((item) => String(item.id) === String(mapped.id));
+      if (index !== -1) {
+        state.data[index] = mapped;
+      }
+    },
+    categoryDeleted: (state, action: PayloadAction<number>) => {
+      const index = state.data.findIndex((item) => String(item.id) === String(action.payload));
+      if (index !== -1) {
+        state.data.splice(index, 1);
+      }
+    },
+  },
   extraReducers: (builder) => {
     builder
       .addCase(fetchCategories.pending, (state) => {
@@ -65,7 +86,10 @@ const categorySlice = createSlice({
         state.error = action.payload as string;
       })
       .addCase(createCategory.fulfilled, (state, action: PayloadAction<Category>) => {
-        state.data.push(action.payload);
+        const exists = state.data.find((item) => String(item.id) === String(action.payload.id));
+        if (!exists) {
+          state.data.unshift(action.payload);
+        }
       })
       .addCase(updateCategory.fulfilled, (state, action: PayloadAction<Category>) => {
         const index = state.data.findIndex((item) => item.id === action.payload.id);
@@ -78,5 +102,7 @@ const categorySlice = createSlice({
       });
   },
 });
+
+export const { categoryCreated, categoryUpdated, categoryDeleted } = categorySlice.actions;
 
 export default categorySlice.reducer;

@@ -1,6 +1,6 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import type { PayloadAction } from "@reduxjs/toolkit";
-import { rawMaterialCategoryService } from "../../services/rawMaterialCategoryService";
+import { rawMaterialCategoryService, mapCategory } from "../../services/rawMaterialCategoryService";
 import type { RawMaterialCategory, RawMaterialCategoryState, CreateRawMaterialCategoryDto, UpdateRawMaterialCategoryDto } from "./types";
 
 export const fetchRawMaterialCategories = createAsyncThunk(
@@ -72,7 +72,28 @@ const initialState: RawMaterialCategoryState = {
 const rawMaterialCategorySlice = createSlice({
   name: "rawMaterialCategories",
   initialState,
-  reducers: {},
+  reducers: {
+    rmCategoryCreated: (state, action: PayloadAction<any>) => {
+      const mapped = mapCategory(action.payload);
+      const exists = state.data.find((item) => String(item.id) === String(mapped.id));
+      if (!exists) {
+        state.data.unshift(mapped);
+      }
+    },
+    rmCategoryUpdated: (state, action: PayloadAction<any>) => {
+      const mapped = mapCategory(action.payload);
+      const index = state.data.findIndex((item) => String(item.id) === String(mapped.id));
+      if (index !== -1) {
+        state.data[index] = mapped;
+      }
+    },
+    rmCategoryDeleted: (state, action: PayloadAction<number>) => {
+      const index = state.data.findIndex((item) => String(item.id) === String(action.payload));
+      if (index !== -1) {
+        state.data.splice(index, 1);
+      }
+    },
+  },
   extraReducers: (builder) => {
     builder
       .addCase(fetchRawMaterialCategories.pending, (state) => {
@@ -111,7 +132,11 @@ const rawMaterialCategorySlice = createSlice({
       .addCase(
         createRawMaterialCategory.fulfilled,
         (state, action: PayloadAction<RawMaterialCategory>) => {
-          state.data.push(action.payload);
+          const mapped = mapCategory(action.payload);
+          const exists = state.data.find((item) => String(item.id) === String(mapped.id));
+          if (!exists) {
+            state.data.unshift(mapped);
+          }
         }
       )
       .addCase(
@@ -131,5 +156,7 @@ const rawMaterialCategorySlice = createSlice({
       });
   },
 });
+
+export const { rmCategoryCreated, rmCategoryUpdated, rmCategoryDeleted } = rawMaterialCategorySlice.actions;
 
 export default rawMaterialCategorySlice.reducer;

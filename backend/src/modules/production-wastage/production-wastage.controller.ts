@@ -2,11 +2,14 @@ import { Request, Response } from "express";
 import productionWastageService from "./production-wastage.service";
 import { ApiResponse } from "../../utils/ApiResponse";
 import { asyncHandler } from "../../utils/asyncHandler";
+import { getIO } from "../../socket/socket";
 
 class ProductionWastageController {
   create = asyncHandler(async (req: Request, res: Response) => {
     const userId = (req as any).user?.userId || "d67768ba-bcde-4321-a123-bcdef9876543";
     const record = await productionWastageService.create(req.body, userId);
+
+    getIO().emit("productionWastage:created", record);
 
     return res.status(201).json(
       new ApiResponse("Production wastage log created successfully", record)
@@ -46,6 +49,8 @@ class ProductionWastageController {
     const userId = (req as any).user?.userId || "d67768ba-bcde-4321-a123-bcdef9876543";
     const record = await productionWastageService.update(BigInt(id as string), req.body, userId);
 
+    getIO().emit("productionWastage:updated", record);
+
     return res.status(200).json(
       new ApiResponse("Production wastage log updated successfully", record)
     );
@@ -54,6 +59,8 @@ class ProductionWastageController {
   delete = asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
     await productionWastageService.delete(BigInt(id as string));
+
+    getIO().emit("productionWastage:deleted", { id: String(id) });
 
     return res.status(200).json(
       new ApiResponse("Production wastage log deleted successfully")
@@ -65,6 +72,8 @@ class ProductionWastageController {
     const userId = (req as any).user?.userId || "d67768ba-bcde-4321-a123-bcdef9876543";
     const record = await productionWastageService.approve(BigInt(id as string), userId);
 
+    getIO().emit("productionWastage:updated", record);
+
     return res.status(200).json(
       new ApiResponse("Production wastage log approved successfully", record)
     );
@@ -74,6 +83,8 @@ class ProductionWastageController {
     const { id } = req.params;
     const userId = (req as any).user?.userId || "d67768ba-bcde-4321-a123-bcdef9876543";
     const record = await productionWastageService.reject(BigInt(id as string), userId);
+
+    getIO().emit("productionWastage:updated", record);
 
     return res.status(200).json(
       new ApiResponse("Production wastage log rejected successfully", record)

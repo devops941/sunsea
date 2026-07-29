@@ -1,6 +1,6 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import type { PayloadAction } from "@reduxjs/toolkit";
-import { rawMaterialService } from "../../services/rawMaterialService";
+import { rawMaterialService, mapRawMaterial } from "../../services/rawMaterialService";
 import type { RawMaterial, RawMaterialState, CreateRawMaterialDto, UpdateRawMaterialDto } from "./types";
 
 export const fetchRawMaterials = createAsyncThunk("rawMaterials/fetchAll", async (search: string | undefined, { rejectWithValue }) => {
@@ -45,7 +45,28 @@ const initialState: RawMaterialState = {
 const rawMaterialSlice = createSlice({
   name: "rawMaterials",
   initialState,
-  reducers: {},
+  reducers: {
+    rawMaterialCreated: (state, action: PayloadAction<any>) => {
+      const mapped = mapRawMaterial(action.payload);
+      const exists = state.data.find((item) => String(item.rawMaterialId) === String(mapped.rawMaterialId));
+      if (!exists) {
+        state.data.unshift(mapped);
+      }
+    },
+    rawMaterialUpdated: (state, action: PayloadAction<any>) => {
+      const mapped = mapRawMaterial(action.payload);
+      const index = state.data.findIndex((item) => String(item.rawMaterialId) === String(mapped.rawMaterialId));
+      if (index !== -1) {
+        state.data[index] = mapped;
+      }
+    },
+    rawMaterialDeleted: (state, action: PayloadAction<string>) => {
+      const index = state.data.findIndex((item) => String(item.rawMaterialId) === String(action.payload));
+      if (index !== -1) {
+        state.data.splice(index, 1);
+      }
+    },
+  },
   extraReducers: (builder) => {
     builder
       .addCase(fetchRawMaterials.pending, (state) => {
@@ -61,7 +82,11 @@ const rawMaterialSlice = createSlice({
         state.error = action.payload as string;
       })
       .addCase(createRawMaterial.fulfilled, (state, action: PayloadAction<RawMaterial>) => {
-        state.data.push(action.payload);
+        const mapped = mapRawMaterial(action.payload);
+        const exists = state.data.find((item) => String(item.rawMaterialId) === String(mapped.rawMaterialId));
+        if (!exists) {
+          state.data.unshift(mapped);
+        }
       })
       .addCase(updateRawMaterial.fulfilled, (state, action: PayloadAction<RawMaterial>) => {
         const index = state.data.findIndex((item) => item.rawMaterialId === action.payload.rawMaterialId);
@@ -74,5 +99,7 @@ const rawMaterialSlice = createSlice({
       });
   },
 });
+
+export const { rawMaterialCreated, rawMaterialUpdated, rawMaterialDeleted } = rawMaterialSlice.actions;
 
 export default rawMaterialSlice.reducer;

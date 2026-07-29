@@ -48,7 +48,28 @@ const initialState: EmployeeState = {
 const employeeSlice = createSlice({
   name: "employees",
   initialState,
-  reducers: {},
+  reducers: {
+    employeeCreated: (state, action: PayloadAction<Employee>) => {
+      const exists = state.employees.find((item) => String(item.id) === String(action.payload.id));
+      if (!exists) {
+        state.employees.unshift(action.payload);
+        state.total += 1;
+      }
+    },
+    employeeUpdated: (state, action: PayloadAction<Employee>) => {
+      const index = state.employees.findIndex((item) => String(item.id) === String(action.payload.id));
+      if (index !== -1) {
+        state.employees[index] = action.payload;
+      }
+    },
+    employeeDeleted: (state, action: PayloadAction<string>) => {
+      const index = state.employees.findIndex((item) => String(item.id) === String(action.payload));
+      if (index !== -1) {
+        state.employees.splice(index, 1);
+        state.total = Math.max(0, state.total - 1);
+      }
+    },
+  },
   extraReducers: (builder) => {
     builder
       .addCase(fetchEmployees.pending, (state) => {
@@ -74,7 +95,11 @@ const employeeSlice = createSlice({
         state.error = action.payload as string;
       })
       .addCase(createEmployee.fulfilled, (state, action: PayloadAction<Employee>) => {
-        state.employees.push(action.payload);
+        const exists = state.employees.find((item) => String(item.id) === String(action.payload.id));
+        if (!exists) {
+          state.employees.unshift(action.payload);
+          state.total += 1;
+        }
       })
       .addCase(updateEmployee.fulfilled, (state, action: PayloadAction<Employee>) => {
         const index = state.employees.findIndex((e) => e.id === action.payload.id);
@@ -87,5 +112,7 @@ const employeeSlice = createSlice({
       });
   },
 });
+
+export const { employeeCreated, employeeUpdated, employeeDeleted } = employeeSlice.actions;
 
 export default employeeSlice.reducer;

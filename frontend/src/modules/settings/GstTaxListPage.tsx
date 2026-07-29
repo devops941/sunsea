@@ -8,7 +8,8 @@ import DataTable, { type DataTableColumn } from "../../components/ui/table/DataT
 import GstTaxModal, { type GstTaxFormValues } from "./GstModal";
 import type { GstTax } from "../../services/gstTaxService";
 import { useAppDispatch, useAppSelector } from "../../hooks/reduxHooks";
-import { createGstTax, fetchGstTaxes, updateGstTax, deleteGstTax } from "../../features/gst/gstSlice";
+import { createGstTax, fetchGstTaxes, updateGstTax, deleteGstTax, gstTaxCreated, gstTaxUpdated, gstTaxDeleted } from "../../features/gst/gstSlice";
+import { useSocketSync } from "../../hooks/useSocketSync";
 import CommonConfirmModal from "../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import DeleteButton from "../../components/ui/DeleteButton/DeleteButton";
 
@@ -19,6 +20,12 @@ const GstTaxList: React.FC = () => {
     const { data, loading, totalPages } = useAppSelector((state) => state.gst);
     const [searchTerm, setSearchTerm] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
+
+    useSocketSync<GstTax>("gstTax", {
+        created: gstTaxCreated,
+        updated: gstTaxUpdated,
+        deleted: gstTaxDeleted,
+    });
 
     // ─── Modal state (Add / Edit) ──────────────────────────────
     const [showModal, setShowModal] = useState(false);
@@ -134,7 +141,7 @@ const GstTaxList: React.FC = () => {
             render: (tax) => (
                 <div className="flex items-center gap-2">
                     <EditButton onClick={() => handleEditClick(tax)} />
-                    <DeleteButton onClick={() => triggerDelete(tax.id)} />
+                    {/* <DeleteButton onClick={() => triggerDelete(tax.id)} /> */}
                 </div>
             ),
             align: "right"

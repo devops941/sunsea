@@ -1,11 +1,18 @@
 import { useCallback } from "react";
 import { useAppDispatch, useAppSelector } from "./reduxHooks";
-import { fetchDepartments, createDepartment, updateDepartment, deleteDepartment } from "../features/departments/departmentSlice";
-import type { CreateDepartmentDto, UpdateDepartmentDto } from "../features/departments/types";
+import { fetchDepartments, createDepartment, updateDepartment, deleteDepartment, departmentCreated, departmentUpdated, departmentDeleted } from "../features/departments/departmentSlice";
+import type { Department, CreateDepartmentDto, UpdateDepartmentDto } from "../features/departments/types";
+import { useSocketSync } from "./useSocketSync";
 
 export const useDepartments = () => {
   const dispatch = useAppDispatch();
   const { data: departments, total, loading, error } = useAppSelector((state) => state.departments);
+
+  useSocketSync<Department>("department", {
+    created: departmentCreated,
+    updated: departmentUpdated,
+    deleted: departmentDeleted,
+  });
 
   const loadDepartments = useCallback((page?: number, limit?: number, search?: string) => {
     dispatch(fetchDepartments({ page, limit, search }));

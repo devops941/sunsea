@@ -2,11 +2,14 @@ import { Request, Response } from "express";
 import rawMaterialCategoryService from "./raw-material-category.service";
 import { ApiResponse } from "../../utils/ApiResponse";
 import { asyncHandler } from "../../utils/asyncHandler";
+import { getIO } from "../../socket/socket";
 
 class RawMaterialCategoryController {
   create = asyncHandler(async (req: Request, res: Response) => {
     const userId = req.user?.userId;
     const category = await rawMaterialCategoryService.create(req.body, userId);
+
+    getIO().emit("rmCategory:created", category);
 
     return res.status(201).json(
       new ApiResponse("Raw Material Category created successfully", category)
@@ -55,6 +58,8 @@ class RawMaterialCategoryController {
       userId
     );
 
+    getIO().emit("rmCategory:updated", category);
+
     return res.status(200).json(
       new ApiResponse("Raw Material Category updated successfully", category)
     );
@@ -62,7 +67,10 @@ class RawMaterialCategoryController {
 
   delete = asyncHandler(async (req: Request, res: Response) => {
     const userId = req.user?.userId;
-    await rawMaterialCategoryService.delete(Number(req.params.id), userId);
+    const id = Number(req.params.id);
+    await rawMaterialCategoryService.delete(id, userId);
+
+    getIO().emit("rmCategory:deleted", { id });
 
     return res.status(200).json(
       new ApiResponse("Raw Material Category deleted successfully")
