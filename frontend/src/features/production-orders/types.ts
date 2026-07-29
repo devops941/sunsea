@@ -24,7 +24,11 @@ export interface ProductionOrder {
   batchNo?: string | null;
   lotNo?: string | null;
   machineId?: string | null;
+  machineMachineId?: string | null;
+  Machine?: any;
+  machine?: any;
   shiftId?: number | string | null;
+  shift?: any;
   sourceSalesOrderId?: string | null;
   sourceSalesOrderLineId?: string | number | null;
   sourceStoreId?: string | null;

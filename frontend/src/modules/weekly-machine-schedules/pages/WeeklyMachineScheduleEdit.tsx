@@ -152,7 +152,7 @@ const WeeklyMachineScheduleEdit: React.FC = () => {
         const machine = machines.find(m => m.machineId === machineId);
         if (!machine) return newStaged;
 
-        const shiftCapacityQty = machine.capacity ? Number(machine.capacity) : 2000;
+        const shiftCapacityQty = (machine as any).capacity ? Number((machine as any).capacity) : 2000;
         const cycleTimeSec = machine.cycleTime ? Number(machine.cycleTime) : (8 * 3600) / shiftCapacityQty;
 
         let remainingRequiredQty = plannedQuantity;
