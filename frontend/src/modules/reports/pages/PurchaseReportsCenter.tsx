@@ -118,7 +118,7 @@ const PurchaseReportsCenter: React.FC = () => {
   const handleDateRangeChange = (val: string) => {
     setDateRangePreset(val);
     if (val === "custom") return;
-    
+
     const today = new Date();
     let start = new Date();
     let end = new Date();
@@ -232,6 +232,7 @@ const PurchaseReportsCenter: React.FC = () => {
                 options={suppliers.map(s => ({ label: s.displayName, value: s.id.toString() }))}
                 defaultOptionLabel="All Suppliers"
                 hideLabel={true}
+                searchable
                 onChange={(e) => setDraftSupplierId(e.target.value)}
               />
             </div>

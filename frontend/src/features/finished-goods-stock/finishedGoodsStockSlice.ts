@@ -40,9 +40,15 @@ const finishedGoodsStockSlice = createSlice({
             })
             .addCase(
                 fetchFinishedGoodsStocks.fulfilled,
-                (state, action: PayloadAction<FinishedGoodsStock[]>) => {
+                (state, action: PayloadAction<any>) => {
                     state.loading = false;
-                    state.data = action.payload;
+                    if (action.payload && typeof action.payload === "object" && "data" in action.payload) {
+                        state.data = action.payload.data || [];
+                        state.total = action.payload.total || 0;
+                    } else {
+                        state.data = action.payload || [];
+                        state.total = Array.isArray(action.payload) ? action.payload.length : 0;
+                    }
                 }
             )
             .addCase(fetchFinishedGoodsStocks.rejected, (state, action) => {

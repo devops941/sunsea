@@ -43,6 +43,14 @@ const getISTDateString = (d: Date = new Date()) => {
   return `${year}-${month}-${day}`;
 };
 
+const formatUom = (uomStr: string | null) => {
+  if (!uomStr) return "";
+  const first = uomStr.split(",")[0].trim();
+  const l = first.toLowerCase();
+  if (l === "ea" || l === "each" || l === "piece" || l === "pcs") return "pcs";
+  return first;
+};
+
 const EodStockList: React.FC = () => {
   const [data, setData] = useState<EodStockItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -399,15 +407,11 @@ const EodStockList: React.FC = () => {
                   )
                 },
                 {
-                  header: "UOM",
-                  render: (item) => <span className="text-slate-600 text-sm font-medium">{item.uom || "-"}</span>
-                },
-                {
                   header: "START QTY",
                   align: "right",
                   render: (item) => (
                     <span className="text-slate-600 font-mono text-sm">
-                      {item.startQty.toLocaleString()}
+                      {item.startQty.toLocaleString()} {formatUom(item.uom)}
                     </span>
                   )
                 },
@@ -416,7 +420,7 @@ const EodStockList: React.FC = () => {
                   align: "right",
                   render: (item) => (
                     <span className="font-bold text-slate-900 font-mono text-sm">
-                      {item.eodQty !== null && item.eodQty !== undefined ? item.eodQty.toLocaleString() : "—"}
+                      {item.eodQty !== null && item.eodQty !== undefined ? `${item.eodQty.toLocaleString()} ${formatUom(item.uom)}` : "—"}
                     </span>
                   )
                 }

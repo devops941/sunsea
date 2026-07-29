@@ -65,40 +65,60 @@ interface SinglePhoneFieldProps {
 }
 
 const SinglePhoneField: React.FC<SinglePhoneFieldProps> = ({
-    name: _name,
+    name,
     value,
     placeholder,
-    required: _required = true,
     error,
     onChange,
     onBlur,
     onRemove,
     showRemove,
 }) => {
+    // Extract core 10 digits
+    let displayValue = (value || '').replace('+91', '').replace(/\D/g, '');
+    if (displayValue.startsWith('0')) {
+        displayValue = displayValue.substring(1);
+    }
+    displayValue = displayValue.slice(0, 10);
+
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        let val = e.target.value.replace(/\D/g, '');
+        if (val.startsWith('0')) {
+            val = val.substring(1);
+        }
+        val = val.slice(0, 10);
+        onChange(val ? `+91${val}` : '');
+    };
+
     return (
         <div className="relative">
             <div className="flex items-center gap-2">
-                <div className="relative flex-1">
-                    <PhoneInput
-                        international={false}
-                        countryCallingCodeEditable={false}
-                        defaultCountry="IN"
-                        countries={["IN"]}
-                        addInternationalOption={false}
-                        placeholder={placeholder}
-                        value={value || ''}
-                        onChange={(val) => onChange(val || '')}
+                <div className={`
+                    relative flex-1 flex items-center gap-2
+                    h-10 px-4 border rounded-[10px] bg-white
+                    transition-all duration-250
+                    ${error
+                        ? "border-red-500 focus-within:border-red-500 focus-within:ring-4 focus-within:ring-red-500/15"
+                        : "border-slate-300 hover:border-slate-400 focus-within:border-primary focus-within:ring-4 focus-within:ring-primary/15"
+                    }
+                `}>
+                    {/* Country Code with Flag */}
+                    <div className="flex items-center gap-1.5 shrink-0 select-none text-[15px] font-medium text-slate-500 border-r border-slate-200 pr-2">
+                        {/* <span className="text-base">🇮🇳</span> */}
+                        <span>+91</span>
+                    </div>
+                    
+                    {/* Native Text Input */}
+                    <input
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        name={name}
+                        placeholder={placeholder || "98765 43210"}
+                        value={displayValue}
+                        onChange={handleInputChange}
                         onBlur={onBlur}
-                        className={`
-                            w-full h-10 px-4 flex items-center
-                            border rounded-[10px] outline-none
-                            text-[15px] font-medium
-                            transition-all duration-250 bg-white
-                            ${error
-                                ? "border-red-500 focus-within:border-red-500 focus-within:ring-4 focus-within:ring-red-500/15"
-                                : "border-slate-300 hover:border-slate-400 focus-within:border-primary focus-within:ring-4 focus-within:ring-primary/15"
-                            }
-                        `}
+                        className="flex-1 h-full border-none outline-none bg-transparent text-[15px] font-medium text-slate-800 placeholder:text-slate-400 p-0"
                     />
                 </div>
 

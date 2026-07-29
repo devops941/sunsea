@@ -14,8 +14,12 @@ class ProductionWastageController {
   });
 
   findAll = asyncHandler(async (req: Request, res: Response) => {
+    const page = req.query.page ? Number(req.query.page) : undefined;
+    const limit = req.query.limit ? Number(req.query.limit) : undefined;
     const { productionOrderId, machineId, shiftId, productId, status } = req.query;
-    const records = await productionWastageService.findAll({
+    const result = await productionWastageService.findAll({
+      page,
+      limit,
       productionOrderId: productionOrderId ? String(productionOrderId) : undefined,
       machineId: machineId ? String(machineId) : undefined,
       shiftId: shiftId ? String(shiftId) : undefined,
@@ -24,7 +28,7 @@ class ProductionWastageController {
     });
 
     return res.status(200).json(
-      new ApiResponse("Production wastage logs fetched successfully", records)
+      new ApiResponse("Production wastage logs fetched successfully", result)
     );
   });
 

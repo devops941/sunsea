@@ -8,6 +8,8 @@ export const productionWastageService = {
     shiftId?: string;
     productId?: string;
     status?: string;
+    page?: number;
+    limit?: number;
   }) => {
     const response = await apiClient.get(config.productionWastage.base, { params });
     return response.data;

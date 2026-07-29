@@ -11,6 +11,7 @@ import PricingButton from "../../../components/ui/PricingButton/PricingButton";
 import SupplierViewModal from "../components/SupplierViewModal";
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import { useSuppliers } from "../../../hooks/useSuppliers";
+import { supplierService } from "../../../services/supplierService";
 import { hasPermission } from "../../../utils/permission";
 import DataTable from "../../../components/ui/table/DataTable";
 
@@ -18,7 +19,7 @@ const ITEMS_PER_PAGE = 10;
 
 const SupplierList: React.FC = () => {
     const navigate = useNavigate();
-    const { suppliers, loading, error, loadSuppliers, removeSupplier } = useSuppliers();
+    const { removeSupplier } = useSuppliers();
 
     const canEditSupplier = hasPermission("supplier.edit");
     const canDeleteSupplier = hasPermission("supplier.delete");
@@ -34,24 +35,41 @@ const SupplierList: React.FC = () => {
     const initialSearch = searchParams.get("search") || "";
 
     const [searchTerm, setSearchTerm] = useState(initialSearch);
+    const [suppliers, setSuppliers] = useState<any[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [total, setTotal] = useState(0);
 
     // Custom confirm delete state
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [supplierToDelete, setSupplierToDelete] = useState<string | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
 
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            loadSuppliers(searchTerm);
-        }, 500);
-        return () => clearTimeout(timer);
-    }, [searchTerm, loadSuppliers]);
+    const fetchSuppliersData = useCallback(async () => {
+        setLoading(true);
+        try {
+            const response = await supplierService.fetchAll({
+                page: currentPage,
+                limit: ITEMS_PER_PAGE,
+                search: searchTerm || undefined,
+            });
+            setSuppliers(response?.suppliers || []);
+            setTotal(response?.pagination?.totalPages || 0);
+        } catch (err: any) {
+            console.error(err);
+            toast.error(err?.response?.data?.message || "Failed to fetch suppliers");
+            setSuppliers([]);
+            setTotal(0);
+        } finally {
+            setLoading(false);
+        }
+    }, [currentPage, searchTerm]);
 
     useEffect(() => {
-        if (error) {
-            toast.error(error);
-        }
-    }, [error]);
+        const timer = setTimeout(() => {
+            fetchSuppliersData();
+        }, 500);
+        return () => clearTimeout(timer);
+    }, [fetchSuppliersData]);
 
     const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
         setSearchTerm(e.target.value);
@@ -84,6 +102,7 @@ const SupplierList: React.FC = () => {
             try {
                 await removeSupplier(supplierToDelete);
                 toast.success("Supplier deleted successfully!");
+                fetchSuppliersData();
             } catch (err: any) {
                 toast.error(err?.response?.data?.message || err.message || err || "Failed to delete supplier");
             } finally {
@@ -94,10 +113,7 @@ const SupplierList: React.FC = () => {
         }
     };
 
-    const filteredSuppliers = suppliers || [];
-    const totalPages = Math.ceil(filteredSuppliers.length / ITEMS_PER_PAGE);
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-    const paginatedSuppliers = filteredSuppliers.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
     return (
         <div >
@@ -133,15 +149,15 @@ const SupplierList: React.FC = () => {
                     {/* View Table */}
                     <div className="p-0">
                         <DataTable
-                            data={paginatedSuppliers}
+                            data={suppliers}
                             rowKey={(supplier) => supplier.id}
                             loading={loading}
                             emptyMessage="No suppliers found."
                             pagination={
-                                totalPages > 1
+                                total > 1
                                     ? {
                                         currentPage,
-                                        totalPages,
+                                        totalPages: total,
                                         onPageChange: setCurrentPage,
                                     }
                                     : undefined

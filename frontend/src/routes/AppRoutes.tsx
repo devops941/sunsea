@@ -6,6 +6,7 @@ import ProtectedRoute from "./ProtectedRoute";
 import PublicRoute from "./PublicRoute";
 import CommonLoader from "../components/ui/Loader/CommonLoader";
 import logo from '../../public/loaderimage.png'
+import PoInvoicePage from "../modules/purchase/purchase-order/invoice/PoInvoicePage";
 
 
 const Dashboard = lazy(() => import("../modules/dashboard/pages/DashboardPage"));
@@ -658,6 +659,7 @@ const AppRoutes = () => {
               <Route path="/expenses" element={<PurchaseTabs />} />
               <Route path="/invoice" element={<PurchaseTabs />} />
               <Route path="/invoice/details/:id" element={<GrnInvoiceViewPage />} />
+              <Route path="/po-invoice/:id" element={<PoInvoicePage />} />
             </Route>
             <Route element={<ProtectedRoute permission="reports.view" />}>
               <Route path="/invoice/create" element={<InvoiceDetail />} />

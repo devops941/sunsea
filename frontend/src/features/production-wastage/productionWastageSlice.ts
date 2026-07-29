@@ -5,6 +5,7 @@ export interface ProductionWastageState {
   data: any[];
   loading: boolean;
   error: string | null;
+  total?: number;
 }
 
 export const fetchProductionWastages = createAsyncThunk(
@@ -16,6 +17,8 @@ export const fetchProductionWastages = createAsyncThunk(
       shiftId?: string;
       productId?: string;
       status?: string;
+      page?: number;
+      limit?: number;
     } | undefined,
     { rejectWithValue }
   ) => {
@@ -106,9 +109,14 @@ const productionWastageSlice = createSlice({
       })
       .addCase(fetchProductionWastages.fulfilled, (state, action) => {
         state.loading = false;
-        state.data = Array.isArray(action.payload)
-          ? action.payload
-          : (action.payload?.data && Array.isArray(action.payload.data) ? action.payload.data : []);
+        const resData = action.payload?.data;
+        if (resData && typeof resData === "object" && "data" in resData) {
+          state.data = resData.data || [];
+          state.total = resData.total || 0;
+        } else {
+          state.data = Array.isArray(resData) ? resData : (action.payload || []);
+          state.total = Array.isArray(state.data) ? state.data.length : 0;
+        }
       })
       .addCase(fetchProductionWastages.rejected, (state, action) => {
         state.loading = false;

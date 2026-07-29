@@ -3,10 +3,17 @@ import config from "../api/config";
 import type { Supplier, CreateSupplierDto, UpdateSupplierDto } from "../features/supplier/types";
 
 export const supplierService = {
-  fetchAll: async (search?: string): Promise<Supplier[]> => {
-    const response = await apiClient.get(config.supplier.base, { params: { search } });
-    // Handle paginated structure if API returns { suppliers: [...], pagination: ... }
-    return response.data?.data?.suppliers || response.data?.data || response.data;
+  fetchAll: async (params?: string | any): Promise<any> => {
+    const queryParams = typeof params === "string" ? { search: params } : params;
+    const response = await apiClient.get(config.supplier.base, { params: queryParams });
+    const resData = response.data?.data || response.data;
+    if (resData && typeof resData === "object" && "suppliers" in resData) {
+      if (queryParams && (queryParams.page !== undefined || queryParams.limit !== undefined)) {
+        return resData;
+      }
+      return resData.suppliers;
+    }
+    return resData;
   },
 
   fetchById: async (id: string): Promise<Supplier> => {
