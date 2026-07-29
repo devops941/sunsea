@@ -14,6 +14,7 @@ import { usePurchaseOrders } from "../../../../hooks/usePurchaseOrder";
 import { hasPermission } from "../../../../utils/permission";
 import { purchaseOrderService } from "../../../../services/purchaseOrderService";
 import type { PurchaseOrder, PurchaseOrderStatus } from "../../../../features/purchaseOrder/types";
+import { useSocketSync } from "../../../../hooks/useSocketSync";
 import DataTable from "../../../../components/ui/table/DataTable";
 import SearchInput from "../../../../components/ui/SearchInput/SearchInput";
 import StatusBadge from "../../../../components/ui/StatusBadge/Badge";
@@ -95,6 +96,8 @@ const PurchaseOrderListPage: React.FC = () => {
       setLoading(false);
     }
   }, [currentPage, searchTerm, statusFilter, fromDate, toDate]);
+
+  useSocketSync("purchaseOrder", undefined, fetchPOs);
 
   useEffect(() => {
     const timer = setTimeout(() => {

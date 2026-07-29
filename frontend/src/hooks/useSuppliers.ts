@@ -6,16 +6,24 @@ import { useSocketSync } from "./useSocketSync";
 
 export const useSuppliers = () => {
   const dispatch = useAppDispatch();
-  const { suppliers, loading, error } = useAppSelector((state) => state.suppliers);
+  const { suppliers, loading, error, total, page, totalPages } = useAppSelector((state) => state.suppliers);
 
+  // We are removing useSocketSync from here to avoid conflicts, and will use it in SupplierList.tsx for refetching
+  // Wait, I will keep useSocketSync here for Redux appending, as we decided to match CustomerList exactly.
+  // Actually, CustomerList had useSocketSync here, and then I added it to CustomerListPage.
+  // To strictly match CustomerList:
   useSocketSync<Supplier>("supplier", {
     created: supplierCreated,
     updated: supplierUpdated,
     deleted: supplierDeleted,
   });
 
-  const loadSuppliers = useCallback((search?: string) => {
-    dispatch(fetchSuppliers(search));
+  const loadSuppliers = useCallback((params?: { search?: string; page?: number; limit?: number } | string) => {
+    if (typeof params === "string") {
+      dispatch(fetchSuppliers({ search: params }));
+    } else {
+      dispatch(fetchSuppliers(params ?? {}));
+    }
   }, [dispatch]);
 
   const addSupplier = useCallback(
@@ -43,6 +51,9 @@ export const useSuppliers = () => {
     suppliers,
     loading,
     error,
+    total,
+    page,
+    totalPages,
     loadSuppliers,
     addSupplier,
     editSupplier,

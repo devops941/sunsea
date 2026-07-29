@@ -15,6 +15,8 @@ import FilterPopover from "../../../components/ui/FilterPopover/FilterPopover";
 import { DocumentPrintLayout } from "../../../components/common/DocumentPrintLayout";
 import { SalesOrderEstimateContent } from "../../../components/salesOrder/SalesOrderEstimateContent";
 import { FiClipboard, FiFileText } from "react-icons/fi";
+import { useSocketSync } from "../../../hooks/useSocketSync";
+
 
 const ITEMS_PER_PAGE = 10;
 
@@ -149,6 +151,8 @@ const AllSalesOrderList: React.FC = () => {
             setLoading(false);
         }
     }, [currentPage, searchTerm, fromDate, toDate, dispatchType]);
+
+    useSocketSync("salesOrder", undefined, fetchOrders);
 
     // ─── Load Data on Mount & Dependencies ─────────────────────
     useEffect(() => {

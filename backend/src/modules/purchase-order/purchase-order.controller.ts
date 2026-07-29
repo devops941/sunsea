@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 
 import purchaseOrderService from "./purchase-order.service";
 import { prisma } from "../../config/prisma";
+import { getIO } from "../../socket/socket";
 
 import { asyncHandler } from "../../utils/asyncHandler";
 import { ApiResponse } from "../../utils/ApiResponse";
@@ -25,6 +26,8 @@ class PurchaseOrderController {
             userId,
             companyId: company.id,
         });
+
+        getIO().emit("purchaseOrder:created", po);
 
         return res.status(201).json(
             new ApiResponse("Purchase Order created successfully", po)
@@ -62,6 +65,8 @@ class PurchaseOrderController {
 
         const po = await purchaseOrderService.updatePurchaseOrder(id, req.body);
 
+        getIO().emit("purchaseOrder:updated", po);
+
         return res.status(200).json(
             new ApiResponse("Purchase Order updated successfully", po)
         );
@@ -79,6 +84,8 @@ class PurchaseOrderController {
         const id = req.params.id as string;
 
         await purchaseOrderService.deletePurchaseOrder(id);
+
+        getIO().emit("purchaseOrder:deleted", { id });
 
         return res.status(200).json(
             new ApiResponse("Purchase Order deleted successfully")

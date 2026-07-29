@@ -4,6 +4,7 @@ import { ApiResponse } from "../../utils/ApiResponse";
 import { ApiError } from "../../utils/ApiError";
 import { expenseService } from "./expense.service";
 import { prisma } from "../../config/prisma";
+import { getIO } from "../../socket/socket";
 
 class ExpenseController {
   private async getCompanyId(): Promise<string> {
@@ -35,6 +36,8 @@ class ExpenseController {
       userId,
       companyId,
     });
+
+    getIO().emit("expense:created", expense);
 
     return res.status(201).json(
       new ApiResponse("Expense created successfully", expense)
@@ -79,6 +82,8 @@ class ExpenseController {
 
     const expense = await expenseService.updateExpense(id, req.body, companyId);
 
+    getIO().emit("expense:updated", expense);
+
     return res.status(200).json(
       new ApiResponse("Expense updated successfully", expense)
     );
@@ -89,6 +94,8 @@ class ExpenseController {
     const companyId = await this.getCompanyId();
 
     await expenseService.deleteExpense(id, companyId);
+
+    getIO().emit("expense:deleted", { id });
 
     return res.status(200).json(
       new ApiResponse("Expense deleted successfully")

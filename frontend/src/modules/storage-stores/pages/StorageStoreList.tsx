@@ -23,6 +23,7 @@ import CommonModal from "../../../components/ui/Modal/CommonModal";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import TextInput from "../../../components/form/TextInput/TextInput";
 import DataTable from "../../../components/ui/table/DataTable";
+import { useSocketSync } from "../../../hooks/useSocketSync";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -76,7 +77,7 @@ const StorageStoreList: React.FC = () => {
     const dispatch = useAppDispatch();
 
     const { data, loading, error, totalPages } = useAppSelector(state => state.stores);
-    
+
     // For form dependencies
     const { data: locations } = useAppSelector(state => state.locations);
     const { employees } = useAppSelector((state: any) => state.employees || { employees: [] });
@@ -117,22 +118,28 @@ const StorageStoreList: React.FC = () => {
         loadRoles();
     }, [dispatch, loadRoles]);
 
+    const fetchStoreData = useCallback(() => {
+        dispatch(
+            fetchStores({
+                search: searchTerm,
+                storeTypeId: storeTypeFilter,
+                page: currentPage,
+                limit: ITEMS_PER_PAGE,
+                sortBy: "storeId",
+                sortOrder: "asc",
+            })
+        );
+    }, [dispatch, searchTerm, storeTypeFilter, currentPage]);
+
+    useSocketSync("store", undefined, fetchStoreData);
+
     useEffect(() => {
         const timer = setTimeout(() => {
-            dispatch(
-                fetchStores({
-                    search: searchTerm,
-                    storeTypeId: storeTypeFilter,
-                    page: currentPage,
-                    limit: ITEMS_PER_PAGE,
-                    sortBy: "storeId",
-                    sortOrder: "asc",
-                })
-            );
+            fetchStoreData();
         }, 300);
 
         return () => clearTimeout(timer);
-    }, [dispatch, searchTerm, storeTypeFilter, currentPage]);
+    }, [fetchStoreData]);
 
     const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
         setSearchTerm(e.target.value);
@@ -151,14 +158,14 @@ const StorageStoreList: React.FC = () => {
         setEditMode(false);
         setErrors({});
         setSelectedRoleId("");
-        
+
         let nextId = "";
         try {
             nextId = await storeService.fetchNextId();
         } catch (err) {
             console.error("Failed to fetch next store ID", err);
         }
-        
+
         setFormData({ ...initialFormState, storeId: nextId });
         setShowFormModal(true);
     };
@@ -407,7 +414,7 @@ const StorageStoreList: React.FC = () => {
                                 disabled={true}
                                 onChange={handleChange}
                             />
-                            
+
                             <TextInput
                                 label="Store Name"
                                 name="storeName"
@@ -417,7 +424,7 @@ const StorageStoreList: React.FC = () => {
                                 error={errors.storeName}
                                 onChange={handleChange}
                             />
-                            
+
                             <SelectInput
                                 label="Store Type"
                                 name="storeTypeId"
@@ -433,7 +440,7 @@ const StorageStoreList: React.FC = () => {
                                 error={errors.storeTypeId}
                                 onChange={handleChange}
                             />
-                            
+
                             <SelectInput
                                 label="Location"
                                 name="locationId"

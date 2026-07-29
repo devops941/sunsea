@@ -14,6 +14,7 @@ import CommonViewModal from "../../components/ui/CommonViewModal/CommonViewModal
 import ExpensesCreate from "./Expensescreate";
 import { useExpenses } from "../../hooks/useExpenses";
 import CommonModal from "../../components/ui/Modal/CommonModal";
+import { useSocketSync } from "../../hooks/useSocketSync";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -47,15 +48,21 @@ const ExpensesList: React.FC = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [expenseToDelete, setExpenseToDelete] = useState<string | null>(null);
 
+  const fetchExpenseData = useCallback(() => {
+    loadExpenses({
+      page: currentPage,
+      limit: ITEMS_PER_PAGE,
+      search: searchTerm || undefined,
+      category: filterCategory || undefined,
+      status: filterStatus || undefined,
+    });
+  }, [currentPage, searchTerm, filterCategory, filterStatus, loadExpenses]);
+
+  useSocketSync("expense", undefined, fetchExpenseData);
+
   useEffect(() => {
     const timer = setTimeout(() => {
-      loadExpenses({
-        page: currentPage,
-        limit: ITEMS_PER_PAGE,
-        search: searchTerm || undefined,
-        category: filterCategory || undefined,
-        status: filterStatus || undefined,
-      });
+      fetchExpenseData();
     }, 500);
     return () => clearTimeout(timer);
   }, [currentPage, searchTerm, filterCategory, filterStatus, loadExpenses]);

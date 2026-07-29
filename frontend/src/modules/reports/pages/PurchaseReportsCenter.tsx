@@ -8,8 +8,10 @@ import { DATE_RANGE_OPTIONS } from "../../../constants/selectOption";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import ExportCSVButton from "../../../components/ui/ExportCSVButton/ExportCSVButton";
+import ColumnToggle from "../../../components/ui/ColumnToggle/ColumnToggle";
 import type { DataTableColumn } from "../../../components/ui/table/DataTable";
 import DataTable from "../../../components/ui/table/DataTable";
+import { useSocketSync } from "../../../hooks/useSocketSync";
 
 const PurchaseReportsCenter: React.FC = () => {
   // Filters state
@@ -34,6 +36,27 @@ const PurchaseReportsCenter: React.FC = () => {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
+  const DEFAULT_COLUMNS = [
+    "#", "PO NUMBER", "PO DATE", "DELIVERY DATE", "SUPPLIER", "BILLING ADDRESS",
+    "SHIPPING ADDRESS", "ITEMS (QTY)", "TAXES", "DISCOUNT", "NET AMOUNT", "STATUS"
+  ];
+
+  const [visibleColumns, setVisibleColumns] = useState<string[]>(() => {
+    const saved = localStorage.getItem("purchaseReportVisibleColumns");
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        return DEFAULT_COLUMNS;
+      }
+    }
+    return DEFAULT_COLUMNS;
+  });
+
+  useEffect(() => {
+    localStorage.setItem("purchaseReportVisibleColumns", JSON.stringify(visibleColumns));
+  }, [visibleColumns]);
+
   useEffect(() => {
     const loadSuppliers = async () => {
       try {
@@ -46,32 +69,35 @@ const PurchaseReportsCenter: React.FC = () => {
     loadSuppliers();
   }, []);
 
+  const loadReport = React.useCallback(async () => {
+    setLoadingBackend(true);
+    try {
+      const res = await reportsService.getPurchaseOrderReport({
+        startDate,
+        endDate,
+        poNumber,
+        supplierId,
+        status,
+        page,
+        limit: 10
+      });
+      setBackendReports(res?.data?.data || []);
+      setTotalPages(res?.data?.totalPages || 1);
+    } catch (err) {
+      console.error("Failed to load backend report", err);
+      setBackendReports([]);
+      setTotalPages(1);
+    } finally {
+      setLoadingBackend(false);
+    }
+  }, [startDate, endDate, poNumber, supplierId, status, page]);
+
+  useSocketSync("purchaseOrder", undefined, loadReport);
+
   // Load report data from backend
   useEffect(() => {
-    const loadReport = async () => {
-      setLoadingBackend(true);
-      try {
-        const res = await reportsService.getPurchaseOrderReport({
-          startDate,
-          endDate,
-          poNumber,
-          supplierId,
-          status,
-          page,
-          limit: 10
-        });
-        setBackendReports(res?.data?.data || []);
-        setTotalPages(res?.data?.totalPages || 1);
-      } catch (err) {
-        console.error("Failed to load backend report", err);
-        setBackendReports([]);
-        setTotalPages(1);
-      } finally {
-        setLoadingBackend(false);
-      }
-    };
     loadReport();
-  }, [startDate, endDate, poNumber, supplierId, status, page]);
+  }, [loadReport]);
 
   const { csvData, csvColumns, csvFilename } = useMemo(() => {
     const columns = [
@@ -157,12 +183,57 @@ const PurchaseReportsCenter: React.FC = () => {
       render: (item: any) => item.poDate ? new Date(item.poDate).toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" }) : "-"
     },
     {
-      header: "SUPPLIER",
-      render: (item: any) => item.supplierName || "N/A"
+      header: "DELIVERY DATE",
+      render: (item: any) => item.expectedDeliveryDate ? new Date(item.expectedDeliveryDate).toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" }) : "-"
     },
     {
-      header: "ITEMS COUNT",
-      render: (item: any) => item.itemsCount || 0
+      header: "SUPPLIER",
+      render: (item: any) => (
+        <div>
+          <div className="font-semibold">{item.supplierName || "N/A"}</div>
+          <div className="text-[10px] text-gray-500">{item.supplierCode || "-"}</div>
+        </div>
+      )
+    },
+    {
+      header: "BILLING ADDRESS",
+      render: (item: any) => (
+        <div className="text-xs max-w-[200px]" title={item.billingAddress}>
+          {item.billingAddress || "-"}
+        </div>
+      )
+    },
+    {
+      header: "SHIPPING ADDRESS",
+      render: (item: any) => (
+        <div className="text-xs max-w-[200px]" title={item.shippingAddress}>
+          {item.shippingAddress || "-"}
+        </div>
+      )
+    },
+    {
+      header: "ITEMS (QTY)",
+      render: (item: any) => (
+        <div className="text-xs max-w-[250px]">
+          {item.items && item.items.length > 0
+            ? item.items.map((i: any, idx: number) => <div key={idx}>{i.productId} ({i.quantity} {i.uom})</div>)
+            : "-"}
+        </div>
+      )
+    },
+    {
+      header: "TAXES",
+      render: (item: any) => (
+        <div className="text-xs">
+          <div>CGST: ₹{item.totalCgst || 0}</div>
+          <div>SGST: ₹{item.totalSgst || 0}</div>
+          <div>IGST: ₹{item.totalIgst || 0}</div>
+        </div>
+      )
+    },
+    {
+      header: "DISCOUNT",
+      render: (item: any) => `₹${(item.totalDiscount ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
     },
     {
       header: "NET AMOUNT",
@@ -173,6 +244,8 @@ const PurchaseReportsCenter: React.FC = () => {
       render: (item: any) => <StatusBadge status={item.status} />
     }
   ];
+
+  const finalColumns = tableColumns.filter(c => visibleColumns.includes(c.header));
 
   return (
     <div className="w-full">
@@ -260,24 +333,33 @@ const PurchaseReportsCenter: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-slate-200">
-            <button
-              onClick={handleClearFilters}
-              className="px-4 py-2 text-sm font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-md transition-colors"
-            >
-              Clear All
-            </button>
-            <button
-              onClick={handleApplyFilters}
-              className="px-6 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-md shadow-sm transition-colors"
-            >
-              Apply Filters
-            </button>
+          <div className="flex items-center justify-between mt-6 pt-4 border-t border-slate-200">
+            <div>
+              <ColumnToggle
+                columns={tableColumns}
+                visibleColumns={visibleColumns}
+                setVisibleColumns={setVisibleColumns}
+              />
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleClearFilters}
+                className="px-4 py-2 text-sm font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-md transition-colors"
+              >
+                Clear All
+              </button>
+              <button
+                onClick={handleApplyFilters}
+                className="px-6 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-md shadow-sm transition-colors"
+              >
+                Apply Filters
+              </button>
+            </div>
           </div>
         </div>
 
         <DataTable
-          columns={tableColumns}
+          columns={finalColumns}
           data={backendReports}
           rowKey={(item: any) => item.id || item.poNumber}
           loading={loadingBackend}

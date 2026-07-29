@@ -20,6 +20,7 @@ import TextInput from "../../../components/form/TextInput/TextInput";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import CityStateSelect from "../../../components/ui/CityStateSelect/CityStateSelect";
 import DataTable from "../../../components/ui/table/DataTable";
+import { useSocketSync } from "../../../hooks/useSocketSync";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -118,20 +119,26 @@ const LocationList: React.FC = () => {
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [isSubmitting, setIsSubmitting] = useState(false);
 
+    const fetchLocationData = useCallback(() => {
+        dispatch(fetchLocations({
+            search: searchTerm,
+            locationType,
+            page: currentPage,
+            limit: ITEMS_PER_PAGE,
+            sortBy: "locationCode",
+            sortOrder: "asc",
+        }));
+    }, [dispatch, searchTerm, locationType, currentPage]);
+
+    useSocketSync("location", undefined, fetchLocationData);
+
     useEffect(() => {
         const delayDebounceFn = setTimeout(() => {
-            dispatch(fetchLocations({
-                search: searchTerm,
-                locationType,
-                page: currentPage,
-                limit: ITEMS_PER_PAGE,
-                sortBy: "locationCode",
-                sortOrder: "asc",
-            }));
+            fetchLocationData();
         }, 300);
 
         return () => clearTimeout(delayDebounceFn);
-    }, [dispatch, searchTerm, locationType, currentPage]);
+    }, [fetchLocationData]);
 
     const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
         setSearchTerm(e.target.value);
@@ -146,14 +153,14 @@ const LocationList: React.FC = () => {
     const handleOpenAdd = async () => {
         setEditMode(false);
         setErrors({});
-        
+
         let nextCode = "";
         try {
             nextCode = await locationService.fetchNextId();
         } catch (err) {
             console.error("Failed to fetch next location code:", err);
         }
-        
+
         setFormData({ ...initialFormState, locationId: nextCode, locationCode: nextCode });
         setShowFormModal(true);
     };
