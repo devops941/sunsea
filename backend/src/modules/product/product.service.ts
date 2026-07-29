@@ -17,6 +17,18 @@ function toBoolean(value: any, fallback: boolean): boolean {
   return value === "true" || value === true;
 }
 
+function cleanString(value: any, maxLength?: number): string | null {
+  if (value === undefined || value === null) return null;
+  const text = String(value).trim();
+  if (!text) return null;
+  return maxLength ? text.slice(0, maxLength) : text;
+}
+
+function cleanRequiredString(value: any, maxLength?: number): string {
+  const text = String(value ?? "").trim();
+  return maxLength ? text.slice(0, maxLength) : text;
+}
+
 function toIdArray(value: any): number[] {
   if (value === undefined || value === null) return [];
   const arr = Array.isArray(value) ? value : [value];
@@ -93,16 +105,16 @@ class ProductService {
     }
 
     const payload: Prisma.ProductUncheckedCreateInput = {
-      productCode: data.productCode,
-      productName: data.productName,
-      displayName: data.displayName || null,
-      itemCode: data.itemCode || null,
-      description: data.description || null,
-      typeCode: data.typeCode || null,
-      dimensions: data.dimensions || null,
+      productCode: cleanRequiredString(data.productCode, 20),
+      productName: cleanRequiredString(data.productName, 160),
+      displayName: cleanString(data.displayName, 80),
+      itemCode: cleanString(data.itemCode, 50),
+      description: cleanString(data.description, 255),
+      typeCode: cleanString(data.typeCode, 20),
+      dimensions: cleanString(data.dimensions, 255),
       gstTaxRateId: data.gstTaxRateId || null,
-      mouldReference: data.mouldReference || null,
-      tags: data.tags || null,
+      mouldReference: cleanString(data.mouldReference, 80),
+      tags: cleanString(data.tags, 255),
 
       categoryId: Number(data.categoryId),
       subCategoryId: Number(data.subCategoryId),
@@ -113,7 +125,7 @@ class ProductService {
       bundleQty: toNumberOrNull(data.bundleQty),
       isActive: toBoolean(data.isActive, true),
 
-      hsnCode: data.hsnCode || null,
+      hsnCode: cleanString(data.hsnCode, 20),
       gstRate: toNumberOrNull(data.gstRate),
       cess: toNumberOrNull(data.cess),
       minimumQty: data.minimumQty || "0",
@@ -177,60 +189,96 @@ class ProductService {
       }
     }
 
-    return prisma.product.create({
-      data: {
-        ...payload,
-        ...(data.openingStockQty && data.openingStockStoreId
-          ? {
-            finishedGoodsStocks: {
-              create: [
-                {
-                  storeId: String(data.openingStockStoreId),
-                  onHandQty: Number(data.openingStockQty),
-                },
-              ],
-            },
-            finishedGoodsTransactions: {
-              create: [
-                {
-                  txnDateTime: new Date(),
-                  storeId: String(data.openingStockStoreId),
-                  txnType: "OPENING_STOCK",
-                  qty: Number(data.openingStockQty),
-                  remarks: "Opening Stock during product creation",
-                },
-              ],
-            },
-          }
-          : {}),
-        ...(rawMaterialsList.length > 0 && {
-          billOfMaterials: {
-            create: rawMaterialsList.map((rm: any) => ({
-              rawMaterialId: String(rm.rawMaterialId),
-              requiredQuantity: new Prisma.Decimal(rm.requiredQuantity || 0),
-              percentage: toNumberOrNull(rm.percentage),
-            })),
-          },
-        }),
-        ...(productionStepsList.length > 0 && {
-          productionSteps: {
-            create: productionStepsList.map((ps: any) => ({
-              stepKey: ps.stepKey,
-              stepOrder: Number(ps.stepOrder),
-            })),
-          },
-        }),
-      },
+    let capacityHistoryList: any[] = [];
+    if (data.capacityHistory) {
+      try {
+        capacityHistoryList = typeof data.capacityHistory === "string"
+          ? JSON.parse(data.capacityHistory)
+          : data.capacityHistory;
+      } catch (e: any) {
+        console.error("Failed to parse capacityHistory in create:", e);
+      }
+    }
 
-      include: {
-        category: true,
-        subCategory: true,
-        uom: true,
-        images: true,
-        billOfMaterials: { include: { rawMaterial: true } },
-        productionSteps: { orderBy: { stepOrder: "asc" } },
-      },
-    });
+    try {
+      return await prisma.product.create({
+        data: {
+          ...payload,
+          ...(data.openingStockQty && data.openingStockStoreId
+            ? {
+              finishedGoodsStocks: {
+                create: [
+                  {
+                    storeId: cleanRequiredString(data.openingStockStoreId, 20),
+                    onHandQty: Number(data.openingStockQty),
+                  },
+                ],
+              },
+              finishedGoodsTransactions: {
+                create: [
+                  {
+                    txnDateTime: new Date(),
+                    storeId: cleanRequiredString(data.openingStockStoreId, 20),
+                    txnType: "OPENING_STOCK",
+                    qty: Number(data.openingStockQty),
+                    remarks: "Opening Stock during product creation",
+                  },
+                ],
+              },
+            }
+            : {}),
+          ...(rawMaterialsList.length > 0 && {
+            billOfMaterials: {
+              create: rawMaterialsList.map((rm: any) => ({
+                rawMaterialId: cleanRequiredString(rm.rawMaterialId, 20),
+                requiredQuantity: new Prisma.Decimal(rm.requiredQuantity || 0),
+                percentage: toNumberOrNull(rm.percentage),
+              })),
+            },
+          }),
+          ...(productionStepsList.length > 0 && {
+            productionSteps: {
+              create: productionStepsList.map((ps: any) => ({
+                stepKey: String(ps.stepKey || "").slice(0, 255),
+                stepOrder: Number(ps.stepOrder),
+              })),
+            },
+          }),
+          ...(capacityHistoryList.length > 0 && {
+            capacityHistories: {
+              create: capacityHistoryList.map((entry: any) => ({
+                newCapacity: Number(entry.newCapacity),
+                previousCapacity: Number(entry.previousCapacity ?? 0),
+                productionDate: new Date(entry.recordedAt ?? new Date()),
+                machineId: cleanRequiredString(entry.machineId || "INITIAL", 20),
+                shiftId: cleanRequiredString(entry.shiftId || "INITIAL", 20),
+                productionOrderId: cleanRequiredString("INITIAL", 20),
+                targetQty: Number(entry.newCapacity),
+                actualQty: Number(entry.newCapacity),
+                achievementPct: 100,
+                operators: cleanString(entry.operatorName, 255),
+              })),
+            },
+          }),
+        },
+
+        include: {
+          category: true,
+          subCategory: true,
+          uom: true,
+          images: true,
+          billOfMaterials: { include: { rawMaterial: true } },
+          productionSteps: { orderBy: { stepOrder: "asc" } },
+        },
+      });
+    } catch (err: any) {
+      console.error("Product create failed. Payload keys:", Object.keys(payload));
+      console.error("Prisma error:", err.message);
+      if (err.message?.includes("too long")) {
+        throw new ApiError(400, "One of the field values is too long. Please shorten your input and try again.");
+      }
+      throw err;
+    }
   }
 
   async findAll(search?: string) {
@@ -466,15 +514,15 @@ class ProductService {
     });
 
     const payload: Prisma.ProductUncheckedUpdateInput = {
-      productCode: data.productCode ?? undefined,
-      productName: data.productName ?? undefined,
-      displayName: data.displayName !== undefined ? data.displayName || null : undefined,
-      itemCode: data.itemCode !== undefined ? data.itemCode || null : undefined,
-      description: data.description !== undefined ? data.description || null : undefined,
-      typeCode: data.typeCode !== undefined ? data.typeCode || null : undefined,
-      dimensions: data.dimensions !== undefined ? data.dimensions || null : undefined,
-      mouldReference: data.mouldReference !== undefined ? data.mouldReference || null : undefined,
-      tags: data.tags !== undefined ? data.tags || null : undefined,
+      productCode: data.productCode !== undefined ? cleanRequiredString(data.productCode, 20) : undefined,
+      productName: data.productName !== undefined ? cleanRequiredString(data.productName, 160) : undefined,
+      displayName: data.displayName !== undefined ? cleanString(data.displayName, 80) : undefined,
+      itemCode: data.itemCode !== undefined ? cleanString(data.itemCode, 50) : undefined,
+      description: data.description !== undefined ? cleanString(data.description, 255) : undefined,
+      typeCode: data.typeCode !== undefined ? cleanString(data.typeCode, 20) : undefined,
+      dimensions: data.dimensions !== undefined ? cleanString(data.dimensions, 255) : undefined,
+      mouldReference: data.mouldReference !== undefined ? cleanString(data.mouldReference, 80) : undefined,
+      tags: data.tags !== undefined ? cleanString(data.tags, 255) : undefined,
 
       categoryId: data.categoryId ? Number(data.categoryId) : undefined,
       subCategoryId: undefined,
@@ -487,7 +535,7 @@ class ProductService {
       maximumQty: data.maximumQty !== undefined ? data.maximumQty : undefined,
       isActive: data.isActive !== undefined ? toBoolean(data.isActive, true) : undefined,
 
-      hsnCode: data.hsnCode !== undefined ? data.hsnCode || null : undefined,
+      hsnCode: data.hsnCode !== undefined ? cleanString(data.hsnCode, 20) : undefined,
       gstTaxRateId: data.gstTaxRateId !== undefined ? data.gstTaxRateId || null : undefined,
       mrp: data.mrp !== undefined ? toNumberOrNull(data.mrp) : undefined,
       b2b: data.b2b !== undefined ? toNumberOrNull(data.b2b) : undefined,
@@ -550,11 +598,10 @@ class ProductService {
 
   async delete(id: bigint) {
     await this.findById(id);
-    const [salesCount, prodOrderCount, dispatchCount, quotationCount, realTxnCount] = await Promise.all([
+    const [salesCount, prodOrderCount, dispatchCount, realTxnCount] = await Promise.all([
       prisma.salesOrderItem.count({ where: { productId: id } }),
       prisma.productionOrder.count({ where: { productItemId: id } }),
       prisma.goodsDispatchItem.count({ where: { productItemId: id } }),
-      prisma.quotationItem.count({ where: { productId: id } }),
       prisma.finishedGoodsTransaction.count({
         where: {
           productItemId: id,
@@ -563,8 +610,8 @@ class ProductService {
       }),
     ]);
 
-    if (salesCount > 0 || prodOrderCount > 0 || dispatchCount > 0 || quotationCount > 0 || realTxnCount > 0) {
-      throw new ApiError(400, "Cannot delete product as it is referenced in sales orders, production orders, quotations, dispatch, or stock transactions.");
+    if (salesCount > 0 || prodOrderCount > 0 || dispatchCount > 0 || realTxnCount > 0) {
+      throw new ApiError(400, "Cannot delete product as it is referenced in sales orders, production orders, dispatch, or stock transactions.");
     }
 
     return executeDeleteWithValidation(

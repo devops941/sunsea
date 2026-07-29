@@ -49,7 +49,6 @@ const MachineViewModal: React.FC<MachineViewModalProps> = ({ show, onHide, machi
             fields: [
                 { label: "Type", value: machine.machineType || "N/A" },
                 { label: "Technology", value: machine.technologyType || "N/A" },
-                { label: "Capacity", value: machine.capacity ? `${machine.capacity}` : "N/A" },
                 { label: "Manufacturer", value: machine.manufacturer || "N/A" }
             ]
         },

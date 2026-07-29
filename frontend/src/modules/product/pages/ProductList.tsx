@@ -1,17 +1,27 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { FaSearch, FaPlus } from "react-icons/fa";
+import { FaSearch, FaPlus, FaCog } from "react-icons/fa";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 
 import ViewButton from "../../../components/ui/viewbutton/ViewButton";
 import EditButton from "../../../components/ui/EditButton/EditButton";
 import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
-import CommonViewModal from "../../../components/ui/CommonViewModal/CommonViewModal";
+import IconButton from "../../../components/ui/IconButton/IconButton";
 import CustomButton from "../../../components/ui/Button/Button";
+import CommonViewModal from "../../../components/ui/CommonViewModal/CommonViewModal";
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import DataTable, { type DataTableColumn } from "../../../components/ui/table/DataTable";
+import DatePickerCalendar from "../../../components/ui/DatePickerCalendar/DatePickerCalendar";
+import MultiSelect from "../../../components/form/multiSelect/MultiSelect";
+import SelectInput from "../../../components/form/SelectInput/SelectInput";
+import TextInput from "../../../components/form/TextInput/TextInput";
 import { useProducts } from "../../../hooks/useProducts";
+import { productCapacityHistoryService } from "../../../services/productCapacityHistoryService";
+import { employeeService } from "../../../services/employeeService";
+import { departmentService } from "../../../services/departmentService";
+import { shiftService } from "../../../services/shiftService";
+import { machineService } from "../../../services/machineService";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -21,6 +31,8 @@ const ProductList: React.FC = () => {
 
     const [showViewModal, setShowViewModal] = useState(false);
     const [selectedProduct, setSelectedProduct] = useState<any>(null);
+    const [capacityRecords, setCapacityRecords] = useState<any[]>([]);
+    const [loadingCapacity, setLoadingCapacity] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
     const location = useLocation();
     const searchParams = new URLSearchParams(location.search);
@@ -32,6 +44,43 @@ const ProductList: React.FC = () => {
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [productToDelete, setProductToDelete] = useState<string | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
+
+    // Capacity change modal
+    const [showCapModal, setShowCapModal] = useState(false);
+    const [capProduct, setCapProduct] = useState<any>(null);
+    const [capDate, setCapDate] = useState(new Date().toISOString().split("T")[0]);
+    const [capShift, setCapShift] = useState("");
+    const [capDeptId, setCapDeptId] = useState("");
+    const [capOps, setCapOps] = useState<string[]>([]);
+    const [capMachine, setCapMachine] = useState("");
+    const [capQty, setCapQty] = useState("");
+    const [savingCap, setSavingCap] = useState(false);
+    const [capErrors, setCapErrors] = useState<Record<string, string>>({});
+    const [employees, setEmployees] = useState<any[]>([]);
+    const [departments, setDepartments] = useState<any[]>([]);
+    const [shifts, setShifts] = useState<any[]>([]);
+    const [machines, setMachines] = useState<any[]>([]);
+
+    useEffect(() => {
+        employeeService.fetchAll({ limit: 500 }).then((res: any) => {
+            const data = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : Array.isArray(res?.employees) ? res.employees : [];
+            setEmployees(data);
+        }).catch(() => { });
+        departmentService.fetchAll().then((res: any) => {
+            const depts = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
+            setDepartments(depts);
+        }).catch(() => { });
+        shiftService.fetchAll().then((res: any) => {
+            const data = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
+            setShifts(data);
+        }).catch(() => { });
+        machineService.getAll().then((res: any) => {
+            const data = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
+            setMachines(data);
+        }).catch((err: any) => {
+            console.error("Failed to fetch machines:", err);
+        });
+    }, []);
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -51,9 +100,19 @@ const ProductList: React.FC = () => {
         setCurrentPage(1);
     };
 
-    const handleView = useCallback((product: any) => {
+    const handleView = useCallback(async (product: any) => {
         setSelectedProduct(product);
         setShowViewModal(true);
+        setLoadingCapacity(true);
+        try {
+            const records = await productCapacityHistoryService.fetchByProduct(Number(product.id));
+            setCapacityRecords(records);
+        } catch (err) {
+            console.error("Failed to load capacity history:", err);
+            setCapacityRecords([]);
+        } finally {
+            setLoadingCapacity(false);
+        }
     }, []);
 
     const handleEdit = useCallback((product: any) => {
@@ -61,6 +120,47 @@ const ProductList: React.FC = () => {
             state: product,
         });
     }, [navigate]);
+
+    const openCapModal = (product: any) => {
+        setCapProduct(product);
+        setCapDate(new Date().toISOString().split("T")[0]);
+        setCapShift("");
+        setCapDeptId("");
+        setCapOps([]);
+        setCapMachine("");
+        setCapQty(product.capacityLitres ? String(product.capacityLitres) : "");
+        setCapErrors({});
+        setShowCapModal(true);
+    };
+
+    const handleCapSave = async () => {
+        const errs: Record<string, string> = {};
+        if (!capDate) errs.capDate = "Date is required";
+        if (!capShift) errs.capShift = "Shift is required";
+        if (!capDeptId) errs.capDeptId = "Role is required";
+        if (!capOps.length) errs.capOps = "Select at least one operator";
+        if (!capQty || Number(capQty) <= 0) errs.capQty = "Valid quantity required";
+        setCapErrors(errs);
+        if (Object.keys(errs).length > 0) return;
+        setSavingCap(true);
+        try {
+            await productCapacityHistoryService.manualChange({
+                productId: Number(capProduct.id),
+                date: capDate,
+                shift: capShift,
+                machine: capMachine,
+                operators: capOps.map(id => employees.find(e => String(e.id) === id)?.fullName || id).join(", "),
+                newCapacity: Number(capQty),
+            });
+            toast.success("Capacity updated successfully!");
+            setShowCapModal(false);
+            loadProducts(searchTerm);
+        } catch (err: any) {
+            toast.error(err.message || "Failed to update capacity");
+        } finally {
+            setSavingCap(false);
+        }
+    };
 
     const triggerDelete = useCallback((id: string) => {
         setProductToDelete(id);
@@ -119,17 +219,23 @@ const ProductList: React.FC = () => {
                 );
             }
         },
+        {
+            header: "Capacity",
+            render: (product) => product.capacityLitres != null ? `${Number(product.capacityLitres).toLocaleString()} / Shift` : "-",
+            align: "center"
+        },
         { header: "Status", render: (product) => <StatusBadge status={product.isActive ? "ACTIVE" : "INACTIVE"} />, align: "center" },
         {
             header: "Actions",
             render: (product) => (
-                <div className="flex items-center gap-2 justify-end">
+                <div className="table-action-group w-full justify-end">
                     <ViewButton onClick={() => handleView(product)} />
                     <EditButton onClick={() => handleEdit(product)} />
+                    <IconButton icon={FaCog} variant="primary" title="Capacity Settings" onClick={() => openCapModal(product)} />
                     <DeleteButton onClick={() => triggerDelete(product.id)} />
                 </div>
             ),
-            align: "left"
+            align: "right"
         }
     ];
 
@@ -203,63 +309,116 @@ const ProductList: React.FC = () => {
                         }
                     ] : []}
                     customContent={
-                        selectedProduct?.billOfMaterials && selectedProduct.billOfMaterials.length > 0 ? (
-                            <div className="mt-6 flex flex-col gap-6">
-                                {/* BOM Section */}
-                                {selectedProduct.billOfMaterials.some((rm: any) => Number(rm.percentage) > 0) && (
-                                    <div>
-                                        <h6 className="text-sm font-semibold text-slate-800 mb-2">Raw Materials Composition (BOM)</h6>
-                                        <div className="border border-slate-200 rounded-lg overflow-hidden">
-                                            <table className="w-full text-left text-sm whitespace-nowrap">
-                                                <thead className="bg-slate-50 text-slate-600">
-                                                    <tr>
-                                                        <th className="px-4 py-2 font-semibold border-b border-slate-200">Raw Material</th>
-                                                        <th className="px-4 py-2 font-semibold border-b border-slate-200 text-right">Percentage (%)</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody className="divide-y divide-slate-100 bg-white">
-                                                    {selectedProduct.billOfMaterials
-                                                        .filter((rm: any) => Number(rm.percentage) > 0)
-                                                        .map((rm: any, idx: number) => (
-                                                            <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
-                                                                <td className="px-4 py-2">{rm.rawMaterial?.materialName || rm.rawMaterialId}</td>
-                                                                <td className="px-4 py-2 text-right">{rm.percentage} %</td>
-                                                            </tr>
-                                                        ))}
-                                                </tbody>
-                                            </table>
+                        <div className="mt-6 flex flex-col gap-6">
+                            {selectedProduct?.billOfMaterials && selectedProduct.billOfMaterials.length > 0 && (
+                                <>
+                                    {/* BOM Section */}
+                                    {selectedProduct.billOfMaterials.some((rm: any) => Number(rm.percentage) > 0) && (
+                                        <div>
+                                            <h6 className="text-sm font-semibold text-slate-800 mb-2">Raw Materials Composition (BOM)</h6>
+                                            <div className="border border-slate-200 rounded-lg overflow-hidden">
+                                                <table className="w-full text-left text-sm whitespace-nowrap">
+                                                    <thead className="bg-slate-50 text-slate-600">
+                                                        <tr>
+                                                            <th className="px-4 py-2 font-semibold border-b border-slate-200">Raw Material</th>
+                                                            <th className="px-4 py-2 font-semibold border-b border-slate-200 text-right">Percentage (%)</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-slate-100 bg-white">
+                                                        {selectedProduct.billOfMaterials
+                                                            .filter((rm: any) => Number(rm.percentage) > 0)
+                                                            .map((rm: any, idx: number) => (
+                                                                <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
+                                                                    <td className="px-4 py-2">{rm.rawMaterial?.materialName || rm.rawMaterialId}</td>
+                                                                    <td className="px-4 py-2 text-right">{rm.percentage} %</td>
+                                                                </tr>
+                                                            ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
                                         </div>
-                                    </div>
-                                )}
+                                    )}
 
-                                {/* Accessories Section */}
-                                {selectedProduct.billOfMaterials.some((rm: any) => Number(rm.requiredQuantity) > 0) && (
-                                    <div>
-                                        <h6 className="text-sm font-semibold text-slate-800 mb-2">Accessories / Additional Items</h6>
-                                        <div className="border border-slate-200 rounded-lg overflow-hidden">
-                                            <table className="w-full text-left text-sm whitespace-nowrap">
-                                                <thead className="bg-slate-50 text-slate-600">
-                                                    <tr>
-                                                        <th className="px-4 py-2 font-semibold border-b border-slate-200">Item</th>
-                                                        <th className="px-4 py-2 font-semibold border-b border-slate-200 text-right">Quantity</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody className="divide-y divide-slate-100 bg-white">
-                                                    {selectedProduct.billOfMaterials
-                                                        .filter((rm: any) => Number(rm.requiredQuantity) > 0)
-                                                        .map((rm: any, idx: number) => (
-                                                            <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
-                                                                <td className="px-4 py-2">{rm.rawMaterial?.materialName || rm.rawMaterialId}</td>
-                                                                <td className="px-4 py-2 text-right">{rm.requiredQuantity}</td>
-                                                            </tr>
-                                                        ))}
-                                                </tbody>
-                                            </table>
+                                    {/* Accessories Section */}
+                                    {selectedProduct.billOfMaterials.some((rm: any) => Number(rm.requiredQuantity) > 0) && (
+                                        <div>
+                                            <h6 className="text-sm font-semibold text-slate-800 mb-2">Accessories / Additional Items</h6>
+                                            <div className="border border-slate-200 rounded-lg overflow-hidden">
+                                                <table className="w-full text-left text-sm whitespace-nowrap">
+                                                    <thead className="bg-slate-50 text-slate-600">
+                                                        <tr>
+                                                            <th className="px-4 py-2 font-semibold border-b border-slate-200">Item</th>
+                                                            <th className="px-4 py-2 font-semibold border-b border-slate-200 text-right">Quantity</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-slate-100 bg-white">
+                                                        {selectedProduct.billOfMaterials
+                                                            .filter((rm: any) => Number(rm.requiredQuantity) > 0)
+                                                            .map((rm: any, idx: number) => (
+                                                                <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
+                                                                    <td className="px-4 py-2">{rm.rawMaterial?.materialName || rm.rawMaterialId}</td>
+                                                                    <td className="px-4 py-2 text-right">{rm.requiredQuantity}</td>
+                                                                </tr>
+                                                            ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
                                         </div>
+                                    )}
+                                </>
+                            )}
+
+                            {/* Capacity History Section */}
+                            <div>
+                                <h6 className="text-sm font-semibold text-slate-800 mb-2">
+                                    Capacity History
+                                    {selectedProduct?.capacityLitres != null && (
+                                        <span className="text-xs font-normal text-slate-500 ms-2">
+                                            (Current: {Number(selectedProduct.capacityLitres).toLocaleString()} / Shift)
+                                        </span>
+                                    )}
+                                </h6>
+                                {loadingCapacity ? (
+                                    <div className="text-center py-3 text-sm text-slate-500">Loading...</div>
+                                ) : capacityRecords.filter(r => r.machineId !== "INITIAL").length > 0 ? (
+                                    <div className="border border-slate-200 rounded-lg overflow-hidden">
+                                        <table className="w-full text-left text-sm whitespace-nowrap">
+                                            <thead className="bg-slate-50 text-slate-600">
+                                                <tr>
+                                                    <th className="px-4 py-2 font-semibold border-b border-slate-200">Type</th>
+                                                    <th className="px-4 py-2 font-semibold border-b border-slate-200">Date</th>
+                                                    <th className="px-4 py-2 font-semibold border-b border-slate-200">Shift</th>
+                                                    <th className="px-4 py-2 font-semibold border-b border-slate-200">Machine</th>
+                                                    <th className="px-4 py-2 font-semibold border-b border-slate-200">Operators</th>
+                                                    <th className="px-4 py-2 font-semibold border-b border-slate-200 text-right">Capacity</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-100 bg-white">
+                                                {capacityRecords.filter(r => r.machineId !== "INITIAL").map((r: any, idx: number) => {
+                                                    const isCurrent = idx === 0;
+                                                    return (
+                                                        <tr key={r.id || idx} className={`hover:bg-slate-50/50 transition-colors ${isCurrent ? "bg-blue-50/40" : ""}`}>
+                                                            <td className="px-4 py-2">
+                                                                <span className={`inline-flex items-center gap-1 text-xs font-bold uppercase tracking-wider ${isCurrent ? "text-blue-600" : "text-slate-500"}`}>
+                                                                    {isCurrent ? "Current" : "Previous"}
+                                                                </span>
+                                                            </td>
+                                                            <td className="px-4 py-2">{new Date(r.productionDate).toLocaleDateString()}</td>
+                                                            <td className="px-4 py-2">{r.shiftId || "-"}</td>
+                                                            <td className="px-4 py-2">{r.machineId || "-"}</td>
+                                                            <td className="px-4 py-2">{r.operators || "-"}</td>
+                                                            <td className="px-4 py-2 text-right font-semibold">{Number(r.newCapacity).toLocaleString()}</td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
                                     </div>
+                                ) : (
+                                    <div className="text-center py-3 text-sm text-slate-400">No capacity history available.</div>
                                 )}
                             </div>
-                        ) : null
+                        </div>
                     }
                 />
 
@@ -275,6 +434,87 @@ const ProductList: React.FC = () => {
                     isDangerous={true}
                     isLoading={isDeleting}
                 />
+
+                {/* Manual Capacity Change Modal */}
+                {showCapModal && capProduct && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40">
+                        <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+                            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+                                <h3 className="text-lg font-bold text-slate-800">Change Capacity</h3>
+                                <button onClick={() => setShowCapModal(false)} className="text-slate-400 hover:text-slate-600 text-xl leading-none">&times;</button>
+                            </div>
+                            <div className="p-6 space-y-4">
+                                <div className="flex items-center gap-3 mb-2">
+                                    <span className="text-sm font-semibold text-slate-700">Product:</span>
+                                    <span className="text-sm text-slate-600">{capProduct.productName}</span>
+                                    <span className="text-xs text-slate-400">(Current: {capProduct.capacityLitres != null ? Number(capProduct.capacityLitres).toLocaleString() : 0} / Shift)</span>
+                                </div>
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                    <div>
+                                        <DatePickerCalendar label="Date" name="capDate" value={capDate} onChange={(e) => { setCapDate(e.target.value); setCapErrors(prev => ({ ...prev, capDate: "" })); }} error={capErrors.capDate} />
+                                    </div>
+                                    <div>
+                                        <SelectInput
+                                            label="Shift"
+                                            name="capShift"
+                                            value={capShift}
+                                            options={[{ value: "", label: "-- Shift --" }, ...shifts.map(s => ({ value: s.shiftName || s.shiftCode, label: s.shiftName || s.shiftCode }))]}
+                                            onChange={(e) => { setCapShift(e.target.value); setCapErrors(prev => ({ ...prev, capShift: "" })); }}
+                                            error={capErrors.capShift}
+                                            required
+                                        />
+                                    </div>
+                                    <div>
+                                        <SelectInput
+                                            label="Machine"
+                                            name="capMachine"
+                                            value={capMachine}
+                                            options={[
+                                                { value: "", label: "-- Machine --" },
+                                                ...machines.map(m => ({ value: m.machineId, label: `${m.machineId} - ${m.machineName}` }))
+                                            ]}
+                                            onChange={(e) => setCapMachine(e.target.value)}
+                                            required
+                                        />
+                                    </div>
+                                    <div>
+                                        <SelectInput
+                                            label="Role"
+                                            name="capDeptId"
+                                            value={capDeptId}
+                                            options={[{ value: "", label: "-- Role --" }, ...departments.map(d => ({ value: String(d.id), label: d.name }))]}
+                                            onChange={(e) => { setCapDeptId(e.target.value); setCapOps([]); setCapErrors(prev => ({ ...prev, capDeptId: "", capOps: "" })); }}
+                                            error={capErrors.capDeptId}
+                                            required
+
+                                        />
+                                    </div>
+                                    <div className="col-span-2">
+                                        <MultiSelect label="Operators" name="capOps" options={employees.filter(emp => !capDeptId || String(emp.departmentId) === capDeptId).map(emp => ({ value: String(emp.id), label: emp.fullName }))} value={capOps} onChange={(_, vals) => { setCapOps(vals); setCapErrors(prev => ({ ...prev, capOps: "" })); }} placeholder={capDeptId ? "Select operators" : "Select role first"} error={capErrors.capOps} />
+                                    </div>
+                                    <div>
+                                        <TextInput
+                                            label="New Capacity / Shift"
+                                            name="capQty"
+                                            type="number"
+                                            step="any"
+                                            value={capQty}
+                                            placeholder="0"
+                                            onChange={(e) => { setCapQty(e.target.value); setCapErrors(prev => ({ ...prev, capQty: "" })); }}
+                                            error={capErrors.capQty}
+                                            required
+
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-200">
+                                <CustomButton text="Cancel" variant="secondary" onClick={() => setShowCapModal(false)} />
+                                <CustomButton text={savingCap ? "Saving..." : "Save"} onClick={handleCapSave} disabled={savingCap} />
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );

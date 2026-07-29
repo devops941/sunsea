@@ -76,16 +76,18 @@ const StockList: React.FC<StockListProps> = ({ storeId: propStoreId }) => {
         const num = Number(qty) || 0;
         let primaryUom = uom ? uom.split(',')[0] : "";
         if (primaryUom.toLowerCase() === "ea") primaryUom = "PCS";
-        return `${num} ${primaryUom}`;
+        const displayNum = Number(num.toFixed(3)).toString();
+        return `${displayNum} ${primaryUom}`;
     };
 
     const formatDisplayQty = (qty: any, uom: string, prefix = "") => {
         const num = Number(qty) || 0;
         let primaryUom = uom ? uom.split(',')[0] : "";
         if (primaryUom.toLowerCase() === "ea") primaryUom = "PCS";
+        const displayNum = Number(num.toFixed(3)).toString();
         return (
             <>
-                {prefix}{num} {primaryUom}
+                {prefix}{displayNum} {primaryUom}
             </>
         );
     };

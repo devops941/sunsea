@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { FaChevronDown } from "react-icons/fa";
 
 interface Option {
@@ -41,12 +42,32 @@ const SelectInput: React.FC<SelectInputProps> = ({
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const portalRef = useRef<HTMLDivElement>(null);
+
+  // Calculate dropdown position for portal rendering
+  const updateDropdownPosition = useCallback(() => {
+    if (triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect();
+      setDropdownStyle({
+        position: "fixed",
+        top: `${rect.bottom + 4}px`,
+        left: `${rect.left}px`,
+        width: `${rect.width}px`,
+        zIndex: 100000,
+      });
+    }
+  }, []);
 
   // Handle click outside to close
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      const isOutsideWrapper = wrapperRef.current && !wrapperRef.current.contains(target);
+      const isOutsidePortal = portalRef.current && !portalRef.current.contains(target);
+      if (isOutsideWrapper && isOutsidePortal) {
         setIsOpen(false);
       }
     };
@@ -57,6 +78,18 @@ const SelectInput: React.FC<SelectInputProps> = ({
     }
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isOpen]);
+
+  // Reposition on scroll/resize while open
+  useEffect(() => {
+    if (!isOpen) return;
+    updateDropdownPosition();
+    window.addEventListener("scroll", updateDropdownPosition, true);
+    window.addEventListener("resize", updateDropdownPosition);
+    return () => {
+      window.removeEventListener("scroll", updateDropdownPosition, true);
+      window.removeEventListener("resize", updateDropdownPosition);
+    };
+  }, [isOpen, updateDropdownPosition]);
 
   const handleSelect = (optionValue: string, optionDisabled?: boolean) => {
     if (optionDisabled) return;
@@ -80,7 +113,7 @@ const SelectInput: React.FC<SelectInputProps> = ({
     : options;
 
   return (
-    <div className={`${noMargin ? "" : "mb-0.5 "}group flex flex-col w-full`} ref={dropdownRef}>
+    <div className={`${noMargin ? "" : "mb-0.5 "}group flex flex-col w-full`} ref={wrapperRef}>
       {!hideLabel && (
         <label className={`
           flex items-center gap-1.5 mb-2
@@ -116,8 +149,14 @@ const SelectInput: React.FC<SelectInputProps> = ({
 
         <button
           type="button"
+          ref={triggerRef}
           disabled={disabled}
-          onClick={() => !disabled && setIsOpen(!isOpen)}
+          onClick={() => {
+            if (!disabled) {
+              if (!isOpen) updateDropdownPosition();
+              setIsOpen(!isOpen);
+            }
+          }}
           className={`
             w-full h-10 pl-4 pr-10
             border rounded-md outline-none
@@ -138,9 +177,9 @@ const SelectInput: React.FC<SelectInputProps> = ({
           </span>
         </button>
 
-        {/* Custom Dropdown Menu */}
-        {isOpen && (
-          <div className="absolute z-50 w-full mt-1 bg-white border border-gray-100 rounded-lg shadow-lg max-h-60 flex flex-col py-1 animate-in fade-in zoom-in-95 duration-100">
+        {/* Custom Dropdown Menu (portal to avoid overflow clipping) */}
+        {isOpen && createPortal(
+          <div ref={portalRef} className="bg-white border border-gray-100 rounded-lg shadow-lg max-h-60 flex flex-col py-1 animate-in fade-in zoom-in-95 duration-100" style={dropdownStyle}>
             {searchable && (
               <div className="p-2 border-b border-gray-100 sticky top-0 bg-white z-10 shrink-0">
                 <input
@@ -192,7 +231,8 @@ const SelectInput: React.FC<SelectInputProps> = ({
                 ))
               )}
             </div>
-          </div>
+          </div>,
+          document.body
         )}
       </div>
 

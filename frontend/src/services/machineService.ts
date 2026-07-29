@@ -4,7 +4,7 @@ import config from "../api/config";
 export const machineService = {
   getAll: async () => {
     const response = await apiClient.get(config.machine.base);
-    return response.data;
+    return response.data?.data || response.data;
   },
 
   getById: async (id: string) => {

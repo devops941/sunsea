@@ -19,7 +19,6 @@ class MachineService {
         machineName: data.machineName,
         technologyType: data.technologyType as any,
         machineType: data.machineType as any,
-        capacity: data.capacity,
         manufacturer: data.manufacturer,
         modelNumber: data.modelNumber,
         cycleTime: data.cycleTime,

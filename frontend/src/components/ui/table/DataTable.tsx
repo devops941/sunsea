@@ -42,6 +42,8 @@ interface DataTableProps<T> {
   getRowStyle?: (row: T, index: number) => React.CSSProperties;
   /** Optional override for the default min-height classes */
   minHeightClassName?: string;
+  /** Reduce cell/header padding for dense tables */
+  density?: "default" | "compact";
 }
 
 const alignClass: Record<NonNullable<DataTableColumn<any>["align"]>, string> = {
@@ -68,7 +70,12 @@ function DataTable<T>({
   rowClassName,
   getRowStyle,
   minHeightClassName = TABLE_MIN_HEIGHT_CLASS,
+  density = "default",
 }: DataTableProps<T>) {
+  const cellPaddingClass = density === "compact"
+    ? "px-2 py-2 sm:px-3 sm:py-3"
+    : "px-3 py-3 sm:px-4 sm:py-3.5";
+
   // By using `minmax(max-content, 1fr)`:
   // 1. `max-content` ensures the column is always wide enough for its content without squishing/wrapping text.
   // 2. `1fr` ensures any leftover table space is distributed equally, so the table stretches to fill 100% width.
@@ -116,7 +123,7 @@ function DataTable<T>({
                 <div
                   key={i}
                   role="columnheader"
-                  className={`flex items-center px-3 py-3 sm:px-4 sm:py-3.5 font-semibold text-[11px] sm:text-xs tracking-wide uppercase text-[#2A3547] whitespace-nowrap ${alignClass[col.align ?? "left"]}`}
+                  className={`flex items-center ${cellPaddingClass} font-semibold text-[11px] sm:text-xs tracking-wide uppercase text-[#2A3547] whitespace-nowrap ${alignClass[col.align ?? "left"]}`}
                 >
                   {col.header}
                 </div>
@@ -147,7 +154,7 @@ function DataTable<T>({
                         <div
                           key={ci}
                           role="cell"
-                          className={`flex items-center px-3 py-3 sm:px-4 sm:py-3.5 text-gray-700 min-w-0 ${alignClass[col.align ?? "left"]}`}
+                          className={`flex items-center ${cellPaddingClass} text-gray-700 min-w-0 ${alignClass[col.align ?? "left"]}`}
                         >
                           {col.render
                             ? col.render(row, index)

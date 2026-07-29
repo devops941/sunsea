@@ -472,6 +472,7 @@ model Shift {
   machineAssignments   MachineOperationAssignment[]
   productionWastages   ProductionWastage[]
   WeeklyMachineProgram WeeklyMachineProgram[]
+  shiftRecords              ProductShiftRecord[]
 
   @@map("shifts")
 }
@@ -566,6 +567,8 @@ model Product {
   salesOrderItems           SalesOrderItem[]           @relation("SalesOrderItemProduct")
   StockAdjustmentItem       StockAdjustmentItem[]
   weeklyPrograms            WeeklyMachineProgram[]     @relation("ProductWeeklyPrograms")
+  shiftRecords              ProductShiftRecord[]
+  capacityHistories         ProductCapacityHistory[]
 
   @@index([categoryId])
   @@index([subCategoryId])
@@ -625,7 +628,6 @@ model Machine {
   machineName           String                       @map("machine_name") @db.VarChar(100)
   technologyType        TechnologyType?
   machineType           MachineType?
-  capacity              Decimal?                     @db.Decimal(10, 2)
   targetTemperature     Decimal?                     @map("target_temperature") @db.Decimal(5, 2)
   targetLoadPercent     Decimal?                     @map("target_load_percent") @db.Decimal(5, 2)
   manufacturer          String?                      @db.VarChar(100)
@@ -644,8 +646,9 @@ model Machine {
   operationAssignments  MachineOperationAssignment[]
   businessPlace         BusinessPlace?               @relation(fields: [businessPlaceId], references: [id])
   productionOrders      ProductionOrder[]
-  productionWastages    ProductionWastage[]
+  productionWastages ProductionWastage[]
   weeklyMachinePrograms WeeklyMachineProgram[]
+  shiftRecords ProductShiftRecord[]
 
   @@map("machines")
 }
@@ -885,6 +888,7 @@ model ProductionOrder {
   rawMaterialTransactions   RawMaterialTransaction[]
   stockAdjustments          StockAdjustment[]
   weeklyMachinePrograms     WeeklyMachineProgram[]
+  shiftRecords              ProductShiftRecord[]
 
   @@index([orderDate])
   @@index([dueDate])
@@ -1648,6 +1652,51 @@ model SystemSetting {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("system_settings")
+}
+
+model ProductShiftRecord {
+  id                BigInt          @id @default(autoincrement())
+  productId         BigInt          @map("product_id")
+  productionOrderId String          @map("production_order_id") @db.VarChar(20)
+  machineId         String          @map("machine_id") @db.VarChar(20)
+  shiftId           String          @map("shift_id") @db.VarChar(20)
+  achievedQty       Decimal         @map("achieved_qty") @db.Decimal(14, 3)
+  targetQty         Decimal         @map("target_qty") @db.Decimal(14, 3)
+  recordedDate      DateTime        @default(now()) @map("recorded_date") @db.Date
+  operatorIds       String?         @map("operator_ids") @db.VarChar(255)
+  isHighest         Boolean         @default(true) @map("is_highest")
+  createdAt         DateTime        @default(now()) @map("created_at")
+  product           Product         @relation(fields: [productId], references: [id])
+  productionOrder   ProductionOrder @relation(fields: [productionOrderId], references: [productionOrderId])
+  machine           Machine         @relation(fields: [machineId], references: [machineId])
+  shift             Shift           @relation(fields: [shiftId], references: [shiftCode])
+
+  @@index([productId])
+  @@index([machineId])
+  @@index([shiftId])
+  @@map("product_shift_records")
+}
+
+model ProductCapacityHistory {
+  id                   BigInt          @id @default(autoincrement())
+  productId            BigInt          @map("product_id")
+  previousCapacity     Decimal         @map("previous_capacity") @db.Decimal(14, 3)
+  newCapacity          Decimal         @map("new_capacity") @db.Decimal(14, 3)
+  productionDate       DateTime        @map("production_date") @db.Date
+  machineId            String          @map("machine_id") @db.VarChar(20)
+  shiftId              String          @map("shift_id") @db.VarChar(20)
+  productionOrderId    String          @map("production_order_id") @db.VarChar(20)
+  targetQty            Decimal         @map("target_qty") @db.Decimal(14, 3)
+  actualQty            Decimal         @map("actual_qty") @db.Decimal(14, 3)
+  achievementPct       Decimal         @map("achievement_pct") @db.Decimal(8, 2)
+  operators            String?         @db.VarChar(255)
+  updatedBy            String?         @map("updated_by") @db.VarChar(36)
+  createdAt            DateTime        @default(now()) @map("created_at")
+  product              Product         @relation(fields: [productId], references: [id])
+
+  @@index([productId])
+  @@index([machineId])
+  @@map("product_capacity_history")
 }
 
 enum BusinessPlaceType {

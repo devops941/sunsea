@@ -6,15 +6,15 @@ import { z } from "zod";
 // that uses FormData (which is required once an image file is involved).
 export const createProductSchema = z.object({
   body: z.object({
-    productCode: z.string().min(1),
-    productName: z.string().min(1),
+    productCode: z.string().trim().min(1).max(20),
+    productName: z.string().trim().min(1).max(160),
 
     categoryId: z.string(),
     // subCategoryId: z.string(),
 
-    itemCode: z.string().optional(),
-    displayName: z.string().optional(),
-    description: z.string().optional(),
+    itemCode: z.string().trim().max(50).optional(),
+    displayName: z.string().trim().max(80).optional(),
+    description: z.string().trim().max(255).optional(),
 
     uomId: z.string().optional(),
     colorId: z.string().optional(),
@@ -22,29 +22,30 @@ export const createProductSchema = z.object({
 
     capacityLitres: z.coerce.number().optional(),
 
-    typeCode: z.string().optional(),
+    typeCode: z.string().trim().max(20).optional(),
 
     bundleQty: z.coerce.number().optional(),
 
     weightPerPiece: z.coerce.number().optional(),
 
-    dimensions: z.string().optional(),
+    dimensions: z.string().trim().max(255).optional(),
 
-    mouldReference: z.string().optional(),
+    mouldReference: z.string().trim().max(80).optional(),
 
-    tags: z.string().optional(),
+    tags: z.string().trim().max(255).optional(),
 
-    minimumQty: z.string().optional(),
-    maximumQty: z.string().optional(),
+    minimumQty: z.string().max(20).optional(),
+    maximumQty: z.string().max(20).optional(),
 
     // FormData booleans also arrive as the literal strings "true"/"false"
     isActive: z
       .union([z.literal("true"), z.literal("false")])
       .optional(),
       
-    openingStockQty: z.string().optional(),
-    openingStockStoreId: z.string().optional(),
+    openingStockQty: z.string().max(20).optional(),
+    openingStockStoreId: z.string().max(20).optional(),
     rawMaterials: z.any().optional(),
+    capacityHistory: z.any().optional(),
   }),
 });
 

@@ -3,7 +3,6 @@ export interface Machine {
   machineName: string;
   technologyType: string;
   machineType: string;
-  capacity?: number | null;
   manufacturer?: string | null;
   modelNumber?: string | null;
   cycleTime?: number | null;

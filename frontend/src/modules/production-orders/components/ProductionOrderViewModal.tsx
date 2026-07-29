@@ -278,7 +278,7 @@ export const ProductionOrderViewModal: React.FC<ProductionOrderViewModalProps> =
                                             coveredWeeklyProgramIds.add(plan.weeklyProgramId);
                                         }
                                         const hourlySum = plan.hourlyProductions?.reduce((acc: number, curr: any) => acc + Number(curr.qtyProduced || 0), 0) || 0;
-                                        const producedForPlan = plan.status === 'COMPLETED' ? Math.max(Number(plan.plannedQty || 0), hourlySum) : hourlySum;
+                                        const producedForPlan = hourlySum > 0 ? hourlySum : (plan.status === 'COMPLETED' ? Number(plan.plannedQty || 0) : 0);
                                         plans.push({
                                             id: plan.dailyPlanId,
                                             date: plan.productionDate ? new Date(plan.productionDate).toLocaleDateString() : '-',
@@ -291,7 +291,10 @@ export const ProductionOrderViewModal: React.FC<ProductionOrderViewModalProps> =
                                     });
                                 }
 
-                                const isDispatched = fullOrder?.status === 'DISPATCHED' || (fullOrder?.goodsDispatchItems && fullOrder.goodsDispatchItems.length > 0);
+                                const totalDispatchedQty = fullOrder?.goodsDispatchItems
+                                    ? fullOrder.goodsDispatchItems.reduce((sum: number, item: any) => sum + Number(item.dispatchQty || 0), 0)
+                                    : 0;
+                                let cumulativeProduced = 0;
 
                                 return (
                                     <>
@@ -314,20 +317,22 @@ export const ProductionOrderViewModal: React.FC<ProductionOrderViewModalProps> =
                                                             <th className="px-4 py-3">Machine</th>
                                                             <th className="px-4 py-3">Planned Qty</th>
                                                             <th className="px-4 py-3">Produced Qty</th>
-                                                            <th className="px-4 py-3">Production Status</th>
-                                                            <th className="px-4 py-3">Dispatch Status</th>
+                                                            <th className="px-4 py-3 whitespace-nowrap">Production Status</th>
+                                                            <th className="px-4 py-3 whitespace-nowrap text-center">Dispatch Status</th>
                                                         </tr>
                                                     </thead>
                                                     <tbody className="divide-y divide-slate-100">
                                                         {plans.length > 0 ? (
                                                             plans.map((plan: any, idx: number) => {
+                                                                cumulativeProduced += plan.producedQty;
+                                                                const isPlanDispatched = totalDispatchedQty > 0 && cumulativeProduced <= totalDispatchedQty + 0.001;
                                                                 const isReadyForDispatch = plan.status === 'COMPLETED' || fullOrder?.status === 'READY_FOR_DISPATCH' || fullOrder?.status === 'COMPLETED';
 
-                                                                let dispatchBadge = <span className="px-2.5 py-1 bg-slate-100 text-slate-600 rounded-full text-xs font-semibold">Not Dispatched</span>;
-                                                                if (isDispatched) {
-                                                                    dispatchBadge = <span className="px-2.5 py-1 bg-green-100 text-green-800 border border-green-200 rounded-full text-xs font-semibold">Dispatched</span>;
+                                                                let dispatchBadge = <span className="inline-flex items-center px-2.5 py-1 bg-slate-100 text-slate-600 rounded-full text-xs font-semibold whitespace-nowrap">Not Dispatched</span>;
+                                                                if (isPlanDispatched) {
+                                                                    dispatchBadge = <span className="inline-flex items-center px-2.5 py-1 bg-green-100 text-green-800 border border-green-200 rounded-full text-xs font-semibold whitespace-nowrap">Dispatched</span>;
                                                                 } else if (isReadyForDispatch) {
-                                                                    dispatchBadge = <span className="px-2.5 py-1 bg-blue-100 text-blue-800 border border-blue-200 rounded-full text-xs font-semibold">Ready for Dispatch</span>;
+                                                                    dispatchBadge = <span className="inline-flex items-center px-2.5 py-1 bg-blue-100 text-blue-800 border border-blue-200 rounded-full text-xs font-semibold whitespace-nowrap">Ready for Dispatch</span>;
                                                                 }
 
                                                                 return (
@@ -340,7 +345,7 @@ export const ProductionOrderViewModal: React.FC<ProductionOrderViewModalProps> =
                                                                         <td className="px-4 py-3">
                                                                             <StatusBadge status={plan.status} />
                                                                         </td>
-                                                                        <td className="px-4 py-3">
+                                                                        <td className="px-4 py-3 text-center">
                                                                             {dispatchBadge}
                                                                         </td>
                                                                     </tr>
@@ -356,13 +361,13 @@ export const ProductionOrderViewModal: React.FC<ProductionOrderViewModalProps> =
                                                                 <td className="px-4 py-3">
                                                                     <StatusBadge status={fullOrder?.status || order.status} />
                                                                 </td>
-                                                                <td className="px-4 py-3">
+                                                                <td className="px-4 py-3 text-center">
                                                                     {fullOrder?.status === 'DISPATCHED' ? (
-                                                                        <span className="px-2.5 py-1 bg-green-100 text-green-800 border border-green-200 rounded-full text-xs font-semibold">Dispatched</span>
+                                                                        <span className="inline-flex items-center px-2.5 py-1 bg-green-100 text-green-800 border border-green-200 rounded-full text-xs font-semibold whitespace-nowrap">Dispatched</span>
                                                                     ) : (fullOrder?.status === 'READY_FOR_DISPATCH' || fullOrder?.status === 'COMPLETED') ? (
-                                                                        <span className="px-2.5 py-1 bg-blue-100 text-blue-800 border border-blue-200 rounded-full text-xs font-semibold">Ready for Dispatch</span>
+                                                                        <span className="inline-flex items-center px-2.5 py-1 bg-blue-100 text-blue-800 border border-blue-200 rounded-full text-xs font-semibold whitespace-nowrap">Ready for Dispatch</span>
                                                                     ) : (
-                                                                        <span className="px-2.5 py-1 bg-slate-100 text-slate-600 rounded-full text-xs font-semibold">Not Dispatched</span>
+                                                                        <span className="inline-flex items-center px-2.5 py-1 bg-slate-100 text-slate-600 rounded-full text-xs font-semibold whitespace-nowrap">Not Dispatched</span>
                                                                     )}
                                                                 </td>
                                                             </tr>
