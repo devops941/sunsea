@@ -34,6 +34,59 @@ const AllSalesOrderList: React.FC = () => {
     const [showEstimateModal, setShowEstimateModal] = useState(false);
     const [estimateOrder, setEstimateOrder] = useState<any | null>(null);
     const [loadingEstimate, setLoadingEstimate] = useState(false);
+    const [generatingPdf, setGeneratingPdf] = useState(false);
+
+    const generatePdf = async (action: "view" | "download") => {
+        if (!estimateOrder) return;
+        setGeneratingPdf(true);
+        try {
+            const html2canvas = (await import("html2canvas-pro")).default;
+            const { jsPDF } = await import("jspdf");
+
+            const element = document.getElementById("pdf-estimate-section");
+            if (!element) {
+                toast.error("Estimate elements not found");
+                return;
+            }
+
+            const canvas = await html2canvas(element, { scale: 2, useCORS: true });
+            const imgData = canvas.toDataURL("image/png");
+
+            const pdf = new jsPDF("p", "mm", "a4");
+            const margin = 10;
+            const pageWidth = pdf.internal.pageSize.getWidth();
+            const pageHeight = pdf.internal.pageSize.getHeight();
+
+            const imgWidth = pageWidth - 2 * margin;
+            const imgHeight = (canvas.height * imgWidth) / canvas.width;
+            const availableHeight = pageHeight - 2 * margin;
+
+            let heightLeft = imgHeight;
+            let position = margin;
+
+            pdf.addImage(imgData, "PNG", margin, position, imgWidth, imgHeight);
+            heightLeft -= availableHeight;
+
+            while (heightLeft > 0) {
+                position -= availableHeight;
+                pdf.addPage();
+                pdf.addImage(imgData, "PNG", margin, position, imgWidth, imgHeight);
+                heightLeft -= availableHeight;
+            }
+
+            if (action === "download") {
+                pdf.save(`Estimate-${estimateOrder?.orderNo || "estimate"}.pdf`);
+            } else {
+                const pdfUrl = pdf.output("bloburl");
+                window.open(pdfUrl, "_blank");
+            }
+        } catch (err) {
+            console.error(err);
+            toast.error(`Failed to ${action} PDF`);
+        } finally {
+            setGeneratingPdf(false);
+        }
+    };
 
     const handleOpenEstimate = async (salesOrderId: number) => {
         setLoadingEstimate(true);
@@ -49,6 +102,17 @@ const AllSalesOrderList: React.FC = () => {
             setLoadingEstimate(false);
         }
     };
+
+    const handleItemRemarksChange = (itemId: string | number, newRemarks: string) => {
+        if (!estimateOrder) return;
+        setEstimateOrder((prev: any) => ({
+            ...prev,
+            items: prev.items.map((item: any) =>
+                String(item.id) === String(itemId) ? { ...item, remarks: newRemarks } : item
+            ),
+        }));
+    };
+
 
     // ─── Filters ────────────────────────────────────────────────
     const [fromDate, setFromDate] = useState("");
@@ -309,6 +373,7 @@ const AllSalesOrderList: React.FC = () => {
                                         <SalesOrderEstimateContent
                                             estimateOrder={estimateOrder}
                                             formatDate={formatDate}
+                                            onItemRemarksChange={handleItemRemarksChange}
                                         />
                                     </DocumentPrintLayout>
                                 ) : (
@@ -335,16 +400,18 @@ const AllSalesOrderList: React.FC = () => {
                                             variant="primary"
                                         />
                                         <CustomButton
-                                            text="View PDF"
+                                            text={generatingPdf ? "Generating..." : "View PDF"}
                                             icon={FaEye}
-                                            onClick={() => window.print()}
+                                            onClick={() => generatePdf("view")}
                                             variant="secondary"
+                                            disabled={generatingPdf}
                                         />
                                         <CustomButton
-                                            text="Download PDF"
+                                            text={generatingPdf ? "Downloading..." : "Download PDF"}
                                             icon={FaDownload}
-                                            onClick={() => window.print()}
+                                            onClick={() => generatePdf("download")}
                                             variant="primary"
+                                            disabled={generatingPdf}
                                         />
                                     </div>
                                 )}
@@ -361,6 +428,20 @@ const AllSalesOrderList: React.FC = () => {
                         <SalesOrderEstimateContent
                             estimateOrder={estimateOrder}
                             formatDate={formatDate}
+                            isEditable={false}
+                        />
+                    </DocumentPrintLayout>
+                </div>
+            )}
+
+            {/* Off-screen section for PDF generation */}
+            {estimateOrder && (
+                <div id="pdf-estimate-section" style={{ position: "absolute", left: "-9999px", top: "0", width: "794px", background: "white" }}>
+                    <DocumentPrintLayout subtitle="Sales Order" title="ESTIMATE">
+                        <SalesOrderEstimateContent
+                            estimateOrder={estimateOrder}
+                            formatDate={formatDate}
+                            isEditable={false}
                         />
                     </DocumentPrintLayout>
                 </div>

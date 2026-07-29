@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 
 interface SalesOrderEstimateContentProps {
     estimateOrder: {
@@ -26,12 +26,41 @@ interface SalesOrderEstimateContentProps {
         }>;
     };
     formatDate: (dateStr: any) => string;
+    onItemRemarksChange?: (itemId: string | number, remarks: string) => void;
+    /** Set explicitly to false when rendering for Print / PDF export so inputs collapse to plain text */
+    isEditable?: boolean;
 }
 
 export const SalesOrderEstimateContent: React.FC<SalesOrderEstimateContentProps> = ({
     estimateOrder,
     formatDate,
+    onItemRemarksChange,
+    isEditable = true,
 }) => {
+    // Internal fallback state so the field is editable even if the parent
+    // doesn't pass onItemRemarksChange. Keyed by item id.
+    const [localRemarks, setLocalRemarks] = useState<Record<string | number, string>>({});
+
+    useEffect(() => {
+        // seed local state whenever the incoming items change (e.g. new order loaded)
+        const seeded: Record<string | number, string> = {};
+        estimateOrder.items?.forEach((item) => {
+            seeded[item.id] = item.remarks !== undefined ? item.remarks : (item.notes || "");
+        });
+        setLocalRemarks(seeded);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [estimateOrder.items?.map((i) => i.id).join(",")]);
+
+    const getValue = (item: NonNullable<typeof estimateOrder.items>[number]) => {
+        if (isEditable && localRemarks[item.id] !== undefined) return localRemarks[item.id];
+        return item.remarks !== undefined ? item.remarks : (item.notes || "");
+    };
+
+    const handleChange = (itemId: string | number, value: string) => {
+        setLocalRemarks((prev) => ({ ...prev, [itemId]: value }));
+        onItemRemarksChange?.(itemId, value);
+    };
+
     return (
         <>
             {/* details-box */}
@@ -123,7 +152,18 @@ export const SalesOrderEstimateContent: React.FC<SalesOrderEstimateContentProps>
                                 className="border border-black px-2.5 py-2 align-middle text-slate-500"
                                 style={{ width: "200px" }}
                             >
-                                {item.remarks || item.notes || ""}
+                                {isEditable ? (
+                                    <input
+                                        type="text"
+                                        value={getValue(item)}
+                                        onChange={(e) => handleChange(item.id, e.target.value)}
+                                        onClick={(e) => e.stopPropagation()}
+                                        className="w-full bg-transparent border border-slate-300 rounded px-2 py-1 text-slate-700 text-sm focus:border-indigo-500 focus:outline-none"
+                                        placeholder="Add remarks..."
+                                    />
+                                ) : (
+                                    getValue(item)
+                                )}
                             </td>
                         </tr>
                     ))}

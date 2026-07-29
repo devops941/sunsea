@@ -33,11 +33,11 @@ const PurchaseTabs: React.FC = () => {
         "invoice": "/invoice"
     };
 
-    const activeTab = pathToKey[location.pathname] || "orders";
+    const activeTab = pathToKey[location.pathname] || "suppliers";
 
     const tabs: TabItem[] = [
-        { key: "orders", label: "Purchase Orders", icon: <FaFileInvoiceDollar />, content: <PurchaseOrderListPage /> },
         { key: "suppliers", label: "Suppliers", icon: <FaTruck />, content: <SupplierListPage /> },
+        { key: "orders", label: "Purchase Orders", icon: <FaFileInvoiceDollar />, content: <PurchaseOrderListPage /> },
         { key: "approvals", label: "MD Approvals", icon: <FaUserCheck />, content: <POMDApproval /> },
         { key: "invoice", label: "Bill & Invoice", icon: <FaCalendarAlt />, content: <InvoiceList /> },
         { key: "expense", label: "Expenses", icon: <FaCalendarAlt />, content: <ExpensesList /> },

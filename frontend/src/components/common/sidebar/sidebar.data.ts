@@ -41,7 +41,7 @@ export const sidebarItems: SidebarItem[] = [
   {
     title: "HR & Organization",
     icon: FiUsers,
-    path: "/employees",
+    path: "/machines",
     activePaths: [
       "/employees",
       "/machines",
@@ -53,7 +53,7 @@ export const sidebarItems: SidebarItem[] = [
   {
     title: "Product Setup",
     icon: FiDatabase,
-    path: "/products",
+    path: "/uoms",
     activePaths: [
       "/products",
       "/categories",
@@ -63,13 +63,13 @@ export const sidebarItems: SidebarItem[] = [
       "/raw-materials",
       "/raw-material-categories",
     ],
-    permission: "products.view",
+    permission: "uoms.view",
   },
   // 5. Purchase
   {
     title: "Purchase",
     icon: FiShoppingBag,
-    path: "/purchase-orders",
+    path: "/suppliers",
     activePaths: [
       "/suppliers",
       "/purchase-orders",
@@ -82,7 +82,7 @@ export const sidebarItems: SidebarItem[] = [
   {
     title: "Sales",
     icon: FiShoppingCart,
-    path: "/sales-order",
+    path: "/customers",
     activePaths: [
       "/customers",
       "/sales-order",
@@ -91,13 +91,13 @@ export const sidebarItems: SidebarItem[] = [
       "/pending-quotations",
       "/sales-invoices",
     ],
-    permission: "sales-orders.view",
+    permission: "customers.view",
   },
   // 7. Production
   {
     title: "Production",
     icon: FiTool,
-    path: "/approved-sales-orders",
+    path: "/allproduction-orders",
     activePaths: [
       "/approved-sales-orders",
       "/production-orders",
