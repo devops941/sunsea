@@ -4,6 +4,7 @@ import { CreateGrnInvoiceInput, UpdateGrnInvoiceInput } from "./grn-invoice.vali
 import { uploadToImageKit } from "../../utils/Imagekit";
 import fs from "fs";
 import path from "path";
+import crypto from "crypto";
 
 class GrnInvoiceService {
 
@@ -173,6 +174,24 @@ class GrnInvoiceService {
 
         const updateStockEnabled = data.updateStock === true || (data.updateStock as any) === "true";
 
+        const rawPayments = typeof (data as any).payments === "string" ? JSON.parse((data as any).payments) : ((data as any).payments || []);
+        const processedPayments = rawPayments.map((p: any) => ({
+            id: p.id || crypto.randomUUID(),
+            amount: Math.round(Number(p.amount) * 100) / 100,
+            paymentMethod: p.paymentMethod,
+            referenceNumber: p.referenceNumber || "",
+            paymentDate: p.paymentDate,
+            recordedBy: currentUser.userId,
+            createdAt: new Date().toISOString()
+        }));
+        const totalPaid = Math.round(processedPayments.reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0) * 100) / 100;
+        const computedStatus = totalPaid === 0 ? "Unpaid" : (totalPaid >= Number(netAmount) ? "Closed" : "Partial");
+
+        const lastPayment = processedPayments[processedPayments.length - 1];
+        const paymentMethod = lastPayment ? lastPayment.paymentMethod : null;
+        const referenceNumber = lastPayment ? lastPayment.referenceNumber : null;
+        const paymentDate = lastPayment ? new Date(lastPayment.paymentDate) : null;
+
         return prisma.$transaction(async (tx) => {
             // Create GRN Invoice
             const grnInvoice = await tx.grnInvoice.create({
@@ -206,10 +225,11 @@ class GrnInvoiceService {
                     discountValue,
                     roundingAdjust,
 
-                    paymentStatus: data.paymentStatus || "Unpaid",
-                    paymentMethod: data.paymentMethod || null,
-                    referenceNumber: data.referenceNumber || null,
-                    paymentDate: data.paymentDate ? new Date(data.paymentDate) : null,
+                    paymentStatus: computedStatus,
+                    paymentMethod,
+                    referenceNumber,
+                    paymentDate,
+                    payments: processedPayments as any,
 
                     subtotal,
                     totalDiscount,
@@ -526,6 +546,8 @@ class GrnInvoiceService {
             ? (data.updateStock === true || (data.updateStock as any) === "true")
             : existing.updateStock;
 
+        const rawPayments = data.payments ? (typeof data.payments === "string" ? JSON.parse(data.payments) : data.payments) : undefined;
+
         return prisma.$transaction(async (tx) => {
             let subtotal = Number(existing.subtotal);
             let totalDiscount = Number(existing.totalDiscount);
@@ -552,6 +574,23 @@ class GrnInvoiceService {
                 await tx.grnInvoiceItem.deleteMany({
                     where: { grnInvoiceId: id },
                 });
+            }
+
+            let processedPayments = existing.payments ? (typeof existing.payments === "string" ? JSON.parse(existing.payments) : existing.payments) as any[] : [];
+            let computedStatus = existing.paymentStatus;
+            
+            if (rawPayments) {
+                processedPayments = rawPayments.map((p: any) => ({
+                    id: p.id || crypto.randomUUID(),
+                    amount: Math.round(Number(p.amount) * 100) / 100,
+                    paymentMethod: p.paymentMethod,
+                    referenceNumber: p.referenceNumber || "",
+                    paymentDate: p.paymentDate,
+                    recordedBy: "System",
+                    createdAt: p.createdAt || new Date().toISOString()
+                }));
+                const totalPaid = Math.round(processedPayments.reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0) * 100) / 100;
+                computedStatus = totalPaid === 0 ? "Unpaid" : (totalPaid >= Number(netAmount) ? "Closed" : "Partial");
             }
 
             // Update GRN record
@@ -587,10 +626,11 @@ class GrnInvoiceService {
                     discountValue,
                     roundingAdjust,
 
-                    paymentStatus: data.paymentStatus || existing.paymentStatus,
-                    paymentMethod: data.paymentMethod !== undefined ? data.paymentMethod : existing.paymentMethod,
-                    referenceNumber: data.referenceNumber !== undefined ? data.referenceNumber : existing.referenceNumber,
-                    paymentDate: data.paymentDate ? new Date(data.paymentDate) : existing.paymentDate,
+                    paymentStatus: computedStatus,
+                    payments: processedPayments as any,
+                    paymentMethod: rawPayments && processedPayments.length > 0 ? processedPayments[processedPayments.length - 1].paymentMethod : (data.paymentMethod !== undefined ? data.paymentMethod : existing.paymentMethod),
+                    referenceNumber: rawPayments && processedPayments.length > 0 ? processedPayments[processedPayments.length - 1].referenceNumber : (data.referenceNumber !== undefined ? data.referenceNumber : existing.referenceNumber),
+                    paymentDate: rawPayments && processedPayments.length > 0 ? new Date(processedPayments[processedPayments.length - 1].paymentDate) : (data.paymentDate ? new Date(data.paymentDate) : existing.paymentDate),
 
                     subtotal,
                     totalDiscount,

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Container, Row, Col } from "react-bootstrap";
 import { FaPlus, FaTrash, FaArrowLeft, FaBoxOpen, FaFileInvoice, FaMapMarkerAlt, FaTruck, FaUser, FaCreditCard, FaHashtag } from "react-icons/fa";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
 
 import CustomButton from "../../../../components/ui/Button/Button";
@@ -68,6 +68,8 @@ const emptyItem = (): GRNItem => ({
 // ─── Component ────────────────────────────────────────────────────────────────
 const InvoiceDetailPage: React.FC = () => {
     const navigate = useNavigate();
+    const { id } = useParams<{ id: string }>();
+    const isEditMode = Boolean(id);
     const dispatch = useAppDispatch();
     const { suppliers, loadSuppliers } = useSuppliers();
     const { data: locations } = useAppSelector((state: any) => state.locations);
@@ -84,6 +86,14 @@ const InvoiceDetailPage: React.FC = () => {
     const [approvedPOs, setApprovedPOs] = useState<PurchaseOrder[]>([]);
     const [selectedPO, setSelectedPO] = useState<any>(null);
     const [rawMaterials, setRawMaterials] = useState<any[]>([]);
+
+    const [payments, setPayments] = useState<any[]>([]);
+    const [newPayment, setNewPayment] = useState({
+        amount: "",
+        paymentMethod: "Bank Transfer",
+        referenceNumber: "",
+        paymentDate: new Date().toISOString().split("T")[0],
+    });
 
 
     // ── Form ─────────────────────────────────────────────────────────────────────
@@ -152,14 +162,114 @@ const InvoiceDetailPage: React.FC = () => {
             .catch(() => toast.error("Failed to load active orders"))
             .finally(() => setLoadingPOs(false));
 
-        grnInvoiceService.fetchNextCode()
-            .then((code) => {
-                if (code) {
-                    setForm((prev) => ({ ...prev, grnNumber: code }));
-                }
-            })
-            .catch((err) => console.error("Failed to fetch next GRN number:", err));
-    }, [dispatch, loadSuppliers, loadActiveUOMs]);
+        if (!id) {
+            grnInvoiceService.fetchNextCode()
+                .then((code) => {
+                    if (code) {
+                        setForm((prev) => ({ ...prev, grnNumber: code }));
+                    }
+                })
+                .catch((err) => console.error("Failed to fetch next GRN number:", err));
+        }
+    }, [dispatch, loadSuppliers, loadActiveUOMs, id]);
+
+    useEffect(() => {
+        if (id) {
+            grnInvoiceService.fetchById(id)
+                .then((invoice) => {
+                    const isClosed = ["CLOSED", "PAID"].includes((invoice.paymentStatus || "").toUpperCase());
+                    if (isClosed) {
+                        toast.error("Fully paid/Closed invoices cannot be edited");
+                        navigate("/invoice");
+                        return;
+                    }
+                    setForm((prev) => ({
+                        ...prev,
+                        poId: invoice.poId ? String(invoice.poId) : "",
+                        grnNumber: invoice.grnNumber || "",
+                        invoiceNo: invoice.invoiceNo || "",
+                        grnDate: invoice.grnDate ? invoice.grnDate.split("T")[0] : "",
+                        supplierId: invoice.supplierId ? String(invoice.supplierId) : "",
+                        storeId: invoice.storeId || "",
+                        billingAddressLine1: invoice.billingAddressLine1 || "",
+                        billingCity: invoice.billingCity || "",
+                        billingState: invoice.billingState || "",
+                        billingPincode: invoice.billingPincode || "",
+                        billingCountry: invoice.billingCountry || "India",
+                        sameAsBilling: invoice.sameAsBilling ?? false,
+                        shippingAddressLine1: invoice.shippingAddressLine1 || "",
+                        shippingCity: invoice.shippingCity || "",
+                        shippingState: invoice.shippingState || "",
+                        shippingPincode: invoice.shippingPincode || "",
+                        shippingCountry: invoice.shippingCountry || "India",
+                        receiveDate: invoice.receiveDate ? invoice.receiveDate.split("T")[0] : "",
+                        billDueDate: invoice.billDueDate ? invoice.billDueDate.split("T")[0] : "",
+                        challanNo: invoice.challanNo || "",
+                        transport: invoice.transport || "",
+                        eWayBill: invoice.eWayBill || "",
+                        remarks: invoice.remarks || "",
+                        discountType: invoice.discountType === "PERCENT" ? "percent" : "flat",
+                        discountValue: Number(invoice.discountValue) || 0,
+                        roundingAdjust: Number(invoice.roundingAdjust) || 0,
+                        paymentStatus: invoice.paymentStatus || "Unpaid",
+                        updateStock: invoice.updateStock ?? true,
+                    }));
+
+                    const mappedItems = (invoice.items || []).map((item: any) => {
+                        const qty = Number(item.quantity);
+                        const unitPrice = Number(item.unitPrice);
+                        const tax = Number(item.tax) || 0;
+                        const taxableAmount = qty * unitPrice;
+                        const totalGstAmount = (taxableAmount * tax) / 100;
+
+                        let cgstRate = 0, cgstAmount = 0, sgstRate = 0, sgstAmount = 0, igstRate = 0, igstAmount = 0;
+                        if (companyState && invoice.billingState && companyState.toLowerCase().trim() !== invoice.billingState.toLowerCase().trim()) {
+                            igstRate = tax;
+                            igstAmount = totalGstAmount;
+                        } else {
+                            cgstRate = tax / 2;
+                            sgstRate = tax / 2;
+                            cgstAmount = totalGstAmount / 2;
+                            sgstAmount = totalGstAmount / 2;
+                        }
+
+                        const materialName = item.product?.materialName || item.product?.productName || item.description || item.productId || "—";
+
+                        return {
+                            productId: item.productId || "",
+                            description: materialName,
+                            uom: item.uom || "",
+                            qty,
+                            unitPrice,
+                            tax,
+                            taxableAmount,
+                            cgstRate,
+                            cgstAmount,
+                            sgstRate,
+                            sgstAmount,
+                            igstRate,
+                            igstAmount,
+                            netAmount: taxableAmount + totalGstAmount,
+                        };
+                    });
+                    setItems(mappedItems);
+
+                    const parsedPayments = invoice.payments
+                        ? (typeof invoice.payments === "string" ? JSON.parse(invoice.payments) : invoice.payments)
+                        : [];
+                    const legacyPayments = parsedPayments.map((p: any) => ({
+                        ...p,
+                        isPersisted: true
+                    }));
+                    setPayments(legacyPayments);
+                })
+                .catch((err) => {
+                    console.error("Failed to load GRN Invoice:", err);
+                    toast.error("Failed to load invoice details");
+                    navigate("/invoice");
+                });
+        }
+    }, [id, navigate, companyState]);
 
     useEffect(() => {
         const fetchRawMaterials = async () => {
@@ -199,6 +309,7 @@ const InvoiceDetailPage: React.FC = () => {
 
     // ── When PO selected → auto-fill ─────────────────────────────────────────────
     useEffect(() => {
+        if (isEditMode) return;
         if (!form.poId) {
             setSelectedPO(null);
             setItems([]);
@@ -471,6 +582,53 @@ const InvoiceDetailPage: React.FC = () => {
         return subtotal - discountAmount + totalTax + rounding;
     }, [subtotal, discountAmount, totalTax, form.roundingAdjust, roundingSign]);
 
+    const totalPaid = useMemo(() => payments.reduce((sum, p) => sum + Number(p.amount || 0), 0), [payments]);
+    const balanceDue = useMemo(() => Math.max(0, grandTotal - totalPaid), [grandTotal, totalPaid]);
+    const isOverpaid = useMemo(() => totalPaid > grandTotal, [grandTotal, totalPaid]);
+    const computedStatus = useMemo(() => {
+        if (totalPaid === 0) return "Unpaid";
+        if (totalPaid >= grandTotal) return "Paid";
+        return "Partial";
+    }, [totalPaid, grandTotal]);
+
+    const handleAddPayment = () => {
+        const amt = Number(newPayment.amount);
+        if (isNaN(amt) || amt <= 0) {
+            toast.error("Payment amount must be greater than 0");
+            return;
+        }
+        if (isEditMode && amt > balanceDue) {
+            toast.error(`Payment amount cannot exceed the remaining balance due of ₹${balanceDue.toFixed(2)}`);
+            return;
+        }
+        if (newPayment.paymentMethod.toLowerCase() !== "cash" && !newPayment.referenceNumber.trim()) {
+            toast.error("Reference number is required for non-cash methods");
+            return;
+        }
+        if (new Date(newPayment.paymentDate) > new Date()) {
+            toast.error("Payment date cannot be in the future");
+            return;
+        }
+
+        setPayments(prev => [...prev, {
+            ...newPayment,
+            amount: amt,
+            id: Math.random().toString(36).substr(2, 9)
+        }]);
+
+        // Reset inputs
+        setNewPayment({
+            amount: "",
+            paymentMethod: "Bank Transfer",
+            referenceNumber: "",
+            paymentDate: new Date().toISOString().split("T")[0],
+        });
+    };
+
+    const handleRemovePayment = (id: string) => {
+        setPayments(prev => prev.filter(p => p.id !== id));
+    };
+
     // ── Options ───────────────────────────────────────────────────────────────────
     const poOptions = useMemo(() => [
         { value: "", label: "Select PO" },
@@ -647,10 +805,14 @@ const InvoiceDetailPage: React.FC = () => {
             payload.append("totalSgst", String(totalSgst));
             payload.append("totalIgst", String(totalIgst));
 
-            payload.append("paymentStatus", form.paymentStatus);
-            if (form.paymentMethod) payload.append("paymentMethod", form.paymentMethod);
-            if (form.referenceNumber) payload.append("referenceNumber", form.referenceNumber);
-            if (form.paymentDate) payload.append("paymentDate", form.paymentDate);
+            payload.append("paymentStatus", computedStatus);
+            const lastPayment = payments[payments.length - 1];
+            if (lastPayment) {
+                payload.append("paymentMethod", lastPayment.paymentMethod);
+                if (lastPayment.referenceNumber) payload.append("referenceNumber", lastPayment.referenceNumber);
+                if (lastPayment.paymentDate) payload.append("paymentDate", lastPayment.paymentDate);
+            }
+            payload.append("payments", JSON.stringify(payments));
 
             // Append items as JSON string
             payload.append(
@@ -679,8 +841,13 @@ const InvoiceDetailPage: React.FC = () => {
                 payload.append("invoiceImage", form.invoiceImage);
             }
 
-            await grnInvoiceService.create(payload);
-            toast.success("GRN / Invoice created successfully!");
+            if (isEditMode && id) {
+                await grnInvoiceService.update(id, payload);
+                toast.success("GRN / Invoice updated successfully!");
+            } else {
+                await grnInvoiceService.create(payload);
+                toast.success("GRN / Invoice created successfully!");
+            }
             navigate("/invoice");
         } catch (error: any) {
             const errorMsg = error.response?.data?.message || "Failed to create GRN / Invoice";
@@ -704,7 +871,7 @@ const InvoiceDetailPage: React.FC = () => {
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <div>
                             <h2 className="text-xl font-bold text-gray-800">
-                                Create GRN / Invoice
+                                {isEditMode ? "Edit GRN / Invoice" : "Create GRN / Invoice"}
                             </h2>
                         </div>
                         <div>
@@ -717,14 +884,14 @@ const InvoiceDetailPage: React.FC = () => {
                     {/* ── Row 1: Header Fields ── */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                         <div>
-                            <SelectInput label="PO (Optional)" name="poId" value={form.poId} options={poOptions} onChange={handleChange} />
+                            <SelectInput label="PO (Optional)" name="poId" value={form.poId} options={poOptions} onChange={handleChange} disabled={isEditMode} />
                             {loadingPO && <div className="text-muted small mt-1"><div className="animate-spin rounded-full border-b-2 border-indigo-600 h-4 w-4 border-b-2"></div> Loading…</div>}
                         </div>
                         <div>
                             <TextInput label="GRN Number" name="grnNumber" value={form.grnNumber} onChange={handleChange} disabled />
                         </div>
                         <div>
-                            <TextInput label="Invoice No." name="invoiceNo" value={form.invoiceNo} onChange={handleChange} placeholder="Supplier invoice" required error={errors.invoiceNo} />
+                            <TextInput label="Invoice No." name="invoiceNo" value={form.invoiceNo} onChange={handleChange} placeholder="Supplier invoice" required error={errors.invoiceNo} disabled={isEditMode} />
                         </div>
                         <div>
                             <DatePickerCalendar
@@ -734,14 +901,15 @@ const InvoiceDetailPage: React.FC = () => {
                                 onChange={(e) => setForm(p => ({ ...p, grnDate: e.target.value }))}
                                 required
                                 error={errors.grnDate}
+                                disabled={isEditMode}
                             />
                         </div>
                         <div>
-                            <SelectInput label="Supplier" name="supplierId" value={form.supplierId} options={supplierOptions} onChange={handleChange} required disabled={isPOSelected} searchable />
+                            <SelectInput label="Supplier" name="supplierId" value={form.supplierId} options={supplierOptions} onChange={handleChange} required disabled={isEditMode || isPOSelected} searchable />
                             {errors.supplierId && <div className="text-red-500 text-sm mt-1">{errors.supplierId}</div>}
                         </div>
                         <div>
-                            <SelectInput label="Store" name="storeId" value={form.storeId} options={storeOptions} onChange={handleChange} required disabled={isPOSelected} searchable />
+                            <SelectInput label="Store" name="storeId" value={form.storeId} options={storeOptions} onChange={handleChange} required disabled={isEditMode || isPOSelected} searchable />
                             {errors.storeId && <div className="text-red-500 text-sm mt-1">{errors.storeId}</div>}
                         </div>
                     </div>
@@ -766,7 +934,7 @@ const InvoiceDetailPage: React.FC = () => {
                                 pincodeValue={form.billingPincode}
                                 onPincodeChange={(val) => setForm((prev) => ({ ...prev, billingPincode: val }))}
                                 pincodeError={errors.billingPincode}
-                                disabled={isPOSelected}
+                                disabled={isPOSelected || isEditMode}
                                 required
                             />
                         </div>
@@ -775,16 +943,6 @@ const InvoiceDetailPage: React.FC = () => {
                         <div>
                             <div className="flex items-center justify-between mb-4">
                                 <h6 className="text-lg font-semibold text-gray-800 mb-0">Shipping Address</h6>
-                                {/* <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-700 mb-0">
-                                    <input
-                                        type="checkbox"
-                                        className="w-4 h-4 text-blue-600 rounded border-gray-300"
-                                        checked={form.sameAsBilling}
-                                        onChange={(e) => setForm((prev) => ({ ...prev, sameAsBilling: e.target.checked }))}
-                                        disabled={isPOSelected}
-                                    />
-                                    <span>Same as billing</span>
-                                </label> */}
                             </div>
                             <AddressForm
                                 addressValue={form.shippingAddressLine1}
@@ -803,7 +961,7 @@ const InvoiceDetailPage: React.FC = () => {
                                 onPincodeChange={(val) => setForm((prev) => ({ ...prev, shippingPincode: val }))}
                                 pincodeError={errors.shippingPincode}
                                 required={!form.sameAsBilling}
-                                disabled={isPOSelected || form.sameAsBilling}
+                                disabled={isPOSelected || form.sameAsBilling || isEditMode}
                             />
                         </div>
                     </div>
@@ -818,6 +976,7 @@ const InvoiceDetailPage: React.FC = () => {
                                     name="receiveDate"
                                     value={form.receiveDate}
                                     onChange={(e) => setForm(p => ({ ...p, receiveDate: e.target.value }))}
+                                    disabled={isEditMode}
                                 />
                             </div>
                             <div>
@@ -826,16 +985,17 @@ const InvoiceDetailPage: React.FC = () => {
                                     name="billDueDate"
                                     value={form.billDueDate}
                                     onChange={(e) => setForm(p => ({ ...p, billDueDate: e.target.value }))}
+                                    disabled={isEditMode}
                                 />
                             </div>
                             <div>
-                                <TextInput label="Challan No" name="challanNo" value={form.challanNo} onChange={handleChange} placeholder="Optional" />
+                                <TextInput label="Challan No" name="challanNo" value={form.challanNo} onChange={handleChange} placeholder="Optional" disabled={isEditMode} />
                             </div>
                             <div>
-                                <TextInput label="Transporter" name="transport" value={form.transport} onChange={handleChange} placeholder="Optional" />
+                                <TextInput label="Transporter" name="transport" value={form.transport} onChange={handleChange} placeholder="Optional" disabled={isEditMode} />
                             </div>
                             <div>
-                                <TextInput label="E-Way Bill" name="eWayBill" value={form.eWayBill} onChange={handleChange} placeholder="Optional" />
+                                <TextInput label="E-Way Bill" name="eWayBill" value={form.eWayBill} onChange={handleChange} placeholder="Optional" disabled={isEditMode} />
                             </div>
                             <div>
                                 <div className="flex flex-col min-h-[68px] justify-end pb-[10px]">
@@ -845,25 +1005,28 @@ const InvoiceDetailPage: React.FC = () => {
                                             className="w-4 h-4 text-blue-600 rounded border-gray-300"
                                             checked={form.updateStock}
                                             onChange={(e) => setForm((prev: any) => ({ ...prev, updateStock: e.target.checked }))}
+                                            disabled={isEditMode}
                                         />
                                         <span>Update Stock</span>
                                     </label>
                                 </div>
                             </div>
-                            <div>
-                                <FileUpload
-                                    label={form.invoiceImage ? `Invoice: ${form.invoiceImage}` : "Upload Invoice"}
-                                    name="invoiceImage"
-                                    onChange={handleFileChange}
-                                />
-                            </div>
+                            {!isEditMode && (
+                                <div>
+                                    <FileUpload
+                                        label={form.invoiceImage ? `Invoice: ${form.invoiceImage}` : "Upload Invoice"}
+                                        name="invoiceImage"
+                                        onChange={handleFileChange}
+                                    />
+                                </div>
+                            )}
                         </div>
                     </div>
 
                     {/* Items */}
                     <div className="flex justify-between items-center mb-4 mt-6">
                         <span className="text-lg font-semibold text-gray-800">Order Items</span>
-                        <CustomButton text="Add Item" icon={FaPlus} type="button" onClick={addItem} />
+                        {!isEditMode && <CustomButton text="Add Item" icon={FaPlus} type="button" onClick={addItem} />}
                     </div>
 
                     <div className="w-full border border-gray-200 rounded-lg overflow-visible">
@@ -892,7 +1055,7 @@ const InvoiceDetailPage: React.FC = () => {
                                         <tr key={idx} className="hover:bg-slate-50 transition-colors">
                                             <td className="p-2 text-center text-gray-500 align-middle">{idx + 1}</td>
                                             <td className="p-2 align-middle">
-                                                {isPOSelected ? (
+                                                {isPOSelected || isEditMode ? (
                                                     <span className="font-semibold text-slate-800 text-sm px-1">{materialName}</span>
                                                 ) : (
                                                     <SelectInput
@@ -947,6 +1110,7 @@ const InvoiceDetailPage: React.FC = () => {
                                                     value={item.qty}
                                                     baseUoms={baseUoms}
                                                     required
+                                                    disabled={isEditMode}
                                                     error={errors[`items.${idx}.qty`]}
                                                     onChange={(e) => updateItem(idx, "qty", Number(e.target.value))}
                                                 />
@@ -970,15 +1134,17 @@ const InvoiceDetailPage: React.FC = () => {
                                                     options={gstOptions}
                                                     value={String(item.tax || 0)}
                                                     onChange={(e) => updateItem(idx, "tax", Number(e.target.value))}
-                                                    // disabled={true}
+                                                    disabled={isEditMode}
                                                 />
                                             </td>
 
                                             <td className="p-2 text-right align-middle font-semibold text-gray-700">₹{item.netAmount.toFixed(2)}</td>
                                             <td className="p-2 text-center align-middle">
-                                                <button type="button" onClick={() => removeItem(idx)} className="text-red-500 hover:text-red-700 p-1.5 rounded-full hover:bg-red-50 transition-colors" title="Remove Item">
-                                                    <FaTrash size={14} />
-                                                </button>
+                                                {!isEditMode && (
+                                                    <button type="button" onClick={() => removeItem(idx)} className="text-red-500 hover:text-red-700 p-1.5 rounded-full hover:bg-red-50 transition-colors" title="Remove Item">
+                                                        <FaTrash size={14} />
+                                                    </button>
+                                                )}
                                             </td>
                                         </tr>
                                     );
@@ -1000,6 +1166,7 @@ const InvoiceDetailPage: React.FC = () => {
                                 placeholder="Additional notes..."
                                 rows={4}
                                 onChange={(e) => setForm(p => ({ ...p, remarks: e.target.value }))}
+                                disabled={isEditMode}
                             />
                         </div>
 
@@ -1017,6 +1184,7 @@ const InvoiceDetailPage: React.FC = () => {
                                             className="border border-gray-300 rounded p-1 text-sm outline-none w-16"
                                             value={form.discountType}
                                             onChange={(e) => setForm((p) => ({ ...p, discountType: e.target.value as any }))}
+                                            disabled={isEditMode}
                                         >
                                             <option value="flat">flat</option>
                                             <option value="percent">%</option>
@@ -1024,6 +1192,7 @@ const InvoiceDetailPage: React.FC = () => {
                                         <input type="number" min={0} step={0.01} value={form.discountValue}
                                             onChange={(e) => setForm((p) => ({ ...p, discountValue: Number(e.target.value) }))}
                                             className="border border-gray-300 rounded p-1 text-sm outline-none w-20 text-right"
+                                            disabled={isEditMode}
                                         />
                                     </div>
                                 </div>
@@ -1032,14 +1201,17 @@ const InvoiceDetailPage: React.FC = () => {
                                     <div className="flex items-center gap-2">
                                         <div className="flex items-center">
                                             <button type="button" onClick={() => setRoundingSign("+")}
+                                                disabled={isEditMode}
                                                 className={`px-2 py-1 border border-gray-300 rounded-l text-xs font-semibold ${roundingSign === "+" ? "bg-blue-600 text-white border-blue-600" : "bg-gray-50 text-gray-600"}`}>+</button>
                                             <button type="button" onClick={() => setRoundingSign("-")}
+                                                disabled={isEditMode}
                                                 className={`px-2 py-1 border border-gray-300 border-l-0 rounded-r text-xs font-semibold ${roundingSign === "-" ? "bg-red-500 text-white border-red-500" : "bg-gray-50 text-gray-600"}`}>-</button>
                                         </div>
                                         <input type="number" min={0} step={0.01} value={form.roundingAdjust}
                                             onChange={(e) => setForm((p) => ({ ...p, roundingAdjust: Math.abs(Number(e.target.value)) }))}
                                             className="border border-gray-300 rounded p-1 text-sm outline-none w-20 text-right"
                                             placeholder="0.00"
+                                            disabled={isEditMode}
                                         />
                                     </div>
                                 </div>
@@ -1093,64 +1265,137 @@ const InvoiceDetailPage: React.FC = () => {
                     </div>
 
                     {/* Payment Details */}
-                    <div className="mt-6">
-                        <h6 className="text-lg font-semibold text-gray-800 mb-4">Payment Details</h6>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                    <div className="mt-6 border-t border-gray-200 pt-6">
+                        <h6 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                            <FaCreditCard className="text-blue-600" /> Payment & Collection Details
+                        </h6>
+
+                        {/* Top Info Cards */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 bg-slate-50 p-4 border border-slate-100 rounded-lg">
+                            <div className="bg-white p-3 border border-slate-100 rounded shadow-xs">
+                                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Total Amount</span>
+                                <span className="text-lg font-bold text-slate-900">₹{grandTotal.toFixed(2)}</span>
+                            </div>
+                            <div className="bg-white p-3 border border-slate-100 rounded shadow-xs">
+                                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Total Paid</span>
+                                <span className="text-lg font-bold text-emerald-600">₹{totalPaid.toFixed(2)}</span>
+                            </div>
+                            <div className="bg-white p-3 border border-slate-100 rounded shadow-xs">
+                                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Balance Due</span>
+                                <span className={`text-lg font-bold ${balanceDue > 0 ? "text-amber-600" : "text-slate-500"}`}>
+                                    ₹{balanceDue.toFixed(2)}
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* Overpayment Warning banner */}
+                        {isOverpaid && (
+                            <div className="mb-4 p-3 bg-amber-50 border border-amber-100 text-amber-800 text-sm font-semibold rounded-lg">
+                                Warning: Total paid amount (₹{totalPaid.toFixed(2)}) exceeds the invoice amount (₹{grandTotal.toFixed(2)}).
+                            </div>
+                        )}
+
+                        {/* Form controls to add a payment transaction */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 bg-slate-50/50 p-4 border border-slate-100/50 rounded-lg mb-4">
                             <div>
-                                <label className="block text-sm font-semibold text-gray-700 mb-2">Payment Status</label>
-                                <div className="flex gap-2">
-                                    {[
-                                        { label: "Paid", color: "text-green-700", border: "border-green-500", bg: "bg-green-50" },
-                                        { label: "Unpaid", color: "text-red-700", border: "border-red-500", bg: "bg-red-50" },
-                                        { label: "Partial", color: "text-orange-700", border: "border-orange-500", bg: "bg-orange-50" },
-                                    ].map(({ label, color, border, bg }) => (
-                                        <button
-                                            key={label}
-                                            type="button"
-                                            onClick={() => setForm((p) => ({ ...p, paymentStatus: label }))}
-                                            className={`px-3 py-1.5 rounded-full text-xs font-semibold border-2 transition-colors ${form.paymentStatus === label ? `${color} ${border} ${bg}` : "border-gray-200 text-gray-500 hover:bg-gray-50"}`}
-                                        >
-                                            {label}
-                                        </button>
-                                    ))}
-                                </div>
+                                <TextInput
+                                    label="Amount"
+                                    type="number"
+                                    name="amount"
+                                    value={newPayment.amount}
+                                    onChange={(e) => setNewPayment(p => ({ ...p, amount: e.target.value }))}
+                                    placeholder="Enter amount"
+                                />
                             </div>
                             <div>
                                 <SelectInput
-                                    label="Payment Method"
+                                    label="Method"
                                     name="paymentMethod"
-                                    value={form.paymentMethod}
+                                    value={newPayment.paymentMethod}
                                     options={[
-                                        { value: "", label: "Select method" },
-                                        { value: "Cash", label: "Cash" },
                                         { value: "Bank Transfer", label: "Bank Transfer" },
+                                        { value: "Cash", label: "Cash" },
                                         { value: "Cheque", label: "Cheque" },
                                         { value: "UPI", label: "UPI" },
-                                        { value: "NEFT", label: "NEFT" },
-                                        { value: "RTGS", label: "RTGS" },
                                     ]}
-                                    onChange={handleChange}
+                                    onChange={(e) => setNewPayment(p => ({ ...p, paymentMethod: e.target.value }))}
                                 />
                             </div>
                             <div>
-                                <TextInput label="Reference Number / UTR" name="referenceNumber" value={form.referenceNumber} onChange={handleChange} placeholder="Transaction reference" />
+                                <TextInput
+                                    label="Reference / UTR"
+                                    name="referenceNumber"
+                                    value={newPayment.referenceNumber}
+                                    onChange={(e) => setNewPayment(p => ({ ...p, referenceNumber: e.target.value }))}
+                                    placeholder="Enter UTR/Cheque ID"
+                                    disabled={newPayment.paymentMethod.toLowerCase() === "cash"}
+                                />
                             </div>
-                            <div>
+                            <div className="flex flex-col justify-between">
                                 <DatePickerCalendar
                                     label="Payment Date"
                                     name="paymentDate"
-                                    value={form.paymentDate}
-                                    onChange={(e) => setForm(p => ({ ...p, paymentDate: e.target.value }))}
+                                    value={newPayment.paymentDate}
+                                    onChange={(e) => setNewPayment(p => ({ ...p, paymentDate: e.target.value }))}
                                 />
+                                <button
+                                    type="button"
+                                    onClick={handleAddPayment}
+                                    className="mt-3 w-full py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-bold shadow-xs transition-colors"
+                                >
+                                    Add Payment
+                                </button>
                             </div>
                         </div>
+
+                        {/* Table layout of added payments */}
+                        {payments.length > 0 ? (
+                            <div className="overflow-x-auto border border-slate-200 rounded-lg">
+                                <table className="w-full text-sm text-left border-collapse bg-white">
+                                    <thead className="bg-slate-50 text-slate-700 font-semibold border-b border-slate-200">
+                                        <tr>
+                                            <th className="p-3">Amount</th>
+                                            <th className="p-3">Payment Method</th>
+                                            <th className="p-3">Reference / UTR</th>
+                                            <th className="p-3">Payment Date</th>
+                                            <th className="p-3 text-center w-12">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {payments.map((p) => (
+                                            <tr key={p.id} className="hover:bg-slate-50/50">
+                                                <td className="p-3 font-semibold text-slate-900">₹{Number(p.amount).toFixed(2)}</td>
+                                                <td className="p-3 text-slate-600">{p.paymentMethod}</td>
+                                                <td className="p-3 text-slate-600">{p.referenceNumber || "—"}</td>
+                                                <td className="p-3 text-slate-500">{p.paymentDate}</td>
+                                                <td className="p-3 text-center">
+                                                    {!p.isPersisted && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleRemovePayment(p.id)}
+                                                            className="text-red-500 hover:text-red-700 p-1 transition-colors"
+                                                        >
+                                                            <FaTrash size={14} />
+                                                        </button>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        ) : (
+                            <div className="p-4 bg-slate-50 border border-dashed border-slate-200 rounded-lg text-center text-slate-400 italic text-sm">
+                                No payment transactions recorded. Use the inputs above to add a payment.
+                            </div>
+                        )}
                     </div>
 
                     {/* Actions */}
                     <div className="flex flex-wrap justify-end gap-3 mt-8 pt-4 border-t border-gray-200">
                         <CustomButton text="Cancel" type="button" onClick={() => navigate("/invoice")} />
                         <CustomButton
-                            text={saving ? "Saving…" : "Create Bill & Update Stock"}
+                            text={saving ? "Saving…" : (isEditMode ? "Update Bill" : "Create Bill & Update Stock")}
                             type="submit"
                             disabled={saving}
                         />

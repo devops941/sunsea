@@ -4,6 +4,7 @@ import { authMiddleware } from "../../middleware/auth.middleware";
 import { validateMiddleware } from "../../middleware/validate.middleware";
 import {
   createSalesInvoiceRequestSchema,
+  updateSalesInvoiceRequestSchema,
   salesInvoiceIdRequestSchema,
 } from "./sales-invoice.validation";
 
@@ -27,6 +28,13 @@ router.get(
   authMiddleware,
   validateMiddleware(salesInvoiceIdRequestSchema),
   salesInvoiceController.findOne
+);
+
+router.put(
+  "/:id",
+  authMiddleware,
+  validateMiddleware(updateSalesInvoiceRequestSchema),
+  salesInvoiceController.update
 );
 
 router.delete(

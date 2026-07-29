@@ -621,6 +621,11 @@ const AppRoutes = () => {
               <Route path="/sales-invoices/create" element={<SalesInvoiceForm />} />
             </Route>
 
+            {/* Edit Sales Invoice Route */}
+            <Route element={<ProtectedRoute permission="reports.view" />}>
+              <Route path="/sales-invoices/edit/:id" element={<SalesInvoiceForm />} />
+            </Route>
+
             {/* Pending Quotations Edit :Id Route */}
             <Route element={<ProtectedRoute permission="reports.view" />}>
               <Route path="/pending-quotations/edit/:id" element={<UpdateQuatation />} />
@@ -663,6 +668,9 @@ const AppRoutes = () => {
             </Route>
             <Route element={<ProtectedRoute permission="reports.view" />}>
               <Route path="/invoice/create" element={<InvoiceDetail />} />
+            </Route>
+            <Route element={<ProtectedRoute permission="reports.view" />}>
+              <Route path="/invoice/edit/:id" element={<InvoiceDetail />} />
             </Route>
             <Route element={<ProtectedRoute permission="reports.view" />}>
               <Route path="/settings" element={<Settings />} />
