@@ -42,7 +42,7 @@ const ProductionOrderTabs: React.FC = () => {
         "oee": "/oee-dashboard"
     };
 
-    const activeTab = pathToKey[location.pathname] || "active";
+    const activeTab = pathToKey[location.pathname] || "history";
 
     const tabs: TabItem[] = [
         { key: "history", label: "Order History", icon: <FaHistory />, content: <AllProductionOrderList /> },
