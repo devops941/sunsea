@@ -1,11 +1,18 @@
 import { useCallback } from "react";
 import { useAppDispatch, useAppSelector } from "./reduxHooks";
-import { fetchCategories, createCategory, updateCategory, deleteCategory } from "../features/categories/categorySlice";
-import type { CreateCategoryDto, UpdateCategoryDto } from "../features/categories/types";
+import { fetchCategories, createCategory, updateCategory, deleteCategory, categoryCreated, categoryUpdated, categoryDeleted } from "../features/categories/categorySlice";
+import type { Category, CreateCategoryDto, UpdateCategoryDto } from "../features/categories/types";
+import { useSocketSync } from "./useSocketSync";
 
 export const useCategories = () => {
   const dispatch = useAppDispatch();
   const { data: categories, loading, error } = useAppSelector((state) => state.categories);
+
+  useSocketSync<Category>("category", {
+    created: categoryCreated,
+    updated: categoryUpdated,
+    deleted: categoryDeleted,
+  });
 
   const loadCategories = useCallback((args?: { search?: string; isActive?: boolean } | string) => {
     dispatch(fetchCategories(args ?? {}));

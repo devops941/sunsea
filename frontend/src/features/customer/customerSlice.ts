@@ -55,7 +55,25 @@ const initialState: CustomerState = {
 const customerSlice = createSlice({
   name: "customers",
   initialState,
-  reducers: {},
+  reducers: {
+    customerCreated: (state, action: PayloadAction<any>) => {
+      const exists = state.customers.find((c) => String(c.id) === String(action.payload.id));
+      if (!exists) {
+        state.customers.unshift(action.payload);
+        state.total += 1;
+      }
+    },
+    customerUpdated: (state, action: PayloadAction<any>) => {
+      const index = state.customers.findIndex((c) => String(c.id) === String(action.payload.id));
+      if (index !== -1) {
+        state.customers[index] = action.payload;
+      }
+    },
+    customerDeleted: (state, action: PayloadAction<string>) => {
+      state.customers = state.customers.filter((c) => String(c.id) !== String(action.payload));
+      state.total = Math.max(0, state.total - 1);
+    },
+  },
   extraReducers: (builder) => {
     builder
       .addCase(fetchCustomers.pending, (state) => {
@@ -75,8 +93,11 @@ const customerSlice = createSlice({
         state.error = action.payload as string;
       })
       .addCase(createCustomer.fulfilled, (state, action: PayloadAction<Customer>) => {
-        state.customers.unshift(action.payload);
-        state.total += 1;
+        const exists = state.customers.find((c) => String(c.id) === String(action.payload.id));
+        if (!exists) {
+          state.customers.unshift(action.payload);
+          state.total += 1;
+        }
       })
       .addCase(updateCustomer.fulfilled, (state, action: PayloadAction<Customer>) => {
         const index = state.customers.findIndex((c) => c.id === action.payload.id);
@@ -90,5 +111,7 @@ const customerSlice = createSlice({
       });
   },
 });
+
+export const { customerCreated, customerUpdated, customerDeleted } = customerSlice.actions;
 
 export default customerSlice.reducer;

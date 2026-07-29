@@ -65,7 +65,28 @@ const initialState: DepartmentState = {
 const departmentSlice = createSlice({
   name: "departments",
   initialState,
-  reducers: {},
+  reducers: {
+    departmentCreated: (state, action: PayloadAction<Department>) => {
+      const exists = state.data.find((item) => item.id === action.payload.id);
+      if (!exists) {
+        state.data.unshift(action.payload);
+        state.total += 1;
+      }
+    },
+    departmentUpdated: (state, action: PayloadAction<Department>) => {
+      const index = state.data.findIndex((item) => item.id === action.payload.id);
+      if (index !== -1) {
+        state.data[index] = action.payload;
+      }
+    },
+    departmentDeleted: (state, action: PayloadAction<number>) => {
+      const index = state.data.findIndex((item) => item.id === action.payload);
+      if (index !== -1) {
+        state.data.splice(index, 1);
+        state.total -= 1;
+      }
+    },
+  },
   extraReducers: (builder) => {
     builder
       .addCase(fetchDepartments.pending, (state) => {
@@ -84,7 +105,11 @@ const departmentSlice = createSlice({
         state.error = action.payload as string;
       })
       .addCase(createDepartment.fulfilled, (state, action: PayloadAction<Department>) => {
-        state.data.push(action.payload);
+        const exists = state.data.find((item) => item.id === action.payload.id);
+        if (!exists) {
+          state.data.unshift(action.payload);
+          state.total += 1;
+        }
       })
       .addCase(updateDepartment.fulfilled, (state, action: PayloadAction<Department>) => {
         const index = state.data.findIndex((item) => item.id === action.payload.id);
@@ -97,5 +122,7 @@ const departmentSlice = createSlice({
       });
   },
 });
+
+export const { departmentCreated, departmentUpdated, departmentDeleted } = departmentSlice.actions;
 
 export default departmentSlice.reducer;

@@ -13,10 +13,11 @@ import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/Common
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import DataTable from "../../../components/ui/table/DataTable";
 
-import { fetchShifts, deleteShift } from "../../../features/shifts/shiftSlice";
+import { fetchShifts, deleteShift, shiftCreated, shiftUpdated, shiftDeleted } from "../../../features/shifts/shiftSlice";
 import type { RootState, AppDispatch } from "../../../app/store";
 import type { Shift } from "../../../features/shifts/types";
 import { hasPermission } from "../../../utils/permission";
+import { useSocketSync } from "../../../hooks/useSocketSync";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -75,6 +76,12 @@ const ShiftList: React.FC = () => {
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [itemToDelete, setItemToDelete] = useState<number | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
+
+    useSocketSync<Shift>("shift", {
+        created: shiftCreated,
+        updated: shiftUpdated,
+        deleted: shiftDeleted,
+    });
 
     useEffect(() => {
         dispatch(fetchShifts());

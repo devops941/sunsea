@@ -46,7 +46,29 @@ const initialState: RoleState = {
 const roleSlice = createSlice({
   name: "roles",
   initialState,
-  reducers: {},
+  reducers: {
+    roleCreated: (state, action: PayloadAction<Role>) => {
+      // Check if it already exists to avoid duplicates
+      const exists = state.data.find((item) => item.id === action.payload.id);
+      if (!exists) {
+        state.data.unshift(action.payload);
+        state.total += 1;
+      }
+    },
+    roleUpdated: (state, action: PayloadAction<Role>) => {
+      const index = state.data.findIndex((item) => item.id === action.payload.id);
+      if (index !== -1) {
+        state.data[index] = action.payload;
+      }
+    },
+    roleDeleted: (state, action: PayloadAction<number>) => {
+      const index = state.data.findIndex((item) => item.id === action.payload);
+      if (index !== -1) {
+        state.data.splice(index, 1);
+        state.total -= 1;
+      }
+    },
+  },
   extraReducers: (builder) => {
     builder
       .addCase(fetchRoles.pending, (state) => {
@@ -63,7 +85,11 @@ const roleSlice = createSlice({
         state.error = action.payload as string;
       })
       .addCase(createRole.fulfilled, (state, action: PayloadAction<Role>) => {
-        state.data.push(action.payload);
+        const exists = state.data.find((item) => item.id === action.payload.id);
+        if (!exists) {
+          state.data.unshift(action.payload);
+          state.total += 1;
+        }
       })
       .addCase(updateRole.fulfilled, (state, action: PayloadAction<Role>) => {
         const index = state.data.findIndex((item) => item.id === action.payload.id);
@@ -76,5 +102,7 @@ const roleSlice = createSlice({
       });
   },
 });
+
+export const { roleCreated, roleUpdated, roleDeleted } = roleSlice.actions;
 
 export default roleSlice.reducer;

@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 
 import { ApiResponse } from "../../utils/ApiResponse";
 import { asyncHandler } from "../../utils/asyncHandler";
+import { getIO } from "../../socket/socket";
 
 import {
   createDepartmentService,
@@ -25,6 +26,8 @@ export const createDepartment =
         await createDepartmentService(
           req.body
         );
+
+      getIO().emit("department:created", department);
 
       return res.status(201).json(
         new ApiResponse(
@@ -110,6 +113,8 @@ export const updateDepartment =
           req.body
         );
 
+      getIO().emit("department:updated", department);
+
       return res.status(200).json(
         new ApiResponse(
           "Department updated successfully",
@@ -124,6 +129,9 @@ export const deleteDepartment =
     async (req: Request, res: Response) => {
       const departmentId = Number(String(req.params.id));
       await deleteDepartmentService(departmentId);
+      
+      getIO().emit("department:deleted", { id: departmentId });
+      
       return res.status(200).json(
         new ApiResponse("Department deleted successfully")
       );

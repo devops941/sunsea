@@ -46,7 +46,23 @@ const initialState: SupplierState = {
 const supplierSlice = createSlice({
   name: "suppliers",
   initialState,
-  reducers: {},
+  reducers: {
+    supplierCreated: (state, action: PayloadAction<any>) => {
+      const exists = state.suppliers.find((s) => String(s.id) === String(action.payload.id));
+      if (!exists) {
+        state.suppliers.unshift(action.payload);
+      }
+    },
+    supplierUpdated: (state, action: PayloadAction<any>) => {
+      const index = state.suppliers.findIndex((s) => String(s.id) === String(action.payload.id));
+      if (index !== -1) {
+        state.suppliers[index] = action.payload;
+      }
+    },
+    supplierDeleted: (state, action: PayloadAction<string>) => {
+      state.suppliers = state.suppliers.filter((s) => String(s.id) !== String(action.payload));
+    },
+  },
   extraReducers: (builder) => {
     builder
       .addCase(fetchSuppliers.pending, (state) => {
@@ -62,7 +78,10 @@ const supplierSlice = createSlice({
         state.error = action.payload as string;
       })
       .addCase(createSupplier.fulfilled, (state, action: PayloadAction<Supplier>) => {
-        state.suppliers.push(action.payload);
+        const exists = state.suppliers.find((s) => String(s.id) === String(action.payload.id));
+        if (!exists) {
+          state.suppliers.unshift(action.payload);
+        }
       })
       .addCase(updateSupplier.fulfilled, (state, action: PayloadAction<Supplier>) => {
         const index = state.suppliers.findIndex((s) => s.id === action.payload.id);
@@ -75,5 +94,7 @@ const supplierSlice = createSlice({
       });
   },
 });
+
+export const { supplierCreated, supplierUpdated, supplierDeleted } = supplierSlice.actions;
 
 export default supplierSlice.reducer;

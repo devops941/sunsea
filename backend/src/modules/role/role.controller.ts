@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import * as roleService from "./role.service";
+import { getIO } from "../../socket/socket";
 
 export const createRole = async (
   req: Request,
@@ -8,6 +9,8 @@ export const createRole = async (
   const role = await roleService.createRole(
     req.body
   );
+  getIO().emit("role:created", role);
+
 
   return res.status(201).json({
     success: true,
@@ -69,6 +72,8 @@ export const updateRole = async (
       roleId,
       req.body
     );
+  getIO().emit("role:updated", role);
+
 
   return res.status(200).json({
     success: true,
@@ -88,6 +93,7 @@ export const deleteRole = async (
   await roleService.deleteRole(
     roleId
   );
+  getIO().emit("role:deleted", { id: roleId });
 
   return res.status(200).json({
     success: true,

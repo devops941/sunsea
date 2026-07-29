@@ -1,12 +1,19 @@
 import { useCallback } from "react";
 import { useAppDispatch, useAppSelector } from "./reduxHooks";
-import { fetchCustomers, createCustomer, updateCustomer, deleteCustomer } from "../features/customer/customerSlice";
-import type { CreateCustomerDto, UpdateCustomerDto } from "../features/customer/types";
+import { fetchCustomers, createCustomer, updateCustomer, deleteCustomer, customerCreated, customerUpdated, customerDeleted } from "../features/customer/customerSlice";
+import type { Customer, CreateCustomerDto, UpdateCustomerDto } from "../features/customer/types";
+import { useSocketSync } from "./useSocketSync";
 
 export const useCustomers = () => {
   const dispatch = useAppDispatch();
   // BUG-CUST-004 fix: expose pagination metadata from state
   const { customers, loading, error, total, page, totalPages } = useAppSelector((state) => state.customers);
+
+  useSocketSync<Customer>("customer", {
+    created: customerCreated,
+    updated: customerUpdated,
+    deleted: customerDeleted,
+  });
 
   // BUG-CUST-004 fix: accept page and limit params for server-side pagination
   const loadCustomers = useCallback((params?: { search?: string; page?: number; limit?: number } | string) => {

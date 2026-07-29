@@ -45,7 +45,26 @@ const initialState: ShiftState = {
 const shiftSlice = createSlice({
   name: "shifts",
   initialState,
-  reducers: {},
+  reducers: {
+    shiftCreated: (state, action: PayloadAction<Shift>) => {
+      const exists = state.data.find((item) => String(item.id) === String(action.payload.id));
+      if (!exists) {
+        state.data.unshift(action.payload);
+      }
+    },
+    shiftUpdated: (state, action: PayloadAction<Shift>) => {
+      const index = state.data.findIndex((item) => String(item.id) === String(action.payload.id));
+      if (index !== -1) {
+        state.data[index] = action.payload;
+      }
+    },
+    shiftDeleted: (state, action: PayloadAction<number>) => {
+      const index = state.data.findIndex((item) => String(item.id) === String(action.payload));
+      if (index !== -1) {
+        state.data.splice(index, 1);
+      }
+    },
+  },
   extraReducers: (builder) => {
     builder
       .addCase(fetchShifts.pending, (state) => {
@@ -61,7 +80,10 @@ const shiftSlice = createSlice({
         state.error = action.payload as string;
       })
       .addCase(createShift.fulfilled, (state, action: PayloadAction<Shift>) => {
-        state.data.push(action.payload);
+        const exists = state.data.find((item) => String(item.id) === String(action.payload.id));
+        if (!exists) {
+          state.data.unshift(action.payload);
+        }
       })
       .addCase(updateShift.fulfilled, (state, action: PayloadAction<Shift>) => {
         const index = state.data.findIndex((item) => item.id === action.payload.id);
@@ -74,5 +96,7 @@ const shiftSlice = createSlice({
       });
   },
 });
+
+export const { shiftCreated, shiftUpdated, shiftDeleted } = shiftSlice.actions;
 
 export default shiftSlice.reducer;

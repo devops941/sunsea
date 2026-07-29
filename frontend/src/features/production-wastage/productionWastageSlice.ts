@@ -1,4 +1,5 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
+import type { PayloadAction } from "@reduxjs/toolkit";
 import { productionWastageService } from "../../services/productionWastageService";
 
 export interface ProductionWastageState {
@@ -100,7 +101,34 @@ const initialState: ProductionWastageState = {
 const productionWastageSlice = createSlice({
   name: "productionWastages",
   initialState,
-  reducers: {},
+  reducers: {
+    productionWastageCreated: (state, action: PayloadAction<any>) => {
+      const record = action.payload?.data || action.payload;
+      if (record && Array.isArray(state.data)) {
+        const exists = state.data.find((m) => String(m.id) === String(record.id));
+        if (!exists) {
+          state.data.unshift(record);
+        }
+      }
+    },
+    productionWastageUpdated: (state, action: PayloadAction<any>) => {
+      const record = action.payload?.data || action.payload;
+      if (record && Array.isArray(state.data)) {
+        const index = state.data.findIndex((m) => String(m.id) === String(record.id));
+        if (index !== -1) {
+          state.data[index] = record;
+        }
+      }
+    },
+    productionWastageDeleted: (state, action: PayloadAction<string>) => {
+      if (Array.isArray(state.data)) {
+        const index = state.data.findIndex((m) => String(m.id) === String(action.payload));
+        if (index !== -1) {
+          state.data.splice(index, 1);
+        }
+      }
+    },
+  },
   extraReducers: (builder) => {
     builder
       .addCase(fetchProductionWastages.pending, (state) => {
@@ -125,7 +153,10 @@ const productionWastageSlice = createSlice({
       .addCase(createProductionWastage.fulfilled, (state, action) => {
         const record = action.payload?.data || action.payload;
         if (record && Array.isArray(state.data)) {
-          state.data.unshift(record);
+          const exists = state.data.find((m) => String(m.id) === String(record.id));
+          if (!exists) {
+            state.data.unshift(record);
+          }
         }
       })
       .addCase(updateProductionWastage.fulfilled, (state, action) => {
@@ -162,5 +193,7 @@ const productionWastageSlice = createSlice({
       });
   },
 });
+
+export const { productionWastageCreated, productionWastageUpdated, productionWastageDeleted } = productionWastageSlice.actions;
 
 export default productionWastageSlice.reducer;

@@ -2,9 +2,11 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
+import http from "http";
 import app from "./app";
 import { prisma } from "./config/prisma";
 import { bootstrapAdmin } from "./utils/bootstrapAdmin";
+import { initSocket } from "./socket/socket";
 import "./modules/inventory/jobs/scheduler";
 // Global BigInt serialization for JSON responses (reconnected)
 // This ensures all BigInt values are converted to strings when Express calls JSON.stringify.
@@ -23,7 +25,11 @@ const startServer = async (): Promise<void> => {
     // Automatically create admin user from .env variables
     await bootstrapAdmin(prisma);
 
-    const server = app.listen(PORT, () => {
+    const server = http.createServer(app);
+
+    initSocket(server);
+
+    server.listen(PORT, () => {
       console.log(
         `🚀 Server is running on http://localhost:${PORT}`
       );

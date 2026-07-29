@@ -5,8 +5,12 @@ import {
   createRawMaterialCategory,
   updateRawMaterialCategory,
   deleteRawMaterialCategory,
+  rmCategoryCreated,
+  rmCategoryUpdated,
+  rmCategoryDeleted,
 } from "../features/raw-material-categories/rawMaterialCategorySlice";
-import type { CreateRawMaterialCategoryDto, UpdateRawMaterialCategoryDto } from "../features/raw-material-categories/types";
+import type { RawMaterialCategory, CreateRawMaterialCategoryDto, UpdateRawMaterialCategoryDto } from "../features/raw-material-categories/types";
+import { useSocketSync } from "./useSocketSync";
 
 export const useRawMaterialCategories = () => {
   const dispatch = useAppDispatch();
@@ -16,6 +20,13 @@ export const useRawMaterialCategories = () => {
     loading,
     error,
   } = useAppSelector((state) => state.rawMaterialCategories);
+
+  useSocketSync<RawMaterialCategory>("rmCategory", {
+    created: rmCategoryCreated,
+    updated: rmCategoryUpdated,
+    deleted: rmCategoryDeleted,
+  });
+
   const loadCategories = useCallback(
     (params?: {
       search?: string;

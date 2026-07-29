@@ -4,8 +4,10 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
-import { fetchRawMaterials, deleteRawMaterial } from "../../../features/raw-materials/rawMaterialSlice";
+import { fetchRawMaterials, deleteRawMaterial, rawMaterialCreated, rawMaterialUpdated, rawMaterialDeleted } from "../../../features/raw-materials/rawMaterialSlice";
 import { fetchStores } from "../../../features/stores/storeSlice";
+import { useSocketSync } from "../../../hooks/useSocketSync";
+import type { RawMaterial } from "../../../features/raw-materials/types";
 
 import EditButton from "../../../components/ui/EditButton/EditButton";
 import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
@@ -47,6 +49,12 @@ const RawMaterialList: React.FC = () => {
         setSelectedItem(item);
         setShowViewModal(true);
     }, []);
+
+    useSocketSync<RawMaterial>("rawMaterial", {
+        created: rawMaterialCreated,
+        updated: rawMaterialUpdated,
+        deleted: rawMaterialDeleted,
+    });
 
     useEffect(() => {
         dispatch(fetchStores(undefined));

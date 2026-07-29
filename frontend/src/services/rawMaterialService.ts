@@ -2,7 +2,7 @@ import apiClient from "../api/apiClient";
 import config from "../api/config";
 import type { RawMaterial, CreateRawMaterialDto, UpdateRawMaterialDto } from "../features/raw-materials/types";
 
-const mapRawMaterial = (item: any): RawMaterial => ({
+export const mapRawMaterial = (item: any): RawMaterial => ({
   rawMaterialId: item.rawMaterialId,
   materialName: item.materialName,
 
