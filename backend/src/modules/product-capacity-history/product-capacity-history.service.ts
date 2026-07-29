@@ -54,9 +54,9 @@ export class ProductCapacityHistoryService {
 
     const previousCapacity = Number(product.capacityLitres ?? 0);
 
-    // Keep max 2 records per product: delete oldest records beyond the 1 most recent
+    // Keep max 2 records per product AND machine: delete oldest records beyond the 1 most recent
     const existing = await prisma.productCapacityHistory.findMany({
-      where: { productId: data.productId },
+      where: { productId: data.productId, machineId: data.machine || "MANUAL" },
       orderBy: { createdAt: "desc" },
       select: { id: true },
     });
@@ -78,8 +78,8 @@ export class ProductCapacityHistoryService {
           previousCapacity,
           newCapacity: data.newCapacity,
           productionDate: new Date(data.date),
-          machineId: data.machine || "MANUAL",
-          shiftId: data.shift || "MANUAL",
+          machineId: (data.machine || "MANUAL").slice(0, 20),
+          shiftId: (data.shift || "MANUAL").slice(0, 20),
           productionOrderId: "MANUAL",
           targetQty,
           actualQty,
@@ -112,6 +112,13 @@ export class ProductCapacityHistoryService {
   async getLatestByProduct(productId: number) {
     return prisma.productCapacityHistory.findFirst({
       where: { productId },
+      orderBy: { createdAt: "desc" },
+    });
+  }
+
+  async getLatestByProductAndMachine(productId: number, machineId: string) {
+    return prisma.productCapacityHistory.findFirst({
+      where: { productId, machineId },
       orderBy: { createdAt: "desc" },
     });
   }

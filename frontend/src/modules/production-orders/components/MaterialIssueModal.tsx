@@ -79,7 +79,15 @@ export const MaterialIssueModal: React.FC<MaterialIssueModalProps> = ({
                 }
                 const reservedQty = Number(calculatedRequiredQty);
                 const storeId = stockRm?.storeId || defaultStoreId || "";
-                const availableStock = stockRm ? (Number(stockRm.onHandQty || 0) - Number(stockRm.reservedQty || 0)) : Number((rm as any).availableStock || 0);
+                
+                // Since this issue is specifically for this production order, the stock reserved for it
+                // should be considered available to be issued.
+                const totalReserved = Number(stockRm?.reservedQty || 0);
+                const onHand = Number(stockRm?.onHandQty || 0);
+                const reservedForOther = Math.max(0, totalReserved - reservedQty);
+                const availableStock = stockRm 
+                    ? Math.max(0, onHand - reservedForOther) 
+                    : Number((rm as any).availableStock || 0);
 
                 let displayUom = stockRm?.baseUom?.split(',')[0] || (rm as any).uom || stockRm?.uom || "KG";
                 if (displayUom.toLowerCase() === 'ea' || displayUom.toLowerCase() === 'each') {
@@ -237,7 +245,7 @@ export const MaterialIssueModal: React.FC<MaterialIssueModalProps> = ({
     if (!show) return null;
 
     return (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-9999 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
             <div className="bg-white rounded-xl shadow-2xl w-full max-w-7xl animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh] overflow-hidden">
                 <form onSubmit={handleSubmit} className="flex flex-col h-full m-0">
                     {/* Header */}

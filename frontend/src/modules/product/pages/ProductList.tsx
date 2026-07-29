@@ -56,6 +56,7 @@ const ProductList: React.FC = () => {
     const [capQty, setCapQty] = useState("");
     const [savingCap, setSavingCap] = useState(false);
     const [capErrors, setCapErrors] = useState<Record<string, string>>({});
+    const [capHistoryRecords, setCapHistoryRecords] = useState<any[]>([]);
     const [employees, setEmployees] = useState<any[]>([]);
     const [departments, setDepartments] = useState<any[]>([]);
     const [shifts, setShifts] = useState<any[]>([]);
@@ -128,9 +129,24 @@ const ProductList: React.FC = () => {
         setCapDeptId("");
         setCapOps([]);
         setCapMachine("");
-        setCapQty(product.capacityLitres ? String(product.capacityLitres) : "");
+        setCapQty("");
         setCapErrors({});
+        setCapHistoryRecords([]);
         setShowCapModal(true);
+        // Fetch this product's capacity history so we can validate per-machine
+        productCapacityHistoryService.fetchByProduct(Number(product.id))
+            .then((records: any[]) => setCapHistoryRecords(records))
+            .catch(() => setCapHistoryRecords([]));
+    };
+
+    // Derive current capacity for the selected machine (highest recorded newCapacity)
+    const getMachineCurrentCap = (machineId: string): number => {
+        if (!machineId) return Number(capProduct?.capacityLitres ?? 0);
+        const machineRecords = capHistoryRecords.filter(
+            (r: any) => r.machineId === machineId && r.machineId !== "INITIAL"
+        );
+        if (machineRecords.length === 0) return 0;
+        return Math.max(...machineRecords.map((r: any) => Number(r.newCapacity)));
     };
 
     const handleCapSave = async () => {
@@ -139,7 +155,17 @@ const ProductList: React.FC = () => {
         if (!capShift) errs.capShift = "Shift is required";
         if (!capDeptId) errs.capDeptId = "Role is required";
         if (!capOps.length) errs.capOps = "Select at least one operator";
-        if (!capQty || Number(capQty) <= 0) errs.capQty = "Valid quantity required";
+        if (!capQty || Number(capQty) <= 0) {
+            errs.capQty = "Valid quantity required";
+        } else {
+            const currentCap = getMachineCurrentCap(capMachine);
+            if (Number(capQty) <= currentCap) {
+                const machineLabel = capMachine
+                    ? machines.find((m: any) => m.machineId === capMachine)?.machineName || capMachine
+                    : "current";
+                errs.capQty = `New capacity must be greater than ${machineLabel}'s current capacity (${currentCap.toLocaleString()})`;
+            }
+        }
         setCapErrors(errs);
         if (Object.keys(errs).length > 0) return;
         setSavingCap(true);
@@ -209,8 +235,7 @@ const ProductList: React.FC = () => {
                 const lastStock =
                     product.finishedGoodsStocks?.[product.finishedGoodsStocks.length - 1];
                 const onHandQty = lastStock?.onHandQty || 0;
-                ``
-                const minQty = product.minimumQty || 0;
+                            const minQty = product.minimumQty || 0;
                 return (
                     <div className="flex flex-col items-center">
                         <span className="font-semibold text-slate-800">{onHandQty}</span>
@@ -218,11 +243,6 @@ const ProductList: React.FC = () => {
                     </div>
                 );
             }
-        },
-        {
-            header: "Capacity",
-            render: (product) => product.capacityLitres != null ? `${Number(product.capacityLitres).toLocaleString()} / Shift` : "-",
-            align: "center"
         },
         { header: "Status", render: (product) => <StatusBadge status={product.isActive ? "ACTIVE" : "INACTIVE"} />, align: "center" },
         {
@@ -388,29 +408,56 @@ const ProductList: React.FC = () => {
                                                     <th className="px-4 py-2 font-semibold border-b border-slate-200">Type</th>
                                                     <th className="px-4 py-2 font-semibold border-b border-slate-200">Date</th>
                                                     <th className="px-4 py-2 font-semibold border-b border-slate-200">Shift</th>
-                                                    <th className="px-4 py-2 font-semibold border-b border-slate-200">Machine</th>
                                                     <th className="px-4 py-2 font-semibold border-b border-slate-200">Operators</th>
                                                     <th className="px-4 py-2 font-semibold border-b border-slate-200 text-right">Capacity</th>
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-slate-100 bg-white">
-                                                {capacityRecords.filter(r => r.machineId !== "INITIAL").map((r: any, idx: number) => {
-                                                    const isCurrent = idx === 0;
-                                                    return (
-                                                        <tr key={r.id || idx} className={`hover:bg-slate-50/50 transition-colors ${isCurrent ? "bg-blue-50/40" : ""}`}>
-                                                            <td className="px-4 py-2">
-                                                                <span className={`inline-flex items-center gap-1 text-xs font-bold uppercase tracking-wider ${isCurrent ? "text-blue-600" : "text-slate-500"}`}>
-                                                                    {isCurrent ? "Current" : "Previous"}
-                                                                </span>
-                                                            </td>
-                                                            <td className="px-4 py-2">{new Date(r.productionDate).toLocaleDateString()}</td>
-                                                            <td className="px-4 py-2">{r.shiftId || "-"}</td>
-                                                            <td className="px-4 py-2">{r.machineId || "-"}</td>
-                                                            <td className="px-4 py-2">{r.operators || "-"}</td>
-                                                            <td className="px-4 py-2 text-right font-semibold">{Number(r.newCapacity).toLocaleString()}</td>
-                                                        </tr>
-                                                    );
-                                                })}
+                                                {(() => {
+                                                    const filtered = capacityRecords.filter((r: any) => r.machineId !== "INITIAL");
+                                                    // Group by machineId, preserving order-of-first-appearance
+                                                    const groups: Record<string, any[]> = {};
+                                                    const machineOrder: string[] = [];
+                                                    filtered.forEach((r: any) => {
+                                                        if (!groups[r.machineId]) {
+                                                            groups[r.machineId] = [];
+                                                            machineOrder.push(r.machineId);
+                                                        }
+                                                        if (groups[r.machineId].length < 2) {
+                                                            groups[r.machineId].push(r);
+                                                        }
+                                                    });
+                                                    return machineOrder.map((machineId, gIdx) => {
+                                                        const machineObj = machines.find((m: any) => m.machineId === machineId);
+                                                        const machineName = machineObj?.machineName || machineId;
+                                                        return (
+                                                        <React.Fragment key={machineId}>
+                                                            {/* Machine group header: show id + name */}
+                                                            <tr className="bg-slate-100">
+                                                                <td colSpan={5} className="px-4 py-1.5 text-xs font-bold text-slate-600 uppercase tracking-wider">
+                                                                    {machineId}{machineName !== machineId && <span className="font-normal normal-case text-slate-500 ms-1">— {machineName}</span>}
+                                                                </td>
+                                                            </tr>
+                                                            {groups[machineId].map((r: any, idx: number) => {
+                                                                const isCurrent = idx === 0;
+                                                                return (
+                                                                    <tr key={r.id || `${machineId}-${idx}`} className={`hover:bg-slate-50/50 transition-colors ${isCurrent ? "bg-blue-50/40" : ""}`}>
+                                                                        <td className="px-4 py-2">
+                                                                            <span className={`inline-flex items-center gap-1 text-xs font-bold uppercase tracking-wider ${isCurrent ? "text-blue-600" : "text-slate-500"}`}>
+                                                                                {isCurrent ? "Current" : "Previous"}
+                                                                            </span>
+                                                                        </td>
+                                                                        <td className="px-4 py-2">{new Date(r.productionDate).toLocaleDateString()}</td>
+                                                                        <td className="px-4 py-2">{r.shiftId || "-"}</td>
+                                                                        <td className="px-4 py-2">{r.operators || "-"}</td>
+                                                                        <td className="px-4 py-2 text-right font-semibold">{Number(r.newCapacity).toLocaleString()}</td>
+                                                                    </tr>
+                                                                );
+                                                            })}
+                                                        </React.Fragment>
+                                                        );
+                                                    });
+                                                })()}
                                             </tbody>
                                         </table>
                                     </div>
@@ -447,7 +494,15 @@ const ProductList: React.FC = () => {
                                 <div className="flex items-center gap-3 mb-2">
                                     <span className="text-sm font-semibold text-slate-700">Product:</span>
                                     <span className="text-sm text-slate-600">{capProduct.productName}</span>
-                                    <span className="text-xs text-slate-400">(Current: {capProduct.capacityLitres != null ? Number(capProduct.capacityLitres).toLocaleString() : 0} / Shift)</span>
+                                    {capMachine ? (
+                                        <span className="text-xs text-slate-400">
+                                            (Machine Current: {getMachineCurrentCap(capMachine).toLocaleString()} / Shift)
+                                        </span>
+                                    ) : (
+                                        <span className="text-xs text-slate-400">
+                                            (Product Current: {capProduct.capacityLitres != null ? Number(capProduct.capacityLitres).toLocaleString() : 0} / Shift)
+                                        </span>
+                                    )}
                                 </div>
                                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                                     <div>
@@ -473,7 +528,11 @@ const ProductList: React.FC = () => {
                                                 { value: "", label: "-- Machine --" },
                                                 ...machines.map(m => ({ value: m.machineId, label: `${m.machineId} - ${m.machineName}` }))
                                             ]}
-                                            onChange={(e) => setCapMachine(e.target.value)}
+                                            onChange={(e) => {
+                                                setCapMachine(e.target.value);
+                                                setCapQty("");
+                                                setCapErrors(prev => ({ ...prev, capMachine: "", capQty: "" }));
+                                            }}
                                             required
                                         />
                                     </div>

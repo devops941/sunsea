@@ -22,8 +22,8 @@ import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
 import ViewButton from "../../../components/ui/viewbutton/ViewButton";
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import DataTable, { type DataTableColumn } from "../../../components/ui/table/DataTable";
+import TextArea from "../../../components/form/TextArea/TextArea";
 import FilterPopover from "../../../components/ui/FilterPopover/FilterPopover";
-import type { ProductionOrder } from "../../../services/productionOrderService";
 import { ProductionOrderViewModal } from "../../production-orders/components/ProductionOrderViewModal";
 import { oeeService } from "../../../services/oeeService";
 import { rawMaterialService } from "../../../services/rawMaterialService";
@@ -317,21 +317,27 @@ const DailyProductionPlanningPage: React.FC = () => {
       const loggedHoursCount = Array.isArray(stopPlan.hourlyProductions)
         ? stopPlan.hourlyProductions.filter((h: any) => Number(h.hourIndex) > 0).length
         : 0;
-      const targetStatus = stopOption === "completed_stop" ? "COMPLETED" : "STOPPED";
       const updatedRemarks = stopPlan.remarks
         ? `${stopPlan.remarks} | Stopped: ${stopReason.trim()}`
         : `Stopped: ${stopReason.trim()}`;
+        
+      const payload: any = {
+        // Permanent stop → move to POST_PRODUCTION so produced qty can be dispatched
+        // Carry forward stop → mark as STOPPED so remaining qty can be carried to a new DP
+        status: stopOption === "completed_stop" ? "POST_PRODUCTION" : "STOPPED",
+        remarks: updatedRemarks,
+        plannedHours: loggedHoursCount > 0 ? loggedHoursCount : stopPlan.plannedHours
+      };
+      if (stopOption === "completed_stop") {
+        payload.shortClosePO = true;
+      }
 
       await dispatch(updateDailyPlan({
         id: stopPlan.dailyPlanId,
-        data: {
-          status: targetStatus,
-          remarks: updatedRemarks,
-          plannedHours: loggedHoursCount > 0 ? loggedHoursCount : stopPlan.plannedHours
-        }
+        data: payload
       })).unwrap();
 
-      toast.success(targetStatus === "COMPLETED" ? "Production completed and closed successfully!" : "Production stopped successfully!");
+      toast.success(stopOption === "completed_stop" ? "Production permanently stopped. Proceeding to post-production." : "Daily plan stopped. You can carry forward the remaining quantity.");
 
       const plannedQty = Number(stopPlan.plannedQty || 0);
       const producedQty = Array.isArray(stopPlan.hourlyProductions)
@@ -648,7 +654,7 @@ const DailyProductionPlanningPage: React.FC = () => {
         const canLog = plan.status === "IN_PROGRESS";
         const alreadyCarriedForward = Array.isArray(plan.carryForwardTo) && plan.carryForwardTo.length > 0;
         // Carry forward ONLY for STOPPED plans — not for SHORT_CLOSED (COMPLETED with shortfall)
-        const canCarryForward = plan.status === "STOPPED" && pendingQty > 0 && !alreadyCarriedForward;
+        const _canCarryForward = plan.status === "STOPPED" && pendingQty > 0 && !alreadyCarriedForward;
 
         let targetNextStatus = STATUS_FLOW[plan.status]?.next;
         let dynamicActionTitle = NEXT_ACTION_LABELS[plan.status] || `Move to ${nextStatus}`;
@@ -738,15 +744,15 @@ const DailyProductionPlanningPage: React.FC = () => {
                 onClick={() => handleStatusAdvance(plan, producedQty, targetNextStatus as any, dynamicModalTitle as any, dynamicModalMessage as any)}
               />
             )}
-            {plan.status === "IN_PROGRESS" && (
+            {!["COMPLETED", "CANCELLED", "STOPPED"].includes(plan.status) && (
               <IconButton variant="danger" title="Stop Production" icon={FaStop} onClick={() => handleStopProductionClick(plan)} />
             )}
             {(plan.status === "DRAFT" || plan.status === "PLANNED") && (
               <IconButton variant="info" title="Edit Plan" icon={FaEdit} onClick={() => openEditForm(plan)} />
             )}
-            {canCarryForward && (
+            {/* {canCarryForward && (
               <IconButton variant="warning" title={`Carry Forward ${pendingQty} pcs`} icon={FaShare} onClick={() => handleCarryForward(plan, pendingQty)} />
-            )}
+            )} */}
             {(plan.status === "DRAFT" || plan.status === "CANCELLED") && (
               <DeleteButton onClick={() => { setDeletePlanId(plan.dailyPlanId); setShowDeleteModal(true); }} />
             )}
@@ -881,7 +887,7 @@ const DailyProductionPlanningPage: React.FC = () => {
           />
         </div>
 
-        {/* ❌ Short-Closed Plans (Force Stopped) — collapsed section */}
+        {/* Short-Closed Plans (Force Stopped) — collapsed section */}
         {closedPlans.length > 0 && (
           <div className="rounded-xl shadow-sm border border-orange-200 overflow-hidden">
             <button
@@ -1324,22 +1330,20 @@ const DailyProductionPlanningPage: React.FC = () => {
           show={showStopModal}
           onHide={() => { setShowStopModal(false); setStopPlan(null); }}
           title={<span className="text-rose-600">Stop Production Plan</span>}
+          maxWidth="3xl"
           footer={
             <div className="flex gap-2">
-              <button
-                className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors font-medium text-sm"
+              <CustomButton
+                text="Cancel"
                 onClick={() => { setShowStopModal(false); setStopPlan(null); }}
                 disabled={isStopping}
-              >
-                Cancel
-              </button>
-              <button
-                className="px-4 py-2 bg-rose-600 text-white rounded-lg hover:bg-rose-700 transition-colors font-medium text-sm disabled:opacity-50"
+              />
+              <CustomButton
+                text={isStopping ? "Stopping..." : "Stop Production"}
+                variant="danger"
                 onClick={confirmStopProduction}
                 disabled={isStopping || !stopReason.trim()}
-              >
-                {isStopping ? "Stopping..." : "Stop Production"}
-              </button>
+              />
             </div>
           }
         >
@@ -1362,38 +1366,80 @@ const DailyProductionPlanningPage: React.FC = () => {
                     }</strong>. The planned hours for this plan will be adjusted to match the logged hours.
                   </p>
                 </div>
-                <div className="flex flex-col gap-1.5">
-                  <label className="font-bold text-slate-800 text-sm">Reason for Stopping <span className="text-rose-500">*</span></label>
-                  <textarea
-                    className="w-full border border-slate-300 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent resize-none"
-                    rows={3}
-                    placeholder="e.g. Urgent production order PO-XXX required on this machine"
-                    value={stopReason}
-                    onChange={(e) => setStopReason(e.target.value)}
-                    required
-                  />
-                </div>
-                {pendingQty > 0 && (
-                  <div className="flex flex-col gap-2">
-                    <label className="font-bold text-slate-800 text-sm">Stop Action Type</label>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {[
-                        {
-                          value: "completed_stop",
-                          title: "Completed Stop",
-                          desc: "Stop production without carrying forward any quantity.",
-                          activeClass: "border-rose-500 bg-rose-50/50 ring-2 ring-rose-500/20",
-                          radioClass: "text-rose-600 focus:ring-rose-500"
-                        },
-                        {
-                          value: "carry_forward",
-                          title: "Stop & Carry Forward",
-                          desc: `Carry forward the remaining ${pendingQty} pcs to a new daily plan.`,
-                          activeClass: "border-amber-500 bg-amber-50/50 ring-2 ring-amber-500/20",
-                          radioClass: "text-amber-600 focus:ring-amber-500"
-                        }
-                      ].map(opt => (
-                        <div
+                
+                {(() => {
+                  const relatedPlans = allPlans
+                    .filter((p: any) => p.productionOrderId === stopPlan?.productionOrderId && p.dailyPlanId !== stopPlan?.dailyPlanId)
+                    .sort((a: any, b: any) => new Date(a.productionDate).getTime() - new Date(b.productionDate).getTime());
+                  
+                  if (relatedPlans.length === 0) return null;
+
+                  const historyColumns: DataTableColumn<any>[] = [
+                    { header: "Date", render: (row) => row.productionDate?.split("T")[0] || "—" },
+                    { header: "Plan ID", render: (row) => <span className="font-mono text-slate-600">{row.dailyPlanId}</span> },
+                    { header: "Planned", accessor: "plannedQty", align: "right" },
+                    { 
+                      header: "Produced", 
+                      render: (row) => (
+                        <span className="text-blue-600 font-medium">
+                          {Array.isArray(row.hourlyProductions) ? row.hourlyProductions.reduce((s: number, h: any) => s + Number(h.qtyProduced || 0), 0) : 0}
+                        </span>
+                      ),
+                      align: "right"
+                    },
+                    { 
+                      header: "Status", 
+                      align: "center",
+                      render: (row) => <span className="text-[9px] font-bold px-1.5 py-0.5 bg-slate-200 rounded text-slate-700">{row.status.replace(/_/g, " ")}</span>
+                    }
+                  ];
+                  
+                  return (
+                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-3">
+                      <h6 className="font-bold text-slate-800 text-xs uppercase mb-2">Production Order History</h6>
+                      <div className="max-h-32 overflow-y-auto rounded border border-slate-200">
+                        <DataTable
+                          columns={historyColumns}
+                          data={relatedPlans}
+                          rowKey={(row) => row.dailyPlanId}
+                          density="compact"
+                        />
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                <TextArea
+                  label="Reason for Stopping"
+                  name="stopReason"
+                  value={stopReason}
+                  onChange={(e) => setStopReason(e.target.value)}
+                  placeholder="e.g. Urgent production order PO-XXX required on this machine"
+                  rows={3}
+                  required
+                />
+                <div className="flex flex-col gap-2 mt-2">
+                  <label className="font-bold text-slate-800 text-sm">Stop Action Type <span className="text-rose-500">*</span></label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {[
+                      {
+                        value: "completed_stop",
+                        title: "Permanent Stop (Close PO)",
+                        desc: "Stop this daily plan AND lock the Weekly Target. No new plans can be created. Post-production for produced pieces will still continue.",
+                        activeClass: "border-rose-500 bg-rose-50/50 ring-2 ring-rose-500/20",
+                        radioClass: "text-rose-600 focus:ring-rose-500"
+                      },
+                      {
+                        value: "carry_forward",
+                        title: "Stop This Daily Plan Only",
+                        desc: pendingQty > 0 
+                          ? `Stop this machine plan. Weekly Target remains open to carry forward the remaining ${pendingQty} pcs to a new plan later.`
+                          : `Stop this machine plan. Weekly Target remains open for future planning.`,
+                        activeClass: "border-amber-500 bg-amber-50/50 ring-2 ring-amber-500/20",
+                        radioClass: "text-amber-600 focus:ring-amber-500"
+                      }
+                    ].map(opt => (
+                      <div
                           key={opt.value}
                           className={`cursor-pointer border rounded-xl p-3 flex flex-col transition-all ${stopOption === opt.value ? opt.activeClass : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"}`}
                           onClick={() => setStopOption(opt.value as any)}
@@ -1407,7 +1453,6 @@ const DailyProductionPlanningPage: React.FC = () => {
                       ))}
                     </div>
                   </div>
-                )}
               </div>
             );
           })()}

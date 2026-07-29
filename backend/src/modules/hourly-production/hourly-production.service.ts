@@ -245,7 +245,138 @@ class HourlyProductionService {
     return { order, weeklyProgram, dailyPlan };
   }
 
-  async create(data: any) {
+  async checkForNewCapacityHigh(tx: any, data: any, prodDate: Date, dailyPlan: any) {
+    const order = await tx.productionOrder.findUnique({
+      where: { productionOrderId: data.productionOrderId },
+      include: { productItem: true }
+    });
+    if (!order) return { newHighReached: false };
+
+    const productId = order.productItemId;
+
+    // Aggregate total quantity, rejects, and scrap produced for this machine, date, and shift
+    const aggregate = await tx.hourlyProduction.aggregate({
+      where: {
+        productionDate: prodDate,
+        machineId: data.machineId,
+        shiftId: data.shiftId,
+        productionOrderId: data.productionOrderId,
+      },
+      _sum: {
+        qtyProduced: true,
+        rejectQty: true,
+        scrapQty: true,
+      }
+    });
+
+    const totalQty = Number(aggregate._sum.qtyProduced || 0);
+    const totalReject = Number(aggregate._sum.rejectQty || 0);
+    const totalScrap = Number(aggregate._sum.scrapQty || 0);
+    const shiftTotalProduced = Math.max(0, totalQty - totalReject - totalScrap);
+
+    // Get the latest capacity for this product and machine
+    const latestCapacityRecord = await tx.productCapacityHistory.findFirst({
+      where: {
+        productId,
+        machineId: data.machineId,
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    const currentCapacity = latestCapacityRecord
+      ? Number(latestCapacityRecord.newCapacity)
+      : Number(order.productItem?.capacityLitres || 0);
+
+    if (currentCapacity > 0 && shiftTotalProduced > currentCapacity) {
+      // It's a new high!
+      // Keep max 2 records per product AND machine
+      const existing = await tx.productCapacityHistory.findMany({
+        where: { productId, machineId: data.machineId },
+        orderBy: { createdAt: "desc" },
+        select: { id: true },
+      });
+      if (existing.length >= 2) {
+        const idsToDelete = existing.slice(1).map((r: any) => r.id);
+        await tx.productCapacityHistory.deleteMany({
+          where: { id: { in: idsToDelete } },
+        });
+      }
+
+      // Resolve operators names
+      let operatorNames = "";
+      if (dailyPlan?.selectedOperatorIds) {
+        try {
+          const opIds = dailyPlan.selectedOperatorIds.split(",").map((id: string) => id.trim()).filter(Boolean);
+          const emps = await tx.employee.findMany({
+            where: { id: { in: opIds.map((id: string) => BigInt(id)) } },
+            select: { fullName: true }
+          });
+          operatorNames = emps.map((e: any) => e.fullName).join(", ");
+        } catch (err) {
+          console.error("Failed to parse operator names", err);
+        }
+      }
+
+      if (!operatorNames) {
+        const assignment = await MachineOperationAssignmentService.resolveAssignment(
+          data.machineId,
+          data.shiftId,
+          prodDate
+        );
+        if (assignment && assignment.operators) {
+          operatorNames = assignment.operators.map((op: any) => op.fullName).join(", ");
+        }
+      }
+
+      // Get machine and shift details
+      const machine = await tx.machine.findUnique({ where: { machineId: data.machineId } });
+      const shift = await tx.shift.findUnique({ where: { shiftCode: data.shiftId } });
+
+      // Create product capacity history record
+      await tx.productCapacityHistory.create({
+        data: {
+          productId,
+          previousCapacity: currentCapacity,
+          newCapacity: shiftTotalProduced,
+          productionDate: prodDate,
+          machineId: data.machineId,
+          shiftId: data.shiftId,
+          productionOrderId: data.productionOrderId,
+          targetQty: currentCapacity,
+          actualQty: shiftTotalProduced,
+          achievementPct: currentCapacity > 0 ? (shiftTotalProduced / currentCapacity) * 100 : 100,
+          operators: operatorNames || null,
+          updatedBy: "SYSTEM_OEE",
+        },
+      });
+
+      // Update product table capacityLitres
+      await tx.product.update({
+        where: { id: productId },
+        data: { capacityLitres: shiftTotalProduced },
+      });
+
+      return {
+        newHighReached: true,
+        newHighDetails: {
+          date: prodDate.toISOString().split("T")[0],
+          machineId: data.machineId,
+          machineName: machine?.machineName || data.machineId,
+          shiftId: data.shiftId,
+          shiftName: shift?.shiftName || data.shiftId,
+          operators: operatorNames || "N/A",
+          newCapacity: shiftTotalProduced,
+          previousCapacity: currentCapacity,
+        }
+      };
+    }
+
+    return { newHighReached: false };
+  }
+
+
+
+  async create(data: any, userId: string = "SYSTEM") {
     const [yyyy, mm, dd] = data.productionDate.split("-").map(Number);
     const prodDate = new Date(Date.UTC(yyyy, mm - 1, dd));
 
@@ -363,8 +494,8 @@ class HourlyProductionService {
               quantity: wastage.quantity,
               uom: wastage.uom || "KG",
               status: "APPROVED",
-              createdBy: data.operatorId || "SYSTEM",
-              approvedBy: data.operatorId || "SYSTEM",
+              createdBy: userId,
+              approvedBy: userId,
               approvedAt: new Date(),
               remarks: "Auto-logged from Hourly Production"
             }
@@ -411,9 +542,9 @@ class HourlyProductionService {
                 sourceDocId: wastageNo,
                 productionOrderId: data.productionOrderId,
                 status: "APPROVED",
-                approvedBy: data.operatorId || "SYSTEM",
+                approvedBy: userId,
                 approvedAt: new Date(),
-                createdBy: data.operatorId || "SYSTEM",
+                createdBy: userId,
               }
             });
 
@@ -434,7 +565,78 @@ class HourlyProductionService {
         }
       }
 
-      return created;
+      // Process raw materials consumed
+      if (data.rawMaterialsUsed && Array.isArray(data.rawMaterialsUsed) && data.rawMaterialsUsed.length > 0) {
+        for (const rm of data.rawMaterialsUsed) {
+          if (!rm.rawMaterialId || !rm.quantity) continue;
+
+          const targetProduct = await tx.rawMaterial.findUnique({
+            where: { rawMaterialId: rm.rawMaterialId }
+          });
+
+          if (targetProduct) {
+            await tx.rawMaterial.update({
+              where: { rawMaterialId: rm.rawMaterialId },
+              data: {
+                onHandQty: { increment: rm.quantity },
+                lastMovementAt: new Date()
+              }
+            });
+
+            await tx.rawMaterialTransaction.create({
+              data: {
+                storeId: rm.storeId || targetProduct.storeId || "STORE-001",
+                rawMaterialId: rm.rawMaterialId,
+                txnType: "RETURN",
+                qty: rm.quantity,
+                remarks: `Returned remaining raw materials in Hourly Production`,
+                productionOrderId: data.productionOrderId,
+              }
+            });
+
+            // Create Stock Adjustment record
+            const latestSA = await tx.stockAdjustment.findFirst({ orderBy: { id: 'desc' } });
+            const saNextId = latestSA ? Number(latestSA.id) + 1 : 1;
+
+            const saRecord = await tx.stockAdjustment.create({
+              data: {
+                adjustmentNumber: `SA${String(saNextId).padStart(4, "0")}`,
+                adjustmentDate: new Date(),
+                adjustmentType: "STOCK_INCREASE",
+                type: "SYSTEM",
+                autoGenerated: true,
+                sourceDocument: "HOURLY_PRODUCTION",
+                sourceDocId: String(created.hourlyProductionId),
+                productionOrderId: data.productionOrderId,
+                status: "APPROVED",
+                approvedBy: userId,
+                approvedAt: new Date(),
+                createdBy: userId,
+              }
+            });
+
+            // Create Stock Adjustment Item
+            await tx.stockAdjustmentItem.create({
+              data: {
+                stockAdjustmentId: saRecord.id,
+                itemType: "RAW_MATERIAL",
+                rawMaterialId: rm.rawMaterialId,
+                storeId: rm.storeId || targetProduct.storeId,
+                currentQty: Number(targetProduct.onHandQty ?? 0),
+                adjustedQty: Number(targetProduct.onHandQty ?? 0) + Number(rm.quantity),
+                difference: Number(rm.quantity),
+                unitCost: Number(targetProduct.avgCost ?? 0),
+              }
+            });
+          }
+        }
+      }
+      const highCheckResult = await this.checkForNewCapacityHigh(tx, data, prodDate, dailyPlan);
+
+      return {
+        ...created,
+        ...highCheckResult,
+      };
     }, { timeout: 15000 }).then(async (result) => {
       // Auto-trigger OEE snapshot recalculation after transaction commits
       try {
@@ -485,6 +687,7 @@ class HourlyProductionService {
         },
         machine: true,
         shift: true,
+        productionWastages: true,
       },
       orderBy: [
         { productionDate: "desc" },
@@ -617,7 +820,7 @@ class HourlyProductionService {
     return log;
   }
 
-  async update(hourlyProductionId: bigint, data: UpdateHourlyProductionInput) {
+  async update(hourlyProductionId: bigint, data: UpdateHourlyProductionInput, userId: string = "SYSTEM") {
     const existing = await this.findById(hourlyProductionId);
 
     // Merge existing and update data for validation
@@ -674,7 +877,19 @@ class HourlyProductionService {
       if (existing.productionOrderId !== updated.productionOrderId) {
         await syncProductionOrderQuantities(tx, existing.productionOrderId);
       }
-      return updated;
+
+      const [yyyy, mm, dd] = merged.productionDate.split("-").map(Number);
+      const prodDate = new Date(Date.UTC(yyyy, mm - 1, dd));
+      const dailyPlan = merged.dailyPlanId
+        ? await tx.dailyProductionPlan.findUnique({ where: { dailyPlanId: merged.dailyPlanId } })
+        : null;
+
+      const highCheckResult = await this.checkForNewCapacityHigh(tx, merged, prodDate, dailyPlan);
+
+      return {
+        ...updated,
+        ...highCheckResult,
+      };
     }, { timeout: 15000 });
   }
 

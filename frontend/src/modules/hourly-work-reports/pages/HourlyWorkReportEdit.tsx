@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { FaSave, FaEraser, FaCheckCircle, FaInfoCircle } from "react-icons/fa";
+import { FaSave, FaEraser, FaCheckCircle, FaInfoCircle, FaCalendarAlt, FaCogs, FaClock, FaUsers, FaTrophy, FaCrown } from "react-icons/fa";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 import TextInput from "../../../components/form/TextInput/TextInput";
@@ -10,6 +10,7 @@ import QuantityInput from "../../../components/form/QuantityInput/QuantityInput"
 import { useAppDispatch } from "../../../hooks/reduxHooks";
 import { updateHourlyProduction } from "../../../features/hourly-productions/hourlyProductionSlice";
 import BackButton from "../../../components/ui/BackButton/BackButton";
+import CommonModal from "../../../components/ui/Modal/CommonModal";
 
 const HourlyWorkReportEdit: React.FC = () => {
     const navigate = useNavigate();
@@ -40,6 +41,8 @@ const HourlyWorkReportEdit: React.FC = () => {
 
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isEditDisabled, setIsEditDisabled] = useState(false);
+    const [showNewHighModal, setShowNewHighModal] = useState(false);
+    const [newHighDetails, setNewHighDetails] = useState<any>(null);
 
     useEffect(() => {
         if (locationState.state) {
@@ -90,12 +93,19 @@ const HourlyWorkReportEdit: React.FC = () => {
                 operatorId: operatorId || undefined,
             };
 
-            await dispatch(updateHourlyProduction({
+            const res = await dispatch(updateHourlyProduction({
                 id: hourlyProductionId,
                 data: payload
             })).unwrap();
             toast.success("Hourly Report updated successfully!");
-            navigate("/hourly-work-reports");
+            
+            const dataObj = res?.data || res;
+            if (dataObj?.newHighReached) {
+                setNewHighDetails(dataObj.newHighDetails);
+                setShowNewHighModal(true);
+            } else {
+                navigate("/hourly-work-reports");
+            }
         } catch (err: any) {
             toast.error(err || "Failed to update report");
         } finally {
@@ -125,7 +135,7 @@ const HourlyWorkReportEdit: React.FC = () => {
                             <div className="bg-gray-50 border border-gray-200 rounded-lg p-5 h-full">
                                 {isEditDisabled && (
                                     <div className="bg-rose-50 border border-rose-200 text-rose-700 px-4 py-3 rounded-xl flex items-center gap-2 text-xs font-semibold mb-4">
-                                        <FaInfoCircle size={14} className="flex-shrink-0 text-rose-500" />
+                                        <FaInfoCircle size={14} className="shrink-0 text-rose-500" />
                                         <span>This log is locked (shift completed, stopped, or final hour logged).</span>
                                     </div>
                                 )}
@@ -308,6 +318,92 @@ const HourlyWorkReportEdit: React.FC = () => {
                     </div>
                 </form>
             </div>
+
+            {/* ─────── New High Reached Modal ─────── */}
+            <CommonModal
+                show={showNewHighModal}
+                onHide={() => {
+                    setShowNewHighModal(false);
+                    navigate("/hourly-work-reports");
+                }}
+                title={
+                    <div className="flex items-center gap-2 text-indigo-600 font-bold">
+                        <FaTrophy className="text-xl text-indigo-500 animate-pulse" />
+                        <span>New Production High Reached!</span>
+                    </div>
+                }
+                footer={
+                    <CustomButton
+                        text="Awesome!"
+                        onClick={() => {
+                            setShowNewHighModal(false);
+                            navigate("/hourly-work-reports");
+                        }}
+                    />
+                }
+            >
+                <div className="text-center py-4">
+                    <div className="flex justify-center mb-5">
+                        <div className="p-4 bg-indigo-50 rounded-full text-indigo-600 animate-bounce shadow-sm">
+                            <FaCrown size={44} />
+                        </div>
+                    </div>
+                    <h3 className="text-2xl font-bold text-slate-800 mb-2">Congratulations!</h3>
+                    <p className="text-slate-505 text-sm max-w-sm mx-auto mb-6">
+                        You have recorded a new highest production capacity for this product on this machine!
+                    </p>
+
+                    <div className="inline-block bg-indigo-50/50 border border-indigo-100 rounded-2xl p-6 mb-6 min-w-60">
+                        <div className="text-xs uppercase tracking-wider text-indigo-700 font-semibold mb-1">
+                            New Capacity High
+                        </div>
+                        <div className="text-4xl font-extrabold text-indigo-600 flex items-center justify-center gap-2">
+                            <span>{newHighDetails?.newCapacity}</span>
+                            <span className="text-lg font-normal text-indigo-500">
+                                {uom || "units"}
+                            </span>
+                        </div>
+                        {newHighDetails?.previousCapacity > 0 && (
+                            <div className="text-xs text-slate-500 mt-2 bg-indigo-100/50 py-1 px-3 rounded-full inline-block">
+                                Previous High: <span className="font-semibold text-slate-700">{newHighDetails.previousCapacity} {uom || "units"}</span>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4 text-left max-w-md mx-auto bg-slate-50 p-5 rounded-2xl border border-slate-100 text-sm">
+                        <div className="flex items-start gap-2.5">
+                            <FaCalendarAlt className="text-indigo-500 mt-0.5 text-base shrink-0" />
+                            <div>
+                                <span className="text-slate-400 text-xs block font-medium">Date</span>
+                                <strong className="text-slate-700 font-semibold">{newHighDetails?.date}</strong>
+                            </div>
+                        </div>
+                        <div className="flex items-start gap-2.5">
+                            <FaCogs className="text-indigo-500 mt-0.5 text-base shrink-0" />
+                            <div>
+                                <span className="text-slate-400 text-xs block font-medium">Machine</span>
+                                <strong className="text-slate-700 font-semibold truncate block max-w-37.5" title={newHighDetails?.machineName}>{newHighDetails?.machineName}</strong>
+                            </div>
+                        </div>
+                        <div className="flex items-start gap-2.5">
+                            <FaClock className="text-indigo-500 mt-0.5 text-base shrink-0" />
+                            <div>
+                                <span className="text-slate-400 text-xs block font-medium">Shift</span>
+                                <strong className="text-slate-700 font-semibold">{newHighDetails?.shiftName}</strong>
+                            </div>
+                        </div>
+                        <div className="flex items-start gap-2.5">
+                            <FaUsers className="text-indigo-500 mt-0.5 text-base shrink-0" />
+                            <div>
+                                <span className="text-slate-400 text-xs block font-medium">Operators</span>
+                                <strong className="text-slate-700 font-semibold block truncate max-w-37.5" title={newHighDetails?.operators}>
+                                    {newHighDetails?.operators}
+                                </strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </CommonModal>
         </div>
     );
 };

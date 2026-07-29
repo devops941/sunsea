@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { Form } from 'react-bootstrap';
 
-import { FaSave, FaEraser, FaInfoCircle, FaCheckCircle } from "react-icons/fa";
+import { FaSave, FaEraser, FaInfoCircle, FaCheckCircle, FaCalendarAlt, FaCogs, FaClock, FaUsers, FaTrophy, FaCrown, FaBoxOpen, FaPlus } from "react-icons/fa";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 import TextInput from "../../../components/form/TextInput/TextInput";
@@ -10,6 +10,7 @@ import CustomButton from "../../../components/ui/Button/Button";
 import QuantityInput from "../../../components/form/QuantityInput/QuantityInput";
 import BackButton from "../../../components/ui/BackButton/BackButton";
 import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
+import CommonModal from "../../../components/ui/Modal/CommonModal";
 
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
 import { createHourlyProduction, updateHourlyProduction } from "../../../features/hourly-productions/hourlyProductionSlice";
@@ -26,6 +27,38 @@ const formatLocalDateString = (d: Date) => {
     const month = String(d.getMonth() + 1).padStart(2, '0');
     const day = String(d.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
+};
+
+const getUomOptions = (baseUom: string) => {
+    if (!baseUom) return [];
+    return baseUom.split(",").map(u => {
+        const cleaned = u.trim().toLowerCase();
+        const display = cleaned === "ea" ? "pcs" : cleaned;
+        return { value: cleaned, label: display };
+    });
+};
+
+const convertToPrimaryUom = (qty: number, selectedUom: string, baseUomStr: string) => {
+    if (!baseUomStr) return qty;
+    const uoms = baseUomStr.split(",").map(u => u.trim().toLowerCase());
+    const primary = uoms[0];
+    const selected = selectedUom.toLowerCase();
+    if (primary === selected) return qty;
+
+    // Weight conversions
+    if (primary === "kg" && selected === "g") return qty / 1000;
+    if (primary === "kg" && (selected === "ton" || selected === "t")) return qty * 1000;
+    if (primary === "g" && selected === "kg") return qty * 1000;
+
+    // Volume conversions
+    if ((primary === "l" || primary === "ltr") && selected === "ml") return qty / 1000;
+    if (primary === "ml" && (selected === "l" || selected === "ltr")) return qty * 1000;
+
+    // Dozen conversions
+    if (primary === "dz" && selected === "ea") return qty / 12;
+    if (primary === "ea" && selected === "dz") return qty * 12;
+
+    return qty;
 };
 
 const HourlyWorkReportCreate: React.FC = () => {
@@ -80,10 +113,14 @@ const HourlyWorkReportCreate: React.FC = () => {
     const [wastages, setWastages] = useState<any[]>([]);
     const [stores, setStores] = useState<any[]>([]);
     const [rawMaterials, setRawMaterials] = useState<any[]>([]);
-    
+    const [rawMaterialsUsed, setRawMaterialsUsed] = useState<any[]>([]);
+    const [rawMaterialOptions, setRawMaterialOptions] = useState<any[]>([]);
+
     const [stopPlanEarly, setStopPlanEarly] = useState(false);
     const [stopPlanReason, setStopPlanReason] = useState("");
     const [stopOption, setStopOption] = useState<"CARRY_FORWARD" | "FORCE_COMPLETE">("CARRY_FORWARD");
+    const [showNewHighModal, setShowNewHighModal] = useState(false);
+    const [newHighDetails, setNewHighDetails] = useState<any>(null);
 
 
     // Is the form pre-filled from Daily Planning?
@@ -101,7 +138,7 @@ const HourlyWorkReportCreate: React.FC = () => {
             else if (data && Array.isArray(data.stores)) setStores(data.stores);
             else if (res.data && Array.isArray(res.data.stores)) setStores(res.data.stores);
         }).catch(err => console.error(err));
-        
+
         apiClient.get(config.rawMaterial.base, { params: { limit: 1000 } }).then(res => {
             const data = res.data?.data;
             let list: any[] = [];
@@ -109,6 +146,7 @@ const HourlyWorkReportCreate: React.FC = () => {
             else if (data && Array.isArray(data.rawMaterials)) list = data.rawMaterials;
             else if (res.data && Array.isArray(res.data.rawMaterials)) list = res.data.rawMaterials;
             setRawMaterials(list.filter((rm: any) => rm.itemType === "WASTAGE"));
+            setRawMaterialOptions(list.filter((rm: any) => rm.itemType !== "WASTAGE"));
         }).catch(err => console.error(err));
     }, [dispatch]);
 
@@ -122,9 +160,9 @@ const HourlyWorkReportCreate: React.FC = () => {
                 else if (res && Array.isArray(res.data)) list = res.data;
                 else if (res && res.data && Array.isArray(res.data.dailyPlans)) list = res.data.dailyPlans;
                 else if (res && Array.isArray(res.dailyPlans)) list = res.dailyPlans;
-                
+
                 // Filter by active statuses: APPROVED, IN_PROGRESS
-                const activePlansList = list.filter((p: any) => 
+                const activePlansList = list.filter((p: any) =>
                     p.status === "APPROVED" || p.status === "IN_PROGRESS" || p.status === "STOPPED" || p.status === "CANCELLED" || (p.status === "COMPLETED" && p.producedQty < p.plannedQty)
                 );
                 setDailyPlans(activePlansList);
@@ -169,7 +207,7 @@ const HourlyWorkReportCreate: React.FC = () => {
                 setMachineId(plan.machineId);
                 setShiftId(plan.shiftId);
                 setProductionDate(plan.productionDate?.split("T")[0]);
-                
+
                 if (!plan.operators || plan.operators.length === 0) {
                     setOperatorName("");
                     setAvailableOperators([]);
@@ -294,14 +332,31 @@ const HourlyWorkReportCreate: React.FC = () => {
             setDowntime(String(matched.downtime || 0));
             setRemarks(matched.remarks || "");
             setDowntimeReason(matched.downtimeReason || "");
-            
+
             // Only load operator from saved log if user has NOT manually picked someone yet.
             // Once the user selects an operator, their choice is locked in for this hour.
             if (matched.operatorId && !userSelectedOperator.current) {
                 setOperatorId(matched.operatorId);
             }
-            
+
             setEditingLogId(matched.hourlyProductionId);
+
+            // Load existing wastages if available on this log
+            if (matched.productionWastages && Array.isArray(matched.productionWastages) && matched.productionWastages.length > 0) {
+                setWastages(matched.productionWastages.map((w: any) => ({
+                    storeId: w.storeId || "",
+                    targetWastageProductId: w.targetWastageProductId || "",
+                    quantity: String(w.quantity || ""),
+                    uom: w.uom || "KG",
+                    selectedUom: w.uom || "KG",
+                    storeError: "",
+                    productError: "",
+                    quantityError: ""
+                })));
+            } else {
+                setWastages([]);
+            }
+            setRawMaterialsUsed([]);
         } else {
             setQtyProduced("0");
             setRejectQty("0");
@@ -311,6 +366,8 @@ const HourlyWorkReportCreate: React.FC = () => {
             setDowntimeReason("");
             // operatorId is already cleared by the hourIndex effect above
             setEditingLogId(null);
+            setWastages([]);
+            setRawMaterialsUsed([]);
         }
     }, [hourIndex, existingLogs]);
 
@@ -459,10 +516,24 @@ const HourlyWorkReportCreate: React.FC = () => {
             if (hasWastageError) updatedWastages = normalizedWastages;
         }
 
+        let updatedRawMaterials = rawMaterialsUsed;
+        let hasRawMaterialError = false;
+        if (rawMaterialsUsed.length > 0) {
+            const normalizedRM = rawMaterialsUsed.map((rm) => ({
+                ...rm,
+                storeError: !rm.storeId ? "Store is required" : "",
+                productError: !rm.rawMaterialId ? "Raw Material is required" : "",
+                quantityError: Number(rm.quantity) > 0 ? "" : "Quantity must be greater than 0",
+            }));
+            hasRawMaterialError = normalizedRM.some(rm => rm.storeError || rm.productError || rm.quantityError);
+            if (hasRawMaterialError) updatedRawMaterials = normalizedRM;
+        }
+
         // Show all errors at once and stop
-        if (Object.keys(errors).length > 0 || hasWastageError) {
+        if (Object.keys(errors).length > 0 || hasWastageError || hasRawMaterialError) {
             setFormErrors(errors);
             if (hasWastageError) setWastages(updatedWastages);
+            if (hasRawMaterialError) setRawMaterialsUsed(updatedRawMaterials);
             return;
         }
 
@@ -499,19 +570,46 @@ const HourlyWorkReportCreate: React.FC = () => {
                 operatorId: operatorId,
                 stopPlanEarly,
                 stopPlanReason: stopPlanEarly ? stopPlanReason : null,
-                logWastage: wastages.length > 0,
-                wastages: wastages.map((w) => ({
-                    ...w,
-                    quantity: Number(w.quantity) || 0,
-                })),
+                logWastage: (isFinalHour || stopPlanEarly) && wastages.length > 0,
+                wastages: (isFinalHour || stopPlanEarly)
+                    ? wastages.map((w) => {
+                        const matched = rawMaterials.find((r: any) => r.rawMaterialId === w.targetWastageProductId);
+                        let baseUomStr = matched?.baseUom || "KG";
+                        if (Array.isArray(matched?.baseUom)) baseUomStr = matched.baseUom.join(',');
+                        else if (typeof matched?.baseUom === "string" && matched.baseUom.startsWith("[")) {
+                            try { baseUomStr = JSON.parse(matched.baseUom).join(','); } catch (e) { }
+                        }
+                        const qty = Number(w.quantity) || 0;
+                        const finalQty = convertToPrimaryUom(qty, w.selectedUom || "", baseUomStr);
+                        return {
+                            storeId: w.storeId,
+                            targetWastageProductId: w.targetWastageProductId,
+                            quantity: finalQty,
+                        };
+                    })
+                    : [],
+                rawMaterialsUsed: (isFinalHour || stopPlanEarly)
+                    ? rawMaterialsUsed.map((rm) => {
+                        const matched = rawMaterialOptions.find((r: any) => r.rawMaterialId === rm.rawMaterialId);
+                        const baseUomStr = matched?.baseUom || "";
+                        const qty = Number(rm.quantity) || 0;
+                        const finalQty = convertToPrimaryUom(qty, rm.uom || "", baseUomStr);
+                        return {
+                            storeId: rm.storeId,
+                            rawMaterialId: rm.rawMaterialId,
+                            quantity: finalQty,
+                        };
+                    })
+                    : [],
                 dailyPlanId: dailyPlanId || undefined,
             };
 
+            let res: any;
             if (editingLogId) {
-                await dispatch(updateHourlyProduction({ id: String(editingLogId), data: payload })).unwrap();
+                res = await dispatch(updateHourlyProduction({ id: String(editingLogId), data: payload })).unwrap();
                 toast.success("Hourly Production entry updated successfully!");
             } else {
-                await dispatch(createHourlyProduction(payload)).unwrap();
+                res = await dispatch(createHourlyProduction(payload)).unwrap();
                 toast.success("Hourly Production entry saved successfully!");
             }
             const actualProductId = activePlan?.productId || activePlan?.productItemId || activePlan?.productionOrder?.productItemId || activePlan?.productionOrder?.productId;
@@ -523,8 +621,6 @@ const HourlyWorkReportCreate: React.FC = () => {
                         ? `${activePlan.remarks} | Stopped: ${stopPlanReason.trim()}`
                         : `Stopped: ${stopPlanReason.trim()}`;
 
-                    // CARRY_FORWARD → status STOPPED (carry forward arrow will appear on planning page)
-                    // FORCE_COMPLETE → status COMPLETED (short-closed, no carry forward)
                     const stopStatus = stopOption === "CARRY_FORWARD" ? "STOPPED" : "COMPLETED";
 
                     await apiClient.put(`/daily-production-plans/${dailyPlanId}`, {
@@ -543,7 +639,13 @@ const HourlyWorkReportCreate: React.FC = () => {
                 }
             }
 
-            navigate("/daily-machine-planning");
+            const dataObj = res?.data || res;
+            if (dataObj?.newHighReached) {
+                setNewHighDetails(dataObj.newHighDetails);
+                setShowNewHighModal(true);
+            } else {
+                navigate("/daily-machine-planning");
+            }
         } catch (err: any) {
             toast.error(err || "Failed to log hourly production");
         } finally {
@@ -642,7 +744,7 @@ const HourlyWorkReportCreate: React.FC = () => {
                                         disabled
                                     />
                                 </div>
-                              
+
                             </div>
 
                             <div className="mt-6 pt-6 border-t border-slate-200">
@@ -713,26 +815,26 @@ const HourlyWorkReportCreate: React.FC = () => {
                                     }}
                                 />
                             </div>
-                              <div>
-                                    <SelectInput
-                                        label="Operator"
-                                        name="operatorId"
-                                        value={operatorId}
-                                        required
-                                        error={formErrors.operatorId || (planError && planError.includes("operator") ? planError : undefined)}
-                                        disabled={loadingPlan || availableOperators.length === 0}
-                                        defaultOptionLabel={loadingPlan ? "Loading operator..." : "— Select Operator —"}
-                                        options={availableOperators.map(op => ({
-                                            value: op.id.toString(),
-                                            label: op.fullName
-                                        }))}
-                                        onChange={(e: any) => {
-                                            userSelectedOperator.current = true;
-                                            setOperatorId(e.target.value);
-                                            setFormErrors((prev) => ({ ...prev, operatorId: "" }));
-                                        }}
-                                    />
-                                </div>
+                            <div>
+                                <SelectInput
+                                    label="Operator"
+                                    name="operatorId"
+                                    value={operatorId}
+                                    required
+                                    error={formErrors.operatorId || (planError && planError.includes("operator") ? planError : undefined)}
+                                    disabled={loadingPlan || availableOperators.length === 0}
+                                    defaultOptionLabel={loadingPlan ? "Loading operator..." : "— Select Operator —"}
+                                    options={availableOperators.map(op => ({
+                                        value: op.id.toString(),
+                                        label: op.fullName
+                                    }))}
+                                    onChange={(e: any) => {
+                                        userSelectedOperator.current = true;
+                                        setOperatorId(e.target.value);
+                                        setFormErrors((prev) => ({ ...prev, operatorId: "" }));
+                                    }}
+                                />
+                            </div>
                             <div>
                                 <TextInput
                                     label="Produced Qty"
@@ -878,18 +980,18 @@ const HourlyWorkReportCreate: React.FC = () => {
                         {/* Stop Plan Early Section (only if not final hour) */}
                         {hourOptions.length > 0 && Number(hourIndex) < hourOptions.length && (
                             <div className="mt-8 pt-6 border-t border-slate-200">
-                                    <Form.Check
-                                        type="switch"
-                                        id="stop-plan-early-switch"
-                                        label={<span className="font-semibold text-red-600 ml-3 text-base">Stop Production Plan after this hour</span>}
-                                        checked={stopPlanEarly}
-                                        onChange={(e) => {
-                                            setStopPlanEarly(e.target.checked);
-                                            if (!e.target.checked) {
-                                                setFormErrors((prev) => ({ ...prev, stopPlanReason: "" }));
-                                            }
-                                        }}
-                                    />
+                                <Form.Check
+                                    type="switch"
+                                    id="stop-plan-early-switch"
+                                    label={<span className="font-semibold text-red-600 ml-3 text-base">Stop Production Plan after this hour</span>}
+                                    checked={stopPlanEarly}
+                                    onChange={(e) => {
+                                        setStopPlanEarly(e.target.checked);
+                                        if (!e.target.checked) {
+                                            setFormErrors((prev) => ({ ...prev, stopPlanReason: "" }));
+                                        }
+                                    }}
+                                />
                                 {stopPlanEarly && (
                                     <div className="mt-3 bg-slate-50/50 p-5 rounded-xl border border-slate-100 w-full flex flex-col gap-4">
                                         <div className="w-full">
@@ -913,11 +1015,10 @@ const HourlyWorkReportCreate: React.FC = () => {
                                             </label>
                                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-1">
                                                 <div
-                                                    className={`cursor-pointer border rounded-xl p-3 flex flex-col transition-all ${
-                                                        stopOption === "FORCE_COMPLETE"
+                                                    className={`cursor-pointer border rounded-xl p-3 flex flex-col transition-all ${stopOption === "FORCE_COMPLETE"
                                                             ? "border-rose-500 bg-rose-50/50 ring-2 ring-rose-500/20"
                                                             : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
-                                                    }`}
+                                                        }`}
                                                     onClick={() => setStopOption("FORCE_COMPLETE")}
                                                 >
                                                     <div className="flex items-center gap-2 font-semibold text-slate-800 text-sm">
@@ -936,11 +1037,10 @@ const HourlyWorkReportCreate: React.FC = () => {
                                                 </div>
 
                                                 <div
-                                                    className={`cursor-pointer border rounded-xl p-3 flex flex-col transition-all ${
-                                                        stopOption === "CARRY_FORWARD"
+                                                    className={`cursor-pointer border rounded-xl p-3 flex flex-col transition-all ${stopOption === "CARRY_FORWARD"
                                                             ? "border-amber-500 bg-amber-50/50 ring-2 ring-amber-500/20"
                                                             : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
-                                                    }`}
+                                                        }`}
                                                     onClick={() => setStopOption("CARRY_FORWARD")}
                                                 >
                                                     <div className="flex items-center gap-2 font-semibold text-slate-800 text-sm">
@@ -988,16 +1088,18 @@ const HourlyWorkReportCreate: React.FC = () => {
                                 )}
 
                                 {/* Wastage Table — always shown (no checkbox) */}
-                                <div className="bg-slate-50/50 p-5 rounded-xl border border-slate-100">
-                                    <div className="flex justify-between items-center mb-4">
-                                        <h4 className="font-bold text-slate-700 text-sm m-0">
+                                <div className="mt-4 p-5 border border-slate-200 rounded-xl bg-slate-50/50">
+                                    <div className="flex justify-between items-center mb-3">
+                                        <h4 className="font-bold text-slate-800 text-[15px] m-0 leading-tight">
                                             Wastage Products
                                             {!stopPlanEarly && <span className="text-red-500 ml-1">*</span>}
                                             {stopPlanEarly && <span className="ml-2 text-xs text-slate-400 font-normal">(optional)</span>}
                                         </h4>
                                         <CustomButton
-                                            text="+ Add Wastage Product"
+                                            size="sm"
                                             variant="secondary"
+                                            icon={FaPlus}
+                                            text=" Add Wastage Product"
                                             onClick={() => {
                                                 setFormErrors((prev) => ({ ...prev, logWastage: "" }));
                                                 setWastages([...wastages, { storeId: "", targetWastageProductId: "", quantity: "", storeError: "", productError: "", quantityError: "" }]);
@@ -1012,109 +1114,259 @@ const HourlyWorkReportCreate: React.FC = () => {
                                                 : "No wastage products added yet. Click '+ Add Wastage Product' to add one."}
                                         </div>
                                     ) : (
-                                        <div className="overflow-visible pb-24">
-                                            <table className="w-full text-left border-collapse">
+                                        <div className="bg-white border border-slate-200 rounded-xl overflow-visible mt-3">
+                                            <div className="overflow-x-auto">
+                                                <table className="w-full text-left text-sm whitespace-nowrap">
+                                                    <thead>
+                                                        <tr className="border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                                                            <th className="px-4 py-3 bg-slate-50 min-w-[160px]">Store <span className="text-red-500">*</span></th>
+                                                            <th className="px-4 py-3 bg-slate-50 min-w-[220px]">Wastage Product <span className="text-red-500">*</span></th>
+                                                            <th className="px-4 py-3 bg-slate-50 min-w-[180px]">Quantity <span className="text-red-500">*</span></th>
+                                                            <th className="px-4 py-3 bg-slate-50 text-center w-[80px]">Action</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-slate-100">
+                                                        {wastages.map((w, index) => (
+                                                            <tr key={index} className="hover:bg-slate-50/50 transition-colors">
+                                                                <td className="px-4 py-3 align-top min-w-[160px]">
+                                                                    <SelectInput
+                                                                        label=""
+                                                                        hideLabel
+                                                                        noMargin
+                                                                        name={`storeId-${index}`}
+                                                                        value={w.storeId}
+                                                                        onChange={(e) => {
+                                                                            const newW = [...wastages];
+                                                                            newW[index].storeId = e.target.value;
+                                                                            newW[index].storeError = "";
+                                                                            newW[index].targetWastageProductId = "";
+                                                                            newW[index].productError = "";
+                                                                            setWastages(newW);
+                                                                        }}
+                                                                        options={[
+                                                                            { label: "Select Store", value: "" },
+                                                                            ...stores.map((s: any) => ({ label: s.storeName, value: s.storeId }))
+                                                                        ]}
+                                                                        required
+                                                                        error={w.storeError}
+                                                                    />
+                                                                </td>
+                                                                <td className="px-4 py-3 align-top min-w-[220px]">
+                                                                    <SelectInput
+                                                                        label=""
+                                                                        hideLabel
+                                                                        noMargin
+                                                                        name={`targetWastageProductId-${index}`}
+                                                                        value={w.targetWastageProductId}
+                                                                        onChange={(e) => {
+                                                                            const newW = [...wastages];
+                                                                            newW[index].targetWastageProductId = e.target.value;
+                                                                            newW[index].productError = "";
+                                                                            const rm = rawMaterials.find(r => r.rawMaterialId === e.target.value);
+                                                                            if (rm) {
+                                                                                let uoms = rm.baseUom || "KG";
+                                                                                if (Array.isArray(rm.baseUom)) uoms = rm.baseUom.join(',');
+                                                                                else if (typeof rm.baseUom === "string" && rm.baseUom.startsWith("[")) {
+                                                                                    try { uoms = JSON.parse(rm.baseUom).join(','); } catch (e) { }
+                                                                                }
+                                                                                newW[index].uom = uoms;
+                                                                                const opts = getUomOptions(uoms);
+                                                                                newW[index].selectedUom = opts.length > 0 ? opts[0].value : "";
+                                                                            } else {
+                                                                                newW[index].uom = "";
+                                                                                newW[index].selectedUom = "";
+                                                                            }
+                                                                            setWastages(newW);
+                                                                        }}
+                                                                        options={[
+                                                                            { label: "Select Product", value: "" },
+                                                                            ...rawMaterials
+                                                                                .filter((r: any) => {
+                                                                                    if (!w.storeId) return true;
+                                                                                    const rmStoreId = r.storeId || r.store?.storeId;
+                                                                                    return rmStoreId && String(rmStoreId) === String(w.storeId);
+                                                                                })
+                                                                                .map((r: any) => {
+                                                                                    const isSelectedInOtherRow = wastages.some((otherW, otherIdx) => otherIdx !== index && otherW.targetWastageProductId === r.rawMaterialId);
+                                                                                    return {
+                                                                                        label: `${r.materialName} (${r.rawMaterialId})`,
+                                                                                        value: r.rawMaterialId,
+                                                                                        disabled: isSelectedInOtherRow
+                                                                                    };
+                                                                                })
+                                                                        ]}
+                                                                        disabled={!w.storeId}
+                                                                        required
+                                                                        error={w.productError}
+                                                                    />
+                                                                </td>
+                                                                <td className="px-4 py-3 align-top min-w-[180px]">
+                                                                    <QuantityInput
+                                                                        label=""
+                                                                        hideLabel
+                                                                        name={`quantity-${index}`}
+                                                                        value={w.quantity}
+                                                                        onChange={(e) => {
+                                                                            const newW = [...wastages];
+                                                                            newW[index].quantity = e.target.value;
+                                                                            if (e.target.uom) {
+                                                                                newW[index].selectedUom = e.target.uom;
+                                                                            }
+                                                                            newW[index].quantityError = "";
+                                                                            setWastages(newW);
+                                                                        }}
+                                                                        baseUoms={w.uom || "KG"}
+                                                                        required
+                                                                        error={w.quantityError}
+                                                                    />
+                                                                </td>
+                                                                <td className="px-4 py-3 align-middle text-center w-[80px]">
+                                                                    <DeleteButton
+                                                                        onClick={() => {
+                                                                            const newW = [...wastages];
+                                                                            newW.splice(index, 1);
+                                                                            setWastages(newW);
+                                                                        }}
+                                                                    />
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Returned Raw Materials */}
+                        {(isFinalHour || stopPlanEarly) && (
+                            <div className="mt-4 p-5 border border-slate-200 rounded-xl bg-slate-50/50">
+                                <div className="flex justify-between items-center mb-3">
+                                    <div className="flex items-center gap-2">
+                                        <div>
+                                            <h4 className="font-bold text-slate-800 text-[15px] m-0 leading-tight">
+                                                Returned Raw Materials
+                                            </h4>
+                                            <p className="text-xs text-slate-500 m-0">
+                                                Log remaining raw materials returned to the warehouse.
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <CustomButton
+                                        size="sm"
+                                        variant="secondary"
+                                        icon={FaPlus}
+                                        text=" Add Raw Material"
+                                        onClick={() => {
+                                            setRawMaterialsUsed([...rawMaterialsUsed, { storeId: "", rawMaterialId: "", quantity: "", uom: "", storeError: "", productError: "", quantityError: "" }]);
+                                        }}
+                                    />
+                                </div>
+
+                                <div className="bg-white border border-slate-200 rounded-xl overflow-hidden mt-3">
+                                    {rawMaterialsUsed.length === 0 ? (
+                                        <div className="p-4 text-center text-slate-500 text-sm italic">
+                                            No raw materials logged. Click '+ Add Raw Material' to add one.
+                                        </div>
+                                    ) : (
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full text-left text-sm whitespace-nowrap">
                                                 <thead>
                                                     <tr className="border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                                                        <th className="px-4 py-3 bg-slate-50">Store <span className="text-red-500">*</span></th>
-                                                        <th className="px-4 py-3 bg-slate-50">Wastage Product <span className="text-red-500">*</span></th>
-                                                        <th className="px-4 py-3 bg-slate-50 w-48">Quantity <span className="text-red-500">*</span></th>
-                                                        <th className="px-4 py-3 bg-slate-50 w-20 text-center">Action</th>
+                                                        <th className="px-4 py-3 bg-slate-50 min-w-[160px]">Store <span className="text-red-500">*</span></th>
+                                                        <th className="px-4 py-3 bg-slate-50 min-w-[220px]">Raw Material <span className="text-red-500">*</span></th>
+                                                        <th className="px-4 py-3 bg-slate-50 min-w-[180px]">Quantity <span className="text-red-500">*</span></th>
+                                                        <th className="px-4 py-3 bg-slate-50 text-center w-[80px]">Action</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody className="divide-y divide-slate-100">
-                                                    {wastages.map((w, index) => (
-                                                        <tr key={index} className="hover:bg-slate-50/50 transition-colors">
-                                                            <td className="px-4 py-3 align-top">
+                                                    {rawMaterialsUsed.map((rm, index) => (
+                                                        <tr key={`rm-${index}`}>
+                                                            <td className="px-4 py-3 align-top min-w-[160px]">
                                                                 <SelectInput
-                                                                    label=""
-                                                                    hideLabel
+                                                                    hideLabel={true}
                                                                     noMargin
-                                                                    name={`storeId-${index}`}
-                                                                    value={w.storeId}
-                                                                    onChange={(e) => {
-                                                                        const newW = [...wastages];
-                                                                        newW[index].storeId = e.target.value;
-                                                                        newW[index].storeError = "";
-                                                                        newW[index].targetWastageProductId = "";
-                                                                        newW[index].productError = "";
-                                                                        setWastages(newW);
-                                                                    }}
+                                                                    name={`rm-store-${index}`}
+                                                                    value={rm.storeId}
                                                                     options={[
-                                                                        { label: "Select Store", value: "" },
-                                                                        ...stores.map((s: any) => ({ label: s.storeName, value: s.storeId }))
+                                                                        { value: "", label: "-- Select Store --" },
+                                                                        ...stores.map((s: any) => ({
+                                                                            value: s.storeId,
+                                                                            label: s.storeName || s.storeId
+                                                                        }))
                                                                     ]}
-                                                                    required
-                                                                    error={w.storeError}
+                                                                    onChange={(e) => {
+                                                                        const newRm = [...rawMaterialsUsed];
+                                                                        newRm[index].storeId = e.target.value;
+                                                                        newRm[index].storeError = "";
+                                                                        newRm[index].rawMaterialId = ""; // Reset raw material when store changes
+                                                                        setRawMaterialsUsed(newRm);
+                                                                    }}
+                                                                    error={rm.storeError}
                                                                 />
                                                             </td>
-                                                            <td className="px-4 py-3 align-top">
+                                                            <td className="px-4 py-3 align-top min-w-[220px]">
                                                                 <SelectInput
-                                                                    label=""
-                                                                    hideLabel
-                                                                    noMargin
-                                                                    name={`targetWastageProductId-${index}`}
-                                                                    value={w.targetWastageProductId}
+                                                                    hideLabel={true}
+                                                                    name={`rm-id-${index}`}
+                                                                    value={rm.rawMaterialId}
+                                                                    options={[
+                                                                        { value: "", label: "-- Select Raw Material --" },
+                                                                        ...rawMaterialOptions
+                                                                            .filter((r: any) => rm.storeId ? r.storeId === rm.storeId : true)
+                                                                            .map((r: any) => ({
+                                                                                value: r.rawMaterialId,
+                                                                                label: `${r.rawMaterialId} - ${r.materialName}`
+                                                                            }))
+                                                                    ]}
                                                                     onChange={(e) => {
-                                                                        const newW = [...wastages];
-                                                                        newW[index].targetWastageProductId = e.target.value;
-                                                                        newW[index].productError = "";
-                                                                        const rm = rawMaterials.find(r => r.rawMaterialId === e.target.value);
-                                                                        if (rm) {
-                                                                            let uoms = rm.baseUom || "KG";
-                                                                            if (Array.isArray(rm.baseUom)) uoms = rm.baseUom.join(',');
-                                                                            else if (typeof rm.baseUom === "string" && rm.baseUom.startsWith("[")) {
-                                                                                try { uoms = JSON.parse(rm.baseUom).join(','); } catch(e){}
-                                                                            }
-                                                                            newW[index].uom = uoms;
+                                                                        const newRm = [...rawMaterialsUsed];
+                                                                        newRm[index].rawMaterialId = e.target.value;
+                                                                        newRm[index].productError = "";
+                                                                        const matchedRm = rawMaterialOptions.find((r: any) => r.rawMaterialId === e.target.value);
+                                                                        if (matchedRm) {
+                                                                            const base = matchedRm.baseUom || "";
+                                                                            const opts = getUomOptions(base);
+                                                                            newRm[index].uom = opts.length > 0 ? opts[0].value : "";
+                                                                        } else {
+                                                                            newRm[index].uom = "";
                                                                         }
-                                                                        setWastages(newW);
+                                                                        setRawMaterialsUsed(newRm);
                                                                     }}
-                                                                    options={[
-                                                                        { label: "Select Product", value: "" },
-                                                                        ...rawMaterials
-                                                                            .filter((r: any) => {
-                                                                                if (!w.storeId) return true;
-                                                                                const rmStoreId = r.storeId || r.store?.storeId;
-                                                                                return rmStoreId && String(rmStoreId) === String(w.storeId);
-                                                                            })
-                                                                            .map((r: any) => {
-                                                                                const isSelectedInOtherRow = wastages.some((otherW, otherIdx) => otherIdx !== index && otherW.targetWastageProductId === r.rawMaterialId);
-                                                                                return { 
-                                                                                    label: `${r.materialName} (${r.rawMaterialId})`, 
-                                                                                    value: r.rawMaterialId,
-                                                                                    disabled: isSelectedInOtherRow
-                                                                                };
-                                                                            })
-                                                                    ]}
-                                                                    disabled={!w.storeId}
-                                                                    required
-                                                                    error={w.productError}
+                                                                    error={rm.productError}
                                                                 />
                                                             </td>
-                                                            <td className="px-4 py-3 align-top">
+                                                            <td className="px-4 py-3 align-top min-w-[180px]">
                                                                 <QuantityInput
                                                                     label=""
                                                                     hideLabel
-                                                                    name={`quantity-${index}`}
-                                                                    value={w.quantity}
+                                                                    name={`rm-qty-${index}`}
+                                                                    value={rm.quantity}
                                                                     onChange={(e) => {
-                                                                        const newW = [...wastages];
-                                                                        newW[index].quantity = e.target.value;
-                                                                        newW[index].quantityError = "";
-                                                                        setWastages(newW);
+                                                                        const newRm = [...rawMaterialsUsed];
+                                                                        newRm[index].quantity = e.target.value;
+                                                                        if (e.target.uom) {
+                                                                            newRm[index].uom = e.target.uom;
+                                                                        }
+                                                                        newRm[index].quantityError = "";
+                                                                        setRawMaterialsUsed(newRm);
                                                                     }}
-                                                                    baseUoms={w.uom || "KG"}
+                                                                    baseUoms={
+                                                                        rawMaterialOptions.find((r: any) => r.rawMaterialId === rm.rawMaterialId)?.baseUom || "KG"
+                                                                    }
+                                                                    uom={rm.uom}
                                                                     required
-                                                                    error={w.quantityError}
+                                                                    error={rm.quantityError}
                                                                 />
                                                             </td>
-                                                            <td className="px-4 py-3 align-middle text-center">
+                                                            <td className="px-4 py-3 align-middle text-center w-[80px]">
                                                                 <DeleteButton
                                                                     onClick={() => {
-                                                                        const newW = [...wastages];
-                                                                        newW.splice(index, 1);
-                                                                        setWastages(newW);
+                                                                        const newRm = [...rawMaterialsUsed];
+                                                                        newRm.splice(index, 1);
+                                                                        setRawMaterialsUsed(newRm);
                                                                     }}
                                                                 />
                                                             </td>
@@ -1127,7 +1379,6 @@ const HourlyWorkReportCreate: React.FC = () => {
                                 </div>
                             </div>
                         )}
-
                     </div>
                 </div>
 
@@ -1148,6 +1399,92 @@ const HourlyWorkReportCreate: React.FC = () => {
                     />
                 </div>
             </form>
+
+            {/* ─────── New High Reached Modal ─────── */}
+            <CommonModal
+                show={showNewHighModal}
+                onHide={() => {
+                    setShowNewHighModal(false);
+                    navigate("/daily-machine-planning");
+                }}
+                title={
+                    <div className="flex items-center gap-2 text-indigo-600 font-bold">
+                        <FaTrophy className="text-xl text-indigo-500 animate-pulse" />
+                        <span>New Production High Reached!</span>
+                    </div>
+                }
+                footer={
+                    <CustomButton
+                        text="Awesome!"
+                        onClick={() => {
+                            setShowNewHighModal(false);
+                            navigate("/daily-machine-planning");
+                        }}
+                    />
+                }
+            >
+                <div className="text-center py-4">
+                    <div className="flex justify-center mb-5">
+                        <div className="p-4 bg-indigo-50 rounded-full text-indigo-600 animate-bounce shadow-sm">
+                            <FaCrown size={44} />
+                        </div>
+                    </div>
+                    <h3 className="text-2xl font-bold text-slate-800 mb-2">Congratulations!</h3>
+                    <p className="text-slate-500 text-sm max-w-sm mx-auto mb-6">
+                        You have recorded a new highest production capacity for this product on this machine!
+                    </p>
+
+                    <div className="inline-block bg-indigo-50/50 border border-indigo-100 rounded-2xl p-6 mb-6 min-w-[240px]">
+                        <div className="text-xs uppercase tracking-wider text-indigo-700 font-semibold mb-1">
+                            New Capacity High
+                        </div>
+                        <div className="text-4xl font-extrabold text-indigo-600 flex items-center justify-center gap-2">
+                            <span>{newHighDetails?.newCapacity}</span>
+                            <span className="text-lg font-normal text-indigo-500">
+                                {activePlan?.uom || "units"}
+                            </span>
+                        </div>
+                        {newHighDetails?.previousCapacity > 0 && (
+                            <div className="text-xs text-slate-500 mt-2 bg-indigo-100/50 py-1 px-3 rounded-full inline-block">
+                                Previous High: <span className="font-semibold text-slate-700">{newHighDetails.previousCapacity} {activePlan?.uom || "units"}</span>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4 text-left max-w-md mx-auto bg-slate-50 p-5 rounded-2xl border border-slate-100 text-sm">
+                        <div className="flex items-start gap-2.5">
+                            <FaCalendarAlt className="text-indigo-500 mt-0.5 text-base flex-shrink-0" />
+                            <div>
+                                <span className="text-slate-400 text-xs block font-medium">Date</span>
+                                <strong className="text-slate-700 font-semibold">{newHighDetails?.date}</strong>
+                            </div>
+                        </div>
+                        <div className="flex items-start gap-2.5">
+                            <FaCogs className="text-indigo-500 mt-0.5 text-base flex-shrink-0" />
+                            <div>
+                                <span className="text-slate-400 text-xs block font-medium">Machine</span>
+                                <strong className="text-slate-700 font-semibold truncate block max-w-[150px]" title={newHighDetails?.machineName}>{newHighDetails?.machineName}</strong>
+                            </div>
+                        </div>
+                        <div className="flex items-start gap-2.5">
+                            <FaClock className="text-indigo-500 mt-0.5 text-base flex-shrink-0" />
+                            <div>
+                                <span className="text-slate-400 text-xs block font-medium">Shift</span>
+                                <strong className="text-slate-700 font-semibold">{newHighDetails?.shiftName}</strong>
+                            </div>
+                        </div>
+                        <div className="flex items-start gap-2.5">
+                            <FaUsers className="text-indigo-500 mt-0.5 text-base flex-shrink-0" />
+                            <div>
+                                <span className="text-slate-400 text-xs block font-medium">Operators</span>
+                                <strong className="text-slate-700 font-semibold block truncate max-w-[150px]" title={newHighDetails?.operators}>
+                                    {newHighDetails?.operators}
+                                </strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </CommonModal>
         </div>
     );
 };

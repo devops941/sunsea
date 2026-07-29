@@ -5,7 +5,8 @@ import { asyncHandler } from "../../utils/asyncHandler";
 
 class HourlyProductionController {
   create = asyncHandler(async (req: Request, res: Response) => {
-    const log = await hourlyProductionService.create(req.body);
+    const userId = req.user?.userId || "SYSTEM";
+    const log = await hourlyProductionService.create(req.body, userId);
 
     return res.status(201).json(
       new ApiResponse("Hourly Production log created successfully", log)
@@ -38,7 +39,8 @@ class HourlyProductionController {
 
   update = asyncHandler(async (req: Request, res: Response) => {
     const { hourlyProductionId } = req.params;
-    const log = await hourlyProductionService.update(BigInt(String(hourlyProductionId)), req.body);
+    const userId = req.user?.userId || "SYSTEM";
+    const log = await hourlyProductionService.update(BigInt(String(hourlyProductionId)), req.body, userId);
 
     return res.status(200).json(
       new ApiResponse("Hourly Production log updated successfully", log)

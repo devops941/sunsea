@@ -2,7 +2,7 @@ import { Router } from "express";
 import { productCapacityHistoryController } from "./product-capacity-history.controller";
 import { authMiddleware } from "../../middleware/auth.middleware";
 import { validateMiddleware } from "../../middleware/validate.middleware";
-import { productIdSchema } from "./product-capacity-history.validation";
+import { productIdSchema, machineIdSchema } from "./product-capacity-history.validation";
 
 const router = Router();
 
@@ -11,6 +11,14 @@ router.get(
   authMiddleware,
   validateMiddleware(productIdSchema),
   productCapacityHistoryController.findByProduct
+);
+
+router.get(
+  "/product/:productId/machine/:machineId",
+  authMiddleware,
+  validateMiddleware(productIdSchema),
+  validateMiddleware(machineIdSchema),
+  productCapacityHistoryController.getLatestByProductAndMachine
 );
 
 router.post(
