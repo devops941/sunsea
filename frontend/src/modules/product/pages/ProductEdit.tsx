@@ -12,7 +12,6 @@ import { useProducts } from "../../../hooks/useProducts";
 import { useCategories } from "../../../hooks/useCategories";
 import { useColors } from "../../../hooks/useColors";
 import { useSizes } from "../../../hooks/useSizes";
-import QuantityInput from "../../../components/form/QuantityInput/QuantityInput";
 import { productService } from "../../../services/productService";
 import { storeService } from "../../../services/storeService";
 import { rawMaterialService } from "../../../services/rawMaterialService";
@@ -21,6 +20,11 @@ import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
 import { fetchGstTaxes, selectActiveGstTaxes } from "../../../features/gst/gstSlice";
 import FlowInput from "../../../components/ui/FlowInput/FlowInput";
 import BackButton from "../../../components/ui/BackButton/BackButton";
+import DatePickerCalendar from "../../../components/ui/DatePickerCalendar/DatePickerCalendar";
+import { employeeService } from "../../../services/employeeService";
+import { departmentService } from "../../../services/departmentService";
+import { shiftService } from "../../../services/shiftService";
+import { machineService } from "../../../services/machineService";
 
 const MAX_IMAGES = 3;
 
@@ -68,6 +72,7 @@ const ProductEdit: React.FC = () => {
         uomId: "",
         capacityLitres: "",
         weightPerPiece: "",
+        weightUom: "kg",
         bundleQty: "",
         dimensions: "",
         mouldReference: "",
@@ -98,6 +103,18 @@ const ProductEdit: React.FC = () => {
     const [allRawMaterials, setAllRawMaterials] = useState<any[]>([]);
     const [productionSteps, setProductionSteps] = useState<string[]>([]);
 
+    // ✅ Capacity initial setup (single entry)
+    const [employees, setEmployees] = useState<any[]>([]);
+    const [departments, setDepartments] = useState<any[]>([]);
+    const [shifts, setShifts] = useState<any[]>([]);
+    const [capDate, setCapDate] = useState(new Date().toISOString().split("T")[0]);
+    const [capShiftId, setCapShiftId] = useState("");
+    const [capDeptId, setCapDeptId] = useState("");
+    const [capOperatorIds, setCapOperatorIds] = useState<string[]>([]);
+    const [capQty, setCapQty] = useState("");
+    const [capMachine, setCapMachine] = useState("");
+    const [machines, setMachines] = useState<any[]>([]);
+
     // Load dropdowns
     useEffect(() => {
         loadCategories({ isActive: true });
@@ -124,6 +141,33 @@ const ProductEdit: React.FC = () => {
                 const data = Array.isArray(res?.rawMaterials) ? res.rawMaterials : Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
                 setAllRawMaterials(data);
             }).catch(() => { });
+
+        employeeService.fetchAll({ limit: 500 })
+            .then((res: any) => {
+                const data = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : Array.isArray(res?.employees) ? res.employees : [];
+                setEmployees(data);
+            }).catch(() => { });
+
+        departmentService.fetchAll()
+            .then((res: any) => {
+                const depts = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
+                setDepartments(depts);
+            }).catch((err: any) => {
+                console.error("Failed to fetch departments:", err);
+            });
+
+        shiftService.fetchAll()
+            .then((res: any) => {
+                const data = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
+                setShifts(data);
+            }).catch(() => { });
+
+        machineService.getAll().then((res: any) => {
+            const data = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
+            setMachines(data);
+        }).catch((err: any) => {
+            console.error("Failed to fetch machines:", err);
+        });
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     // Fetch product
@@ -162,6 +206,7 @@ const ProductEdit: React.FC = () => {
             uomId: productData.uom?.code || productData.uom?.uomCode || (productData.uomId ? String(productData.uomId) : ""),
             capacityLitres: productData.capacityLitres != null ? String(productData.capacityLitres) : "",
             weightPerPiece: productData.weightPerPiece != null ? String(productData.weightPerPiece) : "",
+            weightUom: "kg",
             bundleQty: productData.bundleQty != null ? String(productData.bundleQty) : "",
             dimensions: productData.dimensions || "",
             mouldReference: productData.mouldReference || "",
@@ -375,6 +420,9 @@ const ProductEdit: React.FC = () => {
 
 
 
+
+
+
     const handleAddRawMaterial = () => {
         setRawMaterials(prev => [...prev, { rawMaterialId: "", percentage: "" }]);
     };
@@ -479,8 +527,13 @@ const ProductEdit: React.FC = () => {
             if (formData.description) payload.append("description", formData.description);
 
             // Variants & specs
-            if (formData.capacityLitres) payload.append("capacityLitres", formData.capacityLitres);
-            if (formData.weightPerPiece) payload.append("weightPerPiece", formData.weightPerPiece);
+            const derivedCapacity = capQty || formData.capacityLitres;
+            if (derivedCapacity) payload.append("capacityLitres", derivedCapacity);
+            let weightVal = formData.weightPerPiece;
+            if (weightVal && (formData as any).weightUom === "g") {
+                weightVal = String(Number(weightVal) / 1000);
+            }
+            if (weightVal) payload.append("weightPerPiece", weightVal);
             if (formData.bundleQty) payload.append("bundleQty", formData.bundleQty);
             if (formData.dimensions) payload.append("dimensions", formData.dimensions);
             if (formData.mouldReference) payload.append("mouldReference", formData.mouldReference);
@@ -535,6 +588,18 @@ const ProductEdit: React.FC = () => {
                 ));
             } else {
                 payload.append("productionSteps", "[]");
+            }
+
+            if (capQty && capOperatorIds.length > 0) {
+                payload.append("capacityHistory", JSON.stringify([{
+                    recordedAt: capDate,
+                    shiftId: capShiftId,
+                    machineId: capMachine,
+                    operatorName: capOperatorIds.map(id =>
+                        employees.find(e => String(e.id) === id)?.fullName || id
+                    ).join(", "),
+                    newCapacity: Number(capQty),
+                }]));
             }
 
             // Images
@@ -842,15 +907,34 @@ const ProductEdit: React.FC = () => {
                                 onChange={handleChange}
                                 error={errors.bundleQty}
                             />
-                            <QuantityInput
-                                label="Weight Per Piece"
-                                name="weightPerPiece"
-                                value={formData.weightPerPiece}
-                                baseUoms="kg,g"
-                                required
-                                onChange={handleChange}
-                                error={errors.weightPerPiece}
-                            />
+                            <div>
+                                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                                    Weight Per Piece <span className="text-rose-500 ml-1">*</span>
+                                </label>
+                                <div className="flex rounded-md h-10 border border-slate-200 overflow-hidden">
+                                    <input
+                                        type="number"
+                                        name="weightPerPiece"
+                                        value={formData.weightPerPiece}
+                                        onChange={handleChange}
+                                        placeholder="0.00"
+                                        step="any"
+                                        className="flex-1 w-full bg-transparent px-3 py-2 text-[15px] text-slate-800 placeholder-slate-400 focus:outline-none border-r border-slate-200 h-full"
+                                    />
+                                    <select
+                                        name="weightUom"
+                                        value={(formData as any).weightUom || "kg"}
+                                        onChange={handleChange}
+                                        className="px-2 text-sm font-medium text-slate-700 bg-slate-50 border-0 focus:outline-none h-full cursor-pointer"
+                                    >
+                                        <option value="kg">kg</option>
+                                        <option value="g">g</option>
+                                    </select>
+                                </div>
+                                {errors.weightPerPiece && (
+                                    <p className="mt-1.5 text-sm text-rose-500 font-medium">{errors.weightPerPiece}</p>
+                                )}
+                            </div>
 
                             <TextInput
                                 label="Dimensions (L×B×H CM)"
@@ -1069,6 +1153,82 @@ const ProductEdit: React.FC = () => {
                                 No accessories added. Click "Add Item" to specify additional quantities.
                             </div>
                         )}
+                    </div>
+
+                    {/* Capacity — initial setup (single entry) */}
+                    <div className="pt-2">
+                        <h6 className="text-base font-semibold text-gray-800 mb-3">Initial Capacity Setup</h6>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                            <div>
+                                <DatePickerCalendar
+                                    label="Date"
+                                    name="capDate"
+                                    value={capDate}
+                                    onChange={(e) => setCapDate(e.target.value)}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">Shift</label>
+                                <select
+                                    value={capShiftId}
+                                    onChange={(e) => setCapShiftId(e.target.value)}
+                                    className="w-full h-10 px-3 rounded-md border border-slate-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                                >
+                                    <option value="">-- Shift --</option>
+                                    {shifts.map(s => (
+                                        <option key={s.id} value={s.shiftName || s.shiftCode}>{s.shiftName || s.shiftCode}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">Role</label>
+                                <select
+                                    value={capDeptId}
+                                    onChange={(e) => { setCapDeptId(e.target.value); setCapOperatorIds([]); }}
+                                    className="w-full h-10 px-3 rounded-md border border-slate-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                                >
+                                    <option value="">-- Role --</option>
+                                    {departments.map(dept => (
+                                        <option key={dept.id} value={String(dept.id)}>{dept.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">Qty / Shift</label>
+                                <input
+                                    type="number"
+                                    step="any"
+                                    value={capQty}
+                                    onChange={(e) => setCapQty(e.target.value)}
+                                    placeholder="0"
+                                    className="w-full h-10 px-3 rounded-md border border-slate-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                                />
+                            </div>
+                            <div>
+                                <SelectInput
+                                    label="Machine"
+                                    name="capMachine"
+                                    value={capMachine}
+                                    options={[
+                                        { value: "", label: "-- Machine --" },
+                                        ...machines.map(m => ({ value: m.machineId, label: `${m.machineId} - ${m.machineName}` }))
+                                    ]}
+                                    onChange={(e) => setCapMachine(e.target.value)}
+                                />
+                            </div>
+                            <div className="col-span-full">
+                                <MultiSelect
+                                    label="Operators"
+                                    name="capOperatorIds"
+                                    options={employees
+                                        .filter(emp => !capDeptId || String(emp.departmentId) === capDeptId)
+                                        .map(emp => ({ value: String(emp.id), label: emp.fullName }))}
+                                    value={capOperatorIds}
+                                    onChange={(_, vals) => setCapOperatorIds(vals)}
+                                    placeholder={capDeptId ? "Select operators" : "Select role first"}
+                                />
+                            </div>
+                        </div>
                     </div>
 
                     {/* Production Workflow (optional, free-text step-by-step pipeline) */}

@@ -149,6 +149,14 @@ const config = {
         eligibleOrders: "/goods-dispatches/eligible-orders",
     },
 
+    productShiftRecord: {
+        base: "/product-shift-records",
+    },
+
+    productCapacityHistory: {
+        base: "/product-capacity-history",
+    },
+
 
 }
 export default config;

@@ -22,6 +22,7 @@ import { salesOrderService } from "../../../services/salesOrderService";
 import { rawMaterialService } from "../../../services/rawMaterialService";
 import { productService } from "../../../services/productService";
 import { billOfMaterialService } from "../../../services/billOfMaterialService";
+import { productCapacityHistoryService } from "../../../services/productCapacityHistoryService";
 import BackButton from "../../../components/ui/BackButton/BackButton";
 import CommonLoader from "../../../components/ui/Loader/CommonLoader";
 
@@ -1198,7 +1199,7 @@ const ProductionOrderCreate: React.FC = () => {
                                                                 };
                                                             })}
                                                             defaultOptionLabel="Select Finished Product"
-                                                            onChange={(e) => {
+                                                            onChange={async (e) => {
                                                                 field.onChange(e);
                                                                 const p = products.find((x) => x.id?.toString() === e.target.value);
                                                                 if (p) {

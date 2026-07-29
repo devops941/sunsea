@@ -1,9 +1,13 @@
 import React, { useState, useEffect } from "react";
-import { FaTimes } from "react-icons/fa";
+import { FaTimes, FaPlus } from "react-icons/fa";
 import { toast } from "react-toastify";
 import { productionOrderService } from "../../../services/productionOrderService";
 import { storeService } from "../../../services/storeService";
+import { rawMaterialService } from "../../../services/rawMaterialService";
 import CustomButton from "../../../components/ui/Button/Button";
+import TextInput from "../../../components/form/TextInput/TextInput";
+import SelectInput from "../../../components/form/SelectInput/SelectInput";
+
 interface MaterialIssueModalProps {
     show: boolean;
     onHide: () => void;
@@ -33,6 +37,7 @@ export const MaterialIssueModal: React.FC<MaterialIssueModalProps> = ({
 }) => {
     const [issuing, setIssuing] = useState(false);
     const [stores, setStores] = useState<any[]>([]);
+    const [allRawMaterials, setAllRawMaterials] = useState<any[]>([]);
     const [issueItems, setIssueItems] = useState<Array<{
         rawMaterialId: string;
         materialName: string;
@@ -42,6 +47,11 @@ export const MaterialIssueModal: React.FC<MaterialIssueModalProps> = ({
         storeId: string;
         remarks: string;
         uom: string;
+        remarkErrors: string;
+        storeError: string;
+        rmError: string;
+        qtyError: string;
+        isExtra: boolean;
     }>>([]);
 
     useEffect(() => {
@@ -51,13 +61,17 @@ export const MaterialIssueModal: React.FC<MaterialIssueModalProps> = ({
                 setStores(data);
             })
             .catch((err) => console.error("Failed to fetch stores", err));
+        rawMaterialService.fetchAll({}).then((res: any) => {
+            const list = Array.isArray(res) ? res : [];
+            setAllRawMaterials(list);
+        }).catch(() => { });
     }, []);
 
     useEffect(() => {
         if (show && rawMaterials) {
             const items = rawMaterials.map((rm) => {
                 const stockRm = rawMaterialsMap.get(rm.rawMaterialId?.toString());
-                
+
                 // Calculate proportionate qty based on daily plan
                 let calculatedRequiredQty = Number(rm.requiredQty || 0);
                 if (dailyPlanQty && totalTargetQty && totalTargetQty > 0) {
@@ -66,7 +80,7 @@ export const MaterialIssueModal: React.FC<MaterialIssueModalProps> = ({
                 const reservedQty = Number(calculatedRequiredQty);
                 const storeId = stockRm?.storeId || defaultStoreId || "";
                 const availableStock = stockRm ? (Number(stockRm.onHandQty || 0) - Number(stockRm.reservedQty || 0)) : Number((rm as any).availableStock || 0);
-                
+
                 let displayUom = stockRm?.baseUom?.split(',')[0] || (rm as any).uom || stockRm?.uom || "KG";
                 if (displayUom.toLowerCase() === 'ea' || displayUom.toLowerCase() === 'each') {
                     displayUom = 'pcs';
@@ -80,7 +94,12 @@ export const MaterialIssueModal: React.FC<MaterialIssueModalProps> = ({
                     availableStock,
                     storeId: storeId ? String(storeId) : "",
                     remarks: "",
-                    uom: displayUom
+                    uom: displayUom,
+                    remarkErrors: "",
+                    storeError: "",
+                    rmError: "",
+                    qtyError: "",
+                    isExtra: false,
                 };
             });
             setIssueItems(items);
@@ -92,6 +111,7 @@ export const MaterialIssueModal: React.FC<MaterialIssueModalProps> = ({
         setIssueItems((prev) => {
             const copy = [...prev];
             copy[idx].qty = value;
+            copy[idx].qtyError = "";
             return copy;
         });
     };
@@ -100,6 +120,7 @@ export const MaterialIssueModal: React.FC<MaterialIssueModalProps> = ({
         setIssueItems((prev) => {
             const copy = [...prev];
             copy[idx].storeId = storeId;
+            copy[idx].storeError = "";
             return copy;
         });
     };
@@ -108,6 +129,46 @@ export const MaterialIssueModal: React.FC<MaterialIssueModalProps> = ({
         setIssueItems((prev) => {
             const copy = [...prev];
             copy[idx].remarks = remarks;
+            copy[idx].remarkErrors = "";
+            return copy;
+        });
+    };
+
+    const addRow = (afterIdx: number) => {
+        setIssueItems((prev) => {
+            const copy = [...prev];
+            copy.splice(afterIdx + 1, 0, {
+                rawMaterialId: "",
+                materialName: "",
+                reservedQty: 0,
+                qty: 0,
+                availableStock: 0,
+                storeId: "",
+                remarks: "",
+                uom: "KG",
+                remarkErrors: "",
+                storeError: "",
+                rmError: "",
+                qtyError: "",
+                isExtra: true,
+            });
+            return copy;
+        });
+    };
+
+    const handleExtraRmChange = (idx: number, rmId: string) => {
+        const rm = allRawMaterials.find(r => r.rawMaterialId === rmId);
+        const stockRm = rawMaterialsMap.get(rmId);
+        const availableStock = stockRm ? (Number(stockRm.onHandQty || 0) - Number(stockRm.reservedQty || 0)) : (rm ? (Number((rm as any).onHandQty || 0) - Number((rm as any).reservedQty || 0)) : 0);
+        setIssueItems((prev) => {
+            const copy = [...prev];
+            copy[idx].rawMaterialId = rmId;
+            copy[idx].rmError = "";
+            copy[idx].materialName = rm?.materialName || rmId;
+            copy[idx].availableStock = availableStock;
+            let uom = rm?.baseUom?.split(',')[0] || stockRm?.baseUom?.split(',')[0] || "KG";
+            if (uom.toLowerCase() === 'ea' || uom.toLowerCase() === 'each') uom = 'pcs';
+            copy[idx].uom = uom;
             return copy;
         });
     };
@@ -116,16 +177,41 @@ export const MaterialIssueModal: React.FC<MaterialIssueModalProps> = ({
         e.preventDefault();
 
         // Validations
-        for (const item of issueItems) {
+        let hasError = false;
+        const updated = [...issueItems];
+        for (let i = 0; i < updated.length; i++) {
+            const item = updated[i];
+            updated[i].remarkErrors = "";
+            updated[i].storeError = "";
+            updated[i].rmError = "";
+            updated[i].qtyError = "";
+            if (item.isExtra && !item.rawMaterialId) {
+                updated[i].rmError = "Please select a raw material";
+                hasError = true;
+            }
             if (!item.storeId) {
-                toast.error(`Please select a store for raw material ${item.materialName}`);
-                return;
+                updated[i].storeError = "Store is required";
+                hasError = true;
             }
             if (item.qty <= 0) {
-                toast.error(`Issue quantity for ${item.materialName} must be greater than 0`);
-                return;
+                updated[i].qtyError = "Quantity must be greater than 0";
+                hasError = true;
+            }
+            if (item.qty > item.availableStock) {
+                updated[i].qtyError = `Insufficient stock (Available: ${item.availableStock.toFixed(2)} ${item.uom})`;
+                hasError = true;
+            }
+            // Remark is mandatory when:
+            // - It's an Add Row (isExtra = true) — always required
+            // - OR the qty was changed from the original reserved qty
+            const qtyChanged = item.reservedQty > 0 && Math.abs(item.qty - item.reservedQty) > 0.0001;
+            if ((item.isExtra || qtyChanged) && !item.remarks?.trim()) {
+                updated[i].remarkErrors = "Remark is required";
+                hasError = true;
             }
         }
+        setIssueItems(updated);
+        if (hasError) return;
 
         setIssuing(true);
         try {
@@ -152,7 +238,7 @@ export const MaterialIssueModal: React.FC<MaterialIssueModalProps> = ({
 
     return (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh] overflow-hidden">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-7xl animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh] overflow-hidden">
                 <form onSubmit={handleSubmit} className="flex flex-col h-full m-0">
                     {/* Header */}
                     <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50/50">
@@ -184,24 +270,61 @@ export const MaterialIssueModal: React.FC<MaterialIssueModalProps> = ({
                             </div>
                         )}
 
-                        <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+                        <div className="border border-slate-200 rounded-xl overflow-visible shadow-sm">
                             <table className="w-full text-left text-sm text-slate-600">
                                 <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 font-semibold">
                                     <tr>
+                                        <th className="px-4 py-3 w-36">Store Location</th>
                                         <th className="px-4 py-3">Raw Material</th>
-                                        <th className="px-4 py-3 w-32">Req. Qty</th>
-                                        <th className="px-4 py-3 w-32">Available Stock</th>
-                                        <th className="px-4 py-3 w-32">Issue Qty</th>
-                                        <th className="px-4 py-3 w-40">Store Location</th>
-                                        <th className="px-4 py-3">Remarks</th>
+                                        <th className="px-4 py-3 w-24">Req. Qty</th>
+                                        <th className="px-4 py-3 w-28">Available Stock</th>
+                                        <th className="px-4 py-3 w-28">Issue Qty</th>
+                                        <th className="px-4 py-3">
+                                            Remarks <span className="text-red-500 font-bold">*</span>
+                                        </th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
                                     {issueItems.map((item, idx) => (
-                                        <tr key={item.rawMaterialId} className="hover:bg-slate-50 transition-colors">
+                                        <tr key={`${item.rawMaterialId || "new"}-${idx}`} className="hover:bg-slate-50 transition-colors">
                                             <td className="px-4 py-3">
-                                                <div className="font-bold text-slate-800">{item.materialName}</div>
-                                                <div className="text-xs text-slate-500 mt-0.5">{item.rawMaterialId}</div>
+                                                <SelectInput
+                                                    name={`store-${idx}`}
+                                                    value={item.storeId}
+                                                    onChange={(e) => handleStoreChange(idx, e.target.value)}
+                                                    required
+                                                    hideLabel
+                                                    noMargin
+                                                    error={item.storeError || undefined}
+                                                    defaultOptionLabel="-- Select Store --"
+                                                    options={stores.map((s) => ({
+                                                        value: s.storeId,
+                                                        label: s.storeName,
+                                                    }))}
+                                                />
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                {item.isExtra ? (
+                                                    <SelectInput
+                                                        name={`rm-${idx}`}
+                                                        value={item.rawMaterialId}
+                                                        onChange={(e) => handleExtraRmChange(idx, e.target.value)}
+                                                        required
+                                                        hideLabel
+                                                        noMargin
+                                                        error={item.rmError || undefined}
+                                                        defaultOptionLabel="-- Select Raw Material --"
+                                                        options={allRawMaterials.map((rm: any) => ({
+                                                            value: rm.rawMaterialId,
+                                                            label: `${rm.materialName} (${rm.rawMaterialId})`,
+                                                        }))}
+                                                    />
+                                                ) : (
+                                                    <>
+                                                        <div className="font-bold text-slate-800">{item.materialName}</div>
+                                                        <div className="text-xs text-slate-500 mt-0.5">{item.rawMaterialId}</div>
+                                                    </>
+                                                )}
                                             </td>
                                             <td className="px-4 py-3 font-medium text-slate-700">
                                                 {item.reservedQty.toFixed(2)} {item.uom}
@@ -210,47 +333,36 @@ export const MaterialIssueModal: React.FC<MaterialIssueModalProps> = ({
                                                 {item.availableStock.toFixed(2)} {item.uom}
                                             </td>
                                             <td className="px-4 py-3">
-                                                <input
+                                                <TextInput
+                                                    name={`qty-${idx}`}
                                                     type="number"
                                                     step="0.001"
-                                                    min="0.001"
-                                                    className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary disabled:bg-slate-100 disabled:opacity-75 disabled:cursor-not-allowed"
-                                                    value={item.qty || ""}
+                                                    value={item.qty > 0 ? String(item.qty) : ""}
                                                     onChange={(e) => handleQtyChange(idx, e.target.value)}
                                                     required
-                                                    disabled={true}
+                                                    bottom
+                                                    error={item.qtyError || undefined}
                                                 />
                                             </td>
                                             <td className="px-4 py-3">
-                                                <select
-                                                    className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary disabled:bg-slate-100 disabled:opacity-75 disabled:cursor-not-allowed"
-                                                    value={item.storeId}
-                                                    onChange={(e) => handleStoreChange(idx, e.target.value)}
-                                                    required
-                                                    disabled={true}
-                                                >
-                                                    <option value="">-- Select Store --</option>
-                                                    {stores.map((s) => (
-                                                        <option key={s.storeId} value={s.storeId}>
-                                                            {s.storeName}
-                                                        </option>
-                                                    ))}
-                                                </select>
-                                            </td>
-                                            <td className="px-4 py-3">
-                                                <input
-                                                    type="text"
-                                                    placeholder="e.g. Batch #1 issue"
-                                                    className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary disabled:bg-slate-100 disabled:opacity-75 disabled:cursor-not-allowed"
+                                                <TextInput
+                                                    name={`remarks-${idx}`}
                                                     value={item.remarks}
+                                                    placeholder="Required — e.g. Batch #1 issue"
                                                     onChange={(e) => handleRemarksChange(idx, e.target.value)}
+                                                    error={item.remarkErrors || undefined}
                                                     disabled={issuing}
+                                                    required
+                                                    bottom
                                                 />
                                             </td>
                                         </tr>
                                     ))}
                                 </tbody>
                             </table>
+                            <div className="px-4 py-3 border-t border-slate-200 flex justify-end">
+                                <CustomButton text="+ Add Row" variant="secondary" onClick={() => addRow(issueItems.length - 1)} />
+                            </div>
                         </div>
                     </div>
 

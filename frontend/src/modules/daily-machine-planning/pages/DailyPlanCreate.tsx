@@ -409,7 +409,13 @@ const DailyPlanCreate: React.FC = () => {
         baseCapacity = wp._poRemaining;
       } else {
         const wpPlanned = Number(wp.plannedQty || 0);
+        const productCapacity = Number(wp.productionOrder?.productItem?.capacityLitres || 0);
         baseCapacity = (wpPlanned > 0 && poTarget > 0) ? Math.min(wpPlanned, poRemaining) : (poRemaining || wpPlanned);
+        if (productCapacity > 0 && location.state && (location.state as any).plannedQty) {
+          baseCapacity = Math.max(baseCapacity, Number((location.state as any).plannedQty));
+        } else if (productCapacity > 0 && !(location.state && (location.state as any).plannedQty)) {
+          baseCapacity = Math.max(baseCapacity, productCapacity);
+        }
       }
       const remainingRaw = Math.max(0, baseCapacity - alreadyPlanned);
       const remaining = Math.round(remainingRaw * 1000) / 1000;
@@ -419,7 +425,12 @@ const DailyPlanCreate: React.FC = () => {
           const stateQty = Number((location.state as any).plannedQty);
           setPlannedQty(String(Math.round(stateQty * 1000) / 1000));
         } else {
-          setPlannedQty(String(remaining > 0 ? remaining : ""));
+          const productCapacity = Number(wp.productionOrder?.productItem?.capacityLitres || 0);
+          if (productCapacity > 0) {
+            setPlannedQty(String(productCapacity));
+          } else {
+            setPlannedQty(String(remaining > 0 ? remaining : ""));
+          }
         }
       }
     }).catch(() => setRemainingQty(null))
@@ -561,8 +572,21 @@ const DailyPlanCreate: React.FC = () => {
         await dispatch(updateDailyPlan({ id: editId, data: payload })).unwrap();
         toast.success("Daily Production Plan updated successfully!");
       } else {
-        await dispatch(createDailyPlan(payload)).unwrap();
-        toast.success("Daily Production Plan created successfully!");
+        const created = await dispatch(createDailyPlan(payload)).unwrap();
+        const planId = created?.data?.dailyPlanId || created?.dailyPlanId || "New Plan";
+        const machineName = (machines || []).find((m: any) => m.machineId === machineId)?.machineName || machineId;
+        const shiftName = shifts.find((s: any) => s.shiftCode === shiftId)?.shiftName || shiftId;
+        toast.success(
+          `✅ Plan ${planId} created!\n📅 ${productionDate}  🏭 ${machineName}  ⏱ ${shiftName}  📦 ${plannedQty} pcs`,
+          { autoClose: 6000 }
+        );
+        // Rich reminder notification
+        setTimeout(() => {
+          toast.info(
+            `🔔 Reminder: Plan ${planId} is scheduled for ${productionDate} on ${machineName} (${shiftName}). Target: ${plannedQty} pcs. Don't forget to start production and log hourly entries!`,
+            { autoClose: 10000, toastId: `reminder-${planId}` }
+          );
+        }, 1200);
       }
       navigate("/daily-machine-planning");
     } catch (err: any) {
@@ -704,7 +728,7 @@ const DailyPlanCreate: React.FC = () => {
             {selectedWeeklyProg && (
 
               <div className="rounded-xl p-4 mt-4 bg-green-50 border border-green-200">
-                <div className="grid grid-cols-2 xl:grid-cols-6 gap-4">
+                <div className="grid grid-cols-2 xl:grid-cols-8 gap-4">
                   <div>
                     <div className="text-slate-500 text-xs font-bold uppercase mb-1">Production Order</div>
                     <div className="font-bold text-slate-800">{selectedWeeklyProg.productionOrderId}</div>
@@ -738,6 +762,14 @@ const DailyPlanCreate: React.FC = () => {
                   <div>
                     <div className="text-slate-500 text-xs font-bold uppercase mb-1">Produced So Far</div>
                     <div className="font-bold text-slate-800">{selectedWeeklyProg.productionOrder?.producedQty || 0} pcs</div>
+                  </div>
+                  <div>
+                    <div className="text-slate-500 text-xs font-bold uppercase mb-1">Product Capacity</div>
+                    <div className="font-bold text-slate-800">
+                      {selectedWeeklyProg.productionOrder?.productItem?.capacityLitres
+                        ? `${Number(selectedWeeklyProg.productionOrder.productItem.capacityLitres).toLocaleString()} / Shift`
+                        : "—"}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -854,25 +886,25 @@ const DailyPlanCreate: React.FC = () => {
                     defaultOptionLabel="— Select Shift —"
                     options={shifts.map((s: any) => {
                       const remainingHrs = remainingShiftsHours[s.shiftCode] ?? computeShiftHours(s.startTime, s.endTime);
-                      const isFullyScheduled = remainingHrs === 0;
                       return {
                         value: s.shiftCode,
-                        label: `${s.shiftName} (${s.startTime} – ${s.endTime})${isFullyScheduled ? " — Fully Scheduled" : ` — ${remainingHrs} hrs remaining`}`,
-                        disabled: isFullyScheduled
+                        label: `${s.shiftName} (${s.startTime} – ${s.endTime})`,
+                        disabled: remainingHrs === 0,
                       };
                     })}
                   />
-
-                  {/* Shift hours info */}
-                  {/* {selectedShiftInfo && (
-                        <div className="mt-2 flex items-center gap-2 text-slate-500 text-xs">
-                          <FaClock size={12} />
-                          {selectedShiftInfo.startTime} → {selectedShiftInfo.endTime} &nbsp;|&nbsp;
-                          <strong className="text-slate-800">
-                            {computeShiftHours(selectedShiftInfo.startTime, selectedShiftInfo.endTime)} hrs auto-filled
-                          </strong>
-                        </div>
-                      )} */}
+                  {shiftId && (() => {
+                    const sel = shifts.find((s: any) => s.shiftCode === shiftId);
+                    if (!sel) return null;
+                    const hrs = computeShiftHours(sel.startTime, sel.endTime);
+                    return (
+                      <div className="mt-2 flex items-center gap-2 text-slate-500 text-xs">
+                        <FaClock size={12} />
+                        {sel.startTime} → {sel.endTime} &nbsp;|&nbsp;
+                        <strong className="text-slate-800">{hrs} hrs</strong>
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 {/* Operators */}
@@ -956,6 +988,11 @@ const DailyPlanCreate: React.FC = () => {
                     placeholder={remainingQty !== null ? `Max: ${remainingQty}` : "e.g. 500"}
                     onChange={(e) => setPlannedQty(e.target.value)}
                   />
+                  {selectedWeeklyProg?.productionOrder?.productItem?.capacityLitres != null && (
+                    <div className="text-[11px] text-blue-600 font-semibold mt-1">
+                      Product Capacity: {Number(selectedWeeklyProg.productionOrder.productItem.capacityLitres).toLocaleString()} / Shift
+                    </div>
+                  )}
                   {overCapacity && (
                     <div className="text-red-500 text-xs  flex items-center">
                       <FaExclamationTriangle className="mr-1" />

@@ -18,7 +18,6 @@ const machineSchema = z.object({
     machineName: z.string().trim().min(1, "Machine Name is required").max(100, "Maximum 100 characters allowed"),
     technologyType: z.string().min(1, "Technology Type is required"),
     machineType: z.string().min(1, "Machine Type is required"),
-    capacity: z.coerce.number().min(1, "Capacity is required"),
     targetTemperature: z.coerce.number().optional().nullable(),
     targetLoadPercent: z.coerce.number().optional().nullable(),
     manufacturer: z.string().trim().max(100, "Maximum 100 characters allowed").optional().nullable(),
@@ -35,7 +34,6 @@ const initialFormState = {
     machineName: "",
     technologyType: "",
     machineType: "",
-    capacity: "",
     targetTemperature: "",
     targetLoadPercent: "",
     manufacturer: "",
@@ -119,7 +117,6 @@ const MachineCreate: React.FC = () => {
 
         const payload = {
             ...formData,
-            capacity: formData.capacity ? Number(formData.capacity) : null,
             targetTemperature: formData.targetTemperature ? Number(formData.targetTemperature) : null,
             targetLoadPercent: formData.targetLoadPercent ? Number(formData.targetLoadPercent) : null,
             cycleTime: formData.cycleTime ? Number(formData.cycleTime) : null,
@@ -271,19 +268,6 @@ const MachineCreate: React.FC = () => {
                                     value: emp.id
                                 }))}
                                 error={errors.operatorId}
-                                onChange={handleChange}
-                            />
-                        </div>
-
-                        <div>
-                            <TextInput
-                                label="Capacity"
-                                name="capacity"
-                                type="number"
-                                value={formData.capacity}
-                                placeholder="Machine Capacity"
-                                required
-                                error={errors.capacity}
                                 onChange={handleChange}
                             />
                         </div>

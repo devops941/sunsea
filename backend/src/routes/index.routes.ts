@@ -48,6 +48,8 @@ import oeeRoutes from "../modules/oee/oee.routes";
 import goodsDispatchRoutes from "../modules/goods-dispatch/goods-dispatch.routes";
 import inventoryRoutes from "../modules/inventory/inventory.routes";
 import machineOperationAssignmentRoutes from "../modules/machine-operation-assignment/machine-operation-assignment.routes";
+import productShiftRecordRoutes from "../modules/product-shift-record/product-shift-record.routes";
+import productCapacityHistoryRoutes from "../modules/product-capacity-history/product-capacity-history.routes";
 
 const router = Router();
 
@@ -105,6 +107,8 @@ router.use("/oee", oeeRoutes);
 router.use("/goods-dispatches", goodsDispatchRoutes);
 router.use("/inventory", inventoryRoutes);
 router.use("/machine-operation-assignments", machineOperationAssignmentRoutes);
+router.use("/product-shift-records", productShiftRecordRoutes);
+router.use("/product-capacity-history", productCapacityHistoryRoutes);
 
 router.get("/", (req, res) => {
     res.status(200).json({

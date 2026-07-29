@@ -35,6 +35,8 @@ import finishedGoodsStockReducer from "../features/finished-goods-stock/finished
 import gstReducer from "../features/gst/gstSlice";
 import dailyPlanReducer from "../features/daily-plans/dailyPlanSlice";
 import goodsDispatchReducer from "../features/goods-dispatch/goodsDispatchSlice";
+import productShiftRecordReducer from "../features/product-shift-records/productShiftRecordSlice";
+import productCapacityHistoryReducer from "../features/product-capacity-history/productCapacityHistorySlice";
 
 
 export const store = configureStore({
@@ -75,6 +77,8 @@ export const store = configureStore({
         finishedGoodsStocks: finishedGoodsStockReducer,
         dailyPlans: dailyPlanReducer,
         goodsDispatch: goodsDispatchReducer,
+        productShiftRecords: productShiftRecordReducer,
+        productCapacityHistory: productCapacityHistoryReducer,
     },
     middleware: (getDefaultMiddleware) =>
         getDefaultMiddleware().concat(baseApi.middleware),

@@ -10,6 +10,7 @@ import { fetchProductionOrders, updateProductionOrder } from "../../../features/
 import { fetchHourlyProductions, createHourlyProduction, updateHourlyProduction } from "../../../features/hourly-productions/hourlyProductionSlice";
 import { fetchMachines } from "../../../features/machines/machineSlice";
 import { fetchShifts } from "../../../features/shifts/shiftSlice";
+import { createShiftRecord } from "../../../features/product-shift-records/productShiftRecordSlice";
 import TextInput from "../../../components/form/TextInput/TextInput";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
 
@@ -172,6 +173,21 @@ const ShiftExecutionBoard: React.FC = () => {
         payload.rejectedQty = sumReject;
         payload.scrapQty = sumScrap;
         toast.success("Shift production finishing phase initiated! Status updated to Post-Production.");
+
+        await dispatch(updateProductionOrder({ id: Number(activeOrderId), data: payload })).unwrap();
+
+        dispatch(createShiftRecord({
+          productId: Number(activeOrder.productItemId),
+          productionOrderId: activeOrderId,
+          machineId: selectedMachineId,
+          shiftId: selectedShiftId,
+          achievedQty: sumActual,
+          targetQty: Number(activeOrder.targetQty),
+          operatorIds: operatorName || null,
+        }));
+
+        dispatch(fetchProductionOrders());
+        return;
       }
 
       await dispatch(updateProductionOrder({ id: Number(activeOrderId), data: payload })).unwrap();

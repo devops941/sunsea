@@ -31,7 +31,6 @@ export const createMachineSchema = z.object({
     machineName: z.string().min(1).max(100),
     technologyType: z.nativeEnum(TechnologyType),
     machineType: z.nativeEnum(MachineType),
-    capacity: z.number().optional().nullable(),
     manufacturer: z.string().max(100).optional().nullable(),
     modelNumber: z.string().max(50).optional().nullable(),
     cycleTime: z.number().optional().nullable(),

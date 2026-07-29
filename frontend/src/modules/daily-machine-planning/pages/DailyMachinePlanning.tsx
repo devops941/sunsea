@@ -19,7 +19,6 @@ import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/Common
 import CommonViewModal from "../../../components/ui/CommonViewModal/CommonViewModal";
 import StartProductionModal from "../../../components/ui/StartProductionModal/StartProductionModal";
 import StopProductionModal from "../../../components/ui/StopProductionModal/StopProductionModal";
-import CustomProgressBar from "../../../components/common/CustomProgressBar";
 import { FaPlay, FaStop, FaClipboardList, FaPlus, FaCalendarAlt, FaIndustry } from "react-icons/fa";
 
 const normalizePriority = (pri?: string): "LOW" | "MEDIUM" | "HIGH" | "URGENT" => {
@@ -509,7 +508,6 @@ const DailyMachinePlanning: React.FC = () => {
                       <th>PRODUCT NAME</th>
                       <th>SHIFT TARGET</th>
                       <th>PRODUCED / PO TARGET</th>
-                      <th style={{ width: "200px" }}>PROGRESS</th>
                       <th>MACHINE</th>
                       <th>STATUS</th>
                       <th style={{ width: "160px", textAlign: "right" }}>ACTIONS</th>
@@ -526,7 +524,6 @@ const DailyMachinePlanning: React.FC = () => {
                       // Use PO-level for progress bar (reflects overall completion)
                       const target = poTarget || shiftTarget;
                       const produced = poProduced;
-                      const progressPercent = Math.min(100, Math.max(0, target > 0 ? Math.round((produced / target) * 100) : 0));
                       const displayPriority = getDisplayPriority(po?.priority);
                       
                       const isPaused = prog.status === "PLANNED" && poProduced > 0 && po?.status !== "COMPLETED";
@@ -597,9 +594,6 @@ const DailyMachinePlanning: React.FC = () => {
                             {poTarget > 0 && produced > poTarget && (
                               <div className="text-success" style={{ fontSize: "10px" }}>+{produced - poTarget} extra</div>
                             )}
-                          </td>
-                          <td className="master-data-cell">
-                            <CustomProgressBar progressPercent={progressPercent} />
                           </td>
                           <td className="master-data-cell">
                             {prog.status === "PLANNED" && !isPaused ? (

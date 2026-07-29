@@ -58,6 +58,9 @@ const HourlyWorkReportCreate: React.FC = () => {
     // When true, async useEffects must NOT overwrite the user's selection.
     const userSelectedOperator = useRef(false);
 
+    // Inline validation errors
+    const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+
     // Auto-loaded plan details
     const [activePlan, setActivePlan] = useState<any>(null);
     const [loadingPlan, setLoadingPlan] = useState(false);
@@ -374,10 +377,10 @@ const HourlyWorkReportCreate: React.FC = () => {
     const isFinalHour = hourOptions.length > 0 && Number(hourIndex) === hourOptions.length;
 
     useEffect(() => {
-        if (isFinalHour || stopPlanEarly) {
+        if (isFinalHour) {
             setLogWastage(true);
         }
-    }, [isFinalHour, stopPlanEarly]);
+    }, [isFinalHour]);
 
     // Auto-select the next available hour if the currently selected one is disabled
     useEffect(() => {
@@ -417,36 +420,60 @@ const HourlyWorkReportCreate: React.FC = () => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (planError) {
-            toast.error(planError);
+        setFormErrors({});
+
+        // Collect ALL errors in one pass
+        const errors: Record<string, string> = {};
+
+        if (!hourIndex) errors.hourIndex = "Hour index is required";
+        if (!operatorId) errors.operatorId = "Operator is required";
+        if (!qtyProduced || Number(qtyProduced) <= 0) errors.qtyProduced = "Produced quantity must be greater than 0";
+        if (Number(downtime) > 0 && !downtimeReason) errors.downtimeReason = "Please select a downtime reason";
+        if (Number(rejectQty) > 0 && !rejectReason) errors.rejectReason = "Please select a reject reason";
+        if (Number(scrapQty) > 0 && !scrapReason) errors.scrapReason = "Please select a scrap reason";
+        if ((downtimeReason === "Others" || rejectReason === "Others" || scrapReason === "Others") && !remarks?.trim()) {
+            errors.remarks = "Please provide a reason";
+        }
+
+        // Stop plan reason validation (same pass)
+        if (stopPlanEarly && !stopPlanReason.trim()) {
+            errors.stopPlanReason = "Reason for stopping is required";
+        }
+
+        // Wastage validation
+        const isLastHour = hourOptions.length > 0 && Number(hourIndex) === hourOptions.length;
+        if (isLastHour && !stopPlanEarly && wastages.length === 0) {
+            errors.logWastage = "Please add at least one wastage product for the final hourly entry";
+        }
+
+        let updatedWastages = wastages;
+        let hasWastageError = false;
+        if (wastages.length > 0) {
+            const normalizedWastages = wastages.map((w) => ({
+                ...w,
+                storeError: !w.storeId ? "Store is required" : "",
+                productError: !w.targetWastageProductId ? "Product is required" : "",
+                quantityError: Number(w.quantity) > 0 ? "" : "Quantity must be greater than 0",
+            }));
+            hasWastageError = normalizedWastages.some(w => w.storeError || w.productError || w.quantityError);
+            if (hasWastageError) updatedWastages = normalizedWastages;
+        }
+
+        // Show all errors at once and stop
+        if (Object.keys(errors).length > 0 || hasWastageError) {
+            setFormErrors(errors);
+            if (hasWastageError) setWastages(updatedWastages);
             return;
         }
-        if (!operatorId) {
-            toast.error("The selected Daily Production Plan does not have an assigned operator.");
+
+        // Non-field checks (toast only)
+        if (planError) {
+            toast.error(planError);
             return;
         }
         if (!activePlan) {
             toast.error("Cannot save: No active Daily Plan loaded.");
             return;
-        }
-
-        const isLastHour = hourOptions.length > 0 && (Number(hourIndex) === hourOptions.length || stopPlanEarly);
-
-        if (isLastHour && !logWastage) {
-            toast.error("Wastage collection is mandatory for the final hourly entry.");
-            return;
-        }
-        
-        if (logWastage) {
-            if (wastages.length === 0) {
-                toast.error("Please add at least one Wastage Product, or uncheck the 'Log Wastage' option.");
-                return;
-            }
-            const hasInvalidWastage = wastages.some(w => !w.storeId || !w.targetWastageProductId || w.quantity === "");
-            if (hasInvalidWastage) {
-                toast.error("Please fill in Store, Product, and Quantity for all added wastage products.");
-                return;
-            }
         }
 
         setIsSubmitting(true);
@@ -472,8 +499,11 @@ const HourlyWorkReportCreate: React.FC = () => {
                 operatorId: operatorId,
                 stopPlanEarly,
                 stopPlanReason: stopPlanEarly ? stopPlanReason : null,
-                logWastage,
-                wastages: logWastage ? wastages : [],
+                logWastage: wastages.length > 0,
+                wastages: wastages.map((w) => ({
+                    ...w,
+                    quantity: Number(w.quantity) || 0,
+                })),
                 dailyPlanId: dailyPlanId || undefined,
             };
 
@@ -484,11 +514,6 @@ const HourlyWorkReportCreate: React.FC = () => {
                 await dispatch(createHourlyProduction(payload)).unwrap();
                 toast.success("Hourly Production entry saved successfully!");
             }
-
-            const newShiftProduced = shiftProducedQty + (Number(qtyProduced) || 0);
-            const pendingQtyRaw = Math.max(0, Number(activePlan?.plannedQty || 0) - newShiftProduced);
-            const pendingQty = Math.round(pendingQtyRaw * 1000) / 1000;
-
             const actualProductId = activePlan?.productId || activePlan?.productItemId || activePlan?.productionOrder?.productItemId || activePlan?.productionOrder?.productId;
 
             // Handle Stop Plan Early
@@ -681,7 +706,11 @@ const HourlyWorkReportCreate: React.FC = () => {
                                     value={hourIndex}
                                     options={hourOptions}
                                     required
-                                    onChange={(e) => setHourIndex(e.target.value)}
+                                    error={formErrors.hourIndex}
+                                    onChange={(e) => {
+                                        setHourIndex(e.target.value);
+                                        setFormErrors((prev) => ({ ...prev, hourIndex: "" }));
+                                    }}
                                 />
                             </div>
                               <div>
@@ -689,17 +718,19 @@ const HourlyWorkReportCreate: React.FC = () => {
                                         label="Operator"
                                         name="operatorId"
                                         value={operatorId}
-                                        onChange={(e: any) => {
-                                            userSelectedOperator.current = true;
-                                            setOperatorId(e.target.value);
-                                        }}
-                                        error={planError && planError.includes("operator") ? planError : undefined}
+                                        required
+                                        error={formErrors.operatorId || (planError && planError.includes("operator") ? planError : undefined)}
                                         disabled={loadingPlan || availableOperators.length === 0}
                                         defaultOptionLabel={loadingPlan ? "Loading operator..." : "— Select Operator —"}
                                         options={availableOperators.map(op => ({
                                             value: op.id.toString(),
                                             label: op.fullName
                                         }))}
+                                        onChange={(e: any) => {
+                                            userSelectedOperator.current = true;
+                                            setOperatorId(e.target.value);
+                                            setFormErrors((prev) => ({ ...prev, operatorId: "" }));
+                                        }}
                                     />
                                 </div>
                             <div>
@@ -711,7 +742,11 @@ const HourlyWorkReportCreate: React.FC = () => {
                                     step="1"
                                     required
                                     placeholder="Enter produced amount"
-                                    onChange={(e) => setQtyProduced(e.target.value)}
+                                    error={formErrors.qtyProduced}
+                                    onChange={(e) => {
+                                        setQtyProduced(e.target.value);
+                                        setFormErrors((prev) => ({ ...prev, qtyProduced: "" }));
+                                    }}
                                 />
                             </div>
                             <div>
@@ -722,7 +757,11 @@ const HourlyWorkReportCreate: React.FC = () => {
                                     type="number"
                                     step="1"
                                     placeholder="Enter reject amount"
-                                    onChange={(e) => setRejectQty(e.target.value)}
+                                    error={formErrors.rejectQty}
+                                    onChange={(e) => {
+                                        setRejectQty(e.target.value);
+                                        setFormErrors((prev) => ({ ...prev, rejectQty: "" }));
+                                    }}
                                 />
                             </div>
                             <div>
@@ -733,7 +772,11 @@ const HourlyWorkReportCreate: React.FC = () => {
                                     type="number"
                                     step="1"
                                     placeholder="Enter scrap amount"
-                                    onChange={(e) => setScrapQty(e.target.value)}
+                                    error={formErrors.scrapQty}
+                                    onChange={(e) => {
+                                        setScrapQty(e.target.value);
+                                        setFormErrors((prev) => ({ ...prev, scrapQty: "" }));
+                                    }}
                                 />
                             </div>
                             <div>
@@ -742,7 +785,11 @@ const HourlyWorkReportCreate: React.FC = () => {
                                     name="downtime"
                                     value={downtime}
                                     baseUoms="mins,hrs"
-                                    onChange={(e) => setDowntime(e.target.value)}
+                                    error={formErrors.downtime}
+                                    onChange={(e) => {
+                                        setDowntime(e.target.value);
+                                        setFormErrors((prev) => ({ ...prev, downtime: "" }));
+                                    }}
                                 />
                             </div>
                             {Number(downtime) > 0 && (
@@ -751,7 +798,11 @@ const HourlyWorkReportCreate: React.FC = () => {
                                         label="Downtime Reason"
                                         name="downtimeReason"
                                         value={downtimeReason}
-                                        onChange={(e) => setDowntimeReason(e.target.value)}
+                                        error={formErrors.downtimeReason}
+                                        onChange={(e) => {
+                                            setDowntimeReason(e.target.value);
+                                            setFormErrors((prev) => ({ ...prev, downtimeReason: "" }));
+                                        }}
                                         options={[
                                             { label: "Machine Breakdown", value: "Machine Breakdown" },
                                             { label: "Power Failure", value: "Power Failure" },
@@ -771,7 +822,11 @@ const HourlyWorkReportCreate: React.FC = () => {
                                         label="Reject Reason"
                                         name="rejectReason"
                                         value={rejectReason}
-                                        onChange={(e) => setRejectReason(e.target.value)}
+                                        error={formErrors.rejectReason}
+                                        onChange={(e) => {
+                                            setRejectReason(e.target.value);
+                                            setFormErrors((prev) => ({ ...prev, rejectReason: "" }));
+                                        }}
                                         options={[
                                             { value: "Quality Issue", label: "Quality Issue" },
                                             { value: "Machine Defect", label: "Machine Defect" },
@@ -788,7 +843,11 @@ const HourlyWorkReportCreate: React.FC = () => {
                                         label="Scrap Reason"
                                         name="scrapReason"
                                         value={scrapReason}
-                                        onChange={(e) => setScrapReason(e.target.value)}
+                                        error={formErrors.scrapReason}
+                                        onChange={(e) => {
+                                            setScrapReason(e.target.value);
+                                            setFormErrors((prev) => ({ ...prev, scrapReason: "" }));
+                                        }}
                                         options={[
                                             { value: "Startup Scrap", label: "Startup Scrap" },
                                             { value: "Process Setting", label: "Process Setting" },
@@ -806,7 +865,11 @@ const HourlyWorkReportCreate: React.FC = () => {
                                         value={remarks}
                                         required
                                         placeholder="Enter specific reason"
-                                        onChange={(e) => setRemarks(e.target.value)}
+                                        error={formErrors.remarks}
+                                        onChange={(e) => {
+                                            setRemarks(e.target.value);
+                                            setFormErrors((prev) => ({ ...prev, remarks: "" }));
+                                        }}
                                     />
                                 </div>
                             )}
@@ -815,16 +878,18 @@ const HourlyWorkReportCreate: React.FC = () => {
                         {/* Stop Plan Early Section (only if not final hour) */}
                         {hourOptions.length > 0 && Number(hourIndex) < hourOptions.length && (
                             <div className="mt-8 pt-6 border-t border-slate-200">
-                                <Form.Check
-                                    type="switch"
-                                    id="stop-plan-early-switch"
-                                    label={<span className="font-semibold text-red-600 ml-3 text-base">Stop Production Plan after this hour</span>}
-                                    checked={stopPlanEarly}
-                                    onChange={(e) => {
-                                        setStopPlanEarly(e.target.checked);
-                                        if (e.target.checked) setLogWastage(true);
-                                    }}
-                                />
+                                    <Form.Check
+                                        type="switch"
+                                        id="stop-plan-early-switch"
+                                        label={<span className="font-semibold text-red-600 ml-3 text-base">Stop Production Plan after this hour</span>}
+                                        checked={stopPlanEarly}
+                                        onChange={(e) => {
+                                            setStopPlanEarly(e.target.checked);
+                                            if (!e.target.checked) {
+                                                setFormErrors((prev) => ({ ...prev, stopPlanReason: "" }));
+                                            }
+                                        }}
+                                    />
                                 {stopPlanEarly && (
                                     <div className="mt-3 bg-slate-50/50 p-5 rounded-xl border border-slate-100 w-full flex flex-col gap-4">
                                         <div className="w-full">
@@ -834,13 +899,17 @@ const HourlyWorkReportCreate: React.FC = () => {
                                                 value={stopPlanReason}
                                                 required
                                                 placeholder="e.g. Urgent plan PO2 required on this machine"
-                                                onChange={(e) => setStopPlanReason(e.target.value)}
+                                                error={formErrors.stopPlanReason}
+                                                onChange={(e) => {
+                                                    setStopPlanReason(e.target.value);
+                                                    setFormErrors((prev) => ({ ...prev, stopPlanReason: "" }));
+                                                }}
                                                 width="100%"
                                             />
                                         </div>
                                         <div className="w-full">
                                             <label className="block text-xs font-bold text-slate-500 uppercase mb-2">
-                                                Stop Action Type
+                                                Stop Action Type *
                                             </label>
                                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-1">
                                                 <div
@@ -897,152 +966,165 @@ const HourlyWorkReportCreate: React.FC = () => {
 
                         {hourOptions.length > 0 && (Number(hourIndex) === hourOptions.length || stopPlanEarly) && (
                             <div className="mt-8 pt-6 border-t border-slate-200">
-                                <div className="bg-amber-50/50 border border-amber-200 p-5 flex items-start gap-4 rounded-xl mb-6">
-                                    {/* <FaInfoCircle className="text-amber-600 mt-1 shrink-0 text-xl" /> */}
+                                {/* Info Banner */}
+                                <div className="bg-amber-50 border border-amber-200 p-4 flex items-start gap-3 rounded-xl mb-5">
                                     <div>
-                                        <span className="text-base font-bold text-amber-900 block mb-2">
-                                            {stopPlanEarly ? "Production Stopped: Log Final Wastage" : "Shift Completed: Log Shift Wastage"}
+                                        <span className="text-sm font-bold text-amber-900 block mb-1">
+                                            {stopPlanEarly ? "🛑 Production Stopped — Log Wastage (Optional)" : "✅ Final Hour — Log Shift Wastage (Required)"}
                                         </span>
-                                        <p className="text-sm text-amber-700 leading-relaxed mb-0">
+                                        <p className="text-xs text-amber-700 leading-relaxed mb-0">
                                             {stopPlanEarly
-                                                ? "Since you are stopping the production plan early, please log the final wastage occurred up to this hour."
-                                                : "Since this is the final hour of the shift, please log the total wastage occurred during this entire shift."}
+                                                ? "Wastage logging is optional when stopping early. Add rows below only if wastage occurred."
+                                                : "Since this is the final hour, please log all wastage products for this shift. At least one entry is required."}
                                         </p>
                                     </div>
                                 </div>
 
-                                <div className="flex items-center mb-6">
-                                    <Form.Check
-                                        type="switch"
-                                        id="log-wastage-switch"
-                                        label={<span className="text-sm font-semibold text-slate-700 ml-2">Log Wastage for this Shift</span>}
-                                        checked={logWastage}
-                                        disabled={isFinalHour || stopPlanEarly}
-                                        onChange={(e) => setLogWastage(e.target.checked)}
-                                    />
-                                    {(isFinalHour || stopPlanEarly) && <span className="ml-3 text-red-500 text-xs font-bold">* Mandatory for final entry</span>}
-                                </div>
-
-                                {logWastage && (
-                                    <div className="bg-slate-50/50 p-5 rounded-xl border border-slate-100 mt-4">
-                                        <div className="flex justify-between items-center mb-4">
-                                            <h4 className="font-bold text-slate-700 text-sm m-0">Wastage Products</h4>
-                                            <CustomButton
-                                                text="Add Wastage Product"
-                                                icon={FaSave} // or any relevant icon, actually it's just 'Add', no icon needed or FaPlus if imported. But we can just use `text`. Let's just use CustomButton.
-                                                variant="secondary"
-                                                onClick={() => setWastages([...wastages, { storeId: "", targetWastageProductId: "", quantity: "" }])}
-                                            />
-                                        </div>
-                                        
-                                        {wastages.length === 0 ? (
-                                            <div className="text-center py-6 text-slate-500 text-sm border-2 border-dashed border-slate-200 rounded-lg">
-                                                No wastage products added yet. Click the button above to add one.
-                                            </div>
-                                        ) : (
-                                            <div className="overflow-visible pb-24">
-                                                <table className="w-full text-left border-collapse">
-                                                    <thead>
-                                                        <tr className="border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                                                            <th className="px-4 py-3 bg-slate-50">Store</th>
-                                                            <th className="px-4 py-3 bg-slate-50">Wastage Product</th>
-                                                            <th className="px-4 py-3 bg-slate-50 w-48">Quantity</th>
-                                                            <th className="px-4 py-3 bg-slate-50 w-20 text-center">Action</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody className="divide-y divide-slate-100">
-                                                        {wastages.map((w, index) => (
-                                                            <tr key={index} className="hover:bg-slate-50/50 transition-colors">
-                                                                <td className="px-4 py-3 align-top">
-                                                                    <SelectInput
-                                                                        label=""
-                                                                        hideLabel
-                                                                        noMargin
-                                                                        name={`storeId-${index}`}
-                                                                        value={w.storeId}
-                                                                        onChange={(e) => {
-                                                                            const newW = [...wastages];
-                                                                            newW[index].storeId = e.target.value;
-                                                                            setWastages(newW);
-                                                                        }}
-                                                                        options={[
-                                                                            { label: "Select Store", value: "" },
-                                                                            ...stores.map((s: any) => ({ label: s.storeName, value: s.storeId }))
-                                                                        ]}
-                                                                        required
-                                                                    />
-                                                                </td>
-                                                                <td className="px-4 py-3 align-top">
-                                                                    <SelectInput
-                                                                        label=""
-                                                                        hideLabel
-                                                                        noMargin
-                                                                        name={`targetWastageProductId-${index}`}
-                                                                        value={w.targetWastageProductId}
-                                                                        onChange={(e) => {
-                                                                            const newW = [...wastages];
-                                                                            newW[index].targetWastageProductId = e.target.value;
-                                                                            const rm = rawMaterials.find(r => r.rawMaterialId === e.target.value);
-                                                                            if (rm) {
-                                                                                let uoms = rm.baseUom || "KG";
-                                                                                if (Array.isArray(rm.baseUom)) uoms = rm.baseUom.join(',');
-                                                                                else if (typeof rm.baseUom === "string" && rm.baseUom.startsWith("[")) {
-                                                                                    try { uoms = JSON.parse(rm.baseUom).join(','); } catch(e){}
-                                                                                }
-                                                                                newW[index].uom = uoms;
-                                                                            }
-                                                                            setWastages(newW);
-                                                                        }}
-                                                                        options={[
-                                                                            { label: "Select Product", value: "" },
-                                                                            ...rawMaterials
-                                                                                .filter((r: any) => !w.storeId || r.storeId === w.storeId)
-                                                                                .map((r: any) => {
-                                                                                    const isSelectedInOtherRow = wastages.some((otherW, otherIdx) => otherIdx !== index && otherW.targetWastageProductId === r.rawMaterialId);
-                                                                                    return { 
-                                                                                        label: `${r.materialName} (${r.rawMaterialId})`, 
-                                                                                        value: r.rawMaterialId,
-                                                                                        disabled: isSelectedInOtherRow
-                                                                                    };
-                                                                                })
-                                                                        ]}
-                                                                        disabled={!w.storeId}
-                                                                        required
-                                                                    />
-                                                                </td>
-                                                                <td className="px-4 py-3 align-top">
-                                                                    <QuantityInput
-                                                                        label=""
-                                                                        hideLabel
-                                                                        
-                                                                        name={`quantity-${index}`}
-                                                                        value={w.quantity}
-                                                                        onChange={(e) => {
-                                                                            const newW = [...wastages];
-                                                                            newW[index].quantity = Number(e.target.value);
-                                                                            setWastages(newW);
-                                                                        }}
-                                                                        baseUoms={w.uom || "KG"}
-                                                                        required
-                                                                    />
-                                                                </td>
-                                                                <td className="px-4 py-3 align-middle text-center">
-                                                                    <DeleteButton
-                                                                        onClick={() => {
-                                                                            const newW = [...wastages];
-                                                                            newW.splice(index, 1);
-                                                                            setWastages(newW);
-                                                                        }}
-                                                                    />
-                                                                </td>
-                                                            </tr>
-                                                        ))}
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        )}
-                                    </div>
+                                {/* Wastage error (when final hour + no rows) */}
+                                {formErrors.logWastage && (
+                                    <p className="mb-4 text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                                        ⚠️ {formErrors.logWastage}
+                                    </p>
                                 )}
+
+                                {/* Wastage Table — always shown (no checkbox) */}
+                                <div className="bg-slate-50/50 p-5 rounded-xl border border-slate-100">
+                                    <div className="flex justify-between items-center mb-4">
+                                        <h4 className="font-bold text-slate-700 text-sm m-0">
+                                            Wastage Products
+                                            {!stopPlanEarly && <span className="text-red-500 ml-1">*</span>}
+                                            {stopPlanEarly && <span className="ml-2 text-xs text-slate-400 font-normal">(optional)</span>}
+                                        </h4>
+                                        <CustomButton
+                                            text="+ Add Wastage Product"
+                                            variant="secondary"
+                                            onClick={() => {
+                                                setFormErrors((prev) => ({ ...prev, logWastage: "" }));
+                                                setWastages([...wastages, { storeId: "", targetWastageProductId: "", quantity: "", storeError: "", productError: "", quantityError: "" }]);
+                                            }}
+                                        />
+                                    </div>
+
+                                    {wastages.length === 0 ? (
+                                        <div className="text-center py-8 text-slate-400 text-sm border-2 border-dashed border-slate-200 rounded-lg">
+                                            {stopPlanEarly
+                                                ? "No wastage products added. Click '+ Add Wastage Product' if needed."
+                                                : "No wastage products added yet. Click '+ Add Wastage Product' to add one."}
+                                        </div>
+                                    ) : (
+                                        <div className="overflow-visible pb-24">
+                                            <table className="w-full text-left border-collapse">
+                                                <thead>
+                                                    <tr className="border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                                                        <th className="px-4 py-3 bg-slate-50">Store <span className="text-red-500">*</span></th>
+                                                        <th className="px-4 py-3 bg-slate-50">Wastage Product <span className="text-red-500">*</span></th>
+                                                        <th className="px-4 py-3 bg-slate-50 w-48">Quantity <span className="text-red-500">*</span></th>
+                                                        <th className="px-4 py-3 bg-slate-50 w-20 text-center">Action</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-slate-100">
+                                                    {wastages.map((w, index) => (
+                                                        <tr key={index} className="hover:bg-slate-50/50 transition-colors">
+                                                            <td className="px-4 py-3 align-top">
+                                                                <SelectInput
+                                                                    label=""
+                                                                    hideLabel
+                                                                    noMargin
+                                                                    name={`storeId-${index}`}
+                                                                    value={w.storeId}
+                                                                    onChange={(e) => {
+                                                                        const newW = [...wastages];
+                                                                        newW[index].storeId = e.target.value;
+                                                                        newW[index].storeError = "";
+                                                                        newW[index].targetWastageProductId = "";
+                                                                        newW[index].productError = "";
+                                                                        setWastages(newW);
+                                                                    }}
+                                                                    options={[
+                                                                        { label: "Select Store", value: "" },
+                                                                        ...stores.map((s: any) => ({ label: s.storeName, value: s.storeId }))
+                                                                    ]}
+                                                                    required
+                                                                    error={w.storeError}
+                                                                />
+                                                            </td>
+                                                            <td className="px-4 py-3 align-top">
+                                                                <SelectInput
+                                                                    label=""
+                                                                    hideLabel
+                                                                    noMargin
+                                                                    name={`targetWastageProductId-${index}`}
+                                                                    value={w.targetWastageProductId}
+                                                                    onChange={(e) => {
+                                                                        const newW = [...wastages];
+                                                                        newW[index].targetWastageProductId = e.target.value;
+                                                                        newW[index].productError = "";
+                                                                        const rm = rawMaterials.find(r => r.rawMaterialId === e.target.value);
+                                                                        if (rm) {
+                                                                            let uoms = rm.baseUom || "KG";
+                                                                            if (Array.isArray(rm.baseUom)) uoms = rm.baseUom.join(',');
+                                                                            else if (typeof rm.baseUom === "string" && rm.baseUom.startsWith("[")) {
+                                                                                try { uoms = JSON.parse(rm.baseUom).join(','); } catch(e){}
+                                                                            }
+                                                                            newW[index].uom = uoms;
+                                                                        }
+                                                                        setWastages(newW);
+                                                                    }}
+                                                                    options={[
+                                                                        { label: "Select Product", value: "" },
+                                                                        ...rawMaterials
+                                                                            .filter((r: any) => {
+                                                                                if (!w.storeId) return true;
+                                                                                const rmStoreId = r.storeId || r.store?.storeId;
+                                                                                return rmStoreId && String(rmStoreId) === String(w.storeId);
+                                                                            })
+                                                                            .map((r: any) => {
+                                                                                const isSelectedInOtherRow = wastages.some((otherW, otherIdx) => otherIdx !== index && otherW.targetWastageProductId === r.rawMaterialId);
+                                                                                return { 
+                                                                                    label: `${r.materialName} (${r.rawMaterialId})`, 
+                                                                                    value: r.rawMaterialId,
+                                                                                    disabled: isSelectedInOtherRow
+                                                                                };
+                                                                            })
+                                                                    ]}
+                                                                    disabled={!w.storeId}
+                                                                    required
+                                                                    error={w.productError}
+                                                                />
+                                                            </td>
+                                                            <td className="px-4 py-3 align-top">
+                                                                <QuantityInput
+                                                                    label=""
+                                                                    hideLabel
+                                                                    name={`quantity-${index}`}
+                                                                    value={w.quantity}
+                                                                    onChange={(e) => {
+                                                                        const newW = [...wastages];
+                                                                        newW[index].quantity = e.target.value;
+                                                                        newW[index].quantityError = "";
+                                                                        setWastages(newW);
+                                                                    }}
+                                                                    baseUoms={w.uom || "KG"}
+                                                                    required
+                                                                    error={w.quantityError}
+                                                                />
+                                                            </td>
+                                                            <td className="px-4 py-3 align-middle text-center">
+                                                                <DeleteButton
+                                                                    onClick={() => {
+                                                                        const newW = [...wastages];
+                                                                        newW.splice(index, 1);
+                                                                        setWastages(newW);
+                                                                    }}
+                                                                />
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         )}
 

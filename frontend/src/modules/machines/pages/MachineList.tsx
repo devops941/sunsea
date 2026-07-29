@@ -151,7 +151,6 @@ const MachineList: React.FC = () => {
                                 return emp ? emp.fullName : item.operatorId;
                             } 
                         },
-                        { header: "CAPACITY", render: (item) => item.capacity || "-" },
                         {
                             header: "ACTIVE STATUS",
                             render: (item) => <StatusBadge status={item.isActive ? "ACTIVE" : "INACTIVE"} />
