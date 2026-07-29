@@ -70,6 +70,7 @@ const ProductCreatePage: React.FC = () => {
         b2b: "",
         b2c: "",
         exportPrice: "",
+        weightUom: "kg",
     });
 
     // ✅ Raw Materials Composition

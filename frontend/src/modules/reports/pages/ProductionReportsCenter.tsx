@@ -139,7 +139,7 @@ const ProductionReportsCenter: React.FC = () => {
   const { tableData, totalPages, csvAllData } = useMemo(() => {
     let data: any[] = [];
     if (selectedReportType === "daily") {
-      const grouped: Record<string, { date: string, machineName: string, shiftName: string, target: number; produced: number; rejected: number; scrap: number }> = {};
+      const grouped: Record<string, { date: string, machineName: string, shiftName: string, operatorName: string, target: number; produced: number; rejected: number; scrap: number }> = {};
       filteredOrders.forEach((po) => {
         if (!po.orderDate) return;
         const date = po.orderDate.split("T")[0];
@@ -152,13 +152,13 @@ const ProductionReportsCenter: React.FC = () => {
           mName = po.machine.machineName;
         } else {
           const poMachineId = po.machineId || po.machineMachineId;
-          let machine = machines.find(m => m.id === poMachineId || m.machineId === poMachineId);
+          let machine = machines.find(m => (m as any).id === poMachineId || m.machineId === poMachineId);
 
           if (!machine) {
             const safeHourly = Array.isArray(hourlyProductions) ? hourlyProductions : [];
             const hourly = safeHourly.find(hp => hp.productionOrderId === po.productionOrderId || hp.productionOrderId === po.id);
             if (hourly && hourly.machineId) {
-              machine = machines.find(m => m.id === hourly.machineId || m.machineId === hourly.machineId);
+              machine = machines.find(m => (m as any).id === hourly.machineId || m.machineId === hourly.machineId);
             }
           }
 
@@ -191,7 +191,7 @@ const ProductionReportsCenter: React.FC = () => {
           const operatorIdStr = String(hourly.operatorId);
           const emp = employees.find((e: any) => String(e.id) === operatorIdStr);
           if (emp) {
-            oName = emp.fullName || emp.firstName || operatorIdStr;
+            oName = emp.fullName || operatorIdStr;
           } else {
             oName = operatorIdStr;
           }
@@ -263,7 +263,7 @@ const ProductionReportsCenter: React.FC = () => {
             header: "Operator", accessor: (item: any) => {
               if (!item.operatorId) return "-";
               const emp = employees.find((e: any) => String(e.id) === String(item.operatorId));
-              return emp ? (emp.fullName || emp.firstName) : item.operatorId;
+              return emp ? emp.fullName : item.operatorId;
             }
           },
           { header: "Hour Index", accessor: (item: any) => `Hour ${item.hourIndex}` },
@@ -367,7 +367,7 @@ const ProductionReportsCenter: React.FC = () => {
           header: "OPERATOR", render: (item: any) => {
             if (!item.operatorId) return "-";
             const emp = employees.find((e: any) => String(e.id) === String(item.operatorId));
-            return emp ? (emp.fullName || emp.firstName) : item.operatorId;
+            return emp ? emp.fullName : item.operatorId;
           }
         },
         { header: "HOUR INDEX", render: (item: any) => <span className="font-semibold">Hour {item.hourIndex}</span> },
@@ -469,7 +469,7 @@ const ProductionReportsCenter: React.FC = () => {
         <DataTable
           columns={getTableColumns()}
           data={tableData}
-          rowKey={(item: any, i) => item.id || item.weeklyProgramId || item.date || item.productionOrderId || i.toString()}
+          rowKey={(item: any) => String(item.id || item.weeklyProgramId || item.hourlyProductionId || item.productionOrderId || item.date)}
           loading={loadingOrders || loadingBackend || loadingHourly}
           emptyMessage="No production data found for selected filters."
           pagination={{
