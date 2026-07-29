@@ -32,12 +32,14 @@ class PurchaseOrderController {
     });
 
     findAll = asyncHandler(async (req: Request, res: Response) => {
-        const { page, pageSize, search, status } = req.query;
+        const { page, pageSize, search, status, fromDate, toDate } = req.query;
         const result = await purchaseOrderService.getAllPurchaseOrders({
             page: page ? Number(page) : undefined,
             pageSize: pageSize ? Number(pageSize) : undefined,
             search: search as string,
             status: status as string,
+            fromDate: fromDate as string,
+            toDate: toDate as string,
         });
 
         return res.status(200).json(

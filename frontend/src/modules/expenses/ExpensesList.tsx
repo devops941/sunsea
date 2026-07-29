@@ -33,7 +33,7 @@ interface Expense {
 }
 
 const ExpensesList: React.FC = () => {
-  const { expenses, loading, error, loadExpenses, removeExpense } = useExpenses();
+  const { expenses, loading, error, total, loadExpenses, removeExpense } = useExpenses();
 
   const [viewMode, setViewMode] = useState<"list" | "create" | "edit">("list");
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
@@ -49,10 +49,16 @@ const ExpensesList: React.FC = () => {
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      loadExpenses(searchTerm);
+      loadExpenses({
+        page: currentPage,
+        limit: ITEMS_PER_PAGE,
+        search: searchTerm || undefined,
+        category: filterCategory || undefined,
+        status: filterStatus || undefined,
+      });
     }, 500);
     return () => clearTimeout(timer);
-  }, [searchTerm, loadExpenses]);
+  }, [currentPage, searchTerm, filterCategory, filterStatus, loadExpenses]);
 
   useEffect(() => {
     if (error) {
@@ -85,7 +91,13 @@ const ExpensesList: React.FC = () => {
       try {
         await removeExpense(expenseToDelete);
         toast.success("Expense deleted successfully!");
-        loadExpenses(searchTerm);
+        loadExpenses({
+          page: currentPage,
+          limit: ITEMS_PER_PAGE,
+          search: searchTerm || undefined,
+          category: filterCategory || undefined,
+          status: filterStatus || undefined,
+        });
       } catch (err: any) {
         toast.error(err.message || "Failed to delete expense.");
       } finally {
@@ -98,7 +110,13 @@ const ExpensesList: React.FC = () => {
   const handleSaveComplete = () => {
     setViewMode("list");
     setSelectedExpense(null);
-    loadExpenses(searchTerm);
+    loadExpenses({
+      page: currentPage,
+      limit: ITEMS_PER_PAGE,
+      search: searchTerm || undefined,
+      category: filterCategory || undefined,
+      status: filterStatus || undefined,
+    });
   };
 
   const handleCancel = () => {
@@ -106,17 +124,19 @@ const ExpensesList: React.FC = () => {
     setSelectedExpense(null);
   };
 
-  const filteredExpenses = (expenses || []).filter((exp) => {
-    const matchesCategory = filterCategory ? exp.expenseCategory === filterCategory : true;
-    const matchesStatus = filterStatus ? exp.status === filterStatus : true;
-    return matchesCategory && matchesStatus;
-  });
+  const totalPages = Math.ceil(total / ITEMS_PER_PAGE) || 1;
+  const paginatedExpenses = expenses || [];
 
-  const totalPages = Math.ceil(filteredExpenses.length / ITEMS_PER_PAGE) || 1;
-  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-  const paginatedExpenses = filteredExpenses.slice(startIndex, startIndex + ITEMS_PER_PAGE);
-
-  const categories = Array.from(new Set((expenses || []).map((e) => e.expenseCategory)));
+  const categories = [
+    "Office Supplies",
+    "Travel & Lodging",
+    "Software & Hosting",
+    "Utilities",
+    "Salaries",
+    "Rent",
+    "Marketing",
+    "Others"
+  ];
   const statuses = ["Draft", "Pending", "Approved", "Rejected"];
 
   const formatDateString = (isoString: string) => {

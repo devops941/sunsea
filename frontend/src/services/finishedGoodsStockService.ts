@@ -6,9 +6,13 @@ import type {
 } from "../features/finished-goods-stock/types";
 
 export const finishedGoodsStockService = {
-    fetchAll: async (params?: any): Promise<FinishedGoodsStock[]> => {
+    fetchAll: async (params?: any): Promise<any> => {
         const response = await apiClient.get("/finished-goods-stocks", { params });
-        return response.data.data;
+        const resData = response.data?.data;
+        if (resData && typeof resData === "object" && "data" in resData) {
+            return resData;
+        }
+        return resData || [];
     },
 
     // Get stock by ID (Composite key)

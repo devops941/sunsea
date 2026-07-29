@@ -37,28 +37,62 @@ class ExpenseService {
   }
 
   /**
-   * Fetches all expenses for a company with optional search.
+   * Fetches all expenses for a company with optional search, filtering, and pagination.
    */
-  async getAllExpenses(companyId: string, search?: string) {
-    return prisma.expense.findMany({
-      where: {
-        companyId,
-        ...(search && {
-          OR: [
-            { expenseNumber: { contains: search, mode: "insensitive" } },
-            { expense: { contains: search, mode: "insensitive" } },
-            { expenseCategory: { contains: search, mode: "insensitive" } },
-            { supplier: { legalName: { contains: search, mode: "insensitive" } } },
-          ],
-        }),
-      },
+  async getAllExpenses(companyId: string, query?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    category?: string;
+    status?: string;
+  }) {
+    const page = query?.page;
+    const limit = query?.limit;
+    const search = query?.search;
+    const category = query?.category;
+    const status = query?.status;
+
+    const where: any = {
+      companyId,
+      ...(category && { expenseCategory: category }),
+      ...(status && { status }),
+      ...(search && {
+        OR: [
+          { expenseNumber: { contains: search, mode: "insensitive" } },
+          { expense: { contains: search, mode: "insensitive" } },
+          { expenseCategory: { contains: search, mode: "insensitive" } },
+          { supplier: { legalName: { contains: search, mode: "insensitive" } } },
+        ],
+      }),
+    };
+
+    const total = await prisma.expense.count({ where });
+
+    const findOptions: any = {
+      where,
       include: {
         supplier: true,
       },
       orderBy: {
         createdAt: "desc",
       },
-    });
+    };
+
+    if (page !== undefined && limit !== undefined) {
+      findOptions.skip = (page - 1) * limit;
+      findOptions.take = limit;
+    }
+
+    const expenses = await prisma.expense.findMany(findOptions);
+
+    if (page !== undefined && limit !== undefined) {
+      return {
+        data: expenses,
+        total,
+      };
+    }
+
+    return expenses;
   }
 
   /**

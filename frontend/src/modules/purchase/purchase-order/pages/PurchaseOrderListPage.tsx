@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { FaPlus, FaSearch } from "react-icons/fa";
+import { FaPlus, FaSearch, FaFileInvoice } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useSelector } from "react-redux";
@@ -12,6 +12,7 @@ import CommonConfirmModal from "../../../../components/ui/CommonConfirmModal/Com
 import PurchaseOrderViewModal from "../components/PurchaseOrderViewModal";
 import { usePurchaseOrders } from "../../../../hooks/usePurchaseOrder";
 import { hasPermission } from "../../../../utils/permission";
+import { purchaseOrderService } from "../../../../services/purchaseOrderService";
 import type { PurchaseOrder, PurchaseOrderStatus } from "../../../../features/purchaseOrder/types";
 import DataTable from "../../../../components/ui/table/DataTable";
 import SearchInput from "../../../../components/ui/SearchInput/SearchInput";
@@ -48,12 +49,12 @@ const PurchaseOrderListPage: React.FC = () => {
   const canDelete = FORCE_SHOW_BUTTON || hasPermission("purchase_orders.delete") || user?.role === "admin";
 
   const {
-    purchaseOrders,
-    loading,
-    error,
-    loadPurchaseOrders,
     removePurchaseOrder,
   } = usePurchaseOrders();
+
+  const [purchaseOrders, setPurchaseOrders] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [total, setTotal] = useState(0);
 
   const [showViewModal, setShowViewModal] = useState(false);
   const [selectedPO, setSelectedPO] = useState<PurchaseOrder | null>(null);
@@ -71,13 +72,36 @@ const PurchaseOrderListPage: React.FC = () => {
   const hasActiveFilters = !!(statusFilter || fromDate || toDate);
   const activeFilterCount = [statusFilter, fromDate, toDate].filter(Boolean).length;
 
-  useEffect(() => {
-    loadPurchaseOrders();
-  }, [loadPurchaseOrders]);
+  const fetchPOs = useCallback(async () => {
+    setLoading(true);
+    try {
+      const response = await purchaseOrderService.fetchAll({
+        page: currentPage,
+        pageSize: ITEMS_PER_PAGE,
+        search: searchTerm || undefined,
+        status: statusFilter || undefined,
+        fromDate: fromDate || undefined,
+        toDate: toDate || undefined,
+      });
+
+      setPurchaseOrders(response?.data || []);
+      setTotal(Math.ceil((response?.total ?? 0) / ITEMS_PER_PAGE));
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err?.response?.data?.message || "Failed to fetch purchase orders");
+      setPurchaseOrders([]);
+      setTotal(0);
+    } finally {
+      setLoading(false);
+    }
+  }, [currentPage, searchTerm, statusFilter, fromDate, toDate]);
 
   useEffect(() => {
-    if (error) toast.error(error);
-  }, [error]);
+    const timer = setTimeout(() => {
+      fetchPOs();
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [fetchPOs]);
 
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(e.target.value);
@@ -130,6 +154,7 @@ const PurchaseOrderListPage: React.FC = () => {
     try {
       await removePurchaseOrder(poToDelete);
       toast.success("Purchase Order deleted successfully!");
+      fetchPOs();
     } catch (err: any) {
       toast.error(err?.message || "Failed to delete purchase order");
     } finally {
@@ -137,40 +162,6 @@ const PurchaseOrderListPage: React.FC = () => {
       setPoToDelete(null);
     }
   };
-
-  const filteredPOs = useMemo(() => {
-    const term = searchTerm.toLowerCase();
-
-    return (purchaseOrders || []).filter((po) => {
-      const poNumber = po.poNumber?.toLowerCase() ?? "";
-      const supplierName = po.supplier?.supplierName?.toLowerCase() ?? "";
-      const supplierCode = po.supplier?.supplierCode?.toLowerCase() ?? "";
-
-      const matchesSearch =
-        poNumber.includes(term) ||
-        supplierName.includes(term) ||
-        supplierCode.includes(term);
-
-      const matchesStatus = statusFilter === "" || po.status === statusFilter;
-
-      let matchesDate = true;
-      if (fromDate || toDate) {
-        const poDate = po.poDate ? po.poDate.split("T")[0] : "";
-        if (poDate) {
-          if (fromDate && poDate < fromDate) matchesDate = false;
-          if (toDate && poDate > toDate) matchesDate = false;
-        } else {
-          matchesDate = false; // Exclude if no date and filters are active
-        }
-      }
-
-      return matchesSearch && matchesStatus && matchesDate;
-    });
-  }, [purchaseOrders, searchTerm, statusFilter, fromDate, toDate]);
-
-  const totalPages = Math.ceil(filteredPOs.length / ITEMS_PER_PAGE);
-  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-  const paginatedPOs = filteredPOs.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
   return (
     <div className="w-full">
@@ -260,13 +251,13 @@ const PurchaseOrderListPage: React.FC = () => {
 
         {/* Table */}
         < DataTable
-          data={paginatedPOs}
+          data={purchaseOrders}
           rowKey={(item) => item.id}
-          loading={loading && (purchaseOrders?.length ?? 0) === 0}
+          loading={loading}
           emptyMessage="No purchase orders found."
           pagination={{
             currentPage,
-            totalPages: totalPages,
+            totalPages: total,
             onPageChange: (page) => setCurrentPage(page),
           }}
           columns={
@@ -303,6 +294,30 @@ const PurchaseOrderListPage: React.FC = () => {
                     <ViewButton onClick={() => handleView(item)} />
                     {canEdit && item.status !== "COMPLETED" && item.status !== "CANCELLED" && (
                       <EditButton onClick={() => handleEdit(item)} />
+                    )}
+                    {item.status === "OPEN" && (
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/po-invoice/${item.id}`)}
+                        title="View PO Invoice Format"
+                        className="
+                          w-10 h-10
+                          flex items-center justify-center
+                          border-none rounded-xl
+                          cursor-pointer
+                          bg-emerald-500/[0.12]
+                          text-emerald-600
+                          transition-all duration-[250ms] ease-in-out
+                          hover:-translate-y-[3px]
+                          hover:bg-emerald-500/[0.22]
+                          hover:shadow-[0_8px_18px_rgba(16,185,129,0.18)]
+                          active:scale-95
+                          disabled:opacity-50
+                          disabled:cursor-not-allowed
+                        "
+                      >
+                        <FaFileInvoice className="text-[18px]" />
+                      </button>
                     )}
                     {canDelete && item.status === "DRAFT" && (
                       <DeleteButton onClick={() => triggerDelete(item.id)} />

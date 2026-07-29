@@ -219,11 +219,15 @@ class PurchaseOrderService {
         pageSize?: number;
         search?: string;
         status?: string;
+        fromDate?: string;
+        toDate?: string;
     }) {
         const page = query?.page;
         const pageSize = query?.pageSize;
         const search = query?.search;
         const status = query?.status;
+        const fromDate = query?.fromDate;
+        const toDate = query?.toDate;
 
         const where: any = {};
 
@@ -232,6 +236,18 @@ class PurchaseOrderService {
                 where.status = { in: status.split(",") };
             } else {
                 where.status = status;
+            }
+        }
+
+        if (fromDate || toDate) {
+            where.poDate = {};
+            if (fromDate) {
+                where.poDate.gte = new Date(fromDate);
+            }
+            if (toDate) {
+                const end = new Date(toDate);
+                end.setHours(23, 59, 59, 999);
+                where.poDate.lte = end;
             }
         }
 
