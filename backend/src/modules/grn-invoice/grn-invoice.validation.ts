@@ -16,6 +16,16 @@ const ItemSchema = z.object({
     igstAmount: z.coerce.number().min(0).optional(),
 });
 
+const PaymentSchema = z.object({
+    amount: z.coerce.number().min(0.01, "Amount must be greater than 0"),
+    paymentMethod: z.string().min(1, "Payment method is required"),
+    referenceNumber: z.string().optional().nullable(),
+    paymentDate: z.string().refine((val) => {
+        const d = new Date(val);
+        return !isNaN(d.getTime()) && d <= new Date(new Date().setHours(23, 59, 59, 999));
+    }, "Payment date must be a valid date and not in the future"),
+});
+
 export const CreateGrnInvoiceSchema = z.object({
     poId: z.preprocess(
         (val) => (val === "" || val === "null" || val === "undefined" ? null : val),
@@ -44,7 +54,7 @@ export const CreateGrnInvoiceSchema = z.object({
         (val) => val === "true" || val === true,
         z.boolean().optional()
     ),
-    
+
     receiveDate: z.preprocess((val) => (val === "" || val === "null" ? null : val), z.string().optional().nullable()),
     billDueDate: z.preprocess((val) => (val === "" || val === "null" ? null : val), z.string().optional().nullable()),
     challanNo: z.string().optional().nullable(),
@@ -52,16 +62,27 @@ export const CreateGrnInvoiceSchema = z.object({
     eWayBill: z.string().optional().nullable(),
     invoiceImage: z.string().optional().nullable(),
     remarks: z.string().optional().nullable(),
-    
+
     discountType: z.enum(["PERCENT", "FLAT"]).optional(),
     discountValue: z.coerce.number().min(0).optional(),
     roundingAdjust: z.coerce.number().optional(),
-    
+
     paymentStatus: z.string().optional(),
     paymentMethod: z.string().optional().nullable(),
     referenceNumber: z.string().optional().nullable(),
     paymentDate: z.preprocess((val) => (val === "" || val === "null" ? null : val), z.string().optional().nullable()),
-    
+
+    payments: z.preprocess((value) => {
+        if (typeof value === "string") {
+            try {
+                return JSON.parse(value);
+            } catch {
+                return value;
+            }
+        }
+        return value;
+    }, z.array(PaymentSchema).optional().default([])),
+
     items: z.preprocess((value) => {
         if (typeof value === "string") {
             try {

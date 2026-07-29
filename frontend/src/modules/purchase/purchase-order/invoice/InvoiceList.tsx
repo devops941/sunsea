@@ -11,6 +11,8 @@ import DataTable from "../../../../components/ui/table/DataTable";
 import SearchInput from "../../../../components/ui/SearchInput/SearchInput";
 import ViewButton from "../../../../components/ui/viewbutton/ViewButton";
 import DeleteButton from "../../../../components/ui/DeleteButton/DeleteButton";
+import EditButton from "../../../../components/ui/EditButton/EditButton";
+import StatusBadge from "../../../../components/ui/StatusBadge/Badge";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -142,13 +144,27 @@ const InvoiceList: React.FC = () => {
                             ),
                         },
                         {
+                            header: "STATUS",
+                            render: (item) => {
+                                const displayStatus = (item.paymentStatus === "Paid" || item.paymentStatus === "Closed" || item.paymentStatus === "CLOSED") ? "Closed" : item.paymentStatus;
+                                return <StatusBadge status={displayStatus || "Unpaid"} />;
+                            }
+                        },
+                        {
                             header: "ACTIONS",
-                            render: (item) => (
-                                <div className="flex items-center gap-2">
-                                    <ViewButton onClick={() => navigate(`/invoice/details/${item.id}`)} />
-                                    <DeleteButton onClick={() => handleDeleteClick(item.id)} />
-                                </div>
-                            ),
+                            width: "160px",
+                            render: (item) => {
+                                const isClosed = ["CLOSED", "PAID"].includes((item.paymentStatus || "").toUpperCase());
+                                return (
+                                    <div className="flex items-center gap-2">
+                                        <ViewButton onClick={() => navigate(`/invoice/details/${item.id}`)} />
+                                        {!isClosed && (
+                                            <EditButton onClick={() => navigate(`/invoice/edit/${item.id}`)} />
+                                        )}
+                                        <DeleteButton onClick={() => handleDeleteClick(item.id)} />
+                                    </div>
+                                );
+                            },
                         },
                     ]}
                 />

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
-import { FaSave, FaPlus, FaTrash, FaFileInvoiceDollar, FaExclamationTriangle } from "react-icons/fa";
+import { useNavigate, useParams } from "react-router-dom";
+import { FaSave, FaPlus, FaTrash, FaFileInvoiceDollar, FaExclamationTriangle, FaCreditCard } from "react-icons/fa";
 import { toast } from "react-toastify";
 import { useSelector, useDispatch } from "react-redux";
 
@@ -152,6 +152,8 @@ const calculateInvoiceNumber = (dateStr: string, settings: any, orders: any[]) =
 
 const SalesInvoiceForm: React.FC = () => {
   const navigate = useNavigate();
+  const { id } = useParams<{ id: string }>();
+  const isEditMode = Boolean(id);
   const dispatch = useDispatch<any>();
   const { data: company } = useSelector((state: any) => state.company);
 
@@ -173,13 +175,83 @@ const SalesInvoiceForm: React.FC = () => {
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const [salesOrders, setSalesOrders] = useState<any[]>([]);
+  const [editInvoiceSalesOrder, setEditInvoiceSalesOrder] = useState<any>(null);
   const [selectedSalesOrderId, setSelectedSalesOrderId] = useState("");
   const [gstRates, setGstRates] = useState<any[]>([]);
   const [stockMap, setStockMap] = useState<Map<string, number>>(new Map());
 
+  const [payments, setPayments] = useState<any[]>([]);
+  const [newPayment, setNewPayment] = useState({
+    amount: "",
+    paymentMethod: "Bank Transfer",
+    referenceNumber: "",
+    paymentDate: new Date().toISOString().split("T")[0],
+  });
+
   useEffect(() => {
     dispatch(fetchCompany());
   }, [dispatch]);
+
+  useEffect(() => {
+    if (id) {
+      salesInvoiceService.fetchById(id)
+        .then((invoice) => {
+          if (invoice.status === "PAID") {
+            toast.error("Fully paid invoices cannot be edited");
+            navigate("/sales-invoices");
+            return;
+          }
+          setCustomerId(invoice.customerId || "");
+          setInvoiceDate(invoice.invoiceDate ? invoice.invoiceDate.split("T")[0] : "");
+          setDueDate(invoice.dueDate ? invoice.dueDate.split("T")[0] : "");
+          setNotes(invoice.notes || "");
+          setPreviewInvoiceNo(invoice.invoiceNo);
+          setSelectedSalesOrderId(invoice.salesOrderId ? String(invoice.salesOrderId) : "");
+          
+          if (invoice.salesOrder) {
+            setEditInvoiceSalesOrder(invoice.salesOrder);
+          }
+
+          const mappedLines: InvoiceLineItem[] = (invoice.items || []).map((item: any) => {
+            const qty = Number(item.quantity);
+            const rate = Number(item.unitPrice);
+            const discountAmount = Number(item.discountAmount) || 0;
+            const taxPercent = Number(item.tax) || 0;
+            const amount = qty * rate;
+            const taxableAmount = amount - discountAmount;
+            const taxAmount = (taxableAmount * taxPercent) / 100;
+            const total = taxableAmount + taxAmount;
+
+            return {
+              id: Math.random().toString(36).substr(2, 9),
+              itemId: String(item.productId),
+              itemName: item.product?.productName || item.description || "Unknown",
+              qty,
+              rate,
+              discountAmount,
+              taxPercent,
+              amount,
+              taxAmount,
+              total,
+            };
+          });
+          setLines(mappedLines.length > 0 ? mappedLines : [emptyLine()]);
+
+          const parsedPayments = invoice.payments
+            ? (typeof invoice.payments === "string" ? JSON.parse(invoice.payments) : invoice.payments)
+            : [];
+          const legacyPayments = parsedPayments.map((p: any) => ({
+            ...p,
+            isPersisted: true
+          }));
+          setPayments(legacyPayments);
+        })
+        .catch((err) => {
+          toast.error("Failed to load sales invoice details");
+          navigate("/sales-invoices");
+        });
+    }
+  }, [id, navigate]);
 
   // ---- Load dropdown data + next invoice number preview ----
   useEffect(() => {
@@ -256,10 +328,12 @@ const SalesInvoiceForm: React.FC = () => {
 
         if (settings) {
           setInvoiceSettings(settings);
-          // Initial preview for the default selected date (today)
-          const todayStr = new Date().toISOString().split("T")[0];
-          const calculatedNo = calculateInvoiceNumber(todayStr, settings, ordersList);
-          setPreviewInvoiceNo(calculatedNo);
+          if (!id) {
+            // Initial preview for the default selected date (today)
+            const todayStr = new Date().toISOString().split("T")[0];
+            const calculatedNo = calculateInvoiceNumber(todayStr, settings, ordersList);
+            setPreviewInvoiceNo(calculatedNo);
+          }
         }
       })
       .catch((err) => {
@@ -271,11 +345,11 @@ const SalesInvoiceForm: React.FC = () => {
 
   // Recalculate invoice number preview when date changes
   useEffect(() => {
-    if (invoiceDate && invoiceSettings) {
+    if (!id && invoiceDate && invoiceSettings) {
       const calculatedNo = calculateInvoiceNumber(invoiceDate, invoiceSettings, allOrders);
       setPreviewInvoiceNo(calculatedNo);
     }
-  }, [invoiceDate, invoiceSettings, allOrders]);
+  }, [id, invoiceDate, invoiceSettings, allOrders]);
 
   const handleSalesOrderChange = (soId: string) => {
     setSelectedSalesOrderId(soId);
@@ -418,6 +492,51 @@ const SalesInvoiceForm: React.FC = () => {
     return { subTotal, totalDiscount, taxTotal, grandTotal, cgst, sgst, igst };
   }, [lines, isInterState]);
 
+  const totalPaid = useMemo(() => payments.reduce((sum, p) => sum + Number(p.amount || 0), 0), [payments]);
+  const balanceDue = useMemo(() => Math.max(0, totals.grandTotal - totalPaid), [totals.grandTotal, totalPaid]);
+  const isOverpaid = useMemo(() => totalPaid > totals.grandTotal, [totals.grandTotal, totalPaid]);
+
+  const handleAddPayment = () => {
+    const amt = Number(newPayment.amount);
+    if (isNaN(amt) || amt <= 0) {
+      toast.error("Payment amount must be greater than 0");
+      return;
+    }
+    if (isEditMode && amt > balanceDue) {
+      toast.error(`Payment amount cannot exceed the remaining balance due of ₹${balanceDue.toFixed(2)}`);
+      return;
+    }
+    if (newPayment.paymentMethod.toLowerCase() !== "cash" && !newPayment.referenceNumber.trim()) {
+      toast.error("Reference number is required for non-cash methods");
+      return;
+    }
+    if (new Date(newPayment.paymentDate) > new Date()) {
+      toast.error("Payment date cannot be in the future");
+      return;
+    }
+
+    setPayments((prev) => [
+      ...prev,
+      {
+        ...newPayment,
+        amount: amt,
+        id: Math.random().toString(36).substr(2, 9),
+      },
+    ]);
+
+    // Reset inputs
+    setNewPayment({
+      amount: "",
+      paymentMethod: "Bank Transfer",
+      referenceNumber: "",
+      paymentDate: new Date().toISOString().split("T")[0],
+    });
+  };
+
+  const handleRemovePayment = (id: string) => {
+    setPayments((prev) => prev.filter((p) => p.id !== id));
+  };
+
   // ---- Credit Limit Check ----
   const limitExceeded = useMemo(() => {
     const selectedCustomer = customersRaw.find((c) => String(c.id) === customerId);
@@ -488,13 +607,19 @@ const SalesInvoiceForm: React.FC = () => {
         subTotal: totals.subTotal,
         taxTotal: totals.taxTotal,
         grandTotal: totals.grandTotal,
+        payments,
       };
 
-      await salesInvoiceService.create(payload);
-      toast.success("Sales invoice created successfully!");
+      if (isEditMode && id) {
+        await salesInvoiceService.update(id, payload);
+        toast.success("Sales invoice updated successfully!");
+      } else {
+        await salesInvoiceService.create(payload);
+        toast.success("Sales invoice created successfully!");
+      }
       navigate("/sales-invoices");
     } catch (err: any) {
-      toast.error(err.response?.data?.message || "Failed to create sales invoice");
+      toast.error(err.response?.data?.message || "Failed to save sales invoice");
     } finally {
       setSaving(false);
     }
@@ -513,7 +638,7 @@ const SalesInvoiceForm: React.FC = () => {
         {/* Page Header */}
         <div className="px-6 py-5 border-b border-slate-200 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h2 className="text-xl font-bold text-slate-800">Create Sales Invoice</h2>
+            <h2 className="text-xl font-bold text-slate-800">{isEditMode ? "Edit Sales Invoice" : "Create Sales Invoice"}</h2>
             <p className="text-sm text-slate-500 mt-1">
               Invoice No: <span className="font-semibold text-slate-700">{previewInvoiceNo || "Auto-generated on save"}</span>
             </p>
@@ -558,6 +683,7 @@ const SalesInvoiceForm: React.FC = () => {
                 name="customerId"
                 required
                 value={customerId}
+                disabled={isEditMode}
                 error={errors.customerId}
                 options={customers.map((c) => ({ label: c.name, value: c.id }))}
                 defaultOptionLabel="Select customer"
@@ -583,18 +709,32 @@ const SalesInvoiceForm: React.FC = () => {
                 label="Sales Order "
                 name="selectedSalesOrderId"
                 value={selectedSalesOrderId}
-                disabled={!customerId}
-                options={salesOrders
-                  .filter((so) => so.customerId?.toString() === customerId || so.customer?.id?.toString() === customerId)
-                  .map((so) => {
+                disabled={isEditMode || !customerId}
+                options={(() => {
+                  const filtered = salesOrders.filter(
+                    (so) => so.customerId?.toString() === customerId || so.customer?.id?.toString() === customerId
+                  );
+                  if (isEditMode && editInvoiceSalesOrder) {
+                    const exists = filtered.some((so) => String(so.id) === String(editInvoiceSalesOrder.id));
+                    if (!exists) {
+                      filtered.push({
+                        id: editInvoiceSalesOrder.id,
+                        orderNo: editInvoiceSalesOrder.orderNo,
+                      });
+                    }
+                  }
+                  return filtered.map((so) => {
                     const orderDateStr = so.orderDate || so.createdAt;
                     const formattedDate = orderDateStr
                       ? new Date(orderDateStr).toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" })
                       : "N/A";
-                    const formattedAmount = `₹${Number(so.netAmount || so.grandTotal || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`;
-                    const labelStr = `${so.orderNo} — ${formattedAmount}`;
+                    const formattedAmount = so.netAmount !== undefined
+                      ? `₹${Number(so.netAmount).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`
+                      : "";
+                    const labelStr = formattedAmount ? `${so.orderNo} — ${formattedAmount}` : so.orderNo;
                     return { label: labelStr, value: so.id.toString() };
-                  })}
+                  });
+                })()}
                 defaultOptionLabel={customerId ? "-- Select Sales Order --" : "-- Select Customer First --"}
                 onChange={(e) => handleSalesOrderChange(e.target.value)}
               />
@@ -603,6 +743,7 @@ const SalesInvoiceForm: React.FC = () => {
                 name="invoiceDate"
 
                 value={invoiceDate}
+                disabled={isEditMode}
                 onChange={(e) => setInvoiceDate(e.target.value)}
                 required
                 error={errors.invoiceDate}
@@ -612,6 +753,7 @@ const SalesInvoiceForm: React.FC = () => {
                 name="dueDate"
 
                 value={dueDate}
+                disabled={isEditMode}
                 onChange={(e) => setDueDate(e.target.value)}
               />
             </div>
@@ -626,13 +768,15 @@ const SalesInvoiceForm: React.FC = () => {
                 <FaFileInvoiceDollar className="text-slate-400" />
                 Line Items
               </h3>
-              <button
-                type="button"
-                onClick={addLine}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-semibold rounded-md transition-colors focus:outline-none"
-              >
-                <FaPlus /> Add Item
-              </button>
+              {!isEditMode && (
+                <button
+                  type="button"
+                  onClick={addLine}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-semibold rounded-md transition-colors focus:outline-none"
+                >
+                  <FaPlus /> Add Item
+                </button>
+              )}
             </div>
 
             {errors.lines && <div className="text-red-500 text-sm mb-3 bg-red-50 p-2 rounded-md border border-red-100">{errors.lines}</div>}
@@ -662,6 +806,7 @@ const SalesInvoiceForm: React.FC = () => {
                           noMargin={true}
                           hideLabel={true}
                           value={line.itemId}
+                          disabled={isEditMode}
                           options={items.map((i) => ({ label: i.name, value: i.id }))}
                           defaultOptionLabel="Select item"
                           onChange={(e) => updateLine(line.id, "itemId", e.target.value)}
@@ -675,6 +820,7 @@ const SalesInvoiceForm: React.FC = () => {
                           name="qty"
                           type="number"
                           value={String(line.qty)}
+                          disabled={isEditMode}
                           onChange={(e) => updateLine(line.id, "qty", Number(e.target.value))}
                         />
                         {line.itemId && line.qty > (stockMap.get(line.itemId) || 0) && (
@@ -691,6 +837,7 @@ const SalesInvoiceForm: React.FC = () => {
                           name="rate"
                           type="number"
                           value={String(line.rate)}
+                          disabled={isEditMode}
                           onChange={(e) => updateLine(line.id, "rate", Number(e.target.value))}
                         />
                       </td>
@@ -706,6 +853,7 @@ const SalesInvoiceForm: React.FC = () => {
                           noMargin={true}
                           hideLabel={true}
                           value={String(line.taxPercent)}
+                          disabled={isEditMode}
                           options={gstRates.map((g) => ({
                             label: `${g.taxName} (${g.taxRate}%)`,
                             value: String(g.taxRate),
@@ -724,13 +872,15 @@ const SalesInvoiceForm: React.FC = () => {
                         ₹{line.total.toFixed(2)}
                       </td> */}
                       <td className="px-4 py-2 text-center align-middle">
-                        <button
-                          type="button"
-                          onClick={() => removeLine(line.id)}
-                          className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors focus:outline-none"
-                        >
-                          <FaTrash size={14} />
-                        </button>
+                        {!isEditMode && (
+                          <button
+                            type="button"
+                            onClick={() => removeLine(line.id)}
+                            className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors focus:outline-none"
+                          >
+                            <FaTrash size={14} />
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -780,16 +930,144 @@ const SalesInvoiceForm: React.FC = () => {
           <hr className="border-slate-100" />
 
           {/* Notes */}
-          <div className="w-full md:w-[50%] lg:w-[33%]">
+          <div className="w-full md:w-[50%] lg:w-[33%] mb-6">
             <TextInput
               as="textarea"
               label="Notes & Remarks"
               name="notes"
               rows={3}
               value={notes}
+              disabled={isEditMode}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Optional notes for this invoice..."
             />
+          </div>
+
+          {/* Payment Details */}
+          <div className="mt-6 border-t border-slate-200 pt-6">
+            <h6 className="text-base font-bold text-slate-800 mb-4 flex items-center gap-2">
+              <FaCreditCard className="text-blue-600" /> Payment & Collection Details
+            </h6>
+
+            {/* Top Info Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 bg-slate-50 p-4 border border-slate-100 rounded-lg">
+              <div className="bg-white p-3 border border-slate-100 rounded shadow-xs">
+                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Total Amount</span>
+                <span className="text-lg font-bold text-slate-900">₹{totals.grandTotal.toFixed(2)}</span>
+              </div>
+              <div className="bg-white p-3 border border-slate-100 rounded shadow-xs">
+                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Total Paid</span>
+                <span className="text-lg font-bold text-emerald-600">₹{totalPaid.toFixed(2)}</span>
+              </div>
+              <div className="bg-white p-3 border border-slate-100 rounded shadow-xs">
+                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Balance Due</span>
+                <span className={`text-lg font-bold ${balanceDue > 0 ? "text-amber-600" : "text-slate-500"}`}>
+                  ₹{balanceDue.toFixed(2)}
+                </span>
+              </div>
+            </div>
+
+            {/* Overpayment Warning banner */}
+            {isOverpaid && (
+              <div className="mb-4 p-3 bg-amber-50 border border-amber-100 text-amber-800 text-sm font-semibold rounded-lg">
+                Warning: Total paid amount (₹{totalPaid.toFixed(2)}) exceeds the invoice amount (₹{totals.grandTotal.toFixed(2)}).
+              </div>
+            )}
+
+            {/* Form controls to add a payment transaction */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 bg-slate-50/50 p-4 border border-slate-100/50 rounded-lg mb-4">
+              <div>
+                <TextInput
+                  label="Amount"
+                  type="number"
+                  name="amount"
+                  value={newPayment.amount}
+                  onChange={(e) => setNewPayment(p => ({ ...p, amount: e.target.value }))}
+                  placeholder="Enter amount"
+                />
+              </div>
+              <div>
+                <SelectInput
+                  label="Method"
+                  name="paymentMethod"
+                  value={newPayment.paymentMethod}
+                  options={[
+                    { value: "Bank Transfer", label: "Bank Transfer" },
+                    { value: "Cash", label: "Cash" },
+                    { value: "Cheque", label: "Cheque" },
+                    { value: "UPI", label: "UPI" },
+                  ]}
+                  onChange={(e) => setNewPayment(p => ({ ...p, paymentMethod: e.target.value }))}
+                />
+              </div>
+              <div>
+                <TextInput
+                  label="Reference / UTR"
+                  name="referenceNumber"
+                  value={newPayment.referenceNumber}
+                  onChange={(e) => setNewPayment(p => ({ ...p, referenceNumber: e.target.value }))}
+                  placeholder="Enter UTR/Cheque ID"
+                  disabled={newPayment.paymentMethod.toLowerCase() === "cash"}
+                />
+              </div>
+              <div className="flex flex-col justify-between">
+                <DatePickerCalendar
+                  label="Payment Date"
+                  name="paymentDate"
+                  value={newPayment.paymentDate}
+                  onChange={(e) => setNewPayment(p => ({ ...p, paymentDate: e.target.value }))}
+                />
+                <button
+                  type="button"
+                  onClick={handleAddPayment}
+                  className="mt-3 w-full py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-bold shadow-xs transition-colors"
+                >
+                  Add Payment
+                </button>
+              </div>
+            </div>
+
+            {/* Table layout of added payments */}
+            {payments.length > 0 ? (
+              <div className="overflow-x-auto border border-slate-200 rounded-lg">
+                <table className="w-full text-sm text-left border-collapse bg-white">
+                  <thead className="bg-slate-50 text-slate-700 font-semibold border-b border-slate-200">
+                    <tr>
+                      <th className="p-3">Amount</th>
+                      <th className="p-3">Payment Method</th>
+                      <th className="p-3">Reference / UTR</th>
+                      <th className="p-3">Payment Date</th>
+                      <th className="p-3 text-center w-12">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {payments.map((p) => (
+                      <tr key={p.id} className="hover:bg-slate-50/50">
+                        <td className="p-3 font-semibold text-slate-900">₹{Number(p.amount).toFixed(2)}</td>
+                        <td className="p-3 text-slate-600">{p.paymentMethod}</td>
+                        <td className="p-3 text-slate-600">{p.referenceNumber || "—"}</td>
+                        <td className="p-3 text-slate-500">{p.paymentDate}</td>
+                        <td className="p-3 text-center">
+                          {!p.isPersisted && (
+                            <button
+                              type="button"
+                              onClick={() => handleRemovePayment(p.id)}
+                              className="text-red-500 hover:text-red-700 p-1 transition-colors"
+                            >
+                              <FaTrash size={14} />
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="p-4 bg-slate-50 border border-dashed border-slate-200 rounded-lg text-center text-slate-400 italic text-sm">
+                No payment transactions recorded. Use the inputs above to add a payment.
+              </div>
+            )}
           </div>
 
           {/* Actions */}
@@ -801,7 +1079,7 @@ const SalesInvoiceForm: React.FC = () => {
               onClick={() => navigate(-1)}
             />
             <CustomButton
-              text="Create Invoice"
+              text={isEditMode ? "Update Invoice" : "Create Invoice"}
               icon={FaSave}
               type="submit"
               disabled={saving || isStockNotEnough}

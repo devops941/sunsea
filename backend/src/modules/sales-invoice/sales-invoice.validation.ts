@@ -11,6 +11,16 @@ const ItemSchema = z.object({
   total: z.coerce.number().min(0).optional(),
 });
 
+const PaymentSchema = z.object({
+  amount: z.coerce.number().min(0.01, "Amount must be greater than 0"),
+  paymentMethod: z.string().min(1, "Payment method is required"),
+  referenceNumber: z.string().optional().nullable(),
+  paymentDate: z.string().refine((val) => {
+    const d = new Date(val);
+    return !isNaN(d.getTime()) && d <= new Date(new Date().setHours(23, 59, 59, 999));
+  }, "Payment date must be a valid date and not in the future"),
+});
+
 export const CreateSalesInvoiceSchema = z.object({
   invoiceNo: z.string().min(1, "Invoice number is required"),
   invoiceDate: z.string().min(1, "Invoice date is required"),
@@ -25,6 +35,7 @@ export const CreateSalesInvoiceSchema = z.object({
     (val) => (val === "" || val === "null" || val === "undefined" ? null : val),
     z.coerce.number().optional().nullable()
   ),
+  payments: z.array(PaymentSchema).optional().default([]),
   items: z.array(ItemSchema).min(1, "At least one item is required"),
 });
 

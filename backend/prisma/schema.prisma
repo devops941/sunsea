@@ -1319,6 +1319,7 @@ model GrnInvoice {
   paymentMethod        String?          @map("payment_method")
   referenceNumber      String?          @map("reference_number")
   paymentDate          DateTime?        @map("payment_date") @db.Date
+  payments             Json?            @default("[]") @map("payments")
   subtotal             Decimal          @default(0) @db.Decimal(12, 2)
   totalDiscount        Decimal          @default(0) @db.Decimal(12, 2)
   totalTax             Decimal          @default(0) @db.Decimal(12, 2)
@@ -1558,6 +1559,7 @@ model SalesInvoice {
   updatedAt    DateTime           @updatedAt @map("updated_at")
   salesOrderId Int?               @map("sales_order_id")
   storeId      String?            @map("store_id") @db.VarChar(20)
+  payments     Json?              @default("[]") @map("payments")
   items        SalesInvoiceItem[]
   customer     Customer           @relation(fields: [customerId], references: [id])
   salesOrder   SalesOrder?        @relation(fields: [salesOrderId], references: [id])

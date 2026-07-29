@@ -11,6 +11,7 @@ import CustomButton from "../../components/ui/Button/Button";
 import ViewButton from "../../components/ui/viewbutton/ViewButton";
 import DeleteButton from "../../components/ui/DeleteButton/DeleteButton";
 import StatusBadge from "../../components/ui/StatusBadge/Badge";
+import EditButton from "../../components/ui/EditButton/EditButton";
 import DataTable, { type DataTableColumn } from "../../components/ui/table/DataTable";
 import SearchInput from "../../components/ui/SearchInput/SearchInput";
 
@@ -90,8 +91,8 @@ const SalesInvoiceList: React.FC = () => {
         return d.toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" });
     };
 
-    const formatCurrency = (amount: number) =>
-        `₹${(amount ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`;
+    const formatCurrency = (amount: any) =>
+        `₹${Number(amount ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`;
 
     const totalPages = Math.ceil(total / ITEMS_PER_PAGE);
 
@@ -146,10 +147,13 @@ const SalesInvoiceList: React.FC = () => {
         },
         {
             header: "ACTIONS",
-            width: "120px",
+            width: "160px",
             render: (item) => (
                 <div className="flex justify-start gap-2">
                     <ViewButton onClick={() => handleOpenView(item)} />
+                    {item.status !== "PAID" && (
+                        <EditButton onClick={() => navigate(`/sales-invoices/edit/${item.id}`)} />
+                    )}
                     <DeleteButton onClick={() => {
                         setItemToDelete(item.id);
                         setShowDeleteModal(true);

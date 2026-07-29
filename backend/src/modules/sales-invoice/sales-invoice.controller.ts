@@ -81,6 +81,29 @@ class SalesInvoiceController {
       new ApiResponse("Sales Invoice deleted successfully")
     );
   });
+
+  update = asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user?.userId;
+    if (!userId) {
+      throw new ApiError(401, "Unauthorized: missing user context");
+    }
+
+    const company = await prisma.company.findFirst();
+    if (!company) {
+      throw new ApiError(500, "Internal Server Error: No company found in the system");
+    }
+    const companyId = company.id;
+
+    const id = req.params.id as string;
+    const salesInvoice = await salesInvoiceService.updateSalesInvoice(id, req.body, {
+      userId,
+      companyId,
+    });
+
+    return res.status(200).json(
+      new ApiResponse("Sales Invoice updated successfully", salesInvoice)
+    );
+  });
 }
 
 export const salesInvoiceController = new SalesInvoiceController();
