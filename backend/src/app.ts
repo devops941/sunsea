@@ -47,6 +47,8 @@ app.use(
     allowedHeaders: [
       "Content-Type",
       "Authorization",
+      "ngrok-skip-browser-warning",
+      "Bypass-Tunnel-Reminder",
     ],
   })
 );

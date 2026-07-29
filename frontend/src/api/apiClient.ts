@@ -14,6 +14,8 @@ export const apiClient = axios.create({
     withCredentials: true,
     headers: {
         "Content-Type": "application/json",
+        "Bypass-Tunnel-Reminder": "true", // Bypasses localtunnel warning page
+        "ngrok-skip-browser-warning": "true", // Bypasses ngrok warning page
     },
 });
 

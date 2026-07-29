@@ -27,8 +27,10 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
 
     // Initialize Socket.io connection
     const socketInstance = io(baseUrl, {
-      // Add authentication headers if needed in the future
-      // auth: { token: '...' }
+      extraHeaders: {
+        "Bypass-Tunnel-Reminder": "true", // Bypasses localtunnel warning page
+        "ngrok-skip-browser-warning": "true", // Bypasses ngrok warning page
+      }
     });
 
     socketInstance.on("connect", () => {
