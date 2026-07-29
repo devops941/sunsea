@@ -102,13 +102,13 @@ class GstTaxService {
     async delete(gstTaxId: string) {
         await this.findById(gstTaxId); // throws 404 if missing
 
-        const linkedProducts = await prisma.product.findFirst({ where: { taxId: gstTaxId } });
+        const linkedProducts = await prisma.product.findFirst({ where: { gstTaxRateId: gstTaxId } });
         if (linkedProducts) throw new ApiError(400, "Cannot delete GST Tax because it is linked to one or more Products");
 
-        const linkedMaterials = await prisma.rawMaterial.findFirst({ where: { taxId: gstTaxId } });
+        const linkedMaterials = await prisma.rawMaterial.findFirst({ where: { gstTaxRateId: gstTaxId } });
         if (linkedMaterials) throw new ApiError(400, "Cannot delete GST Tax because it is linked to one or more Raw Materials");
 
-        const linkedSalesOrders = await prisma.salesOrderItem.findFirst({ where: { taxId: gstTaxId } });
+        const linkedSalesOrders = await prisma.salesOrderItem.findFirst({ where: { gstTaxRateId: gstTaxId } });
         if (linkedSalesOrders) throw new ApiError(400, "Cannot delete GST Tax because it is linked to one or more Sales Order Items");
 
         return prisma.gstTaxRate.delete({
