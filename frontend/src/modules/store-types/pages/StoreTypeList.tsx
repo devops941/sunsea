@@ -19,6 +19,7 @@ import CommonModal from "../../../components/ui/Modal/CommonModal";
 import TextInput from "../../../components/form/TextInput/TextInput";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import DataTable from "../../../components/ui/table/DataTable";
+import { useSocketSync } from "../../../hooks/useSocketSync";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -96,21 +97,27 @@ const StoreTypeList: React.FC = () => {
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [isSubmitting, setIsSubmitting] = useState(false);
 
+    const fetchData = useCallback(() => {
+        dispatch(
+            fetchStoreTypes({
+                search: searchTerm,
+                page: currentPage,
+                limit: ITEMS_PER_PAGE,
+                sortBy: "code",
+                sortOrder: "asc",
+            })
+        );
+    }, [dispatch, searchTerm, currentPage]);
+
+    useSocketSync("store-type", undefined, fetchData);
+
     useEffect(() => {
         const delayDebounce = setTimeout(() => {
-            dispatch(
-                fetchStoreTypes({
-                    search: searchTerm,
-                    page: currentPage,
-                    limit: ITEMS_PER_PAGE,
-                    sortBy: "code",
-                    sortOrder: "asc",
-                })
-            );
+            fetchData();
         }, 300);
 
         return () => clearTimeout(delayDebounce);
-    }, [dispatch, searchTerm, currentPage]);
+    }, [fetchData]);
 
     const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
         setSearchTerm(e.target.value);
@@ -125,14 +132,14 @@ const StoreTypeList: React.FC = () => {
     const handleOpenAdd = async () => {
         setEditMode(false);
         setErrors({});
-        
+
         let nextCode = "";
         try {
             nextCode = await storeTypeService.fetchNextId();
         } catch (err) {
             console.error("Failed to fetch next store type code:", err);
         }
-        
+
         setFormData({ ...initialFormState, code: nextCode });
         setShowFormModal(true);
     };
@@ -322,7 +329,7 @@ const StoreTypeList: React.FC = () => {
                         />
                     </div>
                 </div>
-                
+
                 {/* Form Modal (Add / Edit) */}
                 <CommonModal
                     show={showFormModal}

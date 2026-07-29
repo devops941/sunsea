@@ -3,14 +3,31 @@ import type { PayloadAction } from "@reduxjs/toolkit";
 import { supplierService } from "../../services/supplierService";
 import type { Supplier, SupplierState, CreateSupplierDto, UpdateSupplierDto } from "./types";
 
-export const fetchSuppliers = createAsyncThunk("suppliers/fetchAll", async (search: string | undefined, { rejectWithValue }) => {
-  try {
-    const res = await supplierService.fetchAll(search);
-    return res.suppliers || res;
-  } catch (error: any) {
-    return rejectWithValue(error.response?.data?.message || "Failed to fetch suppliers");
+export const fetchSuppliers = createAsyncThunk(
+  "suppliers/fetchAll",
+  async (params: { search?: string; page?: number; limit?: number } | string | undefined, { rejectWithValue }) => {
+    try {
+      const normalized = typeof params === "string" ? { search: params } : (params ?? {});
+      const res = await supplierService.fetchAll(normalized);
+      if (res.suppliers) {
+        return {
+          suppliers: res.suppliers,
+          total: res.pagination?.totalItems || res.suppliers.length,
+          page: res.pagination?.currentPage || 1,
+          totalPages: res.pagination?.totalPages || 1
+        };
+      }
+      return {
+        suppliers: res,
+        total: res.length,
+        page: 1,
+        totalPages: 1
+      };
+    } catch (error: any) {
+      return rejectWithValue(error.response?.data?.message || "Failed to fetch suppliers");
+    }
   }
-});
+);
 
 export const createSupplier = createAsyncThunk("suppliers/create", async (data: CreateSupplierDto, { rejectWithValue }) => {
   try {
@@ -41,6 +58,9 @@ const initialState: SupplierState = {
   suppliers: [],
   loading: false,
   error: null,
+  total: 0,
+  page: 1,
+  totalPages: 1,
 };
 
 const supplierSlice = createSlice({
@@ -61,6 +81,7 @@ const supplierSlice = createSlice({
     },
     supplierDeleted: (state, action: PayloadAction<string>) => {
       state.suppliers = state.suppliers.filter((s) => String(s.id) !== String(action.payload));
+      state.total = Math.max(0, state.total - 1);
     },
   },
   extraReducers: (builder) => {
@@ -69,9 +90,12 @@ const supplierSlice = createSlice({
         state.loading = true;
         state.error = null;
       })
-      .addCase(fetchSuppliers.fulfilled, (state, action: PayloadAction<Supplier[]>) => {
+      .addCase(fetchSuppliers.fulfilled, (state, action: PayloadAction<{ suppliers: Supplier[]; total: number; page: number; totalPages: number }>) => {
         state.loading = false;
-        state.suppliers = action.payload;
+        state.suppliers = action.payload.suppliers;
+        state.total = action.payload.total;
+        state.page = action.payload.page;
+        state.totalPages = action.payload.totalPages;
       })
       .addCase(fetchSuppliers.rejected, (state, action) => {
         state.loading = false;

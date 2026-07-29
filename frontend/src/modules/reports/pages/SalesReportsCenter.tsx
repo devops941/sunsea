@@ -8,8 +8,10 @@ import { DISPATCH_TYPE_OPTIONS, DATE_RANGE_OPTIONS } from "../../../constants/se
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import ExportCSVButton from "../../../components/ui/ExportCSVButton/ExportCSVButton";
+import ColumnToggle from "../../../components/ui/ColumnToggle/ColumnToggle";
 import type { DataTableColumn } from "../../../components/ui/table/DataTable";
 import DataTable from "../../../components/ui/table/DataTable";
+import { useSocketSync } from "../../../hooks/useSocketSync";
 
 const SalesReportsCenter: React.FC = () => {
   // Filters state
@@ -34,6 +36,32 @@ const SalesReportsCenter: React.FC = () => {
   const [customers, setCustomers] = useState<any[]>([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+
+  const DEFAULT_COLUMNS = [
+    "#", "ORDER NUMBER", "ORDER DATE", "CUSTOMER", "BILLING ADDRESS",
+    "SHIPPING ADDRESS", "ITEMS (QTY)", "TOTALS", "TAXES", "NET AMOUNT",
+    "DISPATCH TYPE", "STATUS"
+  ];
+
+  const [visibleColumns, setVisibleColumns] = useState<string[]>(() => {
+    const saved = localStorage.getItem("salesReportVisibleColumns");
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        return DEFAULT_COLUMNS;
+      }
+    }
+    return DEFAULT_COLUMNS;
+  });
+
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  useEffect(() => {
+    localStorage.setItem("salesReportVisibleColumns", JSON.stringify(visibleColumns));
+  }, [visibleColumns]);
+
+  useSocketSync("salesOrder", undefined, () => setRefreshKey(k => k + 1));
 
   useEffect(() => {
     const loadCustomers = async () => {
@@ -73,15 +101,25 @@ const SalesReportsCenter: React.FC = () => {
       }
     };
     loadReport();
-  }, [startDate, endDate, orderNo, customerId, status, dispatchType, page]);
+  }, [startDate, endDate, orderNo, customerId, status, dispatchType, page, refreshKey]);
 
   const { csvData, csvColumns, csvFilename } = useMemo(() => {
     const columns = [
       { header: "Order Number", accessor: (item: any) => item.orderNo },
       { header: "Order Date", accessor: (item: any) => item.orderDate?.split("T")[0] },
       { header: "Customer", accessor: (item: any) => item.customerName },
+      { header: "Customer Type", accessor: (item: any) => item.customerType },
+      { header: "Billing Address", accessor: (item: any) => item.billingAddress },
+      { header: "Shipping Address", accessor: (item: any) => item.shippingAddress },
+      { header: "Items (Qty)", accessor: (item: any) => item.items?.map((i: any) => `${i.productName} (${i.quantity} ${i.uom})`).join(", ") || "-" },
       { header: "Items Count", accessor: (item: any) => item.itemsCount },
       { header: "Total Quantity", accessor: (item: any) => item.totalQty },
+      { header: "Order Discount Type", accessor: (item: any) => item.orderDiscountType },
+      { header: "Order Discount Val", accessor: (item: any) => item.orderDiscountValue },
+      { header: "Total Discount", accessor: (item: any) => item.totalDiscount },
+      { header: "Total CGST", accessor: (item: any) => item.totalCgst },
+      { header: "Total SGST", accessor: (item: any) => item.totalSgst },
+      { header: "Total IGST", accessor: (item: any) => item.totalIgst },
       { header: "Net Amount", accessor: (item: any) => item.netAmount },
       { header: "Dispatch Type", accessor: (item: any) => item.dispatchType },
       { header: "Status", accessor: (item: any) => item.status }
@@ -173,15 +211,62 @@ const SalesReportsCenter: React.FC = () => {
     },
     {
       header: "CUSTOMER",
-      render: (item: any) => item.customerName || "N/A"
+      render: (item: any) => (
+        <div>
+          <div className="font-semibold">{item.customerName || "N/A"}</div>
+          <div className="text-[10px] text-gray-500">{item.customerType || "-"}</div>
+        </div>
+      )
     },
     {
-      header: "ITEMS COUNT",
-      render: (item: any) => item.itemsCount || 0
+      header: "BILLING ADDRESS",
+      render: (item: any) => (
+        <div className="text-xs max-w-[200px]" title={item.billingAddress}>
+          {item.billingAddress || "-"}
+        </div>
+      )
+    },
+    {
+      header: "SHIPPING ADDRESS",
+      render: (item: any) => (
+        <div className="text-xs max-w-[200px]" title={item.shippingAddress}>
+          {item.shippingAddress || "-"}
+        </div>
+      )
+    },
+    {
+      header: "ITEMS (QTY)",
+      render: (item: any) => (
+        <div className="text-xs max-w-[250px]">
+          {item.items && item.items.length > 0
+            ? item.items.map((i: any, idx: number) => <div key={idx}>{i.productName} ({i.quantity})</div>)
+            : "-"}
+        </div>
+      )
+    },
+    {
+      header: "TOTALS",
+      render: (item: any) => (
+        <div className="text-xs">
+          <div>Qty: <span className="font-semibold">{item.totalQty}</span> ({item.itemsCount} items)</div>
+          <div>Disc: <span className="text-green-600 font-semibold">{item.totalDiscount}</span> {item.orderDiscountValue > 0 ? `(${item.orderDiscountValue} ${item.orderDiscountType === 'PERCENT' ? '%' : 'Flat'})` : ''}</div>
+        </div>
+      )
+    },
+    {
+      header: "TAXES",
+      render: (item: any) => (
+        <div className="text-[11px] text-gray-600">
+          {item.totalCgst > 0 && <div>CGST: ₹{item.totalCgst}</div>}
+          {item.totalSgst > 0 && <div>SGST: ₹{item.totalSgst}</div>}
+          {item.totalIgst > 0 && <div>IGST: ₹{item.totalIgst}</div>}
+          {item.totalCgst === 0 && item.totalSgst === 0 && item.totalIgst === 0 && <span>-</span>}
+        </div>
+      )
     },
     {
       header: "NET AMOUNT",
-      render: (item: any) => `₹${(item.netAmount ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+      render: (item: any) => <span className="font-bold text-gray-900">₹{(item.netAmount ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
     },
     {
       header: "DISPATCH TYPE",
@@ -291,24 +376,33 @@ const SalesReportsCenter: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-slate-200">
-            <button
-              onClick={handleClearFilters}
-              className="px-4 py-2 text-sm font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-md transition-colors"
-            >
-              Clear All
-            </button>
-            <button
-              onClick={handleApplyFilters}
-              className="px-6 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-md shadow-sm transition-colors"
-            >
-              Apply Filters
-            </button>
+          <div className="flex items-center justify-between mt-6 pt-4 border-t border-slate-200">
+            <div>
+              <ColumnToggle
+                columns={tableColumns}
+                visibleColumns={visibleColumns}
+                setVisibleColumns={setVisibleColumns}
+              />
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleClearFilters}
+                className="px-4 py-2 text-sm font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-md transition-colors"
+              >
+                Clear All
+              </button>
+              <button
+                onClick={handleApplyFilters}
+                className="px-6 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-md shadow-sm transition-colors"
+              >
+                Apply Filters
+              </button>
+            </div>
           </div>
         </div>
 
         <DataTable
-          columns={tableColumns}
+          columns={tableColumns.filter(c => typeof c.header === 'string' && visibleColumns.includes(c.header))}
           data={backendReports}
           rowKey={(item: any) => item.id || item.orderNo}
           loading={loadingBackend}

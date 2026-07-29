@@ -290,7 +290,13 @@ class ReportsService {
               customerCode: true,
             }
           },
-          items: true,
+          items: {
+            include: {
+              product: {
+                select: { productName: true, itemCode: true }
+              }
+            }
+          },
         },
       })
     ]);
@@ -308,7 +314,21 @@ class ReportsService {
         dispatchType: so.dispatchType,
         mdApprovalStatus: so.mdApprovalStatus,
         customerApprovalStatus: so.customerApprovalStatus,
-        totalQty: so.items.reduce((sum, item) => sum + Number(item.quantity), 0)
+        totalQty: so.items.reduce((sum, item) => sum + Number(item.quantity), 0),
+        customerType: so.customerType,
+        billingAddress: `${so.billingAddressLine1 || ''} ${so.billingCity || ''} ${so.billingState || ''} ${so.billingPincode || ''}`.trim(),
+        shippingAddress: `${so.shippingAddressLine1 || ''} ${so.shippingCity || ''} ${so.shippingState || ''} ${so.shippingPincode || ''}`.trim(),
+        totalDiscount: Number(so.totalDiscount || 0),
+        orderDiscountType: so.orderDiscountType,
+        orderDiscountValue: Number(so.orderDiscountValue || 0),
+        totalCgst: Number(so.totalCgst || 0),
+        totalSgst: Number(so.totalSgst || 0),
+        totalIgst: Number(so.totalIgst || 0),
+        items: so.items.map((item: any) => ({
+          productName: item.product?.productName || 'Unknown',
+          quantity: Number(item.quantity || 0),
+          uom: item.product?.uomId || ''
+        }))
       };
     });
 
@@ -358,6 +378,7 @@ class ReportsService {
             select: {
               displayName: true,
               legalName: true,
+              supplierCode: true,
             }
           },
           items: true,
@@ -370,8 +391,22 @@ class ReportsService {
         id: po.id,
         poNumber: po.poNumber,
         poDate: po.poDate,
+        expectedDeliveryDate: po.expectedDeliveryDate,
         supplierName: po.supplier?.displayName || po.supplier?.legalName || "Unknown",
+        supplierCode: po.supplier?.supplierCode || "Unknown",
+        billingAddress: `${po.billingAddressLine1 || ''} ${po.billingCity || ''} ${po.billingState || ''} ${po.billingPincode || ''}`.trim(),
+        shippingAddress: `${po.shippingAddressLine1 || ''} ${po.shippingCity || ''} ${po.shippingState || ''} ${po.shippingPincode || ''}`.trim(),
         itemsCount: po.items.length,
+        items: po.items.map((item: any) => ({
+          productId: item.productId,
+          quantity: Number(item.quantity || 0),
+          uom: item.uom || ''
+        })),
+        totalDiscount: Number(po.totalDiscount || 0),
+        totalTax: Number(po.totalTax || 0),
+        totalCgst: Number(po.totalCgst || 0),
+        totalSgst: Number(po.totalSgst || 0),
+        totalIgst: Number(po.totalIgst || 0),
         netAmount: Number(po.netAmount),
         status: po.status,
       };

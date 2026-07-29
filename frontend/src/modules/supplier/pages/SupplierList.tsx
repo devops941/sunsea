@@ -14,12 +14,12 @@ import { useSuppliers } from "../../../hooks/useSuppliers";
 import { supplierService } from "../../../services/supplierService";
 import { hasPermission } from "../../../utils/permission";
 import DataTable from "../../../components/ui/table/DataTable";
+import { useSocketSync } from "../../../hooks/useSocketSync";
 
 const ITEMS_PER_PAGE = 10;
-
 const SupplierList: React.FC = () => {
     const navigate = useNavigate();
-    const { removeSupplier } = useSuppliers();
+    const { suppliers, loading, error, total, loadSuppliers, removeSupplier } = useSuppliers();
 
     const canEditSupplier = hasPermission("supplier.edit");
     const canDeleteSupplier = hasPermission("supplier.delete");
@@ -35,34 +35,17 @@ const SupplierList: React.FC = () => {
     const initialSearch = searchParams.get("search") || "";
 
     const [searchTerm, setSearchTerm] = useState(initialSearch);
-    const [suppliers, setSuppliers] = useState<any[]>([]);
-    const [loading, setLoading] = useState(false);
-    const [total, setTotal] = useState(0);
 
     // Custom confirm delete state
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [supplierToDelete, setSupplierToDelete] = useState<string | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
 
-    const fetchSuppliersData = useCallback(async () => {
-        setLoading(true);
-        try {
-            const response = await supplierService.fetchAll({
-                page: currentPage,
-                limit: ITEMS_PER_PAGE,
-                search: searchTerm || undefined,
-            });
-            setSuppliers(response?.suppliers || []);
-            setTotal(response?.pagination?.totalPages || 0);
-        } catch (err: any) {
-            console.error(err);
-            toast.error(err?.response?.data?.message || "Failed to fetch suppliers");
-            setSuppliers([]);
-            setTotal(0);
-        } finally {
-            setLoading(false);
-        }
-    }, [currentPage, searchTerm]);
+    const fetchSuppliersData = useCallback(() => {
+        loadSuppliers({ search: searchTerm, page: currentPage, limit: ITEMS_PER_PAGE });
+    }, [searchTerm, currentPage, loadSuppliers]);
+
+    useSocketSync("supplier", undefined, fetchSuppliersData);
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -70,6 +53,12 @@ const SupplierList: React.FC = () => {
         }, 500);
         return () => clearTimeout(timer);
     }, [fetchSuppliersData]);
+
+    useEffect(() => {
+        if (error) {
+            toast.error(error);
+        }
+    }, [error]);
 
     const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
         setSearchTerm(e.target.value);

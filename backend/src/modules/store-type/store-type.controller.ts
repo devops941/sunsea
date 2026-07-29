@@ -2,10 +2,12 @@ import { Request, Response } from "express";
 import storeTypeService from "./store-type.service";
 import { ApiResponse } from "../../utils/ApiResponse";
 import { asyncHandler } from "../../utils/asyncHandler";
+import { getIO } from "../../socket/socket";
 
 class StoreTypeController {
   create = asyncHandler(async (req: Request, res: Response) => {
     const storeType = await storeTypeService.create(req.body);
+    getIO().emit("store-type:created", storeType);
     res.status(201).json(
       new ApiResponse("Store Type created successfully", storeType)
     );
@@ -42,6 +44,7 @@ findAll = asyncHandler(async (req: Request, res: Response) => {
 
   update = asyncHandler(async (req: Request, res: Response) => {
     const storeType = await storeTypeService.update(Number(req.params.id), req.body);
+    getIO().emit("store-type:updated", storeType);
     res.status(200).json(
       new ApiResponse("Store Type updated successfully", storeType)
     );
@@ -49,6 +52,7 @@ findAll = asyncHandler(async (req: Request, res: Response) => {
 
   delete = asyncHandler(async (req: Request, res: Response) => {
     await storeTypeService.delete(Number(req.params.id));
+    getIO().emit("store-type:deleted", { id: req.params.id });
     res.status(200).json(
       new ApiResponse("Store Type deleted successfully")
     );

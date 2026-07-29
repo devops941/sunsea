@@ -2,11 +2,13 @@ import { Request, Response } from "express";
 import locationService from "./location.service";
 import { ApiResponse } from "../../utils/ApiResponse";
 import { asyncHandler } from "../../utils/asyncHandler";
+import { getIO } from "../../socket/socket";
 
 class LocationController {
   create = asyncHandler(async (req: Request, res: Response) => {
     const userId = req.user?.userId;
     const location = await locationService.create(req.body, userId);
+    getIO().emit("location:created", location);
 
     return res.status(201).json(
       new ApiResponse("Location created successfully", location)
@@ -52,6 +54,7 @@ class LocationController {
       req.body,
       userId
     );
+    getIO().emit("location:updated", location);
 
     return res.status(200).json(
       new ApiResponse("Location updated successfully", location)
@@ -60,6 +63,7 @@ class LocationController {
 
   delete = asyncHandler(async (req: Request, res: Response) => {
     await locationService.delete(String(req.params.locationId));
+    getIO().emit("location:deleted", { id: req.params.locationId });
 
     return res.status(200).json(
       new ApiResponse("Location deleted successfully")

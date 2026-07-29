@@ -2,11 +2,13 @@ import { Request, Response } from "express";
 import storeService from "./store.service";
 import { ApiResponse } from "../../utils/ApiResponse";
 import { asyncHandler } from "../../utils/asyncHandler";
+import { getIO } from "../../socket/socket";
 
 class StoreController {
   create = asyncHandler(async (req: Request, res: Response) => {
     const userId = req.user?.userId;
     const store = await storeService.create(req.body, userId);
+    getIO().emit("store:created", store);
 
     return res.status(201).json(
       new ApiResponse("Store created successfully", store)
@@ -50,6 +52,7 @@ class StoreController {
   update = asyncHandler(async (req: Request, res: Response) => {
     const userId = req.user?.userId;
     const store = await storeService.update(String(req.params.storeId), req.body, userId);
+    getIO().emit("store:updated", store);
 
     return res.status(200).json(
       new ApiResponse("Store updated successfully", store)
@@ -58,6 +61,7 @@ class StoreController {
 
   delete = asyncHandler(async (req: Request, res: Response) => {
     await storeService.delete(String(req.params.storeId));
+    getIO().emit("store:deleted", { id: req.params.storeId });
 
     return res.status(200).json(
       new ApiResponse("Store deleted successfully")

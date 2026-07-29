@@ -8,25 +8,39 @@ interface SocketActions<T> {
   deleted?: (payload: any) => any;
 }
 
-export const useSocketSync = <T,>(moduleName: string, actions: SocketActions<T>) => {
+export const useSocketSync = <T,>(
+  moduleName: string, 
+  actions?: SocketActions<T>,
+  onAnyEvent?: () => void
+) => {
   const dispatch = useAppDispatch();
   const { socket } = useSocket();
+
+  const actionsRef = React.useRef(actions);
+  const onAnyEventRef = React.useRef(onAnyEvent);
+
+  React.useEffect(() => {
+    actionsRef.current = actions;
+    onAnyEventRef.current = onAnyEvent;
+  }, [actions, onAnyEvent]);
 
   React.useEffect(() => {
     if (!socket) return;
 
     const handleCreated = (payload: T) => {
-      if (actions.created) dispatch(actions.created(payload));
+      if (actionsRef.current?.created) dispatch(actionsRef.current.created(payload));
+      if (onAnyEventRef.current) onAnyEventRef.current();
     };
 
     const handleUpdated = (payload: T) => {
-      if (actions.updated) dispatch(actions.updated(payload));
+      if (actionsRef.current?.updated) dispatch(actionsRef.current.updated(payload));
+      if (onAnyEventRef.current) onAnyEventRef.current();
     };
 
     const handleDeleted = (payload: any) => {
-      // payload might be { id: number } or just the id depending on the backend
       const id = payload?.id !== undefined ? payload.id : payload;
-      if (actions.deleted) dispatch(actions.deleted(id));
+      if (actionsRef.current?.deleted) dispatch(actionsRef.current.deleted(id));
+      if (onAnyEventRef.current) onAnyEventRef.current();
     };
 
     socket.on(`${moduleName}:created`, handleCreated);

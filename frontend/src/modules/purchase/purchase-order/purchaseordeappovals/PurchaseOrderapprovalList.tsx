@@ -17,6 +17,7 @@ import EditButton from "../../../../components/ui/EditButton/EditButton";
 import DataTable from "../../../../components/ui/table/DataTable";
 import SearchInput from "../../../../components/ui/SearchInput/SearchInput";
 import { useUsers } from "../../../../hooks/useUsers";
+import { useSocketSync } from "../../../../hooks/useSocketSync";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -61,6 +62,8 @@ const POMDApproval: React.FC = () => {
             setLoading(false);
         }
     }, [currentPage, searchTerm]);
+
+    useSocketSync("purchaseOrder", undefined, fetchOrders);
 
     useEffect(() => {
         fetchOrders();

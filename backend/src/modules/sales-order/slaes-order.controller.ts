@@ -3,6 +3,7 @@ import salesOrderService from "./sales-order.service";
 import creditCheckService from "./creditCheckService";
 import { ApiResponse } from "../../utils/ApiResponse";
 import { asyncHandler } from "../../utils/asyncHandler";
+import { getIO } from "../../socket/socket";
 import {
     SalesOrderQueryInput,
     MdApprovalDecisionInput,
@@ -17,6 +18,7 @@ class SalesOrderController {
 
     create = asyncHandler(async (req: Request, res: Response) => {
         const order = await salesOrderService.create(req.body);
+        getIO().emit("salesOrder:created", order);
         return res.status(201).json(
             new ApiResponse("Sales Order created successfully", order)
         );
@@ -67,6 +69,7 @@ class SalesOrderController {
     update = asyncHandler(async (req: Request, res: Response) => {
         const { id } = req.params;
         const order = await salesOrderService.update(Number(id), req.body);
+        getIO().emit("salesOrder:updated", order);
         return res.status(200).json(
             new ApiResponse("Sales Order updated successfully", order)
         );
@@ -75,6 +78,7 @@ class SalesOrderController {
     delete = asyncHandler(async (req: Request, res: Response) => {
         const { id } = req.params;
         await salesOrderService.delete(Number(id));
+        getIO().emit("salesOrder:deleted", { id: Number(id) });
         return res.status(200).json(
             new ApiResponse("Sales Order deleted successfully")
         );
@@ -94,6 +98,7 @@ class SalesOrderController {
         const { id } = req.params;
         const discountData: UpdateSalesOrderDiscountsInput = req.body;
         const order = await salesOrderService.updateDiscounts(Number(id), discountData);
+        getIO().emit("salesOrder:updated", order);
         return res.status(200).json(
             new ApiResponse("Sales Order discounts updated successfully", order)
         );
@@ -102,6 +107,7 @@ class SalesOrderController {
     submitForMdApproval = asyncHandler(async (req: Request, res: Response) => {
         const { id } = req.params;
         const order = await salesOrderService.submitForMdApproval(Number(id));
+        getIO().emit("salesOrder:updated", order);
         return res.status(200).json(
             new ApiResponse("Sales Order submitted for MD approval", order)
         );
@@ -110,6 +116,7 @@ class SalesOrderController {
     reopen = asyncHandler(async (req: Request, res: Response) => {
         const { id } = req.params;
         const order = await salesOrderService.reopen(Number(id));
+        getIO().emit("salesOrder:updated", order);
         return res.status(200).json(
             new ApiResponse("Sales Order reopened for editing", order)
         );
@@ -119,6 +126,7 @@ class SalesOrderController {
         const { id } = req.params;
         const approvalData: MdApprovalDecisionInput = req.body;
         const order = await salesOrderService.decideMdApproval(Number(id), approvalData);
+        getIO().emit("salesOrder:updated", order);
         return res.status(200).json(
             new ApiResponse("Sales Order MD approval recorded successfully", order)
         );
@@ -128,6 +136,7 @@ class SalesOrderController {
         const { id } = req.params;
         const approvalData: CustomerApprovalDecisionInput = req.body;
         const order = await salesOrderService.decideCustomerApproval(Number(id), approvalData);
+        getIO().emit("salesOrder:updated", order);
         return res.status(200).json(
             new ApiResponse("Sales Order customer approval recorded successfully", order)
         );

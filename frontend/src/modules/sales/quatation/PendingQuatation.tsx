@@ -10,6 +10,9 @@ import { salesOrderService, type SalesOrder, type SalesOrderStatus } from "../..
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import DataTable from "../../../components/ui/table/DataTable";
 import SearchInput from "../../../components/ui/SearchInput/SearchInput";
+import CustomButton from "../../../components/ui/Button/Button";
+import { useSocketSync } from "../../../hooks/useSocketSync";
+
 
 const ITEMS_PER_PAGE = 10;
 
@@ -51,6 +54,8 @@ const PendingQuotationList: React.FC = () => {
             setLoading(false);
         }
     }, [currentPage, searchTerm]);
+
+    useSocketSync("salesOrder", undefined, fetchOrders);
 
     useEffect(() => {
         const timer = setTimeout(() => {

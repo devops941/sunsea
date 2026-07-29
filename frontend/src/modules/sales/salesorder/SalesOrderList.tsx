@@ -11,12 +11,14 @@ import { salesOrderService } from "../../../services/salesOrderService";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import DataTable from "../../../components/ui/table/DataTable";
 import SearchInput from "../../../components/ui/SearchInput/SearchInput";
-import { FaPrint, FaEye, FaDownload, FaTimes } from "react-icons/fa";
+import { FaPrint, FaEye, FaDownload, FaTimes, FaPen, FaTrash, FaPlus, FaCheck, FaFileInvoice } from "react-icons/fa";
 import { FiClipboard } from "react-icons/fi";
 import CustomButton from "../../../components/ui/Button/Button";
 import { DocumentPrintLayout } from "../../../components/common/DocumentPrintLayout";
 import { SalesOrderEstimateContent } from "../../../components/salesOrder/SalesOrderEstimateContent";
 import { ReceiptText } from "lucide-react";
+import { useSocketSync } from "../../../hooks/useSocketSync";
+
 
 const ITEMS_PER_PAGE = 10;
 
@@ -139,6 +141,8 @@ const SalesOrderList: React.FC = () => {
             setLoading(false);
         }
     }, [currentPage, searchTerm]);
+
+    useSocketSync("salesOrder", undefined, fetchOrders);
 
     // ─── Load Data on Mount & Dependencies ─────────────────────
     useEffect(() => {
