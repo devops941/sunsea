@@ -50,7 +50,7 @@ const SalesInvoiceList: React.FC = () => {
             });
 
             setData(response.data || []);
-            setTotal(response.total || 0);
+            setTotal(response.total ?? 0)
         } catch (error: any) {
             console.error("❌ Fetch error:", error);
             toast.error(error?.response?.data?.message || "Failed to fetch invoices");

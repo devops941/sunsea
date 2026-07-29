@@ -133,7 +133,7 @@ const SalesReportsCenter: React.FC = () => {
   const handleDateRangeChange = (val: string) => {
     setDateRangePreset(val);
     if (val === "custom") return;
-    
+
     const today = new Date();
     let start = new Date();
     let end = new Date();
@@ -255,6 +255,7 @@ const SalesReportsCenter: React.FC = () => {
                 options={customers.map(c => ({ label: c.displayName || c.firmName, value: c.id }))}
                 defaultOptionLabel="All Customers"
                 hideLabel={true}
+                searchable
                 onChange={(e) => setDraftCustomerId(e.target.value)}
               />
             </div>

@@ -51,23 +51,30 @@ class FinishedGoodsStockService {
     });
   }
 
-  async findAll(query?: { storeId?: string; search?: string }) {
+  async findAll(query?: { page?: number; limit?: number; storeId?: string; search?: string }) {
+    const page = query?.page;
+    const limit = query?.limit;
+    const storeId = query?.storeId;
+    const search = query?.search;
+
     const whereClause: any = {};
 
-    if (query?.storeId) {
-      whereClause.storeId = query.storeId;
+    if (storeId) {
+      whereClause.storeId = storeId;
     }
 
-    if (query?.search) {
+    if (search) {
       whereClause.product = {
         OR: [
-          { productName: { contains: query.search, mode: 'insensitive' } },
-          { productCode: { contains: query.search, mode: 'insensitive' } },
+          { productName: { contains: search, mode: 'insensitive' } },
+          { productCode: { contains: search, mode: 'insensitive' } },
         ],
       };
     }
 
-    return prisma.finishedGoodsStock.findMany({
+    const total = await prisma.finishedGoodsStock.count({ where: whereClause });
+
+    const findOptions: any = {
       where: whereClause,
       include: {
         store: true,
@@ -81,7 +88,23 @@ class FinishedGoodsStockService {
       orderBy: {
         updatedAt: "desc",
       },
-    });
+    };
+
+    if (page !== undefined && limit !== undefined) {
+      findOptions.skip = (page - 1) * limit;
+      findOptions.take = limit;
+    }
+
+    const data = await prisma.finishedGoodsStock.findMany(findOptions);
+
+    if (page !== undefined && limit !== undefined) {
+      return {
+        data,
+        total,
+      };
+    }
+
+    return data;
   }
 
   async findById(storeId: string, productItemId: bigint) {

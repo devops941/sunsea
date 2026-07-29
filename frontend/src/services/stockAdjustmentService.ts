@@ -5,7 +5,7 @@ const BASE_URL = "/stock-adjustments";
 export const stockAdjustmentService = {
   fetchAll: async (params?: any) => {
     const response = await apiClient.get(BASE_URL, { params });
-    return response.data.data;
+    return response.data;
   },
   
   fetchById: async (id: string | number) => {

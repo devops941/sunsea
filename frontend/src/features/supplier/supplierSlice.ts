@@ -5,7 +5,8 @@ import type { Supplier, SupplierState, CreateSupplierDto, UpdateSupplierDto } fr
 
 export const fetchSuppliers = createAsyncThunk("suppliers/fetchAll", async (search: string | undefined, { rejectWithValue }) => {
   try {
-    return await supplierService.fetchAll(search);
+    const res = await supplierService.fetchAll(search);
+    return res.suppliers || res;
   } catch (error: any) {
     return rejectWithValue(error.response?.data?.message || "Failed to fetch suppliers");
   }

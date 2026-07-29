@@ -5,16 +5,24 @@ export const useExpenses = () => {
   const [expenses, setExpenses] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [total, setTotal] = useState(0);
 
-  const loadExpenses = useCallback(async (search?: string) => {
+  const loadExpenses = useCallback(async (params?: any) => {
     setLoading(true);
     setError(null);
     try {
       const response = await apiClient.get("/expenses", {
-        params: { search },
+        params: typeof params === "string" ? { search: params } : params,
       });
       if (response.data && response.data.success) {
-        setExpenses(response.data.data || []);
+        const resData = response.data.data;
+        if (resData && typeof resData === "object" && "data" in resData) {
+          setExpenses(resData.data || []);
+          setTotal(resData.total || 0);
+        } else {
+          setExpenses(resData || []);
+          setTotal(Array.isArray(resData) ? resData.length : 0);
+        }
       }
     } catch (err: any) {
       setError(err.response?.data?.message || "Failed to load expenses");
@@ -78,6 +86,7 @@ export const useExpenses = () => {
     expenses,
     loading,
     error,
+    total,
     loadExpenses,
     addExpense,
     editExpense,

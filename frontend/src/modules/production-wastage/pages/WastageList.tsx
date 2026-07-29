@@ -17,18 +17,18 @@ import FilterCard from "../../../components/ui/FilterCard/FilterCard";
 import WastageViewModal from "../components/WastageViewModal";
 import DataTable from "../../../components/ui/table/DataTable";
 import { FaPlus } from "react-icons/fa";
+const ITEMS_PER_PAGE = 10;
+
 const WastageList: React.FC = () => {
 
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
 
   // Redux state
-  const { data: wastages, loading, error } = useAppSelector((state) => state.productionWastages);
+  const { data: wastages, loading, error, total } = useAppSelector((state) => state.productionWastages);
   const { data: machines } = useAppSelector((state) => state.machines);
   const { products } = useAppSelector((state: any) => state.products || { products: [] });
   const { data: shifts } = useAppSelector((state) => state.shifts);
-
-  // Filters state removed as per user request
 
   // Modals state
   const [showViewModal, setShowViewModal] = useState(false);
@@ -37,10 +37,16 @@ const WastageList: React.FC = () => {
   const [itemToDelete, setItemToDelete] = useState<string | null>(null);
 
   // Pagination state
-  const [visibleCount, setVisibleCount] = useState(10);
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
-    dispatch(fetchProductionWastages(undefined));
+    dispatch(fetchProductionWastages({
+      page: currentPage,
+      limit: ITEMS_PER_PAGE,
+    }));
+  }, [dispatch, currentPage]);
+
+  useEffect(() => {
     dispatch(fetchMachines());
     dispatch(fetchProducts(undefined));
     dispatch(fetchShifts());
@@ -62,6 +68,10 @@ const WastageList: React.FC = () => {
       try {
         await dispatch(deleteProductionWastage(itemToDelete)).unwrap();
         toast.success("Production wastage log deleted successfully");
+        dispatch(fetchProductionWastages({
+          page: currentPage,
+          limit: ITEMS_PER_PAGE,
+        }));
       } catch (err: any) {
         toast.error(err || "Failed to delete log");
       } finally {
@@ -78,6 +88,10 @@ const WastageList: React.FC = () => {
       if (selectedWastage && String(selectedWastage.id) === String(id)) {
         setShowViewModal(false);
       }
+      dispatch(fetchProductionWastages({
+        page: currentPage,
+        limit: ITEMS_PER_PAGE,
+      }));
     } catch (err: any) {
       toast.error(err || "Failed to approve log");
     }
@@ -90,6 +104,10 @@ const WastageList: React.FC = () => {
       if (selectedWastage && String(selectedWastage.id) === String(id)) {
         setShowViewModal(false);
       }
+      dispatch(fetchProductionWastages({
+        page: currentPage,
+        limit: ITEMS_PER_PAGE,
+      }));
     } catch (err: any) {
       toast.error(err || "Failed to reject log");
     }
@@ -100,8 +118,8 @@ const WastageList: React.FC = () => {
     setShowViewModal(true);
   };
 
-  // Data directly from state without filters
-  const displayWastages = Array.isArray(wastages) ? (wastages as any) : ((wastages as any)?.data && Array.isArray((wastages as any).data) ? (wastages as any).data : []);
+  const totalPages = Math.ceil((total || 0) / ITEMS_PER_PAGE) || 1;
+  const displayWastages = wastages || [];
 
   return (
     <div className="p-4 md:p-1 min-h-screen">
@@ -122,9 +140,14 @@ const WastageList: React.FC = () => {
 
         {/* Table */}
         <DataTable
-          data={displayWastages.slice(0, visibleCount)}
+          data={displayWastages}
           rowKey={(item) => String(item.id)}
           loading={loading}
+          pagination={{
+            currentPage,
+            totalPages,
+            onPageChange: (page) => setCurrentPage(page),
+          }}
           columns={[
             {
               header: "DATE",
@@ -181,15 +204,6 @@ const WastageList: React.FC = () => {
           ]}
           emptyMessage="No wastage logs found"
         />
-        {!loading && displayWastages.length > visibleCount && (
-          <div className="flex justify-center p-4 border-t border-slate-100 bg-slate-50/50">
-            <CustomButton
-              text="Load More"
-              onClick={() => setVisibleCount((prev) => prev + 10)}
-              variant="secondary"
-            />
-          </div>
-        )}
       </div>
 
       {/* Delete Confirmation Modal */}

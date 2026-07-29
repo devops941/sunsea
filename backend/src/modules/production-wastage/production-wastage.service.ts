@@ -146,12 +146,17 @@ class ProductionWastageService {
   }
 
   async findAll(filters?: {
+    page?: number;
+    limit?: number;
     productionOrderId?: string;
     machineId?: string;
     shiftId?: string;
     productId?: string;
     status?: string;
   }) {
+    const page = filters?.page;
+    const limit = filters?.limit;
+
     const where: any = {};
     if (filters?.productionOrderId) where.productionOrderId = filters.productionOrderId;
     if (filters?.machineId) where.machineId = filters.machineId;
@@ -159,7 +164,9 @@ class ProductionWastageService {
     if (filters?.productId) where.productId = BigInt(filters.productId);
     if (filters?.status) where.status = filters.status;
 
-    return prisma.productionWastage.findMany({
+    const total = await prisma.productionWastage.count({ where });
+
+    const findOptions: any = {
       where,
       include: {
         productionOrder: {
@@ -175,7 +182,23 @@ class ProductionWastageService {
       orderBy: {
         createdAt: "desc"
       }
-    });
+    };
+
+    if (page !== undefined && limit !== undefined) {
+      findOptions.skip = (page - 1) * limit;
+      findOptions.take = limit;
+    }
+
+    const data = await prisma.productionWastage.findMany(findOptions);
+
+    if (page !== undefined && limit !== undefined) {
+      return {
+        data,
+        total,
+      };
+    }
+
+    return data;
   }
 
   async findById(id: bigint) {

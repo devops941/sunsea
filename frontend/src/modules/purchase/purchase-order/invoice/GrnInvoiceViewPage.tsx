@@ -14,12 +14,32 @@ import CommonLoader from "../../../../components/ui/Loader/CommonLoader";
 // ─── Formatting helpers ─────────────────────────────────────────────────
 const formatMoney = (val: string | number | null | undefined) => {
     const n = Number(val ?? 0);
-    return `₹${n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    return n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 };
 
 const formatDate = (val: string | null | undefined) => {
     if (!val) return "—";
-    return new Date(val).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+    return new Date(val).toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" });
+};
+
+// Basic number-to-words for Indian Rupees (integer part only)
+const numberToWords = (num: number): string => {
+    const a = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten",
+        "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
+    const b = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
+
+    const inWords = (n: number): string => {
+        if (n < 20) return a[n];
+        if (n < 100) return b[Math.floor(n / 10)] + (n % 10 ? " " + a[n % 10] : "");
+        if (n < 1000) return a[Math.floor(n / 100)] + " Hundred" + (n % 100 ? " " + inWords(n % 100) : "");
+        if (n < 100000) return inWords(Math.floor(n / 1000)) + " Thousand" + (n % 1000 ? " " + inWords(n % 1000) : "");
+        if (n < 10000000) return inWords(Math.floor(n / 100000)) + " Lakh" + (n % 100000 ? " " + inWords(n % 100000) : "");
+        return inWords(Math.floor(n / 10000000)) + " Crore" + (n % 10000000 ? " " + inWords(n % 10000000) : "");
+    };
+
+    const rounded = Math.round(num);
+    if (rounded === 0) return "Zero Only";
+    return inWords(rounded) + " Only";
 };
 
 const GrnInvoiceViewPage: React.FC = () => {
@@ -123,10 +143,116 @@ const GrnInvoiceViewPage: React.FC = () => {
         });
     }, [invoicesList, searchTerm]);
 
+    // Tax calculations per item (CGST/SGST or IGST)
+    const isInterState = useMemo(() => {
+        if (!selectedItem) return false;
+        return (selectedItem.items || []).some((item: any) => Number(item.igstAmount) > 0);
+    }, [selectedItem]);
+
+    const itemsWithTax = useMemo(() => {
+        if (!selectedItem?.items) return [];
+        return selectedItem.items.map((item: any) => {
+            const qty = Number(item.quantity ?? item.qty ?? 0);
+            const rate = Number(item.unitPrice ?? item.rate ?? 0);
+            const amount = Number(item.taxableAmount ?? qty * rate);
+            const taxPercent = Number(item.tax ?? 0);
+
+            const cgstRate = Number(item.cgstRate ?? (isInterState ? 0 : taxPercent / 2));
+            const sgstRate = Number(item.sgstRate ?? (isInterState ? 0 : taxPercent / 2));
+            const igstRate = Number(item.igstRate ?? (isInterState ? taxPercent : 0));
+
+            const cgstAmount = Number(item.cgstAmount ?? (amount * cgstRate) / 100);
+            const sgstAmount = Number(item.sgstAmount ?? (amount * sgstRate) / 100);
+            const igstAmount = Number(item.igstAmount ?? (amount * igstRate) / 100);
+
+            const totalAmount = amount + cgstAmount + sgstAmount + igstAmount;
+
+            return {
+                ...item,
+                qty,
+                rate,
+                amount,
+                hsnCode: item.rawMaterial?.hsnCode || "-",
+                unit: item.uom || "Pcs.",
+                cgstRate,
+                sgstRate,
+                igstRate,
+                cgstAmount,
+                sgstAmount,
+                igstAmount,
+                totalAmount,
+            };
+        });
+    }, [selectedItem, isInterState]);
+
+    const totalCgst = useMemo(() => itemsWithTax.reduce((s: number, i: any) => s + i.cgstAmount, 0), [itemsWithTax]);
+    const totalSgst = useMemo(() => itemsWithTax.reduce((s: number, i: any) => s + i.sgstAmount, 0), [itemsWithTax]);
+    const totalIgst = useMemo(() => itemsWithTax.reduce((s: number, i: any) => s + i.igstAmount, 0), [itemsWithTax]);
+    const totalTaxable = useMemo(() => itemsWithTax.reduce((s: number, i: any) => s + i.amount, 0), [itemsWithTax]);
+    const grandTotal = Number(selectedItem?.netAmount ?? (totalTaxable + totalCgst + totalSgst + totalIgst));
+
+    // Tax summary grouped by rate
+    const taxSummary = useMemo(() => {
+        const map = new Map<number, { taxRate: number; taxableAmt: number; cgstAmt: number; sgstAmt: number; igstAmt: number; totalTax: number }>();
+        itemsWithTax.forEach((item: any) => {
+            const rate = item.cgstRate + item.sgstRate + item.igstRate;
+            const existing = map.get(rate) || { taxRate: rate, taxableAmt: 0, cgstAmt: 0, sgstAmt: 0, igstAmt: 0, totalTax: 0 };
+            existing.taxableAmt += item.amount;
+            existing.cgstAmt += item.cgstAmount;
+            existing.sgstAmt += item.sgstAmount;
+            existing.igstAmt += item.igstAmount;
+            existing.totalTax += item.cgstAmount + item.sgstAmount + item.igstAmount;
+            map.set(rate, existing);
+        });
+        return Array.from(map.values());
+    }, [itemsWithTax]);
+
+    const amountInWords = useMemo(() => numberToWords(grandTotal), [grandTotal]);
+
+    const handleDownloadPdf = async () => {
+        try {
+            const html2canvas = (await import("html2canvas-pro")).default;
+            const { jsPDF } = await import("jspdf");
+
+            const element = document.getElementById("printable-grn-invoice-card");
+            if (!element) return;
+
+            const canvas = await html2canvas(element, { scale: 2, useCORS: true });
+            const imgData = canvas.toDataURL("image/png");
+
+            const pdf = new jsPDF("p", "mm", "a4");
+            const margin = 10;
+            const pageWidth = pdf.internal.pageSize.getWidth();
+            const pageHeight = pdf.internal.pageSize.getHeight();
+
+            const imgWidth = pageWidth - 2 * margin;
+            const imgHeight = (canvas.height * imgWidth) / canvas.width;
+            const availableHeight = pageHeight - 2 * margin;
+
+            let heightLeft = imgHeight;
+            let position = margin;
+
+            pdf.addImage(imgData, "PNG", margin, position, imgWidth, imgHeight);
+            heightLeft -= availableHeight;
+
+            while (heightLeft > 0) {
+                position -= availableHeight;
+                pdf.addPage();
+                pdf.addImage(imgData, "PNG", margin, position, imgWidth, imgHeight);
+                heightLeft -= availableHeight;
+            }
+
+            pdf.save(`GRN-Invoice-${selectedItem?.invoiceNo || selectedItem?.grnNumber || "invoice"}.pdf`);
+        } catch (err) {
+            console.error(err);
+            toast.error("Failed to generate PDF");
+        }
+    };
+
     return (
-        <div className="flex bg-gray-100 overflow-hidden h-[calc(100vh-115px)]">
+        <div className="flex bg-gray-100 overflow-hidden h-[calc(100vh-115px)] print:block print:h-auto print:overflow-visible print:bg-white">
             {/* ── Left Sidebar ── */}
-            <div className="hidden md:flex w-72 md:w-80 flex-shrink-0 bg-white border-r border-gray-200 flex-col h-full">
+            <div className="hidden md:flex w-72 md:w-80 flex-shrink-0 bg-white border-r border-gray-200 flex-col h-full no-print">
                 {/* Header */}
                 <div className="p-4 border-b border-gray-200 flex flex-col gap-3">
                     <button
@@ -169,7 +295,7 @@ const GrnInvoiceViewPage: React.FC = () => {
                                 </div>
                                 <div className="flex justify-between items-center text-xs text-gray-400">
                                     <span>{formatDate(inv.grnDate)}</span>
-                                    <span className="font-bold text-gray-900">{formatMoney(inv.netAmount)}</span>
+                                    <span className="font-bold text-gray-900">₹{formatMoney(inv.netAmount)}</span>
                                 </div>
                             </div>
                         );
@@ -183,7 +309,7 @@ const GrnInvoiceViewPage: React.FC = () => {
             </div>
 
             {/* ── Right Content Panel ── */}
-            <div className="flex-1 overflow-y-auto p-6 lg:p-8">
+            <div className="flex-1 overflow-y-auto p-6 lg:p-8 print:overflow-visible print:h-auto print:p-0 print:block">
                 {loadingDetail ? (
                     <CommonLoader text="Loading invoice details..." fullScreen={false} />
                 ) : !selectedItem ? (
@@ -193,7 +319,7 @@ const GrnInvoiceViewPage: React.FC = () => {
                 ) : (
                     <div className="max-w-5xl mx-auto">
                         {/* Action buttons */}
-                        <div className="flex items-center justify-between gap-4 mb-6">
+                        <div className="flex items-center justify-between gap-4 mb-6 no-print">
                             <div className="flex items-center gap-2">
                                 <button
                                     onClick={() => navigate("/invoice")}
@@ -207,8 +333,7 @@ const GrnInvoiceViewPage: React.FC = () => {
                             </div>
                             <div className="flex items-center gap-3">
                                 <CustomButton text="Print" icon={FaPrint} variant="primary" onClick={() => window.print()} />
-                                <CustomButton text="View PDF" icon={FaEye} variant="secondary" onClick={() => window.print()} />
-                                <CustomButton text="Download PDF" icon={FaDownload} variant="primary" onClick={() => window.print()} />
+                                <CustomButton text="Download PDF" icon={FaDownload} variant="secondary" onClick={handleDownloadPdf} />
                             </div>
                         </div>
 
@@ -226,239 +351,276 @@ const GrnInvoiceViewPage: React.FC = () => {
                                     left: 0;
                                     top: 0;
                                     width: 100%;
-                                    background-color: #F4EFE6 !important;
-                                    -webkit-print-color-adjust: exact;
-                                    print-color-adjust: exact;
+                                    background: #fff !important;
                                     box-shadow: none !important;
-                                    border-radius: 0 !important;
                                     margin: 0 !important;
-                                    padding: 2rem !important;
+                                }
+                                .no-print {
+                                    display: none !important;
+                                }
+                                html, body {
+                                    height: auto;
+                                    overflow: visible !important;
                                 }
                             }
                         `}</style>
 
-                        {/* Printable Invoice Card */}
-                        <div id="printable-grn-invoice-card" className="bg-[#F4EFE6] shadow-lg border-t-4 border-primary rounded-b-lg overflow-hidden text-slate-800">
-                            <div className="p-8 sm:p-12">
-                                {/* Top Section */}
-                                <div className="flex flex-col md:flex-row justify-between items-start mb-12 gap-8">
-                                    <div>
-                                        {company?.logoUrl ? (
-                                            <img
-                                                src={company.logoUrl}
-                                                alt={company.legalName || "Logo"}
-                                                className="max-h-16 object-contain mb-1"
-                                            />
-                                        ) : (
-                                            <div className="text-3xl font-black text-primary tracking-tighter mb-1">
-                                                {company?.legalName || company?.companyName || "SUNSEA"}
-                                            </div>
-                                        )}
+                        {/* GST Tax Invoice Card */}
+                        <div
+                            id="printable-grn-invoice-card"
+                            className="font-[Arial,sans-serif] text-black bg-white border-[1.5px] border-black w-full box-border text-[14px] shadow-lg font-medium"
+                        >
+                            {/* Top bar */}
+                            <div className="flex justify-between items-center px-3 pt-2 text-[13px] font-semibold">
+                                <div>GSTIN : {company?.gstin || "-"}</div>
+                                <div className="italic">Triplicate Copy</div>
+                            </div>
+
+                            {/* Header */}
+                            <div className="text-center border-b-[1.5px] border-black px-3 pb-2">
+                                <div className="text-sm uppercase font-bold tracking-[2px]">GRN Invoice</div>
+                                <h1 className="text-2xl font-extrabold m-0 tracking-[1px] mt-1">
+                                    {company?.legalName || company?.companyName || "Company Name"}
+                                </h1>
+                                <div className="text-[13px] mt-1">
+                                    {company?.addressLine1}
+                                    {company?.city && `, ${company.city}`}
+                                    {company?.state && `, ${company.state}`}
+                                    {company?.pincode && ` - ${company.pincode}`}
+                                </div>
+                            </div>
+
+                            {/* Invoice meta block */}
+                            <div className="flex border-b-[1.5px] border-black">
+                                <div className="flex-1 border-r-[1.5px] border-black p-2 space-y-1">
+                                    <MetaRow label="GRN No." value={selectedItem.grnNumber} />
+                                    <MetaRow label="Dated" value={formatDate(selectedItem.grnDate)} />
+                                    <MetaRow label="Place of Supply" value={selectedItem.billingState || "-"} />
+                                    <MetaRow label="Due Date" value={formatDate(selectedItem.billDueDate)} />
+                                    <MetaRow label="Reverse Charge" value="N" />
+                                    <MetaRow label="Challan No." value={selectedItem.challanNo || "—"} />
+                                </div>
+                                <div className="flex-1 p-2 space-y-1">
+                                    <MetaRow label="Transport" value={selectedItem.transport || "—"} />
+                                    <MetaRow label="Vehicle No" value="—" />
+                                    <MetaRow label="Station" value="—" />
+                                    <MetaRow label="E-way Bill no" value={selectedItem.eWayBill || "—"} />
+                                    <MetaRow label="Invoice No." value={selectedItem.invoiceNo || "—"} />
+                                    {selectedItem.purchaseOrder?.poNumber && (
+                                        <MetaRow label="Ref. PO No." value={selectedItem.purchaseOrder.poNumber} />
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Billed From / Shipped To */}
+                            <div className="flex border-b-[1.5px] border-black">
+                                <div className="flex-1 border-r-[1.5px] border-black p-2">
+                                    <div className="font-bold mb-1">Billed from (Supplier) :</div>
+                                    <div className="font-semibold">
+                                        {selectedItem.supplier?.displayName || selectedItem.supplier?.legalName || "N/A"}
                                     </div>
-
-                                    <div className="md:text-right flex flex-col md:items-end">
-                                        <h1 className="text-3xl font-bold text-gray-900 uppercase mb-6">
-                                            GRN INVOICE
-                                        </h1>
-
-                                        <div className="grid grid-cols-2 gap-x-8 gap-y-3 text-sm text-gray-700 text-left">
-                                            <div className="font-semibold text-gray-600">GRN Number</div>
-                                            <div className="font-bold text-gray-900 text-right">{selectedItem.grnNumber}</div>
-
-                                            <div className="font-semibold text-gray-600">Invoice Number</div>
-                                            <div className="font-bold text-gray-900 text-right">{selectedItem.invoiceNo || "N/A"}</div>
-
-                                            <div className="font-semibold text-gray-600">GRN Date</div>
-                                            <div className="font-bold text-gray-900 text-right">{formatDate(selectedItem.grnDate)}</div>
-
-                                            {selectedItem.billDueDate && (
-                                                <>
-                                                    <div className="font-semibold text-gray-600">Due Date</div>
-                                                    <div className="font-bold text-gray-900 text-right">{formatDate(selectedItem.billDueDate)}</div>
-                                                </>
-                                            )}
-                                        </div>
-
-                                        <div className="w-full h-px bg-gray-300 mt-4 mb-1"></div>
+                                    <div className="font-semibold">
+                                        {selectedItem.billingAddressLine1}<br />
+                                        {selectedItem.billingCity}, {selectedItem.billingState} - {selectedItem.billingPincode}
+                                    </div>
+                                    {selectedItem.supplier?.gstin && (
+                                        <div className="mt-1">GSTIN / UIN : {selectedItem.supplier.gstin}</div>
+                                    )}
+                                    {selectedItem.supplier?.phone && (
+                                        <div className="mt-1 font-semibold">Phone: {selectedItem.supplier.phone}</div>
+                                    )}
+                                </div>
+                                <div className="flex-1 p-2">
+                                    <div className="font-bold mb-1">Shipped to (Store) :</div>
+                                    <div className="font-semibold">
+                                        {selectedItem.store?.storeName || "N/A"}
+                                    </div>
+                                    <div className="font-semibold">
+                                        {selectedItem.shippingAddressLine1 || selectedItem.billingAddressLine1}<br />
+                                        {selectedItem.shippingCity || selectedItem.billingCity}, {selectedItem.shippingState || selectedItem.billingState} - {selectedItem.shippingPincode || selectedItem.billingPincode}
                                     </div>
                                 </div>
+                            </div>
 
-                                {/* Address Section */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-12 mb-12">
-                                    <div>
-                                        <div className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">
-                                            BILL FROM (SUPPLIER)
-                                        </div>
-                                        <div className="text-lg font-bold text-gray-900 mb-2">
-                                            {selectedItem.supplier?.displayName || selectedItem.supplier?.legalName || "N/A"}
-                                        </div>
-                                        <div className="text-sm text-gray-700 leading-relaxed">
-                                            {selectedItem.billingAddressLine1} <br />
-                                            {(selectedItem.billingCity || selectedItem.billingState) && (
-                                                <>
-                                                    {selectedItem.billingCity}, {selectedItem.billingState} — {selectedItem.billingPincode}{selectedItem.billingCountry ? `, ${selectedItem.billingCountry}` : ""} <br />
-                                                </>
-                                            )}
-                                            {selectedItem.supplier?.phone && `Phone: ${selectedItem.supplier.phone}`}
-                                        </div>
-                                    </div>
-
-                                    <div>
-                                        <div className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">
-                                            SHIP TO (STORE)
-                                        </div>
-                                        <div className="text-lg font-bold text-gray-900 mb-2">
-                                            {selectedItem.store?.storeName || "N/A"}
-                                        </div>
-                                        <div className="text-sm text-gray-700 leading-relaxed">
-                                            {selectedItem.shippingAddressLine1 || "Same as Billing Address"} <br />
-                                            {(selectedItem.shippingCity || selectedItem.shippingState) && (
-                                                <>
-                                                    {selectedItem.shippingCity}, {selectedItem.shippingState} — {selectedItem.shippingPincode}{selectedItem.shippingCountry ? `, ${selectedItem.shippingCountry}` : ""}
-                                                </>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Table Section */}
-                                <div className="mb-10 overflow-x-auto">
-                                    <table className="w-full text-left border-collapse min-w-[650px]">
-                                        <thead>
-                                            <tr className="border-b-2 border-gray-800 text-xs font-bold text-gray-900 uppercase tracking-wider">
-                                                <th className="py-3 px-2 w-12 text-center">#</th>
-                                                <th className="py-3 px-2">MATERIAL DESCRIPTION</th>
-                                                <th className="py-3 px-2 w-24 text-right">QTY</th>
-                                                <th className="py-3 px-2 w-24 text-center">UOM</th>
-                                                <th className="py-3 px-2 w-32 text-right">RATE</th>
-                                                <th className="py-3 px-2 w-24 text-right">TAX</th>
-                                                <th className="py-3 px-2 w-32 text-right">AMOUNT</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="text-sm text-gray-800">
-                                            {selectedItem.items?.map((item: any, idx: number) => (
-                                                <tr key={item.id || idx} className="border-b border-gray-300">
-                                                    <td className="py-4 px-2 text-center font-medium text-gray-600">{idx + 1}</td>
-                                                    <td className="py-4 px-2">
-                                                        <div className="font-bold text-gray-900">
-                                                            {item.rawMaterial?.materialName || item.description || "N/A"}
-                                                        </div>
-                                                        {item.productId && (
-                                                            <div className="text-xs text-gray-500 mt-0.5">
-                                                                SKU: {item.productId}
-                                                            </div>
-                                                        )}
-                                                    </td>
-                                                    <td className="py-4 px-2 text-right font-semibold">{item.quantity}</td>
-                                                    <td className="py-4 px-2 text-center font-medium text-gray-600">{item.uom || "—"}</td>
-                                                    <td className="py-4 px-2 text-right">{formatMoney(item.unitPrice)}</td>
-                                                    <td className="py-4 px-2 text-right font-medium">
-                                                        {item.tax ? `${item.tax}%` : "0%"}
-                                                    </td>
-                                                    <td className="py-4 px-2 text-right font-bold text-gray-900">{formatMoney(item.lineTotal || item.taxableAmount)}</td>
-                                                </tr>
-                                            ))}
-                                            {(!selectedItem.items || selectedItem.items.length === 0) && (
-                                                <tr>
-                                                    <td colSpan={7} className="py-8 text-center text-gray-500 text-sm">
-                                                        No items found for this invoice.
-                                                    </td>
-                                                </tr>
-                                            )}
-                                        </tbody>
-                                    </table>
-                                </div>
-
-                                {/* Totals Section */}
-                                <div className="flex flex-col items-end mb-8">
-                                    <div className="w-full md:w-1/2 lg:w-1/3 space-y-3">
-                                        <div className="flex justify-between text-sm font-semibold text-gray-700 px-2">
-                                            <span>Subtotal</span>
-                                            <span>{formatMoney(selectedItem.subtotal)}</span>
-                                        </div>
-
-                                        {Number(selectedItem.totalDiscount) !== 0 && (
-                                            <div className="flex justify-between text-sm font-semibold text-gray-700 px-2">
-                                                <span>Discount</span>
-                                                <span>− {formatMoney(selectedItem.totalDiscount)}</span>
-                                            </div>
-                                        )}
-
-                                        {selectedItem.totalIgst > 0 ? (
-                                            <div className="flex justify-between text-sm font-semibold text-gray-700 px-2">
-                                                <span>Total IGST</span>
-                                                <span className="text-green-600">+ {formatMoney(selectedItem.totalIgst)}</span>
-                                            </div>
+                            {/* Items Table */}
+                            <table className="w-full border-collapse text-[13px]">
+                                <thead>
+                                    <tr>
+                                        <Th w="35px">S.N.</Th>
+                                        <Th>Description of Goods</Th>
+                                        <Th w="60px">HSN/SAC</Th>
+                                        <Th w="55px" align="right">Qty.</Th>
+                                        <Th w="45px">Unit</Th>
+                                        <Th w="60px" align="right">Price</Th>
+                                        {isInterState ? (
+                                            <>
+                                                <Th w="50px">IGST Rate</Th>
+                                                <Th w="65px" align="right">IGST Amt</Th>
+                                            </>
                                         ) : (
                                             <>
-                                                <div className="flex justify-between text-sm font-semibold text-gray-700 px-2">
-                                                    <span>Total CGST</span>
-                                                    <span className="text-blue-600">+ {formatMoney(selectedItem.totalCgst)}</span>
-                                                </div>
-                                                <div className="flex justify-between text-sm font-semibold text-gray-700 px-2">
-                                                    <span>Total SGST</span>
-                                                    <span className="text-purple-600">+ {formatMoney(selectedItem.totalSgst)}</span>
-                                                </div>
+                                                <Th w="50px">CGST Rate</Th>
+                                                <Th w="65px" align="right">CGST Amt</Th>
+                                                <Th w="50px">SGST Rate</Th>
+                                                <Th w="65px" align="right">SGST Amt</Th>
                                             </>
                                         )}
+                                        <Th w="70px" align="right">Amount(Rs.)</Th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {itemsWithTax.map((item: any, idx: number) => (
+                                        <tr key={item.id || idx}>
+                                            <Td align="center">{idx + 1}.</Td>
+                                            <Td>{item.rawMaterial?.materialName || item.description || "N/A"}</Td>
+                                            <Td align="center">{item.hsnCode}</Td>
+                                            <Td align="right">{item.qty}</Td>
+                                            <Td align="center">{item.unit}</Td>
+                                            <Td align="right">{formatMoney(item.rate)}</Td>
+                                            {isInterState ? (
+                                                <>
+                                                    <Td align="center">{item.igstRate}%</Td>
+                                                    <Td align="right">{formatMoney(item.igstAmount)}</Td>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Td align="center">{item.cgstRate}%</Td>
+                                                    <Td align="right">{formatMoney(item.cgstAmount)}</Td>
+                                                    <Td align="center">{item.sgstRate}%</Td>
+                                                    <Td align="right">{formatMoney(item.sgstAmount)}</Td>
+                                                </>
+                                            )}
+                                            <Td align="right">{formatMoney(item.amount)}</Td>
+                                        </tr>
+                                    ))}
+                                    {(!selectedItem.items || selectedItem.items.length === 0) && (
+                                        <tr>
+                                            <td colSpan={isInterState ? 8 : 9} className="border border-black px-2 py-4 text-center text-slate-500">
+                                                No items found for this invoice.
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                                <tfoot>
+                                    <tr>
+                                        <td colSpan={isInterState ? 7 : 10} className="border border-black px-2 py-1 text-right font-bold">
+                                            Grand Total
+                                        </td>
+                                        <td className="border border-black px-2 py-1 text-right font-bold font-mono">
+                                            ₹{formatMoney(grandTotal)}
+                                        </td>
+                                    </tr>
+                                </tfoot>
+                            </table>
 
-                                        <div className="border-t-2 border-gray-800 my-2"></div>
+                            {/* Tax Summary */}
+                            {taxSummary.length > 0 && (
+                                <table className="w-full border-collapse text-[13px] mt-2">
+                                    <thead>
+                                        <tr>
+                                            <Th w="60px">Tax Rate</Th>
+                                            <Th align="right">Taxable Amt.</Th>
+                                            {isInterState ? (
+                                                <Th align="right">IGST Amt.</Th>
+                                            ) : (
+                                                <>
+                                                    <Th align="right">CGST Amt.</Th>
+                                                    <Th align="right">SGST Amt.</Th>
+                                                </>
+                                            )}
+                                            <Th align="right">Total Tax</Th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {taxSummary.map((row, i) => (
+                                            <tr key={i}>
+                                                <Td align="center">{row.taxRate}%</Td>
+                                                <Td align="right">{formatMoney(row.taxableAmt)}</Td>
+                                                {isInterState ? (
+                                                    <Td align="right">{formatMoney(row.igstAmt)}</Td>
+                                                ) : (
+                                                    <>
+                                                        <Td align="right">{formatMoney(row.cgstAmt)}</Td>
+                                                        <Td align="right">{formatMoney(row.sgstAmt)}</Td>
+                                                    </>
+                                                )}
+                                                <Td align="right">{formatMoney(row.totalTax)}</Td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            )}
 
-                                        <div className="flex justify-between text-lg font-bold text-gray-900 px-2">
-                                            <span>Grand Total</span>
-                                            <span>{formatMoney(selectedItem.netAmount)}</span>
-                                        </div>
+                            {/* Amount in words */}
+                            <div className="px-2 py-2 border-t border-black text-[14px] font-semibold">
+                                Rupees {amountInWords}
+                            </div>
+
+                            {/* Bank details */}
+                            <div className="px-2 py-2 border-t border-black text-[13px]">
+                                <span className="font-bold">Bank Details :</span> BANK NAME : {company?.bankName || "BANK OF BARODA"}
+                                &nbsp;&nbsp; BRANCH : {company?.bankBranch || "PALGHAR BRANCH"} <br />
+                                A/c No : {company?.bankAccountNo || "123456789012"} &nbsp;&nbsp; IFSC CODE : {company?.bankIfsc || "BARB0PALGHA"}
+                            </div>
+
+                            {/* Remarks / Notes */}
+                            {selectedItem.remarks && (
+                                <div className="px-2 py-2 border-t border-black text-[13px] print:block">
+                                    <span className="font-bold">Remarks / Notes :</span> {selectedItem.remarks}
+                                </div>
+                            )}
+
+                            {/* Footer: Terms + Signature */}
+                            <div className="flex border-t-[1.5px] border-black text-[13px]">
+                                <div className="flex-1 border-r border-black p-2">
+                                    <div className="font-bold mb-1">Terms &amp; Conditions</div>
+                                    <div>E &amp; O.E.</div>
+                                    <div>1. Goods once sold will not be taken back.</div>
+                                    <div>2. Interest @ 18% p.a. will be charged if the payment is not made within the stipulated time.</div>
+                                </div>
+                                <div className="flex-1 p-2 flex flex-col justify-between">
+                                    <div className="font-bold">Receiver's Signature :</div>
+                                    <div className="text-right font-bold mt-6">
+                                        For {company?.legalName || company?.companyName || "Company"}
                                     </div>
                                 </div>
+                            </div>
+                        </div>
 
-                                {/* Attachment Section */}
-                                {selectedItem.invoiceImage && (
-                                    <div className="mt-12 pt-6 border-t border-gray-300 print:hidden">
-                                        <div className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">
-                                            Invoice Attachment
-                                        </div>
-                                        {selectedItem.invoiceImage.toLowerCase().endsWith(".pdf") ? (
-                                            <a
-                                                href={selectedItem.invoiceImage}
-                                                target="_blank"
-                                                rel="noreferrer"
-                                                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-bold text-blue-600 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors text-decoration-none"
-                                            >
-                                                <FaFilePdf size={14} /> View PDF Document
-                                            </a>
-                                        ) : (
-                                            <div className="flex flex-col gap-3">
-                                                <img
-                                                    src={selectedItem.invoiceImage}
-                                                    alt="Invoice Copy"
-                                                    className="max-h-60 object-contain border border-gray-300 rounded-lg max-w-sm"
-                                                />
-                                                <a
-                                                    href={selectedItem.invoiceImage}
-                                                    target="_blank"
-                                                    rel="noreferrer"
-                                                    className="text-sm font-semibold text-blue-600 hover:underline"
-                                                >
-                                                    Open in New Tab
-                                                </a>
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-
-                                {/* Footer / Notes */}
-                                {selectedItem.remarks && (
-                                    <div className="mt-12 pt-6 border-t border-gray-300">
-                                        <div className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
-                                            Remarks / Notes
-                                        </div>
-                                        <p className="text-sm text-gray-700 leading-relaxed max-w-2xl">
-                                            {selectedItem.remarks}
-                                        </p>
+                        {/* Attachment Section */}
+                        {selectedItem.invoiceImage && (
+                            <div className="mt-6 pt-6 border-t border-gray-200 no-print">
+                                <div className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">
+                                    Invoice Attachment
+                                </div>
+                                {selectedItem.invoiceImage.toLowerCase().endsWith(".pdf") ? (
+                                    <a
+                                        href={selectedItem.invoiceImage}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="inline-flex items-center gap-2 px-4 py-2 text-sm font-bold text-blue-600 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors text-decoration-none"
+                                    >
+                                        <FaFilePdf size={14} /> View PDF Document
+                                    </a>
+                                ) : (
+                                    <div className="flex flex-col gap-3">
+                                        <img
+                                            src={selectedItem.invoiceImage}
+                                            alt="Invoice Copy"
+                                            className="max-h-60 object-contain border border-gray-300 rounded-lg max-w-sm"
+                                        />
+                                        <a
+                                            href={selectedItem.invoiceImage}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="text-sm font-semibold text-blue-600 hover:underline"
+                                        >
+                                            Open in New Tab
+                                        </a>
                                     </div>
                                 )}
                             </div>
-                        </div>
+                        )}
                     </div>
                 )}
             </div>
@@ -476,5 +638,26 @@ const GrnInvoiceViewPage: React.FC = () => {
         </div>
     );
 };
+
+// ─── Small table helpers ─────────────────────────────────────────────
+const MetaRow: React.FC<{ label: string; value: string }> = ({ label, value }) => (
+    <div className="flex text-[13px]">
+        <span className="w-[110px] font-bold">{label}</span>
+        <span>: {value}</span>
+    </div>
+);
+
+const Th: React.FC<{ children: React.ReactNode; w?: string; align?: "left" | "center" | "right" }> = ({ children, w, align = "left" }) => (
+    <th
+        className={`border border-black px-2 py-1 font-bold bg-[#f7f7f7] text-${align}`}
+        style={w ? { width: w } : undefined}
+    >
+        {children}
+    </th>
+);
+
+const Td: React.FC<{ children: React.ReactNode; align?: "left" | "center" | "right" }> = ({ children, align = "left" }) => (
+    <td className={`border border-black px-2 py-1 align-middle text-${align}`}>{children}</td>
+);
 
 export default GrnInvoiceViewPage;

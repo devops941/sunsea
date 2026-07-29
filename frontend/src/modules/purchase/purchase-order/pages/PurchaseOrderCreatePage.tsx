@@ -868,7 +868,7 @@ const PurchaseOrderCreatePage: React.FC = () => {
             </div>
             <div>
               <SelectInput label="Store" name="storeId" value={formData.storeId} options={[{ label: "-- Select Store --", value: "" }, ...(stores || []).filter((s: any) => s.isActive).map((s: any) => ({ label: s.storeName, value: s.storeId }))]} required onChange={handleChange} searchable />
-               {errors.storeId && <div className="text-red-500 mt-1 text-sm">{errors.storeId}</div>}
+              {errors.storeId && <div className="text-red-500 mt-1 text-sm">{errors.storeId}</div>}
             </div>
           </div>
 

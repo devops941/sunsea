@@ -42,13 +42,23 @@ class ExpenseController {
   });
 
   findAll = asyncHandler(async (req: Request, res: Response) => {
+    const page = req.query.page ? Number(req.query.page) : undefined;
+    const limit = req.query.limit ? Number(req.query.limit) : undefined;
     const search = req.query.search ? String(req.query.search) : undefined;
+    const category = req.query.category ? String(req.query.category) : undefined;
+    const status = req.query.status ? String(req.query.status) : undefined;
     const companyId = await this.getCompanyId();
 
-    const expenses = await expenseService.getAllExpenses(companyId, search);
+    const result = await expenseService.getAllExpenses(companyId, {
+      page,
+      limit,
+      search,
+      category,
+      status,
+    });
 
     return res.status(200).json(
-      new ApiResponse("Expenses fetched successfully", expenses)
+      new ApiResponse("Expenses fetched successfully", result)
     );
   });
 

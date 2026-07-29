@@ -27,7 +27,7 @@ interface FinishedStockListProps {
 
 const FinishedStockList: React.FC<FinishedStockListProps> = ({ storeId: propStoreId }) => {
     const dispatch = useAppDispatch();
-    const { data, loading, error } = useAppSelector((state) => state.finishedGoodsStocks);
+    const { data, loading, error, total } = useAppSelector((state) => state.finishedGoodsStocks);
 
     const [searchTerm, setSearchTerm] = useState("");
     const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -36,18 +36,26 @@ const FinishedStockList: React.FC<FinishedStockListProps> = ({ storeId: propStor
     const [showViewModal, setShowViewModal] = useState(false);
     const [selectedItem, setSelectedItem] = useState<any>(null);
 
-
-
     // Debounce search
     useEffect(() => {
         const timer = setTimeout(() => setDebouncedSearch(searchTerm), 500);
         return () => clearTimeout(timer);
     }, [searchTerm]);
 
-    // Fetch stocks based on search and storeId
+    // Reset page to 1 when storeId changes
     useEffect(() => {
-        dispatch(fetchFinishedGoodsStocks({ storeId: activeStoreId, search: debouncedSearch }));
-    }, [dispatch, activeStoreId, debouncedSearch]);
+        setCurrentPage(1);
+    }, [activeStoreId]);
+
+    // Fetch stocks based on search, page, limit and storeId
+    useEffect(() => {
+        dispatch(fetchFinishedGoodsStocks({
+            storeId: activeStoreId,
+            search: debouncedSearch,
+            page: currentPage,
+            limit: ITEMS_PER_PAGE
+        }));
+    }, [dispatch, activeStoreId, debouncedSearch, currentPage]);
 
     useEffect(() => {
         if (error) {
@@ -66,9 +74,8 @@ const FinishedStockList: React.FC<FinishedStockListProps> = ({ storeId: propStor
     }, []);
 
     // Pagination logic
-    const totalPages = Math.ceil((data?.length || 0) / ITEMS_PER_PAGE);
-    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-    const paginatedData = (data || []).slice(startIndex, startIndex + ITEMS_PER_PAGE);
+    const totalPages = Math.ceil((total || 0) / ITEMS_PER_PAGE) || 1;
+    const paginatedData = data || [];
 
     const exportColumns = [
         { header: "Store / Location", accessor: (item: any) => item.store?.storeName },

@@ -42,7 +42,7 @@ const QuotationList: React.FC = () => {
             });
 
             setData(response.data || []);
-            setTotal((response.total ?? 0) / 10);
+            setTotal(Math.ceil((response.total ?? 0) / ITEMS_PER_PAGE));
         } catch (error: any) {
             console.error("❌ Fetch error:", error);
             toast.error(error?.response?.data?.message || "Failed to fetch orders");
@@ -107,26 +107,26 @@ const QuotationList: React.FC = () => {
     return (
         <div>
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-            {/* Page Header */}
-            <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-slate-200">
-                <div>
-                    <h2 className="text-2xl font-bold text-slate-800">Quotation List</h2>
+                {/* Page Header */}
+                <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-slate-200">
+                    <div>
+                        <h2 className="text-2xl font-bold text-slate-800">Quotation List</h2>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-3 relative w-full lg:w-auto">
+                        <SearchInput
+                            value={searchTerm}
+                            onChange={handleSearch}
+                            placeholder="Search orders..."
+                        />
+                    </div>
                 </div>
-                <div className="flex flex-wrap items-center gap-3 relative w-full lg:w-auto">
-                    <SearchInput
-                        value={searchTerm}
-                        onChange={handleSearch}
-                        placeholder="Search orders..."
-                    />
-                </div>
-            </div>
 
-            {/* Table */}
-            <DataTable
-                data={data}
-                rowKey={(item) => item.id}
-                loading={loading}
-                emptyMessage="No orders pending for quotation."
+                {/* Table */}
+                <DataTable
+                    data={data}
+                    rowKey={(item) => item.id}
+                    loading={loading}
+                    emptyMessage="No orders pending for quotation."
                     pagination={{
                         currentPage,
                         totalPages: total,

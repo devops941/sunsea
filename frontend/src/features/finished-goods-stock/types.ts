@@ -54,4 +54,5 @@ export interface FinishedGoodsStockState {
     data: FinishedGoodsStock[];
     loading: boolean;
     error: string | null;
+    total?: number;
 }
