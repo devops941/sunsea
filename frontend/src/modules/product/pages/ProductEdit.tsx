@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { FaSave, FaImage, FaTimes, FaPlus } from "react-icons/fa";
+import { FaSave, FaImage, FaPlus } from "react-icons/fa";
 import { toast } from "react-toastify";
 import TextInput from "../../../components/form/TextInput/TextInput";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
@@ -103,16 +103,32 @@ const ProductEdit: React.FC = () => {
     const [allRawMaterials, setAllRawMaterials] = useState<any[]>([]);
     const [productionSteps, setProductionSteps] = useState<string[]>([]);
 
-    // ✅ Capacity initial setup (single entry)
+    // ✅ Existing Machine Snapshots
+    type ExistingSnapshotRecord = {
+        id: string;
+        machineId: string;
+        shiftId: string;
+        capacity: string;
+        operators: string;
+        recordedAt: string;
+        type: "CURRENT" | "PREVIOUS";
+    };
+    const [existingSnapshots, setExistingSnapshots] = useState<Record<string, ExistingSnapshotRecord[]>>({});
+
+    // ✅ Capacity initial setup (multiple entries)
+    type InitialCapacityRow = {
+        capDate: string;
+        capShiftId: string;
+        capDeptId: string;
+        capOperatorIds: string[];
+        capQty: string;
+        capMachine: string;
+    };
+    const [initialCapacities, setInitialCapacities] = useState<InitialCapacityRow[]>([]);
+
     const [employees, setEmployees] = useState<any[]>([]);
     const [departments, setDepartments] = useState<any[]>([]);
     const [shifts, setShifts] = useState<any[]>([]);
-    const [capDate, setCapDate] = useState(new Date().toISOString().split("T")[0]);
-    const [capShiftId, setCapShiftId] = useState("");
-    const [capDeptId, setCapDeptId] = useState("");
-    const [capOperatorIds, setCapOperatorIds] = useState<string[]>([]);
-    const [capQty, setCapQty] = useState("");
-    const [capMachine, setCapMachine] = useState("");
     const [machines, setMachines] = useState<any[]>([]);
 
     // Load dropdowns
@@ -245,6 +261,45 @@ const ProductEdit: React.FC = () => {
             setProductionSteps(productData.productionSteps.map((s: any) => s.stepKey));
         } else {
             setProductionSteps([]);
+        }
+
+        if (productData.capacityHistories && productData.capacityHistories.length > 0) {
+            const grouped = productData.capacityHistories.reduce((acc: any, curr: any) => {
+                if (!acc[curr.machineId]) acc[curr.machineId] = [];
+                acc[curr.machineId].push(curr);
+                return acc;
+            }, {});
+
+            const snapshotsByMachine: Record<string, ExistingSnapshotRecord[]> = {};
+            Object.keys(grouped).forEach(mId => {
+                const machineRecords = grouped[mId];
+                snapshotsByMachine[mId] = [];
+                if (machineRecords.length > 0) {
+                    snapshotsByMachine[mId].push({
+                        id: String(machineRecords[0].id),
+                        machineId: mId,
+                        shiftId: machineRecords[0].shiftId,
+                        capacity: String(machineRecords[0].newCapacity),
+                        operators: machineRecords[0].operators || "",
+                        recordedAt: new Date(machineRecords[0].productionDate).toISOString().split('T')[0],
+                        type: "CURRENT"
+                    });
+                }
+                if (machineRecords.length > 1) {
+                    snapshotsByMachine[mId].push({
+                        id: String(machineRecords[1].id),
+                        machineId: mId,
+                        shiftId: machineRecords[1].shiftId,
+                        capacity: String(machineRecords[1].newCapacity),
+                        operators: machineRecords[1].operators || "",
+                        recordedAt: new Date(machineRecords[1].productionDate).toISOString().split('T')[0],
+                        type: "PREVIOUS"
+                    });
+                }
+            });
+            setExistingSnapshots(snapshotsByMachine);
+        } else {
+            setExistingSnapshots({});
         }
 
         const images: ExistingProductImage[] = (productData.images || []).slice();
@@ -418,6 +473,32 @@ const ProductEdit: React.FC = () => {
         }
     };
 
+    const handleAddInitialCapacity = () => {
+        setInitialCapacities(prev => [...prev, {
+            capDate: new Date().toISOString().split("T")[0],
+            capShiftId: "",
+            capDeptId: "",
+            capOperatorIds: [],
+            capQty: "",
+            capMachine: ""
+        }]);
+    };
+
+    const handleRemoveInitialCapacity = (index: number) => {
+        setInitialCapacities(prev => prev.filter((_, i) => i !== index));
+    };
+
+    const handleInitialCapacityChange = (index: number, field: keyof InitialCapacityRow, value: any) => {
+        setInitialCapacities(prev => {
+            const newCap = [...prev];
+            newCap[index] = { ...newCap[index], [field]: value };
+            if (field === 'capDeptId') {
+                newCap[index].capOperatorIds = [];
+            }
+            return newCap;
+        });
+    };
+
 
 
 
@@ -527,7 +608,8 @@ const ProductEdit: React.FC = () => {
             if (formData.description) payload.append("description", formData.description);
 
             // Variants & specs
-            const derivedCapacity = capQty || formData.capacityLitres;
+            const totalCapQty = initialCapacities.reduce((acc, cap) => acc + Number(cap.capQty || 0), 0);
+            const derivedCapacity = totalCapQty > 0 ? String(totalCapQty) : formData.capacityLitres;
             if (derivedCapacity) payload.append("capacityLitres", derivedCapacity);
             let weightVal = formData.weightPerPiece;
             if (weightVal && (formData as any).weightUom === "g") {
@@ -590,16 +672,21 @@ const ProductEdit: React.FC = () => {
                 payload.append("productionSteps", "[]");
             }
 
-            if (capQty && capOperatorIds.length > 0) {
-                payload.append("capacityHistory", JSON.stringify([{
-                    recordedAt: capDate,
-                    shiftId: capShiftId,
-                    machineId: capMachine,
-                    operatorName: capOperatorIds.map(id =>
-                        employees.find(e => String(e.id) === id)?.fullName || id
-                    ).join(", "),
-                    newCapacity: Number(capQty),
-                }]));
+            if (initialCapacities.length > 0) {
+                const capacityHistory = initialCapacities
+                    .filter(cap => cap.capQty && cap.capOperatorIds.length > 0)
+                    .map(cap => ({
+                        recordedAt: cap.capDate,
+                        shiftId: cap.capShiftId,
+                        machineId: cap.capMachine,
+                        operatorName: cap.capOperatorIds.map(id =>
+                            employees.find(e => String(e.id) === id)?.fullName || id
+                        ).join(", "),
+                        newCapacity: Number(cap.capQty),
+                    }));
+                if (capacityHistory.length > 0) {
+                    payload.append("capacityHistory", JSON.stringify(capacityHistory));
+                }
             }
 
             // Images
@@ -1155,80 +1242,153 @@ const ProductEdit: React.FC = () => {
                         )}
                     </div>
 
-                    {/* Capacity — initial setup (single entry) */}
-                    <div className="pt-2">
-                        <h6 className="text-base font-semibold text-gray-800 mb-3">Initial Capacity Setup</h6>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                            <div>
-                                <DatePickerCalendar
-                                    label="Date"
-                                    name="capDate"
-                                    value={capDate}
-                                    onChange={(e) => setCapDate(e.target.value)}
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">Shift</label>
-                                <select
-                                    value={capShiftId}
-                                    onChange={(e) => setCapShiftId(e.target.value)}
-                                    className="w-full h-10 px-3 rounded-md border border-slate-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                                >
-                                    <option value="">-- Shift --</option>
-                                    {shifts.map(s => (
-                                        <option key={s.id} value={s.shiftName || s.shiftCode}>{s.shiftName || s.shiftCode}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div>
-                                <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">Role</label>
-                                <select
-                                    value={capDeptId}
-                                    onChange={(e) => { setCapDeptId(e.target.value); setCapOperatorIds([]); }}
-                                    className="w-full h-10 px-3 rounded-md border border-slate-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                                >
-                                    <option value="">-- Role --</option>
-                                    {departments.map(dept => (
-                                        <option key={dept.id} value={String(dept.id)}>{dept.name}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div>
-                                <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">Qty / Shift</label>
-                                <input
-                                    type="number"
-                                    step="any"
-                                    value={capQty}
-                                    onChange={(e) => setCapQty(e.target.value)}
-                                    placeholder="0"
-                                    className="w-full h-10 px-3 rounded-md border border-slate-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                                />
-                            </div>
-                            <div>
-                                <SelectInput
-                                    label="Machine"
-                                    name="capMachine"
-                                    value={capMachine}
-                                    options={[
-                                        { value: "", label: "-- Machine --" },
-                                        ...machines.map(m => ({ value: m.machineId, label: `${m.machineId} - ${m.machineName}` }))
-                                    ]}
-                                    onChange={(e) => setCapMachine(e.target.value)}
-                                />
-                            </div>
-                            <div className="col-span-full">
-                                <MultiSelect
-                                    label="Operators"
-                                    name="capOperatorIds"
-                                    options={employees
-                                        .filter(emp => !capDeptId || String(emp.departmentId) === capDeptId)
-                                        .map(emp => ({ value: String(emp.id), label: emp.fullName }))}
-                                    value={capOperatorIds}
-                                    onChange={(_, vals) => setCapOperatorIds(vals)}
-                                    placeholder={capDeptId ? "Select operators" : "Select role first"}
-                                />
-                            </div>
+                    {/* Machine Production Snapshots */}
+                    <div className="pt-6">
+                        <div className="flex justify-between items-center mb-3">
+                            <h6 className="text-base font-semibold text-gray-800 m-0">Machine Production Snapshots</h6>
                         </div>
+                        {Object.keys(existingSnapshots).length > 0 ? (
+                            <div className="space-y-4">
+                                {Object.keys(existingSnapshots).map(machineId => (
+                                    <div key={machineId} className="border border-slate-200 rounded-xl overflow-hidden">
+                                        <div className="bg-slate-50 px-4 py-2 border-b border-slate-200 font-semibold text-sm text-slate-700">
+                                            Machine: {machines.find(m => String(m.machineId) === machineId)?.machineName || machineId}
+                                        </div>
+                                        <table className="w-full text-left text-sm whitespace-nowrap">
+                                            <thead className="bg-white text-slate-500">
+                                                <tr>
+                                                    <th className="px-4 py-2 font-medium border-b border-slate-100">Type</th>
+                                                    <th className="px-4 py-2 font-medium border-b border-slate-100">Date</th>
+                                                    <th className="px-4 py-2 font-medium border-b border-slate-100">Shift</th>
+                                                    <th className="px-4 py-2 font-medium border-b border-slate-100">Operators</th>
+                                                    <th className="px-4 py-2 font-medium border-b border-slate-100 text-right">Capacity</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-50 bg-white">
+                                                {existingSnapshots[machineId].map(snap => (
+                                                    <tr key={snap.id}>
+                                                        <td className="px-4 py-2">
+                                                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${snap.type === 'CURRENT' ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-800'}`}>
+                                                                {snap.type}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-4 py-2 text-slate-600">{snap.recordedAt}</td>
+                                                        <td className="px-4 py-2 text-slate-600">
+                                                            {shifts.find(s => s.shiftCode === snap.shiftId || s.id === snap.shiftId || s.shiftName === snap.shiftId)?.shiftName || snap.shiftId}
+                                                        </td>
+                                                        <td className="px-4 py-2 text-slate-600">{snap.operators}</td>
+                                                        <td className="px-4 py-2 text-slate-900 font-medium text-right">{snap.capacity}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="text-sm text-slate-500 italic bg-slate-50 p-4 rounded-xl border border-dashed border-slate-200 text-center">
+                                No production snapshots exist yet.
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Add New Machine Production Snapshot */}
+                    <div className="pt-2 mt-4">
+                        <div className="flex justify-between items-center mb-3">
+                            <h6 className="text-base font-semibold text-gray-800 m-0">Add New Machine Production Snapshot</h6>
+                            <CustomButton
+                                text="Add Snapshot"
+                                icon={FaPlus}
+                                onClick={handleAddInitialCapacity}
+                                type="button"
+                                size="sm"
+                                variant="secondary"
+                            />
+                        </div>
+                        {initialCapacities.length > 0 ? (
+                            <div className="space-y-4">
+                                {initialCapacities.map((cap, idx) => (
+                                    <div key={`cap-${idx}`} className="p-4 border border-slate-200 rounded-xl relative bg-slate-50/50">
+                                        <div className="absolute top-2 right-2">
+                                            <DeleteButton onClick={() => handleRemoveInitialCapacity(idx)} />
+                                        </div>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                                            <div>
+                                                <DatePickerCalendar
+                                                    label="Date"
+                                                    name={`capDate-${idx}`}
+                                                    value={cap.capDate}
+                                                    onChange={(e) => handleInitialCapacityChange(idx, "capDate", e.target.value)}
+                                                />
+                                            </div>
+                                            <div>
+                                                <SelectInput
+                                                    label="Shift"
+                                                    name={`capShiftId-${idx}`}
+                                                    value={cap.capShiftId}
+                                                    options={[
+                                                        { value: "", label: "-- Shift --" },
+                                                        ...shifts.map(s => ({ value: s.shiftName || s.shiftCode, label: s.shiftName || s.shiftCode }))
+                                                    ]}
+                                                    onChange={(e) => handleInitialCapacityChange(idx, "capShiftId", e.target.value)}
+                                                />
+                                            </div>
+                                            <div>
+                                                <SelectInput
+                                                    label="Machine"
+                                                    name={`capMachine-${idx}`}
+                                                    value={cap.capMachine}
+                                                    options={[
+                                                        { value: "", label: "-- Machine --" },
+                                                        ...machines.map(m => ({ value: m.machineId, label: `${m.machineId} - ${m.machineName}` }))
+                                                    ]}
+                                                    onChange={(e) => handleInitialCapacityChange(idx, "capMachine", e.target.value)}
+                                                />
+                                            </div>
+                                            <div>
+                                                <SelectInput
+                                                    label="Role"
+                                                    name={`capDeptId-${idx}`}
+                                                    value={cap.capDeptId}
+                                                    options={[
+                                                        { value: "", label: "-- Role --" },
+                                                        ...departments.map(dept => ({ value: String(dept.id), label: dept.name }))
+                                                    ]}
+                                                    onChange={(e) => handleInitialCapacityChange(idx, "capDeptId", e.target.value)}
+                                                />
+                                            </div>
+                                            <div className="col-span-full xl:col-span-3">
+                                                <MultiSelect
+                                                    label="Operators"
+                                                    name={`capOperatorIds-${idx}`}
+                                                    options={employees
+                                                        .filter(emp => !cap.capDeptId || String(emp.departmentId) === cap.capDeptId)
+                                                        .map(emp => ({ value: String(emp.id), label: emp.fullName }))}
+                                                    value={cap.capOperatorIds}
+                                                    onChange={(_, vals) => handleInitialCapacityChange(idx, "capOperatorIds", vals)}
+                                                    placeholder={cap.capDeptId ? "Select operators" : "Select role first"}
+                                                />
+                                            </div>
+                                            <div>
+                                                <TextInput
+                                                    label="Qty / Shift"
+                                                    name={`capQty-${idx}`}
+                                                    type="number"
+                                                    step="any"
+                                                    value={cap.capQty}
+                                                    onChange={(e) => handleInitialCapacityChange(idx, "capQty", e.target.value)}
+                                                    placeholder="0"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="text-sm text-slate-500 italic bg-slate-50 p-4 rounded-xl border border-dashed border-slate-200 text-center">
+                                No snapshots added. Click "Add Snapshot" to configure machines and operators.
+                            </div>
+                        )}
                     </div>
 
                     {/* Production Workflow (optional, free-text step-by-step pipeline) */}

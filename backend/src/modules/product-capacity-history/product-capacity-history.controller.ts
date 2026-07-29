@@ -10,6 +10,13 @@ export class ProductCapacityHistoryController {
     res.json(new ApiResponse("History fetched successfully", records));
   });
 
+  getLatestByProductAndMachine = asyncHandler(async (req: Request, res: Response) => {
+    const productId = Number(req.params.productId);
+    const machineId = req.params.machineId;
+    const record = await productCapacityHistoryService.getLatestByProductAndMachine(productId, machineId);
+    res.json(new ApiResponse("Latest capacity fetched successfully", record));
+  });
+
   manualChange = asyncHandler(async (req: Request, res: Response) => {
     const { productId, date, shift, machine, operators, newCapacity } = req.body;
     const updatedBy = (req as any).user?.userId || null;

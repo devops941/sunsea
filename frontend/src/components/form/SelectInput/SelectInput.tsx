@@ -3,10 +3,10 @@ import { createPortal } from "react-dom";
 import { FaChevronDown } from "react-icons/fa";
 
 interface Option {
-  label: string;
+  label: string | React.ReactNode;
   value: string;
   disabled?: boolean;
-  selectedLabel?: string;
+  selectedLabel?: string | React.ReactNode;
 }
 
 interface SelectInputProps {
@@ -108,8 +108,9 @@ const SelectInput: React.FC<SelectInputProps> = ({
     ? (selectedOption.selectedLabel || selectedOption.label)
     : defaultOptionLabel || "Select an option";
 
+  const toPlainText = (v: any): string => typeof v === "string" ? v : "";
   const filteredOptions = searchable
-    ? options.filter((opt) => opt.label.toLowerCase().includes(searchTerm.toLowerCase()))
+    ? options.filter((opt) => toPlainText(opt.label).toLowerCase().includes(searchTerm.toLowerCase()))
     : options;
 
   return (
@@ -144,7 +145,7 @@ const SelectInput: React.FC<SelectInputProps> = ({
         {/* Hidden native select for form serialization if needed */}
         <select name={name} value={value} className="hidden" onChange={() => { }}>
           {defaultOptionLabel && <option value="">{defaultOptionLabel}</option>}
-          {options.map((opt, i) => <option key={i} value={opt.value}>{opt.label}</option>)}
+          {options.map((opt, i) => <option key={i} value={opt.value}>{toPlainText(opt.label)}</option>)}
         </select>
 
         <button

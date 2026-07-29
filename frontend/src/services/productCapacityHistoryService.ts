@@ -8,6 +8,13 @@ export const productCapacityHistoryService = {
     return Array.isArray(list) ? list : [];
   },
 
+  fetchByProductAndMachine: async (productId: number, machineId: string): Promise<any> => {
+    const response = await apiClient.get(
+      `${config.productCapacityHistory.base}/product/${productId}/machine/${machineId}`
+    );
+    return response.data?.data ?? response.data;
+  },
+
   manualChange: async (data: {
     productId: number;
     date: string;

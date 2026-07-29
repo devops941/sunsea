@@ -329,15 +329,86 @@ class DailyPlanService {
             updateData.currentProductionStep = firstStepName;
             updateData.status = "POST_PRODUCTION";
 
-            if (productionOrderFull.status !== "POST_PRODUCTION" && productionOrderFull.status !== "READY_FOR_DISPATCH" && productionOrderFull.status !== "COMPLETED") {
-              await tx.productionOrder.update({
-                where: { productionOrderId: checkProductionOrderId },
-                data: { status: "POST_PRODUCTION" },
+            if (productionOrderFull.status !== "POST_PRODUCTION" && productionOrderFull.status !== "READY_FOR_DISPATCH" && productionOrderFull.status !== "COMPLETED" && productionOrderFull.status !== "PARTIAL_COMPLETED") {
+              if (data.shortClosePO) {
+                // ── PERMANENT STOP ──────────────────────────────────────────
+                // 1. Close this weekly program
+                await tx.weeklyMachineProgram.update({
+                  where: { weeklyProgramId: checkWeeklyProgramId },
+                  data: { status: "COMPLETED" },
+                });
+                // 2. Mark PO as PARTIAL_COMPLETED (locked — no new DPs allowed)
+                await tx.productionOrder.update({
+                  where: { productionOrderId: checkProductionOrderId },
+                  data: { status: "PARTIAL_COMPLETED" },
+                });
+                // 3. Cascade-stop ALL other active DPs for this PO
+                const otherActiveDPs = await tx.dailyProductionPlan.findMany({
+                  where: {
+                    productionOrderId: checkProductionOrderId,
+                    dailyPlanId: { not: dailyPlanId },
+                    status: { in: ["DRAFT", "PLANNED", "APPROVED", "IN_PROGRESS"] },
+                  },
+                });
+                for (const dp of otherActiveDPs) {
+                  await tx.dailyProductionPlan.update({
+                    where: { dailyPlanId: dp.dailyPlanId },
+                    data: { status: "STOPPED" },
+                  });
+                  // Also lock that plan's weekly program
+                  if (dp.weeklyProgramId) {
+                    await tx.weeklyMachineProgram.update({
+                      where: { weeklyProgramId: dp.weeklyProgramId },
+                      data: { status: "COMPLETED" },
+                    });
+                  }
+                }
+                await StatusSyncService.logHistory(
+                  tx, checkProductionOrderId, productionOrderFull.status, "PARTIAL_COMPLETED", userId,
+                  "Production force-stopped (Permanent Stop). All active plans closed. Proceeding to post-production.", "PARTIAL_COMPLETED"
+                );
+              } else {
+                await tx.productionOrder.update({
+                  where: { productionOrderId: checkProductionOrderId },
+                  data: { status: "POST_PRODUCTION" },
+                });
+                await StatusSyncService.logHistory(
+                  tx, checkProductionOrderId, productionOrderFull.status, "POST_PRODUCTION", userId,
+                  "Production completed. Entering post-production phase.", "POST_PRODUCTION_START"
+                );
+              }
+            } else if (data.shortClosePO) {
+              // PO is already in POST_PRODUCTION or PARTIAL_COMPLETED — still close the weekly program and cascade-stop active DPs
+              await tx.weeklyMachineProgram.update({
+                where: { weeklyProgramId: checkWeeklyProgramId },
+                data: { status: "COMPLETED" },
               });
-              await StatusSyncService.logHistory(
-                tx, checkProductionOrderId, productionOrderFull.status, "POST_PRODUCTION", userId,
-                "Production completed. Entering post-production phase.", "POST_PRODUCTION_START"
-              );
+              const otherActiveDPs2 = await tx.dailyProductionPlan.findMany({
+                where: {
+                  productionOrderId: checkProductionOrderId,
+                  dailyPlanId: { not: dailyPlanId },
+                  status: { in: ["DRAFT", "PLANNED", "APPROVED", "IN_PROGRESS"] },
+                },
+              });
+              for (const dp of otherActiveDPs2) {
+                await tx.dailyProductionPlan.update({
+                  where: { dailyPlanId: dp.dailyPlanId },
+                  data: { status: "STOPPED" },
+                });
+                if (dp.weeklyProgramId) {
+                  await tx.weeklyMachineProgram.update({
+                    where: { weeklyProgramId: dp.weeklyProgramId },
+                    data: { status: "COMPLETED" },
+                  });
+                }
+              }
+              // Also ensure PO is PARTIAL_COMPLETED if not already
+              if (productionOrderFull.status !== "PARTIAL_COMPLETED") {
+                await tx.productionOrder.update({
+                  where: { productionOrderId: checkProductionOrderId },
+                  data: { status: "PARTIAL_COMPLETED" },
+                });
+              }
             }
           } 
           else if (data.status === "NEXT_STEP" && existingPlan.status === "POST_PRODUCTION") {
@@ -396,16 +467,32 @@ class DailyPlanService {
                     "Partial post-production steps completed. Eligible for partial dispatch.", "PARTIAL_COMPLETED"
                   );
                 }
-              } else if (isTargetMet && !["READY_FOR_DISPATCH", "DISPATCHED"].includes(productionOrderFull.status)) {
-                // Short-closed but target qty is met: advance PO directly to READY_FOR_DISPATCH
-                await tx.productionOrder.update({
-                  where: { productionOrderId: checkProductionOrderId },
-                  data: { status: "READY_FOR_DISPATCH" },
-                });
-                await StatusSyncService.logHistory(
-                  tx, checkProductionOrderId, productionOrderFull.status, "READY_FOR_DISPATCH", userId,
-                  "Production completed (short-closed). Target quantity met. Ready for dispatch.", "READY_FOR_DISPATCH"
-                );
+              } else if (isShortClosed) {
+                if (isTargetMet && !["READY_FOR_DISPATCH", "DISPATCHED"].includes(productionOrderFull.status)) {
+                  // Short-closed but target qty is met: advance PO directly to READY_FOR_DISPATCH
+                  await tx.productionOrder.update({
+                    where: { productionOrderId: checkProductionOrderId },
+                    data: { status: "READY_FOR_DISPATCH" },
+                  });
+                  await StatusSyncService.logHistory(
+                    tx, checkProductionOrderId, productionOrderFull.status, "READY_FOR_DISPATCH", userId,
+                    "Production completed (short-closed). Target quantity met. Ready for dispatch.", "READY_FOR_DISPATCH"
+                  );
+                } else if (!isTargetMet && !["PARTIAL_COMPLETED", "READY_FOR_DISPATCH", "DISPATCHED", "COMPLETED"].includes(productionOrderFull.status)) {
+                  // Short-closed and target NOT met (Force Complete Stop): close the PO and Weekly Program
+                  await tx.productionOrder.update({
+                    where: { productionOrderId: checkProductionOrderId },
+                    data: { status: "PARTIAL_COMPLETED" },
+                  });
+                  await tx.weeklyMachineProgram.update({
+                    where: { weeklyProgramId: checkWeeklyProgramId },
+                    data: { status: "COMPLETED" },
+                  });
+                  await StatusSyncService.logHistory(
+                    tx, checkProductionOrderId, productionOrderFull.status, "PARTIAL_COMPLETED", userId,
+                    "Production force-stopped (Complete Stop). No further planning allowed. Eligible for partial dispatch.", "PARTIAL_COMPLETED"
+                  );
+                }
               }
             }
           }

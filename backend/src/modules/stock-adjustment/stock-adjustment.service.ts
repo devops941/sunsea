@@ -132,10 +132,24 @@ export class StockAdjustmentService {
     const users = userIds.length > 0
       ? await prisma.user.findMany({ where: { userId: { in: userIds } }, select: { userId: true, fullName: true } })
       : [];
-    const userMap = new Map(users.map((u) => [u.userId, u.fullName]));
+
+    const empIds = userIds
+      .map(id => {
+        try { return BigInt(id); } catch (e) { return null; }
+      })
+      .filter((id): id is bigint => id !== null);
+
+    const employees = empIds.length > 0
+      ? await prisma.employee.findMany({ where: { id: { in: empIds } }, select: { id: true, fullName: true } })
+      : [];
+
+    const nameMap = new Map<string, string>();
+    users.forEach((u) => nameMap.set(u.userId, u.fullName));
+    employees.forEach((e) => nameMap.set(String(e.id), e.fullName));
+
     const enriched = data.map((d) => ({
       ...d,
-      createdByUser: d.createdBy && userMap.has(d.createdBy) ? { fullName: userMap.get(d.createdBy) } : null,
+      createdByUser: d.createdBy && nameMap.has(d.createdBy) ? { fullName: nameMap.get(d.createdBy) } : null,
     }));
 
     return {
@@ -187,7 +201,19 @@ export class StockAdjustmentService {
         where: { userId: adjustment.createdBy },
         select: { fullName: true },
       });
-      (adjustment as any).createdByUser = user ? { fullName: user.fullName } : null;
+      if (user) {
+        (adjustment as any).createdByUser = { fullName: user.fullName };
+      } else {
+        let emp = null;
+        try {
+          const empId = BigInt(adjustment.createdBy);
+          emp = await prisma.employee.findUnique({
+            where: { id: empId },
+            select: { fullName: true }
+          });
+        } catch (e) {}
+        (adjustment as any).createdByUser = emp ? { fullName: emp.fullName } : null;
+      }
     } else {
       (adjustment as any).createdByUser = null;
     }

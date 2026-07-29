@@ -303,6 +303,7 @@ class ProductService {
         finishedGoodsStocks: true,
         billOfMaterials: { include: { rawMaterial: true } },
         productionSteps: { orderBy: { stepOrder: "asc" } },
+        capacityHistories: { orderBy: { createdAt: "desc" } },
       },
       orderBy: {
         createdAt: "desc",
@@ -321,6 +322,7 @@ class ProductService {
         finishedGoodsStocks: true,
         billOfMaterials: { include: { rawMaterial: true } },
         productionSteps: { orderBy: { stepOrder: "asc" } },
+        capacityHistories: { orderBy: { createdAt: "desc" } },
       },
     });
 
@@ -407,6 +409,17 @@ class ProductService {
           : data.productionSteps;
       } catch (e: any) {
         console.error("Failed to parse productionSteps in update:", e);
+      }
+    }
+
+    let capacityHistoryList: any[] | null = null;
+    if (data.capacityHistory !== undefined) {
+      try {
+        capacityHistoryList = typeof data.capacityHistory === "string"
+          ? JSON.parse(data.capacityHistory)
+          : data.capacityHistory;
+      } catch (e: any) {
+        console.error("Failed to parse capacityHistory in update:", e);
       }
     }
 
@@ -510,7 +523,40 @@ class ProductService {
         }
       }
 
+      if (capacityHistoryList !== null && capacityHistoryList.length > 0) {
+        for (const entry of capacityHistoryList) {
+          const machineId = cleanRequiredString(entry.machineId || "INITIAL", 20);
+          
+          await tx.productCapacityHistory.create({
+            data: {
+              productId: id,
+              newCapacity: Number(entry.newCapacity),
+              previousCapacity: Number(entry.previousCapacity ?? 0),
+              productionDate: new Date(entry.recordedAt ?? new Date()),
+              machineId: machineId,
+              shiftId: cleanRequiredString(entry.shiftId || "INITIAL", 20),
+              productionOrderId: cleanRequiredString("UPDATE", 20),
+              targetQty: Number(entry.newCapacity),
+              actualQty: Number(entry.newCapacity),
+              achievementPct: 100,
+              operators: cleanString(entry.operatorName, 255),
+            }
+          });
 
+          const existing = await tx.productCapacityHistory.findMany({
+            where: { productId: id, machineId: machineId },
+            orderBy: { createdAt: "desc" },
+            select: { id: true }
+          });
+          
+          if (existing.length > 2) {
+            const idsToDelete = existing.slice(2).map(r => r.id);
+            await tx.productCapacityHistory.deleteMany({
+              where: { id: { in: idsToDelete } }
+            });
+          }
+        }
+      }
     });
 
     const payload: Prisma.ProductUncheckedUpdateInput = {
@@ -592,6 +638,7 @@ class ProductService {
         images: true,
         billOfMaterials: { include: { rawMaterial: true } },
         productionSteps: { orderBy: { stepOrder: "asc" } },
+        capacityHistories: { orderBy: { createdAt: "desc" } },
       },
     });
   }
