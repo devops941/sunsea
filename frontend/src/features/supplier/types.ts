@@ -96,6 +96,9 @@ export interface SupplierState {
   suppliers: Supplier[];
   loading: boolean;
   error: string | null;
+  total: number;
+  page: number;
+  totalPages: number;
 }
 
 // ----------------------------

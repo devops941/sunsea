@@ -12,7 +12,7 @@ export class ProductCapacityHistoryController {
 
   getLatestByProductAndMachine = asyncHandler(async (req: Request, res: Response) => {
     const productId = Number(req.params.productId);
-    const machineId = req.params.machineId;
+    const machineId = String(req.params.machineId);
     const record = await productCapacityHistoryService.getLatestByProductAndMachine(productId, machineId);
     res.json(new ApiResponse("Latest capacity fetched successfully", record));
   });
