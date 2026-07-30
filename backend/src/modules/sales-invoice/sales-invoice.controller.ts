@@ -4,6 +4,10 @@ import salesInvoiceService from "./sales-invoice.service";
 import { asyncHandler } from "../../utils/asyncHandler";
 import { ApiResponse } from "../../utils/ApiResponse";
 import { ApiError } from "../../utils/ApiError";
+import companyService from "../company/company.service";
+import { generateInvoiceHtml } from "../../templates/invoiceTemplate";
+import { generatePdfFromHtml } from "../../utils/pdfGenerator";
+import { sendEmail } from "../../utils/mailer";
 
 class SalesInvoiceController {
   create = asyncHandler(async (req: Request, res: Response) => {
@@ -103,6 +107,42 @@ class SalesInvoiceController {
     return res.status(200).json(
       new ApiResponse("Sales Invoice updated successfully", salesInvoice)
     );
+  });
+
+  emailInvoice = asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const { recipientEmail, subject, message } = req.body;
+
+    if (!recipientEmail) {
+      return res.status(400).json(new ApiResponse("Recipient email is required"));
+    }
+
+    const company = await companyService.getCompany();
+    if (!company) {
+      return res.status(500).json(new ApiResponse("Company not found"));
+    }
+
+    const invoice = await salesInvoiceService.getSalesInvoiceById(id as string, company.id);
+    if (!invoice) {
+      return res.status(404).json(new ApiResponse("Invoice not found"));
+    }
+
+    const htmlContent = generateInvoiceHtml(invoice, company);
+    const pdfBuffer = await generatePdfFromHtml(htmlContent);
+
+    await sendEmail({
+      to: recipientEmail,
+      subject: subject || `Invoice ${invoice.invoiceNo}`,
+      text: message || `Please find the attached invoice.`,
+      attachments: [
+        {
+          filename: `Invoice-${invoice.invoiceNo}.pdf`,
+          content: pdfBuffer,
+        }
+      ]
+    });
+
+    return res.status(200).json(new ApiResponse("Email sent successfully!"));
   });
 }
 

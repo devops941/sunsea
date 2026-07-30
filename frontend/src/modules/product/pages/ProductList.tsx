@@ -427,7 +427,7 @@ const ProductList: React.FC = () => {
                                                             groups[r.machineId].push(r);
                                                         }
                                                     });
-                                                    return machineOrder.map((machineId, gIdx) => {
+                                                    return machineOrder.map((machineId) => {
                                                         const machineObj = machines.find((m: any) => m.machineId === machineId);
                                                         const machineName = machineObj?.machineName || machineId;
                                                         return (

@@ -188,6 +188,7 @@ const AppRoutes = () => {
             <Route path="/settings/company" element={<OrganizationTabs />} />
             <Route path="/settings/gst-taxes" element={<OrganizationTabs />} />
             <Route path="/whatsapp" element={<OrganizationTabs />} />
+            <Route path="/email-config" element={<OrganizationTabs />} />
             <Route path="/settings/invoice" element={<OrganizationTabs />} />
             {/* Sample Route */}
             <Route path="/sample" element={<Sample />} />

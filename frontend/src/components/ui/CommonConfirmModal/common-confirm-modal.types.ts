@@ -16,6 +16,9 @@ export interface CommonConfirmModalProps {
   confirmDisabled?: boolean;
   isLoading?: boolean;
   isDangerous?: boolean;
+  warningText?: string;
+  loadingText?: string;
+  confirmIcon?: any;
   size?: "sm" | "md" | "lg" | "xl";
 
   confirmVariant?:

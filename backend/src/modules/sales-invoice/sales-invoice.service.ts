@@ -143,6 +143,7 @@ class SalesInvoiceService {
               id: true,
               firmName: true,
               displayName: true,
+              email: true,
             },
           },
           items: {
@@ -375,6 +376,7 @@ class SalesInvoiceService {
             id: true,
             firmName: true,
             displayName: true,
+            email: true,
             billingAddressLine1: true,
             billingCity: true,
             billingState: true,
@@ -629,6 +631,7 @@ class SalesInvoiceService {
               id: true,
               firmName: true,
               displayName: true,
+              email: true,
             },
           },
           items: {

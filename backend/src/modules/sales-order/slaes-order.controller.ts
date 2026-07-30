@@ -1,9 +1,13 @@
 import { Request, Response } from "express";
 import salesOrderService from "./sales-order.service";
 import creditCheckService from "./creditCheckService";
+import companyService from "../company/company.service";
 import { ApiResponse } from "../../utils/ApiResponse";
 import { asyncHandler } from "../../utils/asyncHandler";
 import { getIO } from "../../socket/socket";
+import { generateQuotationHtml } from "../../templates/quotationTemplate";
+import { generatePdfFromHtml } from "../../utils/pdfGenerator";
+import { sendEmail } from "../../utils/mailer";
 import {
     SalesOrderQueryInput,
     MdApprovalDecisionInput,
@@ -148,6 +152,39 @@ class SalesOrderController {
         return res.status(200).json(
             new ApiResponse("Order status fetched successfully", status)
         );
+    });
+
+    emailQuotation = asyncHandler(async (req: Request, res: Response) => {
+        const { id } = req.params;
+        const { recipientEmail, subject, message } = req.body;
+
+        if (!recipientEmail) {
+            return res.status(400).json(new ApiResponse("Recipient email is required"));
+        }
+
+        const order = await salesOrderService.findById(Number(id));
+        if (!order) {
+            return res.status(404).json(new ApiResponse("Order not found"));
+        }
+
+        const company = await companyService.getCompany();
+
+        const htmlContent = generateQuotationHtml(order, company);
+        const pdfBuffer = await generatePdfFromHtml(htmlContent);
+
+        await sendEmail({
+            to: recipientEmail,
+            subject: subject || `Quotation for Order ${order.orderNo}`,
+            text: message || `Please find the attached quotation.`,
+            attachments: [
+                {
+                    filename: `Quotation-${order.orderNo}.pdf`,
+                    content: pdfBuffer,
+                }
+            ]
+        });
+
+        return res.status(200).json(new ApiResponse("Email sent successfully!"));
     });
 
     // ─── Private helper methods ──────────────────────────────────────

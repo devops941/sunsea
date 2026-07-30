@@ -59,4 +59,12 @@ router.delete(
     purchaseOrderController.delete
 );
 
+router.post(
+    "/:id/email-po-invoice",
+    authMiddleware,
+    requirePermission("purchaseOrders.view"),
+    validateMiddleware(purchaseOrderIdRequestSchema),
+    purchaseOrderController.emailPoInvoice
+);
+
 export default router;

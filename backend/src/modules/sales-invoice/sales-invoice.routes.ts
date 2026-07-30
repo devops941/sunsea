@@ -44,4 +44,11 @@ router.delete(
   salesInvoiceController.delete
 );
 
+router.post(
+  "/:id/email-invoice",
+  authMiddleware,
+  validateMiddleware(salesInvoiceIdRequestSchema),
+  salesInvoiceController.emailInvoice
+);
+
 export default router;

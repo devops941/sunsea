@@ -319,6 +319,8 @@ class PurchaseOrderService {
                         displayName: true,
                         legalName: true,
                         supplierCode: true,
+                        email: true,
+                        gstin: true,
                     },
                 },
                 items: true,
@@ -337,6 +339,8 @@ class PurchaseOrderService {
                     id: supplier.id,
                     supplierCode: supplier.supplierCode,
                     supplierName: supplier.displayName || supplier.legalName,
+                    email: supplier.email,
+                    gstin: supplier.gstin,
                 }
                 : null,
         };

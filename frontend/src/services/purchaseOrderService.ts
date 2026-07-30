@@ -59,4 +59,12 @@ export const purchaseOrderService = {
     );
     return response.data?.data || "";
   },
+
+  emailPoInvoice: async (id: string, emailData: { to: string, subject?: string, message?: string }): Promise<any> => {
+    const response = await apiClient.post(
+      `${config.purchaseOrder.base}/${id}/email-po-invoice`,
+      emailData
+    );
+    return response.data;
+  },
 };
