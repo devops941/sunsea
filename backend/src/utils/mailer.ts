@@ -10,12 +10,12 @@ export interface SendEmailOptions {
 }
 
 export const sendEmail = async (options: SendEmailOptions) => {
-  let smtpHost = process.env.VITE_SMTP_HOST || process.env.SMTP_HOST || "";
-  let smtpPort = Number(process.env.VITE_SMTP_PORT) || Number(process.env.SMTP_PORT) || 587;
-  let smtpUser = process.env.VITE_SMTP_USER || process.env.SMTP_USER || "";
-  let smtpPass = process.env.VITE_SMTP_PASS || process.env.SMTP_PASS || "";
-  let fromEmail = process.env.VITE_SMTP_FROM || process.env.SMTP_FROM_EMAIL || "";
-  let fromName = process.env.VITE_FROM_NAME || process.env.SMTP_FROM_NAME || "Sunsea";
+  let smtpHost = process.env.SMTP_HOST || "";
+  let smtpPort = Number(process.env.SMTP_PORT) || 587;
+  let smtpUser = process.env.SMTP_USER || "";
+  let smtpPass = process.env.SMTP_PASS || "";
+  let fromEmail = process.env.SMTP_FROM || "";
+  let fromName = process.env.FROM_NAME || "Sunsea";
   let encryption = process.env.SMTP_ENCRYPTION || "TLS";
 
   try {
