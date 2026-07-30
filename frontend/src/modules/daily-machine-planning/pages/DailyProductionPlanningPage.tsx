@@ -13,6 +13,7 @@ import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
 import { fetchMachines } from "../../../features/machines/machineSlice";
 import { fetchShifts } from "../../../features/shifts/shiftSlice";
 import { fetchDailyPlans, updateDailyPlan, deleteDailyPlan } from "../../../features/daily-plans/dailyPlanSlice";
+import { productCapacityHistoryService } from "../../../services/productCapacityHistoryService";
 import apiClient from "../../../api/apiClient";
 import config from "../../../api/config";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
@@ -25,6 +26,7 @@ import DataTable, { type DataTableColumn } from "../../../components/ui/table/Da
 import TextArea from "../../../components/form/TextArea/TextArea";
 import FilterPopover from "../../../components/ui/FilterPopover/FilterPopover";
 import { ProductionOrderViewModal } from "../../production-orders/components/ProductionOrderViewModal";
+import { DailyProductionReportModal } from "../components/DailyProductionReportModal";
 import { oeeService } from "../../../services/oeeService";
 import { rawMaterialService } from "../../../services/rawMaterialService";
 import { MaterialIssueModal } from "../../production-orders/components/MaterialIssueModal";
@@ -68,8 +70,9 @@ const DailyProductionPlanningPage: React.FC = () => {
   const location = useLocation();
   const dispatch = useAppDispatch();
 
-  const { data: machines } = useAppSelector((state) => state.machines);
+  const { data: machines } = useAppSelector((state: any) => state.machines);
   const { data: dailyPlans, loading } = useAppSelector((state: any) => state.dailyPlans);
+  const { data: shifts } = useAppSelector((state: any) => state.shifts);
 
   // filters
   const [filterDate, setFilterDate] = useState(formatLocalDateString(new Date()));
@@ -106,11 +109,14 @@ const DailyProductionPlanningPage: React.FC = () => {
   };
 
   // View Modal
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportPlan, setReportPlan] = useState<any>(null);
   const [showViewModal, setShowViewModal] = useState(false);
   const [viewPlan, setViewPlan] = useState<any>(null);
   const [viewHourlyLogs, setViewHourlyLogs] = useState<any[]>([]);
   const [loadingViewLogs, setLoadingViewLogs] = useState(false);
   const [viewPlanOeeSummary, setViewPlanOeeSummary] = useState<any>(null);
+  const [machineProductCapacity, setMachineProductCapacity] = useState<number | null>(null);
   const [weeklyProgram, setWeeklyProgram] = useState<any>(null);
   const [loadingWeekly, setLoadingWeekly] = useState(false);
   const [poHistoryPlans, setPOHistoryPlans] = useState<any[]>([]);
@@ -189,9 +195,9 @@ const DailyProductionPlanningPage: React.FC = () => {
 
   const allPlans = useMemo(() => Array.isArray(dailyPlans) ? dailyPlans : [], [dailyPlans]);
 
-  // Active plans: hide SHORT_CLOSED (force-stopped) — they live in the closed panel
+  // Active plans: show all plans, including short-closed/stopped ones
   const filteredPlans = useMemo(() =>
-    allPlans.filter((p: any) => !isShortClosed(p))
+    allPlans
   , [allPlans]);
 
   // Short-closed plans: COMPLETED but produced < planned
@@ -317,13 +323,14 @@ const DailyProductionPlanningPage: React.FC = () => {
       const loggedHoursCount = Array.isArray(stopPlan.hourlyProductions)
         ? stopPlan.hourlyProductions.filter((h: any) => Number(h.hourIndex) > 0).length
         : 0;
+      const prefix = stopOption === "completed_stop" ? "Permanently Stopped" : "Short Closed";
       const updatedRemarks = stopPlan.remarks
-        ? `${stopPlan.remarks} | Stopped: ${stopReason.trim()}`
-        : `Stopped: ${stopReason.trim()}`;
+        ? `${stopPlan.remarks} | ${prefix}: ${stopReason.trim()}`
+        : `${prefix}: ${stopReason.trim()}`;
         
       const payload: any = {
         // Permanent stop → move to POST_PRODUCTION so produced qty can be dispatched
-        // Carry forward stop → mark as STOPPED so remaining qty can be carried to a new DP
+        // Stop Daily Plan Only → mark as STOPPED so remaining qty can be assigned later
         status: stopOption === "completed_stop" ? "POST_PRODUCTION" : "STOPPED",
         remarks: updatedRemarks,
         plannedHours: loggedHoursCount > 0 ? loggedHoursCount : stopPlan.plannedHours
@@ -346,14 +353,10 @@ const DailyProductionPlanningPage: React.FC = () => {
       const pendingQty = plannedQty > producedQty ? plannedQty - producedQty : 0;
 
       setShowStopModal(false);
-      const currentPlan = stopPlan;
       setStopPlan(null);
 
-      if (stopOption === "carry_forward" && pendingQty > 0) {
-        handleCarryForward(currentPlan, pendingQty);
-      } else {
-        loadDailyPlans();
-      }
+      // Reload plans, the user can manually assign the remaining quantity from the weekly targets page later
+      loadDailyPlans();
     } catch (err: any) {
       toast.error(err || "Failed to stop production");
     } finally {
@@ -385,6 +388,7 @@ const DailyProductionPlanningPage: React.FC = () => {
     if (!viewPlan || !showViewModal) {
       setViewHourlyLogs([]);
       setViewPlanOeeSummary(null);
+      setMachineProductCapacity(null);
       setWeeklyProgram(null);
       setPOHistoryPlans([]);
       return;
@@ -435,6 +439,20 @@ const DailyProductionPlanningPage: React.FC = () => {
         })
         .catch(() => setPOHistoryPlans([]))
         .finally(() => setLoadingPOHistory(false));
+    }
+
+    if (viewPlan.machineId && viewPlan.productionOrder?.productItem?.id) {
+      productCapacityHistoryService.fetchByProductAndMachine(Number(viewPlan.productionOrder.productItem.id), viewPlan.machineId)
+        .then((rec: any) => {
+          if (rec && rec.newCapacity != null) {
+            setMachineProductCapacity(Number(rec.newCapacity));
+          } else {
+            setMachineProductCapacity(null);
+          }
+        })
+        .catch(() => setMachineProductCapacity(null));
+    } else {
+      setMachineProductCapacity(null);
     }
   }, [viewPlan, showViewModal]);
 
@@ -615,22 +633,39 @@ const DailyProductionPlanningPage: React.FC = () => {
         return (
           <div className="flex flex-col items-center gap-1">
             <div className="flex items-center gap-1.5">
-              <StatusBadge status={plan.status === "COMPLETED" && producedQty < plannedQty ? "SHORT_CLOSED" : plan.status} />
-              {(plan.status === "STOPPED" || plan.status === "CANCELLED" || (plan.status === "COMPLETED" && producedQty < plannedQty)) && plan.remarks && (
+              <StatusBadge 
+                status={
+                  plan.productionOrder?.status === "COMPLETED_WITH_SHORTFALL" || (plan.remarks?.includes("Permanently Stopped:") && producedQty < plannedQty && ["POST_PRODUCTION", "COMPLETED"].includes(plan.status))
+                    ? "COMPLETED_WITH_SHORTFALL"
+                    : plan.status === "STOPPED" || plan.status === "SHORT_CLOSED" || (plan.remarks?.includes("Short Closed:") && producedQty < plannedQty && ["POST_PRODUCTION", "COMPLETED"].includes(plan.status))
+                    ? "SHORT_CLOSED"
+                    : plan.status === "COMPLETED" && producedQty < plannedQty
+                    ? "SHORT_CLOSED"
+                    : plan.status
+                }
+                customText={
+                  plan.productionOrder?.status === "COMPLETED_WITH_SHORTFALL" || (plan.remarks?.includes("Permanently Stopped:") && producedQty < plannedQty && ["POST_PRODUCTION", "COMPLETED"].includes(plan.status))
+                    ? "Permanently Stopped" 
+                    : plan.status === "STOPPED" || plan.status === "SHORT_CLOSED" || (plan.remarks?.includes("Short Closed:") && producedQty < plannedQty && ["POST_PRODUCTION", "COMPLETED"].includes(plan.status))
+                    ? "Short Closed"
+                    : undefined
+                }
+              />
+              {(plan.status === "STOPPED" || plan.status === "SHORT_CLOSED" || plan.status === "CANCELLED" || (plan.status === "COMPLETED" && producedQty < plannedQty)) && plan.remarks && (
                 <div className="group relative flex items-center cursor-pointer">
                   <FaInfoCircle className="text-rose-400 text-[13px] hover:text-rose-600 transition-colors" />
                   <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-52 p-2.5 bg-slate-800 text-white text-xs rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-20 shadow-xl text-left">
                     <span className="font-bold text-amber-400 block mb-1">Reason:</span>
                     <div>
-                      {plan.remarks.includes("Stopped:") || plan.remarks.includes("Cancelled:")
-                        ? plan.remarks.split("|").pop()?.replace("Stopped:", "")?.replace("Cancelled:", "").trim()
+                      {plan.remarks.includes("Permanently Stopped:") || plan.remarks.includes("Short Closed:") || plan.remarks.includes("Stopped:") || plan.remarks.includes("Cancelled:")
+                        ? plan.remarks.split("|").pop()?.replace("Permanently Stopped:", "")?.replace("Short Closed:", "")?.replace("Stopped:", "")?.replace("Cancelled:", "").trim()
                         : plan.remarks}
                     </div>
                   </div>
                 </div>
               )}
             </div>
-            {activeStepName && (
+            {activeStepName && plan.productionOrder?.status !== "COMPLETED_WITH_SHORTFALL" && (
               <span className="bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded text-[9px] font-bold border border-indigo-100 uppercase tracking-wide">
                 {activeStepName}
               </span>
@@ -653,8 +688,8 @@ const DailyProductionPlanningPage: React.FC = () => {
         if (plan.status === "IN_PROGRESS") canAdvance = canAdvance && (producedQty >= plannedQty);
         const canLog = plan.status === "IN_PROGRESS";
         const alreadyCarriedForward = Array.isArray(plan.carryForwardTo) && plan.carryForwardTo.length > 0;
-        // Carry forward ONLY for STOPPED plans — not for SHORT_CLOSED (COMPLETED with shortfall)
-        const _canCarryForward = plan.status === "STOPPED" && pendingQty > 0 && !alreadyCarriedForward;
+        // Carry forward for STOPPED and SHORT_CLOSED plans
+        const _canCarryForward = (plan.status === "STOPPED" || plan.status === "SHORT_CLOSED") && pendingQty > 0 && !alreadyCarriedForward;
 
         let targetNextStatus = STATUS_FLOW[plan.status]?.next;
         let dynamicActionTitle = NEXT_ACTION_LABELS[plan.status] || `Move to ${nextStatus}`;
@@ -709,7 +744,7 @@ const DailyProductionPlanningPage: React.FC = () => {
           canAdvance = true;
         }
 
-        if (plan.status === "STOPPED" && producedQty > 0) {
+        if ((plan.status === "STOPPED" || plan.status === "SHORT_CLOSED") && producedQty > 0) {
           targetNextStatus = "POST_PRODUCTION";
           dynamicActionTitle = "Move to Post Production";
           dynamicActionIcon = FaArrowRight;
@@ -719,15 +754,43 @@ const DailyProductionPlanningPage: React.FC = () => {
           canAdvance = true;
         }
 
-        // SHORT_CLOSED: force-stopped plan — can still do post production for the produced qty
-        if (plan.status === "COMPLETED" && producedQty < plannedQty && producedQty > 0) {
-          targetNextStatus = "POST_PRODUCTION";
-          dynamicActionTitle = "Move to Post Production";
-          dynamicActionIcon = FaArrowRight;
-          dynamicActionVariant = "info";
-          dynamicModalTitle = "Move to Post Production";
-          dynamicModalMessage = `This plan was force-stopped with ${producedQty} pcs produced. Move to Post Production for dispatch?`;
-          canAdvance = true;
+        // SHORT_CLOSED: force-stopped plan — can still do post production for the produced qty if not already completed
+        const isPermanentlyStopped = plan.productionOrder?.status === "COMPLETED_WITH_SHORTFALL" || plan.status === "COMPLETED" || plan.status === "COMPLETED_WITH_SHORTFALL";
+        if (isPermanentlyStopped && plan.currentProductionStep !== "Completed" && producedQty > 0) {
+          const customSteps = plan.productionOrder?.productItem?.productionSteps || [];
+          if (customSteps.length > 0) {
+            // Already in post-production steps technically, we should show the step buttons
+            canAdvance = true;
+            const totalStepsCount = customSteps.length;
+            const currentIndex = plan.currentStepIndex || 1;
+            const currentStepName = currentIndex > 0 && currentIndex <= totalStepsCount ? customSteps[currentIndex - 1]?.stepKey : "Post Production";
+            const isLastStep = currentIndex >= totalStepsCount;
+
+            if (!isLastStep) {
+              const nextStepName = customSteps[currentIndex].stepKey;
+              targetNextStatus = "NEXT_STEP";
+              dynamicActionTitle = `Complete ${currentStepName} & Next (${nextStepName})`;
+              dynamicActionIcon = FaArrowRight;
+              dynamicActionVariant = "info";
+              dynamicModalTitle = `Advance Step (${nextStepName})`;
+              dynamicModalMessage = `Complete step "${currentStepName}" and advance to "${nextStepName}"?`;
+            } else {
+              targetNextStatus = "COMPLETED";
+              dynamicActionTitle = `Complete Final Step (${currentStepName}) & Finish Production`;
+              dynamicActionIcon = FaCheckCircle;
+              dynamicActionVariant = "success";
+              dynamicModalTitle = "Complete Production";
+              dynamicModalMessage = `Complete final post-production step "${currentStepName}" and mark production order as ready for dispatch?`;
+            }
+          } else {
+            targetNextStatus = "POST_PRODUCTION";
+            dynamicActionTitle = "Move to Post Production";
+            dynamicActionIcon = FaArrowRight;
+            dynamicActionVariant = "info";
+            dynamicModalTitle = "Move to Post Production";
+            dynamicModalMessage = `This plan was force-stopped with ${producedQty} pcs produced. Move to Post Production for dispatch?`;
+            canAdvance = true;
+          }
         }
 
         return (
@@ -744,7 +807,9 @@ const DailyProductionPlanningPage: React.FC = () => {
                 onClick={() => handleStatusAdvance(plan, producedQty, targetNextStatus as any, dynamicModalTitle as any, dynamicModalMessage as any)}
               />
             )}
-            {!["COMPLETED", "CANCELLED", "STOPPED"].includes(plan.status) && (
+            {!["COMPLETED", "CANCELLED", "STOPPED", "SHORT_CLOSED"].includes(plan.status) && 
+            plan.productionOrder?.status !== "COMPLETED_WITH_SHORTFALL" && 
+            plan.productionOrder?.status !== "CLOSED" && (
               <IconButton variant="danger" title="Stop Production" icon={FaStop} onClick={() => handleStopProductionClick(plan)} />
             )}
             {(plan.status === "DRAFT" || plan.status === "PLANNED") && (
@@ -840,6 +905,7 @@ const DailyProductionPlanningPage: React.FC = () => {
             </FilterPopover>
 
             <CustomButton text="New Production Order" icon={FaPlus} onClick={() => navigate("/production-orders/create")} />
+            <CustomButton text="Daily Report" icon={FaChartBar} onClick={() => { setReportPlan(null); setShowReportModal(true); }} />
             <CustomButton text="New Daily Plan" icon={FaPlus} onClick={openCreateForm} />
           </div>
         </div>
@@ -887,41 +953,7 @@ const DailyProductionPlanningPage: React.FC = () => {
           />
         </div>
 
-        {/* Short-Closed Plans (Force Stopped) — collapsed section */}
-        {closedPlans.length > 0 && (
-          <div className="rounded-xl shadow-sm border border-orange-200 overflow-hidden">
-            <button
-              className="w-full flex items-center justify-between px-5 py-3.5 bg-orange-50 hover:bg-orange-100 transition-colors text-left"
-              onClick={() => setShowClosedPlans(v => !v)}
-            >
-              <div className="flex items-center gap-2.5">
-                <span className="inline-flex items-center gap-1.5 bg-orange-100 text-orange-700 text-xs font-bold px-2.5 py-1 rounded-full border border-orange-200">
-                  <FaStop size={9} />&nbsp;Short Closed Plans
-                </span>
-                <span className="text-xs text-orange-600">
-                  {closedPlans.length} plan{closedPlans.length > 1 ? 's' : ''} &mdash; force-stopped before target reached
-                </span>
-              </div>
-              <span className="text-orange-400 text-xs font-semibold mr-1">
-                {showClosedPlans ? '▲ Hide' : '▼ Show'}
-              </span>
-            </button>
-            {showClosedPlans && (
-              <div className="bg-white">
-                <DataTable
-                  columns={columns}
-                  data={closedPlans}
-                  rowKey={(row: any) => row.dailyPlanId}
-                  density="compact"
-                  emptyMessage={<div className="text-center py-6 text-slate-400 text-sm">No short-closed plans</div>}
-                />
-              </div>
-            )}
-          </div>
-        )}
-
-
-
+  
         {/* ─────── View Modal ─────── */}
         {showViewModal && viewPlan && (
           <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
@@ -1100,7 +1132,7 @@ const DailyProductionPlanningPage: React.FC = () => {
                         } else if (viewPlan.status === "POST_PRODUCTION") {
                           isCompleted = stepNum < currentStep;
                           isActive = stepNum === currentStep;
-                        } else if (viewPlan.status === "STOPPED" || viewPlan.status === "CANCELLED") {
+                        } else if (viewPlan.status === "STOPPED" || viewPlan.status === "CANCELLED" || viewPlan.status === "SHORT_CLOSED") {
                           isCompleted = stepNum < currentStep;
                         }
 
@@ -1196,6 +1228,69 @@ const DailyProductionPlanningPage: React.FC = () => {
                     </div>
                   )}
                 </div>
+
+                {/* ── Daily Target vs Actual Comparison ── */}
+                {viewHourlyLogs.length > 0 && (
+                  <div>
+                    <h6 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Target vs Actual Comparison</h6>
+                    <div className="border border-slate-200 rounded-xl overflow-hidden bg-white">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="bg-slate-50 border-b border-slate-200">
+                            <th className="px-4 py-2.5 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider">Machine</th>
+                            <th className="px-4 py-2.5 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider">Product</th>
+                            <th className="px-4 py-2.5 text-center text-[11px] font-bold text-slate-500 uppercase tracking-wider">Capacity</th>
+                            <th className="px-4 py-2.5 text-center text-[11px] font-bold text-slate-500 uppercase tracking-wider">Produced</th>
+                            <th className="px-4 py-2.5 text-center text-[11px] font-bold text-slate-500 uppercase tracking-wider">Pending</th>
+                            <th className="px-4 py-2.5 text-center text-[11px] font-bold text-slate-500 uppercase tracking-wider">Efficiency</th>
+                            <th className="px-4 py-2.5 text-center text-[11px] font-bold text-slate-500 uppercase tracking-wider">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {(() => {
+                            const capacity = machineProductCapacity || weeklyOrderTargetQty || 0;
+                            const totalProduced = weeklyOrderProducedQty;
+                            const pending = Math.max(0, capacity - totalProduced);
+                            const efficiency = capacity > 0 ? ((totalProduced / capacity) * 100).toFixed(0) : "0";
+                            const shortfall = capacity - totalProduced;
+                            
+                            let statusText = "";
+                            let customColor = { bg: "", text: "" };
+
+                            if (shortfall <= 0) {
+                               statusText = "Highest";
+                               customColor = { bg: '#d1fae5', text: '#065f46' };
+                            } else if (shortfall <= 15) {
+                               statusText = "Medium";
+                               customColor = { bg: '#fef3c7', text: '#b45309' };
+                            } else {
+                               statusText = " Low";
+                               customColor = { bg: '#fee2e2', text: '#b91c1c' };
+                            }
+                            
+                            return (
+                              <tr>
+                                <td className="px-4 py-3 text-slate-700 font-medium text-sm">
+                                  {viewPlan.machine?.machineName || viewPlan.machineId || "—"}
+                                </td>
+                                <td className="px-4 py-3 text-slate-700 text-sm">
+                                  {viewPlan.productionOrder?.productItem?.productName || "—"}
+                                </td>
+                                <td className="px-4 py-3 text-center text-slate-600 font-bold">{capacity}</td>
+                                <td className="px-4 py-3 text-center text-slate-600 font-bold">{totalProduced}</td>
+                                <td className="px-4 py-3 text-center text-amber-600 font-bold">{pending}</td>
+                                <td className="px-4 py-3 text-center text-indigo-600 font-bold">{efficiency}%</td>
+                                <td className="px-4 py-3 text-center">
+                                  <StatusBadge status="CUSTOM" customText={statusText} customColor={customColor} />
+                                </td>
+                              </tr>
+                            );
+                          })()}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
 
                 {/* ── Production Order History ── */}
                 <div className="border border-slate-200 rounded-xl overflow-hidden">
@@ -1502,6 +1597,18 @@ const DailyProductionPlanningPage: React.FC = () => {
           order={selectedPOForView}
         />
       </div>
+      {/* Report Modal */}
+      {showReportModal && (
+        <DailyProductionReportModal
+          show={showReportModal}
+          onHide={() => { setShowReportModal(false); setReportPlan(null); }}
+          dailyPlans={reportPlan ? [reportPlan] : dailyPlans}
+          hourlyProductions={[]}
+          machines={machines}
+          shifts={shifts}
+          products={[]}
+        />
+      )}
     </div>
   );
 };

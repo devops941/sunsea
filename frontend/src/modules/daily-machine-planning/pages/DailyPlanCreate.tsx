@@ -255,8 +255,8 @@ const DailyPlanCreate: React.FC = () => {
 
         const po = p.productionOrder;
 
-        // PO was permanently stopped (PARTIAL_COMPLETED from force-stop) → hide from dropdown
-        if (po && po.status === "PARTIAL_COMPLETED" && p.weeklyProgramId !== stateWpId) return false;
+        // PO was permanently stopped (PARTIAL_COMPLETED/COMPLETED_WITH_SHORTFALL/CLOSED from force-stop) → hide from dropdown
+        if (po && (po.status === "PARTIAL_COMPLETED" || po.status === "COMPLETED_WITH_SHORTFALL" || po.status === "CLOSED") && p.weeklyProgramId !== stateWpId) return false;
         if (po) {
           const targetQty = Number(po.targetQty || 0);
           const producedQty = Number(po.producedQty || 0);
@@ -408,15 +408,19 @@ const DailyPlanCreate: React.FC = () => {
       } catch { return 0; }
     };
 
+    const poTarget = Number(wp.productionOrder?.targetQty || 0);
+    const poProduced = Number(wp.productionOrder?.producedQty || 0);
+    const poRemaining = Math.max(0, poTarget - poProduced);
+
     if (!isCarryForward) {
-      // First plan — use capacity directly
+      // First plan — use remaining PO qty but capped at capacity if capacity > 0
       getCapacity().then((cap) => {
-        const qty = cap > 0 ? cap : (wpPlanned || 0);
-        setRemainingQty(qty);
+        setRemainingQty(poRemaining);
         if (!isEdit && machineId) {
           if (location.state && (location.state as any).plannedQty) {
             setPlannedQty(String(Number((location.state as any).plannedQty)));
-          } else if (qty > 0) {
+          } else {
+            const qty = (cap > 0 && poRemaining > cap) ? cap : poRemaining;
             setPlannedQty(String(qty));
           }
         }
@@ -447,8 +451,6 @@ const DailyPlanCreate: React.FC = () => {
             : 0;
           return sum + Math.max(Number(p.plannedQty || 0), produced);
         }, 0);
-      const poTarget = Number(wp.productionOrder?.targetQty || 0);
-      const poProduced = Number(wp.productionOrder?.producedQty || 0);
       const remaining = Math.max(0, poTarget - poProduced);
       setRemainingQty(remaining);
       if (!isEdit) {
@@ -456,7 +458,8 @@ const DailyPlanCreate: React.FC = () => {
           const stateQty = Number((location.state as any).plannedQty);
           setPlannedQty(String(Math.round(stateQty * 1000) / 1000));
         } else if (effectiveCapacity > 0) {
-          setPlannedQty(String(effectiveCapacity));
+          const qty = (remaining > effectiveCapacity) ? effectiveCapacity : remaining;
+          setPlannedQty(String(qty));
         } else {
           setPlannedQty(String(remaining > 0 ? remaining : ""));
         }
@@ -1007,9 +1010,14 @@ const DailyPlanCreate: React.FC = () => {
                     placeholder={remainingQty !== null ? `Max: ${remainingQty}` : "e.g. 500"}
                     onChange={(e) => setPlannedQty(e.target.value)}
                   />
-                  {machineId && machineProductCapacity != null && (
+                   {machineId && machineProductCapacity != null && (
                     <div className="text-[11px] text-blue-600 font-semibold mt-1">
                       Product Capacity: {machineProductCapacity.toLocaleString()} / Shift
+                    </div>
+                  )}
+                  {machineId && machineProductCapacity != null && Number(plannedQty) < machineProductCapacity && (
+                    <div className="text-[11px] text-indigo-600 font-semibold mt-1">
+                      Available shift capacity: {machineProductCapacity - Number(plannedQty)} pcs remaining.
                     </div>
                   )}
                   {overCapacity && (
@@ -1019,7 +1027,7 @@ const DailyPlanCreate: React.FC = () => {
                     </div>
                   )}
                   {remainingQty !== null && !overCapacity && Number(plannedQty) > 0 && (
-                    <div className="text-slate-500 text-xs ">
+                    <div className="text-slate-500 text-xs mt-1">
                       Remaining after this plan: {remainingQty - Number(plannedQty)} pcs
                     </div>
                   )}

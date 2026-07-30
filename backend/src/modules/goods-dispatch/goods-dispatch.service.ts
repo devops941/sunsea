@@ -57,9 +57,8 @@ export class GoodsDispatchService {
     const orders = await prisma.productionOrder.findMany({
       where: {
         ...where,
-        // ✅ STEP 8: Only READY_FOR_DISPATCH or PARTIAL_COMPLETED orders are eligible for dispatch
-        // (COMPLETED tolerated for legacy)
-        status: { in: ["READY_FOR_DISPATCH", "COMPLETED", "PARTIAL_COMPLETED"] },
+        // ✅ STEP 8: Only READY_FOR_DISPATCH, PARTIAL_COMPLETED, COMPLETED_WITH_SHORTFALL or CLOSED orders are eligible for dispatch
+        status: { in: ["READY_FOR_DISPATCH", "COMPLETED", "PARTIAL_COMPLETED", "COMPLETED_WITH_SHORTFALL", "CLOSED"] },
       },
       include: {
         productItem: true,
@@ -89,8 +88,8 @@ export class GoodsDispatchService {
       
       // Calculate dispatchable produced qty
       let dispatchableProducedQty = 0;
-      if (o.status === "PARTIAL_COMPLETED") {
-        // For partial, only count quantities from plans that finished post-production
+      if (["PARTIAL_COMPLETED", "COMPLETED_WITH_SHORTFALL", "CLOSED"].includes(o.status)) {
+        // For partial/short-closed, only count quantities from plans that finished post-production
         const finishedPlans = o.dailyProductionPlans.filter((p: any) => p.status === "COMPLETED" || p.status === "SHORT_CLOSED");
         dispatchableProducedQty = finishedPlans.reduce((sum, p) => {
           return sum + p.hourlyProductions.reduce((hSum: number, h: any) => hSum + Number(h.qtyProduced), 0);
@@ -143,8 +142,8 @@ export class GoodsDispatchService {
         throw new ApiError(404, `Production Order ${item.productionOrderId} not found`);
       }
 
-      // ✅ STEP 8 RULE: Only READY_FOR_DISPATCH, PARTIAL_COMPLETED (or legacy COMPLETED) orders can be dispatched
-      if (!['READY_FOR_DISPATCH', 'COMPLETED', 'PARTIAL_COMPLETED'].includes(po.status)) {
+      // ✅ STEP 8 RULE: Only READY_FOR_DISPATCH, PARTIAL_COMPLETED (or legacy COMPLETED), COMPLETED_WITH_SHORTFALL, or CLOSED orders can be dispatched
+      if (!['READY_FOR_DISPATCH', 'COMPLETED', 'PARTIAL_COMPLETED', 'COMPLETED_WITH_SHORTFALL', 'CLOSED'].includes(po.status)) {
         throw new ApiError(
           400,
           `Production Order ${item.productionOrderId} is not eligible for dispatch. ` +
@@ -498,8 +497,13 @@ export class GoodsDispatchService {
             });
             const totalDispatched = Number(allDispatches._sum.dispatchQty || 0);
 
-            const isFullyDispatched = targetQty > 0 && (totalDispatched >= targetQty || (producedQty >= targetQty && totalDispatched >= producedQty));
-            const newPoStatus = isFullyDispatched ? "DISPATCHED" : "PARTIAL_COMPLETED";
+            const isShortClosed = ["COMPLETED_WITH_SHORTFALL", "CLOSED", "PARTIAL_COMPLETED"].includes(poRecord.status);
+            const isFullyDispatched = targetQty > 0 && (
+              totalDispatched >= targetQty || 
+              (isShortClosed && totalDispatched >= producedQty) ||
+              (producedQty >= targetQty && totalDispatched >= producedQty)
+            );
+            const newPoStatus = isFullyDispatched ? "DISPATCHED" : (isShortClosed ? poRecord.status : "PARTIAL_COMPLETED");
 
             if (poRecord.status !== newPoStatus) {
               await tx.productionOrder.update({

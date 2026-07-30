@@ -112,10 +112,12 @@ const WeeklyMachineScheduleCreate: React.FC = () => {
     }, [weekStartDate]);
 
     const displayOrders = useMemo(() => {
+        const scheduledPoIds = new Set(alreadyScheduled.map((item: any) => item.productionOrderId));
         return productionOrders.filter((po: any) => {
-            return po.status === "RM_AVAILABLE" || po.status === "READY_FOR_PLANNING" || po.status === "SCHEDULE_DELETED";
+            const isReadyStatus = po.status === "RM_AVAILABLE" || po.status === "READY_FOR_PLANNING" || po.status === "SCHEDULE_DELETED";
+            return isReadyStatus && !scheduledPoIds.has(po.productionOrderId);
         });
-    }, [productionOrders]);
+    }, [productionOrders, alreadyScheduled]);
 
     const handleToggleSelect = (poId: string) => {
         setSelectedOrders(prev => ({ ...prev, [poId]: !prev[poId] }));
@@ -239,7 +241,7 @@ const WeeklyMachineScheduleCreate: React.FC = () => {
                         <div className="p-0">
                             {loadingPo ? (
                                 <div className="text-center p-10 text-slate-500">Loading...</div>
-                            ) : displayOrders.length > 0 ? (
+                            ) : (displayOrders.length > 0 || alreadyScheduled.length > 0) ? (
                                 <div className="overflow-x-auto">
                                     <table className="w-full text-left text-sm text-slate-600">
                                         <thead className="bg-slate-50 border-b border-slate-200 text-slate-700">

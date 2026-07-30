@@ -15,6 +15,8 @@ export const PRODUCTION_STATUS = {
   IN_PRODUCTION: "IN_PRODUCTION",
   POST_PRODUCTION: "POST_PRODUCTION",
   PARTIAL_COMPLETED: "PARTIAL_COMPLETED",
+  COMPLETED_WITH_SHORTFALL: "COMPLETED_WITH_SHORTFALL",
+  CLOSED: "CLOSED",
   READY_FOR_DISPATCH: "READY_FOR_DISPATCH",
   DISPATCHED: "DISPATCHED",
   COMPLETED: "COMPLETED",       // legacy alias for READY_FOR_DISPATCH
@@ -27,6 +29,8 @@ export const LOCKED_STATUSES = [
   "IN_PRODUCTION",
   "POST_PRODUCTION",
   "PARTIAL_COMPLETED",
+  "COMPLETED_WITH_SHORTFALL",
+  "CLOSED",
   "READY_FOR_DISPATCH",
   "DISPATCHED",
   "CANCELLED",
@@ -189,7 +193,7 @@ export class StatusSyncService {
 
     if (statuses.some((s: string) => s === "DISPATCHED")) {
       newSoStatus = "DISPATCHED";
-    } else if (statuses.some((s: string) => s === "READY_FOR_DISPATCH" || s === "PARTIAL_COMPLETED" || s === "DISPATCHED" || s === "COMPLETED")) {
+    } else if (statuses.some((s: string) => s === "READY_FOR_DISPATCH" || s === "PARTIAL_COMPLETED" || s === "COMPLETED_WITH_SHORTFALL" || s === "CLOSED" || s === "DISPATCHED" || s === "COMPLETED")) {
       newSoStatus = "READY_FOR_DISPATCH";
     } else if (statuses.some((s: string) => s === "POST_PRODUCTION")) {
       newSoStatus = "IN_PROGRESS";

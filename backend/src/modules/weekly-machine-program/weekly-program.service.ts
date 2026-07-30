@@ -74,7 +74,7 @@ class WeeklyProgramService {
       (productionOrder as any).status = "PARTIAL_COMPLETED";
     }
 
-    if (productionOrder.status === "COMPLETED" || (productionOrder.status === "DISPATCHED" && orderProducedQtyCheck >= orderTargetQtyCheck) || productionOrder.status === "CANCELLED") {
+    if (productionOrder.status === "COMPLETED" || (productionOrder.status === "DISPATCHED" && orderProducedQtyCheck >= orderTargetQtyCheck) || productionOrder.status === "CANCELLED" || productionOrder.status === "COMPLETED_WITH_SHORTFALL" || productionOrder.status === "CLOSED") {
       throw new ApiError(400, `Cannot schedule a Weekly Program for a Production Order that is already ${productionOrder.status.toLowerCase()}`);
     }
 
@@ -690,7 +690,7 @@ class WeeklyProgramService {
     const weeklyProgram = await this.findById(weeklyProgramId);
     
     // Prevent deletion if production has started or daily planning is done
-    const lockedStatuses = ["DAILY_PLANNED", "IN_PROGRESS", "IN_PRODUCTION", "POST_PRODUCTION", "PARTIAL_COMPLETED", "READY_FOR_DISPATCH", "DISPATCHED", "COMPLETED"];
+    const lockedStatuses = ["DAILY_PLANNED", "IN_PROGRESS", "IN_PRODUCTION", "POST_PRODUCTION", "PARTIAL_COMPLETED", "COMPLETED_WITH_SHORTFALL", "CLOSED", "READY_FOR_DISPATCH", "DISPATCHED", "COMPLETED"];
     if (lockedStatuses.includes(weeklyProgram.status) || lockedStatuses.includes(weeklyProgram.productionOrder?.status || "")) {
       throw new ApiError(400, "Cannot delete weekly program once production has started.");
     }

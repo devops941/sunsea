@@ -602,7 +602,8 @@ const ProductionOrderCreate: React.FC = () => {
             );
 
             const opts = filtered.map((rm) => {
-                const available = (Number(rm.onHandQty) || 0) - (Number(rm.reservedQty) || 0);
+                const availableVal = (Number(rm.onHandQty) || 0) - (Number(rm.reservedQty) || 0);
+                const available = Math.round(availableVal * 100) / 100;
                 return {
                     label: `${rm.materialName || rm.name || rm.rawMaterialId} (Available: ${available})`,
                     value: (rm.rawMaterialId ?? rm.id)?.toString() ?? "",
