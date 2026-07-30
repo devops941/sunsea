@@ -115,6 +115,43 @@ app.get("/", (req, res) => {
     timestamp: new Date().toISOString()
   });
 });
+
+app.get("/api/debug/smtp-test", async (req, res) => {
+  const nodemailer = require("nodemailer");
+  const results: any[] = [];
+
+  const test = async (port: number, secure: boolean) => {
+    const transporter = nodemailer.createTransport({
+      host: "smtp.gmail.com",
+      port,
+      secure,
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+      },
+      connectionTimeout: 8000,
+      greetingTimeout: 8000,
+    });
+
+    try {
+      await transporter.verify();
+      results.push({ port, secure, status: "SUCCESS" });
+    } catch (e: any) {
+      results.push({
+        port,
+        secure,
+        status: "FAILED",
+        code: e.code,
+        message: e.message,
+      });
+    }
+  };
+
+  await test(587, false);
+  await test(465, true);
+
+  res.json({ results });
+});
 app.use("/api", apiRoutes);
 
 /** Route Not Found Handler*/
