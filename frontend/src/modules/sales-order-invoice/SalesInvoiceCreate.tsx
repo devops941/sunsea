@@ -246,7 +246,7 @@ const SalesInvoiceForm: React.FC = () => {
           }));
           setPayments(legacyPayments);
         })
-        .catch((err) => {
+        .catch(() => {
           toast.error("Failed to load sales invoice details");
           navigate("/sales-invoices");
         });
