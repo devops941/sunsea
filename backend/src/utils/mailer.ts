@@ -1,5 +1,3 @@
-import dns from "node:dns";
-dns.setDefaultResultOrder("ipv4first");
 import nodemailer from "nodemailer";
 import { prisma } from "../config/prisma";
 
@@ -45,8 +43,7 @@ export const sendEmail = async (options: SendEmailOptions) => {
         user: smtpUser,
         pass: smtpPass,
       },
-      family: 4, // Force IPv4
-    } as any);
+    });
 
     const info = await transporter.sendMail({
       from: `"${fromName}" <${fromEmail}>`,

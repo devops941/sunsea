@@ -210,7 +210,7 @@ const AppRoutes = () => {
               <Route path="/customers/edit/:id" element={<CustomerEditPage />} />
             </Route>
 
-            <Route>
+            <Route element={<ProtectedRoute permission="suppliers.view" />}>
               <Route path="/suppliers" element={<PurchaseTabs />} />
             </Route>
             {/* Suppliers Create Route */}
@@ -694,7 +694,7 @@ const AppRoutes = () => {
         <Route path="*" element={<NotFoundPage />} />
 
       </Routes>
-    </Suspense >
+    </Suspense>
   );
 };
 

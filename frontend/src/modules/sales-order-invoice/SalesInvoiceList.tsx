@@ -17,7 +17,6 @@ import SearchInput from "../../components/ui/SearchInput/SearchInput";
 import EmailButton from "../../components/ui/EmailButton/EmailButton";
 import { Mail } from "lucide-react";
 import { useAppSelector } from "../../hooks/reduxHooks";
-import { useSocketSync } from "../../hooks/useSocketSync";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -76,8 +75,6 @@ const SalesInvoiceList: React.FC = () => {
     useEffect(() => {
         fetchInvoices();
     }, [fetchInvoices]);
-
-    useSocketSync("salesInvoice", undefined, fetchInvoices);
 
     const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
         setSearchTerm(e.target.value);

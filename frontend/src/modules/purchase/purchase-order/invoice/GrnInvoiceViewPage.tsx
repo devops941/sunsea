@@ -6,7 +6,6 @@ import { useSelector, useDispatch } from "react-redux";
 
 import CommonConfirmModal from "../../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import { grnInvoiceService } from "../../../../services/grnInvoiceService";
-import { useSocketSync } from "../../../../hooks/useSocketSync";
 import CustomButton from "../../../../components/ui/Button/Button";
 import SearchInput from "../../../../components/ui/SearchInput/SearchInput";
 import { fetchCompany } from "../../../../features/company/companySlice";
@@ -104,15 +103,6 @@ const GrnInvoiceViewPage: React.FC = () => {
             loadDetail(idParam);
         }
     }, [idParam, loadDetail]);
-
-    const handleSocketUpdate = useCallback(() => {
-        fetchInvoicesList();
-        if (idParam) {
-            loadDetail(idParam);
-        }
-    }, [fetchInvoicesList, idParam, loadDetail]);
-
-    useSocketSync("grnInvoice", undefined, handleSocketUpdate);
 
     const handleDeleteClick = (id: string) => {
         setItemToDelete(id);

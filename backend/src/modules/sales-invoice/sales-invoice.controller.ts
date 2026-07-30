@@ -8,7 +8,6 @@ import companyService from "../company/company.service";
 import { generateInvoiceHtml } from "../../templates/invoiceTemplate";
 import { generatePdfFromHtml } from "../../utils/pdfGenerator";
 import { sendEmail } from "../../utils/mailer";
-import { getIO } from "../../socket/socket";
 
 class SalesInvoiceController {
   create = asyncHandler(async (req: Request, res: Response) => {
@@ -27,8 +26,6 @@ class SalesInvoiceController {
       userId,
       companyId,
     });
-
-    getIO().emit("salesInvoice:created", salesInvoice);
 
     return res.status(201).json(
       new ApiResponse("Sales Invoice created successfully", salesInvoice)
@@ -84,8 +81,6 @@ class SalesInvoiceController {
     const id = req.params.id as string;
     await salesInvoiceService.deleteSalesInvoice(id, companyId);
 
-    getIO().emit("salesInvoice:deleted", { id });
-
     return res.status(200).json(
       new ApiResponse("Sales Invoice deleted successfully")
     );
@@ -108,8 +103,6 @@ class SalesInvoiceController {
       userId,
       companyId,
     });
-
-    getIO().emit("salesInvoice:updated", salesInvoice);
 
     return res.status(200).json(
       new ApiResponse("Sales Invoice updated successfully", salesInvoice)

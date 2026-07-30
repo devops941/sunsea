@@ -13,7 +13,6 @@ import ViewButton from "../../../../components/ui/viewbutton/ViewButton";
 import DeleteButton from "../../../../components/ui/DeleteButton/DeleteButton";
 import EditButton from "../../../../components/ui/EditButton/EditButton";
 import StatusBadge from "../../../../components/ui/StatusBadge/Badge";
-import { useSocketSync } from "../../../../hooks/useSocketSync";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -62,8 +61,6 @@ const InvoiceList: React.FC = () => {
     useEffect(() => {
         fetchInvoices();
     }, [fetchInvoices]);
-
-    useSocketSync("grnInvoice", undefined, fetchInvoices);
 
     const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
         setSearchTerm(e.target.value);
