@@ -33,9 +33,9 @@ export class GoodsDispatchService {
     dateTo?: string;
   }) {
     const where: any = {
-      // ✅ STEP 8: Only READY_FOR_DISPATCH orders are eligible for dispatch
+      // ✅ STEP 7–8: IN_PRODUCTION and later statuses are eligible for dispatch
       // FG stock is NOT created at COMPLETED — it is created here at dispatch receipt
-      status: { in: ["READY_FOR_DISPATCH", "COMPLETED"] }, // COMPLETED tolerated for legacy
+      status: { in: ["IN_PRODUCTION", "POST_PRODUCTION", "READY_FOR_DISPATCH", "COMPLETED", "PARTIAL_COMPLETED", "COMPLETED_WITH_SHORTFALL", "CLOSED"] },
     };
 
     if (filters.productItemId) where.productItemId = BigInt(filters.productItemId);
@@ -57,13 +57,21 @@ export class GoodsDispatchService {
     const orders = await prisma.productionOrder.findMany({
       where: {
         ...where,
-        // ✅ STEP 8: Only READY_FOR_DISPATCH, PARTIAL_COMPLETED, COMPLETED_WITH_SHORTFALL or CLOSED orders are eligible for dispatch
-        status: { in: ["READY_FOR_DISPATCH", "COMPLETED", "PARTIAL_COMPLETED", "COMPLETED_WITH_SHORTFALL", "CLOSED"] },
+        // ✅ Eligible for dispatch: production started and at least some qty produced
+        status: { in: ["IN_PRODUCTION", "POST_PRODUCTION", "READY_FOR_DISPATCH", "COMPLETED", "PARTIAL_COMPLETED", "COMPLETED_WITH_SHORTFALL", "CLOSED"] },
       },
       include: {
         productItem: true,
         Machine: true,
         goodsDispatchItems: {
+          // Only count items from dispatches that are NOT rejected
+          where: {
+            dispatch: {
+              status: {
+                notIn: ["GATE_REJECTED", "STORE_REJECTED"],
+              },
+            },
+          },
           select: {
             dispatchQty: true,
           },
@@ -88,16 +96,23 @@ export class GoodsDispatchService {
       
       // Calculate dispatchable produced qty
       let dispatchableProducedQty = 0;
-      if (["PARTIAL_COMPLETED", "COMPLETED_WITH_SHORTFALL", "CLOSED"].includes(o.status)) {
-        // For partial/short-closed, only count quantities from plans that finished post-production
-        const finishedPlans = o.dailyProductionPlans.filter((p: any) => p.status === "COMPLETED" || p.status === "SHORT_CLOSED");
+      if (["IN_PRODUCTION", "POST_PRODUCTION", "PARTIAL_COMPLETED", "COMPLETED_WITH_SHORTFALL", "CLOSED"].includes(o.status)) {
+        // For active production or partial/short-closed, only count quantities from plans that finished post-production OR were stopped/short-closed
+        const finishedPlans = o.dailyProductionPlans.filter((p: any) => 
+          p.status === "COMPLETED" || p.status === "SHORT_CLOSED" || p.status === "STOPPED"
+        );
         dispatchableProducedQty = finishedPlans.reduce((sum, p) => {
           return sum + p.hourlyProductions.reduce((hSum: number, h: any) => hSum + Number(h.qtyProduced), 0);
         }, 0);
+        // Fallback: if no finished plans found, use the PO's producedQty directly
+        if (dispatchableProducedQty === 0 && Number(o.producedQty) > 0) {
+          dispatchableProducedQty = Number(o.producedQty);
+        }
       } else {
-        // For fully completed, everything produced is dispatchable
+        // For fully completed (READY_FOR_DISPATCH / COMPLETED), everything produced is dispatchable
         dispatchableProducedQty = Number(o.producedQty);
       }
+
 
       const pendingQty = Math.max(0, dispatchableProducedQty - totalDispatched);
       return {
@@ -142,8 +157,8 @@ export class GoodsDispatchService {
         throw new ApiError(404, `Production Order ${item.productionOrderId} not found`);
       }
 
-      // ✅ STEP 8 RULE: Only READY_FOR_DISPATCH, PARTIAL_COMPLETED (or legacy COMPLETED), COMPLETED_WITH_SHORTFALL, or CLOSED orders can be dispatched
-      if (!['READY_FOR_DISPATCH', 'COMPLETED', 'PARTIAL_COMPLETED', 'COMPLETED_WITH_SHORTFALL', 'CLOSED'].includes(po.status)) {
+      // ✅ STEP 7–8: IN_PRODUCTION and later statuses can be dispatched
+      if (!['IN_PRODUCTION', 'POST_PRODUCTION', 'READY_FOR_DISPATCH', 'COMPLETED', 'PARTIAL_COMPLETED', 'COMPLETED_WITH_SHORTFALL', 'CLOSED'].includes(po.status)) {
         throw new ApiError(
           400,
           `Production Order ${item.productionOrderId} is not eligible for dispatch. ` +
@@ -497,7 +512,7 @@ export class GoodsDispatchService {
             });
             const totalDispatched = Number(allDispatches._sum.dispatchQty || 0);
 
-            const isShortClosed = ["COMPLETED_WITH_SHORTFALL", "CLOSED", "PARTIAL_COMPLETED"].includes(poRecord.status);
+            const isShortClosed = ["COMPLETED_WITH_SHORTFALL", "CLOSED"].includes(poRecord.status);
             const isFullyDispatched = targetQty > 0 && (
               totalDispatched >= targetQty || 
               (isShortClosed && totalDispatched >= producedQty) ||

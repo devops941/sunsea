@@ -97,9 +97,11 @@ class ProductionOrderController {
 
   startProduction = asyncHandler(async (req: Request, res: Response) => {
     const userId = req.user?.userId;
+    const { dailyPlanId } = req.body;
     const result = await productionOrderService.startProduction(
       String(req.params.productionOrderId),
-      userId
+      userId,
+      dailyPlanId ? String(dailyPlanId) : undefined
     );
     return res.status(200).json(
       new ApiResponse("Production started successfully. Raw materials issued.", result)

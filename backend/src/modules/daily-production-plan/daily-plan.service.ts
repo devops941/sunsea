@@ -62,6 +62,7 @@ class DailyPlanService {
       "POST_PRODUCTION", // allow carrying forward production even if previous shifts are in post-production
       "PARTIAL_COMPLETED", // allow planning remaining quantity for partially completed orders
       "READY_FOR_DISPATCH", // allow planning remaining quantity if target is not yet fully met
+      "DISPATCHED", // allow if accidentally fully dispatched but target not met
     ];
     if (!dailyPlanAllowedStatuses.includes(productionOrder.status)) {
       throw new ApiError(
@@ -283,7 +284,7 @@ class DailyPlanService {
         data.status === "IN_PROGRESS" &&
         existingPlan.status !== "IN_PROGRESS"
       ) {
-        if (!["DAILY_PLANNED", "IN_PRODUCTION", "IN_PROGRESS", "WEEKLY_SCHEDULED", "MATERIAL_ISSUED", "POST_PRODUCTION", "PARTIAL_COMPLETED"].includes(productionOrder.status)) {
+        if (!["DAILY_PLANNED", "IN_PRODUCTION", "IN_PROGRESS", "WEEKLY_SCHEDULED", "MATERIAL_ISSUED", "POST_PRODUCTION", "PARTIAL_COMPLETED", "DISPATCHED"].includes(productionOrder.status)) {
           throw new ApiError(
             400,
             `Daily Plan cannot be started because the Production Order status is "${productionOrder.status}". ` +
@@ -453,6 +454,11 @@ class DailyPlanService {
             updateData.currentStepIndex = totalCustomStepsCount + 1;
             updateData.currentProductionStep = "Completed";
             updateData.status = "COMPLETED";
+
+            // If this plan was previously short-closed but is now completing normally via POST_PRODUCTION, strip the Short Closed remarks
+            if (existingPlan.status === "POST_PRODUCTION" && existingPlan.remarks?.includes("Short Closed:")) {
+              updateData.remarks = existingPlan.remarks.replace(/Short Closed:\s*/g, "").replace(/\s*\|\s*/g, " | ").trim();
+            }
 
             // Check if all OTHER daily plans for this PO are completed or cancelled
             const otherPlans = await tx.dailyProductionPlan.findMany({

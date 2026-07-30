@@ -13,12 +13,19 @@ export const createRole = async (
 };
 
 export const getAllRoles = async (page?: number, limit?: number, search?: string) => {
-  const where: any = {};
+  const where: any = {
+    // Never expose the Super Admin role in the management list
+    NOT: { code: "ROLE_ADMIN" },
+  };
   if (search) {
-    where.OR = [
-      { code: { contains: search, mode: "insensitive" } },
-      { name: { contains: search, mode: "insensitive" } },
+    where.AND = [
+      { NOT: { code: "ROLE_ADMIN" } },
+      { OR: [
+        { code: { contains: search, mode: "insensitive" } },
+        { name: { contains: search, mode: "insensitive" } },
+      ]},
     ];
+    delete where.NOT; // replaced by AND above
   }
 
   if (page !== undefined && limit !== undefined) {
