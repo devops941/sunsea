@@ -137,7 +137,7 @@ const defaultValues: ProductionOrderFormValues = {
     lotNo: "",
     sourceStoreId: "",
     destinationStoreId: "",
-    status: "READY_FOR_PLANNING",
+    status: "CREATED",
     remarks: "",
 };
 
@@ -876,7 +876,7 @@ const ProductionOrderCreate: React.FC = () => {
             productionOrderService.getById(id)
                 .then((fullOrder) => {
                     let rmRows: any[];
-                    const nonEditableStatuses = ["SCHEDULED", "IN_PROGRESS", "COMPLETED"];
+                    const nonEditableStatuses = ["DAILY_PLANNED", "IN_PRODUCTION", "POST_PRODUCTION", "PARTIAL_COMPLETED", "COMPLETED_WITH_SHORTFALL", "CLOSED", "READY_FOR_DISPATCH", "DISPATCHED", "CANCELLED"];
                     if (!nonEditableStatuses.includes(fullOrder.status) && (fullOrder as any).draftRawMaterials) {
                         rmRows = ((fullOrder as any).draftRawMaterials as any[]).map((rm: any) => ({
                             rawMaterialId: rm.rawMaterialId?.toString() || "",
@@ -908,7 +908,7 @@ const ProductionOrderCreate: React.FC = () => {
                         lotNo: fullOrder.lotNo || "",
                         sourceStoreId: fullOrder.sourceStoreId?.toString() || "",
                         destinationStoreId: fullOrder.destinationStoreId?.toString() || "",
-                        status: fullOrder.status || "READY_FOR_PLANNING",
+                        status: fullOrder.status || "CREATED",
                         remarks: fullOrder.remarks || "",
                         products: (fullOrder as any).products ? (fullOrder as any).products.map((p: any) => ({
                             productItemId: p.productItemId?.toString() || p.productId?.toString() || "",
@@ -1428,7 +1428,7 @@ const ProductionOrderCreate: React.FC = () => {
                                             : "Create Production Order"
                                 }
                                 icon={isSubmitting ? undefined : FaSave}
-                                onClick={handleSubmit((data) => onSubmit({ ...data, status: data.status === "DRAFT" ? "READY_FOR_PLANNING" : data.status }))}
+                                onClick={handleSubmit((data) => onSubmit({ ...data, status: data.status === "DRAFT" ? "CREATED" : data.status }))}
                                 type="button"
                                 disabled={isSubmitting}
                             />

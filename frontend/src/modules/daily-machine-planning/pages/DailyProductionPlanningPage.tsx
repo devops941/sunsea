@@ -49,6 +49,7 @@ const STATUS_FLOW: Record<string, { label: string; next: string | null; color: s
   COMPLETED: { label: "Completed", next: null, color: "success" },
   CANCELLED: { label: "Cancelled", next: null, color: "danger" },
   STOPPED: { label: "Stopped", next: null, color: "danger" },
+  SHORT_CLOSED: { label: "Short Closed", next: null, color: "warning" },
 };
 
 const NEXT_ACTION_LABELS: Record<string, string> = {
@@ -226,7 +227,7 @@ const DailyProductionPlanningPage: React.FC = () => {
   // Stats (active plans only)
   const stats = useMemo(() => {
     const total = filteredPlans.length;
-    const planned = filteredPlans.filter((p: any) => p.status === "PLANNED" || p.status === "APPROVED").length;
+    const planned = filteredPlans.filter((p: any) => p.status === "PLANNED").length;
     const running = filteredPlans.filter((p: any) => p.status === "IN_PROGRESS").length;
     const completed = filteredPlans.filter((p: any) => p.status === "COMPLETED").length;
     const totalPlanned = filteredPlans.reduce((s: number, p: any) => s + Number(p.plannedQty || 0), 0);
@@ -643,7 +644,7 @@ const DailyProductionPlanningPage: React.FC = () => {
                     : plan.status === "STOPPED" || plan.status === "SHORT_CLOSED" || (plan.remarks?.includes("Short Closed:") && producedQty < plannedQty && ["POST_PRODUCTION", "COMPLETED"].includes(plan.status))
                     ? "SHORT_CLOSED"
                     : plan.status === "COMPLETED"
-                    ? "READY_FOR_DISPATCH"
+                    ? (["DISPATCHED", "PARTIAL_COMPLETED", "READY_FOR_DISPATCH"].includes(plan.productionOrder?.status) ? plan.productionOrder.status : "COMPLETED")
                     : plan.status
                 }
                 customText={
@@ -862,6 +863,73 @@ const DailyProductionPlanningPage: React.FC = () => {
   const weeklyOrderProducedQty = viewPlanOeeSummary?.producedQty ?? weeklyProducedQty;
   const weeklyOrderPct = weeklyOrderTargetQty > 0 ? Math.min(100, Math.round((weeklyOrderProducedQty / weeklyOrderTargetQty) * 100)) : 0;
   const weeklyProgramPct = weeklyTargetQty > 0 ? Math.min(100, Math.round((weeklyOrderProducedQty / weeklyTargetQty) * 100)) : 0;
+
+  const poHistoryColumns: DataTableColumn<any>[] = useMemo(() => [
+    {
+      header: "Plan ID",
+      render: (plan: any) => {
+        const isCurrent = plan.dailyPlanId === viewPlan?.dailyPlanId;
+        return (
+          <span className={`font-mono text-xs font-semibold ${isCurrent ? "text-indigo-700" : "text-slate-700"}`}>
+            {plan.dailyPlanId}
+            {isCurrent && <span className="ml-1.5 text-[9px] bg-indigo-100 text-indigo-600 px-1.5 py-0.5 rounded font-bold uppercase">Current</span>}
+          </span>
+        );
+      }
+    },
+    {
+      header: "Date",
+      render: (plan: any) => (
+        <span className="text-xs text-slate-600">
+          {plan.productionDate ? new Date(plan.productionDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—"}
+        </span>
+      )
+    },
+    {
+      header: "Machine",
+      render: (plan: any) => (
+        <span className="text-xs text-slate-600">
+          {plan.machine?.machineName || plan.machineId || "—"}
+        </span>
+      )
+    },
+    {
+      header: "Shift",
+      render: (plan: any) => (
+        <span className="text-[10px] bg-slate-100 text-slate-600 border border-slate-200 px-2 py-0.5 rounded font-medium">
+          {plan.shift?.shiftName || plan.shiftId || "—"}
+        </span>
+      )
+    },
+    {
+      header: "Planned",
+      align: "center",
+      render: (plan: any) => (
+        <span className="text-xs font-semibold text-slate-700">
+          {Number(plan.plannedQty || 0).toLocaleString()}
+        </span>
+      )
+    },
+    {
+      header: "Produced",
+      align: "center",
+      render: (plan: any) => {
+        const producedQty = Array.isArray(plan.hourlyProductions)
+          ? plan.hourlyProductions.reduce((s: number, h: any) => s + Number(h.qtyProduced || 0), 0)
+          : 0;
+        return (
+          <span className={`text-xs font-bold ${producedQty >= Number(plan.plannedQty || 0) ? "text-emerald-600" : producedQty > 0 ? "text-amber-600" : "text-slate-400"}`}>
+            {producedQty.toLocaleString()}
+          </span>
+        );
+      }
+    },
+    {
+      header: "Status",
+      align: "center",
+      render: (plan: any) => <StatusBadge status={plan.status} />
+    }
+  ], [viewPlan?.dailyPlanId]);
 
   return (
     <div className="p-4 md:p-6 min-h-screen bg-white">
@@ -1331,79 +1399,31 @@ const DailyProductionPlanningPage: React.FC = () => {
                       Loading history...
                     </div>
                   ) : poHistoryPlans.length > 0 ? (
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="bg-slate-50 border-b border-slate-200">
-                            <th className="px-4 py-2.5 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">Plan ID</th>
-                            <th className="px-4 py-2.5 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">Date</th>
-                            <th className="px-4 py-2.5 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">Machine</th>
-                            <th className="px-4 py-2.5 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">Shift</th>
-                            <th className="px-4 py-2.5 text-center text-[10px] font-bold text-slate-500 uppercase tracking-wider">Planned</th>
-                            <th className="px-4 py-2.5 text-center text-[10px] font-bold text-slate-500 uppercase tracking-wider">Produced</th>
-                            <th className="px-4 py-2.5 text-center text-[10px] font-bold text-slate-500 uppercase tracking-wider">Status</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                          {poHistoryPlans.map((plan: any) => {
-                            const producedQty = Array.isArray(plan.hourlyProductions)
-                              ? plan.hourlyProductions.reduce((s: number, h: any) => s + Number(h.qtyProduced || 0), 0)
-                              : 0;
-                            const isCurrent = plan.dailyPlanId === viewPlan.dailyPlanId;
-                            return (
-                              <tr
-                                key={plan.dailyPlanId}
-                                className={`hover:bg-slate-50 transition-colors ${isCurrent ? "bg-indigo-50/60 border-l-2 border-l-indigo-500" : ""}`}
-                              >
-                                <td className="px-4 py-2.5">
-                                  <span className={`font-mono text-xs font-semibold ${isCurrent ? "text-indigo-700" : "text-slate-700"}`}>
-                                    {plan.dailyPlanId}
-                                    {isCurrent && <span className="ml-1.5 text-[9px] bg-indigo-100 text-indigo-600 px-1.5 py-0.5 rounded font-bold uppercase">Current</span>}
-                                  </span>
-                                </td>
-                                <td className="px-4 py-2.5 text-xs text-slate-600">
-                                  {plan.productionDate ? new Date(plan.productionDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—"}
-                                </td>
-                                <td className="px-4 py-2.5 text-xs text-slate-600">
-                                  {plan.machine?.machineName || plan.machineId || "—"}
-                                </td>
-                                <td className="px-4 py-2.5">
-                                  <span className="text-[10px] bg-slate-100 text-slate-600 border border-slate-200 px-2 py-0.5 rounded font-medium">
-                                    {plan.shift?.shiftName || plan.shiftId || "—"}
-                                  </span>
-                                </td>
-                                <td className="px-4 py-2.5 text-center text-xs font-semibold text-slate-700">
-                                  {Number(plan.plannedQty || 0).toLocaleString()}
-                                </td>
-                                <td className="px-4 py-2.5 text-center">
-                                  <span className={`text-xs font-bold ${producedQty >= Number(plan.plannedQty || 0) ? "text-emerald-600" : producedQty > 0 ? "text-amber-600" : "text-slate-400"}`}>
-                                    {producedQty.toLocaleString()}
-                                  </span>
-                                </td>
-                                <td className="px-4 py-2.5 text-center">
-                                  <StatusBadge status={plan.status} />
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                        <tfoot>
-                          <tr className="bg-slate-50 border-t border-slate-200">
-                            <td colSpan={4} className="px-4 py-2.5 text-xs font-bold text-slate-600">Total</td>
-                            <td className="px-4 py-2.5 text-center text-xs font-bold text-slate-800">
-                              {poHistoryPlans.reduce((s: number, p: any) => s + Number(p.plannedQty || 0), 0).toLocaleString()}
-                            </td>
-                            <td className="px-4 py-2.5 text-center text-xs font-bold text-emerald-700">
-                              {poHistoryPlans.reduce((s: number, p: any) => {
-                                const produced = Array.isArray(p.hourlyProductions)
-                                  ? p.hourlyProductions.reduce((ss: number, h: any) => ss + Number(h.qtyProduced || 0), 0) : 0;
-                                return s + produced;
-                              }, 0).toLocaleString()}
-                            </td>
-                            <td />
-                          </tr>
-                        </tfoot>
-                      </table>
+                    <div className="flex flex-col">
+                      <DataTable
+                        columns={poHistoryColumns}
+                        data={poHistoryPlans}
+                        rowKey={(row) => row.dailyPlanId}
+                        emptyMessage="No records found."
+                        minHeightClassName="min-h-0"
+                        density="compact"
+                        rowClassName={(row) => row.dailyPlanId === viewPlan.dailyPlanId ? "bg-indigo-50/60 border-l-2 border-l-indigo-500" : ""}
+                      />
+                      <div className="flex items-center justify-between bg-slate-50 border-t border-slate-200 px-4 py-3">
+                        <div className="text-xs font-bold text-slate-600">Total</div>
+                        <div className="flex gap-8 md:gap-16 items-center pr-16">
+                          <div className="text-center text-xs font-bold text-slate-800">
+                            Planned: {poHistoryPlans.reduce((s: number, p: any) => s + Number(p.plannedQty || 0), 0).toLocaleString()}
+                          </div>
+                          <div className="text-center text-xs font-bold text-emerald-700">
+                            Produced: {poHistoryPlans.reduce((s: number, p: any) => {
+                              const produced = Array.isArray(p.hourlyProductions)
+                                ? p.hourlyProductions.reduce((ss: number, h: any) => ss + Number(h.qtyProduced || 0), 0) : 0;
+                              return s + produced;
+                            }, 0).toLocaleString()}
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   ) : (
                     <div className="flex flex-col items-center justify-center py-8 bg-slate-50 text-center">
@@ -1417,20 +1437,19 @@ const DailyProductionPlanningPage: React.FC = () => {
 
               {/* Footer */}
               <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 flex justify-end gap-3 flex-shrink-0">
-                {(viewPlan.status === "APPROVED" || viewPlan.status === "IN_PROGRESS") && (
-                  <button
-                    className="flex items-center gap-2 px-5 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium text-sm shadow-sm"
+                {(viewPlan.status === "PLANNED" || viewPlan.status === "IN_PROGRESS") && (
+                  <CustomButton
+                    text="Log Hourly Entry"
+                    icon={FaClipboardList}
+                    className="!bg-emerald-600 hover:!bg-emerald-700 !text-white shadow-sm"
                     onClick={() => { setShowViewModal(false); handleLogHourly(viewPlan); }}
-                  >
-                    <FaClipboardList size={13} /> Log Hourly Entry
-                  </button>
+                  />
                 )}
-                <button
-                  className="px-5 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors font-medium text-sm shadow-sm"
+                <CustomButton
+                  text="Close"
+                  className="!bg-white !text-slate-700 border border-slate-200 hover:!bg-slate-50 shadow-sm"
                   onClick={() => { setShowViewModal(false); setViewPlan(null); }}
-                >
-                  Close
-                </button>
+                />
               </div>
             </div>
           </div>

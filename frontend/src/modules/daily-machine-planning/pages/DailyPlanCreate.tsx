@@ -755,10 +755,25 @@ const DailyPlanCreate: React.FC = () => {
                     <div className="font-bold text-slate-800">{selectedWeeklyProg.productionOrderId}</div>
                   </div>
 
-                  <div>
-                    <div className="text-slate-500 text-xs font-bold uppercase mb-1">Production Target</div>
-                    <div className="font-bold text-slate-800">{Number(selectedWeeklyProg.plannedQty) > 0 ? selectedWeeklyProg.plannedQty : (selectedWeeklyProg.productionOrder?.targetQty || 0)} pcs</div>
+                   <div>
+                    <div className="text-slate-500 text-xs font-bold uppercase mb-1">Product</div>
+                    <div className="text-sm font-bold text-slate-800">
+                      {selectedWeeklyProg.productionOrder?.productItem?.productName || "—"}
+                    </div>
                   </div>
+                  
+
+                  <div>
+                    <div className="text-slate-500 text-xs font-bold uppercase mb-1">PO Target Qty</div>
+                    <div className="font-bold text-slate-800">{selectedWeeklyProg.productionOrder?.targetQty || "—"} pcs</div>
+                  </div>
+
+
+                  {/* 
+                  <div>
+                    <div className="text-slate-500 text-xs font-bold uppercase mb-1">Weekly Target</div>
+                    <div className="font-bold text-slate-800">{Number(selectedWeeklyProg.plannedQty) > 0 ? selectedWeeklyProg.plannedQty : (selectedWeeklyProg.productionOrder?.targetQty || 0)} pcs</div>
+                  </div> */}
                   <div>
                     <div className="text-slate-500 text-xs font-bold uppercase mb-1">Remaining Quantity</div>
                     {(() => {
@@ -772,17 +787,9 @@ const DailyPlanCreate: React.FC = () => {
                       );
                     })()}
                   </div>
-                  <div>
-                    <div className="text-slate-500 text-xs font-bold uppercase mb-1">Product</div>
-                    <div className="text-sm font-bold text-slate-800">
-                      {selectedWeeklyProg.productionOrder?.productItem?.productName || "—"}
-                    </div>
-                  </div>
+                 
 
-                  <div>
-                    <div className="text-slate-500 text-xs font-bold uppercase mb-1">PO Target Qty</div>
-                    <div className="font-bold text-slate-800">{selectedWeeklyProg.productionOrder?.targetQty || "—"} pcs</div>
-                  </div>
+
                   <div>
                     <div className="text-slate-500 text-xs font-bold uppercase mb-1">Produced So Far</div>
                     <div className="font-bold text-slate-800">{selectedWeeklyProg.productionOrder?.producedQty || 0} pcs</div>
@@ -1029,7 +1036,7 @@ const DailyPlanCreate: React.FC = () => {
                     placeholder={remainingQty !== null ? `Max: ${remainingQty}` : "e.g. 500"}
                     onChange={(e) => setPlannedQty(e.target.value)}
                   />
-                   {machineId && machineProductCapacity != null && (
+                  {machineId && machineProductCapacity != null && (
                     <div className="text-[11px] text-blue-600 font-semibold mt-1">
                       Product Capacity: {machineProductCapacity.toLocaleString()} / Shift
                     </div>

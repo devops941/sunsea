@@ -206,7 +206,7 @@ const AllProductionOrderList: React.FC = () => {
         // },
         {
             header: "STATUS",
-            render: (item: any) => <StatusBadge status={item.status === 'CANCELLED' ? 'DELETED' : (item.status || 'PLANNED')} />
+            render: (item: any) => <StatusBadge status={item.status || 'CREATED'} />
         },
         {
             header: "CREATED DATE",
@@ -244,14 +244,19 @@ const AllProductionOrderList: React.FC = () => {
                                 options={[
                                     { label: "All Statuses", value: "" },
                                     { label: "Draft", value: "DRAFT" },
-                                    { label: "Planned", value: "PLANNED" },
-                                    { label: "RM Pending", value: "RM_PENDING" },
-                                    { label: "RM Available", value: "RM_AVAILABLE" },
-                                    { label: "Scheduled", value: "SCHEDULED" },
-                                    { label: "Schedule Deleted", value: "SCHEDULE_DELETED" },
-                                    { label: "In Progress", value: "IN_PROGRESS" },
+                                    { label: "Created", value: "CREATED" },
+                                    { label: "Waiting For Material", value: "WAITING_FOR_MATERIAL" },
+                                    { label: "Ready For Planning", value: "READY_FOR_PLANNING" },
+                                    { label: "Weekly Scheduled", value: "WEEKLY_SCHEDULED" },
+                                    { label: "Daily Planned", value: "DAILY_PLANNED" },
+                                    { label: "In Production", value: "IN_PRODUCTION" },
+                                    { label: "Post Production", value: "POST_PRODUCTION" },
                                     { label: "Ready For Dispatch", value: "READY_FOR_DISPATCH" },
-                                    { label: "Completed", value: "COMPLETED" },
+                                    { label: "Partial Completed", value: "PARTIAL_COMPLETED" },
+                                    { label: "Completed With Shortfall", value: "COMPLETED_WITH_SHORTFALL" },
+                                    { label: "Closed", value: "CLOSED" },
+                                    { label: "Dispatched", value: "DISPATCHED" },
+                                    { label: "Cancelled", value: "CANCELLED" },
                                 ]}
                             />
                         </div>
