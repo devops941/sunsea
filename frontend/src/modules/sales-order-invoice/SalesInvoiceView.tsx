@@ -1,10 +1,11 @@
 // src/pages/sales/SalesInvoiceView.tsx
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useCallback } from "react";
 import { FaArrowLeft, FaPrint, FaDownload, FaCircleNotch } from "react-icons/fa";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useSelector, useDispatch } from "react-redux";
 import { salesInvoiceService } from "../../services/salesInvoiceService";
+import { useSocketSync } from "../../hooks/useSocketSync";
 import CustomButton from "../../components/ui/Button/Button";
 import SearchInput from "../../components/ui/SearchInput/SearchInput";
 import { fetchCompany } from "../../features/company/companySlice";
@@ -76,18 +77,31 @@ const SalesInvoiceView: React.FC = () => {
         dispatch(fetchCompany());
     }, [dispatch]);
 
+    const fetchList = useCallback(async () => {
+        try {
+            const response = await salesInvoiceService.fetchAll({ page: 1, pageSize: 100 });
+            setInvoicesList(response.data || []);
+        } catch (error) {
+            console.error("Failed to load invoice list", error);
+        } finally {
+            setLoadingList(false);
+        }
+    }, []);
+
     useEffect(() => {
-        const fetchList = async () => {
-            try {
-                const response = await salesInvoiceService.fetchAll({ page: 1, pageSize: 100 });
-                setInvoicesList(response.data || []);
-            } catch (error) {
-                console.error("Failed to load invoice list", error);
-            } finally {
-                setLoadingList(false);
-            }
-        };
         fetchList();
+    }, [fetchList]);
+
+    const loadDetail = useCallback(async (idToLoad: string) => {
+        setLoading(true);
+        try {
+            const data = await salesInvoiceService.fetchById(idToLoad);
+            setInvoice(data);
+        } catch (error) {
+            toast.error("Failed to load invoice details");
+        } finally {
+            setLoading(false);
+        }
     }, []);
 
     useEffect(() => {
@@ -99,21 +113,19 @@ const SalesInvoiceView: React.FC = () => {
             return;
         }
 
-        const load = async () => {
-            setLoading(true);
-            try {
-                const data = await salesInvoiceService.fetchById(id.toString());
-                setInvoice(data);
-            } catch (error) {
-                toast.error("Failed to load invoice details");
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        load();
+        loadDetail(id.toString());
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [idParam, invoicesList]);
+    }, [idParam, invoicesList, loadDetail]);
+
+    const handleSocketUpdate = useCallback(() => {
+        fetchList();
+        const id = idParam || (location.state as any)?.id;
+        if (id) {
+            loadDetail(id.toString());
+        }
+    }, [fetchList, idParam, location.state, loadDetail]);
+
+    useSocketSync("salesInvoice", undefined, handleSocketUpdate);
 
     const filteredInvoices = useMemo(() => {
         const term = searchTerm.toLowerCase();
