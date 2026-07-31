@@ -256,9 +256,9 @@ const SalesInvoiceForm: React.FC = () => {
   // ---- Load dropdown data + next invoice number preview ----
   useEffect(() => {
     Promise.all([
-      customerService.fetchAll(),
-      productService.fetchAll(),
-      invoiceSettingsService.getConfig(),
+      customerService.fetchAll().catch(() => []),
+      productService.fetchAll().catch(() => []),
+      invoiceSettingsService.getConfig().catch(() => null),
       salesInvoiceService.fetchAll({ pageSize: 100 }).catch(() => ({ data: [] } as any)),
       salesOrderService.fetchAll({ pageSize: 100, status: "IN_PRODUCTION" as SalesOrderStatus }).catch(() => ({ data: [] } as any)),
       finishedGoodsStockService.fetchAll().catch(() => []),

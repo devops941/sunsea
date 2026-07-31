@@ -13,9 +13,12 @@ import RawMaterialCategoryList from "../../raw-material-categories/pages/RawMate
 
 import WastageStoreList from "../../wastage-store/pages/WastageStoreList";
 
+import { usePermission } from "../../../hooks/usePermission";
+
 const ProductMasterTabs: React.FC = () => {
     const location = useLocation();
     const navigate = useNavigate();
+    const { can } = usePermission();
 
     // Map pathnames to tab keys
     const pathToKey: Record<string, string> = {
@@ -36,9 +39,7 @@ const ProductMasterTabs: React.FC = () => {
         "wastage_store": "/wastage-store"
     };
 
-    const activeTab = pathToKey[location.pathname] || "products";
-
-    const tabs: TabItem[] = [
+    const allTabs: TabItem[] = [
         { key: "uoms", label: "UOM", icon: <FaBalanceScale />, content: <UomList /> },
         { key: "categories", label: "Categories", icon: <FaTags />, content: <CategoryList /> },
         { key: "raw_material_categories", label: "RM Categories", icon: <FaLayerGroup />, content: <RawMaterialCategoryList /> },
@@ -46,6 +47,21 @@ const ProductMasterTabs: React.FC = () => {
         { key: "wastage_store", label: "Wastage Store", icon: <FaLayerGroup />, content: <WastageStoreList /> },
         { key: "products", label: "Products", icon: <FaBox />, content: <ProductList /> }
     ];
+
+    const tabs = allTabs.filter(tab => {
+        if (tab.key === "uoms") return can("uoms.view");
+        if (tab.key === "categories") return can("categories.view");
+        if (tab.key === "raw_material_categories") return can("raw_material_categories.view");
+        if (tab.key === "raw_materials") return can("raw_materials.view");
+        if (tab.key === "wastage_store") return can("wastage-store.view");
+        if (tab.key === "products") return can("products.view");
+        return false;
+    });
+
+    let activeTab = pathToKey[location.pathname] || "products";
+    if (tabs.length > 0 && !tabs.find(t => t.key === activeTab)) {
+        activeTab = tabs[0].key;
+    }
 
     const handleTabChange = (key: string) => {
         const targetPath = keyToPath[key];

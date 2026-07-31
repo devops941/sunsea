@@ -2,6 +2,7 @@ import React, { useState, useCallback, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAppSelector } from "../../../hooks/reduxHooks";
 import { toast } from "react-toastify";
+import { usePermission } from "../../../hooks/usePermission";
 
 import ViewButton from "../../../components/ui/viewbutton/ViewButton";
 import CommonViewModal from "../../../components/ui/CommonViewModal/CommonViewModal";
@@ -20,6 +21,7 @@ const ITEMS_PER_PAGE = 10;
 
 const QuotationList: React.FC = () => {
     const navigate = useNavigate();
+    const { can } = usePermission();
     const company = useAppSelector((state) => state.company.data);
     const [data, setData] = useState<SalesOrder[]>([]);
     const [loading, setLoading] = useState(false);
@@ -45,6 +47,7 @@ const QuotationList: React.FC = () => {
 
     // ─── Fetch only CONFIRMED and MD_REJECTED orders ────────────────────────────
     const fetchOrders = useCallback(async () => {
+        if (!can("sales-orders.view")) return;
         setLoading(true);
         try {
             const response = await salesOrderService.fetchAll({
@@ -63,7 +66,7 @@ const QuotationList: React.FC = () => {
         } finally {
             setLoading(false);
         }
-    }, [currentPage, searchTerm]);
+    }, [currentPage, searchTerm, can]);
 
     useSocketSync("salesOrder", undefined, fetchOrders);
 

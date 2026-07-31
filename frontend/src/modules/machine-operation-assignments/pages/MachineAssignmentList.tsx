@@ -8,6 +8,7 @@ import {
 import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
 import { useSocketSync } from "../../../hooks/useSocketSync";
+import { usePermission } from "../../../hooks/usePermission";
 
 import CustomButton from "../../../components/ui/Button/Button";
 import DataTable from "../../../components/ui/table/DataTable";
@@ -34,6 +35,10 @@ const MachineAssignmentList: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
+  const { can } = usePermission();
+  const canCreateAssignment = can("machine-assignments.create");
+  const canEditAssignment = can("machine-assignments.edit");
+  const canDeleteAssignment = can("machine-assignments.delete");
 
   // Search state
   const [searchTerm, setSearchTerm] = useState("");
@@ -219,12 +224,14 @@ const MachineAssignmentList: React.FC = () => {
               variant="secondary"
               onClick={handleExportCSV}
             />
-            <CustomButton
-              text="Assign Operator"
-              icon={FaPlus}
-              variant="primary"
-              onClick={handleOpenCreate}
-            />
+            {canCreateAssignment && (
+              <CustomButton
+                text="Assign Operator"
+                icon={FaPlus}
+                variant="primary"
+                onClick={handleOpenCreate}
+              />
+            )}
           </div>
         </div>
 
@@ -387,18 +394,20 @@ const MachineAssignmentList: React.FC = () => {
                 render: (item) => (
                   <div className="flex items-center gap-2">
                     <ViewButton onClick={() => setViewModalData(item)} />
-                    <EditButton onClick={() => handleOpenEdit(item)} />
-                    <button
-                      type="button"
-                      title={item.isActive ? "Close Assignment" : "Activate Assignment"}
-                      onClick={() => handleToggleStatus(item)}
-                      className={`p-2 rounded-lg transition-colors ${item.isActive
-                        ? "bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
-                        : "bg-slate-100 text-slate-400 hover:bg-slate-200"
-                        }`}
-                    >
-                      {item.isActive ? <FaToggleOn size={18} /> : <FaToggleOff size={18} />}
-                    </button>
+                    {canEditAssignment && <EditButton onClick={() => handleOpenEdit(item)} />}
+                    {canDeleteAssignment && (
+                      <button
+                        type="button"
+                        title={item.isActive ? "Close Assignment" : "Activate Assignment"}
+                        onClick={() => handleToggleStatus(item)}
+                        className={`p-2 rounded-lg transition-colors ${item.isActive
+                          ? "bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
+                          : "bg-slate-100 text-slate-400 hover:bg-slate-200"
+                          }`}
+                      >
+                        {item.isActive ? <FaToggleOn size={18} /> : <FaToggleOff size={18} />}
+                      </button>
+                    )}
                   </div>
                 ),
               },

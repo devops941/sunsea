@@ -9,16 +9,16 @@ import TextInput from "../../../components/form/TextInput/TextInput";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import { useUsers } from "../../../hooks/useUsers";
 import CommonViewModal from "../../../components/ui/CommonViewModal/CommonViewModal";
-import { hasPermission } from "../../../utils/permission";
+import { usePermission } from "../../../hooks/usePermission";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 
 const ITEMS_PER_PAGE = 10;
 
 const UserList: React.FC = () => {
     const { users, loading, error, loadUsers, changeUserStatus } = useUsers();
-    const canEditUser = hasPermission("users.edit");
-    // const canDeleteUser = hasPermission("users.delete");
-    const canCreateUser = hasPermission("users.create");
+    const { can } = usePermission();
+    const canEdit = can("users.edit");
+    const canCreate = can("users.create");
 
     const [searchTerm, setSearchTerm] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
@@ -115,7 +115,7 @@ const UserList: React.FC = () => {
                         <Col lg={6} md={12}>
                             <div className="page-header-info">
                                 <h2 className="page-title">User Management</h2>
-                                
+
                             </div>
                         </Col>
                         <Col lg={6} md={12}>
@@ -170,7 +170,7 @@ const UserList: React.FC = () => {
                                                 <td className="master-data-cell">
                                                     <div className="table-action-group">
                                                         <ViewButton onClick={() => handleOpenView(user)} />
-                                                        {canEditUser && <EditButton onClick={() => handleOpenEdit(user)} />}
+                                                        {canEdit && <EditButton onClick={() => handleOpenEdit(user)} />}
                                                     </div>
                                                 </td>
                                             </tr>
@@ -250,7 +250,7 @@ const UserList: React.FC = () => {
                             </Row>
                         </Modal.Body>
                         <Modal.Footer>
-                            {canCreateUser && <CustomButton
+                            {canCreate && <CustomButton
                                 text="Update"
                                 icon={FaSave}
                                 type="submit"

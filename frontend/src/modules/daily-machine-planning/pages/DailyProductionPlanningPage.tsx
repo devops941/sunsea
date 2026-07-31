@@ -33,6 +33,7 @@ import { rawMaterialService } from "../../../services/rawMaterialService";
 import { MaterialIssueModal } from "../../production-orders/components/MaterialIssueModal";
 import { weeklyProgramService } from "../../../services/weeklyProgramService";
 import { productionOrderService } from "../../../services/productionOrderService";
+import { usePermission } from "../../../hooks/usePermission";
 
 // ---------- helpers ----------
 const formatLocalDateString = (d: Date) => {
@@ -72,6 +73,7 @@ const DailyProductionPlanningPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const dispatch = useAppDispatch();
+  const { can } = usePermission();
 
   const { data: machines } = useAppSelector((state: any) => state.machines);
   const { data: dailyPlans, loading } = useAppSelector((state: any) => state.dailyPlans);
@@ -745,11 +747,13 @@ const DailyProductionPlanningPage: React.FC = () => {
 
         return (
           <div className="flex items-center justify-end gap-1 pr-2" onClick={e => e.stopPropagation()}>
-            <ViewButton onClick={() => handleViewDailyPlan(plan)} />
-            {canLog && (
+            {can("daily-machine-planning.view") && (
+              <ViewButton onClick={() => handleViewDailyPlan(plan)} />
+            )}
+            {canLog && (can("hourly-work-reports.create") || can("daily-machine-planning.edit")) && (
               <IconButton variant="primary" title="Log Hourly Production" icon={FaClipboardList} onClick={() => handleLogHourly(plan)} />
             )}
-            {canAdvance && (
+            {canAdvance && can("daily-machine-planning.edit") && (
               <IconButton
                 variant={dynamicActionVariant}
                 title={dynamicActionTitle}
@@ -759,16 +763,13 @@ const DailyProductionPlanningPage: React.FC = () => {
             )}
             {!["COMPLETED", "CANCELLED", "STOPPED", "SHORT_CLOSED", "POST_PRODUCTION"].includes(plan.status) && 
             plan.productionOrder?.status !== "COMPLETED_WITH_SHORTFALL" && 
-            plan.productionOrder?.status !== "CLOSED" && (
+            plan.productionOrder?.status !== "CLOSED" && can("daily-machine-planning.edit") && (
               <IconButton variant="danger" title="Stop Production" icon={FaStop} onClick={() => handleStopProductionClick(plan)} />
             )}
-            {(plan.status === "DRAFT" || plan.status === "PLANNED") && (
+            {(plan.status === "DRAFT" || plan.status === "PLANNED") && can("daily-machine-planning.edit") && (
               <IconButton variant="info" title="Edit Plan" icon={FaEdit} onClick={() => openEditForm(plan)} />
             )}
-            {/* {canCarryForward && (
-              <IconButton variant="warning" title={`Carry Forward ${pendingQty} pcs`} icon={FaShare} onClick={() => handleCarryForward(plan, pendingQty)} />
-            )} */}
-            {(plan.status === "DRAFT" || plan.status === "CANCELLED") && (
+            {(plan.status === "DRAFT" || plan.status === "CANCELLED") && can("daily-machine-planning.delete") && (
               <DeleteButton onClick={() => { setDeletePlanId(plan.dailyPlanId); setShowDeleteModal(true); }} />
             )}
           </div>
@@ -921,17 +922,23 @@ const DailyProductionPlanningPage: React.FC = () => {
               </div>
             </FilterPopover>
 
-            <CustomButton text="New Production Order" icon={FaPlus} onClick={() => navigate("/production-orders/create")} />
-            <CustomButton text="Daily Report" icon={FaChartBar} onClick={() => {
-              navigate("/daily-machine-planning/report", {
-                state: {
-                  dailyPlans,
-                  machines,
-                  shifts
-                }
-              });
-            }} />
-            <CustomButton text="New Daily Plan" icon={FaPlus} onClick={openCreateForm} />
+            {can("production_orders.create") && (
+              <CustomButton text="New Production Order" icon={FaPlus} onClick={() => navigate("/production-orders/create")} />
+            )}
+            {can("daily-machine-planning.view") && (
+              <CustomButton text="Daily Report" icon={FaChartBar} onClick={() => {
+                navigate("/daily-machine-planning/report", {
+                  state: {
+                    dailyPlans,
+                    machines,
+                    shifts
+                  }
+                });
+              }} />
+            )}
+            {can("daily-machine-planning.create") && (
+              <CustomButton text="New Daily Plan" icon={FaPlus} onClick={openCreateForm} />
+            )}
           </div>
         </div>
 

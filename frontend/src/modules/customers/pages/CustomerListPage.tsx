@@ -9,7 +9,7 @@ import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
 import CustomButton from "../../../components/ui/Button/Button";
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import { useCustomers } from "../../../hooks/useCustomers";
-import { hasPermission } from "../../../utils/permission";
+import { usePermission } from "../../../hooks/usePermission";
 import CustomerViewModal from "../components/CustomerViewModal";
 import DataTable from "../../../components/ui/table/DataTable";
 
@@ -21,8 +21,10 @@ const CustomerListPage: React.FC = () => {
   const { customers, loading, error, totalPages, loadCustomers, removeCustomer } = useCustomers();
 
 
-  const canEditCustomer = hasPermission("customers.edit");
-  const canDeleteCustomer = hasPermission("customers.delete");
+  const { can } = usePermission();
+  const canCreate = can("customers.create");
+  const canEditCustomer = can("customers.edit");
+  const canDeleteCustomer = can("customers.delete");
 
   const [showViewModal, setShowViewModal] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
@@ -37,10 +39,12 @@ const CustomerListPage: React.FC = () => {
   // BUG-CUST-004 fix: send page + limit to server on every search/page change
   useEffect(() => {
     const timer = setTimeout(() => {
-      loadCustomers({ search: searchTerm, page: currentPage, limit: ITEMS_PER_PAGE });
+      if (can("customers.view")) {
+        loadCustomers({ search: searchTerm, page: currentPage, limit: ITEMS_PER_PAGE });
+      }
     }, 500);
     return () => clearTimeout(timer);
-  }, [searchTerm, currentPage, loadCustomers]);
+  }, [searchTerm, currentPage, loadCustomers, can]);
 
   // Custom confirm delete state
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -115,11 +119,13 @@ const CustomerListPage: React.FC = () => {
                   onChange={handleSearch}
                 />
               </div>
-              <CustomButton
-                text="Add Customer"
-                icon={FaPlus}
-                onClick={() => navigate("/customers/create")}
-              />
+              {canCreate && (
+                <CustomButton
+                  text="Add Customer"
+                  icon={FaPlus}
+                  onClick={() => navigate("/customers/create")}
+                />
+              )}
             </div>
           </div>
 

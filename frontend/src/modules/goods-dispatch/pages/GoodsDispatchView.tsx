@@ -15,7 +15,7 @@ import BackButton from "../../../components/ui/BackButton/BackButton";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import TextInput from "../../../components/form/TextInput/TextInput";
 import { formatDate, formatDateTime } from "../../../utils/dateUtils";
-import { hasPermission } from "../../../utils/permission";
+import { usePermission } from "../../../hooks/usePermission";
 
 const InfoField = ({ label, value }: { label: string; value: React.ReactNode }) => (
   <div>
@@ -36,7 +36,8 @@ const GoodsDispatchView: React.FC = () => {
   const dispatch = useAppDispatch();
 
   const { currentDispatch: dispatchData, loading } = useAppSelector((state) => state.goodsDispatch);
-  const { user } = useAppSelector((state) => state.auth);
+  const { can } = usePermission();
+  const canEdit = can("production_orders.edit");
 
   const [remarks, setRemarks] = useState("");
   const [receivedQuantities, setReceivedQuantities] = useState<Record<number, string>>({});
@@ -50,8 +51,6 @@ const GoodsDispatchView: React.FC = () => {
       setReceivedQuantities(initial);
     }
   }, [dispatchData]);
-
-  const canEdit = hasPermission("production_orders.edit");
 
   useEffect(() => {
     if (id) {

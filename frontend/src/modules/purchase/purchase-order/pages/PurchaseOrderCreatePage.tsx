@@ -66,6 +66,29 @@ const initialFormData = {
 
 type PurchaseOrderFormData = typeof initialFormData;
 
+export const getUomMultiplier = (uom: string = "", baseUom: string = ""): number => {
+  const u = (uom || "").trim().toLowerCase();
+  const b = (baseUom || "").trim().toLowerCase();
+  if (!u || u === b) return 1;
+  if (u === "g" || u === "gram" || u === "grams") {
+    if (b.includes("kg") || b === "kilogram" || b === "kilograms" || !b) return 0.001;
+  }
+  if (u === "kg" || u === "kilogram" || u === "kilograms") {
+    if (b === "g" || b === "gram" || b === "grams") return 1000;
+  }
+  if (u === "mg") {
+    if (b.includes("kg")) return 0.000001;
+    if (b.includes("g")) return 0.001;
+  }
+  if (u === "ton" || u === "tonne" || u === "tonnes" || u === "tons") {
+    if (b.includes("kg") || !b) return 1000;
+  }
+  if (u === "ml" && (b.includes("l") || !b)) return 0.001;
+  if (u === "mm" && (b.includes("m") || !b)) return 0.001;
+  if (u === "cm" && (b.includes("m") || !b)) return 0.01;
+  return 1;
+};
+
 const PurchaseOrderCreatePage: React.FC = () => {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
@@ -198,7 +221,9 @@ const PurchaseOrderCreatePage: React.FC = () => {
     items.forEach((item) => {
       const qty = Number(item.quantity) || 0;
       const price = Number(item.unitPrice) || 0;
-      const lineSubtotal = qty * price;
+      const rawMaterial = (rawMaterials || []).find((rm: any) => String(rm.rawMaterialId) === String(item.productId));
+      const mult = getUomMultiplier(item.uom, rawMaterial?.baseUom);
+      const lineSubtotal = qty * mult * price;
 
       // Taxable amount is exactly line subtotal
       const taxableAmount = lineSubtotal;
@@ -521,15 +546,18 @@ const PurchaseOrderCreatePage: React.FC = () => {
   // ============================================================
   // ITEM HANDLERS
   // ============================================================
-  const handleItemChange = (index: number, field: keyof PurchaseOrderItem, value: any) => {
+  const handleItemChange = (index: number, field: keyof PurchaseOrderItem | "uom", value: any, selectedUom?: string) => {
     setFormData((prev) => {
       const items = [...prev.items];
-      items[index] = { ...items[index], [field]: value };
+      const updatedUom = selectedUom !== undefined ? selectedUom : (field === "uom" ? value : items[index].uom);
+      items[index] = { ...items[index], [field]: value, uom: updatedUom };
 
       const item = items[index];
       const qty = Number(item.quantity) || 0;
       const price = Number(item.unitPrice) || 0;
-      const lineSubtotal = qty * price;
+      const rawMaterial = (rawMaterials || []).find((rm: any) => String(rm.rawMaterialId) === String(item.productId));
+      const mult = getUomMultiplier(item.uom, rawMaterial?.baseUom);
+      const lineSubtotal = qty * mult * price;
 
       const taxableAmount = lineSubtotal;
       const totalGstRate = Number(item.tax) || 0;
@@ -947,12 +975,13 @@ const PurchaseOrderCreatePage: React.FC = () => {
                   const qty = Number(item.quantity) || 0;
                   const price = Number(item.unitPrice) || 0;
                   const taxPercent = Number(item.tax) || 0;
-                  const taxableAmount = qty * price;
-                  const gstAmount = taxableAmount * (taxPercent / 100);
-                  const lineTotal = taxableAmount + gstAmount;
                   const rawMaterial = rawMaterials.find(
                     (rm) => String(rm.rawMaterialId) === String(item.productId)
                   );
+                  const mult = getUomMultiplier(item.uom, rawMaterial?.baseUom);
+                  const taxableAmount = qty * mult * price;
+                  const gstAmount = taxableAmount * (taxPercent / 100);
+                  const lineTotal = taxableAmount + gstAmount;
                   return (
                     <tr key={index} className="hover:bg-slate-50/50 transition-colors duration-200">
                       <td className="px-3 py-2 whitespace-nowrap text-sm font-medium text-slate-400 text-center">{index + 1}</td>
@@ -962,7 +991,9 @@ const PurchaseOrderCreatePage: React.FC = () => {
                           name={`items[${index}].quantity`}
                           value={item.quantity}
                           baseUoms={rawMaterial?.baseUom || item.uom || "KG"}
-                          onChange={(e) => handleItemChange(index, "quantity", Number(e.target.value))}
+                          uom={item.uom}
+                          onUomChange={(newUom) => handleItemChange(index, "uom", newUom)}
+                          onChange={(e) => handleItemChange(index, "quantity", Number(e.target.value), e.target.uom)}
                           error={errors[`items.${index}.quantity`]}
                           step="0.01"
                           hideLabel

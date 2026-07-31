@@ -16,8 +16,7 @@ import ViewButton from "../../../components/ui/viewbutton/ViewButton";
 import MachineViewModal from "../components/MachineViewModal";
 import SearchInput from "../../../components/ui/SearchInput/SearchInput";
 import { useEmployees } from "../../../hooks/useEmployees";
-// BUG-MAC: added permission guard utility
-import { hasPermission } from "../../../utils/permission";
+import { usePermission } from "../../../hooks/usePermission";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -27,11 +26,10 @@ const MachineList: React.FC = () => {
     const { employees, loadEmployees } = useEmployees();
 
     const { data, loading, error } = useAppSelector((state) => state.machines);
-
-    // BUG-MAC fix: permission guards for machine actions
-    const canCreateMachine = hasPermission("machines.create");
-    const canEditMachine = hasPermission("machines.edit");
-    const canDeleteMachine = hasPermission("machines.delete");
+    const { can } = usePermission();
+    const canCreateMachine = can("machines.create");
+    const canEditMachine = can("machines.edit");
+    const canDeleteMachine = can("machines.delete");
 
     const [searchTerm, setSearchTerm] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
@@ -44,9 +42,13 @@ const MachineList: React.FC = () => {
     const [selectedMachine, setSelectedMachine] = useState<any | null>(null);
 
     useEffect(() => {
-        dispatch(fetchMachines());
-        loadEmployees();
-    }, [dispatch, loadEmployees]);
+        if (can("machines.view")) {
+            dispatch(fetchMachines());
+        }
+        if (can("employees.view")) {
+            loadEmployees();
+        }
+    }, [dispatch, loadEmployees, can]);
 
     useEffect(() => {
         if (error) {

@@ -8,6 +8,7 @@ import { fetchRawMaterials, deleteRawMaterial, rawMaterialCreated, rawMaterialUp
 import { fetchStores } from "../../../features/stores/storeSlice";
 import { useSocketSync } from "../../../hooks/useSocketSync";
 import type { RawMaterial } from "../../../features/raw-materials/types";
+import { usePermission } from "../../../hooks/usePermission";
 
 import EditButton from "../../../components/ui/EditButton/EditButton";
 import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
@@ -33,6 +34,7 @@ const RawMaterialList: React.FC = () => {
 
     const { data, loading, error } = useAppSelector((state) => state.rawMaterials);
     const { data: stores } = useAppSelector((state) => state.stores);
+    const { can } = usePermission();
 
     const [searchTerm, setSearchTerm] = useState("");
     const [storeFilter, setStoreFilter] = useState("");
@@ -57,16 +59,20 @@ const RawMaterialList: React.FC = () => {
     });
 
     useEffect(() => {
-        dispatch(fetchStores(undefined));
-    }, [dispatch]);
+        if (can("raw_materials.view")) {
+            dispatch(fetchStores(undefined));
+        }
+    }, [dispatch, can]);
 
     useEffect(() => {
         const delayDebounceFn = setTimeout(() => {
-            dispatch(fetchRawMaterials(searchTerm));
+            if (can("raw_materials.view")) {
+                dispatch(fetchRawMaterials(searchTerm));
+            }
         }, 500);
 
         return () => clearTimeout(delayDebounceFn);
-    }, [searchTerm, dispatch]);
+    }, [searchTerm, dispatch, can]);
 
     useEffect(() => {
         if (error) {
@@ -211,8 +217,8 @@ const RawMaterialList: React.FC = () => {
             render: (item) => (
                 <div className="flex items-center gap-2">
                     <ViewButton onClick={() => handleOpenView(item)} />
-                    <EditButton onClick={() => handleOpenEdit(item)} />
-                    <DeleteButton onClick={() => triggerDelete(item.rawMaterialId)} />
+                    {can("raw_materials.edit") && <EditButton onClick={() => handleOpenEdit(item)} />}
+                    {can("raw_materials.delete") && <DeleteButton onClick={() => triggerDelete(item.rawMaterialId)} />}
                 </div>
             ),
         },
@@ -257,11 +263,13 @@ const RawMaterialList: React.FC = () => {
                             columns={exportColumns}
                             filename="raw_materials_list.csv"
                         />
-                        <CustomButton
-                            text="Add Material"
-                            icon={FaPlus}
-                            onClick={handleOpenAdd}
-                        />
+                        {can("raw_materials.create") && (
+                            <CustomButton
+                                text="Add Material"
+                                icon={FaPlus}
+                                onClick={handleOpenAdd}
+                            />
+                        )}
                     </div>
                 </div>
 

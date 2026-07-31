@@ -11,6 +11,7 @@ import CommonViewModal from "../../../components/ui/CommonViewModal/CommonViewMo
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import { useRoles } from "../../../hooks/useRoles";
 // import { useAppSelector } from "../../../hooks/reduxHooks";
+import { usePermission } from "../../../hooks/usePermission";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import DataTable, { type DataTableColumn } from "../../../components/ui/table/DataTable";
 import CommonModal from "../../../components/ui/Modal/CommonModal";
@@ -19,8 +20,7 @@ const ITEMS_PER_PAGE = 10;
 
 const RoleList: React.FC = () => {
     const { roles, total, loading, error, loadRoles, addRole, editRole, removeRole } = useRoles();
-    console.log("fs", roles)
-    // const { user } = useAppSelector((state) => state.auth);
+    const { can } = usePermission();
 
     const [searchTerm, setSearchTerm] = useState("");
     const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
@@ -58,8 +58,10 @@ const RoleList: React.FC = () => {
 
     // Fetch data when page or search term changes
     useEffect(() => {
-        loadRoles(currentPage, ITEMS_PER_PAGE, debouncedSearchTerm);
-    }, [loadRoles, currentPage, debouncedSearchTerm]);
+        if (can("roles.view")) {
+            loadRoles(currentPage, ITEMS_PER_PAGE, debouncedSearchTerm);
+        }
+    }, [loadRoles, currentPage, debouncedSearchTerm, can]);
 
     useEffect(() => {
         if (error) {
@@ -201,9 +203,9 @@ const RoleList: React.FC = () => {
             header: "Actions",
             render: (role) => (
                 <div className="flex items-center gap-2">
-                    <ViewButton onClick={() => handleOpenView(role)} />
-                    <EditButton onClick={() => handleOpenEdit(role)} />
-                    <DeleteButton onClick={() => triggerDelete(role.id)} />
+                    {can("roles.view") && <ViewButton onClick={() => handleOpenView(role)} />}
+                    {can("roles.edit") && <EditButton onClick={() => handleOpenEdit(role)} />}
+                    {can("roles.delete") && <DeleteButton onClick={() => triggerDelete(role.id)} />}
                 </div>
             ),
             align: "left"
@@ -230,11 +232,13 @@ const RoleList: React.FC = () => {
                                     onChange={handleSearch}
                                 />
                             </div>
-                            <CustomButton
-                                text="Add Role"
-                                icon={FaPlus}
-                                onClick={handleOpenAdd}
-                            />
+                            {can("roles.create") && (
+                                <CustomButton
+                                    text="Add Role"
+                                    icon={FaPlus}
+                                    onClick={handleOpenAdd}
+                                />
+                            )}
                         </div>
                     </div>
 

@@ -9,7 +9,7 @@ import EmployeeViewModal from "../../employee/components/EmployeeViewModal";
 import CustomButton from "../../../components/ui/Button/Button";
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import { useEmployees } from "../../../hooks/useEmployees";
-import { hasPermission } from "../../../utils/permission";
+import { usePermission } from "../../../hooks/usePermission";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import DataTable, { type DataTableColumn } from "../../../components/ui/table/DataTable";
 
@@ -18,9 +18,11 @@ const ITEMS_PER_PAGE = 10;
 const Employeelist: React.FC = () => {
   const navigate = useNavigate();
   const { employees, loading, error, loadEmployees, removeEmployee, totalPages } = useEmployees();
-  const canCreateEmployee = hasPermission("employees.create");
-  const canEditEmployee = hasPermission("employees.edit");
-  const canDeleteEmployee = hasPermission("employees.delete");
+  const { can } = usePermission();
+  const canView   = can("employees.view");
+  const canCreate = can("employees.create");
+  const canEdit   = can("employees.edit");
+  const canDelete = can("employees.delete");
 
   const [showViewModal, setShowViewModal] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<any>(null);
@@ -33,11 +35,13 @@ const Employeelist: React.FC = () => {
 
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
-      loadEmployees({
-        search: searchTerm,
-        page: currentPage,
-        limit: ITEMS_PER_PAGE,
-      });
+      if (canView) {
+        loadEmployees({
+          search: searchTerm,
+          page: currentPage,
+          limit: ITEMS_PER_PAGE,
+        });
+      }
     }, 300);
 
     return () => clearTimeout(delayDebounceFn);
@@ -111,9 +115,9 @@ const Employeelist: React.FC = () => {
       header: "Actions",
       render: (emp) => (
         <div className="flex items-center gap-2">
-          <ViewButton onClick={() => handleView(emp)} />
-          {canEditEmployee && <EditButton onClick={() => handleEdit(emp)} />}
-          {canDeleteEmployee && <DeleteButton onClick={() => triggerDelete(emp.id)} />}
+          {canView && <ViewButton onClick={() => handleView(emp)} />}
+          {canEdit && <EditButton onClick={() => handleEdit(emp)} />}
+          {canDelete && <DeleteButton onClick={() => triggerDelete(emp.id)} />}
         </div>
       ),
     }
@@ -140,7 +144,7 @@ const Employeelist: React.FC = () => {
                   onChange={handleSearch}
                 />
               </div>
-              {canCreateEmployee && (
+              {canCreate && (
                 <CustomButton
                   text="Add Employee"
                   icon={FaPlus}

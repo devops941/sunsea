@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
 import { useSocketSync } from "../../../hooks/useSocketSync";
+import { usePermission } from "../../../hooks/usePermission";
 
 // Actions
 import { fetchProductionOrders } from "../../../features/production-orders/productionOrderSlice";
@@ -27,6 +28,16 @@ const DashboardPage: React.FC = () => {
   const dispatch = useAppDispatch();
   const [loadingInitial, setLoadingInitial] = useState(true);
 
+  // Permission guards — only call APIs the user is allowed to access
+  const { can } = usePermission();
+  const canViewProduction  = can("production_orders.view");
+  const canViewMachines    = can("machines.view");
+  const canViewSchedules   = can("weekly_programs.view");
+  const canViewRawMaterials = can("raw_materials.view");
+  const canViewProducts    = can("products.view");
+  const canViewEmployees   = can("employees.view");
+  const canViewUsers       = can("users.view");
+
   // Redux state with safe defaults
   const { data: productionOrders, loading: poLoading } = useAppSelector((state: any) => state.productionOrders || { data: [], loading: false });
   const { data: machines, loading: mLoading } = useAppSelector((state: any) => state.machines || { data: [], loading: false });
@@ -42,15 +53,15 @@ const DashboardPage: React.FC = () => {
     const loadAllData = async () => {
       setLoadingInitial(true);
       try {
-        await Promise.allSettled([
-          dispatch(fetchProductionOrders()),
-          dispatch(fetchMachines()),
-          dispatch(fetchWeeklyPrograms(undefined)),
-          dispatch(fetchRawMaterials(undefined)),
-          loadProducts(),
-          loadEmployees({ limit: 1000 }),
-          loadUsers()
-        ]);
+        const calls: Promise<any>[] = [];
+        if (canViewProduction)   calls.push(dispatch(fetchProductionOrders()) as any);
+        if (canViewMachines)     calls.push(dispatch(fetchMachines()) as any);
+        if (canViewSchedules)    calls.push(dispatch(fetchWeeklyPrograms(undefined)) as any);
+        if (canViewRawMaterials) calls.push(dispatch(fetchRawMaterials(undefined)) as any);
+        if (canViewProducts)     calls.push(loadProducts());
+        if (canViewEmployees)    calls.push(loadEmployees({ limit: 1000 }));
+        if (canViewUsers)        calls.push(loadUsers());
+        if (calls.length > 0) await Promise.allSettled(calls);
       } catch (e) {
         console.error("Error loading dashboard data", e);
       } finally {
@@ -58,12 +69,14 @@ const DashboardPage: React.FC = () => {
       }
     };
     loadAllData();
-  }, [dispatch, loadProducts, loadEmployees, loadUsers]);
+  }, [dispatch, loadProducts, loadEmployees, loadUsers,
+      canViewProduction, canViewMachines, canViewSchedules,
+      canViewRawMaterials, canViewProducts, canViewEmployees, canViewUsers]);
 
-  // Real-time: refresh key data when production/inventory events arrive
-  useSocketSync("productionOrder", undefined, () => dispatch(fetchProductionOrders()));
-  useSocketSync("weeklyProgram", undefined, () => dispatch(fetchWeeklyPrograms(undefined)));
-  useSocketSync("rawMaterial", undefined, () => dispatch(fetchRawMaterials(undefined)));
+  // Real-time: refresh key data when production/inventory events arrive (only if permitted)
+  useSocketSync("productionOrder", undefined, canViewProduction ? () => dispatch(fetchProductionOrders()) : undefined);
+  useSocketSync("weeklyProgram", undefined, canViewSchedules ? () => dispatch(fetchWeeklyPrograms(undefined)) : undefined);
+  useSocketSync("rawMaterial", undefined, canViewRawMaterials ? () => dispatch(fetchRawMaterials(undefined)) : undefined);
 
   // Derived Data: Stats
   const totalFinishedGoods = useMemo(() => {

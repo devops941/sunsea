@@ -8,6 +8,7 @@ import { fetchRawMaterials, deleteRawMaterial, rawMaterialCreated, rawMaterialUp
 import { fetchStores } from "../../../features/stores/storeSlice";
 import { useSocketSync } from "../../../hooks/useSocketSync";
 import type { RawMaterial } from "../../../features/raw-materials/types";
+import { usePermission } from "../../../hooks/usePermission";
 
 import EditButton from "../../../components/ui/EditButton/EditButton";
 import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
@@ -33,6 +34,7 @@ const WastageStoreList: React.FC = () => {
 
     const { data, loading, error } = useAppSelector((state) => state.rawMaterials);
     const { data: stores } = useAppSelector((state) => state.stores);
+    const { can } = usePermission();
 
     const [searchTerm, setSearchTerm] = useState("");
     const [storeFilter, setStoreFilter] = useState("");
@@ -57,16 +59,20 @@ const WastageStoreList: React.FC = () => {
     });
 
     useEffect(() => {
-        dispatch(fetchStores(undefined));
-    }, [dispatch]);
+        if (can("wastage-store.view")) {
+            dispatch(fetchStores(undefined));
+        }
+    }, [dispatch, can]);
 
     useEffect(() => {
         const delayDebounceFn = setTimeout(() => {
-            dispatch(fetchRawMaterials(searchTerm));
+            if (can("wastage-store.view")) {
+                dispatch(fetchRawMaterials(searchTerm));
+            }
         }, 500);
 
         return () => clearTimeout(delayDebounceFn);
-    }, [searchTerm, dispatch]);
+    }, [searchTerm, dispatch, can]);
 
     useEffect(() => {
         if (error) {
@@ -183,9 +189,11 @@ const WastageStoreList: React.FC = () => {
             align: "left",
             render: (item) => (
                 <div className="flex items-center gap-2">
-                    <ViewButton onClick={() => handleOpenView(item)} />
-                    <EditButton onClick={() => handleOpenEdit(item)} />
-                    <DeleteButton onClick={() => triggerDelete(item.rawMaterialId)} />
+                    {(can("wastage-store.view") || can("production-wastages.view")) && (
+                        <ViewButton onClick={() => handleOpenView(item)} />
+                    )}
+                    {(can("wastage-store.edit") || can("production-wastages.edit")) && <EditButton onClick={() => handleOpenEdit(item)} />}
+                    {(can("wastage-store.delete") || can("production-wastages.delete")) && <DeleteButton onClick={() => triggerDelete(item.rawMaterialId)} />}
                 </div>
             ),
         },
@@ -230,11 +238,13 @@ const WastageStoreList: React.FC = () => {
                             columns={exportColumns}
                             filename="wastage_products_list.csv"
                         />
-                        <CustomButton
-                            text="Add Product"
-                            icon={FaPlus}
-                            onClick={handleOpenAdd}
-                        />
+                        {(can("wastage-store.create") || can("production-wastages.create")) && (
+                            <CustomButton
+                                text="Add Product"
+                                icon={FaPlus}
+                                onClick={handleOpenAdd}
+                            />
+                        )}
                     </div>
                 </div>
 

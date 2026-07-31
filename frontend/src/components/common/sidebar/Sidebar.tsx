@@ -1,8 +1,10 @@
 import { useState, useMemo, useCallback } from "react";
 import { NavLink, useNavigate, useLocation } from "react-router-dom";
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
-import { logoutUser } from "../../../features/auth/authSlice";
-import React from "react";
+import { usePermission } from "../../../hooks/usePermission";
+import { logoutUser, getCurrentUser } from "../../../features/auth/authSlice";
+import { useSocketSync } from "../../../hooks/useSocketSync";
+import React, { useEffect } from "react";
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import {
   FaChevronDown,
@@ -54,8 +56,28 @@ const Sidebar = () => {
     if (activeCollapsed) return;
     setOpenMenu((prev) => (prev === menu ? null : menu));
   };
-  const { permissions, user } = useAppSelector((state) => state.auth);
+  const { user } = useAppSelector((state) => state.auth);
   const { data: company } = useAppSelector((state) => state.company);
+  const { can } = usePermission();
+
+  // 🔴 Live Real-Time Permission Sync:
+  // Listens to socket events when roles or permissions change anywhere in the app
+  useSocketSync("rolePermission", undefined, () => {
+    dispatch(getCurrentUser());
+  });
+
+  useSocketSync("role", undefined, () => {
+    dispatch(getCurrentUser());
+  });
+
+  // Also refetch permissions whenever user returns focus to the window or navigates
+  useEffect(() => {
+    const handleFocus = () => {
+      dispatch(getCurrentUser());
+    };
+    window.addEventListener("focus", handleFocus);
+    return () => window.removeEventListener("focus", handleFocus);
+  }, [dispatch]);
   const handleLogout = () => {
     setShowLogoutModal(true);
   };
@@ -64,27 +86,18 @@ const Sidebar = () => {
     dispatch(logoutUser());
     navigate("/login");
   };
-  const hasPermission = useCallback((perm: string | undefined): boolean => {
-    if (!perm) return true;
-    if (
-      user?.isSuperAdmin ||
-      user?.roleId === "ROLE_ADMIN" ||
-      user?.roleId === "SUPER_ADMIN" ||
-      user?.roleId === "ADMIN"
-    ) {
-      return true;
-    }
-    return permissions.includes(perm);
-  }, [permissions, user?.roleId]);
   const filteredSidebarItems = useMemo(() => {
     return sidebarItems
       .map((item) => {
-        if (item.permission && !hasPermission(item.permission)) {
+        if (item.permission && !can(item.permission)) {
+          return null;
+        }
+        if (item.permissionAny && !item.permissionAny.some((p) => can(p))) {
           return null;
         }
         if (item.children) {
           const filteredChildren = item.children.filter((child) =>
-            hasPermission(child.permission)
+            !child.permission || can(child.permission)
           );
           if (filteredChildren.length === 0 && item.children.length > 0) {
             return null;
@@ -94,7 +107,7 @@ const Sidebar = () => {
         return item;
       })
       .filter((item): item is (typeof sidebarItems)[0] => item !== null);
-  }, [hasPermission]);
+  }, [can]);
   return (
     <aside
       className={`h-screen bg-[#ffffff] text-[#2A3547] relative overflow-visible flex flex-col transition-[width] duration-300 ease-in-out z-50 border-r border-black/10  ${activeCollapsed ? "w-[80px]" : "w-[260px]"}`}

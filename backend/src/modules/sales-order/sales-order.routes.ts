@@ -21,7 +21,7 @@ const router = express.Router();
 router.post(
     "/",
     authMiddleware,
-    requirePermission("sales_order.create"),
+    requirePermission("sales-orders.create"),
     validateMiddleware(createSalesOrderSchema),
     SalesOrderController.create
 );
@@ -30,14 +30,14 @@ router.post(
 router.get(
     "/credit-block-check",
     authMiddleware,
-    requirePermission("sales_order.view"),
+    requirePermission("sales-orders.view"),
     SalesOrderController.checkCreditBlock
 );
 
 router.get(
     "/",
     authMiddleware,
-    requirePermission("sales_order.view"),
+    requirePermission("sales-orders.view"),
     validateMiddleware(salesOrderQuerySchema),
     SalesOrderController.findAll
 );
@@ -45,14 +45,14 @@ router.get(
 router.get(
     "/next-code",
     authMiddleware,
-    requirePermission("sales_order.view"),
+    requirePermission("sales-orders.view"),
     SalesOrderController.getNextCode
 );
 
 router.get(
     "/:id/status",
     authMiddleware,
-    requirePermission("sales_order.view"),
+    requirePermission("sales-orders.view"),
     validateMiddleware(salesOrderIdSchema),
     SalesOrderController.getStatus
 );
@@ -60,7 +60,7 @@ router.get(
 router.get(
     "/:id",
     authMiddleware,
-    requirePermission("sales_order.view"),
+    requirePermission("sales-orders.view"),
     validateMiddleware(salesOrderIdSchema),
     SalesOrderController.findById
 );
@@ -68,7 +68,7 @@ router.get(
 router.post(
     "/:id/email-quotation",
     authMiddleware,
-    requirePermission("sales_order.view"),
+    requirePermission("sales-orders.view"),
     validateMiddleware(salesOrderIdSchema),
     SalesOrderController.emailQuotation
 );
@@ -77,7 +77,7 @@ router.post(
 router.put(
     "/:id",
     authMiddleware,
-    requirePermission("sales_order.edit"),
+    requirePermission("sales-orders.edit"),
     validateMiddleware(updateSalesOrderSchema),
     SalesOrderController.update
 );
@@ -86,7 +86,7 @@ router.put(
 router.delete(
     "/:id",
     authMiddleware,
-    requirePermission("sales_order.delete"),
+    requirePermission("sales-orders.delete"),
     validateMiddleware(salesOrderIdSchema),
     SalesOrderController.delete
 );
@@ -97,7 +97,7 @@ router.delete(
 router.patch(
     "/:id/discounts",
     authMiddleware,
-    requirePermission("sales_order.edit"),
+    requirePermission("sales-orders.edit"),
     validateMiddleware(updateSalesOrderDiscountsSchema),
     SalesOrderController.updateDiscounts
 );
@@ -105,7 +105,7 @@ router.patch(
 router.patch(
     "/:id/submit-md-approval",
     authMiddleware,
-    requirePermission("sales_order.edit"),
+    requirePermission("sales-orders.edit"),
     validateMiddleware(submitForMdApprovalSchema),
     SalesOrderController.submitForMdApproval
 );
@@ -113,13 +113,15 @@ router.patch(
 router.patch(
     "/:id/reopen",
     authMiddleware,
-    requirePermission("sales_order.edit"),
+    requirePermission("sales-orders.edit"),
     validateMiddleware(reopenSalesOrderSchema),
     SalesOrderController.reopen
 );
 
 router.patch(
     "/:id/md-approve",
+    authMiddleware,
+    requirePermission("pending-quotations.edit"),
     validateMiddleware(mdApprovalDecisionSchema),
     SalesOrderController.mdApprove
 );

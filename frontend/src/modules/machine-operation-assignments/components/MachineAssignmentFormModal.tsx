@@ -67,9 +67,9 @@ export const MachineAssignmentFormModal: React.FC<Props> = ({
     const loadRefData = async () => {
       try {
         const [mRes, rRes, sRes] = await Promise.all([
-          machineService.getAll(),
-          machineOperationAssignmentService.getRoles(),
-          shiftService.fetchAll(),
+          machineService.getAll().catch(() => []),
+          machineOperationAssignmentService.getRoles().catch(() => ({ data: [] })),
+          shiftService.fetchAll().catch(() => []),
         ]);
 
         const machineList = Array.isArray(mRes) ? mRes : mRes.data || [];
