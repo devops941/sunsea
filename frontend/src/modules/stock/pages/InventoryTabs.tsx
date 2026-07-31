@@ -44,7 +44,7 @@ const InventoryTabs: React.FC = () => {
         "eod-stock": "/inventory/eod-stock",
     };
 
-    const dynamicStoreTabs = useMemo<TabItem[]>(() => {
+    const dynamicStoreTabs = useMemo(() => {
         const canViewRaw = can("raw_material_stocks.view");
         const canViewFG = can("finished_goods_stocks.view");
         if (!canViewRaw && !canViewFG) return [];
@@ -75,7 +75,7 @@ const InventoryTabs: React.FC = () => {
                     <StockList storeId={store.storeId} />
                 )
             };
-        }).filter((t): t is TabItem => t !== null);
+        }).filter((t) => t !== null) as TabItem[];
     }, [stores, can]);
 
     const staticTabs = useMemo<TabItem[]>(() => {
