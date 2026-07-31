@@ -4,6 +4,7 @@ import { prisma } from "../../config/prisma";
 import { asyncHandler } from "../../utils/asyncHandler";
 import { ApiResponse } from "../../utils/ApiResponse";
 import { ApiError } from "../../utils/ApiError";
+import { getIO } from "../../socket/socket";
 
 class GrnInvoiceController {
 
@@ -23,6 +24,8 @@ class GrnInvoiceController {
             userId,
             companyId: company.id,
         }, req.file);
+
+        getIO().emit("grnInvoice:created", grnInvoice);
 
         return res.status(201).json(
             new ApiResponse("GRN / Invoice created successfully", grnInvoice)
@@ -60,6 +63,8 @@ class GrnInvoiceController {
 
         const grnInvoice = await grnInvoiceService.updateGrnInvoice(id, req.body, req.file);
 
+        getIO().emit("grnInvoice:updated", grnInvoice);
+
         return res.status(200).json(
             new ApiResponse("GRN / Invoice updated successfully", grnInvoice)
         );
@@ -77,6 +82,8 @@ class GrnInvoiceController {
         const id = req.params.id as string;
 
         await grnInvoiceService.deleteGrnInvoice(id);
+
+        getIO().emit("grnInvoice:deleted", { id });
 
         return res.status(200).json(
             new ApiResponse("GRN / Invoice deleted successfully")

@@ -7,6 +7,9 @@ import { getIO } from "../../socket/socket";
 import { asyncHandler } from "../../utils/asyncHandler";
 import { ApiResponse } from "../../utils/ApiResponse";
 import { ApiError } from "../../utils/ApiError";
+import { generatePoInvoiceHtml } from "../../templates/poInvoiceTemplate";
+import { generatePdfFromHtml } from "../../utils/pdfGenerator";
+import { sendEmail } from "../../utils/mailer";
 
 class PurchaseOrderController {
 
@@ -90,6 +93,39 @@ class PurchaseOrderController {
         return res.status(200).json(
             new ApiResponse("Purchase Order deleted successfully")
         );
+    });
+
+    emailPoInvoice = asyncHandler(async (req: Request, res: Response) => {
+        const id = req.params.id as string;
+        const { to, subject, message } = req.body;
+
+        if (!to) {
+            throw new ApiError(400, "Recipient email (to) is required");
+        }
+
+        const po = await purchaseOrderService.getPurchaseOrderById(id);
+        const companyDetails = await prisma.company.findFirst();
+
+        const supplier = po.supplier;
+
+        const html = generatePoInvoiceHtml(po, companyDetails, supplier);
+        
+        const pdfBuffer = await generatePdfFromHtml(html);
+
+        await sendEmail({
+            to,
+            subject: subject || `Purchase Order Invoice - ${po.poNumber}`,
+            text: message || `Please find attached the Purchase Order Invoice ${po.poNumber}.`,
+            attachments: [
+                {
+                    filename: `PO-Invoice-${po.poNumber}.pdf`,
+                    content: pdfBuffer,
+                    contentType: "application/pdf",
+                },
+            ],
+        });
+
+        res.status(200).json(new ApiResponse("Purchase Order invoice emailed successfully"));
     });
 }
 

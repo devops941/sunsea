@@ -10,9 +10,10 @@ import RolePermissionMapping from "../../role-permissions/pages/RolePermissionMa
 import CompanySettings from "../../company/pages/CompanySettings";
 import GstTaxList from "../../settings/GstTaxListPage";
 import WhatsappSettings from "../../whatsapp/WhatsappCreate";
+import EmailConfigPage from "../../email-config/pages/EmailConfigPage";
 import SalesInvoiceCreate from "../../sales-order-invoice/sales-invoiceCreate";
 import DepartmentList from "../../departments/pages/DepartmentList";
-import { FaBuilding, FaUserTag, FaUserShield, FaCogs, FaPercent, FaWhatsapp, FaFileInvoice } from "react-icons/fa";
+import { FaBuilding, FaUserTag, FaUserShield, FaCogs, FaPercent, FaWhatsapp, FaFileInvoice, FaEnvelope } from "react-icons/fa";
 import ProfilePage from "../../profile/ProfilePage";
 
 const OrganizationTabs: React.FC = () => {
@@ -26,6 +27,7 @@ const OrganizationTabs: React.FC = () => {
         "/role-permissions": "permissions",
         "/settings/gst-taxes": "gst",
         "/whatsapp": "whatsapp",
+        "/email-config": "email",
         "/settings/invoice": "invoice",
         "/departments": "departments",
         "/settings/company": "companySettings",
@@ -39,6 +41,7 @@ const OrganizationTabs: React.FC = () => {
         "departments": "/departments",
         "gst": "/settings/gst-taxes",
         "whatsapp": "/whatsapp",
+        "email": "/email-config",
         "invoice": "/settings/invoice"
     };
 
@@ -52,6 +55,7 @@ const OrganizationTabs: React.FC = () => {
         { key: "companySettings", label: "Company Settings", icon: <FaCogs />, content: <CompanySettings /> },
         { key: "gst", label: "GST Tax Rates", icon: <FaPercent />, content: <GstTaxList /> },
         { key: "whatsapp", label: "Whatsapp", icon: <FaWhatsapp />, content: <WhatsappSettings /> },
+        { key: "email", label: "Email", icon: <FaEnvelope />, content: <EmailConfigPage /> },
         { key: "invoice", label: "Invoice", icon: <FaFileInvoice />, content: <SalesInvoiceCreate /> }
     ];
 

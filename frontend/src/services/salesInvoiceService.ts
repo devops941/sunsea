@@ -29,5 +29,14 @@ export const salesInvoiceService = {
   delete: async (id: string): Promise<void> => {
     await apiClient.delete(`${getBaseUrl()}/${id}`);
   },
+
+  emailInvoice: async (id: string, recipientEmail: string, subject: string, message: string): Promise<any> => {
+    const response = await apiClient.post(`${getBaseUrl()}/${id}/email-invoice`, {
+      recipientEmail,
+      subject,
+      message,
+    });
+    return response.data?.data || response.data;
+  },
 };
 export default salesInvoiceService;

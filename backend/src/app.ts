@@ -1,3 +1,5 @@
+import dns from "node:dns";
+dns.setDefaultResultOrder("ipv4first");
 import express, { Application } from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
@@ -114,6 +116,56 @@ app.get("/", (req, res) => {
     environment: process.env.NODE_ENV || "development",
     timestamp: new Date().toISOString()
   });
+});
+
+app.get("/api/debug/smtp-test", async (req, res) => {
+  const dns = require("node:dns");
+  dns.setDefaultResultOrder("ipv4first");
+
+  const nodemailer = require("nodemailer");
+  const { prisma } = require("./config/prisma");
+
+  let smtpHost = process.env.SMTP_HOST || "";
+  let smtpPort = Number(process.env.SMTP_PORT) || 587;
+  let smtpUser = process.env.SMTP_USER || "";
+  let smtpPass = process.env.SMTP_PASS || "";
+  let encryption = process.env.SMTP_ENCRYPTION || "TLS";
+  let source = "env";
+
+  const config = await prisma.emailConfig.findFirst();
+  if (config) {
+    smtpHost = config.smtpHost || smtpHost;
+    smtpPort = config.smtpPort || smtpPort;
+    smtpUser = config.smtpUsername || smtpUser;
+    smtpPass = config.smtpPassword || smtpPass;
+    encryption = config.encryption || encryption;
+    source = "database";
+  }
+
+  const transporter = nodemailer.createTransport({
+    host: smtpHost,
+    port: smtpPort,
+    secure: smtpPort === 465 || encryption === "SSL",
+    auth: { user: smtpUser, pass: smtpPass },
+    family: 4,
+    connectionTimeout: 8000,
+    greetingTimeout: 8000,
+  });
+
+  try {
+    await transporter.verify();
+    res.json({ status: "SUCCESS", source, smtpHost, smtpPort, smtpUser });
+  } catch (e: any) {
+    res.json({
+      status: "FAILED",
+      source,
+      smtpHost,
+      smtpPort,
+      smtpUser,
+      code: e.code,
+      message: e.message,
+    });
+  }
 });
 app.use("/api", apiRoutes);
 

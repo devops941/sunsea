@@ -306,6 +306,15 @@ export const salesOrderService = {
         return response.data?.data || response.data;
     },
 
+    emailQuotation: async (id: number | string, recipientEmail: string, subject: string, message: string): Promise<any> => {
+        const response = await apiClient.post(`${config.salesOrder.getById}/${id}/email-quotation`, {
+            recipientEmail,
+            subject,
+            message
+        });
+        return response.data?.data || response.data;
+    },
+
     // ─── 🔟 GET METHOD - Get Order Status Summary ─────────────
     // Lightweight: returns flags like canEdit/canApproveMd/canReopen
     // so the UI can show/hide action buttons without re-fetching everything

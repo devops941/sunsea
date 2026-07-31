@@ -17,6 +17,9 @@ const CommonConfirmModal: React.FC<CommonConfirmModalProps> = ({
   confirmDisabled = false,
   isLoading = false,
   isDangerous,
+  warningText = "This action cannot be undone.",
+  loadingText = "Processing...",
+  confirmIcon = FaTrash,
 }) => {
   // Support both prop naming conventions
   const isVisible = show ?? isOpen ?? false;
@@ -59,9 +62,11 @@ const CommonConfirmModal: React.FC<CommonConfirmModalProps> = ({
             {message}
           </p>
 
-          <p className="text-xs text-gray-400 font-medium">
-            This action cannot be undone.
-          </p>
+          {warningText && (
+            <p className="text-xs text-gray-400 font-medium">
+              {warningText}
+            </p>
+          )}
 
           <div className="flex justify-center gap-3 mt-8">
             <CustomButton
@@ -72,8 +77,8 @@ const CommonConfirmModal: React.FC<CommonConfirmModalProps> = ({
               className="!bg-gray-100 !text-gray-700 hover:!bg-gray-200 !border-transparent px-6"
             />
             <CustomButton
-              text={isLoading ? "Deleting..." : confirmText}
-              icon={FaTrash}
+              text={isLoading ? loadingText : confirmText}
+              icon={confirmIcon}
               onClick={onConfirm}
               disabled={confirmDisabled || isLoading}
               className={dangerMode ? "!bg-red-500 hover:!bg-red-600 !text-white !border-red-500 px-6" : "px-6"}
