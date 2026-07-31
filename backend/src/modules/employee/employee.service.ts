@@ -1,7 +1,7 @@
 import { prisma } from "../../config/prisma";
 import { ApiError } from "../../utils/ApiError";
-import { executeDeleteWithValidation } from "../../utils/deleteValidation";
 import { UserStatus } from "../../types/auth.types";
+import { sendEmail } from "../../utils/mailer";
 import bcrypt from "bcrypt";
 
 class EmployeeService {
@@ -12,8 +12,7 @@ class EmployeeService {
       employeeData.createdBy = null;
     }
 
-    return prisma.$transaction(async (tx) => {
-
+    const createdEmployee = await prisma.$transaction(async (tx) => {
       // Check if email already exists
       if (employeeData.email) {
         const existingEmail = await tx.employee.findUnique({
@@ -23,6 +22,7 @@ class EmployeeService {
           throw new ApiError(400, "Email already exists");
         }
       }
+
       // Check if employee code already exists
       if (employeeData.empCode) {
         const existingCode = await tx.employee.findUnique({
@@ -31,6 +31,38 @@ class EmployeeService {
         if (existingCode) {
           throw new ApiError(400, "Employee code already exists");
         }
+      }
+
+      // Check unique identity fields
+      if (employeeData.aadhaarNumber) {
+        const existing = await tx.employee.findUnique({
+          where: { aadhaarNumber: employeeData.aadhaarNumber },
+        });
+        if (existing) throw new ApiError(400, "Aadhaar number already exists");
+      }
+      if (employeeData.panNumber) {
+        const existing = await tx.employee.findUnique({
+          where: { panNumber: employeeData.panNumber },
+        });
+        if (existing) throw new ApiError(400, "PAN number already exists");
+      }
+      if (employeeData.pfNumber) {
+        const existing = await tx.employee.findUnique({
+          where: { pfNumber: employeeData.pfNumber },
+        });
+        if (existing) throw new ApiError(400, "PF number already exists");
+      }
+      if (employeeData.uanNumber) {
+        const existing = await tx.employee.findUnique({
+          where: { uanNumber: employeeData.uanNumber },
+        });
+        if (existing) throw new ApiError(400, "UAN number already exists");
+      }
+      if (employeeData.esiNumber) {
+        const existing = await tx.employee.findUnique({
+          where: { esiNumber: employeeData.esiNumber },
+        });
+        if (existing) throw new ApiError(400, "ESI number already exists");
       }
 
       // Create employee
@@ -61,7 +93,11 @@ class EmployeeService {
             passwordHash,
             employeeId: employee.id,
             roleId: Number(loginAccount.roleId),
-            status: loginAccount.status || UserStatus.ACTIVE,
+            mustChangePw: loginAccount.mustChangePw !== undefined ? loginAccount.mustChangePw : true,
+            status:
+              loginAccount.loginEnabled === false
+                ? UserStatus.SUSPENDED
+                : loginAccount.status || UserStatus.ACTIVE,
             createdBy: "ADMIN",
           },
         });
@@ -70,22 +106,36 @@ class EmployeeService {
       // Return employee with user included
       return tx.employee.findUnique({
         where: { id: employee.id },
-        include: { user: { include: { role: true } }, department: true },
+        include: { user: { include: { role: true } }, department: true, shift: true },
       });
     });
-  }
 
-  // async findAll() {
-  //   return prisma.employee.findMany({
-  //     include: {
-  //       user: true,
-  //       department: true,
-  //     },
-  //     orderBy: {
-  //       createdAt: "desc",
-  //     },
-  //   });
-  // }
+    // Send welcome email after transaction (non-blocking)
+    if (
+      createLoginAccount &&
+      loginAccount?.loginEnabled !== false &&
+      createdEmployee?.email
+    ) {
+      try {
+        await sendEmail({
+          to: createdEmployee.email,
+          subject: "Welcome to Sunsea — Your Account Has Been Created",
+          html: `
+            <p>Dear ${createdEmployee.fullName},</p>
+            <p>Your employee account has been created successfully.</p>
+            <p><strong>Employee Code:</strong> ${createdEmployee.empCode}</p>
+            <p><strong>Username:</strong> ${loginAccount.username}</p>
+            <p>Please log in and change your password at your earliest convenience.</p>
+            <p>Regards,<br/>Sunsea HR Team</p>
+          `,
+        });
+      } catch (emailErr) {
+        console.error("Failed to send welcome email (non-fatal):", emailErr);
+      }
+    }
+
+    return createdEmployee;
+  }
 
   async findAll(params: {
     search?: string;
@@ -114,7 +164,7 @@ class EmployeeService {
     const [employees, total] = await Promise.all([
       prisma.employee.findMany({
         where,
-        include: { user: { include: { role: true } }, department: true },
+        include: { user: { include: { role: true } }, department: true, shift: true },
         orderBy: { createdAt: "desc" },
         skip: (page - 1) * limit,
         take: limit,
@@ -136,6 +186,7 @@ class EmployeeService {
       include: {
         user: { include: { role: true } },
         department: true,
+        shift: true,
       },
     });
 
@@ -148,7 +199,7 @@ class EmployeeService {
 
   async update(id: bigint, data: any) {
     // Check if employee exists
-    const employeeExists = await this.findById(id);
+    await this.findById(id);
 
     const { createLoginAccount, loginAccount, ...employeeData } = data;
 
@@ -157,6 +208,28 @@ class EmployeeService {
     }
 
     return prisma.$transaction(async (tx) => {
+      // Check unique identity fields against OTHER employees
+      if (employeeData.aadhaarNumber) {
+        const existing = await tx.employee.findUnique({ where: { aadhaarNumber: employeeData.aadhaarNumber } });
+        if (existing && existing.id !== id) throw new ApiError(400, "Aadhaar number already exists");
+      }
+      if (employeeData.panNumber) {
+        const existing = await tx.employee.findUnique({ where: { panNumber: employeeData.panNumber } });
+        if (existing && existing.id !== id) throw new ApiError(400, "PAN number already exists");
+      }
+      if (employeeData.pfNumber) {
+        const existing = await tx.employee.findUnique({ where: { pfNumber: employeeData.pfNumber } });
+        if (existing && existing.id !== id) throw new ApiError(400, "PF number already exists");
+      }
+      if (employeeData.uanNumber) {
+        const existing = await tx.employee.findUnique({ where: { uanNumber: employeeData.uanNumber } });
+        if (existing && existing.id !== id) throw new ApiError(400, "UAN number already exists");
+      }
+      if (employeeData.esiNumber) {
+        const existing = await tx.employee.findUnique({ where: { esiNumber: employeeData.esiNumber } });
+        if (existing && existing.id !== id) throw new ApiError(400, "ESI number already exists");
+      }
+
       // Update employee
       const employee = await tx.employee.update({
         where: { id },
@@ -176,8 +249,14 @@ class EmployeeService {
             fullName: employeeData.fullName !== undefined ? employeeData.fullName : existingUser.fullName,
             email: employeeData.email !== undefined ? (employeeData.email || null) : existingUser.email,
             roleId: Number(loginAccount.roleId),
-            status: loginAccount.status || existingUser.status,
+            status: loginAccount.loginEnabled === false
+              ? UserStatus.SUSPENDED
+              : loginAccount.status || existingUser.status,
           };
+
+          if (loginAccount.mustChangePw !== undefined) {
+            updateData.mustChangePw = loginAccount.mustChangePw;
+          }
 
           if (loginAccount.password) {
             updateData.passwordHash = await bcrypt.hash(loginAccount.password, 10);
@@ -219,7 +298,11 @@ class EmployeeService {
               passwordHash,
               employeeId: id,
               roleId: Number(loginAccount.roleId),
-              status: loginAccount.status || UserStatus.ACTIVE,
+              mustChangePw: loginAccount.mustChangePw !== undefined ? loginAccount.mustChangePw : true,
+              status:
+                loginAccount.loginEnabled === false
+                  ? UserStatus.SUSPENDED
+                  : loginAccount.status || UserStatus.ACTIVE,
               createdBy: "ADMIN",
             },
           });
@@ -229,7 +312,7 @@ class EmployeeService {
       // Return employee with user included
       return tx.employee.findUnique({
         where: { id },
-        include: { user: { include: { role: true } }, department: true },
+        include: { user: { include: { role: true } }, department: true, shift: true },
       });
     });
   }
@@ -286,6 +369,5 @@ class EmployeeService {
     });
   }
 }
-
 
 export default new EmployeeService();

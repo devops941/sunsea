@@ -5,23 +5,21 @@ import employeeController from "./employee.controller";
 import { authMiddleware } from "../../middleware/auth.middleware";
 import { requirePermission } from "../../middleware/permission.middleware";
 import { validateMiddleware } from "../../middleware/validate.middleware";
+import { uploadEmployeePhoto } from "../../middleware/upload.middleware";
 
-import {
-  createEmployeeSchema,
-  updateEmployeeSchema,
-  employeeIdSchema,
-} from "./employee.validation";
+import { employeeIdSchema } from "./employee.validation";
 
 const router = Router();
 
 /**
  * Create Employee
+ * Uses multipart/form-data for photo upload — validation done in controller.
  */
 router.post(
   "/",
   authMiddleware,
   requirePermission("employees.create"),
-  validateMiddleware(createEmployeeSchema),
+  uploadEmployeePhoto.single("photo"),
   employeeController.create
 );
 
@@ -69,12 +67,13 @@ router.get(
 
 /**
  * Update Employee
+ * Uses multipart/form-data for photo upload — validation done in controller.
  */
 router.put(
   "/:id",
   authMiddleware,
   requirePermission("employees.edit"),
-  validateMiddleware(updateEmployeeSchema),
+  uploadEmployeePhoto.single("photo"),
   employeeController.update
 );
 

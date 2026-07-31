@@ -20,6 +20,74 @@ model Employee {
   updatedAt                  DateTime                     @updatedAt @db.Timestamptz(6)
   createdBy                  String?
   updatedBy                  String?
+
+  // Section 1: Basic Info
+  photoUrl                   String?
+  gender                     Gender?
+  dateOfBirth                DateTime?                    @db.Date
+  bloodGroup                 String?
+  maritalStatus              MaritalStatus?
+
+  // Section 2: Contact Info
+  personalMobile             String?                      @db.VarChar(20)
+  personalEmail              String?                      @db.VarChar(100)
+  emergencyContactName       String?
+  emergencyContactNumber     String?                      @db.VarChar(20)
+
+  // Section 3: Family Details
+  fatherName                 String?
+  motherName                 String?
+  spouseName                 String?
+  guardianName               String?
+
+  // Section 4: Identity Documents
+  aadhaarNumber              String?                      @unique
+  panNumber                  String?                      @unique
+  drivingLicense             String?
+  voterId                    String?
+
+  // Section 5: Address
+  permanentAddressLine1      String?
+  permanentAddressLine2      String?
+  permanentCity              String?
+  permanentState             String?
+  permanentPincode           String?
+  presentAddressLine1        String?
+  presentAddressLine2        String?
+  presentCity                String?
+  presentState               String?
+  presentPincode             String?
+
+  // Section 6: Official Info
+  designation                String?
+  employeeType               EmployeeType?
+
+  // Section 7: Joining Details
+  relievingDate              DateTime?
+  previousExperience         String?
+  probationPeriod            Int?
+  noticePeriod               Int?
+
+  // Section 8: Shift
+  shiftId                    String?
+
+  // Section 9: Payroll & Statutory
+  salaryType                 SalaryType?
+  basicSalary                Decimal?                     @db.Decimal(12, 2)
+  grossSalary                Decimal?                     @db.Decimal(12, 2)
+  pfApplicable               Boolean                      @default(false)
+  pfNumber                   String?                      @unique
+  uanNumber                  String?                      @unique
+  esiApplicable              Boolean                      @default(false)
+  esiNumber                  String?                      @unique
+  professionalTax            Boolean                      @default(false)
+  tdsApplicable              Boolean                      @default(false)
+  bankName                   String?
+  bankBranch                 String?
+  accountNumber              String?
+  ifscCode                   String?
+  accountHolderName          String?
+
   collectionAgentCustomers   Customer[]                   @relation("EmployeeCollectionAgent")
   createdByUser              User?                        @relation("EmployeeCreatedBy", fields: [createdBy], references: [userId])
   department                 Department?                  @relation(fields: [departmentId], references: [id])
@@ -28,9 +96,11 @@ model Employee {
   inchargeAssignments        MachineOperationAssignment[] @relation("InchargeEmployeeAssignments")
   stores                     Store[]
   user                       User?
+  shift                      Shift?                       @relation(fields: [shiftId], references: [shiftCode])
 
   @@index([departmentId])
   @@index([status])
+  @@index([shiftId])
   @@map("employees")
 }
 
@@ -487,7 +557,8 @@ model Shift {
   machineAssignments   MachineOperationAssignment[]
   productionWastages   ProductionWastage[]
   WeeklyMachineProgram WeeklyMachineProgram[]
-  shiftRecords              ProductShiftRecord[]
+  shiftRecords         ProductShiftRecord[]
+  employees            Employee[]
 
   @@map("shifts")
 }
@@ -1766,6 +1837,7 @@ enum EmployeeStatus {
   active
   inactive
   resigned
+  retired
   terminated
 }
 
@@ -1846,6 +1918,34 @@ enum WastageType {
   MOULD_CHANGE
   COLOR_CHANGE
   OTHER
+}
+
+enum Gender {
+  male
+  female
+  other
+}
+
+enum MaritalStatus {
+  single
+  married
+  divorced
+  widowed
+}
+
+enum EmployeeType {
+  permanent
+  contract
+  intern
+  consultant
+  operator
+  supervisor
+}
+
+enum SalaryType {
+  monthly
+  daily
+  hourly
 }
 
 enum WastageStatus {
