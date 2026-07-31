@@ -58,9 +58,9 @@ const DashboardPage: React.FC = () => {
         if (canViewMachines)     calls.push(dispatch(fetchMachines()) as any);
         if (canViewSchedules)    calls.push(dispatch(fetchWeeklyPrograms(undefined)) as any);
         if (canViewRawMaterials) calls.push(dispatch(fetchRawMaterials(undefined)) as any);
-        if (canViewProducts)     calls.push(loadProducts());
-        if (canViewEmployees)    calls.push(loadEmployees({ limit: 1000 }));
-        if (canViewUsers)        calls.push(loadUsers());
+        if (canViewProducts)     calls.push(Promise.resolve(loadProducts()));
+        if (canViewEmployees)    calls.push(Promise.resolve(loadEmployees({ limit: 1000 })));
+        if (canViewUsers)        calls.push(Promise.resolve(loadUsers()));
         if (calls.length > 0) await Promise.allSettled(calls);
       } catch (e) {
         console.error("Error loading dashboard data", e);

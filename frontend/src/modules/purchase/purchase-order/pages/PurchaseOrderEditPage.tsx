@@ -172,31 +172,22 @@ const PurchaseOrderEditPage: React.FC = () => {
   // ============================================================
   // TOTALS RECALCULATION
   // ============================================================
-  const recalculateTotals = (items: PurchaseOrderItem[], interState: boolean = isInterState, poDiscountType: "PERCENT" | "FLAT" = formData.discountType, poDiscountValue: number = formData.discountValue, rSign: "+" | "-" = roundingSign, rValue: number = roundingValue) => {
-    let subtotal = 0;
-    let totalTax = 0;
-    let totalCgst = 0;
-    let totalSgst = 0;
-    let totalIgst = 0;
-
-    items.forEach((item) => {
-      const qty = Number(item.quantity) || 0;
-      const price = Number(item.unitPrice) || 0;
-      const rawMaterial = (rawMaterials || []).find((rm: any) => String(rm.rawMaterialId) === String(item.productId));
-      const mult = getUomMultiplier(item.uom, rawMaterial?.baseUom);
-      const lineSubtotal = qty * mult * price;
-
+  // Re-run GST split (CGST/SGST ↔ IGST) whenever inter-state flag changes
+  useEffect(() => {
+    setFormData((prev) => {
+      const updatedItems = (prev.items || []).map((item) => {
+        const qty = Number(item.quantity) || 0;
+        const price = Number(item.unitPrice) || 0;
+        const rawMaterial = (rawMaterials || []).find(
+          (rm: any) => String(rm.rawMaterialId) === String(item.productId)
+        );
+        const mult = getUomMultiplier(item.uom, rawMaterial?.baseUom);
+        const lineSubtotal = qty * mult * price;
         const taxableAmount = lineSubtotal;
         const totalGstRate = Number(item.tax) || 0;
         const totalGstAmount = (taxableAmount * totalGstRate) / 100;
 
-        let cgstRate = 0;
-        let cgstAmount = 0;
-        let sgstRate = 0;
-        let sgstAmount = 0;
-        let igstRate = 0;
-        let igstAmount = 0;
-
+        let cgstRate = 0, cgstAmount = 0, sgstRate = 0, sgstAmount = 0, igstRate = 0, igstAmount = 0;
         if (isInterState) {
           igstRate = totalGstRate;
           igstAmount = totalGstAmount;
@@ -210,22 +201,15 @@ const PurchaseOrderEditPage: React.FC = () => {
         return {
           ...item,
           taxableAmount,
-          cgstRate,
-          cgstAmount,
-          sgstRate,
-          sgstAmount,
-          igstRate,
-          igstAmount,
+          cgstRate, cgstAmount,
+          sgstRate, sgstAmount,
+          igstRate, igstAmount,
           lineTotal: taxableAmount + totalGstAmount,
           discount: 0,
         };
       });
 
-      return {
-        ...prev,
-        items: updatedItems,
-        ...recalculateTotals(updatedItems),
-      };
+      return { ...prev, items: updatedItems };
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isInterState]);
