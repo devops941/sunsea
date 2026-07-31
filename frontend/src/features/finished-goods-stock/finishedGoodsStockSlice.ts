@@ -30,6 +30,33 @@ const finishedGoodsStockSlice = createSlice({
         clearError: (state) => {
             state.error = null;
         },
+        finishedGoodsStockCreated: (state, action) => {
+            if (Array.isArray(state.data)) {
+                const exists = state.data.find(
+                    (m) => String(m.storeId) === String(action.payload.storeId) && String(m.productItemId) === String(action.payload.productItemId)
+                );
+                if (!exists) {
+                    state.data.unshift(action.payload);
+                }
+            }
+        },
+        finishedGoodsStockUpdated: (state, action) => {
+            if (Array.isArray(state.data)) {
+                const index = state.data.findIndex(
+                    (m) => String(m.storeId) === String(action.payload.storeId) && String(m.productItemId) === String(action.payload.productItemId)
+                );
+                if (index !== -1) {
+                    state.data[index] = action.payload;
+                }
+            }
+        },
+        finishedGoodsStockDeleted: (state, action) => {
+            if (Array.isArray(state.data)) {
+                state.data = state.data.filter(
+                    (m) => !(String(m.storeId) === String(action.payload.storeId) && String(m.productItemId) === String(action.payload.productItemId))
+                );
+            }
+        }
     },
     extraReducers: (builder) => {
         builder
@@ -58,5 +85,5 @@ const finishedGoodsStockSlice = createSlice({
     },
 });
 
-export const { clearError } = finishedGoodsStockSlice.actions;
+export const { clearError, finishedGoodsStockCreated, finishedGoodsStockUpdated, finishedGoodsStockDeleted } = finishedGoodsStockSlice.actions;
 export default finishedGoodsStockSlice.reducer;

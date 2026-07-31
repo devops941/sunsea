@@ -59,7 +59,23 @@ const initialState: HourlyProductionState = {
 const hourlyProductionSlice = createSlice({
   name: "hourlyProductions",
   initialState,
-  reducers: {},
+  reducers: {
+    hourlyProductionCreated: (state, action) => {
+      const exists = state.data.find((m: any) => String(m.hourlyProductionId) === String(action.payload.hourlyProductionId));
+      if (!exists) {
+        state.data.unshift(action.payload);
+      }
+    },
+    hourlyProductionUpdated: (state, action) => {
+      const index = state.data.findIndex((m: any) => String(m.hourlyProductionId) === String(action.payload.hourlyProductionId));
+      if (index !== -1) {
+        state.data[index] = action.payload;
+      }
+    },
+    hourlyProductionDeleted: (state, action) => {
+      state.data = state.data.filter((m: any) => String(m.hourlyProductionId) !== String(action.payload.id || action.payload));
+    },
+  },
   extraReducers: (builder) => {
     builder
       .addCase(fetchHourlyProductions.pending, (state) => {
@@ -88,5 +104,7 @@ const hourlyProductionSlice = createSlice({
       });
   },
 });
+
+export const { hourlyProductionCreated, hourlyProductionUpdated, hourlyProductionDeleted } = hourlyProductionSlice.actions;
 
 export default hourlyProductionSlice.reducer;

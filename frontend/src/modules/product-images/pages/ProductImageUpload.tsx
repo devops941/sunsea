@@ -9,6 +9,7 @@ import FileUpload from "../../../components/form/FileUpload/FileUpload";
 import TextInput from "../../../components/form/TextInput/TextInput";
 import Checkbox from "../../../components/form/CheckboxInput/CheckboxInput";
 import apiClient from "../../../api/apiClient";
+import { useSocketSync } from "../../../hooks/useSocketSync";
 
 interface ProductImage {
     id: string;
@@ -54,6 +55,8 @@ const ProductImageUpload: React.FC = () => {
     useEffect(() => {
         loadImages();
     }, [loadImages]);
+
+    useSocketSync("productImage", undefined, loadImages);
 
     const handleProductChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
         setSelectedProductId(Number(e.target.value));

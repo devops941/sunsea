@@ -7,6 +7,7 @@ import {
 } from "react-icons/fa";
 import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
+import { useSocketSync } from "../../../hooks/useSocketSync";
 
 import CustomButton from "../../../components/ui/Button/Button";
 import DataTable from "../../../components/ui/table/DataTable";
@@ -95,6 +96,8 @@ const MachineAssignmentList: React.FC = () => {
     }, 300);
     return () => clearTimeout(timer);
   }, [loadAssignments]);
+
+  useSocketSync("machineOperationAssignment", undefined, loadAssignments);
 
   // Pagination
   const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE) || 1;

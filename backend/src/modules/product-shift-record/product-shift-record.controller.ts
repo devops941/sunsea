@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import productShiftRecordService from "./product-shift-record.service";
 import { ApiResponse } from "../../utils/ApiResponse";
+import { getIO } from "../../socket/socket";
 
 class ProductShiftRecordController {
   async create(req: Request, res: Response) {
@@ -8,6 +9,9 @@ class ProductShiftRecordController {
     if (!record) {
       return res.status(200).json(new ApiResponse("No new record - achieved qty not higher than current best", null));
     }
+
+    getIO().emit("productShiftRecord:created", record);
+
     return res.status(201).json(new ApiResponse("New shift record saved!", record));
   }
 

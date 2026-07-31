@@ -6,23 +6,22 @@ import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import DataTable from "../../../components/ui/table/DataTable";
 import SearchInput from "../../../components/ui/SearchInput/SearchInput";
+import { useNavigate } from "react-router-dom";
 
-import ProductionOrderViewModal from "../components/ProductionOrderViewModal";
 import { productionOrderService } from "../../../services/productionOrderService";
 import type { ProductionOrder } from "../../../services/productionOrderService";
 import { rawMaterialService } from "../../../services/rawMaterialService";
+import { useSocketSync } from "../../../hooks/useSocketSync";
 
 const ITEMS_PER_PAGE = 10;
 
 const AllProductionOrderList: React.FC = () => {
+    const navigate = useNavigate();
     const [data, setData] = useState<ProductionOrder[]>([]);
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
     const [statusFilter, setStatusFilter] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
-
-    const [showViewModal, setShowViewModal] = useState(false);
-    const [selectedItem, setSelectedItem] = useState<ProductionOrder | null>(null);
 
     const [rawMaterialsMap, setRawMaterialsMap] = useState<Map<string, any>>(new Map());
 
@@ -67,6 +66,8 @@ const AllProductionOrderList: React.FC = () => {
         fetchOrders();
     }, [fetchOrders]);
 
+    useSocketSync("productionOrder", undefined, fetchOrders);
+
     const handleSearch = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
         setSearchTerm(e.target.value);
         setCurrentPage(1);
@@ -106,10 +107,9 @@ const AllProductionOrderList: React.FC = () => {
         });
     }, [data]);
 
-    const handleOpenView = useCallback((item: ProductionOrder) => {
-        setSelectedItem(item);
-        setShowViewModal(true);
-    }, []);
+    const handleOpenView = useCallback((item: any) => {
+        navigate(`/production-orders/history/view/${item.productionOrderId}`, { state: { order: item } });
+    }, [navigate]);
 
     const formatDate = (dateStr: string) => {
         if (!dateStr) return "N/A";
@@ -282,13 +282,6 @@ const AllProductionOrderList: React.FC = () => {
                     }}
                 />
             </div>
-
-            <ProductionOrderViewModal
-                show={showViewModal}
-                onHide={() => setShowViewModal(false)}
-                order={selectedItem}
-                onSuccess={fetchOrders}
-            />
         </div>
     );
 };

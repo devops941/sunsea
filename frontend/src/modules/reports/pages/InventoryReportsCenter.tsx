@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { toast } from "react-toastify";
 import DatePickerCalendar from "../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 import { FaFilter } from "react-icons/fa";
@@ -8,6 +8,7 @@ import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import ExportCSVButton from "../../../components/ui/ExportCSVButton/ExportCSVButton";
 import type { DataTableColumn } from "../../../components/ui/table/DataTable";
 import DataTable from "../../../components/ui/table/DataTable";
+import { useSocketSync } from "../../../hooks/useSocketSync";
 
 const InventoryReportsCenter: React.FC = () => {
   // Filters state
@@ -43,36 +44,39 @@ const InventoryReportsCenter: React.FC = () => {
   }, []);
 
   // Load report data from backend
-  useEffect(() => {
-    const loadReport = async () => {
-      setLoadingBackend(true);
-      try {
-        const res = await reportsService.getInventoryReport({
-          date,
-          category,
-          storeId,
-          search,
-          page,
-          limit: 10
-        });
-        
-        setBackendReports(res.data || []);
-        if (res.asOf) {
-            setAsOfDate(res.asOf);
-        }
-        if (res.pagination) {
-            setTotalPages(Math.ceil(res.pagination.total / res.pagination.limit) || 1);
-        } else if (res.total) {
-            setTotalPages(Math.ceil(res.total / 10) || 1);
-        }
-      } catch (err) {
-        console.error("Failed to load inventory report", err);
-      } finally {
-        setLoadingBackend(false);
+  const fetchReportData = useCallback(async () => {
+    setLoadingBackend(true);
+    try {
+      const res = await reportsService.getInventoryReport({
+        date,
+        category,
+        storeId,
+        search,
+        page,
+        limit: 10
+      });
+      
+      setBackendReports(res.data || []);
+      if (res.asOf) {
+          setAsOfDate(res.asOf);
       }
-    };
-    loadReport();
+      if (res.pagination) {
+          setTotalPages(Math.ceil(res.pagination.total / res.pagination.limit) || 1);
+      } else if (res.total) {
+          setTotalPages(Math.ceil(res.total / 10) || 1);
+      }
+    } catch (err) {
+      console.error("Failed to load inventory report", err);
+    } finally {
+      setLoadingBackend(false);
+    }
   }, [date, category, storeId, search, page]);
+
+  useEffect(() => {
+    fetchReportData();
+  }, [fetchReportData]);
+
+  useSocketSync("inventorySnapshot", undefined, fetchReportData);
 
   // CSV Data Configuration
   const { csvData, csvColumns, csvFilename } = useMemo(() => {

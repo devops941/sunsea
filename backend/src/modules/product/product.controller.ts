@@ -1,9 +1,9 @@
 import { Request, Response } from "express";
 
 import productService from "./product.service";
-
 import { asyncHandler } from "../../utils/asyncHandler";
 import { ApiResponse } from "../../utils/ApiResponse";
+import { getIO } from "../../socket/socket";
 
 class ProductController {
   create = asyncHandler(
@@ -13,6 +13,8 @@ class ProductController {
           req.body,
           req.files as Express.Multer.File[] | undefined
         );
+
+      getIO().emit("product:created", product);
 
       return res.status(201).json(
         new ApiResponse(
@@ -74,6 +76,8 @@ class ProductController {
           req.files as Express.Multer.File[] | undefined
         );
 
+      getIO().emit("product:updated", product);
+
       return res.status(200).json(
         new ApiResponse(
           "Product updated successfully",
@@ -92,6 +96,8 @@ class ProductController {
       await productService.delete(
         id
       );
+
+      getIO().emit("product:deleted", { id: id.toString() });
 
       return res.status(200).json(
         new ApiResponse(

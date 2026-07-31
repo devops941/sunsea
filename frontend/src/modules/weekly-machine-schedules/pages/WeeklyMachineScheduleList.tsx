@@ -4,7 +4,8 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
-import { fetchWeeklyPrograms, deleteWeeklyProgram } from "../../../features/weekly-programs/weeklyProgramSlice";
+import { fetchWeeklyPrograms, deleteWeeklyProgram, weeklyProgramCreated, weeklyProgramUpdated, weeklyProgramDeleted } from "../../../features/weekly-programs/weeklyProgramSlice";
+import { useSocketSync } from "../../../hooks/useSocketSync";
 import CustomButton from "../../../components/ui/Button/Button";
 
 import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
@@ -115,6 +116,12 @@ const WeeklyMachineScheduleList: React.FC = () => {
             toast.error(error);
         }
     }, [error]);
+
+    useSocketSync("weeklyProgram", {
+        created: weeklyProgramCreated,
+        updated: weeklyProgramUpdated,
+        deleted: weeklyProgramDeleted,
+    });
 
     const handleSearch = (e: React.ChangeEvent<any>) => {
         setSearchTerm(e.target.value);

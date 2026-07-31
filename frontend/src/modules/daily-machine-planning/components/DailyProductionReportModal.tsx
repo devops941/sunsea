@@ -201,7 +201,7 @@ export const DailyProductionReportModal: React.FC<DailyProductionReportModalProp
       show={show}
       onHide={onHide}
       title="Daily Production Report"
-      size="xl"
+      maxWidth="xl"
     >
       <div className="report-print-container flex flex-col gap-6" id="daily-production-report">
         {/* Header Controls */}

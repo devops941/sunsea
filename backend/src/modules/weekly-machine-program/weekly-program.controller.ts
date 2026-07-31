@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import weeklyProgramService from "./weekly-program.service";
 import { ApiResponse } from "../../utils/ApiResponse";
 import { asyncHandler } from "../../utils/asyncHandler";
+import { getIO } from "../../socket/socket";
 
 class WeeklyProgramController {
   create = asyncHandler(async (req: Request, res: Response) => {
@@ -12,6 +13,8 @@ class WeeklyProgramController {
       req.body,
       userId
     );
+
+    getIO().emit("weeklyProgram:created", weeklyProgram);
 
     return res.status(201).json(
       new ApiResponse(
@@ -67,6 +70,8 @@ class WeeklyProgramController {
         userId
       );
 
+    getIO().emit("weeklyProgram:updated", weeklyProgram);
+
     return res.status(200).json(
       new ApiResponse(
         "Weekly Program updated successfully",
@@ -81,6 +86,8 @@ class WeeklyProgramController {
       req.params.weeklyProgramId as string,
       userId
     );
+
+    getIO().emit("weeklyProgram:deleted", { weeklyProgramId: req.params.weeklyProgramId });
 
     return res.status(200).json(
       new ApiResponse(

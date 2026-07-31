@@ -3,12 +3,16 @@ import dailyScheduleService from "./daily-schedule.service";
 import { ApiResponse } from "../../utils/ApiResponse";
 import { asyncHandler } from "../../utils/asyncHandler";
 import { GetDailyScheduleQueryInput } from "./daily-schedule.validation";
+import { getIO } from "../../socket/socket";
 
 class DailyScheduleController {
   getDailySchedule = asyncHandler(async (req: Request, res: Response) => {
     const query = req.query as unknown as GetDailyScheduleQueryInput;
 
     const data = await dailyScheduleService.getDailySchedule(query);
+
+    // Broadcast that a schedule was accessed/refreshed
+    getIO().emit("dailySchedule:refreshed", { weekStartDate: query.weekStartDate, machineId: query.machineId });
 
     return res.status(200).json(
       new ApiResponse(

@@ -6,6 +6,7 @@ import {
   createMachineAssignmentSchema,
   updateMachineAssignmentSchema,
 } from "./machine-operation-assignment.validation";
+import { getIO } from "../../socket/socket";
 
 export class MachineOperationAssignmentController {
   static getRoles = asyncHandler(async (_req: Request, res: Response) => {
@@ -48,6 +49,11 @@ export class MachineOperationAssignmentController {
       userId
     );
 
+    const safeAssignment = JSON.parse(JSON.stringify(assignment, (key, value) =>
+      typeof value === "bigint" ? value.toString() : value
+    ));
+    getIO().emit("machineOperationAssignment:created", safeAssignment);
+
     res.status(201).json({
       success: true,
       message: "Machine Operation Assignment created successfully",
@@ -66,6 +72,11 @@ export class MachineOperationAssignmentController {
       userId
     );
 
+    const safeAssignment = JSON.parse(JSON.stringify(assignment, (key, value) =>
+      typeof value === "bigint" ? value.toString() : value
+    ));
+    getIO().emit("machineOperationAssignment:updated", safeAssignment);
+
     res.json({
       success: true,
       message: "Machine Operation Assignment updated successfully",
@@ -83,6 +94,11 @@ export class MachineOperationAssignmentController {
       Boolean(isActive),
       userId
     );
+
+    const safeAssignment = JSON.parse(JSON.stringify(assignment, (key, value) =>
+      typeof value === "bigint" ? value.toString() : value
+    ));
+    getIO().emit("machineOperationAssignment:updated", safeAssignment);
 
     res.json({
       success: true,

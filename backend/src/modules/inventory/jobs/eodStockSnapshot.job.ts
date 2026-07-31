@@ -1,5 +1,6 @@
 import { prisma } from "../../../config/prisma";
 import { getISTDateParts } from "../../../utils/dateUtils";
+import { getIO } from "../../../socket/socket";
 
 /**
  * Helper to safely upsert EOD stock snapshots without triggering Postgres ON CONFLICT 42P10 errors
@@ -197,4 +198,5 @@ export const runEodStockSnapshot = async (targetDateStr?: string) => {
   }
 
   console.log(`✅ EOD snapshot done: ${rmCount} RM, ${fgCount} FG rows at ${now.toISOString()} (locked recordedAt to ${recordedAtFixed.toISOString()})`);
+  getIO().emit("inventorySnapshot:completed", { date: dateStr, timestamp: now.toISOString() });
 };

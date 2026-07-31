@@ -3,7 +3,8 @@ import { FaPlus } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
-import { fetchGoodsDispatches } from "../../../features/goods-dispatch/goodsDispatchSlice";
+import { fetchGoodsDispatches, goodsDispatchCreated, goodsDispatchUpdated, goodsDispatchDeleted } from "../../../features/goods-dispatch/goodsDispatchSlice";
+import { useSocketSync } from "../../../hooks/useSocketSync";
 
 import CustomButton from "../../../components/ui/Button/Button";
 import DataTable from "../../../components/ui/table/DataTable";
@@ -64,6 +65,12 @@ const GoodsDispatchList: React.FC = () => {
       })
     );
   }, [dispatch, currentPage, debouncedSearch, filterStatus, filterDateFrom, filterDateTo]);
+
+  useSocketSync("goodsDispatch", {
+    created: goodsDispatchCreated,
+    updated: goodsDispatchUpdated,
+    deleted: goodsDispatchDeleted,
+  });
 
   const handleApplyFilters = () => {
     setFilterStatus(draftFilterStatus);

@@ -3,6 +3,7 @@ import { Container, Row, Col, Card, Badge } from 'react-bootstrap';
 import { FaChartLine, FaIndustry, FaCogs, FaCheckCircle, FaExclamationTriangle, FaPauseCircle } from 'react-icons/fa';
 import { oeeService } from '../../../services/oeeService';
 import { toast } from 'react-toastify';
+import { useSocketSync } from '../../../hooks/useSocketSync';
 
 const formatLocalDateString = (d: Date) => {
   const year = d.getFullYear();
@@ -33,6 +34,12 @@ const OeeDashboard: React.FC = () => {
             setLoading(false);
         }
     };
+
+    // Refresh OEE data when production activity happens
+    useSocketSync("hourlyProduction", undefined, fetchMachineStatus);
+    useSocketSync("productionWastage", undefined, fetchMachineStatus);
+    useSocketSync("dailyPlan", undefined, fetchMachineStatus);
+    useSocketSync("machine", undefined, fetchMachineStatus);
 
     // Calculate aggregated metrics
     const aggregateMetrics = useMemo(() => {

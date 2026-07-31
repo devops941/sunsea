@@ -7,6 +7,7 @@ import {
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
 import { fetchProductionOrders } from "../../../features/production-orders/productionOrderSlice";
 import { fetchMachines } from "../../../features/machines/machineSlice";
+import { useSocketSync } from "../../../hooks/useSocketSync";
 
 const ProductionDashboard: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -19,6 +20,10 @@ const ProductionDashboard: React.FC = () => {
     dispatch(fetchProductionOrders());
     dispatch(fetchMachines());
   }, [dispatch]);
+
+  // Real-time: production dashboard cards refresh when orders change
+  useSocketSync("productionOrder", undefined, () => dispatch(fetchProductionOrders()));
+  useSocketSync("hourlyProduction", undefined, () => dispatch(fetchProductionOrders()));
 
   // Compute stats and KPIs
   const stats = useMemo(() => {

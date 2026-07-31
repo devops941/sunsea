@@ -19,6 +19,7 @@ import type { ProductionOrder } from "../../../services/productionOrderService";
 import { rawMaterialService } from "../../../services/rawMaterialService";
 import { salesOrderService } from "../../../services/salesOrderService";
 import { finishedGoodsStockService } from "../../../services/finishedGoodsStockService";
+import { useSocketSync } from "../../../hooks/useSocketSync";
 
 const ITEMS_PER_PAGE = 20;
 
@@ -238,6 +239,9 @@ const ProductionOrderList: React.FC = () => {
     useEffect(() => {
         fetchCombinedData();
     }, [fetchCombinedData]);
+
+    useSocketSync("productionOrder", undefined, fetchCombinedData);
+    useSocketSync("salesOrder", undefined, fetchCombinedData);
 
 
 

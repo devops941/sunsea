@@ -3,11 +3,14 @@ import productionOrderService from "./production-order.service";
 import { ApiResponse } from "../../utils/ApiResponse";
 import { asyncHandler } from "../../utils/asyncHandler";
 import { ProductionOrderQueryInput } from "./production-order.validation";
+import { getIO } from "../../socket/socket";
 
 class ProductionOrderController {
   create = asyncHandler(async (req: Request, res: Response) => {
     const userId = req.user?.userId;
     const order = await productionOrderService.create(req.body, userId);
+
+    getIO().emit("productionOrder:created", order);
 
     return res.status(201).json(
       new ApiResponse("Production Order created successfully", order)
@@ -51,6 +54,8 @@ class ProductionOrderController {
       userId
     );
 
+    getIO().emit("productionOrder:updated", order);
+
     return res.status(200).json(
       new ApiResponse("Production Order updated successfully", order)
     );
@@ -58,6 +63,8 @@ class ProductionOrderController {
 
   delete = asyncHandler(async (req: Request, res: Response) => {
     await productionOrderService.delete(String(req.params.productionOrderId));
+
+    getIO().emit("productionOrder:deleted", { id: String(req.params.productionOrderId) });
 
     return res.status(200).json(
       new ApiResponse("Production Order deleted successfully")
@@ -78,6 +85,8 @@ class ProductionOrderController {
       req.body,
       userId
     );
+
+    getIO().emit("productionOrder:updated", order);
 
     return res.status(200).json(
       new ApiResponse("Materials issued successfully", order)
@@ -103,6 +112,7 @@ class ProductionOrderController {
       userId,
       dailyPlanId ? String(dailyPlanId) : undefined
     );
+    getIO().emit("productionOrder:updated", result);
     return res.status(200).json(
       new ApiResponse("Production started successfully. Raw materials issued.", result)
     );
@@ -119,6 +129,7 @@ class ProductionOrderController {
       Number(producedQty),
       userId
     );
+    getIO().emit("productionOrder:updated", result);
     return res.status(200).json(
       new ApiResponse("Post-production completed. Order is ready for dispatch.", result)
     );
