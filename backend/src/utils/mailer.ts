@@ -1,5 +1,3 @@
-import dns from "node:dns";
-dns.setDefaultResultOrder("ipv4first");
 import nodemailer from "nodemailer";
 import { prisma } from "../config/prisma";
 
@@ -37,15 +35,23 @@ export const sendEmail = async (options: SendEmailOptions) => {
       throw new Error("SMTP configuration is incomplete. Please check database or .env file.");
     }
 
+    // Railway blocks port 587 — force port 465 (SSL) for production compatibility
+    const effectivePort = smtpPort === 587 ? 465 : smtpPort;
+    const isSSL = effectivePort === 465 || encryption === "SSL";
+
     const transporter = nodemailer.createTransport({
       host: smtpHost,
-      port: smtpPort,
-      secure: smtpPort === 465 || encryption === "SSL", // true for 465, false for other ports
+      port: effectivePort,
+      secure: isSSL,
       auth: {
         user: smtpUser,
         pass: smtpPass,
       },
-      family: 4, // Force IPv4
+      connectionTimeout: 10000,
+      socketTimeout: 10000,
+      tls: {
+        rejectUnauthorized: false,
+      },
     } as any);
 
     const info = await transporter.sendMail({
