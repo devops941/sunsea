@@ -7,6 +7,7 @@ import { PrismaClient } from "@prisma/client";
 // =====================================================================
 
 export const PRODUCTION_STATUS = {
+  DRAFT: "DRAFT",
   CREATED: "CREATED",
   WAITING_FOR_MATERIAL: "WAITING_FOR_MATERIAL",
   READY_FOR_PLANNING: "READY_FOR_PLANNING",
@@ -15,9 +16,39 @@ export const PRODUCTION_STATUS = {
   IN_PRODUCTION: "IN_PRODUCTION",
   POST_PRODUCTION: "POST_PRODUCTION",
   PARTIAL_COMPLETED: "PARTIAL_COMPLETED",
+  COMPLETED_WITH_SHORTFALL: "COMPLETED_WITH_SHORTFALL",
+  CLOSED: "CLOSED",
   READY_FOR_DISPATCH: "READY_FOR_DISPATCH",
   DISPATCHED: "DISPATCHED",
   COMPLETED: "COMPLETED",       // legacy alias for READY_FOR_DISPATCH
+  CANCELLED: "CANCELLED",
+} as const;
+
+export const DAILY_PLAN_STATUS = {
+  DRAFT: "DRAFT",
+  PLANNED: "PLANNED",
+  APPROVED: "APPROVED",
+  IN_PROGRESS: "IN_PROGRESS",
+  POST_PRODUCTION: "POST_PRODUCTION",
+  COMPLETED: "COMPLETED",
+  STOPPED: "STOPPED",
+  SHORT_CLOSED: "SHORT_CLOSED",
+  CANCELLED: "CANCELLED",
+} as const;
+
+export const GOODS_DISPATCH_STATUS = {
+  PENDING_GATE_APPROVAL: "PENDING_GATE_APPROVAL",
+  PENDING_STORE_RECEIPT: "PENDING_STORE_RECEIPT",
+  WAREHOUSE_RECEIVED: "WAREHOUSE_RECEIVED",
+  GATE_REJECTED: "GATE_REJECTED",
+  STORE_REJECTED: "STORE_REJECTED",
+} as const;
+
+export const WEEKLY_PROGRAM_STATUS = {
+  DRAFT: "DRAFT",
+  ACTIVE: "ACTIVE",
+  IN_PROGRESS: "IN_PROGRESS",
+  COMPLETED: "COMPLETED",
   CANCELLED: "CANCELLED",
 } as const;
 
@@ -27,6 +58,8 @@ export const LOCKED_STATUSES = [
   "IN_PRODUCTION",
   "POST_PRODUCTION",
   "PARTIAL_COMPLETED",
+  "COMPLETED_WITH_SHORTFALL",
+  "CLOSED",
   "READY_FOR_DISPATCH",
   "DISPATCHED",
   "CANCELLED",
@@ -189,7 +222,7 @@ export class StatusSyncService {
 
     if (statuses.some((s: string) => s === "DISPATCHED")) {
       newSoStatus = "DISPATCHED";
-    } else if (statuses.some((s: string) => s === "READY_FOR_DISPATCH" || s === "PARTIAL_COMPLETED" || s === "DISPATCHED" || s === "COMPLETED")) {
+    } else if (statuses.some((s: string) => s === "READY_FOR_DISPATCH" || s === "PARTIAL_COMPLETED" || s === "COMPLETED_WITH_SHORTFALL" || s === "CLOSED" || s === "DISPATCHED" || s === "COMPLETED")) {
       newSoStatus = "READY_FOR_DISPATCH";
     } else if (statuses.some((s: string) => s === "POST_PRODUCTION")) {
       newSoStatus = "IN_PROGRESS";

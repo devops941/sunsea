@@ -324,7 +324,7 @@ const HourlyWorkReportCreate: React.FC = () => {
 
     // Track chosen hour index to load/edit existing production values
     useEffect(() => {
-        const matched = existingLogs.find(log => Number(log.hourIndex) === Number(hourIndex));
+        const matched = existingLogs.find(log => Number(log.hourIndex) === Number(hourIndex) && log.dailyPlanId === dailyPlanId);
         if (matched) {
             setQtyProduced(String(matched.qtyProduced));
             setRejectQty(String(matched.rejectQty || 0));
@@ -655,7 +655,7 @@ const HourlyWorkReportCreate: React.FC = () => {
 
     const activeProductionOrderId = activePlan?.productionOrderId;
     const shiftProducedQty = existingLogs
-        .filter(log => log.productionOrderId === activeProductionOrderId && Number(log.hourIndex) > 0)
+        .filter(log => log.dailyPlanId === dailyPlanId && Number(log.hourIndex) > 0)
         .reduce((sum, log) => sum + Number(log.qtyProduced || 0), 0);
 
     const remainingQtyForShift = activePlan

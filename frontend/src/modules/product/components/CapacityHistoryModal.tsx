@@ -3,6 +3,7 @@ import { Modal } from "react-bootstrap";
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
 import { fetchCapacityHistory, clearHistory } from "../../../features/product-capacity-history/productCapacityHistorySlice";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
+import { useSocketSync } from "../../../hooks/useSocketSync";
 
 interface Props {
   show: boolean;
@@ -24,6 +25,12 @@ const CapacityHistoryModal: React.FC<Props> = ({ show, onHide, productId, produc
       if (!show) dispatch(clearHistory());
     };
   }, [show, productId, dispatch]);
+
+  useSocketSync("productCapacityHistory", undefined, () => {
+    if (show && productId) {
+      dispatch(fetchCapacityHistory(productId));
+    }
+  });
 
   return (
     <Modal show={show} onHide={onHide} size="lg" centered>

@@ -10,6 +10,7 @@ import {
   type MachineOperationAssignment,
 } from "../../../services/machineOperationAssignmentService";
 import { MachineAssignmentFormModal } from "./MachineAssignmentFormModal";
+import { useSocketSync } from "../../../hooks/useSocketSync";
 
 interface Props {
   machineId: string;
@@ -44,6 +45,8 @@ export const MachineAssignmentTab: React.FC<Props> = ({ machineId, machineName }
   useEffect(() => {
     loadData();
   }, [machineId]);
+
+  useSocketSync("machineOperationAssignment", undefined, loadData);
 
   return (
     <div className="space-y-6">

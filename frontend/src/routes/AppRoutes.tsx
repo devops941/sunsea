@@ -112,6 +112,8 @@ const ReportsTabs = lazy(() => import("../modules/reports/pages/ReportsTabs"));
 const HourlyWorkReportCreate = lazy(() => import("../modules/hourly-work-reports/pages/HourlyWorkReportCreate"));
 const HourlyWorkReportEdit = lazy(() => import("../modules/hourly-work-reports/pages/HourlyWorkReportEdit"));
 const DailyPlanCreate = lazy(() => import("../modules/daily-machine-planning/pages/DailyPlanCreate"));
+const DailyPlanViewPage = lazy(() => import("../modules/daily-machine-planning/pages/DailyPlanViewPage"));
+const DailyReportPage = lazy(() => import("../modules/daily-machine-planning/pages/DailyReportPage"));
 
 
 const WastageForm = lazy(() => import("../modules/production-wastage/pages/WastageCreate"));
@@ -121,6 +123,7 @@ const WastageForm = lazy(() => import("../modules/production-wastage/pages/Wasta
 const ProductionOrderCreate = lazy(() => import("../modules/production-orders/pages/ProductionOrderCreate"));
 // const ProductionOrderEdit = lazy(() => import("../modules/production-orders/pages/ProductionOrderEdit"));
 const ProductionOrderTabs = lazy(() => import("../modules/production-orders/pages/ProductionOrderTabs"));
+const ProductionOrderHistoryView = lazy(() => import("../modules/production-orders/pages/ProductionOrderHistoryView"));
 
 // Goods Dispatch
 const GoodsDispatchList = lazy(() => import("../modules/goods-dispatch/pages/GoodsDispatchList"));
@@ -468,6 +471,8 @@ const AppRoutes = () => {
             {/* Daily Machine Planning */}
             <Route element={<ProtectedRoute permission="weekly_programs.view" />}>
               <Route path="/daily-machine-planning" element={<ProductionOrderTabs />} />
+              <Route path="/daily-machine-planning/view/:id" element={<DailyPlanViewPage />} />
+              <Route path="/daily-machine-planning/report" element={<DailyReportPage />} />
             </Route>
 
             {/* Daily Production Plans Create / Edit */}
@@ -519,6 +524,7 @@ const AppRoutes = () => {
               <Route path="/oee-dashboard" element={<ProductionOrderTabs />} />
               {/* Approved Sales Orders Route */}
               <Route path="/approved-sales-orders" element={<ProductionOrderTabs />} />
+              <Route path="/production-orders/history/view/:id" element={<ProductionOrderHistoryView />} />
             </Route>
             {/* Production Orders Create Route */}
             <Route element={<ProtectedRoute permission="production_orders.create" />}>

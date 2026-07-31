@@ -1,4 +1,5 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
+import type { PayloadAction } from "@reduxjs/toolkit";
 import { stockAdjustmentService } from "../../services/stockAdjustmentService";
 
 export const fetchStockAdjustments = createAsyncThunk(
@@ -112,6 +113,28 @@ const stockAdjustmentSlice = createSlice({
     },
     clearCurrent: (state) => {
       state.currentAdjustment = null;
+    },
+    stockAdjustmentCreated: (state, action: PayloadAction<any>) => {
+      const exists = state.data.find(a => String(a.id) === String(action.payload.id));
+      if (!exists) {
+        state.data.unshift(action.payload);
+      }
+    },
+    stockAdjustmentUpdated: (state, action: PayloadAction<any>) => {
+      const index = state.data.findIndex(a => String(a.id) === String(action.payload.id));
+      if (index !== -1) {
+        state.data[index] = action.payload;
+        if (state.currentAdjustment?.id === action.payload.id) {
+          state.currentAdjustment = action.payload;
+        }
+      }
+    },
+    stockAdjustmentDeleted: (state, action: PayloadAction<any>) => {
+      const idToDelete = action.payload.id || action.payload;
+      state.data = state.data.filter(a => String(a.id) !== String(idToDelete));
+      if (state.currentAdjustment?.id === idToDelete) {
+        state.currentAdjustment = null;
+      }
     }
   },
   extraReducers: (builder) => {
@@ -204,5 +227,5 @@ const stockAdjustmentSlice = createSlice({
   },
 });
 
-export const { clearError, clearCurrent } = stockAdjustmentSlice.actions;
+export const { clearError, clearCurrent, stockAdjustmentCreated, stockAdjustmentUpdated, stockAdjustmentDeleted } = stockAdjustmentSlice.actions;
 export default stockAdjustmentSlice.reducer;

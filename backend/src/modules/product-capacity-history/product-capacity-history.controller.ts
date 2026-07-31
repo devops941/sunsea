@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { asyncHandler } from "../../utils/asyncHandler";
 import { ApiResponse } from "../../utils/ApiResponse";
 import { productCapacityHistoryService } from "./product-capacity-history.service";
+import { getIO } from "../../socket/socket";
 
 export class ProductCapacityHistoryController {
   findByProduct = asyncHandler(async (req: Request, res: Response) => {
@@ -12,7 +13,7 @@ export class ProductCapacityHistoryController {
 
   getLatestByProductAndMachine = asyncHandler(async (req: Request, res: Response) => {
     const productId = Number(req.params.productId);
-    const machineId = req.params.machineId as string;
+    const machineId = String(req.params.machineId);
     const record = await productCapacityHistoryService.getLatestByProductAndMachine(productId, machineId);
     res.json(new ApiResponse("Latest capacity fetched successfully", record));
   });
@@ -29,6 +30,9 @@ export class ProductCapacityHistoryController {
       newCapacity: Number(newCapacity),
       updatedBy,
     });
+
+    getIO().emit("productCapacityHistory:created", record);
+
     res.json(new ApiResponse("Capacity updated successfully", record));
   });
 }

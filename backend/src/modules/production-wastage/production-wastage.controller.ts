@@ -9,7 +9,10 @@ class ProductionWastageController {
     const userId = (req as any).user?.userId || "d67768ba-bcde-4321-a123-bcdef9876543";
     const record = await productionWastageService.create(req.body, userId);
 
-    getIO().emit("productionWastage:created", record);
+    const safeRecord = JSON.parse(JSON.stringify(record, (key, value) =>
+      typeof value === "bigint" ? value.toString() : value
+    ));
+    getIO().emit("productionWastage:created", safeRecord);
 
     return res.status(201).json(
       new ApiResponse("Production wastage log created successfully", record)
@@ -49,7 +52,10 @@ class ProductionWastageController {
     const userId = (req as any).user?.userId || "d67768ba-bcde-4321-a123-bcdef9876543";
     const record = await productionWastageService.update(BigInt(id as string), req.body, userId);
 
-    getIO().emit("productionWastage:updated", record);
+    const safeRecord = JSON.parse(JSON.stringify(record, (key, value) =>
+      typeof value === "bigint" ? value.toString() : value
+    ));
+    getIO().emit("productionWastage:updated", safeRecord);
 
     return res.status(200).json(
       new ApiResponse("Production wastage log updated successfully", record)
@@ -72,7 +78,10 @@ class ProductionWastageController {
     const userId = (req as any).user?.userId || "d67768ba-bcde-4321-a123-bcdef9876543";
     const record = await productionWastageService.approve(BigInt(id as string), userId);
 
-    getIO().emit("productionWastage:updated", record);
+    const safeRecord = JSON.parse(JSON.stringify(record, (key, value) =>
+      typeof value === "bigint" ? value.toString() : value
+    ));
+    getIO().emit("productionWastage:updated", safeRecord);
 
     return res.status(200).json(
       new ApiResponse("Production wastage log approved successfully", record)
@@ -84,7 +93,10 @@ class ProductionWastageController {
     const userId = (req as any).user?.userId || "d67768ba-bcde-4321-a123-bcdef9876543";
     const record = await productionWastageService.reject(BigInt(id as string), userId);
 
-    getIO().emit("productionWastage:updated", record);
+    const safeRecord = JSON.parse(JSON.stringify(record, (key, value) =>
+      typeof value === "bigint" ? value.toString() : value
+    ));
+    getIO().emit("productionWastage:updated", safeRecord);
 
     return res.status(200).json(
       new ApiResponse("Production wastage log rejected successfully", record)

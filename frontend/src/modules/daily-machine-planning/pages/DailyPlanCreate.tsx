@@ -72,6 +72,8 @@ const DailyPlanCreate: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [availableShiftHours, setAvailableShiftHours] = useState<number>(0);
+  const [totalShiftHours, setTotalShiftHours] = useState<number>(0);
 
   // ── Fetch active assignment ──────────────────────────────────────────────
   const loadedPlanRef = useRef<{ machineId?: string; shiftId?: string; prodDate?: string } | null>(null);
@@ -255,8 +257,8 @@ const DailyPlanCreate: React.FC = () => {
 
         const po = p.productionOrder;
 
-        // PO was permanently stopped (PARTIAL_COMPLETED from force-stop) → hide from dropdown
-        if (po && po.status === "PARTIAL_COMPLETED" && p.weeklyProgramId !== stateWpId) return false;
+        // PO was permanently stopped (COMPLETED_WITH_SHORTFALL/CLOSED from force-stop) → hide from dropdown
+        if (po && (po.status === "COMPLETED_WITH_SHORTFALL" || po.status === "CLOSED") && p.weeklyProgramId !== stateWpId) return false;
         if (po) {
           const targetQty = Number(po.targetQty || 0);
           const producedQty = Number(po.producedQty || 0);
@@ -408,15 +410,19 @@ const DailyPlanCreate: React.FC = () => {
       } catch { return 0; }
     };
 
+    const poTarget = Number(wp.productionOrder?.targetQty || 0);
+    const poProduced = Number(wp.productionOrder?.producedQty || 0);
+    const poRemaining = Math.max(0, poTarget - poProduced);
+
     if (!isCarryForward) {
-      // First plan — use capacity directly
+      // First plan — use remaining PO qty but capped at capacity if capacity > 0
       getCapacity().then((cap) => {
-        const qty = cap > 0 ? cap : (wpPlanned || 0);
-        setRemainingQty(qty);
+        setRemainingQty(poRemaining);
         if (!isEdit && machineId) {
           if (location.state && (location.state as any).plannedQty) {
             setPlannedQty(String(Number((location.state as any).plannedQty)));
-          } else if (qty > 0) {
+          } else {
+            const qty = (cap > 0 && poRemaining > cap) ? cap : poRemaining;
             setPlannedQty(String(qty));
           }
         }
@@ -447,8 +453,6 @@ const DailyPlanCreate: React.FC = () => {
             : 0;
           return sum + Math.max(Number(p.plannedQty || 0), produced);
         }, 0);
-      const poTarget = Number(wp.productionOrder?.targetQty || 0);
-      const poProduced = Number(wp.productionOrder?.producedQty || 0);
       const remaining = Math.max(0, poTarget - poProduced);
       setRemainingQty(remaining);
       if (!isEdit) {
@@ -456,7 +460,8 @@ const DailyPlanCreate: React.FC = () => {
           const stateQty = Number((location.state as any).plannedQty);
           setPlannedQty(String(Math.round(stateQty * 1000) / 1000));
         } else if (effectiveCapacity > 0) {
-          setPlannedQty(String(effectiveCapacity));
+          const qty = (remaining > effectiveCapacity) ? effectiveCapacity : remaining;
+          setPlannedQty(String(qty));
         } else {
           setPlannedQty(String(remaining > 0 ? remaining : ""));
         }
@@ -485,16 +490,22 @@ const DailyPlanCreate: React.FC = () => {
     const selectedShift = shifts.find((s: any) => s.shiftCode === shiftId);
     if (selectedShift?.startTime && selectedShift?.endTime) {
       const shiftHrs = computeShiftHours(selectedShift.startTime, selectedShift.endTime);
+      setTotalShiftHours(shiftHrs);
       if (productionDate && machineId) {
         setLoadingRemaining(true);
         dailyPlanService.getAll({ productionDate, machineId, shiftId })
-          .then((res) => {
-            const existingPlans: any[] = res.data || [];
+          .then((res: any) => {
+            let existingPlans: any[] = [];
+            if (Array.isArray(res)) existingPlans = res;
+            else if (Array.isArray(res?.data)) existingPlans = res.data;
+            else if (Array.isArray(res?.data?.dailyPlans)) existingPlans = res.data.dailyPlans;
+            else if (Array.isArray(res?.dailyPlans)) existingPlans = res.dailyPlans;
+
             const plannedHrsSum = existingPlans
               .filter((p: any) => p.status !== "CANCELLED" && p.dailyPlanId !== editId)
               .reduce((sum: number, p: any) => {
                 const loggedHours = Array.isArray(p.hourlyProductions) ? p.hourlyProductions.length : 0;
-                if (p.status === "COMPLETED" || p.status === "STOPPED") {
+                if (p.status === "COMPLETED" || p.status === "STOPPED" || p.status === "SHORT_CLOSED") {
                   return sum + loggedHours;
                 } else {
                   return sum + Math.max(Number(p.plannedHours || 0), loggedHours);
@@ -502,16 +513,22 @@ const DailyPlanCreate: React.FC = () => {
               }, 0);
             const remainingHrs = Math.max(0, shiftHrs - plannedHrsSum);
             setPlannedHours(String(remainingHrs));
+            setAvailableShiftHours(remainingHrs);
           })
           .catch(() => {
             setPlannedHours(String(shiftHrs));
+            setAvailableShiftHours(shiftHrs);
           })
           .finally(() => {
             setLoadingRemaining(false);
           });
       } else {
         setPlannedHours(String(shiftHrs));
+        setAvailableShiftHours(shiftHrs);
       }
+    } else {
+      setAvailableShiftHours(0);
+      setTotalShiftHours(0);
     }
   }, [shiftId, shifts, productionDate, machineId, editId]);
 
@@ -536,7 +553,11 @@ const DailyPlanCreate: React.FC = () => {
       machineId: z.string().min(1, "Machine is required"),
       shiftId: z.string().min(1, "Shift is required"),
       plannedQty: z.coerce.number().positive("Planned Quantity must be greater than 0"),
-      plannedHours: z.coerce.number().nonnegative("Planned Hours must be a positive number").optional(),
+      plannedHours: z.coerce.number()
+        .nonnegative("Planned Hours must be a positive number")
+        .max(availableShiftHours, `Planned Hours cannot exceed available shift hours (${availableShiftHours}h)`)
+        .optional(),
+      selectedOperators: z.array(z.string()).min(1, "Please select at least one operator"),
     });
 
     const result = schema.safeParse({
@@ -545,7 +566,8 @@ const DailyPlanCreate: React.FC = () => {
       machineId,
       shiftId,
       plannedQty,
-      plannedHours
+      plannedHours,
+      selectedOperators
     });
 
     if (!result.success) {
@@ -564,10 +586,10 @@ const DailyPlanCreate: React.FC = () => {
       return;
     }
 
-    if (selectedOperators.length === 0) {
-      const errMsg = "Please assign or manually select at least one operator before creating the Daily Production Plan.";
-      setSubmitError(errMsg);
-      toast.error(errMsg);
+    // The selectedOperators validation is now handled by Zod above
+    if (selectedOperators.length === 0 && assignmentError) {
+      setSubmitError(assignmentError);
+      toast.error(assignmentError);
       return;
     }
 
@@ -733,10 +755,25 @@ const DailyPlanCreate: React.FC = () => {
                     <div className="font-bold text-slate-800">{selectedWeeklyProg.productionOrderId}</div>
                   </div>
 
-                  <div>
-                    <div className="text-slate-500 text-xs font-bold uppercase mb-1">Production Target</div>
-                    <div className="font-bold text-slate-800">{Number(selectedWeeklyProg.plannedQty) > 0 ? selectedWeeklyProg.plannedQty : (selectedWeeklyProg.productionOrder?.targetQty || 0)} pcs</div>
+                   <div>
+                    <div className="text-slate-500 text-xs font-bold uppercase mb-1">Product</div>
+                    <div className="text-sm font-bold text-slate-800">
+                      {selectedWeeklyProg.productionOrder?.productItem?.productName || "—"}
+                    </div>
                   </div>
+                  
+
+                  <div>
+                    <div className="text-slate-500 text-xs font-bold uppercase mb-1">PO Target Qty</div>
+                    <div className="font-bold text-slate-800">{selectedWeeklyProg.productionOrder?.targetQty || "—"} pcs</div>
+                  </div>
+
+
+                  {/* 
+                  <div>
+                    <div className="text-slate-500 text-xs font-bold uppercase mb-1">Weekly Target</div>
+                    <div className="font-bold text-slate-800">{Number(selectedWeeklyProg.plannedQty) > 0 ? selectedWeeklyProg.plannedQty : (selectedWeeklyProg.productionOrder?.targetQty || 0)} pcs</div>
+                  </div> */}
                   <div>
                     <div className="text-slate-500 text-xs font-bold uppercase mb-1">Remaining Quantity</div>
                     {(() => {
@@ -750,17 +787,9 @@ const DailyPlanCreate: React.FC = () => {
                       );
                     })()}
                   </div>
-                  <div>
-                    <div className="text-slate-500 text-xs font-bold uppercase mb-1">Product</div>
-                    <div className="text-sm font-bold text-slate-800">
-                      {selectedWeeklyProg.productionOrder?.productItem?.productName || "—"}
-                    </div>
-                  </div>
+                 
 
-                  <div>
-                    <div className="text-slate-500 text-xs font-bold uppercase mb-1">PO Target Qty</div>
-                    <div className="font-bold text-slate-800">{selectedWeeklyProg.productionOrder?.targetQty || "—"} pcs</div>
-                  </div>
+
                   <div>
                     <div className="text-slate-500 text-xs font-bold uppercase mb-1">Produced So Far</div>
                     <div className="font-bold text-slate-800">{selectedWeeklyProg.productionOrder?.producedQty || 0} pcs</div>
@@ -955,7 +984,7 @@ const DailyPlanCreate: React.FC = () => {
                         setAssignmentError(null);
                       }}
                       placeholder={availableOperators.length === 0 ? "No operators assigned to this machine..." : "-- Select Assigned Operators --"}
-                      error={selectedOperators.length === 0 && assignmentError ? assignmentError : undefined}
+                      error={formErrors.selectedOperators || (selectedOperators.length === 0 && assignmentError ? assignmentError : undefined)}
                     />
                   )}
                   {availableOperators.length === 0 && !loadingAssignment && (
@@ -1012,6 +1041,11 @@ const DailyPlanCreate: React.FC = () => {
                       Product Capacity: {machineProductCapacity.toLocaleString()} / Shift
                     </div>
                   )}
+                  {machineId && machineProductCapacity != null && Number(plannedQty) < machineProductCapacity && (
+                    <div className="text-[11px] text-indigo-600 font-semibold mt-1">
+                      Available shift capacity: {machineProductCapacity - Number(plannedQty)} pcs remaining.
+                    </div>
+                  )}
                   {overCapacity && (
                     <div className="text-amber-500 text-xs flex items-center mt-1">
                       <FaExclamationTriangle className="mr-1" />
@@ -1019,7 +1053,7 @@ const DailyPlanCreate: React.FC = () => {
                     </div>
                   )}
                   {remainingQty !== null && !overCapacity && Number(plannedQty) > 0 && (
-                    <div className="text-slate-500 text-xs ">
+                    <div className="text-slate-500 text-xs mt-1">
                       Remaining after this plan: {remainingQty - Number(plannedQty)} pcs
                     </div>
                   )}
@@ -1036,9 +1070,9 @@ const DailyPlanCreate: React.FC = () => {
                     placeholder="Auto-filled from shift"
                     onChange={(e) => setPlannedHours(e.target.value)}
                   />
-                  <div className="text-slate-500 text-xs flex items-center">
-                    <FaClock size={11} className="mr-1" />
-                    Auto-filled based on selected shift
+                  <div className="flex items-center gap-1.5 mt-2 text-xs text-slate-500">
+                    <FaInfoCircle className="text-slate-400" />
+                    Max available: {availableShiftHours}/{totalShiftHours}h (based on selected shift and other plans)
                   </div>
                 </div>
 

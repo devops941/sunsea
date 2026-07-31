@@ -166,6 +166,19 @@ export const ProductionOrderViewModal: React.FC<ProductionOrderViewModalProps> =
                                         <div className="text-xs text-slate-500 font-medium mb-1 uppercase">Order Type</div>
                                         <div className="font-semibold text-slate-800">{fullOrder?.orderType || order.orderType || "-"}</div>
                                     </div>
+                                    <div>
+                                        <div className="text-xs text-slate-500 font-medium mb-1 uppercase">Status</div>
+                                        <div className="flex flex-col gap-1">
+                                            <div>
+                                                <StatusBadge status={fullOrder?.status || order.status} />
+                                            </div>
+                                            {fullOrder?.productionOrderHistories?.some((h: any) => h.toStatus === "COMPLETED_WITH_SHORTFALL") && (
+                                                <span className="text-[10px] text-red-600 font-bold uppercase leading-none mt-0.5 whitespace-nowrap">
+                                                    Force Stopped / Short-Closed
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
 
                                 </div>
                             </div>
@@ -303,9 +316,27 @@ export const ProductionOrderViewModal: React.FC<ProductionOrderViewModalProps> =
                                             <h4 className="text-lg font-bold text-slate-800">
                                                 Shift-wise Production & Dispatch Details
                                             </h4>
-                                            <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                                                Target: <span className="text-slate-800 font-bold">{fullOrder?.targetQty || order.targetQty}</span> | Produced: <span className="text-green-600 font-bold">{fullOrder?.producedQty || order.producedQty || 0}</span>
-                                            </div>
+                                            {(() => {
+                                                const targetVal = Number(fullOrder?.targetQty || order.targetQty || 0);
+                                                const producedVal = Number(fullOrder?.producedQty || order.producedQty || 0);
+                                                const hasShortfallStop = fullOrder?.productionOrderHistories?.some((h: any) => h.toStatus === "COMPLETED_WITH_SHORTFALL");
+                                                
+                                                return (
+                                                    <div className="flex items-center gap-2 flex-wrap text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                                                        <span>Target: <span className="text-slate-800 font-bold">{targetVal}</span></span>
+                                                        <span>|</span>
+                                                        <span>Produced: <span className="text-green-600 font-bold">{producedVal}</span></span>
+                                                        {hasShortfallStop && (
+                                                            <>
+                                                                <span>|</span>
+                                                                <span className="bg-red-50 text-red-700 border border-red-200 px-2 py-0.5 rounded text-[10px] font-bold uppercase whitespace-nowrap ">
+                                                                    Permanently Stopped (Shortfall: {Math.max(0, targetVal - producedVal)} pcs)
+                                                                </span>
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })()}
                                         </div>
                                         <div className="p-4 bg-slate-50 overflow-x-auto">
                                             <div className="bg-white border border-slate-200 rounded-lg overflow-hidden min-w-[750px]">

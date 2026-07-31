@@ -4,7 +4,8 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
-import { fetchHourlyProductions, deleteHourlyProduction } from "../../../features/hourly-productions/hourlyProductionSlice";
+import { fetchHourlyProductions, deleteHourlyProduction, hourlyProductionCreated, hourlyProductionUpdated, hourlyProductionDeleted } from "../../../features/hourly-productions/hourlyProductionSlice";
+import { useSocketSync } from "../../../hooks/useSocketSync";
 
 import EditButton from "../../../components/ui/EditButton/EditButton";
 import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
@@ -60,6 +61,12 @@ const HourlyWorkReportList: React.FC = () => {
             toast.error(error);
         }
     }, [error]);
+
+    useSocketSync("hourlyProduction", {
+        created: hourlyProductionCreated,
+        updated: hourlyProductionUpdated,
+        deleted: hourlyProductionDeleted,
+    });
 
     const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
         setSearchTerm(e.target.value);

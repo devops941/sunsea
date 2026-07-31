@@ -45,7 +45,26 @@ const initialState: ProductState = {
 const productSlice = createSlice({
   name: "products",
   initialState,
-  reducers: {},
+  reducers: {
+    productCreated: (state, action: PayloadAction<Product>) => {
+      const exists = state.products.find((p) => String(p.id) === String(action.payload.id));
+      if (!exists) {
+        state.products.unshift(action.payload);
+      }
+    },
+    productUpdated: (state, action: PayloadAction<Product>) => {
+      const index = state.products.findIndex((p) => String(p.id) === String(action.payload.id));
+      if (index !== -1) {
+        state.products[index] = action.payload;
+      }
+    },
+    productDeleted: (state, action: PayloadAction<string | number>) => {
+      const index = state.products.findIndex((p) => String(p.id) === String(action.payload));
+      if (index !== -1) {
+        state.products.splice(index, 1);
+      }
+    },
+  },
   extraReducers: (builder) => {
     builder
       .addCase(fetchProducts.pending, (state) => {
@@ -74,5 +93,7 @@ const productSlice = createSlice({
       });
   },
 });
+
+export const { productCreated, productUpdated, productDeleted } = productSlice.actions;
 
 export default productSlice.reducer;

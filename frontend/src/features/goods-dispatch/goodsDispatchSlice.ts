@@ -130,6 +130,32 @@ const goodsDispatchSlice = createSlice({
     clearError: (state) => {
       state.error = null;
     },
+    goodsDispatchCreated: (state, action) => {
+      if (Array.isArray(state.dispatches)) {
+        const exists = state.dispatches.find((m: any) => String(m.id) === String(action.payload.id));
+        if (!exists) {
+          state.dispatches.unshift(action.payload);
+          state.meta.total += 1;
+        }
+      }
+    },
+    goodsDispatchUpdated: (state, action) => {
+      if (Array.isArray(state.dispatches)) {
+        const index = state.dispatches.findIndex((m: any) => String(m.id) === String(action.payload.id));
+        if (index !== -1) {
+          state.dispatches[index] = action.payload;
+        }
+      }
+      if (state.currentDispatch && String(state.currentDispatch.id) === String(action.payload.id)) {
+        state.currentDispatch = action.payload;
+      }
+    },
+    goodsDispatchDeleted: (state, action) => {
+      if (Array.isArray(state.dispatches)) {
+        state.dispatches = state.dispatches.filter((m: any) => String(m.id) !== String(action.payload));
+        state.meta.total -= 1;
+      }
+    },
   },
   extraReducers: (builder) => {
     // Fetch All
@@ -209,5 +235,5 @@ const goodsDispatchSlice = createSlice({
   },
 });
 
-export const { clearCurrentDispatch, clearError } = goodsDispatchSlice.actions;
+export const { clearCurrentDispatch, clearError, goodsDispatchCreated, goodsDispatchUpdated, goodsDispatchDeleted } = goodsDispatchSlice.actions;
 export default goodsDispatchSlice.reducer;

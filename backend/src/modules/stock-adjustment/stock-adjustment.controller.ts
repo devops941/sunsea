@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { StockAdjustmentService } from "./stock-adjustment.service";
 import { asyncHandler } from "../../utils/asyncHandler";
 import { ApiError } from "../../utils/ApiError";
+import { getIO } from "../../socket/socket";
 
 export class StockAdjustmentController {
   static createStockAdjustment = asyncHandler(async (req: Request, res: Response) => {
@@ -10,6 +11,7 @@ export class StockAdjustmentController {
     if (!userId) throw new ApiError(401, "Unauthorized");
 
     const adjustment = await StockAdjustmentService.createStockAdjustment(data, userId);
+    getIO().emit("stockAdjustment:created", adjustment);
     res.status(201).json({
       success: true,
       message: "Stock Adjustment created successfully",
@@ -42,6 +44,7 @@ export class StockAdjustmentController {
     if (!userId) throw new ApiError(401, "Unauthorized");
 
     const adjustment = await StockAdjustmentService.updateStockAdjustment(id, data, userId);
+    getIO().emit("stockAdjustment:updated", adjustment);
     res.json({
       success: true,
       message: "Stock Adjustment updated successfully",
@@ -56,6 +59,7 @@ export class StockAdjustmentController {
     if (!userId) throw new ApiError(401, "Unauthorized");
 
     const adjustment = await StockAdjustmentService.approveStockAdjustment(id, status, reason, userId);
+    getIO().emit("stockAdjustment:updated", adjustment);
     res.json({
       success: true,
       message: `Stock Adjustment status updated to ${status}`,
@@ -66,6 +70,7 @@ export class StockAdjustmentController {
   static deleteStockAdjustment = asyncHandler(async (req: Request, res: Response) => {
     const id = req.params.id as string;
     await StockAdjustmentService.deleteStockAdjustment(id);
+    getIO().emit("stockAdjustment:deleted", { id });
     res.json({
       success: true,
       message: "Stock Adjustment deleted successfully",

@@ -2,11 +2,16 @@ import { Request, Response } from "express";
 import dailyPlanService from "./daily-plan.service";
 import { ApiResponse } from "../../utils/ApiResponse";
 import { asyncHandler } from "../../utils/asyncHandler";
+import { getIO } from "../../socket/socket";
 
 class DailyPlanController {
   create = asyncHandler(async (req: Request, res: Response) => {
     const userId = req.user?.userId;
     const dailyPlan = await dailyPlanService.create(req.body, userId);
+    const safePlan = JSON.parse(JSON.stringify(dailyPlan, (key, value) =>
+      typeof value === "bigint" ? value.toString() : value
+    ));
+    getIO().emit("dailyPlan:created", safePlan);
     return res.status(201).json(new ApiResponse("Daily Production Plan created successfully", dailyPlan));
   });
 
@@ -14,12 +19,17 @@ class DailyPlanController {
     const userId = req.user?.userId;
     const { dailyPlanId } = req.params;
     const dailyPlan = await dailyPlanService.update(dailyPlanId as string, req.body, userId);
+    const safePlan = JSON.parse(JSON.stringify(dailyPlan, (key, value) =>
+      typeof value === "bigint" ? value.toString() : value
+    ));
+    getIO().emit("dailyPlan:updated", safePlan);
     return res.status(200).json(new ApiResponse("Daily Production Plan updated successfully", dailyPlan));
   });
 
   delete = asyncHandler(async (req: Request, res: Response) => {
     const { dailyPlanId } = req.params;
     await dailyPlanService.delete(dailyPlanId as string);
+    getIO().emit("dailyPlan:deleted", { dailyPlanId: String(dailyPlanId) });
     return res.status(200).json(new ApiResponse("Daily Production Plan deleted successfully"));
   });
 

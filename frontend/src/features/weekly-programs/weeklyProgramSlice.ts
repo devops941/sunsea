@@ -1,4 +1,5 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
+import type { PayloadAction } from "@reduxjs/toolkit";
 import { weeklyProgramService } from "../../services/weeklyProgramService";
 import type { WeeklyProgramState } from "./types";
 
@@ -63,7 +64,24 @@ const initialState: WeeklyProgramState = {
 const weeklyProgramSlice = createSlice({
   name: "weeklyPrograms",
   initialState,
-  reducers: {},
+  reducers: {
+    weeklyProgramCreated: (state, action: PayloadAction<any>) => {
+      const exists = state.data.find(m => String(m.weeklyProgramId) === String(action.payload.weeklyProgramId));
+      if (!exists) {
+        state.data.unshift(action.payload);
+      }
+    },
+    weeklyProgramUpdated: (state, action: PayloadAction<any>) => {
+      const index = state.data.findIndex((m) => String(m.weeklyProgramId) === String(action.payload.weeklyProgramId));
+      if (index !== -1) {
+        state.data[index] = action.payload;
+      }
+    },
+    weeklyProgramDeleted: (state, action: PayloadAction<any>) => {
+      const idToDelete = action.payload.weeklyProgramId || action.payload;
+      state.data = state.data.filter((m) => String(m.weeklyProgramId) !== String(idToDelete));
+    },
+  },
   extraReducers: (builder) => {
     builder
       .addCase(fetchWeeklyPrograms.pending, (state) => {
@@ -92,5 +110,7 @@ const weeklyProgramSlice = createSlice({
       });
   },
 });
+
+export const { weeklyProgramCreated, weeklyProgramUpdated, weeklyProgramDeleted } = weeklyProgramSlice.actions;
 
 export default weeklyProgramSlice.reducer;

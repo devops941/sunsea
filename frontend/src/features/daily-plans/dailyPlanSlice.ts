@@ -1,4 +1,5 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
+import type { PayloadAction } from "@reduxjs/toolkit";
 import { dailyPlanService } from "../../services/dailyPlanService";
 
 interface DailyPlanState {
@@ -73,7 +74,23 @@ export const deleteDailyPlan = createAsyncThunk(
 const dailyPlanSlice = createSlice({
   name: "dailyPlans",
   initialState,
-  reducers: {},
+  reducers: {
+    dailyPlanCreated: (state, action: PayloadAction<any>) => {
+      const exists = state.data.find(p => String(p.dailyPlanId) === String(action.payload.dailyPlanId));
+      if (!exists) {
+        state.data.unshift(action.payload);
+      }
+    },
+    dailyPlanUpdated: (state, action: PayloadAction<any>) => {
+      const index = state.data.findIndex((p) => String(p.dailyPlanId) === String(action.payload.dailyPlanId));
+      if (index !== -1) {
+        state.data[index] = action.payload;
+      }
+    },
+    dailyPlanDeleted: (state, action: PayloadAction<any>) => {
+      state.data = state.data.filter((p) => String(p.dailyPlanId) !== String(action.payload.dailyPlanId || action.payload));
+    },
+  },
   extraReducers: (builder) => {
     builder
       .addCase(fetchDailyPlans.pending, (state) => {
@@ -102,5 +119,7 @@ const dailyPlanSlice = createSlice({
       });
   },
 });
+
+export const { dailyPlanCreated, dailyPlanUpdated, dailyPlanDeleted } = dailyPlanSlice.actions;
 
 export default dailyPlanSlice.reducer;

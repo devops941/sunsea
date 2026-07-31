@@ -11,8 +11,9 @@ import {
 import DataTable from "../../../components/ui/table/DataTable";
 import apiClient from "../../../api/apiClient";
 import { storeService } from "../../../services/storeService";
-import { formatDateTime, formatDate } from "../../../utils/dateUtils";
+import { formatDate, formatDateTime } from "../../../utils/dateUtils";
 import { toast } from "react-toastify";
+import { useSocketSync } from "../../../hooks/useSocketSync";
 
 type EodCategory = 'RAW_MATERIAL' | 'FINISHED_PRODUCT' | 'WASTAGE';
 
@@ -127,6 +128,8 @@ const EodStockList: React.FC = () => {
   useEffect(() => {
     fetchEodStock();
   }, [debouncedSearch, categoryFilter, storeIdFilter, selectedDate, currentPage, simulateEmptyState]);
+
+  useSocketSync("inventorySnapshot", undefined, fetchEodStock);
 
   // Resolve storeName from storeId
   const getStoreName = (storeId: string) => {

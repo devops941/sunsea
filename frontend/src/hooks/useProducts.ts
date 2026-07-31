@@ -1,11 +1,18 @@
 import { useCallback } from "react";
 import { useAppDispatch, useAppSelector } from "./reduxHooks";
-import { fetchProducts, createProduct, updateProduct, deleteProduct } from "../features/product/productSlice";
-import type { CreateProductDto, UpdateProductDto } from "../features/product/types";
+import { fetchProducts, createProduct, updateProduct, deleteProduct, productCreated, productUpdated, productDeleted } from "../features/product/productSlice";
+import type { CreateProductDto, UpdateProductDto, Product } from "../features/product/types";
+import { useSocketSync } from "./useSocketSync";
 
 export const useProducts = () => {
   const dispatch = useAppDispatch();
   const { products, loading, error } = useAppSelector((state) => state.products);
+
+  useSocketSync<Product>("product", {
+    created: productCreated,
+    updated: productUpdated,
+    deleted: productDeleted,
+  });
 
   const loadProducts = useCallback((search?: string) => {
     dispatch(fetchProducts(search));

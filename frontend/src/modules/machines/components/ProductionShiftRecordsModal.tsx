@@ -3,6 +3,7 @@ import { Modal } from "react-bootstrap";
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
 import { fetchRecordsByProduct, clearRecords } from "../../../features/product-shift-records/productShiftRecordSlice";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
+import { useSocketSync } from "../../../hooks/useSocketSync";
 
 interface Props {
   show: boolean;
@@ -23,6 +24,12 @@ const ProductionShiftRecordsModal: React.FC<Props> = ({ show, onHide, productId,
       if (!show) dispatch(clearRecords());
     };
   }, [show, productId, dispatch]);
+
+  useSocketSync("productShiftRecord", undefined, () => {
+    if (show && productId) {
+      dispatch(fetchRecordsByProduct(productId));
+    }
+  });
 
   return (
     <Modal show={show} onHide={onHide} size="lg" centered>

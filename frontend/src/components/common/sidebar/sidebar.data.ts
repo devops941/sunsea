@@ -110,6 +110,7 @@ export const sidebarItems: SidebarItem[] = [
       "/shift-execution",
       "/production-dashboard",
       "/bill-of-materials",
+      "/production/goods-dispatch",
     ],
   },
   // 8. Inventory

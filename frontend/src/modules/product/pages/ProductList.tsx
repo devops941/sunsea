@@ -22,6 +22,7 @@ import { employeeService } from "../../../services/employeeService";
 import { departmentService } from "../../../services/departmentService";
 import { shiftService } from "../../../services/shiftService";
 import { machineService } from "../../../services/machineService";
+import { useSocketSync } from "../../../hooks/useSocketSync";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -95,6 +96,19 @@ const ProductList: React.FC = () => {
             toast.error(error);
         }
     }, [error]);
+
+    useSocketSync("productCapacityHistory", undefined, () => {
+        if (showViewModal && selectedProduct) {
+            productCapacityHistoryService.fetchByProduct(Number(selectedProduct.id))
+                .then(records => setCapacityRecords(records))
+                .catch(() => setCapacityRecords([]));
+        }
+        if (showCapModal && capProduct) {
+            productCapacityHistoryService.fetchByProduct(Number(capProduct.id))
+                .then(records => setCapHistoryRecords(records))
+                .catch(() => setCapHistoryRecords([]));
+        }
+    });
 
     const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
         setSearchTerm(e.target.value);

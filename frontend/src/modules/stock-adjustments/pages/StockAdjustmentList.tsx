@@ -6,7 +6,8 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
-import { fetchStockAdjustments } from "../../../features/stock-adjustments/stockAdjustmentSlice";
+import { fetchStockAdjustments, stockAdjustmentCreated, stockAdjustmentUpdated, stockAdjustmentDeleted } from "../../../features/stock-adjustments/stockAdjustmentSlice";
+import { useSocketSync } from "../../../hooks/useSocketSync";
 
 import CustomButton from "../../../components/ui/Button/Button";
 import DataTable from "../../../components/ui/table/DataTable";
@@ -97,6 +98,12 @@ const StockAdjustmentList: React.FC = () => {
   useEffect(() => {
     if (error) toast.error(error);
   }, [error]);
+
+  useSocketSync("stockAdjustment", {
+    created: stockAdjustmentCreated,
+    updated: stockAdjustmentUpdated,
+    deleted: stockAdjustmentDeleted,
+  });
 
   const handleOpenFilter = () => {
     setDraftStatus(status);

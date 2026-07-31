@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
+import { useSocketSync } from "../../../hooks/useSocketSync";
 
 // Actions
 import { fetchProductionOrders } from "../../../features/production-orders/productionOrderSlice";
@@ -58,6 +59,11 @@ const DashboardPage: React.FC = () => {
     };
     loadAllData();
   }, [dispatch, loadProducts, loadEmployees, loadUsers]);
+
+  // Real-time: refresh key data when production/inventory events arrive
+  useSocketSync("productionOrder", undefined, () => dispatch(fetchProductionOrders()));
+  useSocketSync("weeklyProgram", undefined, () => dispatch(fetchWeeklyPrograms(undefined)));
+  useSocketSync("rawMaterial", undefined, () => dispatch(fetchRawMaterials(undefined)));
 
   // Derived Data: Stats
   const totalFinishedGoods = useMemo(() => {
