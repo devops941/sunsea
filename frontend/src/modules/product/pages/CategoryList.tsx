@@ -10,6 +10,7 @@ import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/Common
 import TextInput from "../../../components/form/TextInput/TextInput";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import { useCategories } from "../../../hooks/useCategories";
+import { usePermission } from "../../../hooks/usePermission";
 import { categoryService } from "../../../services/categoryService";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import DataTable, { type DataTableColumn } from "../../../components/ui/table/DataTable";
@@ -19,6 +20,7 @@ const ITEMS_PER_PAGE = 10;
 
 const CategoryList: React.FC = () => {
     const { categories, loading, error, loadCategories, addCategory, editCategory, removeCategory } = useCategories();
+    const { can } = usePermission();
 
     const [searchTerm, setSearchTerm] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
@@ -39,8 +41,10 @@ const CategoryList: React.FC = () => {
     });
 
     useEffect(() => {
-        loadCategories("");
-    }, [loadCategories]);
+        if (can("categories.view")) {
+            loadCategories("");
+        }
+    }, [loadCategories, can]);
 
     useEffect(() => {
         if (error) {
@@ -179,8 +183,8 @@ const CategoryList: React.FC = () => {
             render: (cat) => (
                 <div className="flex items-center gap-2 justify-end">
                     <ViewButton onClick={() => handleOpenView(cat)} />
-                    <EditButton onClick={() => handleOpenEdit(cat)} />
-                    <DeleteButton onClick={() => triggerDelete(cat.id)} />
+                    {can("categories.edit") && <EditButton onClick={() => handleOpenEdit(cat)} />}
+                    {can("categories.delete") && <DeleteButton onClick={() => triggerDelete(cat.id)} />}
                 </div>
             ),
             align: "left"
@@ -207,7 +211,7 @@ const CategoryList: React.FC = () => {
                                     onChange={handleSearch}
                                 />
                             </div>
-                            <CustomButton text="Add Category" icon={FaPlus} onClick={handleOpenAdd} />
+                            {can("categories.create") && <CustomButton text="Add Category" icon={FaPlus} onClick={handleOpenAdd} />}
                         </div>
                     </div>
 

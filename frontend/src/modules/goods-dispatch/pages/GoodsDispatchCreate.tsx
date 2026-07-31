@@ -21,9 +21,12 @@ import TimePickerInput from "../../../components/form/TimePickerInput/TimePicker
 import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
 import SearchInput from "../../../components/ui/SearchInput/SearchInput";
 
+import { usePermission } from "../../../hooks/usePermission";
+
 const GoodsDispatchCreate: React.FC = () => {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
+  const { can } = usePermission();
 
   const { eligibleOrders, loading } = useAppSelector((state) => state.goodsDispatch);
   const { data: stores = [] } = useAppSelector((state) => state.stores);
@@ -501,12 +504,14 @@ const GoodsDispatchCreate: React.FC = () => {
             disabled={loading}
             variant="secondary"
           />
-          <CustomButton
-            text={loading ? "Creating..." : "Create Dispatch"}
-            icon={FaSave}
-            onClick={handleSubmit}
-            disabled={loading}
-          />
+          {can("goods-dispatch.create") && (
+            <CustomButton
+              text={loading ? "Creating..." : "Create Dispatch"}
+              icon={FaSave}
+              onClick={handleSubmit}
+              disabled={loading}
+            />
+          )}
         </div>
       </div>
     </div>

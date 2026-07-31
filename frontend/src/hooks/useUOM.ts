@@ -13,11 +13,14 @@ let unitsCache: DynamicUnit[] | null = null;
 let categoriesPromise: Promise<string[]> | null = null;
 let unitsPromise: Promise<DynamicUnit[]> | null = null;
 
+import { usePermission } from "./usePermission";
+
 export const useUOM = () => {
   const [categories, setCategories] = useState<string[]>(categoriesCache || []);
   const [units, setUnits] = useState<DynamicUnit[]>(unitsCache || []);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { can } = usePermission();
 
   const fetchAllUomData = async (forceRetry = false) => {
     setLoading(true);
@@ -56,10 +59,10 @@ export const useUOM = () => {
   };
 
   useEffect(() => {
-    if (categories.length === 0 || units.length === 0) {
+    if (can("uoms.view") && (categories.length === 0 || units.length === 0)) {
       fetchAllUomData();
     }
-  }, [categories.length, units.length]);
+  }, [categories.length, units.length, can]);
 
   return {
     categories,

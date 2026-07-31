@@ -12,7 +12,7 @@ import CommonConfirmModal from "../../../../components/ui/CommonConfirmModal/Com
 import EmailButton from "../../../../components/ui/EmailButton/EmailButton";
 import PurchaseOrderViewModal from "../components/PurchaseOrderViewModal";
 import { usePurchaseOrders } from "../../../../hooks/usePurchaseOrder";
-import { hasPermission } from "../../../../utils/permission";
+import { usePermission } from "../../../../hooks/usePermission";
 import { purchaseOrderService } from "../../../../services/purchaseOrderService";
 import type { PurchaseOrder, PurchaseOrderStatus } from "../../../../features/purchaseOrder/types";
 import { useSocketSync } from "../../../../hooks/useSocketSync";
@@ -39,15 +39,11 @@ const STATUS_COLORS: Record<PurchaseOrderStatus, string> = {
 const PurchaseOrderListPage: React.FC = () => {
   const navigate = useNavigate();
 
-  // Get user from Redux
-  const user = useSelector((state: any) => state?.auth?.user);
   const company = useSelector((state: any) => state.company.data);
-  const FORCE_SHOW_BUTTON = true;
-
-  // Real permission check
-  const canCreate = FORCE_SHOW_BUTTON || hasPermission("purchase_orders.create") || user?.role === "admin";
-  const canEdit = FORCE_SHOW_BUTTON || hasPermission("purchase_orders.edit") || user?.role === "admin";
-  const canDelete = FORCE_SHOW_BUTTON || hasPermission("purchase_orders.delete") || user?.role === "admin";
+  const { can } = usePermission();
+  const canCreate = can("purchaseOrders.create");
+  const canEdit = can("purchaseOrders.edit");
+  const canDelete = can("purchaseOrders.delete");
 
   const {
     removePurchaseOrder,
@@ -78,6 +74,7 @@ const PurchaseOrderListPage: React.FC = () => {
   const activeFilterCount = [statusFilter, fromDate, toDate].filter(Boolean).length;
 
   const fetchPOs = useCallback(async () => {
+    if (!can("purchaseOrders.view")) return;
     setLoading(true);
     try {
       const response = await purchaseOrderService.fetchAll({
@@ -284,16 +281,12 @@ const PurchaseOrderListPage: React.FC = () => {
             </FilterPopover>
 
 
-            {canCreate ? (
+            {canCreate && (
               <CustomButton
                 text="Create PO"
                 icon={FaPlus}
                 onClick={() => navigate("/purchase-orders/create")}
               />
-            ) : (
-              <span className="text-red-500 text-xs">
-                ⚠️ Create button hidden
-              </span>
             )}
           </div>
         </div >

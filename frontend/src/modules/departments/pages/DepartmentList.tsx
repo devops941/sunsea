@@ -9,7 +9,7 @@ import TextInput from "../../../components/form/TextInput/TextInput";
 import CommonViewModal from "../../../components/ui/CommonViewModal/CommonViewModal";
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import { useDepartments } from "../../../hooks/useDepartments";
-import { hasPermission } from "../../../utils/permission";
+import { usePermission } from "../../../hooks/usePermission";
 import DataTable, { type DataTableColumn } from "../../../components/ui/table/DataTable";
 import CommonModal from "../../../components/ui/Modal/CommonModal";
 
@@ -17,9 +17,10 @@ const ITEMS_PER_PAGE = 10;
 
 const DepartmentList: React.FC = () => {
     const { departments, total, loading, error, loadDepartments, addDepartment, editDepartment, removeDepartment } = useDepartments();
-    const canCreateDepartment = hasPermission("departments.create");
-    const canEditDepartment = hasPermission("departments.edit");
-    const canDeleteDepartment = hasPermission("departments.delete");
+    const { can } = usePermission();
+    const canCreateDepartment = can("departments.create");
+    const canEditDepartment = can("departments.edit");
+    const canDeleteDepartment = can("departments.delete");
 
     const [searchTerm, setSearchTerm] = useState("");
     const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
@@ -185,7 +186,7 @@ const DepartmentList: React.FC = () => {
             header: "Actions",
             render: (dept) => (
                 <div className="flex items-center gap-2">
-                    <ViewButton onClick={() => handleOpenView(dept)} />
+                    {can("departments.view") && <ViewButton onClick={() => handleOpenView(dept)} />}
                     {canEditDepartment && (<EditButton onClick={() => handleOpenEdit(dept)} />)}
                     {canDeleteDepartment && (<DeleteButton onClick={() => triggerDelete(dept.id)} />)}
                 </div>

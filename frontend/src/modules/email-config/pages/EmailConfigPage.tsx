@@ -5,6 +5,7 @@ import { emailConfigService } from "../../../services/emailConfigService";
 import TextInput from "../../../components/form/TextInput/TextInput";
 import CustomButton from "../../../components/ui/Button/Button";
 import CommonLoader from "../../../components/ui/Loader/CommonLoader";
+import { usePermission } from "../../../hooks/usePermission";
 
 interface EmailConfigForm {
   smtpHost: string;
@@ -48,6 +49,8 @@ const EmailConfigPage: React.FC = () => {
 
   const [configErrors, setConfigErrors] = useState<Record<string, string>>({});
   const [emailErrors, setEmailErrors] = useState<Record<string, string>>({});
+  const { can } = usePermission();
+  const canEditEmail = can("email-config.edit");
 
   useEffect(() => {
     const fetchConfig = async () => {
@@ -120,6 +123,10 @@ const EmailConfigPage: React.FC = () => {
 
   const handleSaveConfig = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canEditEmail) {
+      toast.error("You do not have permission to edit email configuration.");
+      return;
+    }
     if (!validateConfig()) {
       toast.warn("Please fill all required SMTP fields.");
       return;
@@ -242,13 +249,15 @@ const EmailConfigPage: React.FC = () => {
             </div>
           </div>
           <div className="flex justify-end mt-6">
-            <CustomButton
-              text={saving ? "Saving..." : "Save Configuration"}
-              icon={FaSave}
-              type="submit"
-              disabled={saving}
-              className="bg-black text-white hover:bg-gray-800"
-            />
+            {canEditEmail && (
+              <CustomButton
+                text={saving ? "Saving..." : "Save Configuration"}
+                icon={FaSave}
+                type="submit"
+                disabled={saving}
+                className="bg-black text-white hover:bg-gray-800"
+              />
+            )}
           </div>
         </form>
       </div>

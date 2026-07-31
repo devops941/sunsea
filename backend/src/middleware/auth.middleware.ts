@@ -92,11 +92,19 @@ export const authMiddleware = async (
     } else {
       const user = await prisma.user.findUnique({
         where: { userId: decoded.userId },
-        select: { status: true }
+        select: { status: true, roleId: true }
       });
 
       if (!user || user.status !== "active") {
         return next(new ApiError(401, "Account is suspended or inactive"));
+      }
+
+      if (user.roleId) {
+        const rolePermissions = await prisma.rolePermission.findMany({
+          where: { roleId: user.roleId },
+          select: { permission: { select: { key: true } } }
+        });
+        decoded.permissions = rolePermissions.map((p) => p.permission.key);
       }
     }
 

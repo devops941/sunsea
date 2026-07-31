@@ -6,7 +6,7 @@ import TextInput from "../../components/form/TextInput/TextInput";
 import CustomButton from "../../components/ui/Button/Button";
 import IndiaPhoneInput from "../../components/ui/PhoneInput/PhoneInput";
 import CommonLoader from "../../components/ui/Loader/CommonLoader";
-// import BackButton from "../../components/ui/BackButton/BackButton";
+import { usePermission } from "../../hooks/usePermission";
 
 interface WhatsappConfigForm {
     phoneNumberId: string;
@@ -28,6 +28,8 @@ const WhatsappCreatePage: React.FC = () => {
     const [isEditing, setIsEditing] = useState(false);
     const [loading, setLoading] = useState(true);
     const [errors, setErrors] = useState<Record<string, string>>({});
+    const { can } = usePermission();
+    const canEditWhatsapp = can("whatsapp.edit");
 
     // Fetch the existing configuration on mount
     useEffect(() => {
@@ -95,6 +97,11 @@ const WhatsappCreatePage: React.FC = () => {
 
         if (!validate()) {
             toast.warn("Please fill in all required fields correctly.");
+            return;
+        }
+
+        if (!canEditWhatsapp) {
+            toast.error("You do not have permission to edit WhatsApp configuration.");
             return;
         }
 
@@ -219,13 +226,17 @@ const WhatsappCreatePage: React.FC = () => {
                     </div>
 
                     <div className="flex flex-wrap justify-end gap-3 mt-8 pt-4 border-t border-gray-200">
-                        <CustomButton text="Clear" icon={FaEraser} onClick={handleClear} type="button" />
-                        <CustomButton
-                            text={saving ? "Saving..." : isEditing ? "Update Configuration" : "Save Configuration"}
-                            icon={FaSave}
-                            type="submit"
-                            disabled={saving}
-                        />
+                        {canEditWhatsapp && (
+                            <>
+                                <CustomButton text="Clear" icon={FaEraser} onClick={handleClear} type="button" />
+                                <CustomButton
+                                    text={saving ? "Saving..." : isEditing ? "Update Configuration" : "Save Configuration"}
+                                    icon={FaSave}
+                                    type="submit"
+                                    disabled={saving}
+                                />
+                            </>
+                        )}
                     </div>
                 </form>
             </div>

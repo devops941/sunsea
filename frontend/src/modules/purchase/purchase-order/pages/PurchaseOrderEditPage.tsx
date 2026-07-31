@@ -27,6 +27,7 @@ import type { RawMaterial } from "../../../../features/raw-materials/types";
 import BackButton from "../../../../components/ui/BackButton/BackButton";
 import AddressForm from "../../../../components/form/AddressFrom/AddressFrom";
 import { useUsers } from "../../../../hooks/useUsers";
+import { getUomMultiplier } from "./PurchaseOrderCreatePage";
 
 
 
@@ -169,17 +170,21 @@ const PurchaseOrderEditPage: React.FC = () => {
   }, [companyState, formData.billingState]);
 
   // ============================================================
-  // RECOMPUTE ITEM-LEVEL TAX SPLIT WHENEVER isInterState CHANGES
-  // (e.g. billing state edited after items were already added)
+  // TOTALS RECALCULATION
   // ============================================================
-  useEffect(() => {
-    setFormData((prev) => {
-      if (prev.items.length === 0) return prev;
+  const recalculateTotals = (items: PurchaseOrderItem[], interState: boolean = isInterState, poDiscountType: "PERCENT" | "FLAT" = formData.discountType, poDiscountValue: number = formData.discountValue, rSign: "+" | "-" = roundingSign, rValue: number = roundingValue) => {
+    let subtotal = 0;
+    let totalTax = 0;
+    let totalCgst = 0;
+    let totalSgst = 0;
+    let totalIgst = 0;
 
-      const updatedItems = prev.items.map((item) => {
-        const qty = Number(item.quantity) || 0;
-        const price = Number(item.unitPrice) || 0;
-        const lineSubtotal = qty * price;
+    items.forEach((item) => {
+      const qty = Number(item.quantity) || 0;
+      const price = Number(item.unitPrice) || 0;
+      const rawMaterial = (rawMaterials || []).find((rm: any) => String(rm.rawMaterialId) === String(item.productId));
+      const mult = getUomMultiplier(item.uom, rawMaterial?.baseUom);
+      const lineSubtotal = qty * mult * price;
 
         const taxableAmount = lineSubtotal;
         const totalGstRate = Number(item.tax) || 0;
@@ -596,15 +601,18 @@ const PurchaseOrderEditPage: React.FC = () => {
     formData.billingPincode,
   ]);
 
-  const handleItemChange = (index: number, field: keyof PurchaseOrderItem, value: any) => {
+  const handleItemChange = (index: number, field: keyof PurchaseOrderItem | "uom", value: any, selectedUom?: string) => {
     setFormData((prev) => {
       const items = [...prev.items];
-      items[index] = { ...items[index], [field]: value };
+      const updatedUom = selectedUom !== undefined ? selectedUom : (field === "uom" ? value : items[index].uom);
+      items[index] = { ...items[index], [field]: value, uom: updatedUom };
 
       const item = items[index];
       const qty = Number(item.quantity) || 0;
       const price = Number(item.unitPrice) || 0;
-      const lineSubtotal = qty * price;
+      const rawMaterial = (rawMaterials || []).find((rm: any) => String(rm.rawMaterialId) === String(item.productId));
+      const mult = getUomMultiplier(item.uom, rawMaterial?.baseUom);
+      const lineSubtotal = qty * mult * price;
 
       const taxableAmount = lineSubtotal;
       const totalGstRate = Number(item.tax) || 0;
@@ -1036,12 +1044,13 @@ const PurchaseOrderEditPage: React.FC = () => {
                   const qty = Number(item.quantity) || 0;
                   const price = Number(item.unitPrice) || 0;
                   const taxPercent = Number(item.tax) || 0;
-                  const taxableAmount = qty * price;
-                  const gstAmount = taxableAmount * (taxPercent / 100);
-                  const lineTotal = taxableAmount + gstAmount;
                   const rawMaterial = rawMaterials.find(
                     (rm) => String(rm.rawMaterialId) === String(item.productId)
                   );
+                  const mult = getUomMultiplier(item.uom, rawMaterial?.baseUom);
+                  const taxableAmount = qty * mult * price;
+                  const gstAmount = taxableAmount * (taxPercent / 100);
+                  const lineTotal = taxableAmount + gstAmount;
                   return (
                     <tr key={index} className="hover:bg-slate-50/50 transition-colors duration-200">
                       <td className="px-3 py-2 whitespace-nowrap text-sm font-medium text-slate-400 text-center">{index + 1}</td>
@@ -1051,7 +1060,9 @@ const PurchaseOrderEditPage: React.FC = () => {
                           name={`items[${index}].quantity`}
                           value={item.quantity}
                           baseUoms={rawMaterial?.baseUom || item.uom || "KG"}
-                          onChange={(e) => handleItemChange(index, "quantity", Number(e.target.value))}
+                          uom={item.uom}
+                          onUomChange={(newUom) => handleItemChange(index, "uom", newUom)}
+                          onChange={(e) => handleItemChange(index, "quantity", Number(e.target.value), e.target.uom)}
                           error={errors[`items.${index}.quantity`]}
                           step="0.01"
                           hideLabel

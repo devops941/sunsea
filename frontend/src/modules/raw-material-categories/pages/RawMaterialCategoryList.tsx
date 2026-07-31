@@ -12,6 +12,7 @@ import CommonModal from "../../../components/ui/Modal/CommonModal";
 import TextInput from "../../../components/form/TextInput/TextInput";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import { useRawMaterialCategories } from "../../../hooks/useRawMaterialCategories";
+import { usePermission } from "../../../hooks/usePermission";
 import { rawMaterialCategoryService } from "../../../services/rawMaterialCategoryService";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import DataTable from "../../../components/ui/table/DataTable";
@@ -68,6 +69,7 @@ const RawMaterialCategoryList: React.FC = () => {
         editCategory,
         removeCategory,
     } = useRawMaterialCategories();
+    const { can } = usePermission();
 
     const [searchTerm, setSearchTerm] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
@@ -90,17 +92,19 @@ const RawMaterialCategoryList: React.FC = () => {
 
     useEffect(() => {
         const timer = setTimeout(() => {
-            loadCategories({
-                search: searchTerm,
-                page: currentPage,
-                limit: ITEMS_PER_PAGE,
-                sortBy: "categoryCode",
-                sortOrder: "asc",
-            });
+            if (can("raw_material_categories.view")) {
+                loadCategories({
+                    search: searchTerm,
+                    page: currentPage,
+                    limit: ITEMS_PER_PAGE,
+                    sortBy: "categoryCode",
+                    sortOrder: "asc",
+                });
+            }
         }, 300);
 
         return () => clearTimeout(timer);
-    }, [loadCategories, searchTerm, currentPage]);
+    }, [loadCategories, searchTerm, currentPage, can]);
 
     useEffect(() => {
         if (error) {
@@ -238,11 +242,13 @@ const RawMaterialCategoryList: React.FC = () => {
                             onChange={handleSearch}
                             placeholder="Search by code or name..."
                         />
-                        <CustomButton
-                            text="Add Category"
-                            icon={FaPlus}
-                            onClick={handleOpenAdd}
-                        />
+                        {can("raw_material_categories.create") && (
+                            <CustomButton
+                                text="Add Category"
+                                icon={FaPlus}
+                                onClick={handleOpenAdd}
+                            />
+                        )}
                     </div>
                 </div>
 
@@ -272,8 +278,8 @@ const RawMaterialCategoryList: React.FC = () => {
                             render: (item) => (
                                 <div className="flex items-center gap-2">
                                     <ViewButton onClick={() => handleOpenView(item)} />
-                                    <EditButton onClick={() => handleOpenEdit(item)} />
-                                    <DeleteButton onClick={() => triggerDelete(item.id)} />
+                                    {can("raw_material_categories.edit") && <EditButton onClick={() => handleOpenEdit(item)} />}
+                                    {can("raw_material_categories.delete") && <DeleteButton onClick={() => triggerDelete(item.id)} />}
                                 </div>
                             ),
                         },

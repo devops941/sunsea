@@ -13,6 +13,7 @@ import { fetchShifts } from "../../../features/shifts/shiftSlice";
 import { weeklyProgramService } from "../../../services/weeklyProgramService";
 import { productionOrderService } from "../../../services/productionOrderService";
 import BackButton from "../../../components/ui/BackButton/BackButton";
+import { usePermission } from "../../../hooks/usePermission";
 
 const normalizePriority = (pri?: string): "LOW" | "MEDIUM" | "HIGH" | "URGENT" => {
     if (!pri) return "MEDIUM";
@@ -30,6 +31,7 @@ const WeeklyMachineScheduleEdit: React.FC = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const dispatch = useAppDispatch();
+    const { can } = usePermission();
 
     const [weekStartDate, setWeekStartDate] = useState("");
     const [weekEndDate, setWeekEndDate] = useState("");
@@ -398,12 +400,14 @@ const WeeklyMachineScheduleEdit: React.FC = () => {
                                         onClick={() => navigate("/weekly-machine-schedules")}
                                         disabled={isSubmitting}
                                     />
-                                    <CustomButton
-                                        text={isSubmitting ? "Saving..." : "Update Assignment"}
-                                        icon={FaSave}
-                                        type="submit"
-                                        disabled={isSubmitting}
-                                    />
+                                    {can("weekly_programs.edit") && (
+                                        <CustomButton
+                                            text={isSubmitting ? "Saving..." : "Update Assignment"}
+                                            icon={FaSave}
+                                            type="submit"
+                                            disabled={isSubmitting}
+                                        />
+                                    )}
                                 </div>
                             </form>
                         </Card.Body>

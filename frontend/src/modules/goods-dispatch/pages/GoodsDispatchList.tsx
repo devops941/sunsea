@@ -17,11 +17,14 @@ import FilterPopover from "../../../components/ui/FilterPopover/FilterPopover";
 import DatePickerCalendar from "../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 import { formatDate } from "../../../utils/dateUtils";
 
+import { usePermission } from "../../../hooks/usePermission";
+
 const ITEMS_PER_PAGE = 10;
 
 const GoodsDispatchList: React.FC = () => {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
+  const { can } = usePermission();
 
   const { dispatches, meta, loading, error } = useAppSelector((state) => state.goodsDispatch);
 
@@ -141,11 +144,13 @@ const GoodsDispatchList: React.FC = () => {
       accessor: "id",
       render: (item: any) => (
         <div className="flex items-center gap-2">
-          <ViewButton onClick={() => navigate(`/production/goods-dispatch/detail/${item.id}`)} />
-          {item.status === "PENDING_GATE_APPROVAL" && (
+          {can("goods-dispatch.view") && (
+            <ViewButton onClick={() => navigate(`/production/goods-dispatch/detail/${item.id}`)} />
+          )}
+          {item.status === "PENDING_GATE_APPROVAL" && can("goods-dispatch.edit") && (
             <EditButton onClick={() => navigate(`/production/goods-dispatch/gate-approval/${item.id}`)} />
           )}
-          {item.status === "PENDING_STORE_RECEIPT" && (
+          {item.status === "PENDING_STORE_RECEIPT" && can("goods-dispatch.edit") && (
             <EditButton onClick={() => navigate(`/production/goods-dispatch/store-approval/${item.id}`)} />
           )}
         </div>
@@ -221,11 +226,13 @@ const GoodsDispatchList: React.FC = () => {
               </div>
             </FilterPopover>
 
-            <CustomButton
-              text="Create Dispatch"
-              icon={FaPlus}
-              onClick={() => navigate("/production/goods-dispatch/create")}
-            />
+            {can("goods-dispatch.create") && (
+              <CustomButton
+                text="Create Dispatch"
+                icon={FaPlus}
+                onClick={() => navigate("/production/goods-dispatch/create")}
+              />
+            )}
           </div>
         </div>
 

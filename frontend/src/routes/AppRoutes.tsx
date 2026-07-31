@@ -17,6 +17,7 @@ const OrganizationTabs = lazy(() => import("../modules/company/pages/Organizatio
 const InventoryTabs = lazy(() => import("../modules/stock/pages/InventoryTabs"));
 const Sample = lazy(() => import("../modules/sample"));
 const NotFoundPage = lazy(() => import("../modules/not-found/pages/NotFoundPage"));
+const UnauthorizedPage = lazy(() => import("../modules/unauthorized/pages/UnauthorizedPage"));
 const LoginPage = lazy(() => import("../modules/login/pages/LoginPage"));
 const ResetPassword = lazy(() => import("../modules/passwordreset/pages/ResetPassword"));
 
@@ -213,7 +214,7 @@ const AppRoutes = () => {
               <Route path="/customers/edit/:id" element={<CustomerEditPage />} />
             </Route>
 
-            <Route>
+            <Route element={<ProtectedRoute permission="suppliers.view" />}>
               <Route path="/suppliers" element={<PurchaseTabs />} />
             </Route>
             {/* Suppliers Create Route */}
@@ -247,7 +248,7 @@ const AppRoutes = () => {
             </Route>
 
             {/* Products Management (RBAC guarded) */}
-            <Route element={<ProtectedRoute permission="products.view" />}>
+            <Route element={<ProtectedRoute permissionAny={["products.view", "categories.view", "raw_material_categories.view", "raw_materials.view", "uoms.view", "wastage-store.view"]} />}>
               <Route path="/products" element={<ProductMasterTabs />} />
             </Route>
             {/* Products Create Route */}
@@ -260,7 +261,7 @@ const AppRoutes = () => {
             </Route>
 
             {/* Categories & Subcategories */}
-            <Route element={<ProtectedRoute permission="categories.view" />}>
+            <Route element={<ProtectedRoute permissionAny={["products.view", "categories.view", "raw_material_categories.view", "raw_materials.view", "uoms.view", "wastage-store.view"]} />}>
               <Route path="/categories" element={<ProductMasterTabs />} />
             </Route>
             {/* Sub Categories Route */}
@@ -297,7 +298,7 @@ const AppRoutes = () => {
               <Route path="/sizes" element={<ProductMasterTabs />} />
             </Route>
             {/* Uoms Route */}
-            <Route element={<ProtectedRoute permission="uoms.view" />}>
+            <Route element={<ProtectedRoute permissionAny={["products.view", "categories.view", "raw_material_categories.view", "raw_materials.view", "uoms.view", "wastage-store.view"]} />}>
               <Route path="/uoms" element={<ProductMasterTabs />} />
             </Route>
 
@@ -315,18 +316,18 @@ const AppRoutes = () => {
             {/* ========================================================================= */}
 
             {/* Storage Stores */}
-            <Route element={<ProtectedRoute permission="stores.view" />}>
+            <Route element={<ProtectedRoute permissionAny={["stores.view", "store-types.view", "locations.view"]} />}>
               <Route path="/storage-stores" element={<StoreLocationTabs />} />
             </Route>
 
 
             {/* Store Types */}
-            <Route element={<ProtectedRoute permission="store-types.view" />}>
+            <Route element={<ProtectedRoute permissionAny={["stores.view", "store-types.view", "locations.view"]} />}>
               <Route path="/store-types" element={<StoreLocationTabs />} />
             </Route>
 
             {/* Locations */}
-            <Route element={<ProtectedRoute permission="locations.view" />}>
+            <Route element={<ProtectedRoute permissionAny={["stores.view", "store-types.view", "locations.view"]} />}>
               <Route path="/locations" element={<StoreLocationTabs />} />
             </Route>
 
@@ -352,24 +353,24 @@ const AppRoutes = () => {
             </Route>
 
             {/* Shifts */}
-            <Route element={<ProtectedRoute permission="shift.view" />}>
+            <Route element={<ProtectedRoute permission="shifts.view" />}>
               <Route path="/shifts" element={<HROrganizationTabs />} />
             </Route>
             {/* Shifts Create Route */}
-            <Route element={<ProtectedRoute permission="shift.create" />}>
+            <Route element={<ProtectedRoute permission="shifts.create" />}>
               <Route path="/shifts/create" element={<ShiftCreate />} />
             </Route>
             {/* Shifts Edit :Id Route */}
-            <Route element={<ProtectedRoute permission="shift.edit" />}>
+            <Route element={<ProtectedRoute permission="shifts.edit" />}>
               <Route path="/shifts/edit/:id" element={<ShiftEdit />} />
             </Route>
 
             {/* Raw Materials */}
-            <Route element={<ProtectedRoute permission="raw_materials.view" />}>
+            <Route element={<ProtectedRoute permissionAny={["products.view", "categories.view", "raw_material_categories.view", "raw_materials.view", "uoms.view", "wastage-store.view"]} />}>
               <Route path="/raw-materials" element={<ProductMasterTabs />} />
             </Route>
             {/* Raw Material Categories Route */}
-            <Route element={<ProtectedRoute permission="raw_materials.view" />}>
+            <Route element={<ProtectedRoute permissionAny={["products.view", "categories.view", "raw_material_categories.view", "raw_materials.view", "uoms.view", "wastage-store.view"]} />}>
               <Route path="/raw-material-categories" element={<ProductMasterTabs />} />
             </Route>
             {/* Raw Materials Create Route */}
@@ -382,7 +383,7 @@ const AppRoutes = () => {
             </Route>
 
             {/* Wastage Store */}
-            <Route element={<ProtectedRoute permission="raw_materials.view" />}>
+            <Route element={<ProtectedRoute permissionAny={["products.view", "categories.view", "raw_material_categories.view", "raw_materials.view", "uoms.view", "wastage-store.view"]} />}>
               <Route path="/wastage-store" element={<ProductMasterTabs />} />
             </Route>
             <Route element={<ProtectedRoute permission="raw_materials.create" />}>
@@ -392,42 +393,36 @@ const AppRoutes = () => {
               <Route path="/wastage-store/edit/:id" element={<WastageStoreForm />} />
             </Route>
 
-            {/* Stock */}
-            <Route element={<ProtectedRoute permission="raw_material_stocks.view" />}>
+            {/* Stock (raw material / finished goods stores) */}
+            <Route element={<ProtectedRoute permissionAny={["raw_material_stocks.view", "finished_goods_stocks.view"]} />}>
               <Route path="/stock" element={<InventoryTabs />} />
             </Route>
 
             {/* Stock Adjustments */}
-            <Route element={<ProtectedRoute permission="raw_material_stocks.view" />}>
+            <Route element={<ProtectedRoute permission="stock-adjustments.view" />}>
               <Route path="/inventory/stock-adjustments" element={<InventoryTabs />} />
+              <Route path="/inventory/stock-adjustments/view/:id" element={<StockAdjustmentView />} />
             </Route>
-            {/* EOD Stock */}
-            <Route element={<ProtectedRoute permission="raw_material_stocks.view" />}>
-              <Route path="/inventory/eod-stock" element={<InventoryTabs />} />
-            </Route>
-            {/* Stock Adjustments Create Route */}
-            <Route element={<ProtectedRoute permission="raw_material_stocks.create" />}>
+            <Route element={<ProtectedRoute permission="stock-adjustments.create" />}>
               <Route path="/inventory/stock-adjustments/create" element={<StockAdjustmentForm />} />
             </Route>
-            {/* Stock Adjustments Edit Route */}
-            <Route element={<ProtectedRoute permission="raw_material_stocks.edit" />}>
+            <Route element={<ProtectedRoute permission="stock-adjustments.edit" />}>
               <Route path="/inventory/stock-adjustments/edit/:id" element={<StockAdjustmentForm />} />
             </Route>
-            {/* Stock Adjustments View Route */}
-            <Route element={<ProtectedRoute permission="raw_material_stocks.view" />}>
-              <Route path="/inventory/stock-adjustments/view/:id" element={<StockAdjustmentView />} />
+
+            {/* EOD Stock */}
+            <Route element={<ProtectedRoute permission="eod-stock.view" />}>
+              <Route path="/inventory/eod-stock" element={<InventoryTabs />} />
             </Route>
 
             {/* Wastage Stock */}
-            <Route element={<ProtectedRoute permission="raw_material_stocks.view" />}>
+            <Route element={<ProtectedRoute permission="wastage-stock.view" />}>
               <Route path="/wastage-stock" element={<WastageStockList />} />
             </Route>
-            {/* Wastage Stock Create Route */}
-            <Route element={<ProtectedRoute permission="raw_material_stocks.view" />}>
+            <Route element={<ProtectedRoute permission="wastage-stock.create" />}>
               <Route path="/wastage-stock/create" element={<WastageStockCreate />} />
             </Route>
-            {/* Wastage Stock Edit :Id Route */}
-            <Route element={<ProtectedRoute permission="raw_material_stocks.view" />}>
+            <Route element={<ProtectedRoute permission="wastage-stock.edit" />}>
               <Route path="/wastage-stock/edit/:id" element={<WastageStockEdit />} />
             </Route>
 
@@ -469,27 +464,27 @@ const AppRoutes = () => {
             </Route>
 
             {/* Daily Machine Planning */}
-            <Route element={<ProtectedRoute permission="weekly_programs.view" />}>
+            <Route element={<ProtectedRoute permission="daily-machine-planning.view" />}>
               <Route path="/daily-machine-planning" element={<ProductionOrderTabs />} />
               <Route path="/daily-machine-planning/view/:id" element={<DailyPlanViewPage />} />
               <Route path="/daily-machine-planning/report" element={<DailyReportPage />} />
             </Route>
 
             {/* Daily Production Plans Create / Edit */}
-            <Route element={<ProtectedRoute permission="weekly_programs.create" />}>
+            <Route element={<ProtectedRoute permission="daily-machine-planning.create" />}>
               <Route path="/daily-production-plans/create" element={<DailyPlanCreate />} />
             </Route>
-            <Route element={<ProtectedRoute permission="weekly_programs.edit" />}>
+            <Route element={<ProtectedRoute permission="daily-machine-planning.edit" />}>
               <Route path="/daily-production-plans/edit/:id" element={<DailyPlanCreate />} />
             </Route>
 
             {/* Shift Execution Board */}
-            <Route element={<ProtectedRoute permission="weekly_programs.view" />}>
+            <Route element={<ProtectedRoute permission="shift-execution.view" />}>
               <Route path="/shift-execution" element={<ShiftExecutionBoard />} />
             </Route>
 
             {/* Production Dashboard */}
-            <Route element={<ProtectedRoute permission="machines.view" />}>
+            <Route element={<ProtectedRoute permission="production_orders.view" />}>
               <Route path="/production-dashboard" element={<ProductionDashboard />} />
             </Route>
 
@@ -506,10 +501,14 @@ const AppRoutes = () => {
               <Route path="/hourly-work-reports/edit/:id" element={<HourlyWorkReportEdit />} />
             </Route>
 
-            {/* Production Wastage Audits */}
-            <Route element={<ProtectedRoute permission="machines.view" />}>
+            {/* Production Wastage */}
+            <Route element={<ProtectedRoute permission="production-wastages.view" />}>
               <Route path="/production-wastages" element={<ProductionOrderTabs />} />
+            </Route>
+            <Route element={<ProtectedRoute permission="production-wastages.create" />}>
               <Route path="/production-wastages/create" element={<WastageForm />} />
+            </Route>
+            <Route element={<ProtectedRoute permission="production-wastages.edit" />}>
               <Route path="/production-wastages/edit/:id" element={<WastageForm />} />
             </Route>
 
@@ -517,14 +516,12 @@ const AppRoutes = () => {
             <Route element={<ProtectedRoute permission="production_orders.view" />}>
               <Route path="/production-orders" element={<ProductionOrderTabs />} />
               <Route path="/allproduction-orders" element={<ProductionOrderTabs />} />
-              <Route path="/weekly-machine-schedules" element={<ProductionOrderTabs />} />
-              <Route path="/daily-machine-planning" element={<ProductionOrderTabs />} />
-              <Route path="/hourly-work-reports" element={<ProductionOrderTabs />} />
-              <Route path="/production-wastages" element={<ProductionOrderTabs />} />
-              <Route path="/oee-dashboard" element={<ProductionOrderTabs />} />
-              {/* Approved Sales Orders Route */}
               <Route path="/approved-sales-orders" element={<ProductionOrderTabs />} />
               <Route path="/production-orders/history/view/:id" element={<ProductionOrderHistoryView />} />
+            </Route>
+            {/* OEE Dashboard */}
+            <Route element={<ProtectedRoute permission="oee-dashboard.view" />}>
+              <Route path="/oee-dashboard" element={<ProductionOrderTabs />} />
             </Route>
             {/* Production Orders Create Route */}
             <Route element={<ProtectedRoute permission="production_orders.create" />}>
@@ -536,16 +533,16 @@ const AppRoutes = () => {
             </Route>
 
             {/* Goods Dispatch */}
-            <Route element={<ProtectedRoute permission="production_orders.view" />}>
+            <Route element={<ProtectedRoute permission="goods-dispatch.view" />}>
               <Route path="/production/goods-dispatch" element={<ProductionOrderTabs />} />
               <Route path="/production/goods-dispatch/view/:id" element={<GoodsDispatchView />} />
               <Route path="/production/goods-dispatch/detail/:id" element={<GoodsDispatchDetail />} />
             </Route>
-            <Route element={<ProtectedRoute permission="production_orders.edit" />}>
+            <Route element={<ProtectedRoute permission="goods-dispatch.edit" />}>
               <Route path="/production/goods-dispatch/gate-approval/:id" element={<GoodsDispatchGateApproval />} />
               <Route path="/production/goods-dispatch/store-approval/:id" element={<GoodsDispatchStoreApproval />} />
             </Route>
-            <Route element={<ProtectedRoute permission="production_orders.create" />}>
+            <Route element={<ProtectedRoute permission="goods-dispatch.create" />}>
               <Route path="/production/goods-dispatch/create" element={<GoodsDispatchCreate />} />
             </Route>
 
@@ -567,11 +564,19 @@ const AppRoutes = () => {
             {/* ========================================================================= */}
 
             {/* Reports */}
-            <Route element={<ProtectedRoute permission="reports.view" />}>
+            <Route element={<ProtectedRoute permission="sales-reports.view" />}>
               <Route path="/reports/sales" element={<ReportsTabs />} />
+            </Route>
+            <Route element={<ProtectedRoute permission="purchase-reports.view" />}>
               <Route path="/reports/purchase" element={<ReportsTabs />} />
+            </Route>
+            <Route element={<ProtectedRoute permission="inventory-reports.view" />}>
               <Route path="/reports/inventory" element={<ReportsTabs />} />
+            </Route>
+            <Route element={<ProtectedRoute permission="production-reports.view" />}>
               <Route path="/reports/production" element={<ReportsTabs />} />
+            </Route>
+            <Route element={<ProtectedRoute permission="audit-reports.view" />}>
               <Route path="/reports/audit" element={<ReportsTabs />} />
             </Route>
 
@@ -579,112 +584,88 @@ const AppRoutes = () => {
             {/* SALES & QUOTATIONS                                                        */}
             {/* ========================================================================= */}
 
-            {/* Sales */}
-            <Route element={<ProtectedRoute permission="reports.view" />}>
-              <Route path="/draft-order" element={<SalesTabs />} />
-            </Route>
-            {/* All Order Route */}
-            <Route element={<ProtectedRoute permission="reports.view" />}>
+            {/* ========================================================================= */}
+            {/* SALES & QUOTATIONS                                                        */}
+            {/* ========================================================================= */}
+
+            {/* Sales Orders */}
+            <Route element={<ProtectedRoute permission="sales-orders.view" />}>
               <Route path="/sales-order" element={<SalesTabs />} />
-            </Route>
-            {/* All Order Details :Id Route */}
-            <Route element={<ProtectedRoute permission="reports.view" />}>
               <Route path="/sales-order/details/:id" element={<OrderDetails />} />
             </Route>
-            {/* Sales Order Create Route */}
-            <Route element={<ProtectedRoute permission="reports.view" />}>
+            <Route element={<ProtectedRoute permission="sales-orders.create" />}>
               <Route path="/sales-order/create" element={<SalesOrderCreate />} />
             </Route>
-            {/* Sales Order Edit :Id Route */}
-            <Route element={<ProtectedRoute permission="reports.view" />}>
+            {/* Draft Orders */}
+            <Route element={<ProtectedRoute permission="draft-orders.view" />}>
+              <Route path="/draft-order" element={<SalesTabs />} />
+            </Route>
+            <Route element={<ProtectedRoute permission="draft-orders.edit" />}>
               <Route path="/draft-order/edit/:id" element={<SalesOrderCreate />} />
             </Route>
-            <Route element={<ProtectedRoute permission="reports.view" />}>
-              <Route path="/sales-invoices/details/:id" element={<SalesInvoiceView />} />
-            </Route>
-
-            {/* Quatation Order Route */}
-            <Route element={<ProtectedRoute permission="reports.view" />}>
+            {/* Quotations */}
+            <Route element={<ProtectedRoute permission="quotations.view" />}>
               <Route path="/quatation-order" element={<SalesTabs />} />
             </Route>
-
-            {/* Quatation Order Edit :Id Route */}
-            <Route element={<ProtectedRoute permission="reports.view" />}>
+            <Route element={<ProtectedRoute permission="quotations.edit" />}>
               <Route path="/quatation-order/edit/:id" element={<QuotationCreate />} />
             </Route>
-
-            {/* Pending Quotations Route */}
-            <Route element={<ProtectedRoute permission="reports.view" />}>
+            {/* Pending Quotations / MD Approvals */}
+            <Route element={<ProtectedRoute permission="pending-quotations.view" />}>
               <Route path="/pending-quotations" element={<SalesTabs />} />
             </Route>
-
-            {/* Sales Invoice Route */}
-            <Route element={<ProtectedRoute permission="reports.view" />}>
-              <Route path="/sales-invoices" element={<SalesTabs />} />
+            <Route element={<ProtectedRoute permission="pending-quotations.edit" />}>
+              <Route path="/pending-quotations/edit/:id" element={<UpdateQuatation />} />
             </Route>
 
-            {/* Create Sales Invoice Route */}
-            <Route element={<ProtectedRoute permission="reports.view" />}>
+            {/* Sales Invoices */}
+            <Route element={<ProtectedRoute permission="sales-invoices.view" />}>
+              <Route path="/sales-invoices" element={<SalesTabs />} />
+              <Route path="/sales-invoices/details/:id" element={<SalesInvoiceView />} />
+            </Route>
+            <Route element={<ProtectedRoute permission="sales-invoices.create" />}>
               <Route path="/sales-invoices/create" element={<SalesInvoiceForm />} />
             </Route>
-
-            {/* Edit Sales Invoice Route */}
-            <Route element={<ProtectedRoute permission="reports.view" />}>
+            <Route element={<ProtectedRoute permission="sales-invoices.edit" />}>
               <Route path="/sales-invoices/edit/:id" element={<SalesInvoiceForm />} />
-            </Route>
-
-            {/* Pending Quotations Edit :Id Route */}
-            <Route element={<ProtectedRoute permission="reports.view" />}>
-              <Route path="/pending-quotations/edit/:id" element={<UpdateQuatation />} />
             </Route>
 
             {/* ========================================================================= */}
             {/* PURCHASE ORDERS                                                           */}
             {/* ========================================================================= */}
 
-            {/* Purchase Orders - List */}
-            <Route element={<ProtectedRoute permission="reports.view" />}>
+            <Route element={<ProtectedRoute permission="purchaseOrders.view" />}>
               <Route path="/purchase-orders" element={<PurchaseTabs />} />
+              <Route path="/purchase-orders/view/:id" element={<PurchaseOrderViewPage />} />
             </Route>
-
-            {/* Purchase Orders - Create */}
-            <Route element={<ProtectedRoute permission="reports.view" />}>
+            <Route element={<ProtectedRoute permission="purchaseOrders.create" />}>
               <Route path="/purchase-orders/create" element={<PurchaseOrderCreatePage />} />
             </Route>
-
-            {/* Purchase Orders - Edit */}
-            <Route element={<ProtectedRoute permission="reports.view" />}>
+            <Route element={<ProtectedRoute permission="purchaseOrders.edit" />}>
               <Route path="/purchase-orders/edit/:id" element={<PurchaseOrderEditPage />} />
             </Route>
 
-            {/* ============================================ */}
-            {/* END PURCHASE ORDER MODULE */}
-            {/* ============================================ */}
-
-            <Route element={<ProtectedRoute permission="reports.view" />}>
+            <Route element={<ProtectedRoute permission="purchase-order-approvals.view" />}>
               <Route path="/purchase-order-approvals" element={<PurchaseTabs />} />
             </Route>
 
-            <Route element={<ProtectedRoute permission="reports.view" />}>
-              <Route path="/purchase-orders/view/:id" element={<PurchaseOrderViewPage />} />
-
+            <Route element={<ProtectedRoute permission="expenses.view" />}>
               <Route path="/expenses" element={<PurchaseTabs />} />
+            </Route>
+
+            <Route element={<ProtectedRoute permission="invoice.view" />}>
               <Route path="/invoice" element={<PurchaseTabs />} />
               <Route path="/invoice/details/:id" element={<GrnInvoiceViewPage />} />
               <Route path="/po-invoice/:id" element={<PoInvoicePage />} />
             </Route>
-            <Route element={<ProtectedRoute permission="reports.view" />}>
+            <Route element={<ProtectedRoute permission="invoice.create" />}>
               <Route path="/invoice/create" element={<InvoiceDetail />} />
             </Route>
-            <Route element={<ProtectedRoute permission="reports.view" />}>
+            <Route element={<ProtectedRoute permission="invoice.edit" />}>
               <Route path="/invoice/edit/:id" element={<InvoiceDetail />} />
             </Route>
-            <Route element={<ProtectedRoute permission="reports.view" />}>
-              <Route path="/settings" element={<Settings />} />
-            </Route>
-            <Route element={<ProtectedRoute permission="purchase_orders.view" />}>
 
-            </Route>
+            <Route path="/settings" element={<Settings />} />
 
           </Route>
         </Route>
@@ -695,6 +676,9 @@ const AppRoutes = () => {
           {/* Reset Route */}
           <Route path="/reset" element={<ResetPassword />} />
         </Route>
+
+        {/* 403 — Access Denied (outside BaseLayout so it's full-page) */}
+        <Route path="/unauthorized" element={<UnauthorizedPage />} />
 
         {/* 404 */}
         <Route path="*" element={<NotFoundPage />} />

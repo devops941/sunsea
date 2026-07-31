@@ -7,48 +7,23 @@ import {
 
 interface ProtectedRouteProps {
   permission?: string;
+  permissionAny?: string[];
   redirectPath?: string;
 }
 
 import { useAppSelector } from "../../hooks/reduxHooks";
-
-const useAuth = () => {
-  const { accessToken, permissions, user } = useAppSelector((state) => state.auth);
-
-  const isAuthenticated = Boolean(accessToken);
-
-  const hasPermission = (
-    permission: string
-  ): boolean => {
-    if (
-      user?.isSuperAdmin ||
-      user?.roleId === "ROLE_ADMIN" ||
-      user?.roleId === "SUPER_ADMIN" ||
-      user?.roleId === "ADMIN"
-    ) {
-      return true;
-    }
-    return permissions.includes(permission);
-  };
-
-  return {
-    isAuthenticated,
-    userPermissions: permissions,
-    hasPermission,
-  };
-};
+import { usePermission } from "../../hooks/usePermission";
 
 export const ProtectedRoute: React.FC<
   ProtectedRouteProps
 > = ({
   permission,
+  permissionAny,
   redirectPath = "/dashboard",
 }) => {
-    const {
-      isAuthenticated,
-      hasPermission,
-    } = useAuth();
-
+    const { accessToken } = useAppSelector((state) => state.auth);
+    const isAuthenticated = Boolean(accessToken);
+    const { can } = usePermission();
     const location = useLocation();
 
     // Not Logged In
@@ -63,10 +38,16 @@ export const ProtectedRoute: React.FC<
     }
 
     // Permission Check
-    if (
-      permission &&
-      !hasPermission(permission)
-    ) {
+    if (permission && !can(permission)) {
+      return (
+        <Navigate
+          to={redirectPath}
+          replace
+        />
+      );
+    }
+
+    if (permissionAny && permissionAny.length > 0 && !permissionAny.some((p) => can(p))) {
       return (
         <Navigate
           to={redirectPath}

@@ -20,11 +20,13 @@ import { rawMaterialService } from "../../../services/rawMaterialService";
 import { salesOrderService } from "../../../services/salesOrderService";
 import { finishedGoodsStockService } from "../../../services/finishedGoodsStockService";
 import { useSocketSync } from "../../../hooks/useSocketSync";
+import { usePermission } from "../../../hooks/usePermission";
 
 const ITEMS_PER_PAGE = 20;
 
 const ProductionOrderList: React.FC = () => {
     const navigate = useNavigate();
+    const { can } = usePermission();
 
     // --- State ---
     const [combinedData, setCombinedData] = useState<any[]>([]);
@@ -87,25 +89,41 @@ const ProductionOrderList: React.FC = () => {
     const fetchCombinedData = useCallback(async () => {
         setLoading(true);
         try {
-            // 1. Fetch Sales Orders (status: IN_PRODUCTION)
-            const soRes = await salesOrderService.fetchAll({
-                status: "IN_PRODUCTION"
-            });
-            const soList: any[] = (soRes as any).data || soRes || [];
+            // 1. Fetch Sales Orders (status: IN_PRODUCTION) if allowed
+            let soList: any[] = [];
+            if (can("sales-orders.view")) {
+                try {
+                    const soRes = await salesOrderService.fetchAll({
+                        status: "IN_PRODUCTION"
+                    });
+                    soList = (soRes as any).data || soRes || [];
+                } catch (err) {
+                    console.warn("Sales Orders fetch skipped or permission denied:", err);
+                }
+            }
 
             // 2. Fetch Production Orders
-            const poRes = await productionOrderService.fetchAll({
-                limit: 1000
-            } as any);
-            const poList = poRes.data || [];
+            let poList: any[] = [];
+            if (can("production_orders.view") || can("weekly_programs.view")) {
+                try {
+                    const poRes = await productionOrderService.fetchAll({
+                        limit: 1000
+                    } as any);
+                    poList = poRes.data || [];
+                } catch (err) {
+                    console.warn("Production Orders fetch skipped or permission denied:", err);
+                }
+            }
 
             // 2.5 Fetch Finished Goods Stock
             let fgList: any[] = [];
-            try {
-                const fgRes = await finishedGoodsStockService.fetchAll();
-                fgList = Array.isArray(fgRes) ? fgRes : (fgRes as any).data || [];
-            } catch (err) {
-                console.error("Failed to fetch Finished Goods Stock", err);
+            if (can("finished_goods_stocks.view")) {
+                try {
+                    const fgRes = await finishedGoodsStockService.fetchAll();
+                    fgList = Array.isArray(fgRes) ? fgRes : (fgRes as any).data || [];
+                } catch (err) {
+                    console.warn("Failed to fetch Finished Goods Stock:", err);
+                }
             }
 
             // Create stock map of productItemId -> onHandQty
@@ -491,7 +509,7 @@ const ProductionOrderList: React.FC = () => {
             render: (item: any) => (
                 <div className="flex items-center gap-2 justify-start">
                     {/* Assign to Weekly Scheduling — acts as both Check Material and Assign */}
-                    {(item.status === "CREATED" || item.status === "PENDING_PLANNING" || item.status === "READY_FOR_PLANNING") && item.primaryPO && (
+                    {(item.status === "CREATED" || item.status === "PENDING_PLANNING" || item.status === "READY_FOR_PLANNING") && item.primaryPO && (can("weekly_programs.create") || can("production_orders.edit")) && (
                         <IconButton
                             variant="success"
                             title="Assign to Weekly Scheduling (Verifies Material)"
@@ -501,7 +519,7 @@ const ProductionOrderList: React.FC = () => {
                     )}
 
                     {/* WAITING_FOR_MATERIAL: Show Re-Check Raw Material button */}
-                    {item.status === "WAITING_FOR_MATERIAL" && item.primaryPO && (
+                    {item.status === "WAITING_FOR_MATERIAL" && item.primaryPO && can("production_orders.edit") && (
                         <IconButton
                             variant="info"
                             title="Re-Check Raw Material Stock Availability"
@@ -511,7 +529,7 @@ const ProductionOrderList: React.FC = () => {
                     )}
 
                     {/* Legacy RM_PENDING handler */}
-                    {item.status === "RM_PENDING" && (
+                    {item.status === "RM_PENDING" && can("production_orders.edit") && (
                         <IconButton
                             variant="success"
                             title="Allocate & Reserve Raw Materials"
@@ -519,7 +537,7 @@ const ProductionOrderList: React.FC = () => {
                             onClick={() => handleAllocateRM(item)}
                         />
                     )}
-                    {item.status === "RM_PENDING" && (
+                    {item.status === "RM_PENDING" && can("purchase_orders.create") && (
                         <IconButton
                             variant="warning"
                             title="Create Raw Material Purchase Order"
@@ -528,7 +546,7 @@ const ProductionOrderList: React.FC = () => {
                         />
                     )}
 
-                    {item.primaryPO && (
+                    {item.primaryPO && can("production_orders.view") && (
                         <IconButton
                             variant="info"
                             title="View Details"
@@ -543,8 +561,10 @@ const ProductionOrderList: React.FC = () => {
                     )}
                     {item.primaryPO && !["IN_PRODUCTION", "POST_PRODUCTION", "READY_FOR_DISPATCH", "DISPATCHED", "CANCELLED", "CANCELED", "DELETED"].includes(item.primaryPO.status?.toUpperCase()) && (
                         <>
-                            <EditButton onClick={() => handleOpenEdit(item.primaryPO)} />
-                            {item.isDirect && (
+                            {can("production_orders.edit") && (
+                                <EditButton onClick={() => handleOpenEdit(item.primaryPO)} />
+                            )}
+                            {item.isDirect && can("production_orders.delete") && (
                                 <DeleteButton onClick={() => triggerDelete(item.productionOrders.map((po: any) => po.productionOrderId))} />
                             )}
                         </>
@@ -713,17 +733,21 @@ const ProductionOrderList: React.FC = () => {
                         <h2 className="text-2xl font-bold text-slate-800">Production Order Management</h2>
                     </div>
                     <div className="flex flex-wrap items-center gap-3">
-                        <CustomButton
-                            text="Weekly Scheduling"
-                            icon={FaCalendarAlt}
-                            onClick={() => navigate("/weekly-machine-schedules/create")}
-                            variant="secondary"
-                        />
-                        <CustomButton
-                            text="Add Production Order"
-                            icon={FaPlus}
-                            onClick={() => navigate("/production-orders/create")}
-                        />
+                        {(can("weekly_programs.create") || can("weekly_programs.view")) && (
+                            <CustomButton
+                                text="Weekly Scheduling"
+                                icon={FaCalendarAlt}
+                                onClick={() => navigate("/weekly-machine-schedules/create")}
+                                variant="secondary"
+                            />
+                        )}
+                        {can("production_orders.create") && (
+                            <CustomButton
+                                text="Add Production Order"
+                                icon={FaPlus}
+                                onClick={() => navigate("/production-orders/create")}
+                            />
+                        )}
                     </div>
                 </div>
 

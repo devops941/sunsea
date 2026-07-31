@@ -16,6 +16,7 @@ import { DocumentPrintLayout } from "../../../components/common/DocumentPrintLay
 import { SalesOrderEstimateContent } from "../../../components/salesOrder/SalesOrderEstimateContent";
 import { FiClipboard, FiFileText } from "react-icons/fi";
 import { useSocketSync } from "../../../hooks/useSocketSync";
+import { usePermission } from "../../../hooks/usePermission";
 
 
 const ITEMS_PER_PAGE = 10;
@@ -24,6 +25,7 @@ const ITEMS_PER_PAGE = 10;
 
 const AllSalesOrderList: React.FC = () => {
     const navigate = useNavigate();
+    const { can } = usePermission();
     const [data, setData] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const location = useLocation();
@@ -130,6 +132,7 @@ const AllSalesOrderList: React.FC = () => {
     const activeFilterCount = [fromDate, toDate, dispatchType].filter(Boolean).length;
 
     const fetchOrders = useCallback(async () => {
+        if (!can("sales-orders.view")) return;
         setLoading(true);
         try {
             const response = await salesOrderService.fetchAll({
@@ -150,7 +153,7 @@ const AllSalesOrderList: React.FC = () => {
         } finally {
             setLoading(false);
         }
-    }, [currentPage, searchTerm, fromDate, toDate, dispatchType]);
+    }, [currentPage, searchTerm, fromDate, toDate, dispatchType, can]);
 
     useSocketSync("salesOrder", undefined, fetchOrders);
 

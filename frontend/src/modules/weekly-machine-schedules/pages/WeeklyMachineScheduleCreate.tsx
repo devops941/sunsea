@@ -13,11 +13,13 @@ import { weeklyProgramService } from "../../../services/weeklyProgramService";
 import { productionOrderService } from "../../../services/productionOrderService";
 import BackButton from "../../../components/ui/BackButton/BackButton";
 import DatePickerCalendar from "../../../components/ui/DatePickerCalendar/DatePickerCalendar";
+import { usePermission } from "../../../hooks/usePermission";
 
 const WeeklyMachineScheduleCreate: React.FC = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const dispatch = useAppDispatch();
+    const { can } = usePermission();
 
     const [weekStartDate, setWeekStartDate] = useState("");
     const [weekEndDate, setWeekEndDate] = useState("");
@@ -307,12 +309,14 @@ const WeeklyMachineScheduleCreate: React.FC = () => {
                         {selectedCount > 0 && (
                             <div className="flex justify-end items-center gap-3 p-6 border-t border-slate-200 bg-slate-50 rounded-b-2xl">
                                 <span className="font-bold text-primary">{selectedCount} Selected</span>
-                                <CustomButton
-                                    text={isSubmitting ? "Saving..." : "Confirm & Save Allocation"}
-                                    icon={FaSave}
-                                    onClick={handleSubmit}
-                                    disabled={isSubmitting}
-                                />
+                                {can("weekly_programs.create") && (
+                                    <CustomButton
+                                        text={isSubmitting ? "Saving..." : "Confirm & Save Allocation"}
+                                        icon={FaSave}
+                                        onClick={handleSubmit}
+                                        disabled={isSubmitting}
+                                    />
+                                )}
                             </div>
                         )}
                     </div>

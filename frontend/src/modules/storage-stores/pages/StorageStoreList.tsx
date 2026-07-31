@@ -24,6 +24,7 @@ import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import TextInput from "../../../components/form/TextInput/TextInput";
 import DataTable from "../../../components/ui/table/DataTable";
 import { useSocketSync } from "../../../hooks/useSocketSync";
+import { usePermission } from "../../../hooks/usePermission";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -75,6 +76,7 @@ const storeSchema = z.object({
 const StorageStoreList: React.FC = () => {
     const navigate = useNavigate();
     const dispatch = useAppDispatch();
+    const { can } = usePermission();
 
     const { data, loading, error, totalPages } = useAppSelector(state => state.stores);
 
@@ -112,24 +114,26 @@ const StorageStoreList: React.FC = () => {
 
     // Initial loading for list and dependencies
     useEffect(() => {
-        dispatch(fetchLocations(undefined));
-        dispatch(fetchEmployees(undefined));
-        dispatch(fetchStoreTypes(undefined));
-        loadRoles();
-    }, [dispatch, loadRoles]);
+        if (can("locations.view")) dispatch(fetchLocations(undefined));
+        if (can("employees.view")) dispatch(fetchEmployees(undefined));
+        if (can("store-types.view")) dispatch(fetchStoreTypes(undefined));
+        if (can("roles.view")) loadRoles();
+    }, [dispatch, loadRoles, can]);
 
     const fetchStoreData = useCallback(() => {
-        dispatch(
-            fetchStores({
-                search: searchTerm,
-                storeTypeId: storeTypeFilter,
-                page: currentPage,
-                limit: ITEMS_PER_PAGE,
-                sortBy: "storeId",
-                sortOrder: "asc",
-            })
-        );
-    }, [dispatch, searchTerm, storeTypeFilter, currentPage]);
+        if (can("stores.view")) {
+            dispatch(
+                fetchStores({
+                    search: searchTerm,
+                    storeTypeId: storeTypeFilter,
+                    page: currentPage,
+                    limit: ITEMS_PER_PAGE,
+                    sortBy: "storeId",
+                    sortOrder: "asc",
+                })
+            );
+        }
+    }, [dispatch, searchTerm, storeTypeFilter, currentPage, can]);
 
     useSocketSync("store", undefined, fetchStoreData);
 
@@ -321,11 +325,13 @@ const StorageStoreList: React.FC = () => {
                                     onChange={handleSearch}
                                 />
                             </div>
-                            <CustomButton
-                                text="Add Store"
-                                icon={FaPlus}
-                                onClick={handleOpenAdd}
-                            />
+                            {can("stores.create") && (
+                                <CustomButton
+                                    text="Add Store"
+                                    icon={FaPlus}
+                                    onClick={handleOpenAdd}
+                                />
+                            )}
                         </div>
                     </div>
 
@@ -367,8 +373,8 @@ const StorageStoreList: React.FC = () => {
                                     render: (item) => (
                                         <div className="flex items-center gap-2">
                                             <ViewButton onClick={() => handleOpenView(item)} />
-                                            <EditButton onClick={() => handleOpenEdit(item)} />
-                                            <DeleteButton onClick={() => triggerDelete(item.storeId)} />
+                                            {can("stores.edit") && <EditButton onClick={() => handleOpenEdit(item)} />}
+                                            {can("stores.delete") && <DeleteButton onClick={() => triggerDelete(item.storeId)} />}
                                         </div>
                                     ),
                                     align: "left"

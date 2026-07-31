@@ -27,6 +27,7 @@ import DatePickerCalendar from "../../../components/ui/DatePickerCalendar/DatePi
 import CustomButton from "../../../components/ui/Button/Button";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import BackButton from "../../../components/ui/BackButton/BackButton";
+import { usePermission } from "../../../hooks/usePermission";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
 const formatLocalDateString = (d: Date) => {
@@ -52,6 +53,7 @@ const DailyPlanCreate: React.FC = () => {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const location = useLocation();
+  const { can } = usePermission();
   const { id: editId } = useParams<{ id?: string }>();
   const isEdit = !!editId;
 
@@ -778,7 +780,7 @@ const DailyPlanCreate: React.FC = () => {
                     <div className="text-slate-500 text-xs font-bold uppercase mb-1">Remaining Quantity</div>
                     {(() => {
                       const tgt = Number(selectedWeeklyProg.productionOrder?.targetQty || 0);
-                      const produced = Number(selectedWeeklyProg.productionOrder?.producedQty || 0);
+                      const produced = Number(selectedWeeklyProg.productionOrder?.producedQty || 0) - Number(selectedWeeklyProg.productionOrder?.rejectedQty || 0);
                       const rem = Math.max(0, tgt - produced);
                       return (
                         <div className={`font-bold ${rem <= 0 ? "text-red-600" : "text-green-600"}`}>
@@ -792,7 +794,7 @@ const DailyPlanCreate: React.FC = () => {
 
                   <div>
                     <div className="text-slate-500 text-xs font-bold uppercase mb-1">Produced So Far</div>
-                    <div className="font-bold text-slate-800">{selectedWeeklyProg.productionOrder?.producedQty || 0} pcs</div>
+                    <div className="font-bold text-slate-800">{Number(selectedWeeklyProg.productionOrder?.producedQty || 0) - Number(selectedWeeklyProg.productionOrder?.rejectedQty || 0)} pcs</div>
                   </div>
                   <div>
                     <div className="text-slate-500 text-xs font-bold uppercase mb-1">Already Planned</div>
@@ -1122,12 +1124,14 @@ const DailyPlanCreate: React.FC = () => {
 
             onClick={() => navigate("/daily-machine-planning")}
           />
-          <CustomButton
-            text={isSubmitting ? "Saving..." : (isEdit ? "Update Plan" : "Create Plan")}
-            icon={isSubmitting ? undefined : FaSave}
-            type="submit"
-            disabled={isSubmitting}
-          />
+          {(isEdit ? can("daily-machine-planning.edit") : can("daily-machine-planning.create")) && (
+            <CustomButton
+              text={isSubmitting ? "Saving..." : (isEdit ? "Update Plan" : "Create Plan")}
+              icon={isSubmitting ? undefined : FaSave}
+              type="submit"
+              disabled={isSubmitting}
+            />
+          )}
         </div>
       </div>
 

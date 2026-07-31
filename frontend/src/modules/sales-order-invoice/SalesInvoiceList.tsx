@@ -2,7 +2,6 @@ import React, { useState, useCallback, useEffect } from "react";
 import { FaPlus, FaTrash, FaEye } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
-import { useSelector } from "react-redux";
 
 import CommonViewModal from "../../components/ui/CommonViewModal/CommonViewModal";
 import CommonConfirmModal from "../../components/ui/CommonConfirmModal/CommonConfirmModal";
@@ -18,6 +17,7 @@ import EmailButton from "../../components/ui/EmailButton/EmailButton";
 import { Mail } from "lucide-react";
 import { useAppSelector } from "../../hooks/reduxHooks";
 import { useSocketSync } from "../../hooks/useSocketSync";
+import { usePermission } from "../../hooks/usePermission";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -33,6 +33,7 @@ const getMobileFromCustomer = (cust: any) => {
 
 const SalesInvoiceList: React.FC = () => {
     const navigate = useNavigate();
+    const { can } = usePermission();
     const [data, setData] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
@@ -54,6 +55,7 @@ const SalesInvoiceList: React.FC = () => {
     const [sendingEmail, setSendingEmail] = useState(false);
 
     const fetchInvoices = useCallback(async () => {
+        if (!can("sales-invoices.view")) return;
         setLoading(true);
         try {
             const response = await salesInvoiceService.fetchAll({
@@ -71,7 +73,7 @@ const SalesInvoiceList: React.FC = () => {
         } finally {
             setLoading(false);
         }
-    }, [currentPage, searchTerm]);
+    }, [currentPage, searchTerm, can]);
 
     useEffect(() => {
         fetchInvoices();
