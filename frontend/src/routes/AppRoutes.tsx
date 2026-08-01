@@ -163,6 +163,9 @@ const PurchaseOrderViewPage = lazy(() => import("../modules/purchase/purchase-or
 
 const InvoiceDetail = lazy(() => import("../modules/purchase/purchase-order/upcoming-orders/InvoiceDetailPage"));
 const SalesInvoiceForm = lazy(() => import("../modules/sales-order-invoice/SalesInvoiceCreate"));
+const AccountsTabs = lazy(() => import("../modules/accounts/pages/AccountsTabs"));
+const SupplierBreakdownPage = lazy(() => import("../modules/accounts/pages/payable/SupplierBreakdownPage"));
+const CustomerBreakdownPage = lazy(() => import("../modules/accounts/pages/receivable/CustomerBreakdownPage"));
 // profile
 const ProfilePage = lazy(() => import("../modules/profile/ProfilePage"));
 const Settings = lazy(() => import("../modules/settings/Setting"));
@@ -664,6 +667,21 @@ const AppRoutes = () => {
             <Route element={<ProtectedRoute permission="invoice.edit" />}>
               <Route path="/invoice/edit/:id" element={<InvoiceDetail />} />
             </Route>
+
+            {/* ========================================================================= */}
+            {/* ACCOUNTS & FINANCIALS                                                     */}
+            {/* ========================================================================= */}
+            <Route path="/accounts" element={<AccountsTabs />} />
+            <Route path="/accounts/payable" element={<AccountsTabs />} />
+            <Route path="/accounts/payable/:supplierId" element={<SupplierBreakdownPage />} />
+            <Route path="/accounts/receivable" element={<AccountsTabs />} />
+            <Route path="/accounts/receivable/:customerId" element={<CustomerBreakdownPage />} />
+            <Route path="/accounts/ledger-statement" element={<AccountsTabs />} />
+            <Route path="/accounts/chart-of-accounts" element={<AccountsTabs />} />
+            <Route path="/accounts/vouchers" element={<AccountsTabs />} />
+            <Route path="/accounts/sales-returns" element={<AccountsTabs />} />
+            <Route path="/accounts/purchase-returns" element={<AccountsTabs />} />
+            <Route path="/accounts/petty-cash" element={<AccountsTabs />} />
 
             <Route path="/settings" element={<Settings />} />
 

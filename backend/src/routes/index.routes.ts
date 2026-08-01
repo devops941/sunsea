@@ -51,6 +51,10 @@ import machineOperationAssignmentRoutes from "../modules/machine-operation-assig
 import productShiftRecordRoutes from "../modules/product-shift-record/product-shift-record.routes";
 import productCapacityHistoryRoutes from "../modules/product-capacity-history/product-capacity-history.routes";
 import emailConfigRoutes from "../modules/email-config/email-config.routes";
+import accountsRoutes from "../modules/accounts/accounts.routes";
+import voucherRoutes from "../modules/vouchers/vouchers.routes";
+import returnRoutes from "../modules/returns/returns.routes";
+import pettyCashRoutes from "../modules/petty-cash/petty-cash.routes";
 
 const router = Router();
 
@@ -111,6 +115,10 @@ router.use("/machine-operation-assignments", machineOperationAssignmentRoutes);
 router.use("/product-shift-records", productShiftRecordRoutes);
 router.use("/product-capacity-history", productCapacityHistoryRoutes);
 router.use("/email-config", emailConfigRoutes);
+router.use("/accounts", accountsRoutes);
+router.use("/vouchers", voucherRoutes);
+router.use("/returns", returnRoutes);
+router.use("/petty-cash", pettyCashRoutes);
 
 router.get("/", (req, res) => {
     res.status(200).json({
