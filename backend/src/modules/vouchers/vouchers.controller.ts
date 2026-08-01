@@ -18,7 +18,7 @@ class VouchersController {
 
   async getVoucherById(req: Request, res: Response, next: NextFunction) {
     try {
-      const id = parseInt(req.params.id, 10);
+      const id = parseInt(req.params.id as string, 10);
       const voucher = await vouchersService.getVoucherById(id);
       return res.status(200).json({
         success: true,
