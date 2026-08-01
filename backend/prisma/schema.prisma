@@ -340,12 +340,15 @@ model Customer {
   updatedBy            String?
   id                   String                   @id @default(uuid()) @db.Uuid
   transports           Json?
+  openingBalance       Decimal                  @default(0) @db.Decimal(14, 2)
   addresses            CustomerAddress[]
   collectionAgent      Employee?                @relation("EmployeeCollectionAgent", fields: [collectionAgentId], references: [id])
   company              Company                  @relation(fields: [companyId], references: [id])
   route                Route?                   @relation(fields: [routeId], references: [id])
   salesInvoices        SalesInvoice[]
   salesOrders          SalesOrder[]             @relation("CustomerSalesOrders")
+  accountLedger        AccountLedger?
+  salesReturns         SalesReturn[]
 
   @@unique([companyId, customerCode])
   @@index([companyId, status], map: "idx_cust_company_status")
@@ -516,12 +519,15 @@ model Supplier {
   bankAccount           Json?                   @map("bank_account")
   rawMaterialCategories String?                 @map("raw_material_categories") @db.VarChar(255)
   whatsapp              String?                 @map("whatsapp") @db.VarChar(15)
+  openingBalance        Decimal                 @default(0) @map("opening_balance") @db.Decimal(14, 2)
   id                    Int                     @id @default(autoincrement())
   materialPrices        SupplierMaterialPrice[]
   expenses              Expense[]
   grnInvoices           GrnInvoice[]
   purchaseOrders        PurchaseOrder[]
   addresses             SupplierAddress[]
+  accountLedger         AccountLedger?
+  purchaseReturns       PurchaseReturn[]
 
   @@unique([companyId, supplierCode])
   @@index([legalName])
@@ -655,6 +661,7 @@ model Product {
   weeklyPrograms            WeeklyMachineProgram[]     @relation("ProductWeeklyPrograms")
   shiftRecords              ProductShiftRecord[]
   capacityHistories         ProductCapacityHistory[]
+  salesReturnItems          SalesReturnItem[]
 
   @@index([categoryId])
   @@index([subCategoryId])
@@ -862,6 +869,7 @@ model RawMaterial {
   storeLocation           StoreLocation?           @relation(fields: [locationId], references: [id])
   store                   Store?                   @relation("StoreToRawMaterial", fields: [storeId], references: [storeId])
   StockAdjustmentItem     StockAdjustmentItem[]
+  purchaseReturnItems     PurchaseReturnItem[]
 
   @@index([categoryId])
   @@index([storeId])
@@ -1422,6 +1430,7 @@ model GrnInvoice {
   purchaseOrder        PurchaseOrder?   @relation(fields: [poId], references: [id])
   store                Store            @relation(fields: [storeId], references: [storeId])
   supplier             Supplier         @relation(fields: [supplierId], references: [id])
+  purchaseReturns      PurchaseReturn[]
 
   @@index([supplierId])
   @@index([storeId])
@@ -1650,6 +1659,7 @@ model SalesInvoice {
   customer     Customer           @relation(fields: [customerId], references: [id])
   salesOrder   SalesOrder?        @relation(fields: [salesOrderId], references: [id])
   store        Store?             @relation(fields: [storeId], references: [storeId])
+  salesReturns SalesReturn[]
 
   @@index([customerId])
   @@index([companyId])
@@ -1973,4 +1983,170 @@ enum EodItemCategory {
   RAW_MATERIAL
   FINISHED_PRODUCT
   WASTAGE
+}
+
+enum LedgerType {
+  ASSET
+  LIABILITY
+  EXPENSE
+  INCOME
+}
+
+enum VoucherType {
+  PAYMENT
+  RECEIPT
+  JOURNAL
+  CONTRA
+  SALES
+  PURCHASE
+  SALES_RETURN
+  PURCHASE_RETURN
+  EXPENSE
+}
+
+model AccountLedger {
+  id         Int        @id @default(autoincrement())
+  code       String     @unique @db.VarChar(30)
+  name       String     @db.VarChar(160)
+  type       LedgerType
+  group      String     @db.VarChar(80)
+  isActive   Boolean    @default(true)
+  customerId String?    @unique @db.Uuid
+  supplierId Int?       @unique
+  customer   Customer?  @relation(fields: [customerId], references: [id])
+  supplier   Supplier?  @relation(fields: [supplierId], references: [id])
+  debitItems JournalItem[] @relation("DebitItems")
+  creditItems JournalItem[] @relation("CreditItems")
+
+  @@map("account_ledgers")
+}
+
+model Voucher {
+  id          Int          @id @default(autoincrement())
+  voucherNo   String       @unique @db.VarChar(30)
+  type        VoucherType
+  date        DateTime     @db.Date
+  narration   String?      @db.VarChar(500)
+  refDocType  String?      @db.VarChar(30)
+  refDocId    String?      @db.VarChar(36)
+  createdBy   String?      @db.VarChar(36)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  items       JournalItem[]
+
+  @@index([refDocType, refDocId])
+  @@map("vouchers")
+}
+
+model JournalItem {
+  id             Int            @id @default(autoincrement())
+  voucherId      Int
+  debitLedgerId  Int?
+  creditLedgerId Int?
+  debitAmount    Decimal        @default(0) @db.Decimal(14, 2)
+  creditAmount   Decimal        @default(0) @db.Decimal(14, 2)
+  narration      String?        @db.VarChar(255)
+  voucher        Voucher        @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+  debitLedger    AccountLedger? @relation("DebitItems", fields: [debitLedgerId], references: [id])
+  creditLedger   AccountLedger? @relation("CreditItems", fields: [creditLedgerId], references: [id])
+
+  @@index([voucherId])
+  @@index([debitLedgerId])
+  @@index([creditLedgerId])
+  @@map("journal_items")
+}
+
+model SalesReturn {
+  id             String            @id @default(uuid()) @db.Uuid
+  returnNo       String            @unique @db.VarChar(30)
+  returnDate     DateTime          @db.Date
+  customerId     String            @db.Uuid
+  salesInvoiceId String?           @db.Uuid
+  reason         String?           @db.VarChar(255)
+  grandTotal     Decimal           @db.Decimal(14, 2)
+  status         String            @default("APPROVED") @db.VarChar(20)
+  narration      String?           @db.VarChar(500)
+  companyId      String            @db.Uuid
+  createdBy      String?           @db.VarChar(36)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  customer       Customer          @relation(fields: [customerId], references: [id])
+  salesInvoice   SalesInvoice?     @relation(fields: [salesInvoiceId], references: [id])
+  items          SalesReturnItem[]
+
+  @@index([customerId])
+  @@index([companyId])
+  @@map("sales_returns")
+}
+
+model SalesReturnItem {
+  id            Int         @id @default(autoincrement())
+  salesReturnId String      @db.Uuid
+  productId     BigInt
+  quantity      Decimal     @db.Decimal(12, 3)
+  unitPrice     Decimal     @db.Decimal(14, 2)
+  lineTotal     Decimal     @db.Decimal(14, 2)
+  reason        String?     @db.VarChar(255)
+  salesReturn   SalesReturn @relation(fields: [salesReturnId], references: [id], onDelete: Cascade)
+  product       Product     @relation(fields: [productId], references: [id])
+
+  @@index([salesReturnId])
+  @@map("sales_return_items")
+}
+
+model PurchaseReturn {
+  id               String               @id @default(uuid()) @db.Uuid
+  returnNo         String               @unique @db.VarChar(30)
+  returnDate       DateTime             @db.Date
+  supplierId       Int
+  grnInvoiceId     String?              @db.Uuid
+  reason           String?              @db.VarChar(255)
+  grandTotal       Decimal              @db.Decimal(14, 2)
+  status           String               @default("APPROVED") @db.VarChar(20)
+  narration        String?              @db.VarChar(500)
+  companyId        String               @db.Uuid
+  createdBy        String?              @db.VarChar(36)
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  supplier         Supplier             @relation(fields: [supplierId], references: [id])
+  grnInvoice       GrnInvoice?          @relation(fields: [grnInvoiceId], references: [id])
+  items            PurchaseReturnItem[]
+
+  @@index([supplierId])
+  @@index([companyId])
+  @@map("purchase_returns")
+}
+
+model PurchaseReturnItem {
+  id                Int            @id @default(autoincrement())
+  purchaseReturnId  String         @db.Uuid
+  rawMaterialId     String         @db.VarChar(20)
+  quantity          Decimal        @db.Decimal(12, 3)
+  unitPrice         Decimal        @db.Decimal(14, 2)
+  lineTotal         Decimal        @db.Decimal(14, 2)
+  reason            String?        @db.VarChar(255)
+  purchaseReturn    PurchaseReturn @relation(fields: [purchaseReturnId], references: [id], onDelete: Cascade)
+  rawMaterial       RawMaterial    @relation(fields: [rawMaterialId], references: [rawMaterialId])
+
+  @@index([purchaseReturnId])
+  @@map("purchase_return_items")
+}
+
+model PettyCashEntry {
+  id          Int      @id @default(autoincrement())
+  entryNo     String   @unique @db.VarChar(30)
+  entryDate   DateTime @db.Date
+  category    String   @db.VarChar(80)
+  description String?  @db.VarChar(255)
+  amount      Decimal  @db.Decimal(14, 2)
+  type        String   @db.VarChar(3)
+  paidTo      String?  @db.VarChar(160)
+  receiptNo   String?  @db.VarChar(50)
+  companyId   String   @db.Uuid
+  createdBy   String?  @db.VarChar(36)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([companyId])
+  @@map("petty_cash_entries")
 }
