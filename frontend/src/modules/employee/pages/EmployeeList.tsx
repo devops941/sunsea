@@ -5,7 +5,6 @@ import { toast } from "react-toastify";
 import ViewButton from "../../../components/ui/viewbutton/ViewButton";
 import EditButton from "../../../components/ui/EditButton/EditButton";
 import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
-import EmployeeViewModal from "../../employee/components/EmployeeViewModal";
 import CustomButton from "../../../components/ui/Button/Button";
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import { useEmployees } from "../../../hooks/useEmployees";
@@ -24,8 +23,6 @@ const Employeelist: React.FC = () => {
   const canEdit   = can("employees.edit");
   const canDelete = can("employees.delete");
 
-  const [showViewModal, setShowViewModal] = useState(false);
-  const [selectedEmployee, setSelectedEmployee] = useState<any>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -59,9 +56,8 @@ const Employeelist: React.FC = () => {
   };
 
   const handleView = useCallback((employee: any) => {
-    setSelectedEmployee(employee);
-    setShowViewModal(true);
-  }, []);
+    navigate(`/employees/view/${employee.id}`);
+  }, [navigate]);
 
   const handleEdit = useCallback((employee: any) => {
     navigate(`/employees/edit/${employee.id}`, {
@@ -174,13 +170,6 @@ const Employeelist: React.FC = () => {
             />
           </div>
         </div>
-
-        {/* Employee View Modal */}
-        <EmployeeViewModal
-          show={showViewModal}
-          onHide={() => setShowViewModal(false)}
-          employee={selectedEmployee}
-        />
 
         {/* Custom Confirmation Modal for Deletion */}
         <CommonConfirmModal

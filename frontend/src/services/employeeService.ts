@@ -13,13 +13,19 @@ export const employeeService = {
     return response.data?.data || response.data;
   },
 
-  create: async (data: CreateEmployeeDto): Promise<Employee> => {
-    const response = await apiClient.post(config.employee.base, data);
+  create: async (data: CreateEmployeeDto | FormData): Promise<any> => {
+    const isForm = data instanceof FormData;
+    const response = await apiClient.post(config.employee.base, data, {
+      headers: isForm ? { "Content-Type": "multipart/form-data" } : {},
+    });
     return response.data?.data || response.data;
   },
 
-  update: async (id: string, data: UpdateEmployeeDto): Promise<Employee> => {
-    const response = await apiClient.put(`${config.employee.base}/${id}`, data);
+  update: async (id: string, data: UpdateEmployeeDto | FormData): Promise<any> => {
+    const isForm = data instanceof FormData;
+    const response = await apiClient.put(`${config.employee.base}/${id}`, data, {
+      headers: isForm ? { "Content-Type": "multipart/form-data" } : {},
+    });
     return response.data?.data || response.data;
   },
 
