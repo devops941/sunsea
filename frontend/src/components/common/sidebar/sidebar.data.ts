@@ -9,7 +9,8 @@ import {
   FiSettings,
   FiMapPin,
   FiUsers,
-  FiDatabase
+  FiDatabase,
+  FiDollarSign
 } from "react-icons/fi";
 
 export const sidebarItems: SidebarItem[] = [
@@ -208,6 +209,22 @@ export const sidebarItems: SidebarItem[] = [
       "inventory-reports.view",
       "production-reports.view",
       "audit-reports.view",
+    ],
+  },
+  // 11. Accounts
+  {
+    title: "Accounts",
+    icon: FiDollarSign,
+    path: "/accounts/payable",
+    activePaths: [
+      "/accounts/payable",
+      "/accounts/receivable",
+      "/accounts/ledger-statement",
+      "/accounts/chart-of-accounts",
+      "/accounts/vouchers",
+      "/accounts/sales-returns",
+      "/accounts/purchase-returns",
+      "/accounts/petty-cash",
     ],
   }
 ];
