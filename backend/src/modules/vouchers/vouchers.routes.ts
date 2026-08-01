@@ -1,0 +1,10 @@
+import { Router } from "express";
+import { vouchersController } from "./vouchers.controller";
+
+const router = Router();
+
+router.get("/", (req, res, next) => vouchersController.getVouchers(req, res, next));
+router.post("/", (req, res, next) => vouchersController.createVoucher(req, res, next));
+router.get("/:id", (req, res, next) => vouchersController.getVoucherById(req, res, next));
+
+export default router;
