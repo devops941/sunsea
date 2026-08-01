@@ -7,7 +7,7 @@ import app from "./app";
 import { prisma } from "./config/prisma";
 import { bootstrapAdmin } from "./utils/bootstrapAdmin";
 import { initSocket } from "./socket/socket";
-import "./modules/inventory/jobs/scheduler";
+import { initScheduler } from "./modules/inventory/jobs/scheduler";
 // Global BigInt serialization for JSON responses (reconnected)
 // This ensures all BigInt values are converted to strings when Express calls JSON.stringify.
 (BigInt.prototype as any).toJSON = function () {
@@ -28,6 +28,7 @@ const startServer = async (): Promise<void> => {
     const server = http.createServer(app);
 
     initSocket(server);
+    initScheduler();
 
     server.listen(PORT, () => {
       console.log(
