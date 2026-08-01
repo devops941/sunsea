@@ -103,13 +103,15 @@ const initDefaultCutoffSetting = async () => {
 };
 
 // Initialize settings and execute catch-up check on server boot
-initDefaultCutoffSetting().then(async () => {
-  await runStartupCatchUpCheck();
-});
+export const initScheduler = () => {
+  initDefaultCutoffSetting().then(async () => {
+    await runStartupCatchUpCheck();
+  });
 
-/**
- * Cron job checking every minute for any missed/pending EOD snapshots in the last 3 days
- */
-cron.schedule("* * * * *", async () => {
-  await runDailyCronCheck();
-});
+  /**
+   * Cron job checking every minute for any missed/pending EOD snapshots in the last 3 days
+   */
+  cron.schedule("* * * * *", async () => {
+    await runDailyCronCheck();
+  });
+};
