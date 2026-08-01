@@ -21,7 +21,7 @@ const router = Router();
 router.post(
   "/",
   authMiddleware,
-  requirePermission("supplier.create"),
+  requirePermission("suppliers.create"),
   validateMiddleware(
     createSupplierSchema
   ),
@@ -34,7 +34,7 @@ router.post(
 router.get(
   "/",
   authMiddleware,
-  requirePermission("supplier.view"),
+  requirePermission("suppliers.view"),
   validateMiddleware(
     getSuppliersQuerySchema
   ),
@@ -47,7 +47,7 @@ router.get(
 router.get(
   "/next-code",
   authMiddleware,
-  requirePermission("supplier.view"),
+  requirePermission("suppliers.view"),
   supplierController.getNextCode
 );
 
@@ -57,7 +57,7 @@ router.get(
 router.get(
   "/:id",
   authMiddleware,
-  requirePermission("supplier.view"),
+  requirePermission("suppliers.view"),
   validateMiddleware(
     supplierIdSchema
   ),
@@ -70,7 +70,7 @@ router.get(
 router.put(
   "/:id",
   authMiddleware,
-  requirePermission("supplier.edit"),
+  requirePermission("suppliers.edit"),
   validateMiddleware(
     updateSupplierSchema
   ),
@@ -83,7 +83,7 @@ router.put(
 router.delete(
   "/:id",
   authMiddleware,
-  requirePermission("supplier.delete"),
+  requirePermission("suppliers.delete"),
   validateMiddleware(
     supplierIdSchema
   ),

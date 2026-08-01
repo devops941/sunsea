@@ -12,6 +12,7 @@ import { createGstTax, fetchGstTaxes, updateGstTax, deleteGstTax, gstTaxCreated,
 import { useSocketSync } from "../../hooks/useSocketSync";
 import CommonConfirmModal from "../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import DeleteButton from "../../components/ui/DeleteButton/DeleteButton";
+import { usePermission } from "../../hooks/usePermission";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -20,6 +21,11 @@ const GstTaxList: React.FC = () => {
     const { data, loading, totalPages } = useAppSelector((state) => state.gst);
     const [searchTerm, setSearchTerm] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
+    const { can } = usePermission();
+    
+    const canCreateGst = can("gst_tax.create");
+    const canEditGst = can("gst_tax.edit");
+    const canDeleteGst = can("gst_tax.delete");
 
     useSocketSync<GstTax>("gstTax", {
         created: gstTaxCreated,
@@ -140,8 +146,8 @@ const GstTaxList: React.FC = () => {
             header: "Actions",
             render: (tax) => (
                 <div className="flex items-center gap-2">
-                    <EditButton onClick={() => handleEditClick(tax)} />
-                    {/* <DeleteButton onClick={() => triggerDelete(tax.id)} /> */}
+                    {canEditGst && <EditButton onClick={() => handleEditClick(tax)} />}
+                    {canDeleteGst && <DeleteButton onClick={() => triggerDelete(tax.id)} />}
                 </div>
             ),
             align: "right"
@@ -168,11 +174,13 @@ const GstTaxList: React.FC = () => {
                                     onChange={handleSearch}
                                 />
                             </div>
-                            <CustomButton
-                                text="Add GST"
-                                icon={FaPlus}
-                                onClick={handleAddClick}
-                            />
+                            {canCreateGst && (
+                                <CustomButton
+                                    text="Add GST"
+                                    icon={FaPlus}
+                                    onClick={handleAddClick}
+                                />
+                            )}
                         </div>
                     </div>
 

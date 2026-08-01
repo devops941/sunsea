@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { GoodsDispatchService } from "./goods-dispatch.service";
 import { ApiResponse } from "../../utils/ApiResponse";
 import { asyncHandler } from "../../utils/asyncHandler";
+import { getIO } from "../../socket/socket";
 
 class GoodsDispatchController {
   getNextNumber = asyncHandler(async (_req: Request, res: Response) => {
@@ -28,6 +29,12 @@ class GoodsDispatchController {
   create = asyncHandler(async (req: Request, res: Response) => {
     const userId = req.user?.userId;
     const dispatch = await GoodsDispatchService.create(req.body, userId!);
+    
+    const safeDispatch = JSON.parse(JSON.stringify(dispatch, (key, value) =>
+      typeof value === "bigint" ? value.toString() : value
+    ));
+    getIO().emit("goodsDispatch:created", safeDispatch);
+
     return res.status(201).json(
       new ApiResponse("Goods Dispatch created successfully", dispatch)
     );
@@ -61,6 +68,12 @@ class GoodsDispatchController {
       req.body,
       userId!
     );
+    
+    const safeDispatch = JSON.parse(JSON.stringify(dispatch, (key, value) =>
+      typeof value === "bigint" ? value.toString() : value
+    ));
+    getIO().emit("goodsDispatch:updated", safeDispatch);
+
     return res.status(200).json(
       new ApiResponse("Gate approval processed successfully", dispatch)
     );
@@ -73,6 +86,12 @@ class GoodsDispatchController {
       req.body,
       userId!
     );
+
+    const safeDispatch = JSON.parse(JSON.stringify(dispatch, (key, value) =>
+      typeof value === "bigint" ? value.toString() : value
+    ));
+    getIO().emit("goodsDispatch:updated", safeDispatch);
+
     return res.status(200).json(
       new ApiResponse("Store receipt processed successfully", dispatch)
     );

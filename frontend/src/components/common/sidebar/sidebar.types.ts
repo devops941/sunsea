@@ -23,7 +23,11 @@ export interface SidebarItem {
 
   icon: IconType;
 
+  /** Single permission required to show this item */
   permission?: string;
+
+  /** Show this item if the user has ANY of these permissions */
+  permissionAny?: string[];
 
   children?: SidebarSubItem[];
 }

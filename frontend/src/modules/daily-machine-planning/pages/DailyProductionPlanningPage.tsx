@@ -12,7 +12,9 @@ import {
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
 import { fetchMachines } from "../../../features/machines/machineSlice";
 import { fetchShifts } from "../../../features/shifts/shiftSlice";
-import { fetchDailyPlans, updateDailyPlan, deleteDailyPlan } from "../../../features/daily-plans/dailyPlanSlice";
+import { fetchDailyPlans, updateDailyPlan, deleteDailyPlan, dailyPlanCreated, dailyPlanUpdated, dailyPlanDeleted } from "../../../features/daily-plans/dailyPlanSlice";
+import { useSocketSync } from "../../../hooks/useSocketSync";
+import { productCapacityHistoryService } from "../../../services/productCapacityHistoryService";
 import apiClient from "../../../api/apiClient";
 import config from "../../../api/config";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
@@ -25,10 +27,13 @@ import DataTable, { type DataTableColumn } from "../../../components/ui/table/Da
 import TextArea from "../../../components/form/TextArea/TextArea";
 import FilterPopover from "../../../components/ui/FilterPopover/FilterPopover";
 import { ProductionOrderViewModal } from "../../production-orders/components/ProductionOrderViewModal";
+import { DailyProductionReportModal } from "../components/DailyProductionReportModal";
 import { oeeService } from "../../../services/oeeService";
 import { rawMaterialService } from "../../../services/rawMaterialService";
 import { MaterialIssueModal } from "../../production-orders/components/MaterialIssueModal";
 import { weeklyProgramService } from "../../../services/weeklyProgramService";
+import { productionOrderService } from "../../../services/productionOrderService";
+import { usePermission } from "../../../hooks/usePermission";
 
 // ---------- helpers ----------
 const formatLocalDateString = (d: Date) => {
@@ -46,6 +51,7 @@ const STATUS_FLOW: Record<string, { label: string; next: string | null; color: s
   COMPLETED: { label: "Completed", next: null, color: "success" },
   CANCELLED: { label: "Cancelled", next: null, color: "danger" },
   STOPPED: { label: "Stopped", next: null, color: "danger" },
+  SHORT_CLOSED: { label: "Short Closed", next: null, color: "warning" },
 };
 
 const NEXT_ACTION_LABELS: Record<string, string> = {
@@ -67,9 +73,11 @@ const DailyProductionPlanningPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const dispatch = useAppDispatch();
+  const { can } = usePermission();
 
-  const { data: machines } = useAppSelector((state) => state.machines);
+  const { data: machines } = useAppSelector((state: any) => state.machines);
   const { data: dailyPlans, loading } = useAppSelector((state: any) => state.dailyPlans);
+  const { data: shifts } = useAppSelector((state: any) => state.shifts);
 
   // filters
   const [filterDate, setFilterDate] = useState(formatLocalDateString(new Date()));
@@ -87,7 +95,7 @@ const DailyProductionPlanningPage: React.FC = () => {
   const handleApplyFilters = () => {
     setFilterDate(draftFilterDate);
     setFilterStatus(draftFilterStatus);
-    setFilterMachine(draftFilterMachine);
+    setDraftFilterMachine(filterMachine);
   };
 
   const handleClearFilters = () => {
@@ -106,11 +114,15 @@ const DailyProductionPlanningPage: React.FC = () => {
   };
 
   // View Modal
+  const [showStatusModal, setShowStatusModal] = useState(false);
+  const [showStopModal, setShowStopModal] = useState(false);
+  const [reportPlan, setReportPlan] = useState<any>(null);
   const [showViewModal, setShowViewModal] = useState(false);
   const [viewPlan, setViewPlan] = useState<any>(null);
   const [viewHourlyLogs, setViewHourlyLogs] = useState<any[]>([]);
   const [loadingViewLogs, setLoadingViewLogs] = useState(false);
   const [viewPlanOeeSummary, setViewPlanOeeSummary] = useState<any>(null);
+  const [machineProductCapacity, setMachineProductCapacity] = useState<number | null>(null);
   const [weeklyProgram, setWeeklyProgram] = useState<any>(null);
   const [loadingWeekly, setLoadingWeekly] = useState(false);
   const [poHistoryPlans, setPOHistoryPlans] = useState<any[]>([]);
@@ -125,14 +137,12 @@ const DailyProductionPlanningPage: React.FC = () => {
   const [deletePlanId, setDeletePlanId] = useState<string | null>(null);
 
   // Status Change Confirm Modal
-  const [showStatusModal, setShowStatusModal] = useState(false);
   const [statusChangePlan, setStatusChangePlan] = useState<any>(null);
   const [statusChangingTo, setStatusChangingTo] = useState("");
   const [statusModalTitle, setStatusModalTitle] = useState("");
   const [statusModalMessage, setStatusModalMessage] = useState("");
 
   // Stop Production Modal State
-  const [showStopModal, setShowStopModal] = useState(false);
   const [stopPlan, setStopPlan] = useState<any>(null);
   const [stopReason, setStopReason] = useState("");
   const [isStopping, setIsStopping] = useState(false);
@@ -175,6 +185,12 @@ const DailyProductionPlanningPage: React.FC = () => {
     loadDailyPlans();
   }, [loadDailyPlans, location.key]);
 
+  useSocketSync("dailyPlan", {
+    created: dailyPlanCreated,
+    updated: dailyPlanUpdated,
+    deleted: dailyPlanDeleted,
+  });
+
   // ──────────────────────────────────────────────────────────────
   // Filtered data
   // ──────────────────────────────────────────────────────────────
@@ -189,9 +205,9 @@ const DailyProductionPlanningPage: React.FC = () => {
 
   const allPlans = useMemo(() => Array.isArray(dailyPlans) ? dailyPlans : [], [dailyPlans]);
 
-  // Active plans: hide SHORT_CLOSED (force-stopped) — they live in the closed panel
+  // Active plans: show all plans, including short-closed/stopped ones
   const filteredPlans = useMemo(() =>
-    allPlans.filter((p: any) => !isShortClosed(p))
+    allPlans
   , [allPlans]);
 
   // Short-closed plans: COMPLETED but produced < planned
@@ -212,12 +228,14 @@ const DailyProductionPlanningPage: React.FC = () => {
     return filteredPlans.slice(startIndex, startIndex + itemsPerPage);
   }, [filteredPlans, currentPage]);
 
+
+  console.log({filteredPlans});
   const totalPages = Math.ceil(filteredPlans.length / itemsPerPage);
 
   // Stats (active plans only)
   const stats = useMemo(() => {
     const total = filteredPlans.length;
-    const planned = filteredPlans.filter((p: any) => p.status === "PLANNED" || p.status === "APPROVED").length;
+    const planned = filteredPlans.filter((p: any) => p.status === "PLANNED").length;
     const running = filteredPlans.filter((p: any) => p.status === "IN_PROGRESS").length;
     const completed = filteredPlans.filter((p: any) => p.status === "COMPLETED").length;
     const totalPlanned = filteredPlans.reduce((s: number, p: any) => s + Number(p.plannedQty || 0), 0);
@@ -259,8 +277,8 @@ const DailyProductionPlanningPage: React.FC = () => {
       return;
     }
 
-    const bypassIssueStatuses = ["MATERIAL_ISSUED", "IN_PROGRESS", "COMPLETED", "POST_PRODUCTION"];
-    if (nextStatus === "IN_PROGRESS" && !bypassIssueStatuses.includes(plan.productionOrder?.status)) {
+    if (nextStatus === "IN_PROGRESS" && (plan.status === "PLANNED" || plan.status === "DRAFT")) {
+      // Always show material issue modal when starting a daily plan so users can issue/re-issue raw materials
       setMaterialIssuePlan(plan);
       setShowMaterialIssueModal(true);
       return;
@@ -280,7 +298,7 @@ const DailyProductionPlanningPage: React.FC = () => {
       toast.success("Materials issued and production started!");
       loadDailyPlans();
     } catch (err: any) {
-      toast.error(err || "Failed to start production after material issue");
+      toast.error(err?.response?.data?.message || err || "Failed to start production after material issue");
     } finally {
       setMaterialIssuePlan(null);
       setShowMaterialIssueModal(false);
@@ -300,6 +318,10 @@ const DailyProductionPlanningPage: React.FC = () => {
     }
   };
 
+  const handleViewDailyPlan = useCallback((plan: any) => {
+    navigate(`/daily-machine-planning/view/${plan.dailyPlanId}`, { state: { plan } });
+  }, [navigate]);
+
   const handleStopProductionClick = (plan: any) => {
     setStopPlan(plan);
     setStopReason("");
@@ -317,13 +339,14 @@ const DailyProductionPlanningPage: React.FC = () => {
       const loggedHoursCount = Array.isArray(stopPlan.hourlyProductions)
         ? stopPlan.hourlyProductions.filter((h: any) => Number(h.hourIndex) > 0).length
         : 0;
+      const prefix = stopOption === "completed_stop" ? "Permanently Stopped" : "Short Closed";
       const updatedRemarks = stopPlan.remarks
-        ? `${stopPlan.remarks} | Stopped: ${stopReason.trim()}`
-        : `Stopped: ${stopReason.trim()}`;
+        ? `${stopPlan.remarks} | ${prefix}: ${stopReason.trim()}`
+        : `${prefix}: ${stopReason.trim()}`;
         
       const payload: any = {
         // Permanent stop → move to POST_PRODUCTION so produced qty can be dispatched
-        // Carry forward stop → mark as STOPPED so remaining qty can be carried to a new DP
+        // Stop Daily Plan Only → mark as STOPPED so remaining qty can be assigned later
         status: stopOption === "completed_stop" ? "POST_PRODUCTION" : "STOPPED",
         remarks: updatedRemarks,
         plannedHours: loggedHoursCount > 0 ? loggedHoursCount : stopPlan.plannedHours
@@ -346,14 +369,10 @@ const DailyProductionPlanningPage: React.FC = () => {
       const pendingQty = plannedQty > producedQty ? plannedQty - producedQty : 0;
 
       setShowStopModal(false);
-      const currentPlan = stopPlan;
       setStopPlan(null);
 
-      if (stopOption === "carry_forward" && pendingQty > 0) {
-        handleCarryForward(currentPlan, pendingQty);
-      } else {
-        loadDailyPlans();
-      }
+      // Reload plans, the user can manually assign the remaining quantity from the weekly targets page later
+      loadDailyPlans();
     } catch (err: any) {
       toast.error(err || "Failed to stop production");
     } finally {
@@ -377,66 +396,6 @@ const DailyProductionPlanningPage: React.FC = () => {
       }
     });
   };
-
-  // ──────────────────────────────────────────────────────────────
-  // View Hourly Logs + Weekly program data
-  // ──────────────────────────────────────────────────────────────
-  useEffect(() => {
-    if (!viewPlan || !showViewModal) {
-      setViewHourlyLogs([]);
-      setViewPlanOeeSummary(null);
-      setWeeklyProgram(null);
-      setPOHistoryPlans([]);
-      return;
-    }
-    setLoadingViewLogs(true);
-    apiClient.get(config.hourlyProduction.base, {
-      params: {
-        machineId: viewPlan.machineId,
-        shiftId: viewPlan.shiftId,
-        productionDate: viewPlan.productionDate?.split("T")[0],
-        productionOrderId: viewPlan.productionOrderId,
-      }
-    }).then(res => {
-      if (res.data?.success) setViewHourlyLogs((res.data.data || []).filter((h: any) => Number(h.hourIndex) > 0));
-      else setViewHourlyLogs([]);
-    }).catch(() => setViewHourlyLogs([])
-    ).finally(() => setLoadingViewLogs(false));
-
-    oeeService.getProductionOrderOee(viewPlan.productionOrderId)
-      .then((data: any) => setViewPlanOeeSummary(data))
-      .catch(() => setViewPlanOeeSummary(null));
-
-    // Fetch weekly program data if available
-    if (viewPlan.weeklyProgramId) {
-      setLoadingWeekly(true);
-      weeklyProgramService.getById(viewPlan.weeklyProgramId)
-        .then((res: any) => {
-          const data = res?.data || res;
-          setWeeklyProgram(data);
-        })
-        .catch(() => setWeeklyProgram(null))
-        .finally(() => setLoadingWeekly(false));
-    }
-
-    // Fetch all daily plans for the same Production Order (history)
-    if (viewPlan.productionOrderId) {
-      setLoadingPOHistory(true);
-      dailyPlanService.getAll({ productionOrderId: viewPlan.productionOrderId })
-        .then((res: any) => {
-          let plans: any[] = [];
-          if (Array.isArray(res)) plans = res;
-          else if (Array.isArray(res?.data)) plans = res.data;
-          else if (Array.isArray(res?.data?.dailyPlans)) plans = res.data.dailyPlans;
-          else if (Array.isArray(res?.dailyPlans)) plans = res.dailyPlans;
-          // Sort by date desc
-          plans.sort((a: any, b: any) => new Date(b.productionDate || 0).getTime() - new Date(a.productionDate || 0).getTime());
-          setPOHistoryPlans(plans);
-        })
-        .catch(() => setPOHistoryPlans([]))
-        .finally(() => setLoadingPOHistory(false));
-    }
-  }, [viewPlan, showViewModal]);
 
   // ──────────────────────────────────────────────────────────────
   // Navigate to Log Hourly Production for this plan
@@ -615,22 +574,41 @@ const DailyProductionPlanningPage: React.FC = () => {
         return (
           <div className="flex flex-col items-center gap-1">
             <div className="flex items-center gap-1.5">
-              <StatusBadge status={plan.status === "COMPLETED" && producedQty < plannedQty ? "SHORT_CLOSED" : plan.status} />
-              {(plan.status === "STOPPED" || plan.status === "CANCELLED" || (plan.status === "COMPLETED" && producedQty < plannedQty)) && plan.remarks && (
+              <StatusBadge 
+                status={
+                  plan.productionOrder?.status === "COMPLETED_WITH_SHORTFALL" || (plan.remarks?.includes("Permanently Stopped:") && producedQty < plannedQty && ["POST_PRODUCTION", "COMPLETED"].includes(plan.status))
+                    ? "COMPLETED_WITH_SHORTFALL"
+                    : plan.status === "STOPPED" || plan.status === "SHORT_CLOSED" || (plan.remarks?.includes("Short Closed:") && producedQty < plannedQty && ["POST_PRODUCTION", "COMPLETED"].includes(plan.status))
+                    ? "SHORT_CLOSED"
+                    : plan.status === "COMPLETED"
+                    ? (["DISPATCHED", "PARTIAL_COMPLETED", "READY_FOR_DISPATCH"].includes(plan.productionOrder?.status) ? plan.productionOrder.status : "COMPLETED")
+                    : plan.status
+                }
+                customText={
+                  plan.productionOrder?.status === "COMPLETED_WITH_SHORTFALL" || (plan.remarks?.includes("Permanently Stopped:") && producedQty < plannedQty && ["POST_PRODUCTION", "COMPLETED"].includes(plan.status))
+                    ? "Permanently Stopped" 
+                    : plan.status === "STOPPED" || plan.status === "SHORT_CLOSED" || (plan.remarks?.includes("Short Closed:") && producedQty < plannedQty && ["POST_PRODUCTION", "COMPLETED"].includes(plan.status))
+                    ? "Short Closed"
+                    : plan.status === "COMPLETED"
+                    ? "Ready for Dispatch"
+                    : undefined
+                }
+              />
+              {(plan.status === "STOPPED" || plan.status === "SHORT_CLOSED" || plan.status === "CANCELLED" || (plan.status === "COMPLETED" && (plan.remarks?.includes("Short Closed:") || plan.remarks?.includes("Permanently Stopped:")))) && plan.remarks && (
                 <div className="group relative flex items-center cursor-pointer">
                   <FaInfoCircle className="text-rose-400 text-[13px] hover:text-rose-600 transition-colors" />
                   <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-52 p-2.5 bg-slate-800 text-white text-xs rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-20 shadow-xl text-left">
                     <span className="font-bold text-amber-400 block mb-1">Reason:</span>
                     <div>
-                      {plan.remarks.includes("Stopped:") || plan.remarks.includes("Cancelled:")
-                        ? plan.remarks.split("|").pop()?.replace("Stopped:", "")?.replace("Cancelled:", "").trim()
+                      {plan.remarks.includes("Permanently Stopped:") || plan.remarks.includes("Short Closed:") || plan.remarks.includes("Stopped:") || plan.remarks.includes("Cancelled:")
+                        ? plan.remarks.split("|").pop()?.replace("Permanently Stopped:", "")?.replace("Short Closed:", "")?.replace("Stopped:", "")?.replace("Cancelled:", "").trim()
                         : plan.remarks}
                     </div>
                   </div>
                 </div>
               )}
             </div>
-            {activeStepName && (
+            {activeStepName && plan.productionOrder?.status !== "COMPLETED_WITH_SHORTFALL" && (
               <span className="bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded text-[9px] font-bold border border-indigo-100 uppercase tracking-wide">
                 {activeStepName}
               </span>
@@ -648,13 +626,19 @@ const DailyProductionPlanningPage: React.FC = () => {
           ? plan.hourlyProductions.reduce((sum: number, h: any) => sum + Number(h.qtyProduced || 0), 0)
           : 0;
         const pendingQty = plannedQty > producedQty ? plannedQty - producedQty : 0;
+        // Count how many actual hourly slots have been logged (hourIndex > 0)
+        const loggedHoursCount = Array.isArray(plan.hourlyProductions)
+          ? plan.hourlyProductions.filter((h: any) => Number(h.hourIndex) > 0).length
+          : 0;
+        const plannedHoursCount = Number(plan.plannedHours || 0);
+        const allHoursLogged = plannedHoursCount > 0 && loggedHoursCount >= plannedHoursCount;
         const nextStatus = STATUS_FLOW[plan.status]?.next;
         let canAdvance = !!nextStatus && plan.status !== "COMPLETED" && plan.status !== "CANCELLED";
         if (plan.status === "IN_PROGRESS") canAdvance = canAdvance && (producedQty >= plannedQty);
         const canLog = plan.status === "IN_PROGRESS";
         const alreadyCarriedForward = Array.isArray(plan.carryForwardTo) && plan.carryForwardTo.length > 0;
-        // Carry forward ONLY for STOPPED plans — not for SHORT_CLOSED (COMPLETED with shortfall)
-        const _canCarryForward = plan.status === "STOPPED" && pendingQty > 0 && !alreadyCarriedForward;
+        // Carry forward for STOPPED and SHORT_CLOSED plans
+        const _canCarryForward = (plan.status === "STOPPED" || plan.status === "SHORT_CLOSED") && pendingQty > 0 && !alreadyCarriedForward;
 
         let targetNextStatus = STATUS_FLOW[plan.status]?.next;
         let dynamicActionTitle = NEXT_ACTION_LABELS[plan.status] || `Move to ${nextStatus}`;
@@ -699,17 +683,20 @@ const DailyProductionPlanningPage: React.FC = () => {
           }
         }
 
-        if (plan.status === "IN_PROGRESS" && producedQty >= plannedQty) {
+        if (plan.status === "IN_PROGRESS" && producedQty > 0) {
           targetNextStatus = "POST_PRODUCTION";
-          dynamicActionTitle = "Move to Post Production";
+          dynamicActionTitle = allHoursLogged
+            ? "Move to Post Production"
+            : `Move to Post Production (${loggedHoursCount}/${plannedHoursCount} hrs logged)`;
           dynamicActionIcon = FaArrowRight;
           dynamicActionVariant = "info";
           dynamicModalTitle = "Move to Post Production";
           dynamicModalMessage = `Complete manufacturing and move to Post Production phase?`;
-          canAdvance = true;
+          // Only allow advancing to post production when ALL planned hours have been logged
+          canAdvance = allHoursLogged;
         }
 
-        if (plan.status === "STOPPED" && producedQty > 0) {
+        if ((plan.status === "STOPPED" || plan.status === "SHORT_CLOSED") && producedQty > 0) {
           targetNextStatus = "POST_PRODUCTION";
           dynamicActionTitle = "Move to Post Production";
           dynamicActionIcon = FaArrowRight;
@@ -719,24 +706,54 @@ const DailyProductionPlanningPage: React.FC = () => {
           canAdvance = true;
         }
 
-        // SHORT_CLOSED: force-stopped plan — can still do post production for the produced qty
-        if (plan.status === "COMPLETED" && producedQty < plannedQty && producedQty > 0) {
-          targetNextStatus = "POST_PRODUCTION";
-          dynamicActionTitle = "Move to Post Production";
-          dynamicActionIcon = FaArrowRight;
-          dynamicActionVariant = "info";
-          dynamicModalTitle = "Move to Post Production";
-          dynamicModalMessage = `This plan was force-stopped with ${producedQty} pcs produced. Move to Post Production for dispatch?`;
-          canAdvance = true;
+        // SHORT_CLOSED: force-stopped plan — can still do post production for the produced qty if not already completed
+        const isPermanentlyStopped = plan.productionOrder?.status === "COMPLETED_WITH_SHORTFALL" || plan.status === "COMPLETED" || plan.status === "COMPLETED_WITH_SHORTFALL";
+        if (isPermanentlyStopped && plan.currentProductionStep !== "Completed" && producedQty > 0) {
+          const customSteps = plan.productionOrder?.productItem?.productionSteps || [];
+          if (customSteps.length > 0) {
+            // Already in post-production steps technically, we should show the step buttons
+            canAdvance = true;
+            const totalStepsCount = customSteps.length;
+            const currentIndex = plan.currentStepIndex || 1;
+            const currentStepName = currentIndex > 0 && currentIndex <= totalStepsCount ? customSteps[currentIndex - 1]?.stepKey : "Post Production";
+            const isLastStep = currentIndex >= totalStepsCount;
+
+            if (!isLastStep) {
+              const nextStepName = customSteps[currentIndex].stepKey;
+              targetNextStatus = "NEXT_STEP";
+              dynamicActionTitle = `Complete ${currentStepName} & Next (${nextStepName})`;
+              dynamicActionIcon = FaArrowRight;
+              dynamicActionVariant = "info";
+              dynamicModalTitle = `Advance Step (${nextStepName})`;
+              dynamicModalMessage = `Complete step "${currentStepName}" and advance to "${nextStepName}"?`;
+            } else {
+              targetNextStatus = "COMPLETED";
+              dynamicActionTitle = `Complete Final Step (${currentStepName}) & Finish Production`;
+              dynamicActionIcon = FaCheckCircle;
+              dynamicActionVariant = "success";
+              dynamicModalTitle = "Complete Production";
+              dynamicModalMessage = `Complete final post-production step "${currentStepName}" and mark production order as ready for dispatch?`;
+            }
+          } else {
+            targetNextStatus = "COMPLETED";
+            dynamicActionTitle = "Complete Production";
+            dynamicActionIcon = FaCheckCircle;
+            dynamicActionVariant = "success";
+            dynamicModalTitle = "Complete Production";
+            dynamicModalMessage = `This plan was force-stopped with ${producedQty} pcs produced. Complete production to make it ready for dispatch?`;
+            canAdvance = true;
+          }
         }
 
         return (
           <div className="flex items-center justify-end gap-1 pr-2" onClick={e => e.stopPropagation()}>
-            <ViewButton onClick={() => { setViewPlan(plan); setShowViewModal(true); }} />
-            {canLog && (
+            {can("daily-machine-planning.view") && (
+              <ViewButton onClick={() => handleViewDailyPlan(plan)} />
+            )}
+            {canLog && (can("hourly-work-reports.create") || can("daily-machine-planning.edit")) && (
               <IconButton variant="primary" title="Log Hourly Production" icon={FaClipboardList} onClick={() => handleLogHourly(plan)} />
             )}
-            {canAdvance && (
+            {canAdvance && can("daily-machine-planning.edit") && (
               <IconButton
                 variant={dynamicActionVariant}
                 title={dynamicActionTitle}
@@ -744,16 +761,15 @@ const DailyProductionPlanningPage: React.FC = () => {
                 onClick={() => handleStatusAdvance(plan, producedQty, targetNextStatus as any, dynamicModalTitle as any, dynamicModalMessage as any)}
               />
             )}
-            {!["COMPLETED", "CANCELLED", "STOPPED"].includes(plan.status) && (
+            {!["COMPLETED", "CANCELLED", "STOPPED", "SHORT_CLOSED", "POST_PRODUCTION"].includes(plan.status) && 
+            plan.productionOrder?.status !== "COMPLETED_WITH_SHORTFALL" && 
+            plan.productionOrder?.status !== "CLOSED" && can("daily-machine-planning.edit") && (
               <IconButton variant="danger" title="Stop Production" icon={FaStop} onClick={() => handleStopProductionClick(plan)} />
             )}
-            {(plan.status === "DRAFT" || plan.status === "PLANNED") && (
+            {(plan.status === "DRAFT" || plan.status === "PLANNED") && can("daily-machine-planning.edit") && (
               <IconButton variant="info" title="Edit Plan" icon={FaEdit} onClick={() => openEditForm(plan)} />
             )}
-            {/* {canCarryForward && (
-              <IconButton variant="warning" title={`Carry Forward ${pendingQty} pcs`} icon={FaShare} onClick={() => handleCarryForward(plan, pendingQty)} />
-            )} */}
-            {(plan.status === "DRAFT" || plan.status === "CANCELLED") && (
+            {(plan.status === "DRAFT" || plan.status === "CANCELLED") && can("daily-machine-planning.delete") && (
               <DeleteButton onClick={() => { setDeletePlanId(plan.dailyPlanId); setShowDeleteModal(true); }} />
             )}
           </div>
@@ -783,6 +799,73 @@ const DailyProductionPlanningPage: React.FC = () => {
   const weeklyOrderProducedQty = viewPlanOeeSummary?.producedQty ?? weeklyProducedQty;
   const weeklyOrderPct = weeklyOrderTargetQty > 0 ? Math.min(100, Math.round((weeklyOrderProducedQty / weeklyOrderTargetQty) * 100)) : 0;
   const weeklyProgramPct = weeklyTargetQty > 0 ? Math.min(100, Math.round((weeklyOrderProducedQty / weeklyTargetQty) * 100)) : 0;
+
+  const poHistoryColumns: DataTableColumn<any>[] = useMemo(() => [
+    {
+      header: "Plan ID",
+      render: (plan: any) => {
+        const isCurrent = plan.dailyPlanId === viewPlan?.dailyPlanId;
+        return (
+          <span className={`font-mono text-xs font-semibold ${isCurrent ? "text-indigo-700" : "text-slate-700"}`}>
+            {plan.dailyPlanId}
+            {isCurrent && <span className="ml-1.5 text-[9px] bg-indigo-100 text-indigo-600 px-1.5 py-0.5 rounded font-bold uppercase">Current</span>}
+          </span>
+        );
+      }
+    },
+    {
+      header: "Date",
+      render: (plan: any) => (
+        <span className="text-xs text-slate-600">
+          {plan.productionDate ? new Date(plan.productionDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—"}
+        </span>
+      )
+    },
+    {
+      header: "Machine",
+      render: (plan: any) => (
+        <span className="text-xs text-slate-600">
+          {plan.machine?.machineName || plan.machineId || "—"}
+        </span>
+      )
+    },
+    {
+      header: "Shift",
+      render: (plan: any) => (
+        <span className="text-[10px] bg-slate-100 text-slate-600 border border-slate-200 px-2 py-0.5 rounded font-medium">
+          {plan.shift?.shiftName || plan.shiftId || "—"}
+        </span>
+      )
+    },
+    {
+      header: "Planned",
+      align: "center",
+      render: (plan: any) => (
+        <span className="text-xs font-semibold text-slate-700">
+          {Number(plan.plannedQty || 0).toLocaleString()}
+        </span>
+      )
+    },
+    {
+      header: "Produced",
+      align: "center",
+      render: (plan: any) => {
+        const producedQty = Array.isArray(plan.hourlyProductions)
+          ? plan.hourlyProductions.reduce((s: number, h: any) => s + Number(h.qtyProduced || 0), 0)
+          : 0;
+        return (
+          <span className={`text-xs font-bold ${producedQty >= Number(plan.plannedQty || 0) ? "text-emerald-600" : producedQty > 0 ? "text-amber-600" : "text-slate-400"}`}>
+            {producedQty.toLocaleString()}
+          </span>
+        );
+      }
+    },
+    {
+      header: "Status",
+      align: "center",
+      render: (plan: any) => <StatusBadge status={plan.status} />
+    }
+  ], [viewPlan?.dailyPlanId]);
 
   return (
     <div className="p-4 md:p-6 min-h-screen bg-white">
@@ -839,8 +922,23 @@ const DailyProductionPlanningPage: React.FC = () => {
               </div>
             </FilterPopover>
 
-            <CustomButton text="New Production Order" icon={FaPlus} onClick={() => navigate("/production-orders/create")} />
-            <CustomButton text="New Daily Plan" icon={FaPlus} onClick={openCreateForm} />
+            {can("production_orders.create") && (
+              <CustomButton text="New Production Order" icon={FaPlus} onClick={() => navigate("/production-orders/create")} />
+            )}
+            {can("daily-machine-planning.view") && (
+              <CustomButton text="Daily Report" icon={FaChartBar} onClick={() => {
+                navigate("/daily-machine-planning/report", {
+                  state: {
+                    dailyPlans,
+                    machines,
+                    shifts
+                  }
+                });
+              }} />
+            )}
+            {can("daily-machine-planning.create") && (
+              <CustomButton text="New Daily Plan" icon={FaPlus} onClick={openCreateForm} />
+            )}
           </div>
         </div>
 
@@ -887,443 +985,8 @@ const DailyProductionPlanningPage: React.FC = () => {
           />
         </div>
 
-        {/* Short-Closed Plans (Force Stopped) — collapsed section */}
-        {closedPlans.length > 0 && (
-          <div className="rounded-xl shadow-sm border border-orange-200 overflow-hidden">
-            <button
-              className="w-full flex items-center justify-between px-5 py-3.5 bg-orange-50 hover:bg-orange-100 transition-colors text-left"
-              onClick={() => setShowClosedPlans(v => !v)}
-            >
-              <div className="flex items-center gap-2.5">
-                <span className="inline-flex items-center gap-1.5 bg-orange-100 text-orange-700 text-xs font-bold px-2.5 py-1 rounded-full border border-orange-200">
-                  <FaStop size={9} />&nbsp;Short Closed Plans
-                </span>
-                <span className="text-xs text-orange-600">
-                  {closedPlans.length} plan{closedPlans.length > 1 ? 's' : ''} &mdash; force-stopped before target reached
-                </span>
-              </div>
-              <span className="text-orange-400 text-xs font-semibold mr-1">
-                {showClosedPlans ? '▲ Hide' : '▼ Show'}
-              </span>
-            </button>
-            {showClosedPlans && (
-              <div className="bg-white">
-                <DataTable
-                  columns={columns}
-                  data={closedPlans}
-                  rowKey={(row: any) => row.dailyPlanId}
-                  density="compact"
-                  emptyMessage={<div className="text-center py-6 text-slate-400 text-sm">No short-closed plans</div>}
-                />
-              </div>
-            )}
-          </div>
-        )}
-
-
-
-        {/* ─────── View Modal ─────── */}
-        {showViewModal && viewPlan && (
-          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl flex flex-col max-h-[92vh] overflow-hidden">
-              {/* Header */}
-              <div className="px-6 py-4 border-b border-slate-200 flex justify-between items-start flex-shrink-0">
-                <div>
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 bg-indigo-600 rounded-lg flex items-center justify-center flex-shrink-0">
-                      <FaIndustry className="text-white" size={16} />
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-bold text-slate-800 leading-tight">Daily Plan — {viewPlan.dailyPlanId}</h3>
-                      <p className="text-xs text-slate-500 mt-0.5">{viewPlan.productionDate?.split("T")[0]} · {viewPlan.machine?.machineName || viewPlan.machineId} · {viewPlan.shift?.shiftName || viewPlan.shiftId}</p>
-                    </div>
-                  </div>
-                </div>
-                <button
-                  onClick={() => { setShowViewModal(false); setViewPlan(null); }}
-                  className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors flex-shrink-0"
-                >
-                  <FaTimes size={16} />
-                </button>
-              </div>
-
-              {/* Body */}
-              <div className="flex-1 overflow-y-auto p-6 space-y-5">
-
-                {/* ── Weekly Production Target Progress ── */}
-                {viewPlan.weeklyProgramId && (
-                  <div className="rounded-xl border border-indigo-100 bg-gradient-to-br from-indigo-50 to-blue-50 p-4">
-                    <div className="flex items-center gap-2 mb-3">
-                      <FaChartBar className="text-indigo-500" size={14} />
-                      <h6 className="text-xs font-bold text-indigo-700 uppercase tracking-wider m-0">Weekly Target Progress</h6>
-                      <span className="ml-auto text-[10px] text-indigo-400 font-mono bg-white/60 px-2 py-0.5 rounded border border-indigo-100">
-                        {viewPlan.weeklyProgramId}
-                      </span>
-                    </div>
-
-                    {loadingWeekly ? (
-                      <div className="flex items-center gap-2 text-sm text-indigo-400">
-                        <div className="w-4 h-4 border-2 border-indigo-300 border-t-transparent rounded-full animate-spin" />
-                        Loading weekly data...
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        {/* Production Order Target */}
-                        <div>
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="text-xs font-semibold text-slate-600">Production Order Target</span>
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs text-slate-500">{weeklyOrderProducedQty.toLocaleString()} / {weeklyOrderTargetQty.toLocaleString()} pcs</span>
-                              <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${weeklyOrderPct >= 100 ? "bg-emerald-100 text-emerald-700" : weeklyOrderPct >= 50 ? "bg-indigo-100 text-indigo-700" : "bg-amber-100 text-amber-700"}`}>
-                                {weeklyOrderPct}%
-                              </span>
-                            </div>
-                          </div>
-                          <div className="h-2 bg-white/60 rounded-full overflow-hidden border border-indigo-100">
-                            <div
-                              className={`h-full rounded-full transition-all ${weeklyOrderPct >= 100 ? "bg-emerald-500" : weeklyOrderPct >= 50 ? "bg-indigo-500" : "bg-amber-400"}`}
-                              style={{ width: `${weeklyOrderPct}%` }}
-                            />
-                          </div>
-                          <div className="flex justify-between mt-1">
-                            <span className="text-[10px] text-slate-400">Produced: <strong className="text-emerald-600">{weeklyOrderProducedQty.toLocaleString()}</strong></span>
-                            <span className="text-[10px] text-slate-400">Remaining: <strong className="text-amber-600">{Math.max(0, weeklyOrderTargetQty - weeklyOrderProducedQty).toLocaleString()}</strong></span>
-                          </div>
-                        </div>
-
-                        {/* Weekly Program Target (if available) */}
-                        {weeklyTargetQty > 0 && (
-                          <div className="pt-2 border-t border-indigo-100/60">
-                            <div className="flex items-center justify-between mb-1">
-                              <span className="text-xs font-semibold text-slate-600">Weekly Program Target</span>
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs text-slate-500">{weeklyOrderProducedQty.toLocaleString()} / {weeklyTargetQty.toLocaleString()} pcs</span>
-                                <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${weeklyProgramPct >= 100 ? "bg-emerald-100 text-emerald-700" : weeklyProgramPct >= 50 ? "bg-blue-100 text-blue-700" : "bg-rose-100 text-rose-700"}`}>
-                                  {weeklyProgramPct}%
-                                </span>
-                              </div>
-                            </div>
-                            <div className="h-2 bg-white/60 rounded-full overflow-hidden border border-indigo-100">
-                              <div
-                                className={`h-full rounded-full transition-all ${weeklyProgramPct >= 100 ? "bg-emerald-500" : weeklyProgramPct >= 50 ? "bg-blue-500" : "bg-rose-400"}`}
-                                style={{ width: `${weeklyProgramPct}%` }}
-                              />
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Completion status chips */}
-                        <div className="flex flex-wrap gap-2 pt-1">
-                          {weeklyOrderPct >= 100 ? (
-                            <span className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2.5 py-1 rounded-full border border-emerald-200">
-                              <FaCheckCircle size={9} /> Weekly Target Complete!
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-700 text-[10px] font-bold px-2.5 py-1 rounded-full border border-amber-200">
-                              <FaBoxOpen size={9} /> {Math.max(0, weeklyOrderTargetQty - weeklyOrderProducedQty).toLocaleString()} pcs remaining to complete
-                            </span>
-                          )}
-                          {viewPlan.productionOrder?.status === "COMPLETED" && (
-                            <span className="inline-flex items-center gap-1 bg-indigo-100 text-indigo-700 text-[10px] font-bold px-2.5 py-1 rounded-full border border-indigo-200">
-                              <FaTruck size={9} /> Ready for Dispatch
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* ── Plan Details Grid ── */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="rounded-xl border border-slate-200 p-4 bg-slate-50/40">
-                    <h6 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3">Plan Details</h6>
-                    <dl className="space-y-2 text-sm">
-                      {[
-                        { label: "Production Order", value: viewPlan.productionOrderId },
-                        { label: "Product", value: viewPlan.productionOrder?.productItem?.productName || "—" },
-                        { label: "Date", value: viewPlan.productionDate?.split("T")[0] },
-                        { label: "Machine", value: viewPlan.machine?.machineName || viewPlan.machineId },
-                        { label: "Shift", value: viewPlan.shift?.shiftName || viewPlan.shiftId },
-                      ].map(({ label, value }) => (
-                        <div key={label} className="flex items-start gap-2">
-                          <dt className="text-slate-500 font-medium w-36 flex-shrink-0">{label}:</dt>
-                          <dd className="text-slate-800 font-semibold">{value}</dd>
-                        </div>
-                      ))}
-                    </dl>
-                  </div>
-                  <div className="rounded-xl border border-slate-200 p-4 bg-slate-50/40">
-                    <h6 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3">Quantities & Status</h6>
-                    <dl className="space-y-2 text-sm">
-                      <div className="flex items-start gap-2">
-                        <dt className="text-slate-500 font-medium w-36 flex-shrink-0">Planned Qty:</dt>
-                        <dd className="text-slate-800 font-semibold">{viewPlan.plannedQty} pcs</dd>
-                      </div>
-                      <div className="flex items-start gap-2">
-                        <dt className="text-slate-500 font-medium w-36 flex-shrink-0">Planned Hours:</dt>
-                        <dd className="text-slate-800 font-semibold">{viewPlan.plannedHours || "—"} hrs</dd>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <dt className="text-slate-500 font-medium w-36 flex-shrink-0">Priority:</dt>
-                        <dd><StatusBadge status={viewPlan.priority || "MEDIUM"} /></dd>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <dt className="text-slate-500 font-medium w-36 flex-shrink-0">Status:</dt>
-                        <dd><StatusBadge status={viewPlan.status} /></dd>
-                      </div>
-                      {viewPlan.remarks && (
-                        <div className="flex items-start gap-2">
-                          <dt className="text-slate-500 font-medium w-36 flex-shrink-0">Remarks:</dt>
-                          <dd className="text-slate-700 text-xs leading-relaxed">{viewPlan.remarks}</dd>
-                        </div>
-                      )}
-                    </dl>
-                  </div>
-                </div>
-
-                {/* ── Post Production Steps ── */}
-                {viewPlan.productionOrder?.productItem?.productionSteps?.length > 0 && (
-                  <div className="border border-slate-200 rounded-xl overflow-hidden">
-                    <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-200">
-                      <h6 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider m-0">Post Production Steps</h6>
-                    </div>
-                    <div className="p-4 flex flex-wrap gap-2 items-center">
-                      {viewPlan.productionOrder.productItem.productionSteps.map((step: any, idx: number) => {
-                        const stepNum = idx + 1;
-                        const currentStep = viewPlan.currentStepIndex || 1;
-                        let isCompleted = false;
-                        let isActive = false;
-
-                        if (viewPlan.status === "COMPLETED" || viewPlan.status === "READY_FOR_DISPATCH") {
-                          isCompleted = true;
-                        } else if (viewPlan.status === "POST_PRODUCTION") {
-                          isCompleted = stepNum < currentStep;
-                          isActive = stepNum === currentStep;
-                        } else if (viewPlan.status === "STOPPED" || viewPlan.status === "CANCELLED") {
-                          isCompleted = stepNum < currentStep;
-                        }
-
-                        const badgeColors = isCompleted
-                          ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                          : isActive
-                          ? "bg-indigo-50 text-indigo-700 border-indigo-200"
-                          : "bg-slate-50 text-slate-400 border-slate-200";
-
-                        const dotColors = isCompleted
-                          ? "bg-emerald-500 text-white"
-                          : isActive
-                          ? "bg-indigo-600 text-white"
-                          : "bg-slate-300 text-slate-500";
-
-                        return (
-                          <React.Fragment key={step.id || idx}>
-                            <span className={`px-3 py-1.5 font-semibold text-xs rounded-lg border flex items-center gap-1.5 ${badgeColors}`}>
-                              <span className={`w-4 h-4 flex items-center justify-center rounded-full text-[9px] font-bold ${dotColors}`}>
-                                {step.stepOrder || stepNum}
-                              </span>
-                              {step.stepKey}
-                            </span>
-                            {idx < viewPlan.productionOrder.productItem.productionSteps.length - 1 && (
-                              <FaArrowRight className="text-slate-300 text-[10px]" />
-                            )}
-                          </React.Fragment>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {/* ── Hourly Production Logs ── */}
-                <div>
-                  <h6 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Hourly Production Entries</h6>
-                  {loadingViewLogs ? (
-                    <div className="flex items-center justify-center gap-2 py-8 border border-slate-200 rounded-xl bg-slate-50 text-slate-400 text-sm">
-                      <div className="w-5 h-5 border-2 border-indigo-300 border-t-transparent rounded-full animate-spin" />
-                      Loading entries...
-                    </div>
-                  ) : viewHourlyLogs.length > 0 ? (
-                    <div className="border border-slate-200 rounded-xl overflow-hidden">
-                      <DataTable
-                        columns={[
-                          { header: "Hour", align: "center", render: (h: any) => <span className="font-bold font-mono text-slate-700 text-xs">H{h.hourIndex}</span> },
-                          { header: "Produced", align: "center", render: (h: any) => <span className="font-bold text-emerald-600 text-sm">{h.qtyProduced}</span> },
-                          { header: "Reject", align: "center", render: (h: any) => <span className="text-rose-500 text-sm">{h.rejectQty || 0}</span> },
-                          { header: "Scrap", align: "center", render: (h: any) => <span className="text-amber-500 text-sm">{h.scrapQty || 0}</span> },
-                          { header: "Downtime", align: "center", render: (h: any) => <span className="text-slate-500 text-xs">{h.downtime > 0 ? `${h.downtime} min` : "—"}</span> },
-                          { header: "Avail%", align: "center", render: (h: any) => <span className="font-semibold text-emerald-700 text-xs">{h.availabilityPct !== undefined ? `${h.availabilityPct}%` : '—'}</span> },
-                          { header: "Qual%", align: "center", render: (h: any) => <span className="font-semibold text-purple-700 text-xs">{h.qualityPct !== undefined ? `${h.qualityPct}%` : '—'}</span> },
-                          { header: "OEE%", align: "center", render: (h: any) => <span className="font-extrabold text-indigo-700 text-xs">{h.hourlyOEE !== undefined ? `${h.hourlyOEE}%` : '—'}</span> },
-                          { header: "Operator", render: (h: any) => <span className="text-slate-600 font-medium text-xs truncate max-w-[120px] inline-block" title={h.operatorName || h.operatorId}>{h.operatorName || h.operatorId || "—"}</span> }
-                        ]}
-                        data={viewHourlyLogs}
-                        rowKey={(h: any) => h.hourlyProductionId}
-                        minHeightClassName="min-h-0"
-                      />
-                      {/* Totals Footer */}
-                      <div className="bg-slate-50 p-4 border-t border-slate-200 space-y-3">
-                        <div className="flex flex-wrap items-center justify-between gap-3 text-sm font-bold">
-                          <span className="text-slate-500 text-xs uppercase tracking-wider">Totals:</span>
-                          <div className="flex flex-wrap gap-4 text-xs">
-                            <span className="text-emerald-600">✓ Produced: {viewHourlyLogs.reduce((s: any, h: any) => s + Number(h.qtyProduced || 0), 0)}</span>
-                            <span className="text-rose-500">✕ Reject: {viewHourlyLogs.reduce((s: any, h: any) => s + Number(h.rejectQty || 0), 0)}</span>
-                            <span className="text-amber-500">⚠ Scrap: {viewHourlyLogs.reduce((s: any, h: any) => s + Number(h.scrapQty || 0), 0)}</span>
-                            <span className="text-slate-500">↓ Downtime: {(() => { const t = viewHourlyLogs.reduce((s: any, h: any) => s + Number(h.downtime || 0), 0); return t > 0 ? `${t} min` : "—"; })()}</span>
-                          </div>
-                        </div>
-                        <div className="flex flex-wrap items-center justify-between gap-3 text-xs pt-2 border-t border-slate-200 border-dashed">
-                          <div className="flex gap-4 font-bold">
-                            <span className="text-slate-700">Total Produced: <span className="text-emerald-600 ml-1">{viewPlanOeeSummary?.producedQty ?? viewHourlyLogs.reduce((s: any, h: any) => s + Number(h.qtyProduced || 0), 0)} pcs</span></span>
-                            <span className="text-slate-700">Pending: <span className="text-amber-500 ml-1">{viewPlanOeeSummary?.remainingQty ?? (Number(viewPlan.plannedQty) - viewHourlyLogs.reduce((s: any, h: any) => s + Number(h.qtyProduced || 0), 0))} pcs</span></span>
-                          </div>
-                          {viewPlan.carryForwardTo && viewPlan.carryForwardTo.length > 0 && (
-                            <div className="flex items-center gap-2">
-                              <span className="text-slate-400 uppercase tracking-wider text-[10px]">Carried Forward To:</span>
-                              <span className="text-indigo-700 font-bold bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100 flex items-center gap-1 text-xs">
-                                <FaShare className="text-[9px]" />
-                                {viewPlan.carryForwardTo[0].dailyPlanId}
-                                <span className="text-indigo-400 font-normal ml-1">({viewPlan.carryForwardTo[0].productionDate?.split('T')[0]})</span>
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col items-center justify-center py-10 border border-slate-200 rounded-xl bg-slate-50 text-center">
-                      <FaClipboardList className="text-slate-200 mb-2" size={32} />
-                      <span className="text-slate-400 font-medium text-sm">No hourly entries recorded yet for this plan.</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* ── Production Order History ── */}
-                <div className="border border-slate-200 rounded-xl overflow-hidden">
-                  <div className="px-4 py-3 bg-gradient-to-r from-slate-700 to-slate-800 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <FaClipboardList className="text-slate-300" size={13} />
-                      <h6 className="text-[11px] font-bold text-white uppercase tracking-wider m-0">Production Order History</h6>
-                      <span className="text-[10px] text-slate-400 font-mono bg-slate-900/40 px-2 py-0.5 rounded border border-slate-600">
-                        {viewPlan.productionOrderId}
-                      </span>
-                    </div>
-                    {!loadingPOHistory && (
-                      <span className="text-[10px] text-slate-400 bg-slate-900/30 px-2 py-0.5 rounded">
-                        {poHistoryPlans.length} plan{poHistoryPlans.length !== 1 ? "s" : ""}
-                      </span>
-                    )}
-                  </div>
-
-                  {loadingPOHistory ? (
-                    <div className="flex items-center justify-center gap-2 py-6 bg-slate-50 text-slate-400 text-sm">
-                      <div className="w-4 h-4 border-2 border-slate-300 border-t-transparent rounded-full animate-spin" />
-                      Loading history...
-                    </div>
-                  ) : poHistoryPlans.length > 0 ? (
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="bg-slate-50 border-b border-slate-200">
-                            <th className="px-4 py-2.5 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">Plan ID</th>
-                            <th className="px-4 py-2.5 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">Date</th>
-                            <th className="px-4 py-2.5 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">Machine</th>
-                            <th className="px-4 py-2.5 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">Shift</th>
-                            <th className="px-4 py-2.5 text-center text-[10px] font-bold text-slate-500 uppercase tracking-wider">Planned</th>
-                            <th className="px-4 py-2.5 text-center text-[10px] font-bold text-slate-500 uppercase tracking-wider">Produced</th>
-                            <th className="px-4 py-2.5 text-center text-[10px] font-bold text-slate-500 uppercase tracking-wider">Status</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                          {poHistoryPlans.map((plan: any) => {
-                            const producedQty = Array.isArray(plan.hourlyProductions)
-                              ? plan.hourlyProductions.reduce((s: number, h: any) => s + Number(h.qtyProduced || 0), 0)
-                              : 0;
-                            const isCurrent = plan.dailyPlanId === viewPlan.dailyPlanId;
-                            return (
-                              <tr
-                                key={plan.dailyPlanId}
-                                className={`hover:bg-slate-50 transition-colors ${isCurrent ? "bg-indigo-50/60 border-l-2 border-l-indigo-500" : ""}`}
-                              >
-                                <td className="px-4 py-2.5">
-                                  <span className={`font-mono text-xs font-semibold ${isCurrent ? "text-indigo-700" : "text-slate-700"}`}>
-                                    {plan.dailyPlanId}
-                                    {isCurrent && <span className="ml-1.5 text-[9px] bg-indigo-100 text-indigo-600 px-1.5 py-0.5 rounded font-bold uppercase">Current</span>}
-                                  </span>
-                                </td>
-                                <td className="px-4 py-2.5 text-xs text-slate-600">
-                                  {plan.productionDate ? new Date(plan.productionDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—"}
-                                </td>
-                                <td className="px-4 py-2.5 text-xs text-slate-600">
-                                  {plan.machine?.machineName || plan.machineId || "—"}
-                                </td>
-                                <td className="px-4 py-2.5">
-                                  <span className="text-[10px] bg-slate-100 text-slate-600 border border-slate-200 px-2 py-0.5 rounded font-medium">
-                                    {plan.shift?.shiftName || plan.shiftId || "—"}
-                                  </span>
-                                </td>
-                                <td className="px-4 py-2.5 text-center text-xs font-semibold text-slate-700">
-                                  {Number(plan.plannedQty || 0).toLocaleString()}
-                                </td>
-                                <td className="px-4 py-2.5 text-center">
-                                  <span className={`text-xs font-bold ${producedQty >= Number(plan.plannedQty || 0) ? "text-emerald-600" : producedQty > 0 ? "text-amber-600" : "text-slate-400"}`}>
-                                    {producedQty.toLocaleString()}
-                                  </span>
-                                </td>
-                                <td className="px-4 py-2.5 text-center">
-                                  <StatusBadge status={plan.status} />
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                        <tfoot>
-                          <tr className="bg-slate-50 border-t border-slate-200">
-                            <td colSpan={4} className="px-4 py-2.5 text-xs font-bold text-slate-600">Total</td>
-                            <td className="px-4 py-2.5 text-center text-xs font-bold text-slate-800">
-                              {poHistoryPlans.reduce((s: number, p: any) => s + Number(p.plannedQty || 0), 0).toLocaleString()}
-                            </td>
-                            <td className="px-4 py-2.5 text-center text-xs font-bold text-emerald-700">
-                              {poHistoryPlans.reduce((s: number, p: any) => {
-                                const produced = Array.isArray(p.hourlyProductions)
-                                  ? p.hourlyProductions.reduce((ss: number, h: any) => ss + Number(h.qtyProduced || 0), 0) : 0;
-                                return s + produced;
-                              }, 0).toLocaleString()}
-                            </td>
-                            <td />
-                          </tr>
-                        </tfoot>
-                      </table>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col items-center justify-center py-8 bg-slate-50 text-center">
-                      <FaCalendarAlt className="text-slate-200 mb-2" size={24} />
-                      <span className="text-slate-400 font-medium text-xs">No other daily plans found for this production order.</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-
-              {/* Footer */}
-              <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 flex justify-end gap-3 flex-shrink-0">
-                {(viewPlan.status === "APPROVED" || viewPlan.status === "IN_PROGRESS") && (
-                  <button
-                    className="flex items-center gap-2 px-5 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium text-sm shadow-sm"
-                    onClick={() => { setShowViewModal(false); handleLogHourly(viewPlan); }}
-                  >
-                    <FaClipboardList size={13} /> Log Hourly Entry
-                  </button>
-                )}
-                <button
-                  className="px-5 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors font-medium text-sm shadow-sm"
-                  onClick={() => { setShowViewModal(false); setViewPlan(null); }}
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+  
+        {/* ─────── View Modal Removed ─────── */}
 
         {/* ─────── Stop Production Modal ─────── */}
         <CommonModal

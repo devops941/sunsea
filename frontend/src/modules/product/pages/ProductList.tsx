@@ -22,12 +22,15 @@ import { employeeService } from "../../../services/employeeService";
 import { departmentService } from "../../../services/departmentService";
 import { shiftService } from "../../../services/shiftService";
 import { machineService } from "../../../services/machineService";
+import { useSocketSync } from "../../../hooks/useSocketSync";
+import { usePermission } from "../../../hooks/usePermission";
 
 const ITEMS_PER_PAGE = 10;
 
 const ProductList: React.FC = () => {
     const navigate = useNavigate();
     const { products, loading, error, loadProducts, removeProduct } = useProducts();
+    const { can } = usePermission();
 
     const [showViewModal, setShowViewModal] = useState(false);
     const [selectedProduct, setSelectedProduct] = useState<any>(null);
@@ -63,38 +66,55 @@ const ProductList: React.FC = () => {
     const [machines, setMachines] = useState<any[]>([]);
 
     useEffect(() => {
-        employeeService.fetchAll({ limit: 500 }).then((res: any) => {
-            const data = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : Array.isArray(res?.employees) ? res.employees : [];
-            setEmployees(data);
-        }).catch(() => { });
-        departmentService.fetchAll().then((res: any) => {
-            const depts = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
-            setDepartments(depts);
-        }).catch(() => { });
-        shiftService.fetchAll().then((res: any) => {
-            const data = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
-            setShifts(data);
-        }).catch(() => { });
-        machineService.getAll().then((res: any) => {
-            const data = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
-            setMachines(data);
-        }).catch((err: any) => {
-            console.error("Failed to fetch machines:", err);
-        });
-    }, []);
+        if (can("products.view")) {
+            employeeService.fetchAll({ limit: 500 }).then((res: any) => {
+                const data = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : Array.isArray(res?.employees) ? res.employees : [];
+                setEmployees(data);
+            }).catch(() => { });
+            departmentService.fetchAll().then((res: any) => {
+                const depts = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
+                setDepartments(depts);
+            }).catch(() => { });
+            shiftService.fetchAll().then((res: any) => {
+                const data = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
+                setShifts(data);
+            }).catch(() => { });
+            machineService.getAll().then((res: any) => {
+                const data = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
+                setMachines(data);
+            }).catch((err: any) => {
+                console.error("Failed to fetch machines:", err);
+            });
+        }
+    }, [can]);
 
     useEffect(() => {
         const timer = setTimeout(() => {
-            loadProducts(searchTerm);
+            if (can("products.view")) {
+                loadProducts(searchTerm);
+            }
         }, 500);
         return () => clearTimeout(timer);
-    }, [searchTerm, loadProducts]);
+    }, [searchTerm, loadProducts, can]);
 
     useEffect(() => {
         if (error) {
             toast.error(error);
         }
     }, [error]);
+
+    useSocketSync("productCapacityHistory", undefined, () => {
+        if (showViewModal && selectedProduct) {
+            productCapacityHistoryService.fetchByProduct(Number(selectedProduct.id))
+                .then(records => setCapacityRecords(records))
+                .catch(() => setCapacityRecords([]));
+        }
+        if (showCapModal && capProduct) {
+            productCapacityHistoryService.fetchByProduct(Number(capProduct.id))
+                .then(records => setCapHistoryRecords(records))
+                .catch(() => setCapHistoryRecords([]));
+        }
+    });
 
     const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
         setSearchTerm(e.target.value);
@@ -250,9 +270,9 @@ const ProductList: React.FC = () => {
             render: (product) => (
                 <div className="table-action-group w-full justify-end">
                     <ViewButton onClick={() => handleView(product)} />
-                    <EditButton onClick={() => handleEdit(product)} />
-                    <IconButton icon={FaCog} variant="primary" title="Capacity Settings" onClick={() => openCapModal(product)} />
-                    <DeleteButton onClick={() => triggerDelete(product.id)} />
+                    {can("products.edit") && <EditButton onClick={() => handleEdit(product)} />}
+                    {can("products.edit") && <IconButton icon={FaCog} variant="primary" title="Capacity Settings" onClick={() => openCapModal(product)} />}
+                    {can("products.delete") && <DeleteButton onClick={() => triggerDelete(product.id)} />}
                 </div>
             ),
             align: "right"
@@ -279,7 +299,7 @@ const ProductList: React.FC = () => {
                                     onChange={handleSearch}
                                 />
                             </div>
-                            <CustomButton text="Add Product" icon={FaPlus} onClick={() => navigate("/products/create")} />
+                            {can("products.create") && <CustomButton text="Add Product" icon={FaPlus} onClick={() => navigate("/products/create")} />}
                         </div>
                     </div>
 
@@ -427,7 +447,7 @@ const ProductList: React.FC = () => {
                                                             groups[r.machineId].push(r);
                                                         }
                                                     });
-                                                    return machineOrder.map((machineId, _gIdx) => {
+                                                    return machineOrder.map((machineId) => {
                                                         const machineObj = machines.find((m: any) => m.machineId === machineId);
                                                         const machineName = machineObj?.machineName || machineId;
                                                         return (

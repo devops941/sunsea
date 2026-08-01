@@ -13,11 +13,13 @@ import { weeklyProgramService } from "../../../services/weeklyProgramService";
 import { productionOrderService } from "../../../services/productionOrderService";
 import BackButton from "../../../components/ui/BackButton/BackButton";
 import DatePickerCalendar from "../../../components/ui/DatePickerCalendar/DatePickerCalendar";
+import { usePermission } from "../../../hooks/usePermission";
 
 const WeeklyMachineScheduleCreate: React.FC = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const dispatch = useAppDispatch();
+    const { can } = usePermission();
 
     const [weekStartDate, setWeekStartDate] = useState("");
     const [weekEndDate, setWeekEndDate] = useState("");
@@ -112,10 +114,12 @@ const WeeklyMachineScheduleCreate: React.FC = () => {
     }, [weekStartDate]);
 
     const displayOrders = useMemo(() => {
+        const scheduledPoIds = new Set(alreadyScheduled.map((item: any) => item.productionOrderId));
         return productionOrders.filter((po: any) => {
-            return po.status === "RM_AVAILABLE" || po.status === "READY_FOR_PLANNING" || po.status === "SCHEDULE_DELETED";
+            const isReadyStatus = po.status === "RM_AVAILABLE" || po.status === "READY_FOR_PLANNING" || po.status === "SCHEDULE_DELETED";
+            return isReadyStatus && !scheduledPoIds.has(po.productionOrderId);
         });
-    }, [productionOrders]);
+    }, [productionOrders, alreadyScheduled]);
 
     const handleToggleSelect = (poId: string) => {
         setSelectedOrders(prev => ({ ...prev, [poId]: !prev[poId] }));
@@ -239,7 +243,7 @@ const WeeklyMachineScheduleCreate: React.FC = () => {
                         <div className="p-0">
                             {loadingPo ? (
                                 <div className="text-center p-10 text-slate-500">Loading...</div>
-                            ) : displayOrders.length > 0 ? (
+                            ) : (displayOrders.length > 0 || alreadyScheduled.length > 0) ? (
                                 <div className="overflow-x-auto">
                                     <table className="w-full text-left text-sm text-slate-600">
                                         <thead className="bg-slate-50 border-b border-slate-200 text-slate-700">
@@ -305,12 +309,14 @@ const WeeklyMachineScheduleCreate: React.FC = () => {
                         {selectedCount > 0 && (
                             <div className="flex justify-end items-center gap-3 p-6 border-t border-slate-200 bg-slate-50 rounded-b-2xl">
                                 <span className="font-bold text-primary">{selectedCount} Selected</span>
-                                <CustomButton
-                                    text={isSubmitting ? "Saving..." : "Confirm & Save Allocation"}
-                                    icon={FaSave}
-                                    onClick={handleSubmit}
-                                    disabled={isSubmitting}
-                                />
+                                {can("weekly_programs.create") && (
+                                    <CustomButton
+                                        text={isSubmitting ? "Saving..." : "Confirm & Save Allocation"}
+                                        icon={FaSave}
+                                        onClick={handleSubmit}
+                                        disabled={isSubmitting}
+                                    />
+                                )}
                             </div>
                         )}
                     </div>

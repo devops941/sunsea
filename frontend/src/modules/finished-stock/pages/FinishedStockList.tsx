@@ -2,7 +2,8 @@ import React, { useState, useEffect, useCallback } from "react";
 import { toast } from "react-toastify";
 
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
-import { fetchFinishedGoodsStocks } from "../../../features/finished-goods-stock/finishedGoodsStockSlice";
+import { fetchFinishedGoodsStocks, finishedGoodsStockCreated, finishedGoodsStockUpdated, finishedGoodsStockDeleted } from "../../../features/finished-goods-stock/finishedGoodsStockSlice";
+import { useSocketSync } from "../../../hooks/useSocketSync";
 
 
 import ViewButton from "../../../components/ui/viewbutton/ViewButton";
@@ -62,6 +63,12 @@ const FinishedStockList: React.FC<FinishedStockListProps> = ({ storeId: propStor
             toast.error(error);
         }
     }, [error]);
+
+    useSocketSync("finishedGoodsStock", {
+        created: finishedGoodsStockCreated,
+        updated: finishedGoodsStockUpdated,
+        deleted: finishedGoodsStockDeleted,
+    });
 
     const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
         setSearchTerm(e.target.value);

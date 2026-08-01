@@ -344,6 +344,21 @@ model WhatsappConfig {
   @@map("whatsapp_configs")
 }
 
+model EmailConfig {
+  id            String   @id @default(uuid()) @db.Uuid
+  smtpHost      String   @db.VarChar(200)
+  smtpPort      Int
+  smtpUsername  String   @db.VarChar(200)
+  smtpPassword  String   @db.VarChar(200)
+  fromEmail     String   @db.VarChar(200)
+  fromName      String   @db.VarChar(160)
+  encryption    String   @default("TLS") @db.VarChar(20)
+  createdAt     DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt     DateTime @updatedAt @db.Timestamptz(6)
+
+  @@map("email_configs")
+}
+
 model BusinessPlace {
   id           BigInt            @id @default(autoincrement())
   companyId    String            @db.Uuid

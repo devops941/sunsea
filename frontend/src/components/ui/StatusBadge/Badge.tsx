@@ -54,6 +54,7 @@ const statusColors: Record<string, { bg: string; text: string }> = {
     COMPLETED: { bg: '#d1fae5', text: '#065f46' },                 // Green - Completed
     SHORT_CLOSED: { bg: '#ffedd5', text: '#c2410c' },              // Orange - closed without hitting target
     PARTIAL_COMPLETED: { bg: '#e0f2fe', text: '#0284c7' },         // Light Blue
+    COMPLETED_WITH_SHORTFALL: { bg: '#fee2e2', text: '#b91c1c' },  // Red-orange - Stopped with shortfall
     CANCELLED: { bg: '#f3e8ff', text: '#6b21a8' },                 // Purple - cancelled
 
     // ========== LEGACY/COMMON STATUSES (for other modules) ==========

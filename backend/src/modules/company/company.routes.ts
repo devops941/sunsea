@@ -1,6 +1,7 @@
 import { Router } from "express";
 import companyController from "./company.controller";
 import { authMiddleware } from "../../middleware/auth.middleware";
+import { requirePermission } from "../../middleware/permission.middleware";
 import { uploadProductImage } from "../../middleware/upload.middleware";
 
 const router = Router();
@@ -12,6 +13,6 @@ router.get("/", companyController.getCompany);
 router.use(authMiddleware);
 
 // Update company details
-router.put("/:id", uploadProductImage.fields([{ name: "logo", maxCount: 1 }, { name: "favicon", maxCount: 1 }]), companyController.updateCompany);
+router.put("/:id", requirePermission("company-settings.edit"), uploadProductImage.fields([{ name: "logo", maxCount: 1 }, { name: "favicon", maxCount: 1 }]), companyController.updateCompany);
 
 export default router;

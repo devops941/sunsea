@@ -157,6 +157,10 @@ const config = {
         base: "/product-capacity-history",
     },
 
+    email: {
+        base: "/email-config"
+    }
+
 
 }
 export default config;

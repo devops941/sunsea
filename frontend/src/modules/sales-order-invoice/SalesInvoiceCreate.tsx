@@ -246,7 +246,7 @@ const SalesInvoiceForm: React.FC = () => {
           }));
           setPayments(legacyPayments);
         })
-        .catch((_err) => {
+        .catch(() => {
           toast.error("Failed to load sales invoice details");
           navigate("/sales-invoices");
         });
@@ -256,9 +256,9 @@ const SalesInvoiceForm: React.FC = () => {
   // ---- Load dropdown data + next invoice number preview ----
   useEffect(() => {
     Promise.all([
-      customerService.fetchAll(),
-      productService.fetchAll(),
-      invoiceSettingsService.getConfig(),
+      customerService.fetchAll().catch(() => []),
+      productService.fetchAll().catch(() => []),
+      invoiceSettingsService.getConfig().catch(() => null),
       salesInvoiceService.fetchAll({ pageSize: 100 }).catch(() => ({ data: [] } as any)),
       salesOrderService.fetchAll({ pageSize: 100, status: "IN_PRODUCTION" as SalesOrderStatus }).catch(() => ({ data: [] } as any)),
       finishedGoodsStockService.fetchAll().catch(() => []),
@@ -568,7 +568,7 @@ const SalesInvoiceForm: React.FC = () => {
       if (l.itemId && l.qty > 0) {
         const available = stockMap.get(l.itemId) || 0;
         if (l.qty > available) {
-          errs.lines = `Stock not available for ${l.itemName} (Available: ${available})`;
+          errs.lines = `Stock not available for ${l.itemName} (Available: ${Math.round(available * 100) / 100})`;
           break; // Stop on first error
         }
       }
@@ -825,7 +825,7 @@ const SalesInvoiceForm: React.FC = () => {
                         />
                         {line.itemId && line.qty > (stockMap.get(line.itemId) || 0) && (
                           <div className="text-red-500 text-[10px] mt-1 font-medium whitespace-nowrap">
-                            Available: {stockMap.get(line.itemId) || 0}
+                            Available: {Math.round((stockMap.get(line.itemId) || 0) * 100) / 100}
                           </div>
                         )}
                       </td>

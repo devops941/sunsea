@@ -1,9 +1,11 @@
 import { z } from "zod";
 
+import { PRODUCTION_STATUS } from "../../utils/status-sync.util";
+
 /**
  * Production Order Status Enum
  */
-export const ProductionOrderStatusEnum = z.enum(["DRAFT", "PLANNED", "IN_PROGRESS", "COMPLETED", "CANCELLED", "ON_HOLD"]);
+export const ProductionOrderStatusEnum = z.enum(Object.keys(PRODUCTION_STATUS) as [string, ...string[]]);
 export type ProductionOrderStatus = z.infer<typeof ProductionOrderStatusEnum>;
 
 export const productionOrderBodyShape = z.object({
@@ -74,7 +76,7 @@ export const productionOrderBodyShape = z.object({
     .string()
     .max(20)
     .optional()
-    .default("PLANNED"),
+    .default(PRODUCTION_STATUS.CREATED),
 
   remarks: z
     .string()

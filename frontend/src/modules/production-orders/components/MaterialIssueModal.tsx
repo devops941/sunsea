@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { FaTimes, FaPlus } from "react-icons/fa";
+import { FaTimes, FaPlus, FaTrash } from "react-icons/fa";
 import { toast } from "react-toastify";
 import { productionOrderService } from "../../../services/productionOrderService";
 import { storeService } from "../../../services/storeService";
@@ -7,6 +7,7 @@ import { rawMaterialService } from "../../../services/rawMaterialService";
 import CustomButton from "../../../components/ui/Button/Button";
 import TextInput from "../../../components/form/TextInput/TextInput";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
+import { dailyPlanService } from "../../../services/dailyPlanService";
 
 interface MaterialIssueModalProps {
     show: boolean;
@@ -52,6 +53,7 @@ export const MaterialIssueModal: React.FC<MaterialIssueModalProps> = ({
         rmError: string;
         qtyError: string;
         isExtra: boolean;
+        reusedQtyInfo?: string; // Information about reused materials
     }>>([]);
 
     useEffect(() => {
@@ -69,50 +71,119 @@ export const MaterialIssueModal: React.FC<MaterialIssueModalProps> = ({
 
     useEffect(() => {
         if (show && rawMaterials) {
-            const items = rawMaterials.map((rm) => {
-                const stockRm = rawMaterialsMap.get(rm.rawMaterialId?.toString());
+            // Fetch all plans for this PO to find unused material balances from past completed/stopped shifts
+            dailyPlanService.getAll({ productionOrderId })
+                .then((res: any) => {
+                    const plans = Array.isArray(res?.dailyPlans) ? res.dailyPlans : Array.isArray(res) ? res : [];
+                    
+                    // Filter completed/stopped plans
+                    const finishedStatuses = ["COMPLETED", "SHORT_CLOSED", "STOPPED", "POST_PRODUCTION", "PARTIAL_COMPLETED", "COMPLETED_WITH_SHORTFALL"];
+                    const pastPlans = plans.filter((p: any) => finishedStatuses.includes(p.status));
+                    
+                    // Sum up the unused planned quantities across past plans
+                    let totalUnusedPlannedQty = 0;
+                    pastPlans.forEach((p: any) => {
+                        const planned = Number(p.plannedQty || 0);
+                        const produced = Array.isArray(p.hourlyProductions)
+                            ? p.hourlyProductions.reduce((s: number, h: any) => s + Number(h.qtyProduced || 0), 0)
+                            : 0;
+                        if (planned > produced) {
+                            totalUnusedPlannedQty += (planned - produced);
+                        }
+                    });
 
-                // Calculate proportionate qty based on daily plan
-                let calculatedRequiredQty = Number(rm.requiredQty || 0);
-                if (dailyPlanQty && totalTargetQty && totalTargetQty > 0) {
-                    calculatedRequiredQty = (calculatedRequiredQty / totalTargetQty) * dailyPlanQty;
-                }
-                const reservedQty = Number(calculatedRequiredQty);
-                const storeId = stockRm?.storeId || defaultStoreId || "";
-                
-                // Since this issue is specifically for this production order, the stock reserved for it
-                // should be considered available to be issued.
-                const totalReserved = Number(stockRm?.reservedQty || 0);
-                const onHand = Number(stockRm?.onHandQty || 0);
-                const reservedForOther = Math.max(0, totalReserved - reservedQty);
-                const availableStock = stockRm 
-                    ? Math.max(0, onHand - reservedForOther) 
-                    : Number((rm as any).availableStock || 0);
+                    const items = rawMaterials.map((rm) => {
+                        const stockRm = rawMaterialsMap.get(rm.rawMaterialId?.toString());
+                        const totalPOQty = Number(rm.requiredQty || 0);
+                        const targetQty = Number(totalTargetQty || 0);
+                        const factor = targetQty > 0 ? (totalPOQty / targetQty) : 0;
 
-                let displayUom = stockRm?.baseUom?.split(',')[0] || (rm as any).uom || stockRm?.uom || "KG";
-                if (displayUom.toLowerCase() === 'ea' || displayUom.toLowerCase() === 'each') {
-                    displayUom = 'pcs';
-                }
+                        // Unused raw material balance still on floor/machine
+                        const unusedMaterialQty = totalUnusedPlannedQty * factor;
 
-                return {
-                    rawMaterialId: rm.rawMaterialId,
-                    materialName: rm.materialName || stockRm?.materialName || rm.rawMaterialId,
-                    reservedQty,
-                    qty: reservedQty,
-                    availableStock,
-                    storeId: storeId ? String(storeId) : "",
-                    remarks: "",
-                    uom: displayUom,
-                    remarkErrors: "",
-                    storeError: "",
-                    rmError: "",
-                    qtyError: "",
-                    isExtra: false,
-                };
-            });
-            setIssueItems(items);
+                        // Proportionate qty needed for this daily plan/shift
+                        const newPlannedRequiredMaterial = (dailyPlanQty || 0) * factor;
+
+                        // Final net qty to issue (deducting unused balance)
+                        const finalIssueQty = parseFloat(Math.max(0, newPlannedRequiredMaterial - unusedMaterialQty).toFixed(3));
+
+                        const storeId = stockRm?.storeId || defaultStoreId || "";
+                        const totalReserved = Number(stockRm?.reservedQty || 0);
+                        const onHand = Number(stockRm?.onHandQty || 0);
+                        const reservedForOther = Math.max(0, totalReserved - newPlannedRequiredMaterial);
+                        const availableStock = stockRm 
+                            ? Math.max(0, onHand - reservedForOther) 
+                            : Number((rm as any).availableStock || 0);
+
+                        let displayUom = stockRm?.baseUom?.split(',')[0] || (rm as any).uom || stockRm?.uom || "KG";
+                        if (displayUom.toLowerCase() === 'ea' || displayUom.toLowerCase() === 'each') {
+                            displayUom = 'pcs';
+                        }
+
+                        let reusedQtyInfo = "";
+                        if (unusedMaterialQty > 0) {
+                            reusedQtyInfo = `${unusedMaterialQty.toFixed(2)} ${displayUom} unused from previous shift, issuing ${finalIssueQty.toFixed(2)} ${displayUom} (instead of ${newPlannedRequiredMaterial.toFixed(2)} ${displayUom})`;
+                        }
+
+                        return {
+                            rawMaterialId: rm.rawMaterialId,
+                            materialName: rm.materialName || stockRm?.materialName || rm.rawMaterialId,
+                            reservedQty: newPlannedRequiredMaterial,
+                            qty: finalIssueQty,
+                            availableStock,
+                            storeId: storeId ? String(storeId) : "",
+                            remarks: unusedMaterialQty > 0 ? `Unused balance of ${unusedMaterialQty.toFixed(2)} ${displayUom} from past shift adjusted.` : "",
+                            uom: displayUom,
+                            remarkErrors: "",
+                            storeError: "",
+                            rmError: "",
+                            qtyError: "",
+                            isExtra: false,
+                            reusedQtyInfo,
+                        };
+                    });
+                    setIssueItems(items);
+                })
+                .catch((err) => {
+                    console.error("Failed to load plans for unused balance calculations", err);
+                    // Fallback to simple proportionate calculation if API fails
+                    const items = rawMaterials.map((rm) => {
+                        const stockRm = rawMaterialsMap.get(rm.rawMaterialId?.toString());
+                        let calculatedRequiredQty = Number(rm.requiredQty || 0);
+                        if (dailyPlanQty && totalTargetQty && totalTargetQty > 0) {
+                            calculatedRequiredQty = (calculatedRequiredQty / totalTargetQty) * dailyPlanQty;
+                        }
+                        const reservedQty = Number(calculatedRequiredQty);
+                        const storeId = stockRm?.storeId || defaultStoreId || "";
+                        const totalReserved = Number(stockRm?.reservedQty || 0);
+                        const onHand = Number(stockRm?.onHandQty || 0);
+                        const reservedForOther = Math.max(0, totalReserved - reservedQty);
+                        const availableStock = stockRm ? Math.max(0, onHand - reservedForOther) : Number((rm as any).availableStock || 0);
+
+                        let displayUom = stockRm?.baseUom?.split(',')[0] || (rm as any).uom || stockRm?.uom || "KG";
+                        if (displayUom.toLowerCase() === 'ea' || displayUom.toLowerCase() === 'each') displayUom = 'pcs';
+
+                        return {
+                            rawMaterialId: rm.rawMaterialId,
+                            materialName: rm.materialName || stockRm?.materialName || rm.rawMaterialId,
+                            reservedQty,
+                            qty: reservedQty,
+                            availableStock,
+                            storeId: storeId ? String(storeId) : "",
+                            remarks: "",
+                            uom: displayUom,
+                            remarkErrors: "",
+                            storeError: "",
+                            rmError: "",
+                            qtyError: "",
+                            isExtra: false,
+                        };
+                    });
+                    setIssueItems(items);
+                });
         }
-    }, [show, rawMaterials, rawMaterialsMap, defaultStoreId, dailyPlanQty, totalTargetQty]);
+    }, [show, rawMaterials, rawMaterialsMap, defaultStoreId, dailyPlanQty, totalTargetQty, productionOrderId]);
+
 
     const handleQtyChange = (idx: number, val: string) => {
         const value = val === "" ? 0 : Number(val);
@@ -160,6 +231,14 @@ export const MaterialIssueModal: React.FC<MaterialIssueModalProps> = ({
                 qtyError: "",
                 isExtra: true,
             });
+            return copy;
+        });
+    };
+
+    const removeRow = (idx: number) => {
+        setIssueItems((prev) => {
+            const copy = [...prev];
+            copy.splice(idx, 1);
             return copy;
         });
     };
@@ -278,8 +357,8 @@ export const MaterialIssueModal: React.FC<MaterialIssueModalProps> = ({
                             </div>
                         )}
 
-                        <div className="border border-slate-200 rounded-xl overflow-visible shadow-sm">
-                            <table className="w-full text-left text-sm text-slate-600">
+                        <div className="border border-slate-200 rounded-xl overflow-x-auto shadow-sm">
+                            <table className="w-full min-w-[800px] text-left text-sm text-slate-600">
                                 <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 font-semibold">
                                     <tr>
                                         <th className="px-4 py-3 w-36">Store Location</th>
@@ -290,6 +369,7 @@ export const MaterialIssueModal: React.FC<MaterialIssueModalProps> = ({
                                         <th className="px-4 py-3">
                                             Remarks <span className="text-red-500 font-bold">*</span>
                                         </th>
+                                        <th className="px-4 py-3 w-12 text-center"></th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
@@ -331,6 +411,11 @@ export const MaterialIssueModal: React.FC<MaterialIssueModalProps> = ({
                                                     <>
                                                         <div className="font-bold text-slate-800">{item.materialName}</div>
                                                         <div className="text-xs text-slate-500 mt-0.5">{item.rawMaterialId}</div>
+                                                        {item.reusedQtyInfo && (
+                                                            <div className="text-xs text-emerald-600 font-medium mt-1 bg-emerald-50 px-2 py-1 rounded border border-emerald-100">
+                                                                {item.reusedQtyInfo}
+                                                            </div>
+                                                        )}
                                                     </>
                                                 )}
                                             </td>
@@ -363,6 +448,18 @@ export const MaterialIssueModal: React.FC<MaterialIssueModalProps> = ({
                                                     required
                                                     bottom
                                                 />
+                                            </td>
+                                            <td className="px-4 py-3 text-center">
+                                                {item.isExtra && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => removeRow(idx)}
+                                                        className="text-red-500 hover:text-red-700 hover:bg-red-50 p-2 rounded-full transition-colors focus:outline-none"
+                                                        title="Remove Row"
+                                                    >
+                                                        <FaTrash size={14} />
+                                                    </button>
+                                                )}
                                             </td>
                                         </tr>
                                     ))}

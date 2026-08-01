@@ -2,10 +2,16 @@ import { Request, Response } from "express";
 import rawMaterialStockService from "./raw-material-stock.service";
 import { ApiResponse } from "../../utils/ApiResponse";
 import { asyncHandler } from "../../utils/asyncHandler";
+import { getIO } from "../../socket/socket";
 
 class RawMaterialStockController {
   create = asyncHandler(async (req: Request, res: Response) => {
     const stock = await rawMaterialStockService.create(req.body);
+
+    const safeStock = JSON.parse(JSON.stringify(stock, (key, value) =>
+      typeof value === "bigint" ? value.toString() : value
+    ));
+    getIO().emit("rawMaterialStock:created", safeStock);
 
     return res.status(201).json(
       new ApiResponse("Raw Material Stock created successfully", stock)
@@ -40,6 +46,11 @@ class RawMaterialStockController {
       req.body
     );
 
+    const safeStock = JSON.parse(JSON.stringify(stock, (key, value) =>
+      typeof value === "bigint" ? value.toString() : value
+    ));
+    getIO().emit("rawMaterialStock:updated", safeStock);
+
     return res.status(200).json(
       new ApiResponse("Raw Material Stock updated successfully", stock)
     );
@@ -48,6 +59,8 @@ class RawMaterialStockController {
   delete = asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
     await rawMaterialStockService.delete(String(id));
+
+    getIO().emit("rawMaterialStock:deleted", { id: String(id) });
 
     return res.status(200).json(
       new ApiResponse("Raw Material Stock deleted successfully")

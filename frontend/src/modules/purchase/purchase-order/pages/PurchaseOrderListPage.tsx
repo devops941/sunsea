@@ -9,9 +9,10 @@ import EditButton from "../../../../components/ui/EditButton/EditButton";
 import DeleteButton from "../../../../components/ui/DeleteButton/DeleteButton";
 import CustomButton from "../../../../components/ui/Button/Button";
 import CommonConfirmModal from "../../../../components/ui/CommonConfirmModal/CommonConfirmModal";
+import EmailButton from "../../../../components/ui/EmailButton/EmailButton";
 import PurchaseOrderViewModal from "../components/PurchaseOrderViewModal";
 import { usePurchaseOrders } from "../../../../hooks/usePurchaseOrder";
-import { hasPermission } from "../../../../utils/permission";
+import { usePermission } from "../../../../hooks/usePermission";
 import { purchaseOrderService } from "../../../../services/purchaseOrderService";
 import type { PurchaseOrder, PurchaseOrderStatus } from "../../../../features/purchaseOrder/types";
 import { useSocketSync } from "../../../../hooks/useSocketSync";
@@ -38,16 +39,11 @@ const STATUS_COLORS: Record<PurchaseOrderStatus, string> = {
 const PurchaseOrderListPage: React.FC = () => {
   const navigate = useNavigate();
 
-  // Get user from Redux
-  const user = useSelector((state: any) => state?.auth?.user);
-
-  // TEMPORARY: Force show button for testing
-  const FORCE_SHOW_BUTTON = true;
-
-  // Real permission check
-  const canCreate = FORCE_SHOW_BUTTON || hasPermission("purchase_orders.create") || user?.role === "admin";
-  const canEdit = FORCE_SHOW_BUTTON || hasPermission("purchase_orders.edit") || user?.role === "admin";
-  const canDelete = FORCE_SHOW_BUTTON || hasPermission("purchase_orders.delete") || user?.role === "admin";
+  const company = useSelector((state: any) => state.company.data);
+  const { can } = usePermission();
+  const canCreate = can("purchaseOrders.create");
+  const canEdit = can("purchaseOrders.edit");
+  const canDelete = can("purchaseOrders.delete");
 
   const {
     removePurchaseOrder,
@@ -70,10 +66,15 @@ const PurchaseOrderListPage: React.FC = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [poToDelete, setPoToDelete] = useState<string | number | null>(null);
 
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [emailPo, setEmailPo] = useState<any | null>(null);
+  const [sendingEmail, setSendingEmail] = useState(false);
+
   const hasActiveFilters = !!(statusFilter || fromDate || toDate);
   const activeFilterCount = [statusFilter, fromDate, toDate].filter(Boolean).length;
 
   const fetchPOs = useCallback(async () => {
+    if (!can("purchaseOrders.view")) return;
     setLoading(true);
     try {
       const response = await purchaseOrderService.fetchAll({
@@ -108,7 +109,49 @@ const PurchaseOrderListPage: React.FC = () => {
 
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(e.target.value);
-    setCurrentPage(1);
+    setPoToDelete(null);
+  };
+
+  const handleOpenEmailModal = async (item: any) => {
+    try {
+      setSendingEmail(true);
+      const fullItem = await purchaseOrderService.fetchById(item.id);
+      setEmailPo(fullItem);
+      setShowEmailModal(true);
+    } catch (error: any) {
+      toast.error("Failed to load PO details");
+    } finally {
+      setSendingEmail(false);
+    }
+  };
+
+  const handleSendEmail = async () => {
+    if (!emailPo) return;
+    setSendingEmail(true);
+    try {
+      const recipientEmail = (emailPo.supplier as any)?.email;
+      if (!recipientEmail) {
+         toast.error("Supplier email is not available.");
+         setSendingEmail(false);
+         return;
+      }
+      const emailSubject = `Purchase Order Invoice - ${emailPo.poNumber}`;
+      const emailMessage = `Dear ${emailPo.supplier?.supplierName || "Supplier"},\n\nPlease find the attached Purchase Order invoice for your reference.\n\nBest regards,\n${company?.companyName || "Company"}`;
+      
+      await purchaseOrderService.emailPoInvoice(emailPo.id, {
+        to: recipientEmail,
+        subject: emailSubject,
+        message: emailMessage
+      });
+
+      toast.success("Email sent successfully!");
+      setShowEmailModal(false);
+      setEmailPo(null);
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || "Failed to send email");
+    } finally {
+      setSendingEmail(false);
+    }
   };
 
   const handleApplyFilters = () => {
@@ -238,16 +281,12 @@ const PurchaseOrderListPage: React.FC = () => {
             </FilterPopover>
 
 
-            {canCreate ? (
+            {canCreate && (
               <CustomButton
                 text="Create PO"
                 icon={FaPlus}
                 onClick={() => navigate("/purchase-orders/create")}
               />
-            ) : (
-              <span className="text-red-500 text-xs">
-                ⚠️ Create button hidden
-              </span>
             )}
           </div>
         </div >
@@ -298,29 +337,35 @@ const PurchaseOrderListPage: React.FC = () => {
                     {canEdit && item.status !== "COMPLETED" && item.status !== "CANCELLED" && (
                       <EditButton onClick={() => handleEdit(item)} />
                     )}
-                    {item.status === "OPEN" && (
-                      <button
-                        type="button"
-                        onClick={() => navigate(`/po-invoice/${item.id}`)}
-                        title="View PO Invoice Format"
-                        className="
-                          w-10 h-10
-                          flex items-center justify-center
-                          border-none rounded-xl
-                          cursor-pointer
-                          bg-emerald-500/[0.12]
-                          text-emerald-600
-                          transition-all duration-[250ms] ease-in-out
-                          hover:-translate-y-[3px]
-                          hover:bg-emerald-500/[0.22]
-                          hover:shadow-[0_8px_18px_rgba(16,185,129,0.18)]
-                          active:scale-95
-                          disabled:opacity-50
-                          disabled:cursor-not-allowed
-                        "
-                      >
-                        <FaFileInvoice className="text-[18px]" />
-                      </button>
+                    {item.status !== "REJECTED" && item.status !== "CANCELLED" && item.status !== "PENDING" && item.status !== "DRAFT" && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/po-invoice/${item.id}`)}
+                          title="View PO Invoice Format"
+                          className="
+                            w-10 h-10
+                            flex items-center justify-center
+                            border-none rounded-xl
+                            cursor-pointer
+                            bg-emerald-500/[0.12]
+                            text-emerald-600
+                            transition-all duration-[250ms] ease-in-out
+                            hover:-translate-y-[3px]
+                            hover:bg-emerald-500/[0.22]
+                            hover:shadow-[0_8px_18px_rgba(16,185,129,0.18)]
+                            active:scale-95
+                            disabled:opacity-50
+                            disabled:cursor-not-allowed
+                          "
+                        >
+                          <FaFileInvoice className="text-[17px] opacity-90" />
+                        </button>
+                        <EmailButton 
+                          onClick={() => handleOpenEmailModal(item)} 
+                          disabled={sendingEmail && emailPo?.id === item.id} 
+                        />
+                      </>
                     )}
                     {canDelete && item.status === "DRAFT" && (
                       <DeleteButton onClick={() => triggerDelete(item.id)} />
@@ -340,12 +385,23 @@ const PurchaseOrderListPage: React.FC = () => {
 
         <CommonConfirmModal
           show={showDeleteModal}
-          onHide={() => setShowDeleteModal(false)}
-          onConfirm={handleDeleteConfirm}
-          title="Confirm Delete"
-          message="Are you sure you want to delete this purchase order?"
+          title="Delete Purchase Order"
+          message="Are you sure you want to delete this purchase order? This action cannot be undone."
           confirmText="Delete"
           confirmVariant="danger"
+          onConfirm={handleDeleteConfirm}
+          onHide={() => setShowDeleteModal(false)}
+        />
+
+        {/* Email Confirmation Modal */}
+        <CommonConfirmModal
+          show={showEmailModal}
+          title="Send Email"
+          message={`Are you sure you want to send the PO Invoice for ${emailPo?.poNumber} to ${(emailPo?.supplier as any)?.email || "the supplier"}?`}
+          confirmText={sendingEmail ? "Sending..." : "Send Email"}
+          confirmVariant="primary"
+          onConfirm={handleSendEmail}
+          onHide={() => setShowEmailModal(false)}
         />
       </div >
     </div >

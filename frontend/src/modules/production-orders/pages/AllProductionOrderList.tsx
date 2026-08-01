@@ -6,23 +6,22 @@ import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import DataTable from "../../../components/ui/table/DataTable";
 import SearchInput from "../../../components/ui/SearchInput/SearchInput";
+import { useNavigate } from "react-router-dom";
 
-import ProductionOrderViewModal from "../components/ProductionOrderViewModal";
 import { productionOrderService } from "../../../services/productionOrderService";
 import type { ProductionOrder } from "../../../services/productionOrderService";
 import { rawMaterialService } from "../../../services/rawMaterialService";
+import { useSocketSync } from "../../../hooks/useSocketSync";
 
 const ITEMS_PER_PAGE = 10;
 
 const AllProductionOrderList: React.FC = () => {
+    const navigate = useNavigate();
     const [data, setData] = useState<ProductionOrder[]>([]);
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
     const [statusFilter, setStatusFilter] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
-
-    const [showViewModal, setShowViewModal] = useState(false);
-    const [selectedItem, setSelectedItem] = useState<ProductionOrder | null>(null);
 
     const [rawMaterialsMap, setRawMaterialsMap] = useState<Map<string, any>>(new Map());
 
@@ -67,6 +66,8 @@ const AllProductionOrderList: React.FC = () => {
         fetchOrders();
     }, [fetchOrders]);
 
+    useSocketSync("productionOrder", undefined, fetchOrders);
+
     const handleSearch = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
         setSearchTerm(e.target.value);
         setCurrentPage(1);
@@ -106,10 +107,9 @@ const AllProductionOrderList: React.FC = () => {
         });
     }, [data]);
 
-    const handleOpenView = useCallback((item: ProductionOrder) => {
-        setSelectedItem(item);
-        setShowViewModal(true);
-    }, []);
+    const handleOpenView = useCallback((item: any) => {
+        navigate(`/production-orders/history/view/${item.productionOrderId}`, { state: { order: item } });
+    }, [navigate]);
 
     const formatDate = (dateStr: string) => {
         if (!dateStr) return "N/A";
@@ -206,7 +206,7 @@ const AllProductionOrderList: React.FC = () => {
         // },
         {
             header: "STATUS",
-            render: (item: any) => <StatusBadge status={item.status === 'CANCELLED' ? 'DELETED' : (item.status || 'PLANNED')} />
+            render: (item: any) => <StatusBadge status={item.status || 'CREATED'} />
         },
         {
             header: "CREATED DATE",
@@ -244,14 +244,19 @@ const AllProductionOrderList: React.FC = () => {
                                 options={[
                                     { label: "All Statuses", value: "" },
                                     { label: "Draft", value: "DRAFT" },
-                                    { label: "Planned", value: "PLANNED" },
-                                    { label: "RM Pending", value: "RM_PENDING" },
-                                    { label: "RM Available", value: "RM_AVAILABLE" },
-                                    { label: "Scheduled", value: "SCHEDULED" },
-                                    { label: "Schedule Deleted", value: "SCHEDULE_DELETED" },
-                                    { label: "In Progress", value: "IN_PROGRESS" },
+                                    { label: "Created", value: "CREATED" },
+                                    { label: "Waiting For Material", value: "WAITING_FOR_MATERIAL" },
+                                    { label: "Ready For Planning", value: "READY_FOR_PLANNING" },
+                                    { label: "Weekly Scheduled", value: "WEEKLY_SCHEDULED" },
+                                    { label: "Daily Planned", value: "DAILY_PLANNED" },
+                                    { label: "In Production", value: "IN_PRODUCTION" },
+                                    { label: "Post Production", value: "POST_PRODUCTION" },
                                     { label: "Ready For Dispatch", value: "READY_FOR_DISPATCH" },
-                                    { label: "Completed", value: "COMPLETED" },
+                                    { label: "Partial Completed", value: "PARTIAL_COMPLETED" },
+                                    { label: "Completed With Shortfall", value: "COMPLETED_WITH_SHORTFALL" },
+                                    { label: "Closed", value: "CLOSED" },
+                                    { label: "Dispatched", value: "DISPATCHED" },
+                                    { label: "Cancelled", value: "CANCELLED" },
                                 ]}
                             />
                         </div>
@@ -277,13 +282,6 @@ const AllProductionOrderList: React.FC = () => {
                     }}
                 />
             </div>
-
-            <ProductionOrderViewModal
-                show={showViewModal}
-                onHide={() => setShowViewModal(false)}
-                order={selectedItem}
-                onSuccess={fetchOrders}
-            />
         </div>
     );
 };

@@ -8,9 +8,12 @@ import StoreTypeList from "../../store-types/pages/StoreTypeList";
 import StorageStoreList from "../../storage-stores/pages/StorageStoreList";
 import LocationList from "../../locations/pages/LocationList";
 
+import { usePermission } from "../../../hooks/usePermission";
+
 const StoreLocationTabs: React.FC = () => {
     const location = useLocation();
     const navigate = useNavigate();
+    const { can } = usePermission();
 
     // Map pathnames to tab keys
     const pathToKey: Record<string, string> = {
@@ -25,13 +28,23 @@ const StoreLocationTabs: React.FC = () => {
         "locations": "/locations"
     };
 
-    const activeTab = pathToKey[location.pathname] || "types";
-
-    const tabs: TabItem[] = [
+    const allTabs: TabItem[] = [
         { key: "stores", label: "Storage Stores", icon: <FaWarehouse />, content: <StorageStoreList /> },
         { key: "types", label: "Store Types", icon: <FaCogs />, content: <StoreTypeList /> },
         { key: "locations", label: "Locations", icon: <FaMapMarkerAlt />, content: <LocationList /> }
     ];
+
+    const tabs = allTabs.filter(tab => {
+        if (tab.key === "stores") return can("stores.view");
+        if (tab.key === "types") return can("store-types.view");
+        if (tab.key === "locations") return can("locations.view");
+        return false;
+    });
+
+    let activeTab = pathToKey[location.pathname] || "stores";
+    if (tabs.length > 0 && !tabs.find(t => t.key === activeTab)) {
+        activeTab = tabs[0].key;
+    }
 
     const handleTabChange = (key: string) => {
         const targetPath = keyToPath[key];

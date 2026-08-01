@@ -21,6 +21,7 @@ import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import CityStateSelect from "../../../components/ui/CityStateSelect/CityStateSelect";
 import DataTable from "../../../components/ui/table/DataTable";
 import { useSocketSync } from "../../../hooks/useSocketSync";
+import { usePermission } from "../../../hooks/usePermission";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -96,6 +97,7 @@ const locationSchema = z.object({
 const LocationList: React.FC = () => {
     const navigate = useNavigate();
     const dispatch = useAppDispatch();
+    const { can } = usePermission();
 
     const { data, loading, error, totalPages } = useAppSelector(state => state.locations);
     useEffect(() => { if (error) toast.error(error); }, [error]);
@@ -120,15 +122,19 @@ const LocationList: React.FC = () => {
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     const fetchLocationData = useCallback(() => {
-        dispatch(fetchLocations({
-            search: searchTerm,
-            locationType,
-            page: currentPage,
-            limit: ITEMS_PER_PAGE,
-            sortBy: "locationCode",
-            sortOrder: "asc",
-        }));
-    }, [dispatch, searchTerm, locationType, currentPage]);
+        if (can("locations.view")) {
+            dispatch(
+                fetchLocations({
+                    search: searchTerm,
+                    locationType: locationType,
+                    page: currentPage,
+                    limit: ITEMS_PER_PAGE,
+                    sortBy: "locationCode",
+                    sortOrder: "asc",
+                })
+            );
+        }
+    }, [dispatch, searchTerm, locationType, currentPage, can]);
 
     useSocketSync("location", undefined, fetchLocationData);
 
@@ -309,11 +315,13 @@ const LocationList: React.FC = () => {
                                     onChange={handleSearch}
                                 />
                             </div>
-                            <CustomButton
-                                text="Add Location"
-                                icon={FaPlus}
-                                onClick={handleOpenAdd}
-                            />
+                            {can("locations.create") && (
+                                <CustomButton
+                                    text="Add Location"
+                                    icon={FaPlus}
+                                    onClick={handleOpenAdd}
+                                />
+                            )}
                         </div>
                     </div>
 
@@ -354,8 +362,8 @@ const LocationList: React.FC = () => {
                                     render: (item) => (
                                         <div className="flex items-center gap-2">
                                             <ViewButton onClick={() => handleOpenView(item)} />
-                                            <EditButton onClick={() => handleOpenEdit(item)} />
-                                            <DeleteButton onClick={() => triggerDelete(item.locationId)} />
+                                            {can("locations.edit") && <EditButton onClick={() => handleOpenEdit(item)} />}
+                                            {can("locations.delete") && <DeleteButton onClick={() => triggerDelete(item.locationId)} />}
                                         </div>
                                     ),
                                     align: "left"

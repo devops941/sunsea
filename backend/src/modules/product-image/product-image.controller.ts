@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 
 import productImageService from "./product-image.service";
+import { getIO } from "../../socket/socket";
 
 const serializeBigInt = (
   data: any
@@ -24,6 +25,8 @@ class ProductImageController {
       await productImageService.create(
         req.body
       );
+
+    getIO().emit("productImage:created", serializeBigInt(result));
 
     return res.status(201).json({
       success: true,
@@ -73,6 +76,8 @@ class ProductImageController {
         req.body
       );
 
+    getIO().emit("productImage:updated", serializeBigInt(result));
+
     return res.status(200).json({
       success: true,
       data: serializeBigInt(result),
@@ -88,6 +93,8 @@ class ProductImageController {
         String(req.params.id)
       )
     );
+
+    getIO().emit("productImage:deleted", { id: String(req.params.id) });
 
     return res.status(200).json({
       success: true,

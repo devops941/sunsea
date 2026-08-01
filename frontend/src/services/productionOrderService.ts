@@ -128,8 +128,8 @@ export const productionOrderService = {
         return response.data?.data || response.data;
     },
 
-    startProduction: async (id: number | string): Promise<any> => {
-        const response = await apiClient.post(`${config.productionOrder.base}/${id}/start-production`);
+    startProduction: async (id: number | string, dailyPlanId?: string): Promise<any> => {
+        const response = await apiClient.post(`${config.productionOrder.base}/${id}/start-production`, dailyPlanId ? { dailyPlanId } : {});
         return response.data?.data || response.data;
     },
 

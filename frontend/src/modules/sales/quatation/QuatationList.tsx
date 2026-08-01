@@ -1,9 +1,10 @@
 import React, { useState, useCallback, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { useAppSelector } from "../../../hooks/reduxHooks";
 import { toast } from "react-toastify";
+import { usePermission } from "../../../hooks/usePermission";
 
 import ViewButton from "../../../components/ui/viewbutton/ViewButton";
-import EditButton from "../../../components/ui/EditButton/EditButton";
 import CommonViewModal from "../../../components/ui/CommonViewModal/CommonViewModal";
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import { salesOrderService, type SalesOrder, type SalesOrderStatus } from "../../../services/salesOrderService";
@@ -12,12 +13,16 @@ import DataTable from "../../../components/ui/table/DataTable";
 import SearchInput from "../../../components/ui/SearchInput/SearchInput";
 import CustomButton from "../../../components/ui/Button/Button";
 import { useSocketSync } from "../../../hooks/useSocketSync";
-
+import EmailButton from "../../../components/ui/EmailButton/EmailButton";
+import { Mail } from "lucide-react";
+import EditButton from "../../../components/ui/EditButton/EditButton";
 
 const ITEMS_PER_PAGE = 10;
 
 const QuotationList: React.FC = () => {
     const navigate = useNavigate();
+    const { can } = usePermission();
+    const company = useAppSelector((state) => state.company.data);
     const [data, setData] = useState<SalesOrder[]>([]);
     const [loading, setLoading] = useState(false);
     const location = useLocation();
@@ -33,8 +38,16 @@ const QuotationList: React.FC = () => {
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [itemToDelete, setItemToDelete] = useState<number | null>(null);
 
+    const [showEmailModal, setShowEmailModal] = useState(false);
+    const [emailOrder, setEmailOrder] = useState<SalesOrder | null>(null);
+    const [recipientEmail, setRecipientEmail] = useState("");
+    const [emailSubject, setEmailSubject] = useState("");
+    const [emailMessage, setEmailMessage] = useState("");
+    const [sendingEmail, setSendingEmail] = useState(false);
+
     // ─── Fetch only CONFIRMED and MD_REJECTED orders ────────────────────────────
     const fetchOrders = useCallback(async () => {
+        if (!can("sales-orders.view")) return;
         setLoading(true);
         try {
             const response = await salesOrderService.fetchAll({
@@ -53,7 +66,7 @@ const QuotationList: React.FC = () => {
         } finally {
             setLoading(false);
         }
-    }, [currentPage, searchTerm]);
+    }, [currentPage, searchTerm, can]);
 
     useSocketSync("salesOrder", undefined, fetchOrders);
 
@@ -83,10 +96,46 @@ const QuotationList: React.FC = () => {
         }
     };
 
-    // const triggerDelete = useCallback((id: number) => {
-    //     setItemToDelete(id);
-    //     setShowDeleteModal(true);
-    // }, []);
+    const handleOpenEmailModal = async (item: SalesOrder) => {
+        try {
+            setSendingEmail(true);
+            const fullItem = await salesOrderService.fetchById(item.id);
+            setEmailOrder(fullItem);
+            setRecipientEmail((fullItem.customer as any)?.email || "");
+            setEmailSubject(`Quotation for Order ${fullItem.orderNo}`);
+            setEmailMessage(`Dear ${fullItem.customer?.displayName || fullItem.customer?.firmName || "Customer"},\n\nPlease find the attached quotation for your reference.\n\nBest regards,\n${company?.companyName || "Sunsea"}`);
+            setShowEmailModal(true);
+        } catch (error: any) {
+            toast.error("Failed to load quotation details");
+        } finally {
+            setSendingEmail(false);
+        }
+    };
+
+    const handleSendEmail = async () => {
+        if (!emailOrder || !recipientEmail) {
+            toast.error("Recipient email is required.");
+            return;
+        }
+        setSendingEmail(true);
+        try {
+            await salesOrderService.emailQuotation(
+                emailOrder.id,
+                recipientEmail,
+                emailSubject,
+                emailMessage
+            );
+
+            toast.success("Email sent successfully!");
+            setShowEmailModal(false);
+        } catch (err: any) {
+            console.error(err);
+            toast.error(err?.response?.data?.message || "Failed to send email");
+        } finally {
+            setSendingEmail(false);
+        }
+    };
+
 
     const formatDate = (dateStr: string) => {
         if (!dateStr) return "N/A";
@@ -157,6 +206,7 @@ const QuotationList: React.FC = () => {
                                 <div className="flex items-center gap-2">
                                     <ViewButton onClick={() => handleOpenView(item)} />
                                     <EditButton onClick={() => handleOpenEdit(item)} />
+                                    <EmailButton onClick={() => handleOpenEmailModal(item)} />
                                     {/* <DeleteButton onClick={() => triggerDelete(item.id)} /> */}
                                 </div>
                             ),
@@ -272,6 +322,22 @@ const QuotationList: React.FC = () => {
                     confirmVariant="danger"
                 />
             </div>
+
+
+
+            <CommonConfirmModal
+                show={showEmailModal}
+                onHide={() => setShowEmailModal(false)}
+                onConfirm={handleSendEmail}
+                title="Send Email"
+                message={`Are you sure you want to send the quotation to ${recipientEmail}?`}
+                warningText="This will generate a PDF and send it to the customer."
+                confirmText="Send Email"
+                loadingText="Sending..."
+                confirmIcon={Mail}
+                confirmVariant="primary"
+                isLoading={sendingEmail}
+            />
         </div>
     );
 };

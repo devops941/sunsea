@@ -2,7 +2,6 @@ import React, { useState, useCallback, useEffect } from "react";
 import { FaPlus, FaTrash, FaEye } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
-import { useSelector } from "react-redux";
 
 import CommonViewModal from "../../components/ui/CommonViewModal/CommonViewModal";
 import CommonConfirmModal from "../../components/ui/CommonConfirmModal/CommonConfirmModal";
@@ -14,6 +13,11 @@ import StatusBadge from "../../components/ui/StatusBadge/Badge";
 import EditButton from "../../components/ui/EditButton/EditButton";
 import DataTable, { type DataTableColumn } from "../../components/ui/table/DataTable";
 import SearchInput from "../../components/ui/SearchInput/SearchInput";
+import EmailButton from "../../components/ui/EmailButton/EmailButton";
+import { Mail } from "lucide-react";
+import { useAppSelector } from "../../hooks/reduxHooks";
+import { useSocketSync } from "../../hooks/useSocketSync";
+import { usePermission } from "../../hooks/usePermission";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -29,6 +33,7 @@ const getMobileFromCustomer = (cust: any) => {
 
 const SalesInvoiceList: React.FC = () => {
     const navigate = useNavigate();
+    const { can } = usePermission();
     const [data, setData] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
@@ -41,7 +46,16 @@ const SalesInvoiceList: React.FC = () => {
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [itemToDelete, setItemToDelete] = useState<string | null>(null);
 
+    const company = useAppSelector((state) => state.company.data);
+    const [showEmailModal, setShowEmailModal] = useState(false);
+    const [emailInvoice, setEmailInvoice] = useState<any | null>(null);
+    const [recipientEmail, setRecipientEmail] = useState("");
+    const [emailSubject, setEmailSubject] = useState("");
+    const [emailMessage, setEmailMessage] = useState("");
+    const [sendingEmail, setSendingEmail] = useState(false);
+
     const fetchInvoices = useCallback(async () => {
+        if (!can("sales-invoices.view")) return;
         setLoading(true);
         try {
             const response = await salesInvoiceService.fetchAll({
@@ -59,11 +73,13 @@ const SalesInvoiceList: React.FC = () => {
         } finally {
             setLoading(false);
         }
-    }, [currentPage, searchTerm]);
+    }, [currentPage, searchTerm, can]);
 
     useEffect(() => {
         fetchInvoices();
     }, [fetchInvoices]);
+
+    useSocketSync("salesInvoice", undefined, fetchInvoices);
 
     const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
         setSearchTerm(e.target.value);
@@ -95,6 +111,46 @@ const SalesInvoiceList: React.FC = () => {
         `₹${Number(amount ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`;
 
     const totalPages = Math.ceil(total / ITEMS_PER_PAGE);
+
+    const handleOpenEmailModal = async (item: any) => {
+        try {
+            setSendingEmail(true);
+            const fullItem = await salesInvoiceService.fetchById(item.id);
+            setEmailInvoice(fullItem);
+            setRecipientEmail((fullItem.customer as any)?.email || "");
+            setEmailSubject(`Invoice ${fullItem.invoiceNo}`);
+            setEmailMessage(`Dear ${fullItem.customer?.displayName || fullItem.customer?.firmName || "Customer"},\n\nPlease find the attached invoice for your reference.\n\nBest regards,\n${company?.companyName || "Sunsea"}`);
+            setShowEmailModal(true);
+        } catch (error: any) {
+            toast.error("Failed to load invoice details");
+        } finally {
+            setSendingEmail(false);
+        }
+    };
+
+    const handleSendEmail = async () => {
+        if (!emailInvoice || !recipientEmail) {
+            toast.error("Recipient email is required.");
+            return;
+        }
+        setSendingEmail(true);
+        try {
+            await salesInvoiceService.emailInvoice(
+                emailInvoice.id,
+                recipientEmail,
+                emailSubject,
+                emailMessage
+            );
+
+            toast.success("Email sent successfully!");
+            setShowEmailModal(false);
+        } catch (err: any) {
+            console.error(err);
+            toast.error(err?.response?.data?.message || "Failed to send email");
+        } finally {
+            setSendingEmail(false);
+        }
+    };
 
     const handleOpenView = async (item: any) => {
         navigate(`/sales-invoices/details/${item.id}`);
@@ -150,6 +206,7 @@ const SalesInvoiceList: React.FC = () => {
             width: "160px",
             render: (item) => (
                 <div className="flex justify-start gap-2">
+                    <EmailButton onClick={() => handleOpenEmailModal(item)} />
                     <ViewButton onClick={() => handleOpenView(item)} />
                     {item.status !== "PAID" && (
                         <EditButton onClick={() => navigate(`/sales-invoices/edit/${item.id}`)} />
@@ -274,6 +331,20 @@ const SalesInvoiceList: React.FC = () => {
                 message="Are you sure you want to delete this invoice? This action cannot be undone."
                 confirmText="Delete"
                 confirmVariant="danger"
+            />
+
+            <CommonConfirmModal
+                show={showEmailModal}
+                onHide={() => setShowEmailModal(false)}
+                onConfirm={handleSendEmail}
+                title="Send Email"
+                message={`Are you sure you want to send the invoice to ${recipientEmail || "this customer"}?`}
+                warningText="This will generate a PDF and send it to the customer."
+                confirmText="Send Email"
+                loadingText="Sending..."
+                confirmIcon={Mail}
+                confirmVariant="primary"
+                isLoading={sendingEmail}
             />
         </div>
     );

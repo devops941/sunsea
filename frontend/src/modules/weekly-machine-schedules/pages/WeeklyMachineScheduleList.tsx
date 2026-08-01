@@ -4,7 +4,8 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
-import { fetchWeeklyPrograms, deleteWeeklyProgram } from "../../../features/weekly-programs/weeklyProgramSlice";
+import { fetchWeeklyPrograms, deleteWeeklyProgram, weeklyProgramCreated, weeklyProgramUpdated, weeklyProgramDeleted } from "../../../features/weekly-programs/weeklyProgramSlice";
+import { useSocketSync } from "../../../hooks/useSocketSync";
 import CustomButton from "../../../components/ui/Button/Button";
 
 import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
@@ -18,11 +19,14 @@ import SearchInput from "../../../components/ui/SearchInput/SearchInput";
 import DataTable from "../../../components/ui/table/DataTable";
 import type { DataTableColumn } from "../../../components/ui/table/DataTable";
 
+import { usePermission } from "../../../hooks/usePermission";
+
 const ITEMS_PER_PAGE = 20;
 
 const WeeklyMachineScheduleList: React.FC = () => {
     const navigate = useNavigate();
     const dispatch = useAppDispatch();
+    const { can } = usePermission();
 
     const getFormattedWeekLabel = (startDateStr: string, endDateStr: string) => {
         try {
@@ -36,6 +40,7 @@ const WeeklyMachineScheduleList: React.FC = () => {
     };
 
     const canDeleteSchedule = (schedule: any, orderStatus: string) => {
+        if (!can("weekly_programs.delete")) return false;
         const lockedStatuses = [
             "DAILY_PLANNED",
             "IN_PROGRESS",
@@ -115,6 +120,12 @@ const WeeklyMachineScheduleList: React.FC = () => {
             toast.error(error);
         }
     }, [error]);
+
+    useSocketSync("weeklyProgram", {
+        created: weeklyProgramCreated,
+        updated: weeklyProgramUpdated,
+        deleted: weeklyProgramDeleted,
+    });
 
     const handleSearch = (e: React.ChangeEvent<any>) => {
         setSearchTerm(e.target.value);
@@ -388,11 +399,13 @@ const WeeklyMachineScheduleList: React.FC = () => {
                             onChange={handleSearch}
                             placeholder="Search..."
                         />
-                        <CustomButton
-                            text="Add Schedule"
-                            icon={FaPlus}
-                            onClick={handleOpenAdd}
-                        />
+                        {can("weekly_programs.create") && (
+                            <CustomButton
+                                text="Add Schedule"
+                                icon={FaPlus}
+                                onClick={handleOpenAdd}
+                            />
+                        )}
                     </div>
                 </div>
 

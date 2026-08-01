@@ -3,7 +3,8 @@ import React, { useState, useEffect } from "react";
 import { toast } from "react-toastify";
 
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
-import { fetchRawMaterialStocks } from "../../../features/raw-materials/rawMaterialStockSlice";
+import { fetchRawMaterialStocks, rawMaterialStockCreated, rawMaterialStockUpdated, rawMaterialStockDeleted } from "../../../features/raw-materials/rawMaterialStockSlice";
+import { useSocketSync } from "../../../hooks/useSocketSync";
 import ViewButton from "../../../components/ui/viewbutton/ViewButton";
 import DataTable from "../../../components/ui/table/DataTable";
 import SearchInput from "../../../components/ui/SearchInput/SearchInput";
@@ -62,6 +63,12 @@ const StockList: React.FC<StockListProps> = ({ storeId: propStoreId }) => {
             toast.error(error);
         }
     }, [error]);
+
+    useSocketSync("rawMaterialStock", {
+        created: rawMaterialStockCreated,
+        updated: rawMaterialStockUpdated,
+        deleted: rawMaterialStockDeleted,
+    });
 
     const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
         setSearchTerm(e.target.value);

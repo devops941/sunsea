@@ -6,6 +6,7 @@ import { toast } from "react-toastify";
 import TextInput from "../../components/form/TextInput/TextInput";
 import CustomButton from "../../components/ui/Button/Button";
 import CommonLoader from "../../components/ui/Loader/CommonLoader";
+import { usePermission } from "../../hooks/usePermission";
 
 import { invoiceSettingsService, type InvoiceSettingDto } from "../../services/invoiceSettingsService";
 
@@ -26,6 +27,8 @@ const SalesInvoiceCreate: React.FC = () => {
         formatTemplate: "{PREFIX}-{FY}-{SEQ}",
     });
     const [errors, setErrors] = useState<Record<string, string>>({});
+    const { can } = usePermission();
+    const canEditInvoice = can("invoice-settings.edit");
 
     // ---- Financial Year helpers ----
 
@@ -167,6 +170,10 @@ const SalesInvoiceCreate: React.FC = () => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (!canEditInvoice) {
+            toast.error("You do not have permission to edit invoice settings.");
+            return;
+        }
         if (!validate()) return;
 
         setSaving(true);
@@ -372,7 +379,9 @@ const SalesInvoiceCreate: React.FC = () => {
                     </div>
 
                     <div className="flex flex-wrap justify-end gap-3 mt-8 pt-4 border-t border-gray-200">
-                        <CustomButton text={saving ? "Saving..." : "Save Settings"} icon={FaSave} type="submit" disabled={saving} />
+                        {canEditInvoice && (
+                            <CustomButton text={saving ? "Saving..." : "Save Settings"} icon={FaSave} type="submit" disabled={saving} />
+                        )}
                     </div>
                 </form>
             </div>

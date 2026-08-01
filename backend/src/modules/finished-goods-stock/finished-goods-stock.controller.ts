@@ -2,10 +2,16 @@ import { Request, Response } from "express";
 import finishedGoodsStockService from "./finished-goods-stock.service";
 import { ApiResponse } from "../../utils/ApiResponse";
 import { asyncHandler } from "../../utils/asyncHandler";
+import { getIO } from "../../socket/socket";
 
 class FinishedGoodsStockController {
   create = asyncHandler(async (req: Request, res: Response) => {
     const stock = await finishedGoodsStockService.create(req.body);
+
+    const safeStock = JSON.parse(JSON.stringify(stock, (key, value) =>
+      typeof value === "bigint" ? value.toString() : value
+    ));
+    getIO().emit("finishedGoodsStock:created", safeStock);
 
     return res.status(201).json(
       new ApiResponse("Finished Goods Stock created successfully", stock)
@@ -48,6 +54,11 @@ class FinishedGoodsStockController {
       req.body
     );
 
+    const safeStock = JSON.parse(JSON.stringify(stock, (key, value) =>
+      typeof value === "bigint" ? value.toString() : value
+    ));
+    getIO().emit("finishedGoodsStock:updated", safeStock);
+
     return res.status(200).json(
       new ApiResponse("Finished Goods Stock updated successfully", stock)
     );
@@ -56,6 +67,8 @@ class FinishedGoodsStockController {
   delete = asyncHandler(async (req: Request, res: Response) => {
     const { storeId, productItemId } = req.params;
     await finishedGoodsStockService.delete(String(storeId), BigInt(String(productItemId)));
+
+    getIO().emit("finishedGoodsStock:deleted", { id: String(productItemId) });
 
     return res.status(200).json(
       new ApiResponse("Finished Goods Stock deleted successfully")

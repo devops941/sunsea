@@ -16,7 +16,7 @@ import DataTable from "../../../components/ui/table/DataTable";
 import { fetchShifts, deleteShift, shiftCreated, shiftUpdated, shiftDeleted } from "../../../features/shifts/shiftSlice";
 import type { RootState, AppDispatch } from "../../../app/store";
 import type { Shift } from "../../../features/shifts/types";
-import { hasPermission } from "../../../utils/permission";
+import { usePermission } from "../../../hooks/usePermission";
 import { useSocketSync } from "../../../hooks/useSocketSync";
 
 const ITEMS_PER_PAGE = 10;
@@ -62,10 +62,10 @@ const ShiftList: React.FC = () => {
     const dispatch = useDispatch<AppDispatch>();
 
     const { data, loading, error } = useSelector((state: RootState) => state.shifts);
-
-    const canCreateShift = hasPermission("shifts.create");
-    const canEditShift = hasPermission("shifts.edit");
-    const canDeleteShift = hasPermission("shifts.delete");
+    const { can } = usePermission();
+    const canCreateShift = can("shifts.create");
+    const canEditShift = can("shifts.edit");
+    const canDeleteShift = can("shifts.delete");
 
     const [searchTerm, setSearchTerm] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
@@ -84,8 +84,10 @@ const ShiftList: React.FC = () => {
     });
 
     useEffect(() => {
-        dispatch(fetchShifts());
-    }, [dispatch]);
+        if (can("shifts.view")) {
+            dispatch(fetchShifts());
+        }
+    }, [dispatch, can]);
 
     const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
         setSearchTerm(e.target.value);

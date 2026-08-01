@@ -12,7 +12,7 @@ import SupplierViewModal from "../components/SupplierViewModal";
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import { useSuppliers } from "../../../hooks/useSuppliers";
 import { supplierService } from "../../../services/supplierService";
-import { hasPermission } from "../../../utils/permission";
+import { usePermission } from "../../../hooks/usePermission";
 import DataTable from "../../../components/ui/table/DataTable";
 import { useSocketSync } from "../../../hooks/useSocketSync";
 
@@ -21,11 +21,11 @@ const SupplierList: React.FC = () => {
     const navigate = useNavigate();
     const { suppliers, loading, error, total, loadSuppliers, removeSupplier } = useSuppliers();
 
-    const canEditSupplier = hasPermission("supplier.edit");
-    const canDeleteSupplier = hasPermission("supplier.delete");
-    const canViewPricing = hasPermission("supplierpricelist.view");
-    // BUG-SUP-009 fix: added missing create permission check
-    const canCreateSupplier = hasPermission("supplier.create");
+    const { can } = usePermission();
+    const canEditSupplier = can("suppliers.edit");
+    const canDeleteSupplier = can("suppliers.delete");
+    const canViewPricing = can("supplierpricelist.view");
+    const canCreateSupplier = can("suppliers.create");
 
     const [showViewModal, setShowViewModal] = useState(false);
     const [selectedSupplier, setSelectedSupplier] = useState<any>(null);
@@ -42,8 +42,10 @@ const SupplierList: React.FC = () => {
     const [isDeleting, setIsDeleting] = useState(false);
 
     const fetchSuppliersData = useCallback(() => {
-        loadSuppliers({ search: searchTerm, page: currentPage, limit: ITEMS_PER_PAGE });
-    }, [searchTerm, currentPage, loadSuppliers]);
+        if (can("suppliers.view")) {
+            loadSuppliers({ search: searchTerm, page: currentPage, limit: ITEMS_PER_PAGE });
+        }
+    }, [searchTerm, currentPage, loadSuppliers, can]);
 
     useSocketSync("supplier", undefined, fetchSuppliersData);
 

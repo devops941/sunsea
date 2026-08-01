@@ -70,7 +70,32 @@ const initialState: RawMaterialStockState = {
 const rawMaterialStockSlice = createSlice({
   name: "rawMaterialStocks",
   initialState,
-  reducers: {},
+  reducers: {
+    clearStockError: (state) => {
+      state.error = null;
+    },
+    rawMaterialStockCreated: (state, action) => {
+      if (Array.isArray(state.data)) {
+        const exists = state.data.find((m: any) => String(m.id) === String(action.payload.id));
+        if (!exists) {
+          state.data.unshift(action.payload);
+        }
+      }
+    },
+    rawMaterialStockUpdated: (state, action) => {
+      if (Array.isArray(state.data)) {
+        const index = state.data.findIndex((m: any) => String(m.id) === String(action.payload.id));
+        if (index !== -1) {
+          state.data[index] = action.payload;
+        }
+      }
+    },
+    rawMaterialStockDeleted: (state, action) => {
+      if (Array.isArray(state.data)) {
+        state.data = state.data.filter((m: any) => String(m.id) !== String(action.payload.id));
+      }
+    },
+  },
   extraReducers: (builder) => {
     builder
       .addCase(fetchRawMaterialStocks.pending, (state) => {
@@ -112,5 +137,7 @@ const rawMaterialStockSlice = createSlice({
       );
   },
 });
+
+export const { clearStockError, rawMaterialStockCreated, rawMaterialStockUpdated, rawMaterialStockDeleted } = rawMaterialStockSlice.actions;
 
 export default rawMaterialStockSlice.reducer;

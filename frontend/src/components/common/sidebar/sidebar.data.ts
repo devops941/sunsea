@@ -13,7 +13,7 @@ import {
 } from "react-icons/fi";
 
 export const sidebarItems: SidebarItem[] = [
-  // 1. Dashboard
+  // 1. Dashboard — always visible to authenticated users
   {
     title: "Dashboard",
     icon: FiPieChart,
@@ -36,24 +36,40 @@ export const sidebarItems: SidebarItem[] = [
       "/users",
       "/permissions",
     ],
+    permissionAny: [
+      "company-settings.view",
+      "roles.view",
+      "departments.view",
+      "role-permissions.view",
+      "gst_tax.view",
+      "whatsapp.view",
+      "email-config.view",
+      "invoice-settings.view",
+    ],
   },
   // 3. HR & Organization
   {
     title: "HR & Organization",
     icon: FiUsers,
-    path: "/machines",
+    path: "/employees",
     activePaths: [
       "/employees",
       "/machines",
+      "/machines/assignments",
       "/shifts",
     ],
-    permission: "employees.view",
+    permissionAny: [
+      "employees.view",
+      "machines.view",
+      "machine-assignments.view",
+      "shifts.view",
+    ],
   },
   // 4. Product Setup
   {
     title: "Product Setup",
     icon: FiDatabase,
-    path: "/uoms",
+    path: "/products",
     activePaths: [
       "/products",
       "/categories",
@@ -62,8 +78,16 @@ export const sidebarItems: SidebarItem[] = [
       "/sizes",
       "/raw-materials",
       "/raw-material-categories",
+      "/wastage-store",
     ],
-    permission: "uoms.view",
+    permissionAny: [
+      "products.view",
+      "categories.view",
+      "uoms.view",
+      "raw_materials.view",
+      "raw_material_categories.view",
+      "wastage-store.view",
+    ],
   },
   // 5. Purchase
   {
@@ -76,6 +100,13 @@ export const sidebarItems: SidebarItem[] = [
       "/purchase-order-approvals",
       "/expenses",
       "/invoice",
+    ],
+    permissionAny: [
+      "suppliers.view",
+      "purchaseOrders.view",
+      "purchase-order-approvals.view",
+      "invoice.view",
+      "expenses.view",
     ],
   },
   // 6. Sales
@@ -91,7 +122,14 @@ export const sidebarItems: SidebarItem[] = [
       "/pending-quotations",
       "/sales-invoices",
     ],
-    permission: "customers.view",
+    permissionAny: [
+      "customers.view",
+      "sales-orders.view",
+      "draft-orders.view",
+      "quotations.view",
+      "pending-quotations.view",
+      "sales-invoices.view",
+    ],
   },
   // 7. Production
   {
@@ -110,6 +148,18 @@ export const sidebarItems: SidebarItem[] = [
       "/shift-execution",
       "/production-dashboard",
       "/bill-of-materials",
+      "/production/goods-dispatch",
+    ],
+    permissionAny: [
+      "production_orders.view",
+      "weekly_programs.view",
+      "daily-machine-planning.view",
+      "hourly_productions.view",
+      "production-wastages.view",
+      "goods-dispatch.view",
+      "shift-execution.view",
+      "oee-dashboard.view",
+      "bill_of_materials.view",
     ],
   },
   // 8. Inventory
@@ -124,7 +174,13 @@ export const sidebarItems: SidebarItem[] = [
       "/finished-stock",
       "/wastage-stock",
     ],
-    permission: "raw_material_stocks.view",
+    permissionAny: [
+      "raw_material_stocks.view",
+      "finished_goods_stocks.view",
+      "wastage-stock.view",
+      "stock-adjustments.view",
+      "eod-stock.view",
+    ],
   },
   // 9. Store & Locations
   {
@@ -132,7 +188,7 @@ export const sidebarItems: SidebarItem[] = [
     icon: FiMapPin,
     path: "/storage-stores",
     activePaths: ["/storage-stores", "/store-types", "/locations"],
-    permission: "storage_stores.view",
+    permissionAny: ["stores.view", "store-types.view", "locations.view"],
   },
   // 10. Reports
   {
@@ -144,7 +200,14 @@ export const sidebarItems: SidebarItem[] = [
       "/reports/purchase",
       "/reports/inventory",
       "/reports/production",
+      "/reports/audit",
     ],
-    permission: "reports.view",
+    permissionAny: [
+      "sales-reports.view",
+      "purchase-reports.view",
+      "inventory-reports.view",
+      "production-reports.view",
+      "audit-reports.view",
+    ],
   }
 ];

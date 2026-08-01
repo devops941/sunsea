@@ -688,12 +688,12 @@ class ProductionOrderService {
 
   // ── Start Production ──────────────────────────────────────────────────────
   // STEP 5: Production Start
-  // - Status must be DAILY_PLANNED
-  // - Auto-create RAW_MATERIAL_ISSUE stock adjustment (once only)
-  // - Deduct raw material stock
+  // - Status must be DAILY_PLANNED / IN_PRODUCTION (for subsequent shifts)
+  // - Auto-create RAW_MATERIAL_ISSUE stock adjustment per shift (based on shift plannedQty)
+  // - Deduct raw material stock proportional to shift's plannedQty / PO targetQty
   // - Insert raw material transactions
   // - Set status to IN_PRODUCTION
-  async startProduction(productionOrderId: string, userId?: string) {
+  async startProduction(productionOrderId: string, userId?: string, dailyPlanId?: string) {
     const order = await prisma.productionOrder.findUnique({
       where: { productionOrderId },
     }) as any;
@@ -702,7 +702,7 @@ class ProductionOrderService {
       throw new ApiError(404, `Production Order ${productionOrderId} not found`);
     }
 
-    const allowedStartStatuses = ["DAILY_PLANNED", "PARTIAL_COMPLETED", "IN_PRODUCTION", "IN_PROGRESS", "POST_PRODUCTION", "WEEKLY_SCHEDULED"];
+    const allowedStartStatuses = ["DAILY_PLANNED", "PARTIAL_COMPLETED", "IN_PRODUCTION", "IN_PROGRESS", "POST_PRODUCTION", "WEEKLY_SCHEDULED", "DISPATCHED"];
     if (!allowedStartStatuses.includes(order.status)) {
       throw new ApiError(
         400,
@@ -710,51 +710,71 @@ class ProductionOrderService {
       );
     }
 
-    // ✅ Idempotency check: don't issue materials twice
-    const existingIssue = await prisma.stockAdjustment.findFirst({
-      where: {
-        productionOrderId,
-        adjustmentType: "RAW_MATERIAL_ISSUE",
-        status: { not: "REJECTED" },
-      },
-    });
+    // ── Resolve planned quantity for this specific shift ──────────────────────
+    let shiftPlannedQty: number | null = null;
+    const poTargetQty = Number(order.targetQty || 0);
 
-    if (existingIssue) {
-      // Materials already issued — just update status to IN_PRODUCTION
-      const updated = await prisma.$transaction(async (tx) => {
-        const result = await tx.productionOrder.update({
-          where: { productionOrderId },
-          data: { status: "IN_PRODUCTION", updatedBy: userId },
+    if (dailyPlanId) {
+      const dailyPlan = await prisma.dailyProductionPlan.findUnique({
+        where: { dailyPlanId },
+        select: { plannedQty: true },
+      });
+      if (dailyPlan) {
+        shiftPlannedQty = Number(dailyPlan.plannedQty || 0);
+        // Idempotency: check if this specific daily plan already had materials issued
+        const existingIssueForShift = await prisma.stockAdjustment.findFirst({
+          where: { productionOrderId, adjustmentType: "RAW_MATERIAL_ISSUE", status: { not: "REJECTED" }, sourceDocId: dailyPlanId },
         });
-        await this.addHistory(tx, productionOrderId, "DAILY_PLANNED", "IN_PRODUCTION", userId,
-          "Production started (materials already issued)", "PRODUCTION_START");
-        return result;
-      }, { timeout: 15000, maxWait: 10000 });
-      return updated;
+        if (existingIssueForShift) {
+          const updated = await prisma.$transaction(async (tx) => {
+            const result = await tx.productionOrder.update({ where: { productionOrderId }, data: { status: "IN_PRODUCTION", updatedBy: userId } });
+            await this.addHistory(tx, productionOrderId, order.status, "IN_PRODUCTION", userId,
+              `Production started for shift plan ${dailyPlanId} (materials already issued for this shift)`, "PRODUCTION_START");
+            return result;
+          }, { timeout: 15000, maxWait: 10000 });
+          return updated;
+        }
+      }
+    } else {
+      // Legacy path: global idempotency check (no dailyPlanId provided)
+      const existingIssue = await prisma.stockAdjustment.findFirst({
+        where: { productionOrderId, adjustmentType: "RAW_MATERIAL_ISSUE", status: { not: "REJECTED" }, sourceDocId: null },
+      });
+      if (existingIssue) {
+        const updated = await prisma.$transaction(async (tx) => {
+          const result = await tx.productionOrder.update({ where: { productionOrderId }, data: { status: "IN_PRODUCTION", updatedBy: userId } });
+          await this.addHistory(tx, productionOrderId, order.status, "IN_PRODUCTION", userId,
+            "Production started (materials already issued)", "PRODUCTION_START");
+          return result;
+        }, { timeout: 15000, maxWait: 10000 });
+        return updated;
+      }
     }
+
+    // Proportional ratio: e.g. shift=500, target=4000 → 0.125
+    const qtyRatio = (shiftPlannedQty !== null && poTargetQty > 0) ? shiftPlannedQty / poTargetQty : 1;
 
     const rawMaterials: any[] = Array.isArray(order.draftRawMaterials) && order.draftRawMaterials.length > 0
       ? order.draftRawMaterials as any[]
       : [];
 
     if (rawMaterials.length === 0) {
-      // No raw materials to issue — still start production
       return await prisma.$transaction(async (tx) => {
         const result = await tx.productionOrder.update({
           where: { productionOrderId },
           data: { status: "IN_PRODUCTION", updatedBy: userId },
         });
-        await this.addHistory(tx, productionOrderId, "DAILY_PLANNED", "IN_PRODUCTION", userId,
+        await this.addHistory(tx, productionOrderId, order.status, "IN_PRODUCTION", userId,
           "Production started (no raw materials configured)", "PRODUCTION_START");
         return result;
       }, { timeout: 15000, maxWait: 10000 });
     }
 
     return prisma.$transaction(async (tx) => {
-      // 1. Create StockAdjustment header (RAW_MATERIAL_ISSUE)
       const now = new Date();
       const dateStr = now.toISOString().replace(/[-:T]/g, "").slice(0, 14);
-      const adjustmentNumber = `RMI-${productionOrderId}-${dateStr}`;
+      const planSuffix = dailyPlanId ? `-${dailyPlanId}` : "";
+      const adjustmentNumber = `RMI-${productionOrderId}${planSuffix}-${dateStr}`;
 
       const stockAdjustment = await tx.stockAdjustment.create({
         data: {
@@ -762,21 +782,24 @@ class ProductionOrderService {
           adjustmentDate: now,
           adjustmentType: "RAW_MATERIAL_ISSUE",
           productionOrderId,
-          reason: `Raw material issued for Production Order: ${productionOrderId} (Production Start)`,
+          reason: dailyPlanId
+            ? `Raw material issued for Production Order: ${productionOrderId}, Daily Plan: ${dailyPlanId} (Shift Start)`
+            : `Raw material issued for Production Order: ${productionOrderId} (Production Start)`,
           status: "APPROVED",
           approvedBy: userId,
           approvedAt: now,
           createdBy: userId,
           autoGenerated: true,
-          sourceDocument: "PRODUCTION_ORDER",
-          sourceDocId: productionOrderId,
+          sourceDocument: dailyPlanId ? "DAILY_PLAN" : "PRODUCTION_ORDER",
+          sourceDocId: dailyPlanId ?? productionOrderId,
         },
       });
 
-      // 2. Process each raw material
+      // 2. Process each raw material — scale qty to this shift's proportion
       for (const rm of rawMaterials) {
         const { rawMaterialId, requiredQty } = rm;
-        const qty = Number(requiredQty);
+        const fullQty = Number(requiredQty);
+        const qty = parseFloat((fullQty * qtyRatio).toFixed(6));
         if (!rawMaterialId || qty <= 0) continue;
 
         const stock = await tx.rawMaterial.findUnique({
@@ -792,7 +815,7 @@ class ProductionOrderService {
         if (newOnHand < 0 && !allowNegative) {
           throw new ApiError(
             400,
-            `Insufficient stock for raw material "${stock.materialName}" (${rawMaterialId}). Available: ${Number(stock.onHandQty).toFixed(3)}, Required: ${qty.toFixed(3)}`
+            `Insufficient stock for raw material "${stock.materialName}" (${rawMaterialId}). Available: ${Number(stock.onHandQty).toFixed(3)}, Required for this shift (${shiftPlannedQty ?? fullQty} pcs): ${qty.toFixed(3)}`
           );
         }
 
@@ -822,7 +845,9 @@ class ProductionOrderService {
             currentQty,
             adjustedQty: newOnHand,
             difference: -qty,
-            remarks: `Issued for Production Order ${productionOrderId} on production start`,
+            remarks: dailyPlanId
+              ? `Issued for Daily Plan ${dailyPlanId} (${shiftPlannedQty} pcs of PO ${productionOrderId} target ${poTargetQty} pcs)`
+              : `Issued for Production Order ${productionOrderId} on production start`,
           },
         });
 
@@ -834,7 +859,9 @@ class ProductionOrderService {
             txnType: "RAW_MATERIAL_ISSUE",
             qty: -qty,
             productionOrderId,
-            remarks: `Issued for Production Order ${productionOrderId} on production start`,
+            remarks: dailyPlanId
+              ? `Issued for Daily Plan ${dailyPlanId} (${shiftPlannedQty} pcs of PO ${productionOrderId})`
+              : `Issued for Production Order ${productionOrderId} on production start`,
           },
         });
       }
@@ -850,12 +877,14 @@ class ProductionOrderService {
       await this.addHistory(
         tx,
         productionOrderId,
-        "DAILY_PLANNED",
+        order.status,
         "IN_PRODUCTION",
         userId,
-        "Production started. Raw materials issued.",
+        dailyPlanId
+          ? `Production started for Daily Plan ${dailyPlanId} (${shiftPlannedQty} pcs). Raw materials issued proportionally (ratio: ${qtyRatio.toFixed(4)}).`
+          : "Production started. Raw materials issued.",
         "PRODUCTION_START",
-        { stockAdjustmentId: stockAdjustment.id.toString(), rawMaterialsIssued: rawMaterials.length }
+        { stockAdjustmentId: stockAdjustment.id.toString(), rawMaterialsIssued: rawMaterials.length, dailyPlanId: dailyPlanId ?? null, shiftPlannedQty: shiftPlannedQty ?? null, qtyRatio }
       );
 
       return result;
@@ -930,6 +959,7 @@ class ProductionOrderService {
       "PARTIAL_COMPLETED",
       "POST_PRODUCTION",
       "READY_FOR_DISPATCH",
+      "DISPATCHED", // Allow if accidentally fully dispatched but target not met
     ];
     if (!allowedForManualIssue.includes(order.status)) {
       throw new ApiError(

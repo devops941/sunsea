@@ -4,7 +4,8 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
-import { fetchHourlyProductions, deleteHourlyProduction } from "../../../features/hourly-productions/hourlyProductionSlice";
+import { fetchHourlyProductions, deleteHourlyProduction, hourlyProductionCreated, hourlyProductionUpdated, hourlyProductionDeleted } from "../../../features/hourly-productions/hourlyProductionSlice";
+import { useSocketSync } from "../../../hooks/useSocketSync";
 
 import EditButton from "../../../components/ui/EditButton/EditButton";
 import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
@@ -17,11 +18,14 @@ import DatePickerCalendar from "../../../components/ui/DatePickerCalendar/DatePi
 import SearchInput from "../../../components/ui/SearchInput/SearchInput";
 import DataTable, { type DataTableColumn } from "../../../components/ui/table/DataTable";
 
+import { usePermission } from "../../../hooks/usePermission";
+
 const ITEMS_PER_PAGE = 10;
 
 const HourlyWorkReportList: React.FC = () => {
     const navigate = useNavigate();
     const dispatch = useAppDispatch();
+    const { can } = usePermission();
 
     const { data, loading, error } = useAppSelector((state) => state.hourlyProductions);
     const { user } = useAppSelector((state) => state.auth);
@@ -60,6 +64,12 @@ const HourlyWorkReportList: React.FC = () => {
             toast.error(error);
         }
     }, [error]);
+
+    useSocketSync("hourlyProduction", {
+        created: hourlyProductionCreated,
+        updated: hourlyProductionUpdated,
+        deleted: hourlyProductionDeleted,
+    });
 
     const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
         setSearchTerm(e.target.value);
@@ -313,7 +323,9 @@ const HourlyWorkReportList: React.FC = () => {
                                             On Hold
                                         </span>
                                     )}
-                                    <ViewButton onClick={() => handleView(group)} />
+                                    {can("hourly_productions.view") && (
+                                        <ViewButton onClick={() => handleView(group)} />
+                                    )}
                                 </div>
                                 {group.totalQtyProduced < group.plannedQty ? (
                                     <span className="text-red-600 font-bold text-[10px]">
@@ -326,11 +338,13 @@ const HourlyWorkReportList: React.FC = () => {
                                 ) : null}
                             </div>
                         ) : (
-                            <CustomButton
-                                text="Add Hourly"
-                                size="sm"
-                                onClick={() => handleAddHourly(group)}
-                            />
+                            can("hourly_productions.create") && (
+                                <CustomButton
+                                    text="Add Hourly"
+                                    size="sm"
+                                    onClick={() => handleAddHourly(group)}
+                                />
+                            )
                         )}
                     </div>
                 );
@@ -425,8 +439,10 @@ const HourlyWorkReportList: React.FC = () => {
                                         <div className="ml-4 flex gap-2">
                                             {!isGroupEditDisabled(group) ? (
                                                 <>
-                                                    <EditButton onClick={() => handleOpenEdit(group, h)} />
-                                                    {user?.roleId === "ROLE_ADMIN" && (
+                                                    {can("hourly_productions.edit") && (
+                                                        <EditButton onClick={() => handleOpenEdit(group, h)} />
+                                                    )}
+                                                    {(can("hourly_productions.delete") || user?.roleId === "ROLE_ADMIN") && (
                                                         <DeleteButton onClick={() => triggerDelete(h.hourlyProductionId?.toString())} />
                                                     )}
                                                 </>

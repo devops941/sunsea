@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
+import { usePermission } from "../../../hooks/usePermission";
 
 import ViewButton from "../../../components/ui/viewbutton/ViewButton";
 import EditButton from "../../../components/ui/EditButton/EditButton";
@@ -24,6 +25,7 @@ const ITEMS_PER_PAGE = 10;
 
 const SalesOrderList: React.FC = () => {
     const navigate = useNavigate();
+    const { can } = usePermission();
     const [data, setData] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const location = useLocation();
@@ -122,6 +124,7 @@ const SalesOrderList: React.FC = () => {
     };
 
     const fetchOrders = useCallback(async () => {
+        if (!can("sales-orders.view")) return;
         setLoading(true);
         try {
             const response = await salesOrderService.fetchAll({
@@ -140,7 +143,7 @@ const SalesOrderList: React.FC = () => {
         } finally {
             setLoading(false);
         }
-    }, [currentPage, searchTerm]);
+    }, [currentPage, searchTerm, can]);
 
     useSocketSync("salesOrder", undefined, fetchOrders);
 

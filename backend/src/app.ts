@@ -115,6 +115,7 @@ app.get("/", (req, res) => {
     timestamp: new Date().toISOString()
   });
 });
+
 app.use("/api", apiRoutes);
 
 /** Route Not Found Handler*/

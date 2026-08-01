@@ -20,6 +20,7 @@ import TextInput from "../../../components/form/TextInput/TextInput";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import DataTable from "../../../components/ui/table/DataTable";
 import { useSocketSync } from "../../../hooks/useSocketSync";
+import { usePermission } from "../../../hooks/usePermission";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -71,6 +72,7 @@ const storeTypeSchema = z.object({
 const StoreTypeList: React.FC = () => {
     const navigate = useNavigate();
     const dispatch = useAppDispatch();
+    const { can } = usePermission();
 
     const {
         data,
@@ -98,16 +100,18 @@ const StoreTypeList: React.FC = () => {
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     const fetchData = useCallback(() => {
-        dispatch(
-            fetchStoreTypes({
-                search: searchTerm,
-                page: currentPage,
-                limit: ITEMS_PER_PAGE,
-                sortBy: "code",
-                sortOrder: "asc",
-            })
-        );
-    }, [dispatch, searchTerm, currentPage]);
+        if (can("store-types.view")) {
+            dispatch(
+                fetchStoreTypes({
+                    search: searchTerm,
+                    page: currentPage,
+                    limit: ITEMS_PER_PAGE,
+                    sortBy: "code",
+                    sortOrder: "asc",
+                })
+            );
+        }
+    }, [dispatch, searchTerm, currentPage, can]);
 
     useSocketSync("store-type", undefined, fetchData);
 
@@ -275,11 +279,13 @@ const StoreTypeList: React.FC = () => {
                                     onChange={handleSearch}
                                 />
                             </div>
-                            <CustomButton
-                                text="Add Type"
-                                icon={FaPlus}
-                                onClick={handleOpenAdd}
-                            />
+                            {can("store-types.create") && (
+                                <CustomButton
+                                    text="Add Type"
+                                    icon={FaPlus}
+                                    onClick={handleOpenAdd}
+                                />
+                            )}
                         </div>
                     </div>
 
@@ -319,8 +325,8 @@ const StoreTypeList: React.FC = () => {
                                     render: (item) => (
                                         <div className="flex items-center gap-2">
                                             <ViewButton onClick={() => handleOpenView(item)} />
-                                            <EditButton onClick={() => handleOpenEdit(item)} />
-                                            <DeleteButton onClick={() => triggerDelete(item.id)} />
+                                            {can("store-types.edit") && <EditButton onClick={() => handleOpenEdit(item)} />}
+                                            {can("store-types.delete") && <DeleteButton onClick={() => triggerDelete(item.id)} />}
                                         </div>
                                     ),
                                     align: "left"

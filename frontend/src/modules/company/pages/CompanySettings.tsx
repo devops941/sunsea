@@ -11,6 +11,7 @@ import Button from "../../../components/ui/Button/Button";
 import CityStateSelect from "../../../components/ui/CityStateSelect/CityStateSelect";
 import IndiaPhoneInput from "../../../components/ui/PhoneInput/PhoneInput";
 import type { RootState, AppDispatch } from '../../../app/store';
+import { usePermission } from "../../../hooks/usePermission";
 import CommonLoader from "../../../components/ui/Loader/CommonLoader";
 import { fetchCompany, updateCompany } from '../../../features/company/companySlice';
 import type { UpdateCompanyDto } from '../../../features/company/types';
@@ -20,6 +21,8 @@ const CompanySettings: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const dispatch = useDispatch<AppDispatch>();
+  const { can } = usePermission();
+  const canEdit = can("company-settings.edit");
   const { data: company, loading } = useSelector((state: RootState) => state.company);
   
   const [phones, setPhones] = useState<any[]>([]);
@@ -124,6 +127,10 @@ const CompanySettings: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canEdit) {
+      toast.error("You do not have permission to edit company settings.");
+      return;
+    }
     if (!validate() || !company) return;
 
     try {
@@ -432,7 +439,9 @@ const CompanySettings: React.FC = () => {
           </div>
 
           <div className="flex flex-wrap justify-end gap-3 mt-8 pt-4 border-t border-gray-200">
-            <Button text={isEditMode ? "Save Changes" : "Create Company"} icon={FaSave} type="submit" disabled={loading} />
+            {canEdit && (
+                <Button text={isEditMode ? "Save Changes" : "Create Company"} icon={FaSave} type="submit" disabled={loading} />
+            )}
           </div>
         </form>
       </div>

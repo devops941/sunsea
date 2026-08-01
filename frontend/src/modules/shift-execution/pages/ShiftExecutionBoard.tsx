@@ -13,6 +13,7 @@ import { fetchShifts } from "../../../features/shifts/shiftSlice";
 import { createShiftRecord } from "../../../features/product-shift-records/productShiftRecordSlice";
 import TextInput from "../../../components/form/TextInput/TextInput";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
+import { useSocketSync } from "../../../hooks/useSocketSync";
 
 // Interface for local Downtime log
 interface DowntimeLog {
@@ -71,6 +72,14 @@ const ShiftExecutionBoard: React.FC = () => {
     dispatch(fetchMachines());
     dispatch(fetchShifts());
   }, [dispatch]);
+
+  // Real-time sync: refresh production orders and hourly logs when socket events arrive
+  useSocketSync("productionOrder", undefined, () => {
+    dispatch(fetchProductionOrders());
+  });
+  useSocketSync("hourlyProduction", undefined, () => {
+    dispatch(fetchHourlyProductions());
+  });
 
   // Load downtime logs from local storage when activeOrderId changes
   useEffect(() => {

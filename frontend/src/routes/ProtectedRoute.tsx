@@ -3,20 +3,24 @@ import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAppSelector, useAppDispatch } from "../hooks/reduxHooks";
 import { fetchCompany } from "../features/company/companySlice";
 import CommonLoader from "../components/ui/Loader/CommonLoader";
-import logo from '../../public/loaderimage.png'
+import logo from '../../public/loaderimage.png';
+import { usePermission } from "../hooks/usePermission";
 
 interface ProtectedRouteProps {
     permission?: string;
+    permissionAny?: string[];
     redirectPath?: string;
 }
 
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     permission,
-    redirectPath = "/dashboard",
+    permissionAny,
+    redirectPath = "/unauthorized",
 }) => {
     const dispatch = useAppDispatch();
-    const { isAuthenticated, permissions, isInitialized, user } = useAppSelector((state) => state.auth);
+    const { isAuthenticated, isInitialized } = useAppSelector((state) => state.auth);
     const { data: company, loading: companyLoading } = useAppSelector((state) => state.company);
+    const { can } = usePermission();
     const location = useLocation();
 
     useEffect(() => {
@@ -45,16 +49,11 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
         }
     }
 
-    // Role-based Access Control (RBAC) / Permissions check
-    const isAdmin =
-        user?.isSuperAdmin ||
-        user?.roleId === "ROLE_ADMIN" ||
-        user?.roleId === "SUPER_ADMIN" ||
-        user?.roleId === "ADMIN" ||
-        user?.roleId === "1";
-
-    if (permission && !isAdmin && !permissions.includes(permission)) {
-        console.warn(`Access Denied: Required permission "${permission}" not found on user. User role: ${user?.roleId}`);
+    // RBAC permission check — Super Admin bypasses automatically via usePermission
+    if (permission && !can(permission)) {
+        return <Navigate to={redirectPath} replace />;
+    }
+    if (permissionAny && permissionAny.length > 0 && !permissionAny.some(p => can(p))) {
         return <Navigate to={redirectPath} replace />;
     }
 

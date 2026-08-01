@@ -62,6 +62,7 @@ class DailyPlanService {
       "POST_PRODUCTION", // allow carrying forward production even if previous shifts are in post-production
       "PARTIAL_COMPLETED", // allow planning remaining quantity for partially completed orders
       "READY_FOR_DISPATCH", // allow planning remaining quantity if target is not yet fully met
+      "DISPATCHED", // allow if accidentally fully dispatched but target not met
     ];
     if (!dailyPlanAllowedStatuses.includes(productionOrder.status)) {
       throw new ApiError(
@@ -283,7 +284,7 @@ class DailyPlanService {
         data.status === "IN_PROGRESS" &&
         existingPlan.status !== "IN_PROGRESS"
       ) {
-        if (!["DAILY_PLANNED", "IN_PRODUCTION", "IN_PROGRESS", "WEEKLY_SCHEDULED", "MATERIAL_ISSUED", "POST_PRODUCTION", "PARTIAL_COMPLETED"].includes(productionOrder.status)) {
+        if (!["DAILY_PLANNED", "IN_PRODUCTION", "IN_PROGRESS", "WEEKLY_SCHEDULED", "MATERIAL_ISSUED", "POST_PRODUCTION", "PARTIAL_COMPLETED", "DISPATCHED"].includes(productionOrder.status)) {
           throw new ApiError(
             400,
             `Daily Plan cannot be started because the Production Order status is "${productionOrder.status}". ` +
@@ -321,15 +322,17 @@ class DailyPlanService {
           const customSteps = productionOrderFull.productItem?.productionSteps || [];
           const totalCustomStepsCount = customSteps.length;
           
-          if (data.status === "POST_PRODUCTION" && existingPlan.status !== "POST_PRODUCTION") {
+          if (data.status === "POST_PRODUCTION") {
             // First time entering POST_PRODUCTION
-            const firstStepName = totalCustomStepsCount > 0 ? customSteps[0].stepKey : "Post Production";
-            
-            updateData.currentStepIndex = 1;
-            updateData.currentProductionStep = firstStepName;
-            updateData.status = "POST_PRODUCTION";
+            if (existingPlan.status !== "POST_PRODUCTION") {
+              const firstStepName = totalCustomStepsCount > 0 ? customSteps[0].stepKey : "Post Production";
+              
+              updateData.currentStepIndex = 1;
+              updateData.currentProductionStep = firstStepName;
+              updateData.status = "POST_PRODUCTION";
+            }
 
-            if (productionOrderFull.status !== "POST_PRODUCTION" && productionOrderFull.status !== "READY_FOR_DISPATCH" && productionOrderFull.status !== "COMPLETED" && productionOrderFull.status !== "PARTIAL_COMPLETED") {
+            if (productionOrderFull.status !== "POST_PRODUCTION" && productionOrderFull.status !== "READY_FOR_DISPATCH" && productionOrderFull.status !== "COMPLETED" && productionOrderFull.status !== "PARTIAL_COMPLETED" && productionOrderFull.status !== "COMPLETED_WITH_SHORTFALL" && productionOrderFull.status !== "CLOSED") {
               if (data.shortClosePO) {
                 // ── PERMANENT STOP ──────────────────────────────────────────
                 // 1. Close this weekly program
@@ -337,10 +340,10 @@ class DailyPlanService {
                   where: { weeklyProgramId: checkWeeklyProgramId },
                   data: { status: "COMPLETED" },
                 });
-                // 2. Mark PO as PARTIAL_COMPLETED (locked — no new DPs allowed)
+                // 2. Mark PO as COMPLETED_WITH_SHORTFALL (locked — no new DPs allowed)
                 await tx.productionOrder.update({
                   where: { productionOrderId: checkProductionOrderId },
-                  data: { status: "PARTIAL_COMPLETED" },
+                  data: { status: "COMPLETED_WITH_SHORTFALL" },
                 });
                 // 3. Cascade-stop ALL other active DPs for this PO
                 const otherActiveDPs = await tx.dailyProductionPlan.findMany({
@@ -363,9 +366,32 @@ class DailyPlanService {
                     });
                   }
                 }
+
+                // Audit metadata details
+                let stopReasonOnly = "No reason provided";
+                if (data.remarks) {
+                  const parts = data.remarks.split("Stopped:");
+                  if (parts.length > 1) {
+                    stopReasonOnly = parts[parts.length - 1].trim();
+                  } else {
+                    stopReasonOnly = data.remarks;
+                  }
+                }
+                const targetQty = Number(productionOrderFull.targetQty || 0);
+                const producedQty = Number(productionOrderFull.producedQty || 0);
+                const cancelledQty = targetQty > producedQty ? targetQty - producedQty : 0;
+
                 await StatusSyncService.logHistory(
-                  tx, checkProductionOrderId, productionOrderFull.status, "PARTIAL_COMPLETED", userId,
-                  "Production force-stopped (Permanent Stop). All active plans closed. Proceeding to post-production.", "PARTIAL_COMPLETED"
+                  tx, checkProductionOrderId, productionOrderFull.status, "COMPLETED_WITH_SHORTFALL", userId,
+                  data.remarks || "Production force-stopped (Permanent Stop). All active plans closed. Proceeding to post-production.", "PERMANENT_STOP",
+                  {
+                    stopReason: stopReasonOnly,
+                    stopAction: "PERMANENT_STOP",
+                    producedQuantity: producedQty,
+                    cancelledQuantity: cancelledQty,
+                    user: userId,
+                    dateTime: new Date().toISOString()
+                  }
                 );
               } else {
                 await tx.productionOrder.update({
@@ -378,7 +404,7 @@ class DailyPlanService {
                 );
               }
             } else if (data.shortClosePO) {
-              // PO is already in POST_PRODUCTION or PARTIAL_COMPLETED — still close the weekly program and cascade-stop active DPs
+              // PO is already in POST_PRODUCTION or PARTIAL_COMPLETED/COMPLETED_WITH_SHORTFALL — still close the weekly program and cascade-stop active DPs
               await tx.weeklyMachineProgram.update({
                 where: { weeklyProgramId: checkWeeklyProgramId },
                 data: { status: "COMPLETED" },
@@ -402,11 +428,11 @@ class DailyPlanService {
                   });
                 }
               }
-              // Also ensure PO is PARTIAL_COMPLETED if not already
-              if (productionOrderFull.status !== "PARTIAL_COMPLETED") {
+              // Also ensure PO is COMPLETED_WITH_SHORTFALL if not already
+              if (productionOrderFull.status !== "COMPLETED_WITH_SHORTFALL" && productionOrderFull.status !== "CLOSED") {
                 await tx.productionOrder.update({
                   where: { productionOrderId: checkProductionOrderId },
-                  data: { status: "PARTIAL_COMPLETED" },
+                  data: { status: "COMPLETED_WITH_SHORTFALL" },
                 });
               }
             }
@@ -428,6 +454,11 @@ class DailyPlanService {
             updateData.currentStepIndex = totalCustomStepsCount + 1;
             updateData.currentProductionStep = "Completed";
             updateData.status = "COMPLETED";
+
+            // If this plan was previously short-closed but is now completing normally via POST_PRODUCTION, strip the Short Closed remarks
+            if (existingPlan.status === "POST_PRODUCTION" && existingPlan.remarks?.includes("Short Closed:")) {
+              updateData.remarks = existingPlan.remarks.replace(/Short Closed:\s*/g, "").replace(/\s*\|\s*/g, " | ").trim();
+            }
 
             // Check if all OTHER daily plans for this PO are completed or cancelled
             const otherPlans = await tx.dailyProductionPlan.findMany({
@@ -457,7 +488,7 @@ class DailyPlanService {
                     tx, checkProductionOrderId, productionOrderFull.status, "READY_FOR_DISPATCH", userId,
                     "All post-production steps completed and target quantity met. Ready for dispatch.", "READY_FOR_DISPATCH"
                   );
-                } else if (productionOrderFull.status !== "PARTIAL_COMPLETED" && productionOrderFull.status !== "DISPATCHED" && productionOrderFull.status !== "READY_FOR_DISPATCH") {
+                } else if (productionOrderFull.status !== "PARTIAL_COMPLETED" && productionOrderFull.status !== "COMPLETED_WITH_SHORTFALL" && productionOrderFull.status !== "CLOSED" && productionOrderFull.status !== "DISPATCHED" && productionOrderFull.status !== "READY_FOR_DISPATCH") {
                   await tx.productionOrder.update({
                     where: { productionOrderId: checkProductionOrderId },
                     data: { status: "PARTIAL_COMPLETED" },
@@ -478,19 +509,19 @@ class DailyPlanService {
                     tx, checkProductionOrderId, productionOrderFull.status, "READY_FOR_DISPATCH", userId,
                     "Production completed (short-closed). Target quantity met. Ready for dispatch.", "READY_FOR_DISPATCH"
                   );
-                } else if (!isTargetMet && !["PARTIAL_COMPLETED", "READY_FOR_DISPATCH", "DISPATCHED", "COMPLETED"].includes(productionOrderFull.status)) {
+                } else if (!isTargetMet && !["PARTIAL_COMPLETED", "COMPLETED_WITH_SHORTFALL", "CLOSED", "READY_FOR_DISPATCH", "DISPATCHED", "COMPLETED"].includes(productionOrderFull.status)) {
                   // Short-closed and target NOT met (Force Complete Stop): close the PO and Weekly Program
                   await tx.productionOrder.update({
                     where: { productionOrderId: checkProductionOrderId },
-                    data: { status: "PARTIAL_COMPLETED" },
+                    data: { status: "COMPLETED_WITH_SHORTFALL" },
                   });
                   await tx.weeklyMachineProgram.update({
                     where: { weeklyProgramId: checkWeeklyProgramId },
                     data: { status: "COMPLETED" },
                   });
                   await StatusSyncService.logHistory(
-                    tx, checkProductionOrderId, productionOrderFull.status, "PARTIAL_COMPLETED", userId,
-                    "Production force-stopped (Complete Stop). No further planning allowed. Eligible for partial dispatch.", "PARTIAL_COMPLETED"
+                    tx, checkProductionOrderId, productionOrderFull.status, "COMPLETED_WITH_SHORTFALL", userId,
+                    "Production force-stopped (Complete Stop). No further planning allowed. Eligible for partial dispatch.", "COMPLETED_WITH_SHORTFALL"
                   );
                 }
               }

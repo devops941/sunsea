@@ -1,4 +1,5 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
+import type { PayloadAction } from "@reduxjs/toolkit";
 import { productionOrderService } from "../../services/productionOrderService";
 import type { ProductionOrderState } from "./types";
 
@@ -60,7 +61,26 @@ const initialState: ProductionOrderState = {
 const productionOrderSlice = createSlice({
   name: "productionOrders",
   initialState,
-  reducers: {},
+  reducers: {
+    productionOrderCreated: (state, action: PayloadAction<any>) => {
+      const exists = state.data.find((item: any) => String(item.id) === String(action.payload.id));
+      if (!exists) {
+        state.data.unshift(action.payload);
+      }
+    },
+    productionOrderUpdated: (state, action: PayloadAction<any>) => {
+      const index = state.data.findIndex((item: any) => String(item.id) === String(action.payload.id));
+      if (index !== -1) {
+        state.data[index] = action.payload;
+      }
+    },
+    productionOrderDeleted: (state, action: PayloadAction<string | number>) => {
+      const index = state.data.findIndex((item: any) => String(item.id) === String(action.payload));
+      if (index !== -1) {
+        state.data.splice(index, 1);
+      }
+    },
+  },
   extraReducers: (builder) => {
     builder
       .addCase(fetchProductionOrders.pending, (state) => {
@@ -90,5 +110,6 @@ const productionOrderSlice = createSlice({
   },
 });
 
-export default productionOrderSlice.reducer;
+export const { productionOrderCreated, productionOrderUpdated, productionOrderDeleted } = productionOrderSlice.actions;
 
+export default productionOrderSlice.reducer;

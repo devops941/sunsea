@@ -1,9 +1,10 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { Container } from "react-bootstrap";
 import { useLocation, useNavigate } from "react-router-dom";
-import { FaPlay, FaHistory, FaTrashAlt, FaCalendarWeek, FaCalendarDay, FaClock, FaChartBar, FaTruck } from "react-icons/fa";
+import { FaPlay, FaHistory, FaTrashAlt, FaCalendarWeek, FaCalendarDay, FaClock, FaTruck } from "react-icons/fa";
 import Tabs from "../../../components/ui/tab/Tabs";
 import type { TabItem } from "../../../components/ui/tab/Tabs";
+import { usePermission } from "../../../hooks/usePermission";
 
 import ProductionOrderList from "./ProductionOrderList";
 import AllProductionOrderList from "./AllProductionOrderList";
@@ -12,13 +13,12 @@ import WeeklyMachineScheduleList from "../../weekly-machine-schedules/pages/Week
 import DailyProductionPlanningPage from "../../daily-machine-planning/pages/DailyProductionPlanningPage";
 import HourlyWorkReportList from "../../hourly-work-reports/pages/HourlyWorkReportList";
 import GoodsDispatchList from "../../goods-dispatch/pages/GoodsDispatchList";
-// import OeeDashboard from "../../dashboard/pages/OeeDashboard";
 
 const ProductionOrderTabs: React.FC = () => {
     const location = useLocation();
     const navigate = useNavigate();
+    const { can } = usePermission();
 
-    // Map pathnames to tab keys
     const pathToKey: Record<string, string> = {
         "/approved-sales-orders": "active",
         "/production-orders": "active",
@@ -28,7 +28,6 @@ const ProductionOrderTabs: React.FC = () => {
         "/hourly-work-reports": "hourly",
         "/production-wastages": "wastage",
         "/production/goods-dispatch": "dispatch",
-        "/oee-dashboard": "oee"
     };
 
     const keyToPath: Record<string, string> = {
@@ -39,21 +38,41 @@ const ProductionOrderTabs: React.FC = () => {
         "hourly": "/hourly-work-reports",
         "wastage": "/production-wastages",
         "dispatch": "/production/goods-dispatch",
-        "oee": "/oee-dashboard"
     };
 
-    const activeTab = pathToKey[location.pathname] || "history";
+    const tabs = useMemo<TabItem[]>(() => {
+        const result: TabItem[] = [];
 
-    const tabs: TabItem[] = [
-        { key: "history", label: "Order History", icon: <FaHistory />, content: <AllProductionOrderList /> },
-        { key: "active", label: "Production Orders", icon: <FaPlay />, content: <ProductionOrderList /> },
-        { key: "weekly", label: "Weekly Schedules", icon: <FaCalendarWeek />, content: <WeeklyMachineScheduleList /> },
-        { key: "daily", label: "Daily Planning", icon: <FaCalendarDay />, content: <DailyProductionPlanningPage /> },
-        { key: "hourly", label: "Hourly Production", icon: <FaClock />, content: <HourlyWorkReportList /> },
-        { key: "wastage", label: "Production Wastage", icon: <FaTrashAlt />, content: <WastageList /> },
-        { key: "dispatch", label: "Goods Dispatch", icon: <FaTruck />, content: <GoodsDispatchList /> },
-        // { key: "oee", label: "OEE Dashboard", icon: <FaChartBar />, content: <OeeDashboard /> }
-    ];
+        if (can("production_orders.view")) {
+            result.push({ key: "history", label: "Order History", icon: <FaHistory />, content: <AllProductionOrderList /> });
+            result.push({ key: "active", label: "Production Orders", icon: <FaPlay />, content: <ProductionOrderList /> });
+        }
+
+        if (can("weekly_programs.view")) {
+            result.push({ key: "weekly", label: "Weekly Schedules", icon: <FaCalendarWeek />, content: <WeeklyMachineScheduleList /> });
+        }
+
+        if (can("daily-machine-planning.view")) {
+            result.push({ key: "daily", label: "Daily Planning", icon: <FaCalendarDay />, content: <DailyProductionPlanningPage /> });
+        }
+
+        if (can("hourly_productions.view")) {
+            result.push({ key: "hourly", label: "Hourly Production", icon: <FaClock />, content: <HourlyWorkReportList /> });
+        }
+
+        if (can("production-wastages.view")) {
+            result.push({ key: "wastage", label: "Production Wastage", icon: <FaTrashAlt />, content: <WastageList /> });
+        }
+
+        if (can("goods-dispatch.view")) {
+            result.push({ key: "dispatch", label: "Goods Dispatch", icon: <FaTruck />, content: <GoodsDispatchList /> });
+        }
+
+        return result;
+    }, [can]);
+
+    const pathKey = pathToKey[location.pathname];
+    const activeTab = (pathKey && tabs.some(t => t.key === pathKey)) ? pathKey : tabs[0]?.key || "history";
 
     const handleTabChange = (key: string) => {
         const targetPath = keyToPath[key];
@@ -61,6 +80,14 @@ const ProductionOrderTabs: React.FC = () => {
             navigate(targetPath);
         }
     };
+
+    if (tabs.length === 0) {
+        return (
+            <div className="p-8 text-center text-slate-500">
+                You don't have permission to view any Production sections.
+            </div>
+        );
+    }
 
     return (
         <div className="inner-container">
