@@ -55,6 +55,34 @@ export const uploadProductImage = multer({
     },
 });
 
+// ─── Employee photo upload ────────────────────────────────────────────────────
+
+const employeePhotoStorage = isProduction
+    ? multer.memoryStorage()
+    : (() => {
+          const EMPLOYEE_UPLOAD_DIR = path.join(process.cwd(), "uploads", "employees");
+          ensureUploadDir(EMPLOYEE_UPLOAD_DIR);
+
+          return multer.diskStorage({
+              destination: (_req, _file, cb) => {
+                  cb(null, EMPLOYEE_UPLOAD_DIR);
+              },
+              filename: (_req, file, cb) => {
+                  const ext = path.extname(file.originalname).toLowerCase();
+                  const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+                  cb(null, `${unique}${ext}`);
+              },
+          });
+      })();
+
+export const uploadEmployeePhoto = multer({
+    storage: employeePhotoStorage,
+    fileFilter,
+    limits: {
+        fileSize: 5 * 1024 * 1024, // 5MB
+    },
+});
+
 const ALLOWED_INVOICE_TYPES = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
 
 function invoiceFileFilter(_req: Request, file: Express.Multer.File, cb: multer.FileFilterCallback) {

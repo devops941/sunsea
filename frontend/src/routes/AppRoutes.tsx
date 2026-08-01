@@ -30,6 +30,7 @@ const CustomerEditPage = lazy(() => import("../modules/customers/pages/CustomerE
 
 const EmployeeCreatePage = lazy(() => import("../modules/employee/pages/EmployeeCreate"));
 const EmployeeEdit = lazy(() => import("../modules/employee/pages/EmployeeEdit"));
+const EmployeeViewPage = lazy(() => import("../modules/employee/pages/EmployeeViewPage"));
 
 // Suppliers
 
@@ -244,6 +245,10 @@ const AppRoutes = () => {
             {/* Employees Create Route */}
             <Route element={<ProtectedRoute permission="employees.create" />}>
               <Route path="/employees/create" element={<EmployeeCreatePage />} />
+            </Route>
+            {/* Employees View :Id Route */}
+            <Route element={<ProtectedRoute permission="employees.view" />}>
+              <Route path="/employees/view/:id" element={<EmployeeViewPage />} />
             </Route>
             {/* Employees Edit :Id Route */}
             <Route element={<ProtectedRoute permission="employees.edit" />}>

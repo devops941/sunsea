@@ -1,421 +1,818 @@
-import React, { useState, useEffect, useMemo } from "react";
-import { FaSave, FaEraser, FaUser, FaKey, FaArrowLeft } from "react-icons/fa";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
+import { useSelector } from "react-redux";
+import {
+  FaUser, FaPhone, FaUsers, FaIdCard, FaMapMarkerAlt,
+  FaBriefcase, FaCalendarAlt, FaClock, FaMoneyBillWave, FaKey,
+  FaClipboardList, FaSave, FaChevronLeft, FaChevronRight, FaCamera,
+  FaRandom,
+} from "react-icons/fa";
+
 import TextInput from "../../../components/form/TextInput/TextInput";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
+import CityStateSelect from "../../../components/ui/CityStateSelect/CityStateSelect";
 import CustomButton from "../../../components/ui/Button/Button";
 import BackButton from "../../../components/ui/BackButton/BackButton";
-import { useEmployees } from "../../../hooks/useEmployees";
+import DatePickerCalendar from "../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 import { useDepartments } from "../../../hooks/useDepartments";
 import { useRoles } from "../../../hooks/useRoles";
 import { employeeService } from "../../../services/employeeService";
-import { useSelector } from "react-redux";
-import IndiaPhoneInput from "../../../components/ui/PhoneInput/PhoneInput";
-import { validatePhoneNumber } from "../../../components/ui/PhoneInput/PhoneInput";
+import apiClient from "../../../api/apiClient";
+
+// ─── helpers ────────────────────────────────────────────────────────────────
+
+function calcAge(dob: string): string {
+  if (!dob) return "";
+  const birth = new Date(dob);
+  const now = new Date();
+  let age = now.getFullYear() - birth.getFullYear();
+  const m = now.getMonth() - birth.getMonth();
+  if (m < 0 || (m === 0 && now.getDate() < birth.getDate())) age--;
+  return age >= 0 ? String(age) : "";
+}
+
+function calcExperience(dateOfJoining: string): string {
+  if (!dateOfJoining) return "";
+  const start = new Date(dateOfJoining);
+  const now = new Date();
+  let years = now.getFullYear() - start.getFullYear();
+  let months = now.getMonth() - start.getMonth();
+  if (months < 0) { years--; months += 12; }
+  if (years < 0) return "";
+  const parts: string[] = [];
+  if (years > 0) parts.push(`${years} year${years !== 1 ? "s" : ""}`);
+  if (months > 0) parts.push(`${months} month${months !== 1 ? "s" : ""}`);
+  return parts.length ? parts.join(" ") : "Less than a month";
+}
+
+function generatePassword(): string {
+  const upper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  const lower = "abcdefghijklmnopqrstuvwxyz";
+  const digits = "0123456789";
+  const symbols = "!@#$%^&*";
+  const all = upper + lower + digits + symbols;
+  const rand = (s: string) => s[Math.floor(Math.random() * s.length)];
+  let pw = rand(upper) + rand(lower) + rand(digits) + rand(symbols);
+  for (let i = 4; i < 12; i++) pw += rand(all);
+  return pw.split("").sort(() => Math.random() - 0.5).join("");
+}
+
+// ─── tab definitions ─────────────────────────────────────────────────────────
+
+const TABS = [
+  { id: 0, label: "Basic Info", icon: FaUser },
+  { id: 1, label: "Contact", icon: FaPhone },
+  { id: 2, label: "Family", icon: FaUsers },
+  { id: 3, label: "Identity", icon: FaIdCard },
+  { id: 4, label: "Address", icon: FaMapMarkerAlt },
+  { id: 5, label: "Official Info", icon: FaBriefcase },
+  { id: 6, label: "Joining", icon: FaCalendarAlt },
+  { id: 7, label: "Shift", icon: FaClock },
+  { id: 8, label: "Payroll", icon: FaMoneyBillWave },
+  { id: 9, label: "Login Account", icon: FaKey },
+  { id: 10, label: "Audit", icon: FaClipboardList },
+];
+
+// ─── form state type ──────────────────────────────────────────────────────────
+
+interface FormState {
+  // Basic Info
+  empCode: string;
+  fullName: string;
+  gender: string;
+  dateOfBirth: string;
+  bloodGroup: string;
+  maritalStatus: string;
+  employeeStatus: string;
+  photoFile: File | null;
+  photoPreview: string;
+  // Contact
+  personalMobile: string;
+  officialMobile: string;
+  personalEmail: string;
+  officialEmail: string;
+  emergencyContactName: string;
+  emergencyContactNumber: string;
+  // Family
+  fatherName: string;
+  motherName: string;
+  spouseName: string;
+  guardianName: string;
+  // Identity
+  aadhaarNumber: string;
+  panNumber: string;
+  drivingLicense: string;
+  voterId: string;
+  // Address
+  permAddress1: string;
+  permAddress2: string;
+  permCity: string;
+  permState: string;
+  permPincode: string;
+  sameAsPermanent: boolean;
+  presAddress1: string;
+  presAddress2: string;
+  presCity: string;
+  presState: string;
+  presPincode: string;
+  // Official Info
+  departmentId: string;
+  designation: string;
+  employeeType: string;
+  // Joining
+  dateOfJoining: string;
+  relievingDate: string;
+  previousExperience: string;
+  probationPeriod: string;
+  noticePeriod: string;
+  // Shift
+  shiftId: string;
+  // Payroll
+  salaryType: string;
+  basicSalary: string;
+  grossSalary: string;
+  pfApplicable: boolean;
+  pfNumber: string;
+  uanNumber: string;
+  esiApplicable: boolean;
+  esiNumber: string;
+  professionalTax: boolean;
+  tdsApplicable: boolean;
+  bankName: string;
+  bankBranch: string;
+  accountNumber: string;
+  ifscCode: string;
+  accountHolderName: string;
+  // Login Account
+  createLoginAccount: boolean;
+  username: string;
+  password: string;
+  roleId: string;
+  mustChangePw: boolean;
+  loginEnabled: boolean;
+}
+
+const INITIAL_STATE: FormState = {
+  empCode: "", fullName: "", gender: "", dateOfBirth: "", bloodGroup: "",
+  maritalStatus: "", employeeStatus: "active", photoFile: null, photoPreview: "",
+  personalMobile: "", officialMobile: "", personalEmail: "", officialEmail: "",
+  emergencyContactName: "", emergencyContactNumber: "",
+  fatherName: "", motherName: "", spouseName: "", guardianName: "",
+  aadhaarNumber: "", panNumber: "", drivingLicense: "", voterId: "",
+  permAddress1: "", permAddress2: "", permCity: "", permState: "", permPincode: "",
+  sameAsPermanent: false,
+  presAddress1: "", presAddress2: "", presCity: "", presState: "", presPincode: "",
+  departmentId: "", designation: "", employeeType: "",
+  dateOfJoining: "", relievingDate: "", previousExperience: "",
+  probationPeriod: "", noticePeriod: "",
+  shiftId: "",
+  salaryType: "", basicSalary: "", grossSalary: "",
+  pfApplicable: false, pfNumber: "", uanNumber: "",
+  esiApplicable: false, esiNumber: "",
+  professionalTax: false, tdsApplicable: false,
+  bankName: "", bankBranch: "", accountNumber: "", ifscCode: "", accountHolderName: "",
+  createLoginAccount: false, username: "", password: "", roleId: "",
+  mustChangePw: false, loginEnabled: true,
+};
+
+// ─── section header ───────────────────────────────────────────────────────────
+
+const SectionHeader: React.FC<{ icon: React.ElementType; title: string; color?: string }> = ({
+  icon: Icon, title, color = "text-primary",
+}) => (
+  <div className="flex items-center gap-2 mb-5 pb-2 border-b border-slate-100">
+    <Icon className={`${color} text-lg`} />
+    <h3 className="text-base font-semibold text-slate-700">{title}</h3>
+  </div>
+);
+
+// ─── toggle switch ────────────────────────────────────────────────────────────
+
+const Toggle: React.FC<{ label: string; value: boolean; onChange: (v: boolean) => void }> = ({
+  label, value, onChange,
+}) => (
+  <div className="flex items-center gap-3">
+    <label className="text-xs font-bold uppercase tracking-[0.5px] text-slate-500">{label}</label>
+    <label className="relative inline-flex cursor-pointer items-center">
+      <input type="checkbox" className="sr-only" checked={value} onChange={(e) => onChange(e.target.checked)} />
+      <div className={`block w-14 h-8 rounded-full transition-colors duration-300 ${value ? "bg-primary" : "bg-gray-300"}`} />
+      <div className={`dot absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition-transform duration-300 ${value ? "transform translate-x-6" : ""}`} />
+    </label>
+    <span className="text-sm font-medium text-slate-600">{value ? "YES" : "NO"}</span>
+  </div>
+);
+
+// ─── main component ───────────────────────────────────────────────────────────
 
 const EmployeeCreatePage: React.FC = () => {
   const navigate = useNavigate();
-  const { addEmployee, employees, loadEmployees } = useEmployees();
+  const user = useSelector((state: any) => state.auth.user);
   const { departments, loadDepartments } = useDepartments();
   const { roles, loadRoles } = useRoles();
-  const user = useSelector((state: any) => state.auth.user);
+
+  const [activeTab, setActiveTab] = useState(0);
+  const [form, setForm] = useState<FormState>(INITIAL_STATE);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [shifts, setShifts] = useState<{ id: string | number; name: string }[]>([]);
+  const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({});
+  const photoInputRef = useRef<HTMLInputElement>(null);
 
-  const [formData, setFormData] = useState({
-    empCode: "",
-    fullName: "",
-    mobile: "",
-    email: "",
-    departmentId: "",
-    status: "active",
-    createLoginAccount: false,
-    username: "",
-    password: "",
-    roleId: "",
-    userStatus: "active",
-    createdByOn: user?.username,
-  });
-
-  useEffect(() => {
-    const fetchCode = async () => {
-      try {
-        const nextCode = await employeeService.fetchNextCode();
-        if (nextCode) {
-          setFormData(prev => ({ ...prev, empCode: nextCode }));
-        }
-      } catch (err) {
-        console.error("Error fetching next employee code:", err);
-      }
-    };
-    fetchCode();
-  }, []);
-
+  // ── fetch next emp code, departments, roles, shifts
   useEffect(() => {
     const init = async () => {
-      await loadDepartments();
-      await loadRoles();
-      await loadEmployees({ limit: 1000 });
+      try {
+        const code = await employeeService.fetchNextCode();
+        if (code) setForm((p) => ({ ...p, empCode: code }));
+      } catch { /* silent */ }
     };
-
     init();
-  }, [loadDepartments, loadRoles, loadEmployees]);
+    loadDepartments();
+    loadRoles();
+    apiClient.get("/shifts").then((res) => {
+      const data = res.data?.data || res.data || [];
+      setShifts(Array.isArray(data) ? data : []);
+    }).catch(() => {});
+  }, [loadDepartments, loadRoles]);
 
+  // ── auto-suggest username from empCode
+  useEffect(() => {
+    if (!form.createLoginAccount || form.username) return;
+    if (form.empCode) setForm((p) => ({ ...p, username: p.empCode.toLowerCase() }));
+  }, [form.empCode, form.createLoginAccount]);
+
+  // ── field change handler
   const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement> | { target: { name: string; value: any } }
   ) => {
-    const { name, value, type } = e.target;
-    const val = type === "checkbox"
-      ? (e.target as HTMLInputElement).checked
-      : value;
+    const { name, value } = e.target;
+    setForm((p) => {
+      const next = { ...p, [name]: value };
 
-    // BUG-EMP-007 fix: removed stale designationId reference that does not exist in formData
-    setFormData(prev => ({
-      ...prev,
-      [name]: val,
-    }));
+      // same-as-permanent logic
+      if (name === "sameAsPermanent") {
+        const checked = (e as React.ChangeEvent<HTMLInputElement>).target.checked ?? value;
+        next.sameAsPermanent = checked;
+        if (checked) {
+          next.presAddress1 = p.permAddress1;
+          next.presAddress2 = p.permAddress2;
+          next.presCity = p.permCity;
+          next.presState = p.permState;
+          next.presPincode = p.permPincode;
+        }
+      }
 
-    if (errors[name as keyof FormErrors]) {
-      setErrors(prev => ({ ...prev, [name]: undefined }));
+      // propagate permanent -> present when sameAsPermanent is on
+      if (p.sameAsPermanent && ["permAddress1","permAddress2","permCity","permState","permPincode"].includes(name)) {
+        const map: Record<string, keyof FormState> = {
+          permAddress1: "presAddress1", permAddress2: "presAddress2",
+          permCity: "presCity", permState: "presState", permPincode: "presPincode",
+        };
+        (next as any)[map[name]] = value;
+      }
+
+      return next;
+    });
+    if (errors[name as keyof FormState]) {
+      setErrors((p) => ({ ...p, [name]: undefined }));
     }
   };
 
-  const handleClear = () => {
-    setFormData({
-      empCode: formData.empCode,
-      fullName: "",
-      mobile: "",
-      email: "",
-      departmentId: "",
-      status: "active",
-      createLoginAccount: false,
-      username: "",
-      password: "",
-      roleId: "",
-      userStatus: "active",
-      createdByOn: user?.username,
-    });
-    setErrors({});
+  const handleToggle = (name: keyof FormState) => (v: boolean) => {
+    setForm((p) => ({ ...p, [name]: v }));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // ── photo upload
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const preview = URL.createObjectURL(file);
+    setForm((p) => ({ ...p, photoFile: file, photoPreview: preview }));
+  };
 
+  // ── derived values
+  const age = calcAge(form.dateOfBirth);
+  const currentExperience = calcExperience(form.dateOfJoining);
+
+  // ── dropdown options
+  const departmentOptions = useMemo(() =>
+    departments.map((d) => ({ value: String(d.id), label: d.name })),
+    [departments]
+  );
+
+  const roleOptions = useMemo(() => {
+    const excluded = ["ROLE_ADMIN", "Super Admin", "System Administrator"];
+    return roles
+      .filter((r) => !excluded.includes(r.name))
+      .map((r) => ({ value: String(r.id), label: r.name }));
+  }, [roles]);
+
+  const shiftOptions = useMemo(() =>
+    shifts.map((s: any) => ({ value: String(s.shiftCode), label: s.shiftName })),
+    [shifts]
+  );
+
+  // ── validation
+  const validate = (): boolean => {
+    const e: Partial<Record<keyof FormState, string>> = {};
+    if (!form.empCode.trim()) e.empCode = "Employee code is required";
+    if (!form.fullName.trim()) e.fullName = "Employee name is required";
+    if (!form.officialMobile.trim()) e.officialMobile = "Official mobile is required";
+    if (!form.officialEmail.trim()) e.officialEmail = "Official email is required";
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.officialEmail.trim())) e.officialEmail = "Enter a valid email";
+    if (!form.departmentId) e.departmentId = "Department is required";
+    if (form.createLoginAccount && !form.roleId) e.roleId = "Role is required";
+    if (form.createLoginAccount && !form.username.trim()) e.username = "Username is required";
+    if (form.createLoginAccount && !form.password.trim()) e.password = "Password is required";
+
+    setErrors(e);
+    if (Object.keys(e).length > 0) {
+      toast.error(Object.values(e)[0]);
+      return false;
+    }
+    return true;
+  };
+
+  // ── build FormData & submit
+  const handleSubmit = async () => {
     if (!validate() || isSubmitting) return;
     setIsSubmitting(true);
-
     try {
-      const payload: any = {
-        empCode: formData.empCode,
-        fullName: formData.fullName,
-        mobile: formData.mobile || undefined,
-        email: formData.email || undefined,
-        departmentId: formData.departmentId ? Number(formData.departmentId) : undefined,
-        status: formData.status as any,
-        createLoginAccount: formData.createLoginAccount,
-        createdBy: user ? user?.userId : undefined,
-      };
+      const fd = new FormData();
+      fd.append("empCode", form.empCode);
+      fd.append("fullName", form.fullName);
+      if (form.gender) fd.append("gender", form.gender);
+      if (form.dateOfBirth) fd.append("dateOfBirth", form.dateOfBirth);
+      if (form.bloodGroup) fd.append("bloodGroup", form.bloodGroup);
+      if (form.maritalStatus) fd.append("maritalStatus", form.maritalStatus);
+      fd.append("status", form.employeeStatus || "active");
 
-      // If a role is selected but they didn't toggle createLoginAccount, auto-create one
-      // because in the database, role belongs to the User (Login Account).
-      if (formData.createLoginAccount || formData.roleId) {
-        payload.createLoginAccount = true;
-        payload.loginAccount = {
-          username: formData.createLoginAccount ? formData.username : formData.empCode,
-          password: formData.createLoginAccount ? formData.password : "Sunsea@123",
-          roleId: Number(formData.roleId),
-          status: formData.userStatus || "active",
+      if (form.photoFile) fd.append("photo", form.photoFile);
+
+      // contact
+      if (form.personalMobile) fd.append("personalMobile", form.personalMobile);
+      fd.append("mobile", form.officialMobile);
+      if (form.personalEmail) fd.append("personalEmail", form.personalEmail);
+      fd.append("email", form.officialEmail);
+      if (form.emergencyContactName) fd.append("emergencyContactName", form.emergencyContactName);
+      if (form.emergencyContactNumber) fd.append("emergencyContactNumber", form.emergencyContactNumber);
+
+      // family
+      if (form.fatherName) fd.append("fatherName", form.fatherName);
+      if (form.motherName) fd.append("motherName", form.motherName);
+      if (form.spouseName) fd.append("spouseName", form.spouseName);
+      if (form.guardianName) fd.append("guardianName", form.guardianName);
+
+      // identity
+      if (form.aadhaarNumber) fd.append("aadhaarNumber", form.aadhaarNumber);
+      if (form.panNumber) fd.append("panNumber", form.panNumber);
+      if (form.drivingLicense) fd.append("drivingLicense", form.drivingLicense);
+      if (form.voterId) fd.append("voterId", form.voterId);
+
+      // address — use backend schema field names
+      if (form.permAddress1) fd.append("permanentAddressLine1", form.permAddress1);
+      if (form.permAddress2) fd.append("permanentAddressLine2", form.permAddress2);
+      if (form.permCity)     fd.append("permanentCity",         form.permCity);
+      if (form.permState)    fd.append("permanentState",        form.permState);
+      if (form.permPincode)  fd.append("permanentPincode",      form.permPincode);
+      if (form.presAddress1) fd.append("presentAddressLine1",   form.presAddress1);
+      if (form.presAddress2) fd.append("presentAddressLine2",   form.presAddress2);
+      if (form.presCity)     fd.append("presentCity",           form.presCity);
+      if (form.presState)    fd.append("presentState",          form.presState);
+      if (form.presPincode)  fd.append("presentPincode",        form.presPincode);
+
+      // official
+      if (form.departmentId) fd.append("departmentId", form.departmentId);
+      if (form.designation) fd.append("designation", form.designation);
+      if (form.employeeType) fd.append("employeeType", form.employeeType);
+
+      // joining
+      if (form.dateOfJoining) fd.append("dateOfJoining", form.dateOfJoining);
+      if (form.relievingDate) fd.append("relievingDate", form.relievingDate);
+      if (form.previousExperience) fd.append("previousExperience", form.previousExperience);
+      if (form.probationPeriod) fd.append("probationPeriod", form.probationPeriod);
+      if (form.noticePeriod) fd.append("noticePeriod", form.noticePeriod);
+
+      // shift
+      if (form.shiftId) fd.append("shiftId", form.shiftId);
+
+      // payroll
+      if (form.salaryType) fd.append("salaryType", form.salaryType);
+      if (form.basicSalary) fd.append("basicSalary", form.basicSalary);
+      if (form.grossSalary) fd.append("grossSalary", form.grossSalary);
+      fd.append("pfApplicable", String(form.pfApplicable));
+      if (form.pfApplicable && form.pfNumber) fd.append("pfNumber", form.pfNumber);
+      if (form.pfApplicable && form.uanNumber) fd.append("uanNumber", form.uanNumber);
+      fd.append("esiApplicable", String(form.esiApplicable));
+      if (form.esiApplicable && form.esiNumber) fd.append("esiNumber", form.esiNumber);
+      fd.append("professionalTax", String(form.professionalTax));
+      fd.append("tdsApplicable", String(form.tdsApplicable));
+      if (form.bankName) fd.append("bankName", form.bankName);
+      if (form.bankBranch) fd.append("bankBranch", form.bankBranch);
+      if (form.accountNumber) fd.append("accountNumber", form.accountNumber);
+      if (form.ifscCode) fd.append("ifscCode", form.ifscCode);
+      if (form.accountHolderName) fd.append("accountHolderName", form.accountHolderName);
+
+      // login account
+      fd.append("createLoginAccount", String(form.createLoginAccount));
+      if (form.createLoginAccount) {
+        const loginAccount = {
+          username: form.username,
+          password: form.password,
+          roleId: Number(form.roleId),
+          status: form.loginEnabled ? "active" : "suspended",
+          mustChangePw: form.mustChangePw,
         };
+        fd.append("loginAccount", JSON.stringify(loginAccount));
       }
 
-      await addEmployee(payload);
+      if (user?.userId) fd.append("createdBy", String(user.userId));
+
+      await employeeService.create(fd as any);
       toast.success("Employee created successfully!");
       navigate("/employees");
     } catch (err: any) {
-      toast.error(err || "Failed to create employee");
+      toast.error(err?.response?.data?.message || err?.message || "Failed to create employee");
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const departmentOptions = useMemo(() => {
-    return departments.map((d) => ({
-      value: String(d.id),
-      label: d.name,
-    }));
-  }, [departments]);
+  // ─── tab content renderers ────────────────────────────────────────────────
 
-  const roleOptions = useMemo(() => {
-    const excludedRoles = ["ROLE_ADMIN", "Super Admin", "System Administrator"];
-    return roles
-      .filter((r) => !excludedRoles.includes(r.name))
-      .map(r => ({ value: String(r.id), label: r.name }));
-  }, [roles]);
+  const renderTab0 = () => (
+    <div>
+      <SectionHeader icon={FaUser} title="Basic Information" />
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+        <TextInput label="Employee Code" name="empCode" value={form.empCode} onChange={handleChange} disabled required error={errors.empCode} placeholder="Auto-generated" />
+        <TextInput label="Employee Name" name="fullName" value={form.fullName} onChange={handleChange} required error={errors.fullName} placeholder="Full name" />
+        <SelectInput label="Gender" name="gender" value={form.gender} onChange={handleChange}
+          defaultOptionLabel="Select Gender"
+          options={[{ value: "male", label: "Male" }, { value: "female", label: "Female" }, { value: "other", label: "Other" }]} />
+        <DatePickerCalendar label="Date of Birth" name="dateOfBirth" value={form.dateOfBirth}
+          onChange={handleChange} placeholder="Select DOB" maxDate={new Date()} />
+        <TextInput label="Age (years)" name="_age" value={age} onChange={() => {}} disabled placeholder="Auto-calculated" />
+        <SelectInput label="Blood Group" name="bloodGroup" value={form.bloodGroup} onChange={handleChange}
+          defaultOptionLabel="Select Blood Group"
+          options={["A+","A-","B+","B-","O+","O-","AB+","AB-"].map((g) => ({ value: g, label: g }))} />
+        <SelectInput label="Marital Status" name="maritalStatus" value={form.maritalStatus} onChange={handleChange}
+          defaultOptionLabel="Select Status"
+          options={["Single","Married","Divorced","Widowed"].map((s) => ({ value: s.toLowerCase(), label: s }))} />
+        <SelectInput label="Employee Status" name="employeeStatus" value={form.employeeStatus} onChange={handleChange}
+          options={[
+            { value: "active", label: "Active" }, { value: "inactive", label: "Inactive" },
+            { value: "resigned", label: "Resigned" }, { value: "retired", label: "Retired" },
+            { value: "terminated", label: "Terminated" },
+          ]} />
+      </div>
 
-  interface FormErrors {
-    empCode?: string;
-    fullName?: string;
-    mobile?: string;
-    email?: string;
-    username?: string;
-    password?: string;
-    roleId?: string;
-    departmentId?: string;
-  }
-
-  const [errors, setErrors] = useState<FormErrors>({});
-
-  const validate = (): boolean => {
-    const newErrors: FormErrors = {};
-
-    if (!formData.empCode.trim()) {
-      newErrors.empCode = "Employee code is required";
-    }
-
-    if (!formData.fullName.trim()) {
-      newErrors.fullName = "Employee name is required";
-    }
-
-    if (!formData.mobile) {
-      newErrors.mobile = "Mobile number is required";
-    } else {
-      const mobileError = validatePhoneNumber(formData.mobile, true);
-      if (mobileError) {
-        newErrors.mobile = mobileError;
-      }
-    }
-
-    // BUG-EMP-003 fix: department is required on Create (consistent enforcement)
-    if (!formData.departmentId) {
-      newErrors.departmentId = "Department is required";
-    }
-
-    if (!formData.email) {
-      newErrors.email = "Email address is required";
-    } else {
-      const emailFormatValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim());
-      if (!emailFormatValid) {
-        newErrors.email = "Enter a valid email address";
-      } else {
-        const emailExists = employees.some(
-          (emp) => emp.email?.toLowerCase().trim() === formData.email.toLowerCase().trim()
-        );
-        if (emailExists) {
-          newErrors.email = "Email already exists";
-        }
-      }
-    }
-
-    if (!formData.roleId) {
-      newErrors.roleId = "Role is required";
-    }
-
-    if (formData.createLoginAccount) {
-      if (!formData.username.trim()) {
-        newErrors.username = "Username is required";
-      }
-      if (!formData.password.trim()) {
-        newErrors.password = "Password is required";
-      } else if (formData.password.length < 6) {
-        newErrors.password = "Password must be at least 6 characters";
-      }
-    }
-
-    setErrors(newErrors);
-
-    if (Object.keys(newErrors).length > 0) {
-      toast.error(`Validation failed: ${Object.values(newErrors)[0]}`);
-      return false;
-    }
-
-    return true;
-  };
-
-  return (
-    <div className="w-full mx-auto">
-      <div className="bg-white shadow-sm border border-slate-200 overflow-hidden">
-        <div className="px-6 py-5 border-b border-slate-200">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <h2 className="text-xl font-bold text-slate-800">Create Employee</h2>
-            <BackButton />
-          </div>
-        </div>
-
-        <form onSubmit={handleSubmit} className="px-6 py-5 space-y-8" noValidate>
-          {/* General Info */}
-          <div>
-            <div className="flex items-center gap-2 mb-6 pb-2 border-b border-gray-100">
-              {/* <FaUser className="text-primary text-xl" /> */}
-              <h3 className="text-lg font-semibold text-gray-700">Basic & Professional Information</h3>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              <TextInput
-                label="Employee Code"
-                name="empCode"
-                value={formData.empCode}
-                placeholder="e.g. EMP001"
-                required
-                onChange={handleChange}
-                error={errors.empCode}
-                disabled
-              />
-
-              <TextInput
-                label="Employee Name"
-                name="fullName"
-                value={formData.fullName}
-                placeholder="Enter Employee Name"
-                required
-                onChange={handleChange}
-                error={errors.fullName}
-              />
-
-              <IndiaPhoneInput
-                label="Phone Number"
-                name="mobile"
-                value={formData.mobile}
-                placeholder="Enter Mobile Number"
-                required
-                onChange={(e) => handleChange(e as any)}
-                error={errors.mobile}
-              />
-
-              <TextInput
-                label="Email Address"
-                name="email"
-                type="email"
-                value={formData.email}
-                placeholder="Enter Email Address"
-                required
-                onChange={handleChange}
-                error={errors.email}
-              />
-
-              <SelectInput
-                label="Department"
-                name="departmentId"
-                value={formData.departmentId}
-                options={departmentOptions}
-                defaultOptionLabel="Select Department"
-                required
-                onChange={handleChange}
-                error={errors.departmentId}
-              />
-
-                <SelectInput
-                  label="Role"
-                  name="roleId"
-                  value={formData.roleId}
-                  options={roleOptions}
-                  defaultOptionLabel="Select Role"
-                  required
-                  onChange={handleChange}
-                  error={errors.roleId}
-                />
-
-              <SelectInput
-                label="Status"
-                name="status"
-                value={formData.status}
-                options={[
-                  { value: "active", label: "Active" },
-                  { value: "inactive", label: "Inactive" },
-                  { value: "resigned", label: "Resigned" },
-                  { value: "terminated", label: "Terminated" },
-                ]}
-                onChange={handleChange}
-              />
-
-              <TextInput
-                label="Created By"
-                name="createdByOn"
-                value={formData.createdByOn}
-                required
-                onChange={handleChange}
-                disabled
-              />
-            </div>
-          </div>
-
-          {/* User Login Account Section */}
-          <div>
-            <div className="flex items-center justify-between mb-6 pb-2 border-b border-gray-100">
-              <div className="flex items-center gap-2">
-                {/* <FaKey className="text-primary text-xl" /> */}
-                <h3 className="text-lg font-semibold text-gray-700">Login Account Details</h3>
-              </div>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <span className="text-sm font-semibold text-primary">Create Login Account</span>
-                <div className="relative">
-                  <input
-                    type="checkbox"
-                    className="sr-only"
-                    name="createLoginAccount"
-                    checked={formData.createLoginAccount}
-                    onChange={handleChange}
-                  />
-                  <div className={`block w-14 h-8 rounded-full transition-colors duration-300 ${formData.createLoginAccount ? 'bg-primary' : 'bg-gray-300'}`}></div>
-                  <div className={`dot absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition-transform duration-300 ${formData.createLoginAccount ? 'transform translate-x-6' : ''}`}></div>
-                </div>
-              </label>
-            </div>
-
-            {formData.createLoginAccount && (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 bg-white p-6 rounded-xl border border-slate-100 animate-[fadeIn_0.3s_ease]">
-                <TextInput
-                  label="Username"
-                  name="username"
-                  value={formData.username}
-                  placeholder="Enter username"
-                  required
-                  onChange={handleChange}
-                  error={errors.username}
-                />
-
-                <TextInput
-                  label="Password"
-                  name="password"
-                  type="password"
-                  value={formData.password}
-                  placeholder="Enter password"
-                  required
-                  onChange={handleChange}
-                  error={errors.password}
-                />
-
-              
-
-                <SelectInput
-                  label="User Status"
-                  name="userStatus"
-                  value={formData.userStatus}
-                  options={[
-                    { value: "active", label: "Active" },
-                    { value: "suspended", label: "Suspended" },
-                    { value: "locked", label: "Locked" },
-                  ]}
-                  onChange={handleChange}
-                />
+      {/* Photo upload */}
+      <div className="mt-6">
+        <SectionHeader icon={FaCamera} title="Profile Photo" />
+        <div className="flex items-center gap-6">
+          <div
+            className="w-28 h-28 rounded-full border-2 border-dashed border-slate-300 flex items-center justify-center bg-slate-50 overflow-hidden cursor-pointer hover:border-primary transition-colors"
+            onClick={() => photoInputRef.current?.click()}
+          >
+            {form.photoPreview ? (
+              <img src={form.photoPreview} alt="Preview" className="w-full h-full object-cover" />
+            ) : (
+              <div className="flex flex-col items-center gap-1 text-slate-400">
+                <FaCamera size={24} />
+                <span className="text-xs">Upload Photo</span>
               </div>
             )}
           </div>
-
-          <div className="flex flex-wrap justify-end gap-3 mt-8 pt-4 border-t border-gray-200">
-            <CustomButton
-              text="Clear"
-              icon={FaEraser}
-              onClick={handleClear}
-
-            />
-            <CustomButton
-              text={isSubmitting ? "Saving..." : "Save Employee"}
-              icon={FaSave}
-              type="submit"
-              disabled={isSubmitting}
-            />
+          <div>
+            <button
+              type="button"
+              onClick={() => photoInputRef.current?.click()}
+              className="px-4 py-2 text-sm font-medium text-primary border border-primary rounded-lg hover:bg-primary/5 transition-colors"
+            >
+              {form.photoPreview ? "Change Photo" : "Choose Photo"}
+            </button>
+            <p className="text-xs text-slate-400 mt-1">JPG, PNG, GIF up to 5MB</p>
+            <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoChange} />
           </div>
-        </form>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderTab1 = () => (
+    <div>
+      <SectionHeader icon={FaPhone} title="Contact Information" />
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <TextInput label="Personal Mobile Number" name="personalMobile" value={form.personalMobile} onChange={handleChange} placeholder="Personal mobile" />
+        <TextInput label="Official Mobile Number" name="officialMobile" value={form.officialMobile} onChange={handleChange} required error={errors.officialMobile} placeholder="Official mobile" />
+        <TextInput label="Personal Email Address" name="personalEmail" type="email" value={form.personalEmail} onChange={handleChange} placeholder="Personal email" />
+        <TextInput label="Official Email Address" name="officialEmail" type="email" value={form.officialEmail} onChange={handleChange} required error={errors.officialEmail} placeholder="Official email" />
+        <TextInput label="Emergency Contact Name" name="emergencyContactName" value={form.emergencyContactName} onChange={handleChange} placeholder="Emergency contact name" />
+        <TextInput label="Emergency Contact Number" name="emergencyContactNumber" value={form.emergencyContactNumber} onChange={handleChange} placeholder="Emergency contact number" />
+      </div>
+    </div>
+  );
+
+  const renderTab2 = () => (
+    <div>
+      <SectionHeader icon={FaUsers} title="Family Details" />
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <TextInput label="Father Name" name="fatherName" value={form.fatherName} onChange={handleChange} placeholder="Father's name" />
+        <TextInput label="Mother Name" name="motherName" value={form.motherName} onChange={handleChange} placeholder="Mother's name" />
+        <TextInput label="Husband / Wife Name" name="spouseName" value={form.spouseName} onChange={handleChange} placeholder="Spouse's name" />
+        <TextInput label="Guardian Name" name="guardianName" value={form.guardianName} onChange={handleChange} placeholder="Guardian's name" />
+      </div>
+    </div>
+  );
+
+  const renderTab3 = () => (
+    <div>
+      <SectionHeader icon={FaIdCard} title="Identity Documents" />
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <TextInput label="Aadhaar Number" name="aadhaarNumber" value={form.aadhaarNumber} onChange={handleChange} placeholder="12-digit Aadhaar number" />
+        <TextInput label="PAN Number" name="panNumber" value={form.panNumber} onChange={handleChange} placeholder="e.g. ABCDE1234F" />
+        <TextInput label="Driving License Number" name="drivingLicense" value={form.drivingLicense} onChange={handleChange} placeholder="Driving license number" />
+        <TextInput label="Voter ID" name="voterId" value={form.voterId} onChange={handleChange} placeholder="Voter ID number" />
+      </div>
+    </div>
+  );
+
+  const renderTab4 = () => (
+    <div>
+      <SectionHeader icon={FaMapMarkerAlt} title="Permanent Address" />
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <TextInput label="Address Line 1" name="permAddress1" value={form.permAddress1} onChange={handleChange} placeholder="Street / Building / Plot" />
+        <TextInput label="Address Line 2" name="permAddress2" value={form.permAddress2} onChange={handleChange} placeholder="Area / Locality" />
+        <TextInput label="Pincode" name="permPincode" value={form.permPincode} onChange={handleChange} placeholder="6-digit pincode" />
+        <CityStateSelect
+          stateLabel="State"
+          cityLabel="City"
+          stateValue={form.permState}
+          cityValue={form.permCity}
+          onStateChange={(s) => setForm((p) => ({ ...p, permState: s.name, permCity: "" }))}
+          onCityChange={(c) => setForm((p) => ({ ...p, permCity: c.name }))}
+        />
+      </div>
+
+      <div className="mt-6 mb-4 flex items-center gap-3">
+        <input
+          id="sameAsPermanent"
+          type="checkbox"
+          checked={form.sameAsPermanent}
+          name="sameAsPermanent"
+          onChange={(e) => handleChange({ target: { name: "sameAsPermanent", value: e.target.checked } })}
+          className="w-4 h-4 accent-primary cursor-pointer"
+        />
+        <label htmlFor="sameAsPermanent" className="text-sm font-semibold text-slate-600 cursor-pointer select-none">
+          Same as Permanent Address
+        </label>
+      </div>
+
+      <SectionHeader icon={FaMapMarkerAlt} title="Present Address" color="text-emerald-500" />
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <TextInput label="Address Line 1" name="presAddress1" value={form.presAddress1} onChange={handleChange} placeholder="Street / Building / Plot" disabled={form.sameAsPermanent} />
+        <TextInput label="Address Line 2" name="presAddress2" value={form.presAddress2} onChange={handleChange} placeholder="Area / Locality" disabled={form.sameAsPermanent} />
+        <TextInput label="Pincode" name="presPincode" value={form.presPincode} onChange={handleChange} placeholder="6-digit pincode" disabled={form.sameAsPermanent} />
+        <CityStateSelect
+          stateLabel="State"
+          cityLabel="City"
+          stateValue={form.presState}
+          cityValue={form.presCity}
+          onStateChange={(s) => setForm((p) => ({ ...p, presState: s.name, presCity: "" }))}
+          onCityChange={(c) => setForm((p) => ({ ...p, presCity: c.name }))}
+          disabled={form.sameAsPermanent}
+        />
+      </div>
+    </div>
+  );
+
+  const renderTab5 = () => (
+    <div>
+      <SectionHeader icon={FaBriefcase} title="Official Information" />
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <SelectInput label="Department" name="departmentId" value={form.departmentId} onChange={handleChange}
+          required error={errors.departmentId}
+          defaultOptionLabel="Select Department" options={departmentOptions} searchable />
+        <TextInput label="Designation" name="designation" value={form.designation} onChange={handleChange} placeholder="e.g. Senior Engineer" />
+        <SelectInput label="Employee Type" name="employeeType" value={form.employeeType} onChange={handleChange}
+          defaultOptionLabel="Select Type"
+          options={["Permanent","Contract","Intern","Consultant","Operator","Supervisor"].map((t) => ({ value: t.toLowerCase(), label: t }))} />
+        <SelectInput label="Employment Status" name="employeeStatus" value={form.employeeStatus} onChange={handleChange}
+          options={[
+            { value: "active", label: "Active" }, { value: "inactive", label: "Inactive" },
+            { value: "resigned", label: "Resigned" }, { value: "retired", label: "Retired" },
+            { value: "terminated", label: "Terminated" },
+          ]} />
+      </div>
+    </div>
+  );
+
+  const renderTab6 = () => (
+    <div>
+      <SectionHeader icon={FaCalendarAlt} title="Joining Details" />
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <DatePickerCalendar label="Date of Joining" name="dateOfJoining" value={form.dateOfJoining} onChange={handleChange} placeholder="Select joining date" />
+        <DatePickerCalendar label="Relieving Date" name="relievingDate" value={form.relievingDate} onChange={handleChange} placeholder="Select relieving date" />
+        <TextInput label="Previous Experience" name="previousExperience" value={form.previousExperience} onChange={handleChange} placeholder="e.g. 2 years 3 months" />
+        <TextInput label="Current Experience" name="_exp" value={currentExperience} onChange={() => {}} disabled placeholder="Auto-calculated" />
+        <TextInput label="Probation Period (months)" name="probationPeriod" type="number" value={form.probationPeriod} onChange={handleChange} placeholder="e.g. 3" />
+        <TextInput label="Notice Period (days)" name="noticePeriod" type="number" value={form.noticePeriod} onChange={handleChange} placeholder="e.g. 30" />
+      </div>
+    </div>
+  );
+
+  const renderTab7 = () => (
+    <div>
+      <SectionHeader icon={FaClock} title="Shift Assignment" />
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <SelectInput label="Shift" name="shiftId" value={form.shiftId} onChange={handleChange}
+          defaultOptionLabel="Select Shift" options={shiftOptions} />
+      </div>
+    </div>
+  );
+
+  const renderTab8 = () => (
+    <div>
+      <SectionHeader icon={FaMoneyBillWave} title="Salary & Payroll" />
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+        <SelectInput label="Salary Type" name="salaryType" value={form.salaryType} onChange={handleChange}
+          defaultOptionLabel="Select Type"
+          options={[{ value: "monthly", label: "Monthly" }, { value: "daily", label: "Daily" }, { value: "hourly", label: "Hourly" }]} />
+        <TextInput label="Basic Salary" name="basicSalary" type="number" value={form.basicSalary} onChange={handleChange} placeholder="0.00" />
+        <TextInput label="Gross Salary" name="grossSalary" type="number" value={form.grossSalary} onChange={handleChange} placeholder="0.00" />
+      </div>
+
+      <div className="mt-6 space-y-5">
+        <div className="flex flex-wrap gap-8">
+          <Toggle label="PF Applicable" value={form.pfApplicable} onChange={handleToggle("pfApplicable")} />
+          <Toggle label="ESI Applicable" value={form.esiApplicable} onChange={handleToggle("esiApplicable")} />
+          <Toggle label="Professional Tax" value={form.professionalTax} onChange={handleToggle("professionalTax")} />
+          <Toggle label="TDS Applicable" value={form.tdsApplicable} onChange={handleToggle("tdsApplicable")} />
+        </div>
+
+        {form.pfApplicable && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 p-4 bg-blue-50 rounded-xl border border-blue-100">
+            <TextInput label="PF Number" name="pfNumber" value={form.pfNumber} onChange={handleChange} placeholder="PF account number" />
+            <TextInput label="UAN Number" name="uanNumber" value={form.uanNumber} onChange={handleChange} placeholder="Universal Account Number" />
+          </div>
+        )}
+        {form.esiApplicable && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 p-4 bg-green-50 rounded-xl border border-green-100">
+            <TextInput label="ESI Number" name="esiNumber" value={form.esiNumber} onChange={handleChange} placeholder="ESI number" />
+          </div>
+        )}
+      </div>
+
+      <div className="mt-6">
+        <SectionHeader icon={FaMoneyBillWave} title="Bank Details" color="text-emerald-600" />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+          <TextInput label="Bank Name" name="bankName" value={form.bankName} onChange={handleChange} placeholder="e.g. State Bank of India" />
+          <TextInput label="Bank Branch" name="bankBranch" value={form.bankBranch} onChange={handleChange} placeholder="Branch name" />
+          <TextInput label="Account Number" name="accountNumber" value={form.accountNumber} onChange={handleChange} placeholder="Account number" />
+          <TextInput label="IFSC Code" name="ifscCode" value={form.ifscCode} onChange={handleChange} placeholder="e.g. SBIN0001234" />
+          <TextInput label="Account Holder Name" name="accountHolderName" value={form.accountHolderName} onChange={handleChange} placeholder="As per bank records" />
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderTab9 = () => (
+    <div>
+      <div className="flex items-center justify-between mb-5 pb-2 border-b border-slate-100">
+        <div className="flex items-center gap-2">
+          <FaKey className="text-primary text-lg" />
+          <h3 className="text-base font-semibold text-slate-700">Login Account</h3>
+        </div>
+        <Toggle label="Create Login Account" value={form.createLoginAccount} onChange={handleToggle("createLoginAccount")} />
+      </div>
+
+      {form.createLoginAccount && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 p-5 bg-slate-50 rounded-xl border border-slate-100">
+          <TextInput label="Username" name="username" value={form.username} onChange={handleChange} required error={errors.username} placeholder="Login username" />
+          <TextInput label="Official Email" name="_officialEmailDisplay" value={form.officialEmail} onChange={() => {}} disabled placeholder="From Contact tab" />
+          <SelectInput label="Role" name="roleId" value={form.roleId} onChange={handleChange}
+            required error={errors.roleId}
+            defaultOptionLabel="Select Role" options={roleOptions} searchable />
+          <div className="flex flex-col gap-2">
+            <TextInput label="Password" name="password" type="password" value={form.password} onChange={handleChange} required error={errors.password} placeholder="Minimum 8 characters" />
+            <button
+              type="button"
+              onClick={() => setForm((p) => ({ ...p, password: generatePassword() }))}
+              className="flex items-center gap-2 text-xs font-semibold text-primary hover:underline self-start"
+            >
+              <FaRandom size={11} /> Generate Random Password
+            </button>
+          </div>
+          <div className="flex flex-col gap-4">
+            <Toggle label="Password Reset Required" value={form.mustChangePw} onChange={handleToggle("mustChangePw")} />
+            <Toggle label="Login Enabled" value={form.loginEnabled} onChange={handleToggle("loginEnabled")} />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  const renderTab10 = () => (
+    <div>
+      <SectionHeader icon={FaClipboardList} title="Audit Information" />
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <TextInput label="Created By" name="_createdBy" value={user?.username || ""} onChange={() => {}} disabled />
+        <TextInput label="Created At" name="_createdAt" value="Will be set on save" onChange={() => {}} disabled />
+        <TextInput label="Updated By" name="_updatedBy" value="" onChange={() => {}} disabled />
+        <TextInput label="Updated At" name="_updatedAt" value="" onChange={() => {}} disabled />
+      </div>
+    </div>
+  );
+
+  const tabRenderers = [
+    renderTab0, renderTab1, renderTab2, renderTab3, renderTab4,
+    renderTab5, renderTab6, renderTab7, renderTab8, renderTab9, renderTab10,
+  ];
+
+  // ─── render ───────────────────────────────────────────────────────────────
+
+  return (
+    <div className="w-full mx-auto space-y-0">
+      {/* Header */}
+      <div className="bg-white shadow-sm border border-slate-200 rounded-t-lg">
+        <div className="px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h2 className="text-xl font-bold text-slate-800">Create Employee</h2>
+            <p className="text-sm text-slate-400 mt-0.5">Fill in the details across all sections</p>
+          </div>
+          <BackButton />
+        </div>
+
+        {/* Tab navigation */}
+        <div className="px-6 overflow-x-auto">
+          <div className="flex gap-0 border-b border-slate-200 min-w-max">
+            {TABS.map((tab) => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`
+                    flex items-center gap-1.5 px-4 py-3 text-xs font-semibold uppercase tracking-wide
+                    border-b-2 transition-all duration-200 whitespace-nowrap
+                    ${isActive
+                      ? "border-primary text-primary bg-primary/5"
+                      : "border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50"
+                    }
+                  `}
+                >
+                  <Icon size={13} />
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Tab content */}
+      <div className="bg-white border-x border-slate-200 px-6 py-6 min-h-[400px]">
+        {tabRenderers[activeTab]()}
+      </div>
+
+      {/* Footer navigation */}
+      <div className="bg-white border border-slate-200 rounded-b-lg px-6 py-4 flex items-center justify-between">
+        <button
+          type="button"
+          disabled={activeTab === 0}
+          onClick={() => setActiveTab((p) => Math.max(0, p - 1))}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all
+            ${activeTab === 0
+              ? "text-slate-300 cursor-not-allowed"
+              : "text-slate-600 hover:bg-slate-100 border border-slate-200"
+            }`}
+        >
+          <FaChevronLeft size={12} /> Previous
+        </button>
+
+        <span className="text-xs text-slate-400 font-medium">
+          {activeTab + 1} / {TABS.length}
+        </span>
+
+        {activeTab < TABS.length - 1 ? (
+          <button
+            type="button"
+            onClick={() => setActiveTab((p) => Math.min(TABS.length - 1, p + 1))}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white bg-primary hover:bg-primary/90 transition-all"
+          >
+            Next <FaChevronRight size={12} />
+          </button>
+        ) : (
+          <CustomButton
+            text={isSubmitting ? "Saving..." : "Save Employee"}
+            icon={FaSave}
+            type="button"
+            disabled={isSubmitting}
+            onClick={handleSubmit}
+          />
+        )}
       </div>
     </div>
   );

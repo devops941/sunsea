@@ -1,9 +1,10 @@
-import React, { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon } from "lucide-react";
 
 /**
  * DatePickerCalendar — React + TypeScript + Tailwind CSS (medium size)
  * Drop-in replacement for a native <input type="date">.
+ * Header has clickable month/year dropdowns for fast navigation.
  */
 
 export interface DatePickerCalendarProps {
@@ -87,6 +88,16 @@ export function parseLocalDate(dateStr: string | null | undefined): Date | null 
   return new Date(year, month, day);
 }
 
+// Generate a range of years: 100 years back to 10 years forward
+function buildYearOptions(today: Date): number[] {
+  const currentYear = today.getFullYear();
+  const years: number[] = [];
+  for (let y = currentYear - 100; y <= currentYear + 10; y++) {
+    years.push(y);
+  }
+  return years;
+}
+
 export default function DatePickerCalendar({
   name = "",
   value = null,
@@ -112,6 +123,9 @@ export default function DatePickerCalendar({
   const [viewMonth, setViewMonth] = useState<number>((parsedValue || today).getMonth());
 
   const containerRef = useRef<HTMLDivElement>(null);
+  const yearSelectRef = useRef<HTMLSelectElement>(null);
+
+  const yearOptions = buildYearOptions(today);
 
   // Sync state if value changes externally
   useEffect(() => {
@@ -178,7 +192,7 @@ export default function DatePickerCalendar({
   const cells = buildMonthGrid(viewYear, viewMonth);
 
   return (
-    <div ref={containerRef} className="relative w-full  group">
+    <div ref={containerRef} className="relative w-full group">
       {label && (
         <label
           className={`
@@ -221,27 +235,47 @@ export default function DatePickerCalendar({
 
         {/* Popover */}
         {open && !disabled && (
-          <div className="absolute left-0 top-full z-50 mt-1 w-54 rounded-xl border border-gray-100 bg-white p-2 shadow-lg">
-            {/* Header: month/year with paging */}
-            <div className="mb-1 flex items-center justify-between">
+          <div className="absolute left-0 top-full z-50 mt-1 w-60 rounded-xl border border-gray-100 bg-white p-2 shadow-lg">
+
+            {/* Header: prev arrow | month select | year select | next arrow */}
+            <div className="mb-1 flex items-center justify-between gap-1">
               <button
                 type="button"
                 onClick={goPrevMonth}
                 aria-label="Previous month"
-                className="flex h-6 w-6 items-center justify-center rounded bg-gray-100 text-gray-600 hover:bg-gray-200"
+                className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded bg-gray-100 text-gray-600 hover:bg-gray-200"
               >
                 <ChevronLeft size={14} />
               </button>
 
-              <span className="text-xs font-semibold text-gray-900">
-                {MONTHS[viewMonth]} {viewYear}
-              </span>
+              {/* Month dropdown */}
+              <select
+                value={viewMonth}
+                onChange={(e) => setViewMonth(Number(e.target.value))}
+                className="flex-1 min-w-0 rounded border border-gray-200 bg-white px-1 py-0.5 text-[11px] font-semibold text-gray-800 focus:outline-none focus:border-primary cursor-pointer"
+              >
+                {MONTHS.map((m, i) => (
+                  <option key={m} value={i}>{m}</option>
+                ))}
+              </select>
+
+              {/* Year dropdown */}
+              <select
+                ref={yearSelectRef}
+                value={viewYear}
+                onChange={(e) => setViewYear(Number(e.target.value))}
+                className="w-16 flex-shrink-0 rounded border border-gray-200 bg-white px-1 py-0.5 text-[11px] font-semibold text-gray-800 focus:outline-none focus:border-primary cursor-pointer"
+              >
+                {yearOptions.map((y) => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
 
               <button
                 type="button"
                 onClick={goNextMonth}
                 aria-label="Next month"
-                className="flex h-6 w-6 items-center justify-center rounded bg-gray-100 text-gray-600 hover:bg-gray-200"
+                className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded bg-gray-100 text-gray-600 hover:bg-gray-200"
               >
                 <ChevronRight size={14} />
               </button>
