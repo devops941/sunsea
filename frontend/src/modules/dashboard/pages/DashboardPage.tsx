@@ -1,25 +1,6 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useSocketSync } from "../../../hooks/useSocketSync";
-import { usePermission } from "../../../hooks/usePermission";
-
-// Actions
-import { fetchProductionOrders } from "../../../features/production-orders/productionOrderSlice";
-import { fetchMachines } from "../../../features/machines/machineSlice";
-import { fetchWeeklyPrograms } from "../../../features/weekly-programs/weeklyProgramSlice";
-import { fetchRawMaterials } from "../../../features/raw-materials/rawMaterialSlice";
-
-// Services
-import { salesOrderService } from "../../../services/salesOrderService";
-import { purchaseOrderService } from "../../../services/purchaseOrderService";
-import { dailyPlanService } from "../../../services/dailyPlanService";
-import { finishedGoodsStockService } from "../../../services/finishedGoodsStockService";
-import { rawMaterialStockService } from "../../../services/rawMaterialStockService";
-
-// Hooks
-import { useProducts } from "../../../hooks/useProducts";
-import { useEmployees } from "../../../hooks/useEmployees";
-import { useUsers } from "../../../hooks/useUsers";
+import dashboardService from "../../../services/dashboardService";
 
 // Recharts
 import {
@@ -81,99 +62,55 @@ const inventoryChartConfig = {
    MAIN DASHBOARD
    ════════════════════════════════════════════════════════════════ */
 const DashboardPage: React.FC = () => {
-  const dispatch = useAppDispatch();
   const [loadingInitial, setLoadingInitial] = useState(true);
 
-  // Extra data not in Redux
+  // All data from single API
   const [salesOrders, setSalesOrders] = useState<any[]>([]);
   const [purchaseOrders, setPurchaseOrders] = useState<any[]>([]);
+  const [productionOrders, setProductionOrders] = useState<any[]>([]);
   const [dailyPlans, setDailyPlans] = useState<any[]>([]);
   const [finishedGoodsStocks, setFinishedGoodsStocks] = useState<any[]>([]);
   const [rawMaterialStocks, setRawMaterialStocks] = useState<any[]>([]);
+  const [machines, setMachines] = useState<any[]>([]);
+  const [weeklyPrograms, setWeeklyPrograms] = useState<any[]>([]);
+  const [rawMaterials, setRawMaterials] = useState<any[]>([]);
+  const [productsCount, setProductsCount] = useState(0);
+  const [employeesCount, setEmployeesCount] = useState(0);
 
-  // Permissions
-  const { can } = usePermission();
-  const canViewProduction = can("production_orders.view");
-  const canViewMachines = can("machines.view");
-  const canViewSchedules = can("weekly_programs.view");
-  const canViewRawMaterials = can("raw_materials.view");
-  const canViewProducts = can("products.view");
-  const canViewEmployees = can("employees.view");
-  const canViewUsers = can("users.view");
+  // ── Single Dashboard API ────────────────────────────────────
+  const loadDashboard = useCallback(async () => {
+    setLoadingInitial(true);
+    try {
+      const data = await dashboardService.getSummary();
+      setSalesOrders(data.salesOrders || []);
+      setPurchaseOrders(data.purchaseOrders || []);
+      setProductionOrders(data.productionOrders || []);
+      setDailyPlans(data.dailyPlans || []);
+      setFinishedGoodsStocks(data.finishedGoodsStocks || []);
+      setRawMaterialStocks(data.rawMaterialStocks || []);
+      setMachines(data.machines || []);
+      setWeeklyPrograms(data.weeklyPrograms || []);
+      setRawMaterials(data.rawMaterials || []);
+      setProductsCount(data.productsCount || 0);
+      setEmployeesCount(data.employeesCount || 0);
+    } catch (e) {
+      console.error("Dashboard load error", e);
+    } finally {
+      setLoadingInitial(false);
+    }
+  }, []);
 
-  // Redux state
-  const { data: productionOrders, loading: poLoading } = useAppSelector((s: any) => s.productionOrders || { data: [], loading: false });
-  const { data: machines, loading: mLoading } = useAppSelector((s: any) => s.machines || { data: [], loading: false });
-  const { data: weeklyPrograms } = useAppSelector((s: any) => s.weeklyPrograms || { data: [] });
-  const { data: rawMaterials } = useAppSelector((s: any) => s.rawMaterials || { data: [] });
-
-  // Custom hooks
-  const { products, loadProducts, loading: pLoading } = useProducts();
-  const { employees, loadEmployees } = useEmployees();
-  const { users, loadUsers } = useUsers();
-
-  // ── Bootstrap ──────────────────────────────────────────────
   useEffect(() => {
-    const load = async () => {
-      setLoadingInitial(true);
-      try {
-        const calls: Promise<any>[] = [];
-        if (canViewProduction) calls.push(dispatch(fetchProductionOrders()) as any);
-        if (canViewMachines) calls.push(dispatch(fetchMachines()) as any);
-        if (canViewSchedules) calls.push(dispatch(fetchWeeklyPrograms(undefined)) as any);
-        if (canViewRawMaterials) calls.push(dispatch(fetchRawMaterials(undefined)) as any);
-        if (canViewProducts) calls.push(Promise.resolve(loadProducts()));
-        if (canViewEmployees) calls.push(Promise.resolve(loadEmployees({ limit: 1000 })));
-        if (canViewUsers) calls.push(Promise.resolve(loadUsers()));
+    loadDashboard();
+  }, [loadDashboard]);
 
-        // Sales & Purchase
-        calls.push(
-          salesOrderService.fetchAll().then((res: any) => {
-            const list = res?.data || res || [];
-            setSalesOrders(Array.isArray(list) ? list : []);
-          }).catch(() => { })
-        );
-        calls.push(
-          purchaseOrderService.fetchAll().then((res: any) => {
-            const list = res?.data || res || [];
-            setPurchaseOrders(Array.isArray(list) ? list : []);
-          }).catch(() => { })
-        );
-        calls.push(
-          dailyPlanService.getAll().then((res: any) => {
-            const list = Array.isArray(res?.data?.dailyPlans) ? res.data.dailyPlans : (Array.isArray(res?.dailyPlans) ? res.dailyPlans : (Array.isArray(res) ? res : []));
-            setDailyPlans(list);
-          }).catch(() => { })
-        );
-        calls.push(
-          finishedGoodsStockService.fetchAll().then((res: any) => {
-            const list = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []);
-            setFinishedGoodsStocks(list);
-          }).catch(() => { })
-        );
-        calls.push(
-          rawMaterialStockService.fetchAll().then((res: any) => {
-            const list = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []);
-            setRawMaterialStocks(list);
-          }).catch(() => { })
-        );
-
-        await Promise.allSettled(calls);
-      } catch (e) {
-        console.error("Dashboard load error", e);
-      } finally {
-        setLoadingInitial(false);
-      }
-    };
-    load();
-  }, [dispatch, loadProducts, loadEmployees, loadUsers,
-    canViewProduction, canViewMachines, canViewSchedules,
-    canViewRawMaterials, canViewProducts, canViewEmployees, canViewUsers]);
-
-  // Real-time sockets
-  useSocketSync("productionOrder", undefined, canViewProduction ? () => dispatch(fetchProductionOrders()) : undefined);
-  useSocketSync("weeklyProgram", undefined, canViewSchedules ? () => dispatch(fetchWeeklyPrograms(undefined)) : undefined);
-  useSocketSync("rawMaterial", undefined, canViewRawMaterials ? () => dispatch(fetchRawMaterials(undefined)) : undefined);
+  // ── Real-time socket refresh on any relevant change ─────────
+  useSocketSync("salesOrder", undefined, loadDashboard);
+  useSocketSync("purchaseOrder", undefined, loadDashboard);
+  useSocketSync("productionOrder", undefined, loadDashboard);
+  useSocketSync("dailyPlan", undefined, loadDashboard);
+  useSocketSync("finishedGoodsStock", undefined, loadDashboard);
+  useSocketSync("rawMaterialStock", undefined, loadDashboard);
 
   /* ─── DERIVED DATA ────────────────────────────────────────── */
   const safe = (d: any) => (Array.isArray(d) ? d : []);
@@ -183,10 +120,6 @@ const DashboardPage: React.FC = () => {
     const po = safe(productionOrders);
     const so = safe(salesOrders);
     const purc = safe(purchaseOrders);
-    const prod = safe(products);
-    const rm = safe(rawMaterials);
-    const emp = safe(employees);
-    const usr = safe(users);
     const mach = safe(machines);
     const wp = safe(weeklyPrograms);
     const totalFinished = po.reduce((a: number, o: any) => a + (Number(o.producedQty) || 0), 0);
@@ -213,17 +146,16 @@ const DashboardPage: React.FC = () => {
       productionOrders: po.length,
       weeklySchedules: wp.length,
       machines: mach.length,
-      products: prod.length,
-      rawMaterials: rm.length,
+      products: productsCount,
+      rawMaterials: rawMaterials.length,
       finishedGoods: totalFinished,
-      employees: emp.filter((e: any) => e.status === "active").length,
-      activeUsers: usr.filter((u: any) => u.isActive !== false).length,
+      employees: employeesCount,
       totalRevenue,
       lastMonthRevenue,
       pendingAmount,
       uniqueCustomers,
     };
-  }, [productionOrders, salesOrders, purchaseOrders, products, rawMaterials, employees, users, machines, weeklyPrograms]);
+  }, [productionOrders, salesOrders, purchaseOrders, rawMaterials, machines, weeklyPrograms, productsCount, employeesCount]);
 
   // Today's Tasks Stats
   const todayStats = useMemo(() => {
@@ -296,29 +228,14 @@ const DashboardPage: React.FC = () => {
   };
 
   const inventoryData = useMemo(() => {
-    const fg = safe(finishedGoodsStocks);
-    const rm = safe(rawMaterialStocks);
+    const rm = safe(rawMaterials);
     const itemMap: Record<string, { qty: number, storeName: string, productName: string, uom: string }> = {};
-    
-    // Process Finished Goods
-    fg.forEach((item: any) => {
-      const storeName = item.store?.storeName || "Main Warehouse";
-      const qty = Number(item.onHandQty) || 0;
-      const productName = item.product?.productName || "Unknown Product";
-      const uom = formatUom(item.product?.uom?.uomCode);
-      const key = `${storeName}::${productName}`;
-      
-      if (!itemMap[key]) {
-        itemMap[key] = { qty: 0, storeName, productName, uom };
-      }
-      itemMap[key].qty += qty;
-    });
 
     // Process Raw Materials
     rm.forEach((item: any) => {
       const storeName = item.store?.storeName || "Main Warehouse";
       const qty = Number(item.onHandQty) || 0;
-      const productName = item.rawMaterial?.materialName || item.rawMaterial?.name || item.materialName || "Unknown RM";
+      const productName = item.materialName || item.rawMaterial?.materialName || "Unknown RM";
       const uom = formatUom(item.baseUom || item.rawMaterial?.baseUom);
       const key = `${storeName}::${productName}`;
       
@@ -330,16 +247,16 @@ const DashboardPage: React.FC = () => {
 
     const data = Object.entries(itemMap)
       .map(([key, obj], i) => ({
-        name: obj.productName,
+        name: obj.storeName,
         value: 1, // Equal slice for each unique item
         displayValue: `${obj.qty} ${obj.uom}`.trim(),
-        products: obj.storeName,
+        products: obj.productName,
         color: PIE_COLORS[i % PIE_COLORS.length],
       }))
-      .sort((a, b) => b.name.localeCompare(a.name));
+      .sort((a, b) => a.name.localeCompare(b.name));
 
     return data.length > 0 ? data : [{ name: "No Stock", value: 1, displayValue: "0", products: "", color: "#cbd5e1" }];
-  }, [finishedGoodsStocks, rawMaterialStocks]);
+  }, [rawMaterials]);
 
 
 
@@ -367,20 +284,20 @@ const DashboardPage: React.FC = () => {
   }, [productionOrders]);
 
   const topProducts = useMemo(() => {
-    const p = safe(products);
     const fg = safe(finishedGoodsStocks);
-    return [...p]
-      .map((prod: any) => {
-        const stockItems = fg.filter((item: any) => item.productItemId === prod.id || item.productItemId === String(prod.id));
-        const totalStock = stockItems.reduce((acc, item) => acc + (Number(item.onHandQty) || 0), 0);
-        return {
-          name: prod.productName || "Unknown",
-          value: totalStock,
-        };
-      })
-      .sort((a: any, b: any) => b.value - a.value)
+    
+    // Group stocks by product name
+    const grouped = fg.reduce((acc: Record<string, number>, curr: any) => {
+      const name = curr.product?.productName || curr.productItem?.productName || "Unknown";
+      acc[name] = (acc[name] || 0) + (Number(curr.onHandQty) || 0);
+      return acc;
+    }, {});
+
+    return Object.entries(grouped)
+      .map(([name, value]) => ({ name, value: value as number }))
+      .sort((a, b) => b.value - a.value)
       .slice(0, 7);
-  }, [products, finishedGoodsStocks]);
+  }, [finishedGoodsStocks]);
 
   // Recent orders
   const recentSales = useMemo(() => {
@@ -389,12 +306,12 @@ const DashboardPage: React.FC = () => {
       .slice(0, 5);
   }, [salesOrders]);
 
-  const anyLoading = loadingInitial || poLoading || mLoading || pLoading;
+  const loading = loadingInitial;
 
   /* ═══════════════ RENDER ═══════════════ */
   return (
     <div className="bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/40 min-h-screen">
-      {anyLoading && <CommonLoader text="Loading ..." />}
+      {loading && <CommonLoader text="Loading ..." />}
 
       <div className="w-full px-4 py-6 sm:px-6 lg:px-8 mx-auto max-w-[1440px]">
 
@@ -485,7 +402,7 @@ const DashboardPage: React.FC = () => {
           </Card>
 
           {/* Inventory Doughnut */}
-          <Card title="Stock by Store" badge="Products">
+          <Card title="Stock by Store" badge="Raw Materials">
             <div className="flex flex-col items-center justify-center h-[200px] relative">
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none mt-2">
                 <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Items</span>
@@ -575,7 +492,7 @@ const DashboardPage: React.FC = () => {
               {topProducts.length === 0 ? (
                 <div className="flex items-center justify-center h-full text-slate-400 text-sm font-medium">No Products</div>
               ) : (
-                topProducts.map((prod, i) => {
+                topProducts.map((prod: any, i: number) => {
                   const maxVal = topProducts[0]?.value || 1;
                   const pct = Math.min((prod.value / maxVal) * 100, 100);
                   const barColors = [
