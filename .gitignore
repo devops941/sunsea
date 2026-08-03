@@ -139,3 +139,5 @@ temp/
 .cache/
 
 Command 
+.claude/
+.agent/ 

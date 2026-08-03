@@ -42,9 +42,68 @@ class VoucherPostingService {
 
     if (!voucher) {
       const g: any = grnInvoice;
-      const netAmount = new Prisma.Decimal(g.netAmount || g.subtotal || g.grandTotal || g.totalAmount || 0);
+      const netAmountNum = Number(g.netAmount || g.subtotal || g.grandTotal || g.totalAmount || 0);
+      const totalCgst = Number(g.totalCgst || 0);
+      const totalSgst = Number(g.totalSgst || 0);
+      const totalIgst = Number(g.totalIgst || 0);
+      const purchaseBase = netAmountNum - totalCgst - totalSgst - totalIgst;
+
       const voucherNo = `PUR-${grnInvoice.grnNumber || grnInvoice.id.slice(-6)}`;
       const date = grnInvoice.grnDate || grnInvoice.createdAt;
+
+      const journalItemsToCreate: any[] = [
+        {
+          debitLedgerId: purchaseLedger.id,
+          debitAmount: new Prisma.Decimal(purchaseBase > 0 ? purchaseBase : netAmountNum),
+          creditAmount: new Prisma.Decimal(0),
+          narration: `Purchase of raw materials / goods (base excl. GST)`,
+        },
+      ];
+
+      // Add GST input credit entries if GST breakdown is available
+      if (totalCgst > 0 || totalSgst > 0 || totalIgst > 0) {
+        if (totalCgst > 0) {
+          const cgstRecLedger = await db.accountLedger.findUnique({ where: { code: "CGST-REC-001" } });
+          if (cgstRecLedger) {
+            journalItemsToCreate.push({
+              debitLedgerId: cgstRecLedger.id,
+              debitAmount: new Prisma.Decimal(totalCgst),
+              creditAmount: new Prisma.Decimal(0),
+              narration: `CGST Input Tax Credit`,
+            });
+          }
+        }
+        if (totalSgst > 0) {
+          const sgstRecLedger = await db.accountLedger.findUnique({ where: { code: "SGST-REC-001" } });
+          if (sgstRecLedger) {
+            journalItemsToCreate.push({
+              debitLedgerId: sgstRecLedger.id,
+              debitAmount: new Prisma.Decimal(totalSgst),
+              creditAmount: new Prisma.Decimal(0),
+              narration: `SGST Input Tax Credit`,
+            });
+          }
+        }
+        if (totalIgst > 0) {
+          const igstRecLedger = await db.accountLedger.findUnique({ where: { code: "IGST-REC-001" } });
+          if (igstRecLedger) {
+            journalItemsToCreate.push({
+              debitLedgerId: igstRecLedger.id,
+              debitAmount: new Prisma.Decimal(totalIgst),
+              creditAmount: new Prisma.Decimal(0),
+              narration: `IGST Input Tax Credit`,
+            });
+          }
+        }
+      }
+
+      // Credit supplier ledger for full net amount
+      journalItemsToCreate.push({
+        creditLedgerId: supplierLedger.id,
+        debitAmount: new Prisma.Decimal(0),
+        creditAmount: new Prisma.Decimal(netAmountNum),
+        narration: `Liability payable to ${grnInvoice.supplier.legalName}`,
+      });
 
       voucher = await db.voucher.create({
         data: {
@@ -54,22 +113,7 @@ class VoucherPostingService {
           narration: `Purchase invoice posted for GRN ${grnInvoice.grnNumber || grnInvoice.invoiceNo}`,
           refDocType: "GRN_INVOICE",
           refDocId: grnInvoice.id,
-          items: {
-            create: [
-              {
-                debitLedgerId: purchaseLedger.id,
-                debitAmount: netAmount,
-                creditAmount: new Prisma.Decimal(0),
-                narration: `Purchase of raw materials / goods`,
-              },
-              {
-                creditLedgerId: supplierLedger.id,
-                debitAmount: new Prisma.Decimal(0),
-                creditAmount: netAmount,
-                narration: `Liability payable to ${grnInvoice.supplier.legalName}`,
-              },
-            ],
-          },
+          items: { create: journalItemsToCreate },
         },
         include: { items: true },
       });
@@ -197,7 +241,7 @@ class VoucherPostingService {
     const db = txClient || prisma;
     const salesInvoice = await db.salesInvoice.findUnique({
       where: { id: salesInvoiceId },
-      include: { customer: true },
+      include: { customer: true, items: true },
     });
 
     if (!salesInvoice || !salesInvoice.customer) {
@@ -222,9 +266,71 @@ class VoucherPostingService {
     });
 
     if (!voucher) {
-      const grandTotal = new Prisma.Decimal(salesInvoice.grandTotal || salesInvoice.subTotal || 0);
+      const grandTotalNum = Number(salesInvoice.grandTotal || salesInvoice.subTotal || 0);
+      const grandTotal = new Prisma.Decimal(grandTotalNum);
       const voucherNo = `SLS-${salesInvoice.invoiceNo || salesInvoice.id.slice(-6)}`;
       const date = salesInvoice.invoiceDate || salesInvoice.createdAt;
+
+      // Sum GST components from line items
+      const items: any[] = (salesInvoice as any).items || [];
+      const totalCgst = items.reduce((s: number, i: any) => s + Number(i.cgstAmount || 0), 0);
+      const totalSgst = items.reduce((s: number, i: any) => s + Number(i.sgstAmount || 0), 0);
+      const totalIgst = items.reduce((s: number, i: any) => s + Number(i.igstAmount || 0), 0);
+      const salesBase = grandTotalNum - totalCgst - totalSgst - totalIgst;
+
+      const salesJournalItems: any[] = [
+        // Debit Customer for full grand total
+        {
+          debitLedgerId: customerLedger.id,
+          debitAmount: grandTotal,
+          creditAmount: new Prisma.Decimal(0),
+          narration: `Receivable from ${salesInvoice.customer.firmName}`,
+        },
+        // Credit Sales Account for base amount (excl. GST)
+        {
+          creditLedgerId: salesLedger.id,
+          debitAmount: new Prisma.Decimal(0),
+          creditAmount: new Prisma.Decimal(salesBase > 0 ? salesBase : grandTotalNum),
+          narration: `Revenue credited to Sales Account`,
+        },
+      ];
+
+      // Credit GST liability ledgers if GST breakdown available
+      if (totalCgst > 0 || totalSgst > 0 || totalIgst > 0) {
+        if (totalCgst > 0) {
+          const cgstLiaLedger = await db.accountLedger.findUnique({ where: { code: "CGST-LIA-001" } });
+          if (cgstLiaLedger) {
+            salesJournalItems.push({
+              creditLedgerId: cgstLiaLedger.id,
+              debitAmount: new Prisma.Decimal(0),
+              creditAmount: new Prisma.Decimal(totalCgst),
+              narration: `CGST Output Tax Payable`,
+            });
+          }
+        }
+        if (totalSgst > 0) {
+          const sgstLiaLedger = await db.accountLedger.findUnique({ where: { code: "SGST-LIA-001" } });
+          if (sgstLiaLedger) {
+            salesJournalItems.push({
+              creditLedgerId: sgstLiaLedger.id,
+              debitAmount: new Prisma.Decimal(0),
+              creditAmount: new Prisma.Decimal(totalSgst),
+              narration: `SGST Output Tax Payable`,
+            });
+          }
+        }
+        if (totalIgst > 0) {
+          const igstLiaLedger = await db.accountLedger.findUnique({ where: { code: "IGST-LIA-001" } });
+          if (igstLiaLedger) {
+            salesJournalItems.push({
+              creditLedgerId: igstLiaLedger.id,
+              debitAmount: new Prisma.Decimal(0),
+              creditAmount: new Prisma.Decimal(totalIgst),
+              narration: `IGST Output Tax Payable`,
+            });
+          }
+        }
+      }
 
       voucher = await db.voucher.create({
         data: {
@@ -234,22 +340,7 @@ class VoucherPostingService {
           narration: `Sales invoice posted for ${salesInvoice.invoiceNo}`,
           refDocType: "SALES_INVOICE",
           refDocId: salesInvoice.id,
-          items: {
-            create: [
-              {
-                debitLedgerId: customerLedger.id,
-                debitAmount: grandTotal,
-                creditAmount: new Prisma.Decimal(0),
-                narration: `Receivable from ${salesInvoice.customer.firmName}`,
-              },
-              {
-                creditLedgerId: salesLedger.id,
-                debitAmount: new Prisma.Decimal(0),
-                creditAmount: grandTotal,
-                narration: `Revenue credited to Sales Account`,
-              },
-            ],
-          },
+          items: { create: salesJournalItems },
         },
         include: { items: true },
       });
@@ -476,42 +567,36 @@ class VoucherPostingService {
   }
 
   /**
-   * Sync unposted GRN Invoices, Sales Invoices, and Payments to the Voucher table
+   * Sync unposted GRN Invoices, Sales Invoices, and Payments to the Voucher table.
+   * Uses set-based queries and parallel batches for efficiency.
    */
   async syncUnpostedVouchers() {
     try {
-      const existingGrnVouchers = await prisma.voucher.findMany({
-        where: { refDocType: "GRN_INVOICE", refDocId: { not: null } },
-        select: { refDocId: true },
-      });
-      const postedGrnIds = existingGrnVouchers.map((v) => v.refDocId!).filter(Boolean);
+      const [postedGrnVouchers, postedSalesVouchers, allGrnIds, allSalesIds] = await Promise.all([
+        prisma.voucher.findMany({
+          where: { refDocType: "GRN_INVOICE" },
+          select: { refDocId: true },
+        }),
+        prisma.voucher.findMany({
+          where: { refDocType: "SALES_INVOICE" },
+          select: { refDocId: true },
+        }),
+        prisma.grnInvoice.findMany({ select: { id: true } }),
+        prisma.salesInvoice.findMany({ select: { id: true } }),
+      ]);
 
-      const unpostedGrns = await prisma.grnInvoice.findMany({
-        where: {
-          id: { notIn: postedGrnIds },
-        },
-        select: { id: true },
-      });
+      const postedGrnIds = new Set(postedGrnVouchers.map((v) => v.refDocId).filter(Boolean));
+      const postedSalesIds = new Set(postedSalesVouchers.map((v) => v.refDocId).filter(Boolean));
 
-      for (const grn of unpostedGrns) {
-        await this.postPurchaseVoucher(grn.id);
+      const unpostedGrnIds = allGrnIds.filter((g) => !postedGrnIds.has(g.id)).map((g) => g.id);
+      const unpostedSalesIds = allSalesIds.filter((s) => !postedSalesIds.has(s.id)).map((s) => s.id);
+
+      const batchSize = 10;
+      for (let i = 0; i < unpostedGrnIds.length; i += batchSize) {
+        await Promise.all(unpostedGrnIds.slice(i, i + batchSize).map((id) => this.postPurchaseVoucher(id)));
       }
-
-      const existingSalesVouchers = await prisma.voucher.findMany({
-        where: { refDocType: "SALES_INVOICE", refDocId: { not: null } },
-        select: { refDocId: true },
-      });
-      const postedSalesIds = existingSalesVouchers.map((v) => v.refDocId!).filter(Boolean);
-
-      const unpostedSales = await prisma.salesInvoice.findMany({
-        where: {
-          id: { notIn: postedSalesIds },
-        },
-        select: { id: true },
-      });
-
-      for (const inv of unpostedSales) {
-        await this.postSalesVoucher(inv.id);
+      for (let i = 0; i < unpostedSalesIds.length; i += batchSize) {
+        await Promise.all(unpostedSalesIds.slice(i, i + batchSize).map((id) => this.postSalesVoucher(id)));
       }
     } catch (err) {
       console.error("[Auto-Post Voucher Error] Syncing unposted vouchers failed:", err);

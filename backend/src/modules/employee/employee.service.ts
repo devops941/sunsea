@@ -12,7 +12,7 @@ class EmployeeService {
       employeeData.createdBy = null;
     }
 
-    const createdEmployee = await prisma.$transaction(async (tx) => {
+    const createdEmployee = (await prisma.$transaction(async (tx) => {
       // Check if email already exists
       if (employeeData.email) {
         const existingEmail = await tx.employee.findUnique({
@@ -108,25 +108,33 @@ class EmployeeService {
         where: { id: employee.id },
         include: { user: { include: { role: true } }, department: true, shift: true },
       });
-    });
+    }))!;
 
     // Send welcome email after transaction (non-blocking)
+    const recipientEmail = createdEmployee?.email || createdEmployee?.personalEmail || loginAccount?.email;
     if (
       createLoginAccount &&
       loginAccount?.loginEnabled !== false &&
-      createdEmployee?.email
+      recipientEmail
     ) {
       try {
         await sendEmail({
-          to: createdEmployee.email,
+          to: recipientEmail,
           subject: "Welcome to Sunsea — Your Account Has Been Created",
           html: `
-            <p>Dear ${createdEmployee.fullName},</p>
-            <p>Your employee account has been created successfully.</p>
-            <p><strong>Employee Code:</strong> ${createdEmployee.empCode}</p>
-            <p><strong>Username:</strong> ${loginAccount.username}</p>
-            <p>Please log in and change your password at your earliest convenience.</p>
-            <p>Regards,<br/>Sunsea HR Team</p>
+            <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+              <h2 style="color: #1a56db;">Welcome to Sunsea!</h2>
+              <p>Dear <strong>${createdEmployee.fullName}</strong>,</p>
+              <p>Your employee account and login credentials have been created successfully.</p>
+              <table style="border-collapse: collapse; margin: 15px 0; background: #f9fafb; padding: 12px; border: 1px solid #e5e7eb; border-radius: 6px; width: 100%; max-width: 500px;">
+                <tr><td style="padding: 8px; font-weight: bold; width: 140px; color: #4b5563;">Employee Code:</td><td style="padding: 8px;">${createdEmployee.empCode}</td></tr>
+                <tr><td style="padding: 8px; font-weight: bold; color: #4b5563;">Username:</td><td style="padding: 8px;">${loginAccount.username}</td></tr>
+                ${loginAccount.password ? `<tr><td style="padding: 8px; font-weight: bold; color: #4b5563;">Password:</td><td style="padding: 8px;">${loginAccount.password}</td></tr>` : ''}
+              </table>
+              <p>Please log in to the Sunsea portal and change your password at your earliest convenience.</p>
+              <br/>
+              <p>Regards,<br/><strong>Sunsea HR & IT Team</strong></p>
+            </div>
           `,
         });
       } catch (emailErr) {
@@ -207,7 +215,7 @@ class EmployeeService {
       employeeData.updatedBy = null;
     }
 
-    return prisma.$transaction(async (tx) => {
+    const updatedEmployee = (await prisma.$transaction(async (tx) => {
       // Check unique identity fields against OTHER employees
       if (employeeData.aadhaarNumber) {
         const existing = await tx.employee.findUnique({ where: { aadhaarNumber: employeeData.aadhaarNumber } });
@@ -314,7 +322,42 @@ class EmployeeService {
         where: { id },
         include: { user: { include: { role: true } }, department: true, shift: true },
       });
-    });
+    }))!;
+
+    // Send email notification after transaction if login account password was set/updated
+    const recipientEmail = updatedEmployee?.email || updatedEmployee?.personalEmail || loginAccount?.email;
+    if (
+      createLoginAccount &&
+      loginAccount?.loginEnabled !== false &&
+      loginAccount?.password &&
+      recipientEmail
+    ) {
+      try {
+        await sendEmail({
+          to: recipientEmail,
+          subject: "Sunsea — Your Login Account Credentials",
+          html: `
+            <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+              <h2 style="color: #1a56db;">Sunsea Account Credentials</h2>
+              <p>Dear <strong>${updatedEmployee.fullName}</strong>,</p>
+              <p>Your employee login account credentials have been updated:</p>
+              <table style="border-collapse: collapse; margin: 15px 0; background: #f9fafb; padding: 12px; border: 1px solid #e5e7eb; border-radius: 6px; width: 100%; max-width: 500px;">
+                <tr><td style="padding: 8px; font-weight: bold; width: 140px; color: #4b5563;">Employee Code:</td><td style="padding: 8px;">${updatedEmployee.empCode}</td></tr>
+                <tr><td style="padding: 8px; font-weight: bold; color: #4b5563;">Username:</td><td style="padding: 8px;">${loginAccount.username}</td></tr>
+                <tr><td style="padding: 8px; font-weight: bold; color: #4b5563;">Password:</td><td style="padding: 8px;">${loginAccount.password}</td></tr>
+              </table>
+              <p>Please log in and change your password at your earliest convenience.</p>
+              <br/>
+              <p>Regards,<br/><strong>Sunsea HR & IT Team</strong></p>
+            </div>
+          `,
+        });
+      } catch (emailErr) {
+        console.error("Failed to send welcome email on update (non-fatal):", emailErr);
+      }
+    }
+
+    return updatedEmployee;
   }
 
   async getNextEmployeeCode() {
@@ -359,12 +402,30 @@ class EmployeeService {
     const linkedCustomers = await prisma.customer.findFirst({ where: { collectionAgentId: id } });
     if (linkedCustomers) throw new ApiError(400, "Cannot delete employee because they are assigned as a Collection Agent for a Customer.");
 
-    // BUG-EMP-008 fix: explicitly delete linked user account first to prevent orphaned records
+    // explicitly delete linked records first to prevent RESTRICT foreign key constraint failures
     return prisma.$transaction(async (tx) => {
+      // 1. Delete linked user account
       const linkedUser = await tx.user.findUnique({ where: { employeeId: id } });
       if (linkedUser) {
         await tx.user.delete({ where: { userId: linkedUser.userId } });
       }
+
+      // 2. Delete payroll config
+      await tx.employeePayrollConfig.deleteMany({ where: { employeeId: id } });
+
+      // 3. Delete attendance records
+      await tx.attendanceRecord.deleteMany({ where: { employeeId: id } });
+
+      // 4. Delete payroll results
+      await tx.payrollResult.deleteMany({ where: { employeeId: id } });
+
+      // 5. Delete permanent deductions
+      await tx.employeePermanentDeduction.deleteMany({ where: { employeeId: id } });
+
+      // 6. Delete salary advances
+      await tx.salaryAdvance.deleteMany({ where: { employeeId: id } });
+
+      // 7. Delete employee record
       return tx.employee.delete({ where: { id } });
     });
   }

@@ -41,6 +41,20 @@ export const errorMiddleware = (
     return;
   }
 
+  if (err instanceof Prisma.PrismaClientValidationError) {
+    // Extract the human-readable part: everything up to the first newline after "Invalid"
+    const raw = err.message;
+    const match = raw.match(/Invalid[^\n]+/);
+    const detail = match ? match[0].trim() : 'One or more fields have an invalid value.';
+    console.warn(`[Prisma Validation] ${detail}`);
+    res.status(400).json({
+      success: false,
+      message: `Validation error: ${detail}`,
+      errors: []
+    });
+    return;
+  }
+
   if (err instanceof Prisma.PrismaClientKnownRequestError) {
     if (err.code === "P2002") {
       res.status(409).json({

@@ -15,4 +15,14 @@ router.get("/payable/:supplierId", (req, res, next) => accountsController.getSup
 router.get("/receivable", (req, res, next) => accountsController.getReceivableSummaries(req, res, next));
 router.get("/receivable/:customerId", (req, res, next) => accountsController.getCustomerReceivableDetail(req, res, next));
 
+// Reports
+router.get("/trial-balance", (req, res, next) => accountsController.getTrialBalance(req, res, next));
+router.get("/profit-loss", (req, res, next) => accountsController.getProfitAndLoss(req, res, next));
+
+// Accounting Periods
+router.get("/periods", (req, res, next) => accountsController.listPeriods(req, res, next));
+router.post("/periods", (req, res, next) => accountsController.createPeriod(req, res, next));
+router.post("/periods/:id/close", (req, res, next) => accountsController.closePeriod(req, res, next));
+router.post("/periods/:id/reopen", (req, res, next) => accountsController.reopenPeriod(req, res, next));
+
 export default router;

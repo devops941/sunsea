@@ -342,11 +342,13 @@ class PayableService {
       };
     });
 
-    // Payment history from journal items / vouchers
+    // Payment history from journal items / vouchers (PAYMENT + JOURNAL)
     const paymentItems = await prisma.journalItem.findMany({
       where: {
         debitLedgerId: ledger.id,
-        voucher: { type: VoucherType.PAYMENT },
+        voucher: {
+          type: { in: [VoucherType.PAYMENT, VoucherType.JOURNAL] },
+        },
       },
       include: { voucher: true },
       orderBy: { voucher: { date: "desc" } },

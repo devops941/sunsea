@@ -37,6 +37,8 @@ import dailyPlanReducer from "../features/daily-plans/dailyPlanSlice";
 import goodsDispatchReducer from "../features/goods-dispatch/goodsDispatchSlice";
 import productShiftRecordReducer from "../features/product-shift-records/productShiftRecordSlice";
 import productCapacityHistoryReducer from "../features/product-capacity-history/productCapacityHistorySlice";
+import payrollSettingsReducer from "../features/payroll/payrollSettingsSlice";
+import payrollRunReducer from "../features/payroll/payrollRunSlice";
 
 
 export const store = configureStore({
@@ -79,6 +81,8 @@ export const store = configureStore({
         goodsDispatch: goodsDispatchReducer,
         productShiftRecords: productShiftRecordReducer,
         productCapacityHistory: productCapacityHistoryReducer,
+        payrollSettings: payrollSettingsReducer,
+        payrollRun: payrollRunReducer,
     },
     middleware: (getDefaultMiddleware) =>
         getDefaultMiddleware().concat(baseApi.middleware),

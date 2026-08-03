@@ -9,6 +9,13 @@ import {
 import { employeeService } from "../../../services/employeeService";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import { usePermission } from "../../../hooks/usePermission";
+import { usePayrollConfig } from "../../../hooks/usePayrollConfig";
+import {
+  deriveFromMonthly, deriveFromWeekly, deriveFromDaily, deriveFromHourly,
+  getMonthlyWorkingDays, getWeeklyWorkingDays,
+  formatINR, calcMethodLabel,
+  type PayrollCalcConfig,
+} from "../../../utils/salaryCalculation";
 
 const STATUS_MAP: Record<string, string> = {
   active: "ACTIVE",
@@ -74,6 +81,243 @@ function calcAge(dob: string | null | undefined): string {
   return `${years} yrs`;
 }
 
+function getPhotoUrl(photoUrl?: string | null): string {
+  if (!photoUrl) return "";
+  if (photoUrl.startsWith("http://") || photoUrl.startsWith("https://") || photoUrl.startsWith("data:")) {
+    return photoUrl;
+  }
+  const baseUrl = import.meta.env.VITE_API_BASE_URL?.replace("/api", "") || "http://localhost:5000";
+  return `${baseUrl}/${photoUrl.replace(/^\//, "")}`;
+}
+
+// ─── Salary type helpers ──────────────────────────────────────────────────────
+
+const SALARY_TYPE_LABELS: Record<string, string> = {
+  monthly: "Monthly", weekly: "Weekly", daily: "Daily Wage", hourly: "Hourly",
+};
+
+const PRIMARY_SALARY_LABELS: Record<string, string> = {
+  monthly: "Monthly Gross Salary",
+  weekly:  "Weekly Gross Salary",
+  daily:   "Daily Wage",
+  hourly:  "Hourly Rate",
+};
+
+// ─── Payroll Section Component ────────────────────────────────────────────────
+
+function PayrollSection({ employee, payrollConfig }: { employee: any; payrollConfig: any }) {
+  const salaryType = (employee.salaryType || "monthly").toLowerCase();
+  const grossAmount = Number(employee.grossSalary || 0);
+  const basicAmount = Number(employee.basicSalary || 0);
+
+  const calcConfig: PayrollCalcConfig = {
+    salaryCalculationMethod: payrollConfig?.salaryCalculationMethod || "WORKING_DAYS",
+    fixedDays:               payrollConfig?.fixedDays               || 26,
+    defaultWorkingHoursPerDay: payrollConfig?.defaultWorkingHoursPerDay || 8,
+    weeklyOffDays:           payrollConfig?.weeklyOffDays            || [0],
+  };
+
+  // Derive all salary equivalents using the centralized engine
+  const derivatives = grossAmount > 0
+    ? salaryType === "monthly" ? deriveFromMonthly(grossAmount, calcConfig)
+    : salaryType === "weekly"  ? deriveFromWeekly(grossAmount,  calcConfig)
+    : salaryType === "daily"   ? deriveFromDaily(grossAmount,   calcConfig)
+    : salaryType === "hourly"  ? deriveFromHourly(grossAmount,  calcConfig)
+    : null
+    : null;
+
+  const workingDays  = getMonthlyWorkingDays(calcConfig);
+  const weeklyDays   = getWeeklyWorkingDays(calcConfig);
+  const hoursPerDay  = calcConfig.defaultWorkingHoursPerDay;
+  const methodLabel  = calcMethodLabel(calcConfig.salaryCalculationMethod);
+
+  // PF calculation
+  const pfRate  = payrollConfig?.employeePfPercent  || 12;
+  const maxPf   = payrollConfig?.maxPfWage           || 15000;
+  const pfWageFormula = payrollConfig?.pfWageFormula || "BASIC";
+  const pfBase  = pfWageFormula === "GROSS" ? grossAmount : basicAmount || grossAmount;
+  const pfWage  = Math.min(pfBase, maxPf);
+  const pf      = employee.pfApplicable  ? (pfWage  * pfRate) / 100  : 0;
+
+  // ESI calculation
+  const esiRate = payrollConfig?.employeeEsiPercent || 0.75;
+  const maxEsi  = payrollConfig?.maxEsiSalary        || 21000;
+  const esi     = employee.esiApplicable && grossAmount <= maxEsi
+    ? (grossAmount * esiRate) / 100
+    : 0;
+
+  const SubHeader = ({ text }: { text: string }) => (
+    <p className="text-xs font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100 pb-1 mb-4 mt-2">
+      {text}
+    </p>
+  );
+
+  const StatFlag = ({ label, value }: { label: string; value: boolean }) => (
+    <div className="flex items-center gap-2 p-3 rounded-xl bg-slate-50 border border-slate-100">
+      <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${value ? "bg-green-500" : "bg-slate-300"}`} />
+      <span className="text-xs font-semibold text-slate-600">{label}</span>
+      <span className={`ml-auto text-xs font-bold ${value ? "text-green-600" : "text-slate-400"}`}>
+        {value ? "Yes" : "No"}
+      </span>
+    </div>
+  );
+
+  const CALC_CARD_STYLES: Record<string, { bg: string; border: string; label: string; val: string }> = {
+    slate:   { bg: "bg-slate-50",   border: "border-slate-200",  label: "text-slate-400",  val: "text-slate-800"  },
+    blue:    { bg: "bg-blue-50",    border: "border-blue-100",   label: "text-blue-400",   val: "text-blue-800"   },
+    emerald: { bg: "bg-emerald-50", border: "border-emerald-100",label: "text-emerald-400",val: "text-emerald-800" },
+    indigo:  { bg: "bg-indigo-50",  border: "border-indigo-100", label: "text-indigo-400", val: "text-indigo-800"  },
+  };
+
+  const CalcCard = ({ label, amount, note, color = "slate" }: {
+    label: string; amount: string; note: string; color?: string;
+  }) => {
+    const s = CALC_CARD_STYLES[color] ?? CALC_CARD_STYLES.slate;
+    return (
+      <div className={`p-4 ${s.bg} border ${s.border} rounded-2xl flex flex-col gap-1.5`}>
+        <span className={`text-[10px] font-bold uppercase tracking-wider ${s.label}`}>{label}</span>
+        <span className={`text-xl font-extrabold ${s.val}`}>{amount}</span>
+        <span className={`text-[10px] font-medium ${s.label}`}>{note}</span>
+      </div>
+    );
+  };
+
+  return (
+    <FullWidthSection icon={FaMoneyBillWave} title="Payroll & Statutory">
+
+      {/* ── Salary Structure ── */}
+      <SubHeader text="Salary Structure" />
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-5 mb-6">
+        <InfoRow
+          label="Salary Type"
+          value={SALARY_TYPE_LABELS[salaryType] ?? salaryType}
+        />
+        <InfoRow
+          label={PRIMARY_SALARY_LABELS[salaryType] ?? "Gross Salary"}
+          value={grossAmount > 0 ? formatINR(grossAmount) : null}
+        />
+        {basicAmount > 0 && (
+          <InfoRow label="Basic Salary" value={formatINR(basicAmount)} />
+        )}
+      </div>
+
+      {/* ── Salary Breakdown (derived via centralized engine) ── */}
+      {derivatives && (
+        <>
+          <SubHeader text="Salary Breakdown" />
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            {salaryType !== "daily" && salaryType !== "hourly" && (
+              <CalcCard
+                label="Daily Wage"
+                amount={formatINR(derivatives.dailyWage)}
+                note={`${PRIMARY_SALARY_LABELS[salaryType]} ÷ ${salaryType === "weekly" ? `${weeklyDays} days/week` : `${workingDays} working days`}`}
+                color="slate"
+              />
+            )}
+            {salaryType !== "hourly" && (
+              <CalcCard
+                label="Hourly Rate"
+                amount={formatINR(derivatives.hourlyWage)}
+                note={`Daily ÷ ${hoursPerDay} hrs/day`}
+                color="indigo"
+              />
+            )}
+            {salaryType !== "weekly" && (
+              <CalcCard
+                label="Weekly Equivalent"
+                amount={formatINR(derivatives.weeklyEquivalent)}
+                note={`Daily × ${weeklyDays} days/week`}
+                color="blue"
+              />
+            )}
+            {salaryType !== "monthly" && (
+              <CalcCard
+                label="Monthly Equivalent"
+                amount={formatINR(derivatives.monthlyEquivalent)}
+                note={
+                  salaryType === "weekly"
+                    ? "Weekly × 52 ÷ 12"
+                    : `Daily × ${workingDays} working days`
+                }
+                color="emerald"
+              />
+            )}
+          </div>
+          <div className="flex flex-wrap gap-4 mb-6 p-3 rounded-xl bg-slate-50 border border-slate-100">
+            <span className="text-xs text-slate-500">
+              <span className="font-semibold">Calculation Method:</span> {methodLabel}
+            </span>
+            <span className="text-xs text-slate-500">
+              <span className="font-semibold">Monthly Working Days:</span> {workingDays}
+            </span>
+            <span className="text-xs text-slate-500">
+              <span className="font-semibold">Weekly Working Days:</span> {weeklyDays}
+            </span>
+            <span className="text-xs text-slate-500">
+              <span className="font-semibold">Hours / Day:</span> {hoursPerDay}
+            </span>
+          </div>
+        </>
+      )}
+
+      {/* ── Statutory Flags ── */}
+      <SubHeader text="Statutory Deductions" />
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <StatFlag label="PF Applicable"    value={!!employee.pfApplicable}    />
+        <StatFlag label="ESI Applicable"   value={!!employee.esiApplicable}   />
+        <StatFlag label="Professional Tax" value={!!employee.professionalTax} />
+        <StatFlag label="TDS Applicable"   value={!!employee.tdsApplicable}   />
+      </div>
+
+      {/* PF / ESI / UAN numbers */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-5 mb-6">
+        <InfoRow label="PF Number"  value={employee.pfNumber}  />
+        <InfoRow label="UAN Number" value={employee.uanNumber} />
+        <InfoRow label="ESI Number" value={employee.esiNumber} />
+      </div>
+
+      {/* ── Statutory Estimates ── */}
+      <SubHeader text="Estimated Statutory Contributions" />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <CalcCard
+          label="Estimated Employee PF / Month"
+          amount={employee.pfApplicable ? formatINR(pf) : "₹0.00"}
+          note={
+            !employee.pfApplicable
+              ? "PF not applicable"
+              : `${pfRate}% of ${pfWageFormula === "GROSS" ? "Gross" : "Basic"} (capped at ${formatINR(maxPf)})`
+          }
+          color="blue"
+        />
+        <CalcCard
+          label="Estimated Employee ESI / Month"
+          amount={employee.esiApplicable ? formatINR(esi) : "₹0.00"}
+          note={
+            !employee.esiApplicable
+              ? "ESI not applicable"
+              : esi === 0
+              ? `Gross salary exceeds ESI ceiling (${formatINR(maxEsi)})`
+              : `${esiRate}% of Gross Salary`
+          }
+          color="emerald"
+        />
+      </div>
+
+      {/* ── Bank Details ── */}
+      <SubHeader text="Bank Details" />
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-5">
+        <InfoRow label="Payment Mode"    value={employee.paymentMode || "—"} />
+        <InfoRow label="Bank Name"       value={employee.bankName}           />
+        <InfoRow label="Branch"          value={employee.bankBranch}         />
+        <InfoRow label="Account Number"  value={employee.accountNumber}      />
+        <InfoRow label="IFSC Code"       value={employee.ifscCode}           />
+        <InfoRow label="Account Holder"  value={employee.accountHolderName}  />
+      </div>
+
+    </FullWidthSection>
+  );
+}
+
 export default function EmployeeViewPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -82,13 +326,16 @@ export default function EmployeeViewPage() {
 
   const [employee, setEmployee] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [imgError, setImgError] = useState(false);
+
+  // Company payroll settings — drives all salary derivations
+  const { config: payrollConfig } = usePayrollConfig();
 
   useEffect(() => {
     if (!id) return;
     setLoading(true);
-    employeeService
-      .fetchById(id)
-      .then((emp: any) => setEmployee(emp))
+    employeeService.fetchById(id)
+      .then((emp) => setEmployee(emp))
       .catch((err: any) => {
         toast.error(err?.response?.data?.message || "Failed to load employee");
         navigate("/employees");
@@ -138,14 +385,15 @@ export default function EmployeeViewPage() {
 
       {/* Hero card */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 flex flex-col sm:flex-row items-center sm:items-start gap-5">
-        {employee.photoUrl ? (
+        {employee.photoUrl && !imgError ? (
           <img
-            src={`${import.meta.env.VITE_API_BASE_URL?.replace("/api", "") || "http://localhost:5000"}/${employee.photoUrl}`}
+            src={getPhotoUrl(employee.photoUrl)}
             alt={employee.fullName}
+            onError={() => setImgError(true)}
             className="w-24 h-24 rounded-full object-cover border-4 border-primary/20 flex-shrink-0"
           />
         ) : (
-          <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center text-primary text-3xl font-bold flex-shrink-0">
+          <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center text-primary text-3xl font-bold flex-shrink-0 border-4 border-primary/20">
             {initials}
           </div>
         )}
@@ -259,50 +507,7 @@ export default function EmployeeViewPage() {
       </Section>
 
       {/* 9. Payroll */}
-      <FullWidthSection icon={FaMoneyBillWave} title="Payroll & Statutory">
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-5 mb-6">
-          <InfoRow label="Salary Type" value={employee.salaryType ? employee.salaryType.charAt(0).toUpperCase() + employee.salaryType.slice(1) : null} />
-          <InfoRow label="Basic Salary" value={employee.basicSalary != null ? `₹ ${Number(employee.basicSalary).toLocaleString("en-IN")}` : null} />
-          <InfoRow label="Gross Salary" value={employee.grossSalary != null ? `₹ ${Number(employee.grossSalary).toLocaleString("en-IN")}` : null} />
-        </div>
-
-        {/* Statutory flags */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          {[
-            { label: "PF Applicable", value: employee.pfApplicable },
-            { label: "ESI Applicable", value: employee.esiApplicable },
-            { label: "Professional Tax", value: employee.professionalTax },
-            { label: "TDS Applicable", value: employee.tdsApplicable },
-          ].map(({ label, value }) => (
-            <div key={label} className="flex items-center gap-2 p-3 rounded-xl bg-slate-50 border border-slate-100">
-              <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${value ? "bg-green-500" : "bg-slate-300"}`} />
-              <span className="text-xs font-semibold text-slate-600">{label}</span>
-              <span className={`ml-auto text-xs font-bold ${value ? "text-green-600" : "text-slate-400"}`}>
-                {value ? "Yes" : "No"}
-              </span>
-            </div>
-          ))}
-        </div>
-
-        {/* PF / ESI / UAN numbers */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-5 mb-6">
-          <InfoRow label="PF Number" value={employee.pfNumber} />
-          <InfoRow label="UAN Number" value={employee.uanNumber} />
-          <InfoRow label="ESI Number" value={employee.esiNumber} />
-        </div>
-
-        {/* Bank Details */}
-        <p className="text-xs font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100 pb-1 mb-4">
-          Bank Details
-        </p>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-5">
-          <InfoRow label="Bank Name" value={employee.bankName} />
-          <InfoRow label="Branch" value={employee.bankBranch} />
-          <InfoRow label="Account Number" value={employee.accountNumber} />
-          <InfoRow label="IFSC Code" value={employee.ifscCode} />
-          <InfoRow label="Account Holder" value={employee.accountHolderName} />
-        </div>
-      </FullWidthSection>
+      <PayrollSection employee={employee} payrollConfig={payrollConfig} />
 
       {/* 10. Login Account */}
       <Section icon={FaLock} title="Login Account">

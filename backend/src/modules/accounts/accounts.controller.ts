@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import { accountsService } from "./accounts.service";
 import { payableService } from "./payable.service";
 import { receivableService } from "./receivable.service";
+import { periodService } from "./period.service";
 import { createLedgerSchema, updateLedgerSchema, getLedgersQuerySchema, ledgerStatementQuerySchema } from "./accounts.types";
 
 export class AccountsController {
@@ -151,6 +152,69 @@ export class AccountsController {
         success: true,
         data,
       });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getTrialBalance(req: Request, res: Response, next: NextFunction) {
+    try {
+      const data = await accountsService.getTrialBalance();
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getProfitAndLoss(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { startDate, endDate } = req.query;
+      const data = await accountsService.getProfitAndLoss({
+        startDate: startDate as string | undefined,
+        endDate: endDate as string | undefined,
+      });
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async listPeriods(req: Request, res: Response, next: NextFunction) {
+    try {
+      const companyId = req.query.companyId as string;
+      const data = await periodService.listPeriods(companyId);
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async createPeriod(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { periodName, startDate, endDate, companyId } = req.body;
+      const data = await periodService.createPeriod({ periodName, startDate, endDate, companyId });
+      res.status(201).json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async closePeriod(req: Request, res: Response, next: NextFunction) {
+    try {
+      const id = parseInt(req.params.id as string, 10);
+      const closedBy = (req as any).user?.userId;
+      const data = await periodService.closePeriod(id, closedBy);
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async reopenPeriod(req: Request, res: Response, next: NextFunction) {
+    try {
+      const id = parseInt(req.params.id as string, 10);
+      const data = await periodService.reopenPeriod(id);
+      res.json({ success: true, data });
     } catch (error) {
       next(error);
     }
