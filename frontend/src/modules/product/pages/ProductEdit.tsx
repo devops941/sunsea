@@ -95,7 +95,7 @@ const ProductEdit: React.FC = () => {
     // ✅ Raw Materials Composition
     type RawMaterialRow = { rawMaterialId: string; percentage: string; };
     const [rawMaterials, setRawMaterials] = useState<RawMaterialRow[]>([]);
-    
+
     // ✅ Accessories / Additional Items
     type AccessoryRow = { rawMaterialId: string; quantity: string; };
     const [accessories, setAccessories] = useState<AccessoryRow[]>([]);
@@ -431,7 +431,7 @@ const ProductEdit: React.FC = () => {
                 newErrors.accessories = "Duplicate items selected in Accessories.";
                 toast.error("Duplicate items selected in Accessories");
             }
-            
+
             accessories.forEach((acc, index) => {
                 if (!acc.rawMaterialId) newErrors[`accessories.${index}.rawMaterialId`] = "Required";
                 if (!acc.quantity || Number(acc.quantity) <= 0) newErrors[`accessories.${index}.quantity`] = "Invalid Qty";
@@ -827,7 +827,7 @@ const ProductEdit: React.FC = () => {
                                 required
                                 onChange={handleChange}
                                 error={errors.categoryId}
-                                  disabled={true}
+                                disabled={true}
                             />
                             <TextInput
                                 label="Minimum Stock Qty"
@@ -839,7 +839,7 @@ const ProductEdit: React.FC = () => {
                                 required
                                 error={errors.minimumQty}
                             />
-                          
+
                             <TextInput
                                 label="Opening Stock Qty"
                                 name="openingStockQty"
@@ -849,7 +849,7 @@ const ProductEdit: React.FC = () => {
                                 value={formData.openingStockQty}
                                 onChange={handleChange}
                                 error={errors.openingStockQty}
-                                  disabled={true}
+                                disabled={true}
 
                             />
                             <SelectInput
@@ -860,10 +860,10 @@ const ProductEdit: React.FC = () => {
                                 options={storeOptions}
                                 onChange={handleChange}
                                 error={errors.openingStockStoreId}
-                                  disabled={true}
+                                disabled={true}
 
                             />
-                              <SelectInput
+                            <SelectInput
                                 label="Status"
                                 name="isActive"
                                 value={formData.isActive}
@@ -982,7 +982,7 @@ const ProductEdit: React.FC = () => {
                                     }
                                 }}
                                 error={errors.uomId}
-                                  disabled={true}
+                                disabled={true}
 
                             />
                             <TextInput

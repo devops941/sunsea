@@ -105,24 +105,17 @@ const SalesReportsCenter: React.FC = () => {
 
   const { csvData, csvColumns, csvFilename } = useMemo(() => {
     const columns = [
-      { header: "Order Number", accessor: (item: any) => item.orderNo },
-      { header: "Order Date", accessor: (item: any) => item.orderDate?.split("T")[0] },
-      { header: "Customer", accessor: (item: any) => item.customerName },
-      { header: "Customer Type", accessor: (item: any) => item.customerType },
-      { header: "Billing Address", accessor: (item: any) => item.billingAddress },
-      { header: "Shipping Address", accessor: (item: any) => item.shippingAddress },
-      { header: "Items (Qty)", accessor: (item: any) => item.items?.map((i: any) => `${i.productName} (${i.quantity} ${i.uom})`).join(", ") || "-" },
-      { header: "Items Count", accessor: (item: any) => item.itemsCount },
-      { header: "Total Quantity", accessor: (item: any) => item.totalQty },
-      { header: "Order Discount Type", accessor: (item: any) => item.orderDiscountType },
-      { header: "Order Discount Val", accessor: (item: any) => item.orderDiscountValue },
-      { header: "Total Discount", accessor: (item: any) => item.totalDiscount },
-      { header: "Total CGST", accessor: (item: any) => item.totalCgst },
-      { header: "Total SGST", accessor: (item: any) => item.totalSgst },
-      { header: "Total IGST", accessor: (item: any) => item.totalIgst },
-      { header: "Net Amount", accessor: (item: any) => item.netAmount },
-      { header: "Dispatch Type", accessor: (item: any) => item.dispatchType },
-      { header: "Status", accessor: (item: any) => item.status }
+      { header: "ORDER NUMBER", accessor: (item: any) => item.orderNo },
+      { header: "ORDER DATE", accessor: (item: any) => item.orderDate?.split("T")[0] },
+      { header: "CUSTOMER", accessor: (item: any) => item.customerName },
+      { header: "BILLING ADDRESS", accessor: (item: any) => item.billingAddress },
+      { header: "SHIPPING ADDRESS", accessor: (item: any) => item.shippingAddress },
+      { header: "ITEMS (QTY)", accessor: (item: any) => item.items?.map((i: any) => `${i.productName} (${i.quantity} ${i.uom})`).join(", ") || "-" },
+      { header: "TOTALS", accessor: (item: any) => `Qty: ${item.totalQty} | Disc: ${item.totalDiscount}` },
+      { header: "TAXES", accessor: (item: any) => (item.totalCgst || 0) + (item.totalSgst || 0) + (item.totalIgst || 0) },
+      { header: "NET AMOUNT", accessor: (item: any) => item.netAmount },
+      { header: "DISPATCH TYPE", accessor: (item: any) => item.dispatchType },
+      { header: "STATUS", accessor: (item: any) => item.status }
     ];
     return { csvData: backendReports, csvColumns: columns, csvFilename: `Sales_Order_Report_${startDate}_${endDate}.csv` };
   }, [backendReports, startDate, endDate]);
@@ -293,7 +286,7 @@ const SalesReportsCenter: React.FC = () => {
           <div className="flex flex-wrap items-center gap-3 relative w-full lg:w-auto">
             <ExportCSVButton
               data={csvData}
-              columns={csvColumns}
+              columns={csvColumns.filter(c => visibleColumns.map(v => v.toLowerCase()).includes(c.header.toLowerCase()))}
               filename={csvFilename}
               text="Export CSV"
             />

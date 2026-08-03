@@ -9,12 +9,14 @@ import { fetchShifts } from "../../../features/shifts/shiftSlice";
 import { fetchHourlyProductions } from "../../../features/hourly-productions/hourlyProductionSlice";
 import { fetchEmployees } from "../../../features/employee/employeeSlice";
 import { reportsService } from "../../../services/reportsService";
-import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import ExportCSVButton from "../../../components/ui/ExportCSVButton/ExportCSVButton";
+import ColumnToggle from "../../../components/ui/ColumnToggle/ColumnToggle";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import DataTable from "../../../components/ui/table/DataTable";
 import type { DataTableColumn } from "../../../components/ui/table/DataTable";
+import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import { DATE_RANGE_OPTIONS } from "../../../constants/selectOption";
+import { useSocketSync } from "../../../hooks/useSocketSync";
 
 const ProductionReportsCenter: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -43,17 +45,39 @@ const ProductionReportsCenter: React.FC = () => {
   const [page, setPage] = useState(1);
   const limit = 10;
 
-  // Backend direct reports loading
   const [backendReports, setBackendReports] = useState<any[]>([]);
   const [loadingBackend, setLoadingBackend] = useState(false);
 
-  useEffect(() => {
+  const [visibleColumnsConfig, setVisibleColumnsConfig] = useState<Record<string, string[]>>(() => {
+    const saved = localStorage.getItem("productionReportVisibleColumns");
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) { return {}; }
+    }
+    return {};
+  });
+
+  const handleVisibleColumnsChange = (newCols: string[]) => {
+    const updated = { ...visibleColumnsConfig, [selectedReportType]: newCols };
+    setVisibleColumnsConfig(updated);
+    localStorage.setItem("productionReportVisibleColumns", JSON.stringify(updated));
+  };
+
+  const fetchAllData = () => {
     dispatch(fetchProductionOrders());
     dispatch(fetchMachines());
     dispatch(fetchShifts());
     dispatch(fetchEmployees());
     dispatch(fetchHourlyProductions(undefined));
+  };
+
+  useEffect(() => {
+    fetchAllData();
   }, [dispatch]);
+
+  useSocketSync("productionOrder", undefined, fetchAllData);
+  useSocketSync("hourlyProduction", undefined, fetchAllData);
+  useSocketSync("machine", undefined, fetchAllData);
+  useSocketSync("shift", undefined, fetchAllData);
 
   // Load report data from backend if applicable
   useEffect(() => {
@@ -139,7 +163,7 @@ const ProductionReportsCenter: React.FC = () => {
   const { tableData, totalPages, csvAllData } = useMemo(() => {
     let data: any[] = [];
     if (selectedReportType === "daily") {
-      const grouped: Record<string, { date: string, machineName: string, shiftName: string, operatorName: string, target: number; produced: number; rejected: number; scrap: number }> = {};
+      const grouped: Record<string, { date: string, machineName: string, shiftName: string, operatorName: string, productionOrder: string, productName: string, status: string, target: number; produced: number; rejected: number; scrap: number }> = {};
       filteredOrders.forEach((po) => {
         if (!po.orderDate) return;
         const date = po.orderDate.split("T")[0];
@@ -197,9 +221,13 @@ const ProductionReportsCenter: React.FC = () => {
           }
         }
 
-        const key = `${date}_${mName}_${sName}_${oName}`;
+        const poNum = (po as any).orderNumber || po.productionOrderId || "-";
+        const prodName = (po as any).product?.productName || po.productItem?.productName || "-";
+        const status = po.status || "-";
+
+        const key = `${date}_${mName}_${sName}_${oName}_${poNum}_${prodName}`;
         if (!grouped[key]) {
-          grouped[key] = { date, machineName: mName, shiftName: sName, operatorName: oName, target: 0, produced: 0, rejected: 0, scrap: 0 };
+          grouped[key] = { date, machineName: mName, shiftName: sName, operatorName: oName, productionOrder: poNum, productName: prodName, status, target: 0, produced: 0, rejected: 0, scrap: 0 };
         }
         grouped[key].target += Number(po.targetQty) || 0;
         grouped[key].produced += Number(po.producedQty) || 0;
@@ -211,7 +239,15 @@ const ProductionReportsCenter: React.FC = () => {
       data = sortedKeys.map(key => {
         const vals = grouped[key];
         const eff = vals.target > 0 ? ((vals.produced / vals.target) * 100).toFixed(1) : "0.0";
-        return { id: key, ...vals, eff };
+        
+        let calculatedStatus = "Low";
+        if (vals.produced >= vals.target && vals.target > 0) {
+          calculatedStatus = "Highest";
+        } else if (vals.produced > 0) {
+          calculatedStatus = "Medium";
+        }
+
+        return { id: key, ...vals, eff, status: calculatedStatus };
       });
     } else if (selectedReportType === "weekly") {
       data = backendReports;
@@ -231,13 +267,16 @@ const ProductionReportsCenter: React.FC = () => {
         const columns = [
           { header: "Date", accessor: (item: any) => item.date },
           { header: "Machine", accessor: (item: any) => item.machineName },
+          { header: "Prod. Order", accessor: (item: any) => item.productionOrder },
+          { header: "Product", accessor: (item: any) => item.productName },
           { header: "Shift", accessor: (item: any) => item.shiftName },
           { header: "Operator", accessor: (item: any) => item.operatorName },
           { header: "Target Qty", accessor: (item: any) => item.target },
-          { header: "Produced Qty", accessor: (item: any) => item.produced },
-          { header: "Rejected Qty", accessor: (item: any) => item.rejected },
-          { header: "Scrap Qty", accessor: (item: any) => item.scrap },
-          { header: "Efficiency %", accessor: (item: any) => item.eff }
+          { header: "Produced", accessor: (item: any) => item.produced },
+          { header: "Rejected", accessor: (item: any) => item.rejected },
+          { header: "Scrap", accessor: (item: any) => item.scrap },
+          { header: "Efficiency", accessor: (item: any) => item.eff },
+          { header: "Status", accessor: (item: any) => item.status }
         ];
         return { csvColumns: columns, csvFilename: `Daily_Production_${startDate}_${endDate}.csv` };
       }
@@ -248,8 +287,8 @@ const ProductionReportsCenter: React.FC = () => {
           { header: "Machine", accessor: (item: any) => item.machineName },
           { header: "Planned Product", accessor: (item: any) => item.productName || "Various" },
           { header: "Target Qty", accessor: (item: any) => item.plannedQty },
-          { header: "Produced Qty", accessor: (item: any) => item.totalActualQty },
-          { header: "Progress %", accessor: (item: any) => item.progressPercentage },
+          { header: "Produced", accessor: (item: any) => item.totalActualQty },
+          { header: "Progress", accessor: (item: any) => item.progressPercentage },
           { header: "Status", accessor: (item: any) => item.status }
         ];
         return { csvColumns: columns, csvFilename: `Weekly_Production_${startDate}_${endDate}.csv` };
@@ -337,13 +376,25 @@ const ProductionReportsCenter: React.FC = () => {
       return [
         { header: "DATE", render: (item: any) => <span className="font-semibold text-gray-800">{item.date}</span> },
         { header: "MACHINE", render: (item: any) => item.machineName },
+        { header: "PROD. ORDER", render: (item: any) => item.productionOrder },
+        { header: "PRODUCT", render: (item: any) => item.productName },
         { header: "SHIFT", render: (item: any) => item.shiftName },
         { header: "OPERATOR", render: (item: any) => item.operatorName },
         { header: "TARGET QTY", render: (item: any) => item.target },
         { header: "PRODUCED", render: (item: any) => <span className="text-emerald-600 font-semibold">{item.produced}</span> },
         { header: "REJECTED", render: (item: any) => <span className="text-red-500 font-medium">{item.rejected}</span> },
         { header: "SCRAP", render: (item: any) => <span className="text-amber-500 font-medium">{item.scrap}</span> },
-        { header: "EFFICIENCY", render: (item: any) => <StatusBadge status={Number(item.eff) > 90 ? "COMPLETED" : "IN_PROGRESS"} customText={`${item.eff}%`} /> }
+        { header: "EFFICIENCY", render: (item: any) => <StatusBadge status={Number(item.eff) > 90 ? "COMPLETED" : "IN_PROGRESS"} customText={`${item.eff}%`} /> },
+        { 
+          header: "STATUS", 
+          render: (item: any) => {
+            let customColor = { bg: "", text: "" };
+            if (item.status === 'Highest') customColor = { bg: '#d1fae5', text: '#065f46' };
+            else if (item.status === 'Medium') customColor = { bg: '#dbeafe', text: '#1d4ed8' };
+            else customColor = { bg: '#fee2e2', text: '#b91c1c' };
+            return <StatusBadge status="CUSTOM" customText={item.status} customColor={customColor} />;
+          }
+        }
       ];
     }
     if (selectedReportType === "weekly") {
@@ -380,6 +431,11 @@ const ProductionReportsCenter: React.FC = () => {
     return [];
   };
 
+  const currentColumns = getTableColumns();
+  const currentHeaders = currentColumns.map(c => c.header as string);
+  const visibleColumns = visibleColumnsConfig[selectedReportType] || currentHeaders;
+  const finalColumns = currentColumns.filter(c => visibleColumns.includes(c.header as string));
+
   return (
     <div className="w-full">
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
@@ -391,7 +447,7 @@ const ProductionReportsCenter: React.FC = () => {
           <div className="flex flex-wrap items-center gap-3 relative w-full lg:w-auto">
             <ExportCSVButton
               data={csvAllData}
-              columns={csvColumns}
+              columns={csvColumns.filter(c => visibleColumns.map(v => v.toLowerCase()).includes(c.header.toLowerCase()))}
               filename={csvFilename}
               text="Export CSV"
             />
@@ -450,24 +506,33 @@ const ProductionReportsCenter: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-slate-200">
-            <button
-              onClick={handleClearFilters}
-              className="px-4 py-2 text-sm font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-md transition-colors"
-            >
-              Clear All
-            </button>
-            <button
-              onClick={handleApplyFilters}
-              className="px-6 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-md shadow-sm transition-colors"
-            >
-              Apply Filters
-            </button>
+          <div className="flex items-center justify-between mt-6 pt-4 border-t border-slate-200">
+            <div>
+              <ColumnToggle
+                columns={currentColumns}
+                visibleColumns={visibleColumns}
+                setVisibleColumns={handleVisibleColumnsChange}
+              />
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleClearFilters}
+                className="px-4 py-2 text-sm font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-md transition-colors"
+              >
+                Clear All
+              </button>
+              <button
+                onClick={handleApplyFilters}
+                className="px-6 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-md shadow-sm transition-colors"
+              >
+                Apply Filters
+              </button>
+            </div>
           </div>
         </div>
 
         <DataTable
-          columns={getTableColumns()}
+          columns={finalColumns}
           data={tableData}
           rowKey={(item: any) => String(item.id || item.weeklyProgramId || item.hourlyProductionId || item.productionOrderId || item.date)}
           loading={loadingOrders || loadingBackend || loadingHourly}

@@ -84,7 +84,7 @@ const LoginPage = () => {
                 toast.success(`Welcome back, ${user?.fullName || "User"}`);
 
                 const locationState = location.state as { from?: any } | null;
-                const fromPath = locationState?.from?.pathname || locationState?.from || "/dashboard";
+                const fromPath = "/dashboard";
 
                 navigate(fromPath, { replace: true });
             } else {

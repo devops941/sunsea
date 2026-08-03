@@ -101,12 +101,17 @@ const PurchaseReportsCenter: React.FC = () => {
 
   const { csvData, csvColumns, csvFilename } = useMemo(() => {
     const columns = [
-      { header: "PO Number", accessor: (item: any) => item.poNumber },
-      { header: "PO Date", accessor: (item: any) => item.poDate?.split("T")[0] },
-      { header: "Supplier", accessor: (item: any) => item.supplierName },
-      { header: "Items Count", accessor: (item: any) => item.itemsCount },
-      { header: "Net Amount", accessor: (item: any) => item.netAmount },
-      { header: "Status", accessor: (item: any) => item.status }
+      { header: "PO NUMBER", accessor: (item: any) => item.poNumber },
+      { header: "PO DATE", accessor: (item: any) => item.poDate?.split("T")[0] },
+      { header: "DELIVERY DATE", accessor: (item: any) => item.expectedDeliveryDate?.split("T")[0] },
+      { header: "SUPPLIER", accessor: (item: any) => item.supplierName },
+      { header: "BILLING ADDRESS", accessor: (item: any) => item.billingAddress },
+      { header: "SHIPPING ADDRESS", accessor: (item: any) => item.shippingAddress },
+      { header: "ITEMS (QTY)", accessor: (item: any) => item.itemsCount },
+      { header: "TAXES", accessor: (item: any) => (item.totalCgst || 0) + (item.totalSgst || 0) + (item.totalIgst || 0) },
+      { header: "DISCOUNT", accessor: (item: any) => item.totalDiscount },
+      { header: "NET AMOUNT", accessor: (item: any) => item.netAmount },
+      { header: "STATUS", accessor: (item: any) => item.status }
     ];
     return { csvData: backendReports, csvColumns: columns, csvFilename: `Purchase_Order_Report_${startDate}_${endDate}.csv` };
   }, [backendReports, startDate, endDate]);
@@ -258,7 +263,7 @@ const PurchaseReportsCenter: React.FC = () => {
           <div className="flex flex-wrap items-center gap-3 relative w-full lg:w-auto">
             <ExportCSVButton
               data={csvData}
-              columns={csvColumns}
+              columns={csvColumns.filter(c => visibleColumns.map(v => v.toLowerCase()).includes(c.header.toLowerCase()))}
               filename={csvFilename}
               text="Export CSV"
             />
