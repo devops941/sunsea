@@ -55,6 +55,7 @@ import accountsRoutes from "../modules/accounts/accounts.routes";
 import voucherRoutes from "../modules/vouchers/vouchers.routes";
 import returnRoutes from "../modules/returns/returns.routes";
 import pettyCashRoutes from "../modules/petty-cash/petty-cash.routes";
+import dashboardRoutes from "../modules/dashboard/dashboard.routes";
 
 const router = Router();
 
@@ -119,6 +120,7 @@ router.use("/accounts", accountsRoutes);
 router.use("/vouchers", voucherRoutes);
 router.use("/returns", returnRoutes);
 router.use("/petty-cash", pettyCashRoutes);
+router.use("/dashboard", dashboardRoutes);
 
 router.get("/", (req, res) => {
     res.status(200).json({
