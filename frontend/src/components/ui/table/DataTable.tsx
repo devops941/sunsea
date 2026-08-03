@@ -4,6 +4,12 @@ import CommonLoader from "../Loader/CommonLoader";
 
 export interface DataTableColumn<T> {
   header: string;
+  /**
+   * Optional JSX to render in the column header instead of the plain `header` string.
+   * Use this when you need multi-line or styled header content (e.g. "PRESENT / 7d").
+   * `header` is still required for ColumnToggle / CSV export.
+   */
+  headerNode?: React.ReactNode;
   /** Simple key lookup on the row object */
   accessor?: keyof T;
   /** Custom cell renderer — receives the row and its index. Overrides `accessor` if both given. */
@@ -125,7 +131,7 @@ function DataTable<T>({
                   role="columnheader"
                   className={`flex items-center ${cellPaddingClass} font-semibold text-[11px] sm:text-xs tracking-wide uppercase text-[#2A3547] whitespace-nowrap ${alignClass[col.align ?? "left"]}`}
                 >
-                  {col.header}
+                  {col.headerNode ?? col.header}
                 </div>
               ))}
             </div>

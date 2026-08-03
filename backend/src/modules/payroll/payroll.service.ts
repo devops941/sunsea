@@ -25,7 +25,7 @@ function periodToDateRange(period: string): { start: string; end: string } {
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-type SalaryType = 'FIXED_MONTHLY' | 'PF_MONTHLY' | 'CASH_MONTHLY' | 'DAILY_WEEKLY';
+type SalaryType = 'FIXED_MONTHLY' | 'PF_MONTHLY' | 'CASH_MONTHLY' | 'DAILY_WEEKLY' | 'WEEKLY';
 
 interface AttendanceInput {
   employeeId: number;
@@ -114,8 +114,11 @@ export function getEffectivePayrollConfig(emp: any) {
   if (emp.payrollConfig) return emp.payrollConfig;
 
   let salaryType = 'FIXED_MONTHLY';
-  if (emp.salaryType === 'daily' || emp.salaryType === 'weekly') {
+  if (emp.salaryType === 'daily') {
     salaryType = 'DAILY_WEEKLY';
+  } else if (emp.salaryType === 'weekly') {
+    // Weekly salary employees get their own independent calculation path
+    salaryType = 'WEEKLY';
   } else if (emp.pfApplicable) {
     salaryType = 'PF_MONTHLY';
   } else if (emp.salaryType === 'monthly') {
@@ -188,10 +191,11 @@ function computeResult(
 
   let formulaDivisor = 1;
 
-  if (salaryType === 'DAILY_WEEKLY') {
+  const st = String(salaryType).toUpperCase();
+  if (st === 'DAILY_WEEKLY' || st === 'DAILY') {
     if (settings.dailySalaryFormula === 'FIXED_DAILY' || monthlySalary === 0) {
       // Pure per-diem: use the stored per-day rate directly
-      dailyRate = dailySalaryStored;
+      dailyRate = dailySalaryStored || monthlySalary;
       formulaDivisor = 1;
     } else if (settings.dailySalaryFormula === 'MONTHLY_BY_CALENDAR') {
       // Monthly ÷ Calendar Days: Aug=31, Sep=30, etc.
@@ -202,6 +206,11 @@ function computeResult(
       formulaDivisor = workingDaysPerMonth;
       dailyRate = monthlySalary / formulaDivisor;
     }
+  } else if (st === 'WEEKLY') {
+    // For weekly salary, monthlySalary field stores the weekly gross salary (e.g. 5000)
+    // So the daily rate is the weekly amount ÷ 7 days.
+    formulaDivisor = 7;
+    dailyRate = monthlySalary / formulaDivisor;
   } else {
     // Fixed / PF / Cash monthly employees
     if (settings.dailySalaryFormula === 'MONTHLY_BY_CALENDAR') {
@@ -228,8 +237,14 @@ function computeResult(
   // ─────────────────────────────────────────────────────────────────────────────
   let earnedSalary: number;
   if (salaryType === 'DAILY_WEEKLY') {
+    // Daily wage workers: pay only for days actually worked
     earnedSalary = dailyRate * presentDays;
+  } else if (salaryType === 'WEEKLY') {
+    // Weekly salary: start from weekly gross, deduct absent days only
+    // Weekly off and holidays are paid (they are part of the weekly gross)
+    earnedSalary = monthlySalary - (lopDays * dailyRate);
   } else {
+    // Monthly: full month salary minus LOP deductions
     earnedSalary = monthlySalary - (lopDays * dailyRate);
   }
   earnedSalary = Math.max(0, earnedSalary);
@@ -359,8 +374,12 @@ function computeResult(
     salaryAdvanceOverride + loanRecoveryAmount + otherDeductionAmount;
 
   // ─ Net salary ─
+  // For WEEKLY runs: allow negative net salary when salary advance exceeds earned salary.
+  // The payslip will display a negative balance — employee owes the difference.
+  // For MONTHLY runs: clamp at 0 (excess advance carries forward to next period).
+  const rawNet = grossSalary - totalDeductions;
   const netSalary = applyRounding(
-    Math.max(0, grossSalary - totalDeductions),
+    runType === 'WEEKLY' ? rawNet : Math.max(0, rawNet),
     settings.roundingRule
   );
 
@@ -618,7 +637,10 @@ class PayrollService {
         payrollConfig: getEffectivePayrollConfig(e),
       }))
       .filter(e => {
-        const isWeekly = e.payrollConfig?.salaryType === 'DAILY_WEEKLY' || (e as any).salaryType === 'daily';
+        const isWeekly = e.payrollConfig?.salaryType === 'DAILY_WEEKLY'
+          || e.payrollConfig?.salaryType === 'WEEKLY'
+          || (e as any).salaryType === 'daily'
+          || (e as any).salaryType === 'weekly';
         if (opts.type === 'WEEKLY' && !isWeekly) return false;
         if (opts.type === 'MONTHLY' && isWeekly) return false;
         if (opts.employeeCategory !== 'ALL' && e.payrollConfig?.salaryType !== opts.employeeCategory) return false;

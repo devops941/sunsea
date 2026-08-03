@@ -2,7 +2,7 @@
 // Payroll Module — TypeScript Types (single source of truth)
 // ============================================================
 
-export type SalaryType = 'FIXED_MONTHLY' | 'PF_MONTHLY' | 'CASH_MONTHLY' | 'DAILY_WEEKLY';
+export type SalaryType = 'FIXED_MONTHLY' | 'PF_MONTHLY' | 'CASH_MONTHLY' | 'DAILY_WEEKLY' | 'WEEKLY';
 
 export type PayrollStatus = 'DRAFT' | 'PREVIEW' | 'APPROVED' | 'LOCKED';
 

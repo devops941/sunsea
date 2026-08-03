@@ -95,6 +95,21 @@ export const PERMISSION_REGISTRY: ModulePermission[] = [
   { module: "inventory-reports",  actions: ["view"], description: "Inventory Reports" },
   { module: "production-reports", actions: ["view"], description: "Production Reports" },
   { module: "audit-reports",      actions: ["view"], description: "Audit Reports" },
+
+  // ── Accounts ─────────────────────────────────────────────────────────────────
+  { module: "accounts",          actions: ["view","create","edit","delete"], description: "Accounts" },
+  { module: "payable",           actions: ["view","create","edit","delete"], description: "Accounts Payable" },
+  { module: "receivable",        actions: ["view","create","edit","delete"], description: "Accounts Receivable" },
+  { module: "vouchers",          actions: ["view","create","edit","delete"], description: "Vouchers" },
+  { module: "petty-cash",        actions: ["view","create","edit","delete"], description: "Petty Cash" },
+  { module: "chart-of-accounts", actions: ["view","create","edit","delete"], description: "Chart of Accounts" },
+
+  // ── Payroll ──────────────────────────────────────────────────────────────────
+  { module: "payroll",            actions: ["view","create","edit","delete"], description: "Payroll Dashboard" },
+  { module: "payroll-run",        actions: ["view","create","edit","delete"], description: "Payroll Run" },
+  { module: "payroll-settings",   actions: ["view","create","edit","delete"], description: "Payroll Settings" },
+  { module: "payroll-attendance", actions: ["view","create","edit","delete"], description: "Attendance" },
+  { module: "payroll-advance",    actions: ["view","create","edit","delete"], description: "Salary Advance" },
 ];
 
 /**

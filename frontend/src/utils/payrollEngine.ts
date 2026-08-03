@@ -73,9 +73,11 @@ export function computeDailyRate(
   let dailyRate = 0;
   let formulaDivisor = 1;
 
-  if (salaryType === 'DAILY_WEEKLY') {
+  const st = salaryType?.toUpperCase() || '';
+
+  if (st === 'DAILY' || st === 'DAILY_WEEKLY') {
     if (settings.dailySalaryFormula === 'FIXED_DAILY' || monthlySalary === 0) {
-      dailyRate = dailySalaryStored ?? 0;
+      dailyRate = dailySalaryStored ?? monthlySalary ?? 0;
       formulaDivisor = 1;
     } else if (settings.dailySalaryFormula === 'MONTHLY_BY_CALENDAR') {
       formulaDivisor = calDaysForFormula > 0 ? calDaysForFormula : 30;
@@ -84,7 +86,15 @@ export function computeDailyRate(
       formulaDivisor = workingDaysPerMonth > 0 ? workingDaysPerMonth : 26;
       dailyRate = monthlySalary / formulaDivisor;
     }
+  } else if (st === 'WEEKLY') {
+    // If the salary is weekly, the monthlySalary field actually holds the weekly gross salary
+    // The UI calculates daily wage as weekly gross ÷ 7 days/week by default, or working days.
+    // We match the Salary Preview (which divides by 7 or uses settings).
+    // Let's use 7 days as the formula divisor for WEEKLY to match the UI's ₹714.29 (5000/7)
+    formulaDivisor = 7;
+    dailyRate = monthlySalary / formulaDivisor;
   } else {
+    // MONTHLY
     if (settings.dailySalaryFormula === 'MONTHLY_BY_CALENDAR') {
       formulaDivisor = calDaysForFormula > 0 ? calDaysForFormula : 30;
       dailyRate = monthlySalary / formulaDivisor;
@@ -234,7 +244,8 @@ export function computeEmployeePayroll(
   employee: PayrollEmployee,
   attendance: EmployeeAttendance,
   settings: PayrollSettings,
-  calendarDays: number
+  calendarDays: number,
+  salaryAdvanceAmount = 0
 ): PayrollResult {
   const { days } = attendance;
 
@@ -252,18 +263,36 @@ export function computeEmployeePayroll(
 
   // 2. Daily rate
   const workingDays = calendarDays - weeklyOffCount - holidayCount;
-  const { dailyRate, formulaDivisor } = computeDailyRate(employee, settings, calendarDays, workingDays);
+  const { dailyRate } = computeDailyRate(employee, settings, calendarDays, workingDays);
 
-  // 3. Gross salary (annual components)
-  const { basicSalary, da, hra, otherAllowance } = employee;
-  const grossSalary = basicSalary + da + hra + otherAllowance;
+  // 3. Gross salary & earned salary — each salary type has its own formula
+  const st = employee.salaryType?.toUpperCase() || '';
+  const isWeekly = st === 'WEEKLY';
 
-  // 4. Earned salary (prorated)
-  const earnedSalary = applyRounding(
-    totalDays > 0 ? (grossSalary * paidDays) / totalDays : 0,
-    settings.roundingRule,
-    settings.decimalPrecision
-  );
+  let grossSalary: number;
+  let earnedSalary: number;
+
+  if (isWeekly) {
+    // WEEKLY: monthlySalary field stores the weekly gross salary (e.g. ₹5,000/week).
+    // Earned = dailyRate × paidDays (present + 0.5×halfDay + weeklyOff + holiday + paidLeave).
+    // Weekly off and holidays are paid as part of the weekly gross.
+    // Absent/LOP days are deducted at dailyRate each.
+    grossSalary = employee.monthlySalary;
+    earnedSalary = applyRounding(
+      dailyRate * paidDays,
+      settings.roundingRule,
+      settings.decimalPrecision
+    );
+  } else {
+    // MONTHLY: gross = sum of salary components, prorated by paid days / total days
+    const { basicSalary, da, hra, otherAllowance } = employee;
+    grossSalary = basicSalary + da + hra + otherAllowance;
+    earnedSalary = applyRounding(
+      totalDays > 0 ? (grossSalary * paidDays) / totalDays : 0,
+      settings.roundingRule,
+      settings.decimalPrecision
+    );
+  }
 
   // 5. OT + permission + late entry
   let totalOtHours  = 0;
@@ -313,18 +342,23 @@ export function computeEmployeePayroll(
 
   // 9. Net
   const totalDeductions = applyRounding(
-    employeePf + employeeEsi + professionalTax + lateEntryDeduction + permissionDeduction,
-    settings.roundingRule,
-    settings.decimalPrecision
-  );
-  const netSalary = applyRounding(
-    earnedSalary + totalOtPay - totalDeductions,
+    employeePf + employeeEsi + professionalTax + lateEntryDeduction + permissionDeduction + salaryAdvanceAmount,
     settings.roundingRule,
     settings.decimalPrecision
   );
 
-  // 10. Variance: net deviates >20% from monthly salary
-  const hasVariance = employee.monthlySalary > 0
+  // For WEEKLY: allow negative net salary when advance exceeds earned salary.
+  // The payslip displays the negative balance — employee owes the difference.
+  // For MONTHLY: clamp at 0 (excess advance carries forward to the next period).
+  const rawNet = earnedSalary + totalOtPay - totalDeductions;
+  const netSalary = applyRounding(
+    isWeekly ? rawNet : Math.max(0, rawNet),
+    settings.roundingRule,
+    settings.decimalPrecision
+  );
+
+  // 10. Variance: only meaningful for monthly salary types
+  const hasVariance = !isWeekly && employee.monthlySalary > 0
     && Math.abs(netSalary - employee.monthlySalary) / employee.monthlySalary > 0.2;
 
   return {
@@ -361,7 +395,7 @@ export function computeEmployeePayroll(
     professionalTax,
     lateEntryDeduction,
     permissionDeduction,
-    salaryAdvance: 0,
+    salaryAdvance: salaryAdvanceAmount,
     loanRecovery: 0,
     otherDeductions: 0,
     totalDeductions,

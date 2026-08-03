@@ -8,7 +8,8 @@ import {
 } from 'lucide-react';
 import { useSocket } from '../../../providers/SocketProvider';
 import { payrollService } from '../../../services/payrollService';
-import type { ApiPayrollRun, ApiEmployeePayroll, AttendanceInput } from '../../../services/payrollService';
+import type { ApiPayrollRun, ApiEmployeePayroll, AttendanceInput, ApiPayrollResult } from '../../../services/payrollService';
+import DataTable, { type DataTableColumn } from '../../../components/ui/table/DataTable';
 
 // ─── Steps ───────────────────────────────────────────────────────────────────
 const STEPS = [
@@ -76,7 +77,7 @@ function getWeeksOfMonth(year: number, month: number): WeekOption[] {
   return opts;
 }
 
-type SalaryCategory = 'ALL' | 'FIXED_MONTHLY' | 'PF_MONTHLY' | 'CASH_MONTHLY' | 'DAILY_WEEKLY';
+type SalaryCategory = 'ALL' | 'FIXED_MONTHLY' | 'PF_MONTHLY' | 'CASH_MONTHLY' | 'DAILY_WEEKLY' | 'WEEKLY';
 
 const CATEGORIES: { value: SalaryCategory; label: string }[] = [
   { value: 'ALL',           label: 'All Employees'          },
@@ -84,6 +85,7 @@ const CATEGORIES: { value: SalaryCategory; label: string }[] = [
   { value: 'PF_MONTHLY',    label: 'PF Workers (Monthly)'   },
   { value: 'CASH_MONTHLY',  label: 'Cash Monthly'           },
   { value: 'DAILY_WEEKLY',  label: 'Daily Wage (Weekly)'    },
+  { value: 'WEEKLY',        label: 'Weekly Salary'          },
 ];
 
 // ─── Stepper ──────────────────────────────────────────────────────────────────
@@ -410,10 +412,149 @@ const Step2: React.FC<{
       </div>
     );
   }
+  const columns: DataTableColumn<AttRow>[] = [
+    {
+      header: "EMPLOYEE",
+      align: "left",
+      render: (row) => (
+        <div>
+          <p className="font-semibold text-text-primary text-xs">{row.name}</p>
+          <p className="text-[10px] text-text-muted">{row.code} · {row.salaryType.replace(/_/g, ' ')}</p>
+        </div>
+      ),
+    },
+    {
+      header: "PRESENT",
+      headerNode: (
+        <span>
+          PRESENT <br />
+          <span className="font-normal normal-case text-slate-400">/ {calDays}d</span>
+        </span>
+      ),
+      align: "center",
+      render: (row) => (
+        <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-emerald-100 text-emerald-700 font-bold text-sm">
+          {row.presentDays}
+        </span>
+      ),
+    },
+    {
+      header: "ABSENT",
+      align: "center",
+      render: (row) => (
+        <span
+          className={`inline-flex items-center justify-center w-8 h-8 rounded-full font-bold text-sm ${
+            row.absentDays > 0 ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-400'
+          }`}
+        >
+          {row.absentDays > 0 ? row.absentDays : '—'}
+        </span>
+      ),
+    },
+    {
+      header: "HALF DAY",
+      headerNode: (
+        <span>
+          HALF <br />
+          <span className="font-normal normal-case text-slate-400">Day</span>
+        </span>
+      ),
+      align: "center",
+      render: (row) => (
+        <span
+          className={`inline-flex items-center justify-center w-8 h-8 rounded-full font-bold text-sm ${
+            row.halfDays > 0 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-400'
+          }`}
+        >
+          {row.halfDays > 0 ? row.halfDays : '—'}
+        </span>
+      ),
+    },
+    {
+      header: "OT HRS",
+      headerNode: (
+        <span>
+          OT <br />
+          <span className="font-normal normal-case text-slate-400">Hrs</span>
+        </span>
+      ),
+      align: "center",
+      render: (row) => (
+        <span className={`font-mono text-sm ${row.otHours > 0 ? 'text-blue-600 font-semibold' : 'text-text-muted'}`}>
+          {row.otHours > 0 ? row.otHours.toFixed(1) : '—'}
+        </span>
+      ),
+    },
+    {
+      header: "LATE MIN",
+      headerNode: (
+        <span>
+          LATE <br />
+          <span className="font-normal normal-case text-slate-400">min</span>
+        </span>
+      ),
+      align: "center",
+      render: (row) => (
+        <span className={`font-mono text-sm ${row.lateMinutes > 0 ? 'text-orange-600' : 'text-text-muted'}`}>
+          {row.lateMinutes > 0 ? row.lateMinutes : '—'}
+        </span>
+      ),
+    },
+    {
+      header: "PERM MIN",
+      headerNode: (
+        <span>
+          PERM <br />
+          <span className="font-normal normal-case text-slate-400">min</span>
+        </span>
+      ),
+      align: "center",
+      render: (row) => (
+        <span className={`font-mono text-sm ${row.permissionMinutes > 0 ? 'text-orange-600' : 'text-text-muted'}`}>
+          {row.permissionMinutes > 0 ? row.permissionMinutes : '—'}
+        </span>
+      ),
+    },
+    {
+      header: "ADVANCE ₹",
+      align: "right",
+      render: (row) => (
+        <span className={`font-mono text-sm ${row.advance > 0 ? 'text-violet-700 font-semibold' : 'text-text-muted'}`}>
+          {row.advance > 0 ? `₹${row.advance.toLocaleString('en-IN')}` : '—'}
+        </span>
+      ),
+    },
+    {
+      header: "STATUS",
+      align: "center",
+      render: (row) => {
+        const totalTracked = row.presentDays + row.absentDays + row.halfDays;
+        const missingDays = calDays - totalTracked;
+        const overCap = totalTracked > calDays;
+        return totalTracked === 0 ? (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-red-100 text-red-700">
+            <AlertTriangle size={9} /> No Data
+          </span>
+        ) : overCap ? (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-red-100 text-red-700">
+            <AlertTriangle size={9} /> Over
+          </span>
+        ) : missingDays > 3 ? (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-700">
+            <Info size={9} /> {missingDays}d unset
+          </span>
+        ) : (
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-700">
+            OK
+          </span>
+        );
+      },
+    },
+  ];
 
   return (
     <div className="space-y-4">
-      <div className="flex items-start justify-between">
+      <div className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-bold text-text-primary">Review Attendance</h2>
           <p className="text-sm text-text-secondary mt-0.5">
@@ -444,113 +585,33 @@ const Step2: React.FC<{
         ))}
       </div>
 
-      {/* Per-employee attendance breakdown */}
-      <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[780px]">
-            <thead>
-              <tr className="bg-slate-800 text-white text-xs uppercase tracking-wider">
-                <th className="text-left px-4 py-3 font-semibold sticky left-0 bg-slate-800 z-10">Employee</th>
-                <th className="text-center px-3 py-3 font-semibold">Present<br/><span className="font-normal normal-case text-slate-400">/ {calDays}d</span></th>
-                <th className="text-center px-3 py-3 font-semibold">Absent</th>
-                <th className="text-center px-3 py-3 font-semibold">Half<br/><span className="font-normal normal-case text-slate-400">Day</span></th>
-                <th className="text-center px-3 py-3 font-semibold">OT<br/><span className="font-normal normal-case text-slate-400">Hrs</span></th>
-                <th className="text-center px-3 py-3 font-semibold">Late<br/><span className="font-normal normal-case text-slate-400">min</span></th>
-                <th className="text-center px-3 py-3 font-semibold">Perm<br/><span className="font-normal normal-case text-slate-400">min</span></th>
-                <th className="text-right px-4 py-3 font-semibold">Advance ₹</th>
-                <th className="text-center px-3 py-3 font-semibold">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {rows.map((row, idx) => {
-                const totalTracked = row.presentDays + row.absentDays + row.halfDays;
-                const missingDays  = calDays - totalTracked;
-                const overCap      = totalTracked > calDays;
-                return (
-                  <tr
-                    key={row.employeeId}
-                    className={`transition-colors ${
-                      totalTracked === 0 ? 'bg-red-50/40' :
-                      overCap ? 'bg-red-50' :
-                      missingDays > 5 ? 'bg-amber-50/50' :
-                      idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'
-                    } hover:bg-blue-50/20`}
-                  >
-                    <td className="px-4 py-2.5 sticky left-0 bg-inherit z-10">
-                      <p className="font-semibold text-text-primary text-xs">{row.name}</p>
-                      <p className="text-[10px] text-text-muted">{row.code} · {row.salaryType.replace(/_/g,' ')}</p>
-                    </td>
-                    <td className="px-3 py-2.5 text-center">
-                      <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-emerald-100 text-emerald-700 font-bold text-sm">
-                        {row.presentDays}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2.5 text-center">
-                      <span className={`inline-flex items-center justify-center w-8 h-8 rounded-full font-bold text-sm ${
-                        row.absentDays > 0 ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-400'
-                      }`}>
-                        {row.absentDays > 0 ? row.absentDays : '—'}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2.5 text-center">
-                      <span className={`inline-flex items-center justify-center w-8 h-8 rounded-full font-bold text-sm ${
-                        row.halfDays > 0 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-400'
-                      }`}>
-                        {row.halfDays > 0 ? row.halfDays : '—'}
-                      </span>
-                    </td>
-                    <td className={`px-3 py-2.5 text-center font-mono text-sm ${row.otHours > 0 ? 'text-blue-600 font-semibold' : 'text-text-muted'}`}>
-                      {row.otHours > 0 ? row.otHours.toFixed(1) : '—'}
-                    </td>
-                    <td className={`px-3 py-2.5 text-center font-mono text-sm ${row.lateMinutes > 0 ? 'text-orange-600' : 'text-text-muted'}`}>
-                      {row.lateMinutes > 0 ? row.lateMinutes : '—'}
-                    </td>
-                    <td className={`px-3 py-2.5 text-center font-mono text-sm ${row.permissionMinutes > 0 ? 'text-orange-600' : 'text-text-muted'}`}>
-                      {row.permissionMinutes > 0 ? row.permissionMinutes : '—'}
-                    </td>
-                    <td className={`px-4 py-2.5 text-right font-mono text-sm ${row.advance > 0 ? 'text-violet-700 font-semibold' : 'text-text-muted'}`}>
-                      {row.advance > 0 ? `₹${row.advance.toLocaleString('en-IN')}` : '—'}
-                    </td>
-                    <td className="px-3 py-2.5 text-center">
-                      {totalTracked === 0 ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-red-100 text-red-700">
-                          <AlertTriangle size={9} /> No Data
-                        </span>
-                      ) : overCap ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-red-100 text-red-700">
-                          <AlertTriangle size={9} /> Over
-                        </span>
-                      ) : missingDays > 3 ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-700">
-                          <Info size={9} /> {missingDays}d unset
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-700">
-                          OK
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-            <tfoot>
-              <tr className="bg-slate-100 border-t-2 border-slate-300 font-bold text-sm">
-                <td className="px-4 py-2.5 font-bold text-text-primary sticky left-0 bg-slate-100 z-10">
-                  TOTAL ({rows.length} employees)
-                </td>
-                <td className="px-3 py-2.5 text-center text-emerald-700">{totals.present}</td>
-                <td className="px-3 py-2.5 text-center text-red-600">{totals.absent}</td>
-                <td className="px-3 py-2.5 text-center text-amber-600">{totals.half}</td>
-                <td className="px-3 py-2.5 text-center text-blue-600 font-mono">{totals.ot.toFixed(1)}</td>
-                <td colSpan={2} />
-                <td className="px-4 py-2.5 text-right font-mono text-violet-700">
-                  {totals.adv > 0 ? `₹${totals.adv.toLocaleString('en-IN')}` : '—'}
-                </td>
-                <td />
-              </tr>
-            </tfoot>
-          </table>
+      {/* Per-employee attendance breakdown using reusable DataTable component */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <DataTable
+          columns={columns}
+          data={rows}
+          rowKey={(row) => row.employeeId}
+          emptyMessage="No attendance records found."
+          rowClassName={(row) => {
+            const totalTracked = row.presentDays + row.absentDays + row.halfDays;
+            const missingDays = calDays - totalTracked;
+            const overCap = totalTracked > calDays;
+            return totalTracked === 0 ? 'bg-red-50/40' :
+              overCap ? 'bg-red-50' :
+              missingDays > 5 ? 'bg-amber-50/50' : '';
+          }}
+          density="compact"
+        />
+        {/* Total Summary Footer */}
+        <div className="bg-slate-50 border-t border-slate-200 p-4 flex flex-wrap justify-between items-center text-xs font-mono">
+          <span className="font-bold text-slate-800 text-sm">TOTAL ({rows.length} employees)</span>
+          <div className="flex gap-6 flex-wrap justify-end font-semibold">
+            <span className="text-emerald-700">Present: {totals.present}</span>
+            <span className="text-red-600">Absent: {totals.absent}</span>
+            <span className="text-amber-600">Half: {totals.half}</span>
+            <span className="text-blue-600 font-mono">OT: {totals.ot.toFixed(1)}h</span>
+            <span className="text-violet-700 font-mono">Advance: {totals.adv > 0 ? `₹${totals.adv.toLocaleString('en-IN')}` : '—'}</span>
+          </div>
         </div>
       </div>
 
@@ -622,6 +683,183 @@ const Step3: React.FC<{
   const results   = run.results || [];
   const variances = results.filter(r => r.hasVariance);
 
+  const columns: DataTableColumn<ApiPayrollResult>[] = [
+    {
+      header: "Employee",
+      align: "left",
+      render: (r) => (
+        <div className="flex items-center gap-2">
+          {r.hasVariance && <AlertTriangle size={11} className="text-amber-500 shrink-0" />}
+          <div>
+            <p className="font-semibold text-text-primary text-xs">{r.employeeName}</p>
+            <p className="text-[10px] text-text-muted">{r.employeeCode}</p>
+          </div>
+        </div>
+      ),
+    },
+    {
+      header: "Pres / LOP",
+      align: "center",
+      render: (r) => (
+        <div className="text-xs">
+          <span className="text-emerald-600 font-semibold">{Number(r.presentDays).toFixed(1)}</span>
+          <span className="text-text-muted"> / </span>
+          <span className={Number(r.lopDays) > 0 ? 'text-red-500 font-semibold' : 'text-text-muted'}>
+            {Number(r.lopDays).toFixed(1)}
+          </span>
+        </div>
+      ),
+    },
+    {
+      header: "Daily Rate",
+      align: "right",
+      render: (r) => (
+        <span
+          className="font-mono text-xs cursor-help"
+          title={r.monthlySalary !== undefined
+            ? `Daily Rate = ₹${r.monthlySalary.toLocaleString('en-IN')} ÷ ${r.formulaDivisor || 1} days\n= ${fmtDec(Number(r.dailyRate))}/day`
+            : `Daily Rate\n= ${fmtDec(Number(r.dailyRate))}/day`}
+        >
+          {fmtDec(Number(r.dailyRate))}
+        </span>
+      ),
+    },
+    {
+      header: "Earned",
+      align: "right",
+      render: (r) => (
+        <span
+          className="font-mono text-xs cursor-help"
+          title={`Earned = Daily Rate × Payable Days\n= ${fmtDec(Number(r.dailyRate))} × ${Number(r.presentDays).toFixed(1)}d\n= ${fmtDec(Number(r.earnedSalary))}`}
+        >
+          {fmtRs(Number(r.earnedSalary))}
+        </span>
+      ),
+    },
+    {
+      header: "OT Pay",
+      align: "right",
+      render: (r) => (
+        <span
+          className="font-mono text-xs text-emerald-600 cursor-help"
+          title={Number(r.otHours) > 0
+            ? `OT = ${r.otHours}h × ₹${Number(r.otHours) > 0 ? (Number(r.otPay) / Number(r.otHours)).toFixed(2) : 0}/h\n= ${fmtDec(Number(r.otPay))}`
+            : 'No overtime'}
+        >
+          {Number(r.otPay) > 0 ? fmtRs(Number(r.otPay)) : '—'}
+        </span>
+      ),
+    },
+    {
+      header: "Gross",
+      align: "right",
+      render: (r) => (
+        <span
+          className="font-mono text-xs font-semibold cursor-help"
+          title={`Gross = Earned + OT\n= ${fmtDec(Number(r.earnedSalary))} + ${fmtDec(Number(r.otPay))}\n= ${fmtDec(Number(r.grossSalary))}`}
+        >
+          {fmtRs(Number(r.grossSalary))}
+        </span>
+      ),
+    },
+    {
+      header: "Emp PF",
+      align: "right",
+      render: (r) => (
+        <span
+          className="font-mono text-xs text-red-500 cursor-help"
+          title={r.pfApplicable
+            ? `PF Wage: ₹${Number(r.pfWage).toLocaleString('en-IN')}\nEmployee PF @ 12%\n= ${fmtRs(Number(r.employeePf))}`
+            : 'PF not applicable'}
+        >
+          {r.pfApplicable ? fmtRs(Number(r.employeePf)) : '—'}
+        </span>
+      ),
+    },
+    {
+      header: "Emp ESI",
+      align: "right",
+      render: (r) => (
+        <span
+          className="font-mono text-xs text-red-500 cursor-help"
+          title={r.esiApplicable
+            ? `ESI on Gross ₹${fmtRs(Number(r.grossSalary))}\nEmployee ESI @ 0.75%\n= ${fmtRs(Number(r.employeeEsi))}`
+            : 'ESI not applicable (gross > limit)'}
+        >
+          {r.esiApplicable ? fmtRs(Number(r.employeeEsi)) : '—'}
+        </span>
+      ),
+    },
+    {
+      header: "PT",
+      align: "right",
+      render: (r) => (
+        <span
+          className="font-mono text-xs text-red-500 cursor-help"
+          title={Number(r.professionalTax) > 0
+            ? `Professional Tax (monthly slab)\n= ${fmtRs(Number(r.professionalTax))}`
+            : 'PT: ₹0 (weekly run — applied in monthly payroll)'}
+        >
+          {Number(r.professionalTax) > 0 ? fmtRs(Number(r.professionalTax)) : '—'}
+        </span>
+      ),
+    },
+    {
+      header: "Late Ded",
+      align: "right",
+      render: (r) => (
+        <span
+          className="font-mono text-xs text-red-500 cursor-help"
+          title={Number(r.lateEntryDeduction) > 0
+            ? `Late Entry Deduction\n= ${r.lateMinutes ? r.lateMinutes + ' mins late' : 'Calculated by Slab'}\n= ${fmtRs(Number(r.lateEntryDeduction))}`
+            : 'No late entry deduction'}
+        >
+          {Number(r.lateEntryDeduction) > 0 ? fmtRs(Number(r.lateEntryDeduction)) : '—'}
+        </span>
+      ),
+    },
+    {
+      header: "Perm Ded",
+      align: "right",
+      render: (r) => (
+        <span
+          className="font-mono text-xs text-red-500 cursor-help"
+          title={Number(r.permissionDeduction) > 0
+            ? `Permission Deduction\n= ${r.permissionMinutes ? r.permissionMinutes + ' mins permission' : 'Calculated by Slab'}\n= ${fmtRs(Number(r.permissionDeduction))}`
+            : 'No permission deduction'}
+        >
+          {Number(r.permissionDeduction) > 0 ? fmtRs(Number(r.permissionDeduction)) : '—'}
+        </span>
+      ),
+    },
+    {
+      header: "Advance",
+      align: "right",
+      render: (r) => (
+        <span
+          className="font-mono text-xs text-red-500 cursor-help"
+          title={Number(r.salaryAdvance) > 0
+            ? `Salary Advance Recovery\n= ${fmtRs(Number(r.salaryAdvance))}`
+            : 'No advance deduction'}
+        >
+          {Number(r.salaryAdvance) > 0 ? fmtRs(Number(r.salaryAdvance)) : '—'}
+        </span>
+      ),
+    },
+    {
+      header: "Net",
+      align: "right",
+      render: (r) => (
+        <span
+          className="font-mono font-bold text-xs text-text-primary cursor-help"
+          title={`Net = Gross − All Deductions\n= ${fmtDec(Number(r.grossSalary))} − ${fmtDec(Number(r.totalDeductions))}\n= ${fmtDec(Number(r.netSalary))}`}
+        >
+          {fmtRs(Number(r.netSalary))}
+        </span>
+      ),
+    },
+  ];
+
   return (
     <div className="space-y-5">
       <div className="flex items-start justify-between">
@@ -668,147 +906,28 @@ const Step3: React.FC<{
         </div>
       )}
 
-      {/* Results table */}
-      <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[1320px]">
-            <thead>
-              <tr className="bg-slate-50 text-xs text-text-muted uppercase tracking-wider">
-                <th className="text-left px-4 py-3 font-semibold sticky left-0 bg-slate-50 z-10">Employee</th>
-                <th className="text-center px-3 py-3 font-semibold">Pres / LOP</th>
-                <th className="text-right px-3 py-3 font-semibold">Daily Rate</th>
-                <th className="text-right px-3 py-3 font-semibold">Earned</th>
-                <th className="text-right px-3 py-3 font-semibold">OT Pay</th>
-                <th className="text-right px-3 py-3 font-semibold">Gross</th>
-                <th className="text-right px-3 py-3 font-semibold">Emp PF</th>
-                <th className="text-right px-3 py-3 font-semibold">Emp ESI</th>
-                <th className="text-right px-3 py-3 font-semibold">PT</th>
-                <th className="text-right px-3 py-3 font-semibold">Late Ded</th>
-                <th className="text-right px-3 py-3 font-semibold">Perm Ded</th>
-                <th className="text-right px-3 py-3 font-semibold">Advance</th>
-                <th className="text-right px-4 py-3 font-semibold text-text-primary">Net</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {results.map(r => (
-                <tr key={r.id} className={`hover:bg-slate-50/60 transition-colors ${r.hasVariance ? 'border-l-2 border-l-amber-400' : ''}`}>
-                  <td className="px-4 py-2.5 sticky left-0 bg-white z-10">
-                    <div className="flex items-center gap-2">
-                      {r.hasVariance && <AlertTriangle size={11} className="text-amber-500 shrink-0" />}
-                      <div>
-                        <p className="font-semibold text-text-primary text-xs">{r.employeeName}</p>
-                        <p className="text-[10px] text-text-muted">{r.employeeCode}</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-3 py-2.5 text-center text-xs">
-                    <span className="text-emerald-600 font-semibold">{Number(r.presentDays).toFixed(1)}</span>
-                    <span className="text-text-muted"> / </span>
-                    <span className={Number(r.lopDays) > 0 ? 'text-red-500 font-semibold' : 'text-text-muted'}>{Number(r.lopDays).toFixed(1)}</span>
-                  </td>
-                  <td
-                    className="px-3 py-2.5 text-right font-mono text-xs cursor-help"
-                    title={r.monthlySalary !== undefined
-                      ? `Daily Rate = ₹${r.monthlySalary.toLocaleString('en-IN')} ÷ ${r.formulaDivisor || 1} days\n= ${fmtDec(Number(r.dailyRate))}/day`
-                      : `Daily Rate\n= ${fmtDec(Number(r.dailyRate))}/day`}
-                  >
-                    {fmtDec(Number(r.dailyRate))}
-                  </td>
-                  <td
-                    className="px-3 py-2.5 text-right font-mono text-xs cursor-help"
-                    title={`Earned = Daily Rate × Payable Days\n= ${fmtDec(Number(r.dailyRate))} × ${Number(r.presentDays).toFixed(1)}d\n= ${fmtDec(Number(r.earnedSalary))}`}
-                  >
-                    {fmtRs(Number(r.earnedSalary))}
-                  </td>
-                  <td
-                    className="px-3 py-2.5 text-right font-mono text-xs text-emerald-600 cursor-help"
-                    title={Number(r.otHours) > 0
-                      ? `OT = ${r.otHours}h × ₹${Number(r.otHours) > 0 ? (Number(r.otPay) / Number(r.otHours)).toFixed(2) : 0}/h\n= ${fmtDec(Number(r.otPay))}`
-                      : 'No overtime'}
-                  >
-                    {Number(r.otPay) > 0 ? fmtRs(Number(r.otPay)) : '—'}
-                  </td>
-                  <td
-                    className="px-3 py-2.5 text-right font-mono text-xs font-semibold cursor-help"
-                    title={`Gross = Earned + OT\n= ${fmtDec(Number(r.earnedSalary))} + ${fmtDec(Number(r.otPay))}\n= ${fmtDec(Number(r.grossSalary))}`}
-                  >
-                    {fmtRs(Number(r.grossSalary))}
-                  </td>
-                  <td
-                    className="px-3 py-2.5 text-right font-mono text-xs text-red-500 cursor-help"
-                    title={r.pfApplicable
-                      ? `PF Wage: ₹${Number(r.pfWage).toLocaleString('en-IN')}\nEmployee PF @ 12%\n= ${fmtRs(Number(r.employeePf))}`
-                      : 'PF not applicable'}
-                  >
-                    {r.pfApplicable ? fmtRs(Number(r.employeePf)) : '—'}
-                  </td>
-                  <td
-                    className="px-3 py-2.5 text-right font-mono text-xs text-red-500 cursor-help"
-                    title={r.esiApplicable
-                      ? `ESI on Gross ₹${fmtRs(Number(r.grossSalary))}\nEmployee ESI @ 0.75%\n= ${fmtRs(Number(r.employeeEsi))}`
-                      : 'ESI not applicable (gross > limit)'}
-                  >
-                    {r.esiApplicable ? fmtRs(Number(r.employeeEsi)) : '—'}
-                  </td>
-                  <td
-                    className="px-3 py-2.5 text-right font-mono text-xs text-red-500 cursor-help"
-                    title={Number(r.professionalTax) > 0
-                      ? `Professional Tax (monthly slab)\n= ${fmtRs(Number(r.professionalTax))}`
-                      : 'PT: ₹0 (weekly run — applied in monthly payroll)'}
-                  >
-                    {Number(r.professionalTax) > 0 ? fmtRs(Number(r.professionalTax)) : '—'}
-                  </td>
-                  <td
-                    className="px-3 py-2.5 text-right font-mono text-xs text-red-500 cursor-help"
-                    title={Number(r.lateEntryDeduction) > 0
-                      ? `Late Entry Deduction\n= ${r.lateMinutes ? r.lateMinutes + ' mins late' : 'Calculated by Slab'}\n= ${fmtRs(Number(r.lateEntryDeduction))}`
-                      : 'No late entry deduction'}
-                  >
-                    {Number(r.lateEntryDeduction) > 0 ? fmtRs(Number(r.lateEntryDeduction)) : '—'}
-                  </td>
-                  <td
-                    className="px-3 py-2.5 text-right font-mono text-xs text-red-500 cursor-help"
-                    title={Number(r.permissionDeduction) > 0
-                      ? `Permission Deduction\n= ${r.permissionMinutes ? r.permissionMinutes + ' mins permission' : 'Calculated by Slab'}\n= ${fmtRs(Number(r.permissionDeduction))}`
-                      : 'No permission deduction'}
-                  >
-                    {Number(r.permissionDeduction) > 0 ? fmtRs(Number(r.permissionDeduction)) : '—'}
-                  </td>
-                  <td
-                    className="px-3 py-2.5 text-right font-mono text-xs text-red-500 cursor-help"
-                    title={Number(r.salaryAdvance) > 0
-                      ? `Salary Advance Recovery\n= ${fmtRs(Number(r.salaryAdvance))}`
-                      : 'No advance deduction'}
-                  >
-                    {Number(r.salaryAdvance) > 0 ? fmtRs(Number(r.salaryAdvance)) : '—'}
-                  </td>
-                  <td
-                    className="px-4 py-2.5 text-right font-mono font-bold text-text-primary cursor-help"
-                    title={`Net = Gross − All Deductions\n= ${fmtDec(Number(r.grossSalary))} − ${fmtDec(Number(r.totalDeductions))}\n= ${fmtDec(Number(r.netSalary))}`}
-                  >
-                    {fmtRs(Number(r.netSalary))}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr className="bg-slate-50 font-semibold text-xs">
-                <td className="px-4 py-2.5 font-bold text-text-primary sticky left-0 bg-slate-50 z-10">TOTAL</td>
-                <td />
-                <td className="px-3 py-2.5 text-right font-mono text-text-muted">—</td>
-                <td className="px-3 py-2.5 text-right font-mono">{fmtRs(results.reduce((s,r)=>s+Number(r.earnedSalary),0))}</td>
-                <td className="px-3 py-2.5 text-right font-mono text-emerald-600">{fmtRs(results.reduce((s,r)=>s+Number(r.otPay),0))}</td>
-                <td className="px-3 py-2.5 text-right font-mono font-bold">{fmtRs(run.totalGross)}</td>
-                <td className="px-3 py-2.5 text-right font-mono text-red-500">{fmtRs(results.reduce((s,r)=>s+Number(r.employeePf),0))}</td>
-                <td className="px-3 py-2.5 text-right font-mono text-red-500">{fmtRs(results.reduce((s,r)=>s+Number(r.employeeEsi),0))}</td>
-                <td className="px-3 py-2.5 text-right font-mono text-red-500">{fmtRs(results.reduce((s,r)=>s+Number(r.professionalTax),0))}</td>
-                <td className="px-3 py-2.5 text-right font-mono text-red-500">{fmtRs(results.reduce((s,r)=>s+Number(r.lateEntryDeduction),0))}</td>
-                <td className="px-3 py-2.5 text-right font-mono text-red-500">{fmtRs(results.reduce((s,r)=>s+Number(r.permissionDeduction),0))}</td>
-                <td className="px-3 py-2.5 text-right font-mono text-red-500">{fmtRs(results.reduce((s,r)=>s+Number(r.salaryAdvance),0))}</td>
-                <td className="px-4 py-2.5 text-right font-mono font-bold text-primary">{fmtRs(run.totalNetSalary)}</td>
-              </tr>
-            </tfoot>
-          </table>
+      {/* Results table using reusable DataTable component */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <DataTable
+          columns={columns}
+          data={results}
+          rowKey={(r) => r.id}
+          emptyMessage="No payroll results found."
+          rowClassName={(r) => (r.hasVariance ? 'border-l-2 border-l-amber-400' : '')}
+          density="compact"
+        />
+        {/* Total Summary Footer */}
+        <div className="bg-slate-50 border-t border-slate-200 p-4 flex flex-wrap justify-between items-center text-xs font-mono">
+          <span className="font-bold text-slate-800 text-sm">TOTAL ({results.length} employees)</span>
+          <div className="flex gap-4 flex-wrap justify-end font-semibold">
+            <span>Earned: {fmtRs(results.reduce((s,r)=>s+Number(r.earnedSalary),0))}</span>
+            <span className="text-emerald-600">OT: {fmtRs(results.reduce((s,r)=>s+Number(r.otPay),0))}</span>
+            <span className="font-bold text-slate-900">Gross: {fmtRs(run.totalGross)}</span>
+            <span className="text-rose-600">PF: {fmtRs(results.reduce((s,r)=>s+Number(r.employeePf),0))}</span>
+            <span className="text-rose-600">ESI: {fmtRs(results.reduce((s,r)=>s+Number(r.employeeEsi),0))}</span>
+            <span className="text-rose-600">Adv: {fmtRs(results.reduce((s,r)=>s+Number(r.salaryAdvance),0))}</span>
+            <span className="font-bold text-emerald-700 text-sm">Net: {fmtRs(run.totalNetSalary)}</span>
+          </div>
         </div>
       </div>
 
@@ -963,6 +1082,73 @@ const Step5: React.FC<{
   const bankTotal = bankRows.reduce((s,r) => s + Number(r.netSalary), 0);
   const cashTotal = cashRows.reduce((s,r) => s + Number(r.netSalary), 0);
 
+  const bankColumns: DataTableColumn<ApiPayrollResult>[] = [
+    {
+      header: "EMPLOYEE",
+      align: "left",
+      render: (r) => (
+        <div>
+          <p className="font-semibold text-text-primary text-xs">{r.employeeName}</p>
+          <p className="text-[10px] text-text-muted">{r.employeeCode}</p>
+        </div>
+      ),
+    },
+    {
+      header: "ACCOUNT",
+      align: "left",
+      render: (r) => (
+        <div className="text-xs font-mono">
+          {(r as any).employee?.accountNumber ? (
+            <div>
+              <p className="font-semibold text-text-primary text-xs">{(r as any).employee.accountNumber}</p>
+              <p className="text-[10px] text-text-muted">{(r as any).employee.bankName || ''} · {(r as any).employee.ifscCode || ''}</p>
+            </div>
+          ) : '—'}
+        </div>
+      ),
+    },
+    {
+      header: "AMOUNT",
+      align: "right",
+      render: (r) => (
+        <span className="font-mono font-semibold text-text-primary text-xs">
+          {fmtRs(Number(r.netSalary))}
+        </span>
+      ),
+    },
+  ];
+
+  const cashColumns: DataTableColumn<ApiPayrollResult>[] = [
+    {
+      header: "EMPLOYEE",
+      align: "left",
+      render: (r) => (
+        <div>
+          <p className="font-semibold text-text-primary text-xs">{r.employeeName}</p>
+          <p className="text-[10px] text-text-muted">{r.employeeCode}</p>
+        </div>
+      ),
+    },
+    {
+      header: "TYPE",
+      align: "left",
+      render: (r) => (
+        <span className="text-xs text-text-secondary">
+          {r.salaryType.replace('_', ' ')}
+        </span>
+      ),
+    },
+    {
+      header: "AMOUNT",
+      align: "right",
+      render: (r) => (
+        <span className="font-mono font-semibold text-text-primary text-xs">
+          {fmtRs(Number(r.netSalary))}
+        </span>
+      ),
+    },
+  ];
+
   useEffect(() => {
     if (!socket) return;
     const handler = (data: { runId: number }) => {
@@ -1083,12 +1269,12 @@ const Step5: React.FC<{
         ))}
       </div>
 
-      {/* Bank table */}
+      {/* Bank table using reusable DataTable component */}
       {bankRows.length > 0 && (
         <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
           <div className="flex items-center justify-between px-5 py-3 border-b border-border bg-blue-50/60">
             <h3 className="text-xs font-bold text-blue-700 uppercase tracking-wider flex items-center gap-1.5">
-              <Building2 size={12} /> Bank Transfers ({bankRows.length})
+               Bank Transfers ({bankRows.length})
             </h3>
             <button 
               onClick={handleDownloadNEFT}
@@ -1097,40 +1283,21 @@ const Step5: React.FC<{
               <Download size={11} /> Download NEFT List
             </button>
           </div>
-          <table className="w-full text-sm">
-            <thead><tr className="bg-slate-50 text-xs text-text-muted uppercase tracking-wider">
-              <th className="text-left px-5 py-2.5 font-semibold">Employee</th>
-              <th className="text-left px-3 py-2.5 font-semibold">Account</th>
-              <th className="text-right px-5 py-2.5 font-semibold">Amount</th>
-            </tr></thead>
-            <tbody className="divide-y divide-border">
-              {bankRows.map(r => (
-                <tr key={r.id} className="hover:bg-slate-50/60">
-                  <td className="px-5 py-2.5">
-                    <p className="font-semibold text-text-primary text-xs">{r.employeeName}</p>
-                    <p className="text-[10px] text-text-muted">{r.employeeCode}</p>
-                  </td>
-                  <td className="px-3 py-2.5 text-xs text-text-secondary font-mono">
-                    {(r as any).employee?.accountNumber ? (
-                      <div>
-                        <p className="font-semibold text-text-primary text-xs">{(r as any).employee.accountNumber}</p>
-                        <p className="text-[10px] text-text-muted">{(r as any).employee.bankName || ''} · {(r as any).employee.ifscCode || ''}</p>
-                      </div>
-                    ) : '—'}
-                  </td>
-                  <td className="px-5 py-2.5 text-right font-mono font-semibold text-text-primary">{fmtRs(Number(r.netSalary))}</td>
-                </tr>
-              ))}
-              <tr className="bg-slate-50">
-                <td colSpan={2} className="px-5 py-2.5 text-xs font-bold text-text-primary">TOTAL BANK</td>
-                <td className="px-5 py-2.5 text-right font-mono font-bold text-blue-700">{fmtRs(bankTotal)}</td>
-              </tr>
-            </tbody>
-          </table>
+          <DataTable
+            columns={bankColumns}
+            data={bankRows}
+            rowKey={(r) => r.id}
+            emptyMessage="No bank transfer records."
+            density="compact"
+          />
+          <div className="bg-slate-50 border-t border-slate-200 px-5 py-3 flex items-center justify-between text-xs font-bold text-text-primary">
+            <span>TOTAL BANK</span>
+            <span className="font-mono text-blue-700 text-sm">{fmtRs(bankTotal)}</span>
+          </div>
         </div>
       )}
 
-      {/* Cash table */}
+      {/* Cash table using reusable DataTable component */}
       {cashRows.length > 0 && (
         <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
           <div className="flex items-center justify-between px-5 py-3 border-b border-border bg-emerald-50/60">
@@ -1144,29 +1311,17 @@ const Step5: React.FC<{
               <Download size={11} /> Download Cash List
             </button>
           </div>
-          <table className="w-full text-sm">
-            <thead><tr className="bg-slate-50 text-xs text-text-muted uppercase tracking-wider">
-              <th className="text-left px-5 py-2.5 font-semibold">Employee</th>
-              <th className="text-left px-3 py-2.5 font-semibold">Type</th>
-              <th className="text-right px-5 py-2.5 font-semibold">Amount</th>
-            </tr></thead>
-            <tbody className="divide-y divide-border">
-              {cashRows.map(r => (
-                <tr key={r.id} className="hover:bg-slate-50/60">
-                  <td className="px-5 py-2.5">
-                    <p className="font-semibold text-text-primary text-xs">{r.employeeName}</p>
-                    <p className="text-[10px] text-text-muted">{r.employeeCode}</p>
-                  </td>
-                  <td className="px-3 py-2.5 text-xs text-text-secondary">{r.salaryType.replace('_',' ')}</td>
-                  <td className="px-5 py-2.5 text-right font-mono font-semibold text-text-primary">{fmtRs(Number(r.netSalary))}</td>
-                </tr>
-              ))}
-              <tr className="bg-slate-50">
-                <td colSpan={2} className="px-5 py-2.5 text-xs font-bold text-text-primary">TOTAL CASH</td>
-                <td className="px-5 py-2.5 text-right font-mono font-bold text-emerald-700">{fmtRs(cashTotal)}</td>
-              </tr>
-            </tbody>
-          </table>
+          <DataTable
+            columns={cashColumns}
+            data={cashRows}
+            rowKey={(r) => r.id}
+            emptyMessage="No cash payment records."
+            density="compact"
+          />
+          <div className="bg-slate-50 border-t border-slate-200 px-5 py-3 flex items-center justify-between text-xs font-bold text-text-primary">
+            <span>TOTAL CASH</span>
+            <span className="font-mono text-emerald-700 text-sm">{fmtRs(cashTotal)}</span>
+          </div>
         </div>
       )}
 
