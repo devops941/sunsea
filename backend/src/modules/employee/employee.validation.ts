@@ -105,7 +105,7 @@ const employeeBodySchema = z.object({
   shiftId: z.string().optional().nullable(),
 
   // ── Section 9: Payroll & Statutory ───────────────────────────────────────
-  salaryType: z.enum(["monthly", "daily", "hourly"]).optional().nullable(),
+  salaryType: z.enum(["monthly", "weekly", "daily", "hourly"]).optional().nullable(),
   basicSalary: z.number().optional().nullable(),
   grossSalary: z.number().optional().nullable(),
   pfApplicable: z.boolean().optional(),

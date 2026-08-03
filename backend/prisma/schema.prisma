@@ -97,6 +97,10 @@ model Employee {
   stores                     Store[]
   user                       User?
   shift                      Shift?                       @relation(fields: [shiftId], references: [shiftCode])
+  payrollConfig              EmployeePayrollConfig?
+  payrollResults             PayrollResult[]
+  salaryAdvances             SalaryAdvance[]
+  permanentDeductions        EmployeePermanentDeduction[]
 
   @@index([departmentId])
   @@index([status])
@@ -1427,6 +1431,7 @@ model GrnInvoice {
   updatedAt            DateTime         @updatedAt @map("updated_at")
   poId                 String?          @map("po_id") @db.Uuid
   items                GrnInvoiceItem[]
+  paymentRecords       GrnInvoicePayment[]
   purchaseOrder        PurchaseOrder?   @relation(fields: [poId], references: [id])
   store                Store            @relation(fields: [storeId], references: [storeId])
   supplier             Supplier         @relation(fields: [supplierId], references: [id])
@@ -1440,30 +1445,49 @@ model GrnInvoice {
 }
 
 model GrnInvoiceItem {
-  id            String      @id @default(uuid()) @db.Uuid
-  grnInvoiceId  String      @map("grn_invoice_id") @db.Uuid
-  productId     String      @map("product_id")
-  description   String
-  uom           String
-  quantity      Decimal     @db.Decimal(12, 3)
-  unitPrice     Decimal     @map("unit_price") @db.Decimal(12, 2)
-  tax           Decimal     @default(0) @db.Decimal(5, 2)
-  taxableAmount Decimal     @default(0) @map("taxable_amount") @db.Decimal(14, 2)
-  cgstRate      Decimal     @default(0) @map("cgst_rate") @db.Decimal(5, 2)
-  cgstAmount    Decimal     @default(0) @map("cgst_amount") @db.Decimal(14, 2)
-  sgstRate      Decimal     @default(0) @map("sgst_rate") @db.Decimal(5, 2)
-  sgstAmount    Decimal     @default(0) @map("sgst_amount") @db.Decimal(14, 2)
-  igstRate      Decimal     @default(0) @map("igst_rate") @db.Decimal(5, 2)
-  igstAmount    Decimal     @default(0) @map("igst_amount") @db.Decimal(14, 2)
-  lineTotal     Decimal     @map("line_total") @db.Decimal(12, 2)
-  createdAt     DateTime    @default(now()) @map("created_at")
-  updatedAt     DateTime    @updatedAt @map("updated_at")
-  grnInvoice    GrnInvoice  @relation(fields: [grnInvoiceId], references: [id], onDelete: Cascade)
-  rawMaterial   RawMaterial @relation(fields: [productId], references: [rawMaterialId])
+  id             String      @id @default(uuid()) @db.Uuid
+  grnInvoiceId   String      @map("grn_invoice_id") @db.Uuid
+  productId      String      @map("product_id")
+  description    String
+  uom            String
+  quantity       Decimal     @db.Decimal(12, 3)
+  unitPrice      Decimal     @map("unit_price") @db.Decimal(12, 2)
+  discountAmount Decimal     @default(0) @map("discount_amount") @db.Decimal(14, 2)
+  tax            Decimal     @default(0) @db.Decimal(5, 2)
+  taxableAmount  Decimal     @default(0) @map("taxable_amount") @db.Decimal(14, 2)
+  cgstRate       Decimal     @default(0) @map("cgst_rate") @db.Decimal(5, 2)
+  cgstAmount     Decimal     @default(0) @map("cgst_amount") @db.Decimal(14, 2)
+  sgstRate       Decimal     @default(0) @map("sgst_rate") @db.Decimal(5, 2)
+  sgstAmount     Decimal     @default(0) @map("sgst_amount") @db.Decimal(14, 2)
+  igstRate       Decimal     @default(0) @map("igst_rate") @db.Decimal(5, 2)
+  igstAmount     Decimal     @default(0) @map("igst_amount") @db.Decimal(14, 2)
+  lineTotal      Decimal     @map("line_total") @db.Decimal(12, 2)
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
+  grnInvoice     GrnInvoice  @relation(fields: [grnInvoiceId], references: [id], onDelete: Cascade)
+  rawMaterial    RawMaterial @relation(fields: [productId], references: [rawMaterialId])
 
   @@index([grnInvoiceId])
   @@index([productId])
   @@map("grn_invoice_items")
+}
+
+model GrnInvoicePayment {
+  id              String     @id @default(uuid()) @db.Uuid
+  grnInvoiceId    String     @map("grn_invoice_id") @db.Uuid
+  amount          Decimal    @db.Decimal(14, 2)
+  paymentMethod   String     @map("payment_method") @db.VarChar(50)
+  referenceNumber String?    @map("reference_number") @db.VarChar(100)
+  paymentDate     DateTime   @map("payment_date") @db.Date
+  recordedBy      String?    @map("recorded_by") @db.VarChar(36)
+  voucherPosted   Boolean    @default(false) @map("voucher_posted")
+  sourceVoucherId String?    @map("source_voucher_id") @db.VarChar(36)
+  createdAt       DateTime   @default(now()) @map("created_at")
+  updatedAt       DateTime   @updatedAt @map("updated_at")
+  grnInvoice      GrnInvoice @relation(fields: [grnInvoiceId], references: [id], onDelete: Cascade)
+
+  @@index([grnInvoiceId])
+  @@map("grn_invoice_payments")
 }
 
 model GstTaxRate {
@@ -1655,11 +1679,12 @@ model SalesInvoice {
   salesOrderId Int?               @map("sales_order_id")
   storeId      String?            @map("store_id") @db.VarChar(20)
   payments     Json?              @default("[]") @map("payments")
-  items        SalesInvoiceItem[]
-  customer     Customer           @relation(fields: [customerId], references: [id])
-  salesOrder   SalesOrder?        @relation(fields: [salesOrderId], references: [id])
-  store        Store?             @relation(fields: [storeId], references: [storeId])
-  salesReturns SalesReturn[]
+  items          SalesInvoiceItem[]
+  paymentRecords SalesInvoicePayment[]
+  customer       Customer           @relation(fields: [customerId], references: [id])
+  salesOrder     SalesOrder?        @relation(fields: [salesOrderId], references: [id])
+  store          Store?             @relation(fields: [storeId], references: [storeId])
+  salesReturns   SalesReturn[]
 
   @@index([customerId])
   @@index([companyId])
@@ -1695,6 +1720,24 @@ model SalesInvoiceItem {
   @@index([salesInvoiceId])
   @@index([productId])
   @@map("sales_invoice_items")
+}
+
+model SalesInvoicePayment {
+  id              String       @id @default(uuid()) @db.Uuid
+  salesInvoiceId  String       @map("sales_invoice_id") @db.Uuid
+  amount          Decimal      @db.Decimal(14, 2)
+  paymentMethod   String       @map("payment_method") @db.VarChar(50)
+  referenceNumber String?      @map("reference_number") @db.VarChar(100)
+  paymentDate     DateTime     @map("payment_date") @db.Date
+  recordedBy      String?      @map("recorded_by") @db.VarChar(36)
+  voucherPosted   Boolean      @default(false) @map("voucher_posted")
+  sourceVoucherId String?      @map("source_voucher_id") @db.VarChar(36)
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
+  salesInvoice    SalesInvoice @relation(fields: [salesInvoiceId], references: [id], onDelete: Cascade)
+
+  @@index([salesInvoiceId])
+  @@map("sales_invoice_payments")
 }
 
 /// Stores calculated OEE metrics per machine per shift for historical lookup and reporting
@@ -1955,6 +1998,7 @@ enum EmployeeType {
 
 enum SalaryType {
   monthly
+  weekly
   daily
   hourly
 }
@@ -2160,4 +2204,202 @@ model PettyCashEntry {
 
   @@index([companyId])
   @@map("petty_cash_entries")
+}
+
+model AccountingPeriod {
+  id          Int      @id @default(autoincrement())
+  periodName  String   @db.VarChar(50)
+  startDate   DateTime @db.Date
+  endDate     DateTime @db.Date
+  isClosed    Boolean  @default(false)
+  closedAt    DateTime?
+  closedBy    String?  @db.VarChar(36)
+  companyId   String   @db.Uuid
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([companyId])
+  @@map("accounting_periods")
+}
+
+// ─── Payroll Module Tables ────────────────────────────────────────────────────
+
+model AttendanceRecord {
+  id                Int      @id @default(autoincrement())
+  employeeId        BigInt
+  date              String
+  period            String
+  status            String
+  otHours           Decimal  @default(0) @db.Decimal(10, 2)
+  lateMinutes       Int      @default(0)
+  permissionMinutes Int      @default(0)
+  salaryAdvance     Decimal  @default(0) @db.Decimal(14, 2)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([employeeId, date])
+  @@map("attendance_records")
+}
+
+model EmployeePayrollConfig {
+  id             Int      @id @default(autoincrement())
+  employeeId     BigInt   @unique
+  salaryType     String
+  monthlySalary  Decimal  @default(0) @db.Decimal(14, 2)
+  basicSalary    Decimal  @default(0) @db.Decimal(14, 2)
+  da             Decimal  @default(0) @db.Decimal(14, 2)
+  hra            Decimal  @default(0) @db.Decimal(14, 2)
+  otherAllowance Decimal  @default(0) @db.Decimal(14, 2)
+  dailySalary    Decimal? @db.Decimal(14, 2)
+  bankAccount    String?
+  ifscCode       String?
+  bankName       String?
+  pfNumber       String?
+  esiNumber      String?
+  paymentMode    String   @default("CASH")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  employee       Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@map("employee_payroll_configs")
+}
+
+model PayrollConfig {
+  id                        Int      @id @default(autoincrement())
+  companyId                 String   @unique @db.Uuid
+  dailySalaryFormula        String   @default("MONTHLY_BY_CALENDAR")
+  salaryCalculationMethod   String   @default("CALENDAR_DAYS")
+  fixedDays                 Int      @default(26)
+  defaultWorkingHoursPerDay Decimal  @default(8) @db.Decimal(5, 2)
+  weeklyOffDays             Json     @default("[0]")
+  otEnabled                 Boolean  @default(true)
+  otMethod                  String   @default("SLAB")
+  otRatePerHour             Decimal  @default(0) @db.Decimal(10, 2)
+  weekdayOtMultiplier       Decimal  @default(1.5) @db.Decimal(5, 2)
+  holidayOtMultiplier       Decimal  @default(2.0) @db.Decimal(5, 2)
+  weeklyOffOtMultiplier     Decimal  @default(1.5) @db.Decimal(5, 2)
+  maxOtHoursPerDay          Decimal  @default(4) @db.Decimal(5, 2)
+  maxOtHoursPerWeek         Decimal  @default(20) @db.Decimal(5, 2)
+  otSlabs                   Json     @default("[]")
+  pfEnabled                 Boolean  @default(true)
+  pfWageFormula             String   @default("BASIC")
+  employeePfPercent         Decimal  @default(12) @db.Decimal(5, 2)
+  employerPfPercent         Decimal  @default(13) @db.Decimal(5, 2)
+  maxPfWage                 Decimal  @default(15000) @db.Decimal(10, 2)
+  pfRoundingRule            String   @default("ROUND")
+  esiEnabled                Boolean  @default(true)
+  employeeEsiPercent        Decimal  @default(0.75) @db.Decimal(5, 3)
+  employerEsiPercent        Decimal  @default(3.25) @db.Decimal(5, 3)
+  maxEsiSalary              Decimal  @default(21000) @db.Decimal(10, 2)
+  esiRoundingRule           String   @default("ROUND")
+  paidLeavePerYear          Int      @default(12)
+  lateEntryGraceMinutes     Int      @default(5)
+  permissionSlabs           Json     @default("[]")
+  lateEntrySlabs            Json     @default("[]")
+  professionalTaxEnabled    Boolean  @default(false)
+  professionalTaxAmount     Decimal  @default(200) @db.Decimal(10, 2)
+  components                Json     @default("[]")
+  roundingRule              String   @default("ROUND")
+  decimalPrecision          Int      @default(0)
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+
+  @@map("payroll_configs")
+}
+
+model PayrollRun {
+  id               Int       @id @default(autoincrement())
+  runCode          String    @unique
+  period           String
+  type             String
+  status           String    @default("DRAFT")
+  employeeCategory String    @default("ALL")
+  calendarDays     Int       @default(31)
+  totalEmployees   Int       @default(0)
+  totalGross       Decimal   @default(0) @db.Decimal(14, 2)
+  totalNetSalary   Decimal   @default(0) @db.Decimal(14, 2)
+  totalPfEmployee  Decimal   @default(0) @db.Decimal(14, 2)
+  totalPfEmployer  Decimal   @default(0) @db.Decimal(14, 2)
+  totalEsiEmployee Decimal   @default(0) @db.Decimal(14, 2)
+  totalEsiEmployer Decimal   @default(0) @db.Decimal(14, 2)
+  createdById      String
+  approvedById     String?
+  lockedById       String?
+  createdAt        DateTime  @default(now())
+  approvedAt       DateTime?
+  lockedAt         DateTime?
+  results          PayrollResult[]
+
+  @@map("payroll_runs")
+}
+
+model PayrollResult {
+  id                  Int      @id @default(autoincrement())
+  payrollRunId        Int
+  employeeId          BigInt
+  employeeCode        String
+  employeeName        String
+  department          String
+  salaryType          String
+  totalDays           Int      @default(0)
+  presentDays         Decimal  @default(0) @db.Decimal(10, 2)
+  absentDays          Decimal  @default(0) @db.Decimal(10, 2)
+  lopDays             Decimal  @default(0) @db.Decimal(10, 2)
+  halfDays            Decimal  @default(0) @db.Decimal(10, 2)
+  dailyRate           Decimal  @default(0) @db.Decimal(14, 2)
+  earnedSalary        Decimal  @default(0) @db.Decimal(14, 2)
+  grossSalary         Decimal  @default(0) @db.Decimal(14, 2)
+  otHours             Decimal  @default(0) @db.Decimal(10, 2)
+  otPay               Decimal  @default(0) @db.Decimal(14, 2)
+  pfWage              Decimal  @default(0) @db.Decimal(14, 2)
+  employeePf          Decimal  @default(0) @db.Decimal(14, 2)
+  employerPf          Decimal  @default(0) @db.Decimal(14, 2)
+  employeeEsi         Decimal  @default(0) @db.Decimal(14, 2)
+  employerEsi         Decimal  @default(0) @db.Decimal(14, 2)
+  pfApplicable        Boolean  @default(false)
+  esiApplicable       Boolean  @default(false)
+  professionalTax     Decimal  @default(0) @db.Decimal(14, 2)
+  permissionDeduction Decimal  @default(0) @db.Decimal(14, 2)
+  salaryAdvance       Decimal  @default(0) @db.Decimal(14, 2)
+  loanRecovery        Decimal  @default(0) @db.Decimal(14, 2)
+  otherDeductions     Decimal  @default(0) @db.Decimal(14, 2)
+  totalDeductions     Decimal  @default(0) @db.Decimal(14, 2)
+  netSalary           Decimal  @default(0) @db.Decimal(14, 2)
+  paymentMode         String   @default("CASH")
+  hasVariance         Boolean  @default(false)
+  varianceNote        String?
+  lateEntryDeduction  Decimal  @default(0) @db.Decimal(14, 2)
+  payrollRun          PayrollRun @relation(fields: [payrollRunId], references: [id], onDelete: Cascade)
+  employee            Employee   @relation(fields: [employeeId], references: [id])
+
+  @@map("payroll_results")
+}
+
+model SalaryAdvance {
+  id              Int      @id @default(autoincrement())
+  employeeId      BigInt
+  amount          Decimal  @db.Decimal(14, 2)
+  disbursedDate   DateTime @db.Date
+  reason          String?
+  recoveredAmount Decimal  @default(0) @db.Decimal(14, 2)
+  status          String   @default("PENDING")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  employee        Employee @relation(fields: [employeeId], references: [id])
+
+  @@map("salary_advances")
+}
+
+model EmployeePermanentDeduction {
+  id         Int      @id @default(autoincrement())
+  employeeId BigInt
+  type       String
+  label      String
+  amount     Decimal  @db.Decimal(14, 2)
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  employee   Employee @relation(fields: [employeeId], references: [id])
+
+  @@map("employee_permanent_deductions")
 }

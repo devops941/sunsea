@@ -167,6 +167,15 @@ const SalesInvoiceForm = lazy(() => import("../modules/sales-order-invoice/Sales
 const AccountsTabs = lazy(() => import("../modules/accounts/pages/AccountsTabs"));
 const SupplierBreakdownPage = lazy(() => import("../modules/accounts/pages/payable/SupplierBreakdownPage"));
 const CustomerBreakdownPage = lazy(() => import("../modules/accounts/pages/receivable/CustomerBreakdownPage"));
+
+// Payroll
+const PayrollDashboard = lazy(() => import("../modules/payroll/pages/PayrollDashboard"));
+const PayrollRun = lazy(() => import("../modules/payroll/pages/PayrollRun"));
+const PayrollSettings = lazy(() => import("../modules/payroll/pages/PayrollSettings"));
+const AttendancePage = lazy(() => import("../modules/payroll/pages/AttendancePage"));
+const SalaryAdvancePage = lazy(() => import("../modules/payroll/pages/SalaryAdvancePage"));
+const MonthlyPayrollReport = lazy(() => import("../modules/payroll/pages/MonthlyPayrollReport"));
+const WeeklyPayrollReport = lazy(() => import("../modules/payroll/pages/WeeklyPayrollReport"));
 // profile
 const ProfilePage = lazy(() => import("../modules/profile/ProfilePage"));
 const Settings = lazy(() => import("../modules/settings/Setting"));
@@ -696,8 +705,21 @@ const AppRoutes = () => {
             <Route path="/accounts/sales-returns" element={<AccountsTabs />} />
             <Route path="/accounts/purchase-returns" element={<AccountsTabs />} />
             <Route path="/accounts/petty-cash" element={<AccountsTabs />} />
+            <Route path="/accounts/trial-balance" element={<AccountsTabs />} />
+            <Route path="/accounts/profit-loss" element={<AccountsTabs />} />
 
             <Route path="/settings" element={<Settings />} />
+
+            {/* ========================================================================= */}
+            {/* PAYROLL                                                                   */}
+            {/* ========================================================================= */}
+            <Route path="/payroll" element={<PayrollDashboard />} />
+            <Route path="/payroll/run" element={<PayrollRun />} />
+            <Route path="/payroll/settings" element={<PayrollSettings />} />
+            <Route path="/payroll/attendance" element={<AttendancePage />} />
+            <Route path="/payroll/salary-advance" element={<SalaryAdvancePage />} />
+            <Route path="/payroll/monthly-report" element={<MonthlyPayrollReport />} />
+            <Route path="/payroll/weekly-report" element={<WeeklyPayrollReport />} />
 
           </Route>
         </Route>

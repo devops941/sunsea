@@ -10,7 +10,8 @@ import {
   FiMapPin,
   FiUsers,
   FiDatabase,
-  FiDollarSign
+  FiDollarSign,
+  FiClock,
 } from "react-icons/fi";
 
 export const sidebarItems: SidebarItem[] = [
@@ -226,5 +227,18 @@ export const sidebarItems: SidebarItem[] = [
       "/accounts/purchase-returns",
       "/accounts/petty-cash",
     ],
-  }
+  },
+  // 12. Payroll
+  {
+    title: "Payroll",
+    icon: FiClock,
+    path: "/payroll",
+    activePaths: [
+      "/payroll",
+      "/payroll/run",
+      "/payroll/settings",
+      "/payroll/weekly-report",
+      "/payroll/monthly-report",
+    ],
+  },
 ];

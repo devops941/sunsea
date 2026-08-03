@@ -19,6 +19,7 @@ import { useDepartments } from "../../../hooks/useDepartments";
 import { useRoles } from "../../../hooks/useRoles";
 import { employeeService } from "../../../services/employeeService";
 import apiClient from "../../../api/apiClient";
+import SalaryStructureSection from "../../../components/employee/SalaryStructureSection";
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -126,9 +127,27 @@ interface FormState {
   probationPeriod: string;
   noticePeriod: string;
   shiftId: string;
+  // Payroll — salary structure
   salaryType: string;
+  // Monthly
+  monthlySalary: string;
   basicSalary: string;
-  grossSalary: string;
+  da: string;
+  hra: string;
+  conveyanceAllowance: string;
+  medicalAllowance: string;
+  specialAllowance: string;
+  otherAllowance: string;
+  // Weekly
+  weeklySalary: string;
+  // Daily
+  dailySalary: string;
+  overtimeEligible: boolean;
+  // Hourly
+  hourlySalary: string;
+  minWorkingHours: string;
+  maxWorkingHours: string;
+  // Statutory
   pfApplicable: boolean;
   pfNumber: string;
   uanNumber: string;
@@ -136,6 +155,8 @@ interface FormState {
   esiNumber: string;
   professionalTax: boolean;
   tdsApplicable: boolean;
+  // Bank
+  paymentMode: string;
   bankName: string;
   bankBranch: string;
   accountNumber: string;
@@ -168,10 +189,17 @@ const INITIAL_STATE: FormState = {
   dateOfJoining: "", relievingDate: "", previousExperience: "",
   probationPeriod: "", noticePeriod: "",
   shiftId: "",
-  salaryType: "", basicSalary: "", grossSalary: "",
+  salaryType: "MONTHLY",
+  monthlySalary: "", basicSalary: "", da: "", hra: "",
+  conveyanceAllowance: "", medicalAllowance: "", specialAllowance: "",
+  otherAllowance: "",
+  weeklySalary: "",
+  dailySalary: "", overtimeEligible: false,
+  hourlySalary: "", minWorkingHours: "", maxWorkingHours: "",
   pfApplicable: false, pfNumber: "", uanNumber: "",
   esiApplicable: false, esiNumber: "",
   professionalTax: false, tdsApplicable: false,
+  paymentMode: "BANK",
   bankName: "", bankBranch: "", accountNumber: "", ifscCode: "", accountHolderName: "",
   createLoginAccount: false, username: "", password: "", roleId: "",
   mustChangePw: false, loginEnabled: true,
@@ -277,9 +305,21 @@ const EmployeeEdit: React.FC = () => {
         probationPeriod: emp.probationPeriod ? String(emp.probationPeriod) : "",
         noticePeriod: emp.noticePeriod ? String(emp.noticePeriod) : "",
         shiftId: emp.shiftId ? String(emp.shiftId) : "",
-        salaryType: emp.salaryType || "",
-        basicSalary: emp.basicSalary ? String(emp.basicSalary) : "",
-        grossSalary: emp.grossSalary ? String(emp.grossSalary) : "",
+        salaryType: (emp.salaryType || "monthly").toUpperCase(),
+        monthlySalary:      emp.salaryType?.toLowerCase() === "monthly" ? String(emp.grossSalary || "") : "",
+        weeklySalary:       emp.salaryType?.toLowerCase() === "weekly"  ? String(emp.grossSalary || "") : "",
+        dailySalary:        emp.salaryType?.toLowerCase() === "daily"   ? String(emp.grossSalary || "") : "",
+        hourlySalary:       emp.salaryType?.toLowerCase() === "hourly"  ? String(emp.grossSalary || "") : "",
+        basicSalary:        emp.basicSalary  ? String(emp.basicSalary)  : "",
+        da:                 emp.da           ? String(emp.da)           : "",
+        hra:                emp.hra          ? String(emp.hra)          : "",
+        conveyanceAllowance: "",
+        medicalAllowance:   "",
+        specialAllowance:   "",
+        otherAllowance:     emp.otherAllowance ? String(emp.otherAllowance) : "",
+        overtimeEligible:   false,
+        minWorkingHours:    "",
+        maxWorkingHours:    "",
         pfApplicable: !!emp.pfApplicable,
         pfNumber: emp.pfNumber || "",
         uanNumber: emp.uanNumber || "",
@@ -287,6 +327,7 @@ const EmployeeEdit: React.FC = () => {
         esiNumber: emp.esiNumber || "",
         professionalTax: !!emp.professionalTax,
         tdsApplicable: !!emp.tdsApplicable,
+        paymentMode: emp.paymentMode || "BANK",
         bankName: emp.bankName || "",
         bankBranch: emp.bankBranch || "",
         accountNumber: emp.accountNumber || "",
@@ -388,6 +429,37 @@ const EmployeeEdit: React.FC = () => {
     if (form.createLoginAccount && !form.roleId) e.roleId = "Role is required";
     if (form.createLoginAccount && !form.username.trim()) e.username = "Username is required";
 
+    // Payroll — validate primary salary field per type
+    const st = (form.salaryType || "").toUpperCase();
+    if (st === "MONTHLY" && !form.monthlySalary)
+      e.monthlySalary = "Monthly gross salary is required";
+    if (st === "WEEKLY" && !form.weeklySalary)
+      e.weeklySalary = "Weekly gross salary is required";
+    if (st === "DAILY" && !form.dailySalary)
+      e.dailySalary = "Daily wage is required";
+    if (st === "HOURLY" && !form.hourlySalary)
+      e.hourlySalary = "Hourly rate is required";
+
+    // PF validation
+    if (form.pfApplicable) {
+      if (!form.pfNumber.trim()) e.pfNumber = "PF Number is required when PF is applicable";
+      if (!form.uanNumber.trim()) e.uanNumber = "UAN Number is required when PF is applicable";
+    }
+
+    // ESI validation
+    if (form.esiApplicable) {
+      if (!form.esiNumber.trim()) e.esiNumber = "ESI Number is required when ESI is applicable";
+    }
+
+    // Bank validation
+    if (form.paymentMode === "BANK") {
+      if (!form.bankName.trim())           e.bankName = "Bank Name is required for Bank Transfers";
+      if (!form.bankBranch.trim())         e.bankBranch = "Bank Branch is required for Bank Transfers";
+      if (!form.accountNumber.trim())      e.accountNumber = "Account Number is required for Bank Transfers";
+      if (!form.ifscCode.trim())            e.ifscCode = "IFSC Code is required for Bank Transfers";
+      if (!form.accountHolderName.trim())  e.accountHolderName = "Account Holder Name is required for Bank Transfers";
+    }
+
     setErrors(e);
     if (Object.keys(e).length > 0) {
       toast.error(Object.values(e)[0]);
@@ -452,9 +524,20 @@ const EmployeeEdit: React.FC = () => {
 
       if (form.shiftId) fd.append("shiftId", form.shiftId);
 
-      if (form.salaryType) fd.append("salaryType", form.salaryType);
-      if (form.basicSalary) fd.append("basicSalary", form.basicSalary);
-      if (form.grossSalary) fd.append("grossSalary", form.grossSalary);
+      if (form.salaryType) fd.append("salaryType", form.salaryType.toLowerCase());
+      const st = (form.salaryType || "MONTHLY").toUpperCase();
+      if (st === "MONTHLY") {
+        if (form.monthlySalary) fd.append("grossSalary", form.monthlySalary);
+        if (form.basicSalary)   fd.append("basicSalary", form.basicSalary);
+      } else if (st === "WEEKLY") {
+        if (form.weeklySalary)  fd.append("grossSalary", form.weeklySalary);
+        if (form.basicSalary)   fd.append("basicSalary", form.basicSalary);
+      } else if (st === "DAILY") {
+        if (form.dailySalary)   fd.append("grossSalary", form.dailySalary);
+        if (form.dailySalary)   fd.append("basicSalary", form.dailySalary);
+      } else if (st === "HOURLY") {
+        if (form.hourlySalary)  fd.append("grossSalary", form.hourlySalary);
+      }
       fd.append("pfApplicable", String(form.pfApplicable));
       if (form.pfApplicable && form.pfNumber) fd.append("pfNumber", form.pfNumber);
       if (form.pfApplicable && form.uanNumber) fd.append("uanNumber", form.uanNumber);
@@ -462,6 +545,7 @@ const EmployeeEdit: React.FC = () => {
       if (form.esiApplicable && form.esiNumber) fd.append("esiNumber", form.esiNumber);
       fd.append("professionalTax", String(form.professionalTax));
       fd.append("tdsApplicable", String(form.tdsApplicable));
+      fd.append("paymentMode", form.paymentMode || "CASH");
       if (form.bankName) fd.append("bankName", form.bankName);
       if (form.bankBranch) fd.append("bankBranch", form.bankBranch);
       if (form.accountNumber) fd.append("accountNumber", form.accountNumber);
@@ -531,7 +615,15 @@ const EmployeeEdit: React.FC = () => {
             {form.photoPreview ? (
               <img src={form.photoPreview} alt="New preview" className="w-full h-full object-cover" />
             ) : form.existingPhotoUrl ? (
-              <img src={form.existingPhotoUrl} alt="Current photo" className="w-full h-full object-cover" />
+              <img
+                src={
+                  form.existingPhotoUrl.startsWith("http://") || form.existingPhotoUrl.startsWith("https://") || form.existingPhotoUrl.startsWith("data:")
+                    ? form.existingPhotoUrl
+                    : `${import.meta.env.VITE_API_BASE_URL?.replace("/api", "") || "http://localhost:5000"}/${form.existingPhotoUrl.replace(/^\//, "")}`
+                }
+                alt="Current photo"
+                className="w-full h-full object-cover"
+              />
             ) : (
               <div className="flex flex-col items-center gap-1 text-slate-400">
                 <FaCamera size={24} />
@@ -691,47 +783,12 @@ const EmployeeEdit: React.FC = () => {
   );
 
   const renderTab8 = () => (
-    <div>
-      <SectionHeader icon={FaMoneyBillWave} title="Salary & Payroll" />
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-        <SelectInput label="Salary Type" name="salaryType" value={form.salaryType} onChange={handleChange}
-          defaultOptionLabel="Select Type"
-          options={[{ value: "monthly", label: "Monthly" }, { value: "daily", label: "Daily" }, { value: "hourly", label: "Hourly" }]} />
-        <TextInput label="Basic Salary" name="basicSalary" type="number" value={form.basicSalary} onChange={handleChange} placeholder="0.00" />
-        <TextInput label="Gross Salary" name="grossSalary" type="number" value={form.grossSalary} onChange={handleChange} placeholder="0.00" />
-      </div>
-
-      <div className="mt-6 space-y-5">
-        <div className="flex flex-wrap gap-8">
-          <Toggle label="PF Applicable" value={form.pfApplicable} onChange={handleToggle("pfApplicable")} />
-          <Toggle label="ESI Applicable" value={form.esiApplicable} onChange={handleToggle("esiApplicable")} />
-          <Toggle label="Professional Tax" value={form.professionalTax} onChange={handleToggle("professionalTax")} />
-          <Toggle label="TDS Applicable" value={form.tdsApplicable} onChange={handleToggle("tdsApplicable")} />
-        </div>
-        {form.pfApplicable && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 p-4 bg-blue-50 rounded-xl border border-blue-100">
-            <TextInput label="PF Number" name="pfNumber" value={form.pfNumber} onChange={handleChange} placeholder="PF account number" />
-            <TextInput label="UAN Number" name="uanNumber" value={form.uanNumber} onChange={handleChange} placeholder="Universal Account Number" />
-          </div>
-        )}
-        {form.esiApplicable && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 p-4 bg-green-50 rounded-xl border border-green-100">
-            <TextInput label="ESI Number" name="esiNumber" value={form.esiNumber} onChange={handleChange} placeholder="ESI number" />
-          </div>
-        )}
-      </div>
-
-      <div className="mt-6">
-        <SectionHeader icon={FaMoneyBillWave} title="Bank Details" color="text-emerald-600" />
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-          <TextInput label="Bank Name" name="bankName" value={form.bankName} onChange={handleChange} placeholder="e.g. State Bank of India" />
-          <TextInput label="Bank Branch" name="bankBranch" value={form.bankBranch} onChange={handleChange} placeholder="Branch name" />
-          <TextInput label="Account Number" name="accountNumber" value={form.accountNumber} onChange={handleChange} placeholder="Account number" />
-          <TextInput label="IFSC Code" name="ifscCode" value={form.ifscCode} onChange={handleChange} placeholder="e.g. SBIN0001234" />
-          <TextInput label="Account Holder Name" name="accountHolderName" value={form.accountHolderName} onChange={handleChange} placeholder="As per bank records" />
-        </div>
-      </div>
-    </div>
+    <SalaryStructureSection
+      form={form}
+      onChange={handleChange}
+      onToggle={(name) => handleToggle(name as any)}
+      errors={errors}
+    />
   );
 
   const renderTab9 = () => (

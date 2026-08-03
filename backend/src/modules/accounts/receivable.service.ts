@@ -21,7 +21,7 @@ export interface CustomerReceivableSummary {
   netBalance: number;
   balanceAsOnDate: number;
   overdueAmount: number;
-  dueDays: number;
+  dueDays: number | null;
   isOverdue: boolean;
 }
 
@@ -209,7 +209,25 @@ class ReceivableService {
         const credit = totalPaid + totalReturned;
         const balanceAsOnDate = netAsset;
         const isOverdue = balanceAsOnDate > 0;
-        const dueDays = isOverdue ? 30 : 0;
+
+        // Calculate actual overdue days from earliest unpaid invoice's dueDate
+        const earliestUnpaidDueDate = salesInvoices
+          .filter((inv: any) => {
+            const amount = Number(inv.grandTotal || inv.subTotal || 0);
+            const pList = extractPaymentsArray(inv.payments);
+            const pSum = pList.reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0);
+            const paidAmt = Math.max(pSum, Number((inv as any).paidAmount || 0));
+            return amount - paidAmt > 0 && inv.dueDate;
+          })
+          .map((inv: any) => new Date(inv.dueDate))
+          .sort((a: Date, b: Date) => a.getTime() - b.getTime())[0];
+
+        const dueDays = isOverdue
+          ? earliestUnpaidDueDate
+            ? Math.max(0, Math.floor((cutoffDate.getTime() - earliestUnpaidDueDate.getTime()) / 86400000))
+            : null
+          : 0;
+
         const netBalance = balanceAsOnDate;
 
         return {
@@ -295,11 +313,13 @@ class ReceivableService {
       };
     });
 
-    // Collection history from journal items / vouchers
+    // Collection history from journal items / vouchers (RECEIPT + JOURNAL + PAYMENT)
     const collectionItems = await prisma.journalItem.findMany({
       where: {
         creditLedgerId: ledger.id,
-        voucher: { type: VoucherType.RECEIPT },
+        voucher: {
+          type: { in: [VoucherType.RECEIPT, VoucherType.JOURNAL, VoucherType.PAYMENT] },
+        },
       },
       include: { voucher: true },
       orderBy: { voucher: { date: "desc" } },

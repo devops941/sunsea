@@ -101,17 +101,14 @@ const initDefaultCutoffSetting = async () => {
     console.error("❌ Failed to initialize EOD cutoff setting:", error);
   }
 };
-
 // Initialize settings and execute catch-up check on server boot
-export const initScheduler = () => {
-  initDefaultCutoffSetting().then(async () => {
-    await runStartupCatchUpCheck();
-  });
-
-  /**
-   * Cron job checking every minute for any missed/pending EOD snapshots in the last 3 days
-   */
-  cron.schedule("* * * * *", async () => {
-    await runDailyCronCheck();
-  });
+export const initScheduler = async () => {
+  await initDefaultCutoffSetting();
+  await runStartupCatchUpCheck();
 };
+/**
+ * Cron job checking every minute for any missed/pending EOD snapshots in the last 3 days
+ */
+cron.schedule("* * * * *", async () => {
+  await runDailyCronCheck();
+});

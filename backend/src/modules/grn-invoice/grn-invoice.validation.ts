@@ -6,6 +6,7 @@ const ItemSchema = z.object({
     uom: z.string().min(1, "UOM is required"),
     quantity: z.coerce.number().min(0.001, "Qty must be > 0"),
     unitPrice: z.coerce.number().min(0, "Price must be ≥ 0"),
+    discountAmount: z.coerce.number().min(0).default(0).optional(),
     tax: z.coerce.number().min(0).max(100).optional(),
     taxableAmount: z.coerce.number().min(0).optional(),
     cgstRate: z.coerce.number().min(0).optional(),
