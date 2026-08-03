@@ -176,7 +176,7 @@ const SalesPurchaseTrendChart: React.FC<SalesPurchaseTrendChartProps> = ({
 
         {/* Bar Chart */}
         <ChartContainer config={trendChartConfig} className="w-full h-[300px] !aspect-auto">
-          <BarChart data={chartData} margin={{ top: 10, right: 0, left: 15, bottom: 0 }} barGap={6}>
+          <BarChart data={chartData} margin={{ top: 10, right: 0, left: 15, bottom: 0 }} barGap={6} style={{ outline: 'none' }}>
             <defs>
               <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor="#0ea5e9" stopOpacity={1} />
@@ -207,7 +207,7 @@ const SalesPurchaseTrendChart: React.FC<SalesPurchaseTrendChartProps> = ({
             />
 
             <ChartTooltip
-              cursor={{ fill: "rgba(0,0,0,0.02)" }}
+              cursor={false}
               content={
                 <ChartTooltipContent
                   indicator="dot"
@@ -230,6 +230,7 @@ const SalesPurchaseTrendChart: React.FC<SalesPurchaseTrendChartProps> = ({
             />
 
             <Bar
+              className="focus:outline-none"
               dataKey="purchase"
               fill="url(#colorPurchase)"
               radius={[6, 6, 0, 0]}
@@ -237,6 +238,7 @@ const SalesPurchaseTrendChart: React.FC<SalesPurchaseTrendChartProps> = ({
               activeBar={{ fill: '#fb7185', stroke: '#f43f5e', strokeWidth: 1 }}
             />
             <Bar
+              className="focus:outline-none"
               dataKey="sales"
               fill="url(#colorSales)"
               radius={[6, 6, 0, 0]}
