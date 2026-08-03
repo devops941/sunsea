@@ -115,11 +115,11 @@ const Sidebar = () => {
       <div
         className={`flex shrink-0 h-[72px] items-center ${activeCollapsed ? "justify-center gap-1" : "justify-between pl-4 pr-6"}`}
       >
-        <div className={`overflow-hidden bg-transparent flex items-center ${activeCollapsed ? "w-11 h-11 rounded-xl justify-center shrink-0" : "flex-1 h-[56px] justify-start"}`}>
+        <div className={`bg-transparent flex items-center ${activeCollapsed ? "w-12 h-12 justify-center shrink-0 ml-1" : "flex-1 h-[56px] justify-start overflow-hidden"}`}>
           <img
             src={activeCollapsed ? (company?.faviconUrl || company?.logoUrl || Logo) : (company?.logoUrl || Logo)}
             alt={activeCollapsed ? "Company Favicon" : "Company Logo"}
-            className={`w-full h-full ${activeCollapsed ? "object-contain scale-150" : "object-contain object-left scale-110 ml-2"}`}
+            className={`w-full h-full ${activeCollapsed ? "object-contain" : "object-contain object-left scale-110 ml-2"}`}
           />
         </div>
         <div
