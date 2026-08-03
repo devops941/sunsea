@@ -21,6 +21,8 @@ import ExportCSVButton from "../../../../components/ui/ExportCSVButton/ExportCSV
 import { DATE_RANGE_OPTIONS } from "../../../../constants/selectOption";
 import { voucherService, type Voucher, type VoucherType } from "../../../../services/voucherService";
 
+import { useSocketSync } from "../../../../hooks/useSocketSync";
+
 export const VoucherListPage: React.FC = () => {
   const navigate = useNavigate();
 
@@ -69,6 +71,8 @@ export const VoucherListPage: React.FC = () => {
   useEffect(() => {
     loadVouchers();
   }, [typeFilter, startDate, endDate, searchTerm, page]);
+
+  useSocketSync("voucher", undefined, loadVouchers);
 
   // Date range preset handler
   const handleDateRangeChange = (val: string) => {

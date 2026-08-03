@@ -52,6 +52,7 @@ export interface Customer {
   stateCode?: string;
   creditLimit?: number | string | null;
   creditDays?: number | null;
+  openingBalance?: number | string | null;
   priceList?: string | null;
   collectionAgentId?: string | null;
   routeId?: string | null;
@@ -96,6 +97,7 @@ export interface CreateCustomerDto {
   shippingCountry?: string;
   creditLimit?: number;
   creditDays?: number;
+  openingBalance?: number;
   priceList?: string;
   routeId?: string | null;
   collectionAgentId?: string | null;
@@ -134,6 +136,7 @@ export interface UpdateCustomerDto {
   shippingCountry?: string;
   creditLimit?: number;
   creditDays?: number;
+  openingBalance?: number;
   priceList?: string;
   routeId?: string | null;
   collectionAgentId?: string | null;

@@ -81,17 +81,22 @@ export class AccountsController {
 
   async getPayableSummaries(req: Request, res: Response, next: NextFunction) {
     try {
-      const { asOnDate, startDate, endDate, supplierId, search } = req.query;
-      const data = await payableService.getPayableSummaries({
+      const { asOnDate, startDate, endDate, supplierId, search, page, limit } = req.query;
+      const result = await payableService.getPayableSummaries({
         asOnDate: asOnDate as string,
         startDate: startDate as string,
         endDate: endDate as string,
         supplierId: supplierId ? String(supplierId) : undefined,
         search: search as string,
+        page: page ? parseInt(page as string, 10) : undefined,
+        limit: limit ? parseInt(limit as string, 10) : undefined,
       });
       res.json({
         success: true,
-        data,
+        data: result.data,
+        total: result.total,
+        page: result.page,
+        totalPages: result.totalPages,
       });
     } catch (error) {
       next(error);

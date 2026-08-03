@@ -52,6 +52,7 @@ class SupplierService {
       mobile: mobileData as any,
       bankAccount: processedBankAccount as any,
       minOrderQty: supplierData.minOrderQty !== undefined && supplierData.minOrderQty !== null ? new Prisma.Decimal(supplierData.minOrderQty) : undefined,
+      openingBalance: supplierData.openingBalance !== undefined && supplierData.openingBalance !== null ? new Prisma.Decimal(supplierData.openingBalance) : undefined,
       createdBy: userId,
       addresses: addresses && addresses.length > 0
         ? {

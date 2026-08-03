@@ -12,6 +12,8 @@ import { toast } from "react-toastify";
 import { pettyCashService, type PettyCashEntry, type PettyCashSummary } from "../../../../services/pettyCashService";
 import { useAppSelector } from "../../../../hooks/reduxHooks";
 
+import { useSocketSync } from "../../../../hooks/useSocketSync";
+
 export const PettyCashPage: React.FC = () => {
   const [entries, setEntries] = useState<PettyCashEntry[]>([]);
   const [summary, setSummary] = useState<PettyCashSummary>({
@@ -60,6 +62,8 @@ export const PettyCashPage: React.FC = () => {
   useEffect(() => {
     loadData();
   }, [typeFilter, startDate, endDate, company?.id]);
+
+  useSocketSync("pettyCash", undefined, loadData);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

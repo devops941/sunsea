@@ -59,7 +59,7 @@ const DashboardPage: React.FC = () => {
         if (canViewSchedules)    calls.push(dispatch(fetchWeeklyPrograms(undefined)) as any);
         if (canViewRawMaterials) calls.push(dispatch(fetchRawMaterials(undefined)) as any);
         if (canViewProducts)     calls.push(Promise.resolve(loadProducts()));
-        if (canViewEmployees)    calls.push(Promise.resolve(loadEmployees({ limit: 1000 })));
+        if (canViewEmployees)    calls.push(Promise.resolve(loadEmployees({ limit: 10 })));
         if (canViewUsers)        calls.push(Promise.resolve(loadUsers()));
         if (calls.length > 0) await Promise.allSettled(calls);
       } catch (e) {

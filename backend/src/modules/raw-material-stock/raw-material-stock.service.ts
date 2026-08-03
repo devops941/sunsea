@@ -130,6 +130,59 @@ class RawMaterialStockService {
       }
     });
   }
+  async deductForPurchaseReturn(
+    items: { rawMaterialId: string; quantity: number; storeId: string }[],
+    refDocNo: string,
+    txClient?: any
+  ) {
+    const db = txClient || prisma;
+    for (const item of items) {
+      console.log(
+        `[PurchaseReturn] Deducting ${item.quantity} of raw material ${item.rawMaterialId} from store ${item.storeId}`
+      );
+
+      const rawMaterial = await db.rawMaterial.findUnique({
+        where: { rawMaterialId: item.rawMaterialId },
+      });
+
+      if (!rawMaterial) {
+        throw new ApiError(404, `Raw material ${item.rawMaterialId} not found`);
+      }
+
+      const currentStock = Number(rawMaterial.onHandQty || 0);
+      if (currentStock < item.quantity) {
+        throw new ApiError(
+          400,
+          `Insufficient stock for raw material ${item.rawMaterialId} (current on-hand: ${currentStock}, attempted return: ${item.quantity})`
+        );
+      }
+
+      // Deduct onHandQty using update (throws P2025 if record missing)
+      await db.rawMaterial.update({
+        where: { rawMaterialId: item.rawMaterialId },
+        data: {
+          onHandQty: { decrement: item.quantity },
+          lastMovementAt: new Date(),
+        },
+      });
+
+      // Log RawMaterialTransaction audit entry
+      await db.rawMaterialTransaction.create({
+        data: {
+          storeId: item.storeId,
+          rawMaterialId: item.rawMaterialId,
+          txnType: "PURCHASE_RETURN_OUT",
+          qty: item.quantity,
+          txnDateTime: new Date(),
+          remarks: `Deducted ${item.quantity} units for Purchase Return ${refDocNo}`,
+        },
+      });
+
+      console.log(
+        `[PurchaseReturn] Successfully deducted ${item.quantity} of raw material ${item.rawMaterialId}. New on-hand: ${currentStock - item.quantity}`
+      );
+    }
+  }
 }
 
 export default new RawMaterialStockService();

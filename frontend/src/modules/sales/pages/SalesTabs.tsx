@@ -1,7 +1,7 @@
 import React, { useMemo } from "react";
 
 import { useLocation, useNavigate } from "react-router-dom";
-import { FaFileInvoice, FaFileAlt, FaFileSignature, FaUserCheck, FaUserTie } from "react-icons/fa";
+import { FaFileInvoice, FaFileAlt, FaFileSignature, FaUserCheck, FaUserTie, FaUndoAlt } from "react-icons/fa";
 import Tabs from "../../../components/ui/tab/Tabs";
 import type { TabItem } from "../../../components/ui/tab/Tabs";
 import { usePermission } from "../../../hooks/usePermission";
@@ -12,6 +12,7 @@ import QuotationList from "../quatation/QuatationList";
 import PendingQuatationList from "../quatation/PendingQuatation";
 import SalesInvoiceList from "../../sales-order-invoice/SalesInvoiceList";
 import CustomerListPage from "../../customers/pages/CustomerListPage";
+import { SalesReturnPage } from "../../accounts/pages/returns/SalesReturnPage";
 
 const SalesTabs: React.FC = () => {
     const location = useLocation();
@@ -25,6 +26,7 @@ const SalesTabs: React.FC = () => {
         "/quatation-order": "quotations",
         "/pending-quotations": "approvals",
         "/sales-invoices": "salesorderinvoice",
+        "/sales-returns": "salesreturns",
     };
 
     const keyToPath: Record<string, string> = {
@@ -33,7 +35,8 @@ const SalesTabs: React.FC = () => {
         "customers": "/customers",
         "quotations": "/quatation-order",
         "approvals": "/pending-quotations",
-        "salesorderinvoice": "/sales-invoices"
+        "salesorderinvoice": "/sales-invoices",
+        "salesreturns": "/sales-returns",
     };
 
     const tabs = useMemo<TabItem[]>(() => {
@@ -61,6 +64,10 @@ const SalesTabs: React.FC = () => {
 
         if (can("sales-invoices.view")) {
             result.push({ key: "salesorderinvoice", label: "Sales Invoice", icon: <FaFileInvoice />, content: <SalesInvoiceList /> });
+        }
+
+        if (can("sales-returns.view") || can("sales-invoices.view")) {
+            result.push({ key: "salesreturns", label: "Sales Return", icon: <FaUndoAlt />, content: <SalesReturnPage /> });
         }
 
         return result;

@@ -3,8 +3,10 @@ import apiClient from "../api/apiClient";
 export interface SalesReturnItem {
   id?: string;
   productId: number;
+  salesInvoiceItemId?: string | null;
   quantity: number;
   unitPrice: number;
+  taxRate?: number;
   lineTotal?: number;
   reason?: string;
   product?: { id: number; productName: string };
@@ -17,6 +19,9 @@ export interface SalesReturn {
   customerId: string;
   salesInvoiceId?: string | null;
   reason?: string | null;
+  refundMode?: string;
+  subTotal?: number;
+  taxAmount?: number;
   grandTotal: number;
   status: string;
   narration?: string | null;
@@ -29,12 +34,15 @@ export interface CreateSalesReturnDto {
   customerId: string;
   salesInvoiceId?: string;
   reason?: string;
+  refundMode?: "CREDIT_NOTE" | "CASH" | "BANK";
   narration?: string;
   companyId: string;
   items: {
     productId: number;
+    salesInvoiceItemId?: string;
     quantity: number;
     unitPrice: number;
+    taxRate?: number;
     reason?: string;
   }[];
 }
@@ -46,7 +54,7 @@ export interface PurchaseReturnItem {
   unitPrice: number;
   lineTotal?: number;
   reason?: string;
-  rawMaterial?: { rawMaterialId: string; name: string };
+  rawMaterial?: { rawMaterialId: string; name?: string; materialName?: string };
 }
 
 export interface PurchaseReturn {
@@ -55,6 +63,7 @@ export interface PurchaseReturn {
   returnDate: string;
   supplierId: number;
   grnInvoiceId?: string | null;
+  grnInvoice?: { id: string; invoiceNo: string };
   reason?: string | null;
   grandTotal: number;
   status: string;
@@ -67,6 +76,8 @@ export interface PurchaseReturn {
 export interface CreatePurchaseReturnDto {
   supplierId: number;
   grnInvoiceId?: string;
+  storeId?: string;
+  refundMode?: "CREDIT_NOTE" | "CASH" | "BANK";
   reason?: string;
   narration?: string;
   companyId: string;

@@ -21,6 +21,8 @@ import DataTable from "../../../../components/ui/table/DataTable";
 import { DATE_RANGE_OPTIONS } from "../../../../constants/selectOption";
 import { receivableService, type CustomerReceivableDetail } from "../../../../services/receivableService";
 
+import { useSocketSync } from "../../../../hooks/useSocketSync";
+
 export const CustomerBreakdownPage: React.FC = () => {
   const { customerId } = useParams<{ customerId: string }>();
   const navigate = useNavigate();
@@ -85,6 +87,11 @@ export const CustomerBreakdownPage: React.FC = () => {
   useEffect(() => {
     loadData();
   }, [customerId, startDate, endDate]);
+
+  useSocketSync("voucher", undefined, loadData);
+  useSocketSync("salesInvoice", undefined, loadData);
+  useSocketSync("salesReturn", undefined, loadData);
+  useSocketSync("customer", undefined, loadData);
 
   // Date range preset handler
   const handleDateRangeChange = (val: string) => {
@@ -248,7 +255,16 @@ export const CustomerBreakdownPage: React.FC = () => {
     },
     {
       header: "VOUCHER / REF NO",
-      render: (item: any) => <span className="font-mono font-bold text-slate-900">{item.voucherNo}</span>,
+      render: (item: any) => (
+        <div className="flex items-center gap-2">
+          <span className="font-mono font-bold text-slate-900">{item.voucherNo}</span>
+          {item.postedToLedger === false && (
+            <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-300">
+              Not posted to ledger
+            </span>
+          )}
+        </div>
+      ),
     },
     {
       header: "DATE",

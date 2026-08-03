@@ -66,7 +66,7 @@ const SalesReportsCenter: React.FC = () => {
   useEffect(() => {
     const loadCustomers = async () => {
       try {
-        const res = await customerService.fetchAll({ limit: 1000 });
+        const res = await customerService.fetchAll({ limit: 10 });
         setCustomers(res.customers || []);
       } catch (err) {
         console.error("Failed to load customers", err);

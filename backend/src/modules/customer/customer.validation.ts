@@ -54,6 +54,7 @@ export const createCustomerSchema = z.object({
 
   creditLimit: z.number().optional(),
   creditDays: z.number().optional(),
+  openingBalance: z.number().optional(),
   priceList: z.string().optional(),
 
   collectionAgentId: z.coerce.bigint().nullable().optional(),

@@ -2,6 +2,8 @@ import { prisma } from "../../config/prisma";
 import { VoucherType, Prisma } from "@prisma/client";
 import { accountsService } from "./accounts.service";
 
+import { extractPaymentsArray } from "../../utils/payments";
+
 class VoucherPostingService {
   /**
    * Post a formal double-entry PURCHASE Voucher for a GRN Purchase Invoice.
@@ -105,9 +107,7 @@ class VoucherPostingService {
       return [];
     }
 
-    const rawPayments: any[] = Array.isArray(grnInvoice.payments)
-      ? (grnInvoice.payments as any[])
-      : (grnInvoice.payments ? [grnInvoice.payments] : []);
+    const rawPayments: any[] = extractPaymentsArray(grnInvoice.payments);
 
     const postedVouchers: any[] = [];
 
@@ -126,6 +126,9 @@ class VoucherPostingService {
       });
 
       if (existing) {
+        if (!p.sourceVoucherId) {
+          p.sourceVoucherId = String(existing.id);
+        }
         postedVouchers.push(existing);
         continue;
       }
@@ -168,7 +171,18 @@ class VoucherPostingService {
         include: { items: true },
       });
 
+      p.sourceVoucherId = String(voucher.id);
       postedVouchers.push(voucher);
+    }
+
+    // Persist updated payments array with sourceVoucherId references
+    try {
+      await db.grnInvoice.update({
+        where: { id: grnInvoice.id },
+        data: { payments: rawPayments as any },
+      });
+    } catch (err) {
+      console.error("[postPaymentVouchersForGRN] Failed to update grnInvoice payments array with sourceVoucherId:", err);
     }
 
     return postedVouchers;
@@ -273,9 +287,7 @@ class VoucherPostingService {
       return [];
     }
 
-    const rawPayments: any[] = Array.isArray(salesInvoice.payments)
-      ? (salesInvoice.payments as any[])
-      : (salesInvoice.payments ? [salesInvoice.payments] : []);
+    const rawPayments: any[] = extractPaymentsArray(salesInvoice.payments);
 
     const postedVouchers: any[] = [];
 
@@ -336,27 +348,170 @@ class VoucherPostingService {
         include: { items: true },
       });
 
+      p.sourceVoucherId = String(voucher.id);
       postedVouchers.push(voucher);
+    }
+
+    // Persist updated payments array with sourceVoucherId references
+    try {
+      await db.salesInvoice.update({
+        where: { id: salesInvoice.id },
+        data: { payments: rawPayments as any },
+      });
+    } catch (err) {
+      console.error("[postReceiptVouchersForSales] Failed to update salesInvoice payments array with sourceVoucherId:", err);
     }
 
     return postedVouchers;
   }
 
   /**
-   * Sync all unposted GRN Invoices, Sales Invoices, and Payments to the Voucher table
+   * Post formal double-entry SALES_RETURN Voucher for a Sales Return.
+   * Debit: Sales Return Account (SRT-001)
+   * Credit: Customer Account Ledger
+   * Plus optional settlement payment voucher if refundMode is CASH or BANK.
+   */
+  async postSalesReturnVoucher(salesReturnId: string, txClient?: Prisma.TransactionClient) {
+    const db = txClient || prisma;
+    const salesReturn = await db.salesReturn.findUnique({
+      where: { id: salesReturnId },
+      include: { customer: true },
+    });
+
+    if (!salesReturn || !salesReturn.customer) {
+      console.warn(`[Auto-Post Voucher] Sales Return ${salesReturnId} not found or missing customer.`);
+      return null;
+    }
+
+    await accountsService.ensureSystemLedgersExist(db);
+    const customerLedger = await accountsService.ensureCustomerLedger(salesReturn.customer, db);
+    let salesReturnLedger = await db.accountLedger.findUnique({ where: { code: "SRT-001" } });
+    if (!salesReturnLedger) {
+      const srList = await db.accountLedger.findMany({
+        where: { name: { contains: "Sales Return", mode: "insensitive" } },
+      });
+      salesReturnLedger = srList.length > 0 ? srList[0] : null;
+    }
+
+    if (!salesReturnLedger || !customerLedger) {
+      console.error("[Auto-Post Voucher Error] Missing sales return or customer ledger");
+      return null;
+    }
+
+    const existing = await db.voucher.findFirst({
+      where: { refDocType: "SALES_RETURN", refDocId: salesReturn.id },
+    });
+    if (existing) return existing;
+
+    const grandTotal = new Prisma.Decimal(salesReturn.grandTotal);
+    const voucherNo = `SRT-${salesReturn.returnNo}`;
+
+    const voucher = await db.voucher.create({
+      data: {
+        voucherNo,
+        type: VoucherType.SALES_RETURN,
+        date: salesReturn.returnDate,
+        narration: `Sales return posted for ${salesReturn.returnNo}${salesReturn.salesInvoiceId ? ` against invoice ${salesReturn.salesInvoiceId}` : ""}`,
+        refDocType: "SALES_RETURN",
+        refDocId: salesReturn.id,
+        items: {
+          create: [
+            {
+              debitLedgerId: salesReturnLedger.id,
+              debitAmount: grandTotal,
+              creditAmount: new Prisma.Decimal(0),
+              narration: `Sales return — goods returned by ${salesReturn.customer.firmName}`,
+            },
+            {
+              creditLedgerId: customerLedger.id,
+              debitAmount: new Prisma.Decimal(0),
+              creditAmount: grandTotal,
+              narration: `Receivable reduced for ${salesReturn.customer.firmName}`,
+            },
+          ],
+        },
+      },
+      include: { items: true },
+    });
+
+    if (salesReturn.refundMode === "CASH" || salesReturn.refundMode === "BANK") {
+      const payLedgerCode = salesReturn.refundMode === "CASH" ? "CASH-001" : "BANK-001";
+      let payLedger = await db.accountLedger.findUnique({ where: { code: payLedgerCode } });
+      if (!payLedger) {
+        payLedger = await db.accountLedger.findFirst({
+          where: { name: { contains: salesReturn.refundMode === "CASH" ? "Cash" : "Bank", mode: "insensitive" } },
+        });
+      }
+      if (payLedger) {
+        await db.voucher.create({
+          data: {
+            voucherNo: `SRT-PAY-${salesReturn.returnNo}`,
+            type: VoucherType.PAYMENT,
+            date: salesReturn.returnDate,
+            narration: `Refund paid to ${salesReturn.customer.firmName} for return ${salesReturn.returnNo}`,
+            refDocType: "SALES_RETURN_REFUND",
+            refDocId: salesReturn.id,
+            items: {
+              create: [
+                {
+                  debitLedgerId: customerLedger.id,
+                  debitAmount: grandTotal,
+                  creditAmount: new Prisma.Decimal(0),
+                  narration: `Credit settled via refund`,
+                },
+                {
+                  creditLedgerId: payLedger.id,
+                  debitAmount: new Prisma.Decimal(0),
+                  creditAmount: grandTotal,
+                  narration: `Refund paid via ${salesReturn.refundMode}`,
+                },
+              ],
+            },
+          },
+        });
+      }
+    }
+
+    return voucher;
+  }
+
+  /**
+   * Sync unposted GRN Invoices, Sales Invoices, and Payments to the Voucher table
    */
   async syncUnpostedVouchers() {
     try {
-      const grnInvoices = await prisma.grnInvoice.findMany({ select: { id: true } });
-      for (const grn of grnInvoices) {
+      const existingGrnVouchers = await prisma.voucher.findMany({
+        where: { refDocType: "GRN_INVOICE", refDocId: { not: null } },
+        select: { refDocId: true },
+      });
+      const postedGrnIds = existingGrnVouchers.map((v) => v.refDocId!).filter(Boolean);
+
+      const unpostedGrns = await prisma.grnInvoice.findMany({
+        where: {
+          id: { notIn: postedGrnIds },
+        },
+        select: { id: true },
+      });
+
+      for (const grn of unpostedGrns) {
         await this.postPurchaseVoucher(grn.id);
-        await this.postPaymentVouchersForGRN(grn.id);
       }
 
-      const salesInvoices = await prisma.salesInvoice.findMany({ select: { id: true } });
-      for (const inv of salesInvoices) {
+      const existingSalesVouchers = await prisma.voucher.findMany({
+        where: { refDocType: "SALES_INVOICE", refDocId: { not: null } },
+        select: { refDocId: true },
+      });
+      const postedSalesIds = existingSalesVouchers.map((v) => v.refDocId!).filter(Boolean);
+
+      const unpostedSales = await prisma.salesInvoice.findMany({
+        where: {
+          id: { notIn: postedSalesIds },
+        },
+        select: { id: true },
+      });
+
+      for (const inv of unpostedSales) {
         await this.postSalesVoucher(inv.id);
-        await this.postReceiptVouchersForSales(inv.id);
       }
     } catch (err) {
       console.error("[Auto-Post Voucher Error] Syncing unposted vouchers failed:", err);

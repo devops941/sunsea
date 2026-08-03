@@ -22,6 +22,8 @@ import DataTable from "../../../../components/ui/table/DataTable";
 import { DATE_RANGE_OPTIONS } from "../../../../constants/selectOption";
 import { payableService, type SupplierPayableDetail } from "../../../../services/payableService";
 
+import { useSocketSync } from "../../../../hooks/useSocketSync";
+
 export const SupplierBreakdownPage: React.FC = () => {
   const { supplierId } = useParams<{ supplierId: string }>();
   const navigate = useNavigate();
@@ -86,6 +88,11 @@ export const SupplierBreakdownPage: React.FC = () => {
   useEffect(() => {
     loadData();
   }, [supplierId, startDate, endDate]);
+
+  useSocketSync("voucher", undefined, loadData);
+  useSocketSync("grnInvoice", undefined, loadData);
+  useSocketSync("purchaseReturn", undefined, loadData);
+  useSocketSync("supplier", undefined, loadData);
 
   // Date range preset handler
   const handleDateRangeChange = (val: string) => {
@@ -177,6 +184,39 @@ export const SupplierBreakdownPage: React.FC = () => {
     }
   }, [supplierDetail, activeTab]);
 
+  // 10-item Pagination state per tab
+  const [invoicePage, setInvoicePage] = useState<number>(1);
+  const [paymentPage, setPaymentPage] = useState<number>(1);
+  const [statementPage, setStatementPage] = useState<number>(1);
+  const breakdownPageSize = 10;
+
+  useEffect(() => {
+    setInvoicePage(1);
+    setPaymentPage(1);
+    setStatementPage(1);
+  }, [startDate, endDate, activeTab]);
+
+  const invoices = supplierDetail?.invoices || [];
+  const invoiceTotalPages = Math.ceil(invoices.length / breakdownPageSize) || 1;
+  const paginatedInvoices = useMemo(() => {
+    const start = (invoicePage - 1) * breakdownPageSize;
+    return invoices.slice(start, start + breakdownPageSize);
+  }, [invoices, invoicePage]);
+
+  const payments = supplierDetail?.paymentHistory || [];
+  const paymentTotalPages = Math.ceil(payments.length / breakdownPageSize) || 1;
+  const paginatedPayments = useMemo(() => {
+    const start = (paymentPage - 1) * breakdownPageSize;
+    return payments.slice(start, start + breakdownPageSize);
+  }, [payments, paymentPage]);
+
+  const statements = supplierDetail?.statementEntries || [];
+  const statementTotalPages = Math.ceil(statements.length / breakdownPageSize) || 1;
+  const paginatedStatements = useMemo(() => {
+    const start = (statementPage - 1) * breakdownPageSize;
+    return statements.slice(start, start + breakdownPageSize);
+  }, [statements, statementPage]);
+
   // Invoice Table Columns
   const invoiceColumns: DataTableColumn<any>[] = [
     {
@@ -249,7 +289,16 @@ export const SupplierBreakdownPage: React.FC = () => {
     },
     {
       header: "VOUCHER / REF NO",
-      render: (item: any) => <span className="font-mono font-bold text-slate-900">{item.voucherNo}</span>,
+      render: (item: any) => (
+        <div className="flex items-center gap-2">
+          <span className="font-mono font-bold text-slate-900">{item.voucherNo}</span>
+          {item.postedToLedger === false && (
+            <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-300">
+              Not posted to ledger
+            </span>
+          )}
+        </div>
+      ),
     },
     {
       header: "DATE",
@@ -270,6 +319,10 @@ export const SupplierBreakdownPage: React.FC = () => {
           ₹ {item.amount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </div>
       ),
+    },
+    {
+      header: "REFERENCE NO",
+      render: (item: any) => <span className="text-slate-600 font-mono text-xs">{item.referenceNo || "-"}</span>,
     },
     {
       header: "NARRATION",
@@ -527,10 +580,15 @@ export const SupplierBreakdownPage: React.FC = () => {
           {activeTab === "invoices" && (
             <DataTable
               columns={invoiceColumns.filter(c => typeof c.header === 'string' && visibleColumns.includes(c.header))}
-              data={supplierDetail?.invoices || []}
+              data={paginatedInvoices}
               rowKey={(item: any) => item.id}
               loading={loading}
               emptyMessage="No purchase invoices recorded for this supplier."
+              pagination={{
+                currentPage: invoicePage,
+                totalPages: invoiceTotalPages,
+                onPageChange: setInvoicePage,
+              }}
             />
           )}
 
@@ -538,10 +596,15 @@ export const SupplierBreakdownPage: React.FC = () => {
           {activeTab === "payments" && (
             <DataTable
               columns={paymentColumns}
-              data={supplierDetail?.paymentHistory || []}
+              data={paginatedPayments}
               rowKey={(item: any) => item.id}
               loading={loading}
               emptyMessage="No payment vouchers recorded for this supplier."
+              pagination={{
+                currentPage: paymentPage,
+                totalPages: paymentTotalPages,
+                onPageChange: setPaymentPage,
+              }}
             />
           )}
 
@@ -549,10 +612,15 @@ export const SupplierBreakdownPage: React.FC = () => {
           {activeTab === "statement" && (
             <DataTable
               columns={statementColumns}
-              data={supplierDetail?.statementEntries || []}
+              data={paginatedStatements}
               rowKey={(item: any) => item.id}
               loading={loading}
               emptyMessage="No ledger statement entries recorded for this supplier."
+              pagination={{
+                currentPage: statementPage,
+                totalPages: statementTotalPages,
+                onPageChange: setStatementPage,
+              }}
             />
           )}
         </div>

@@ -638,6 +638,11 @@ const AppRoutes = () => {
               <Route path="/sales-invoices/edit/:id" element={<SalesInvoiceForm />} />
             </Route>
 
+            {/* Sales Returns */}
+            <Route element={<ProtectedRoute permissionAny={["sales-returns.view", "sales-invoices.view"]} />}>
+              <Route path="/sales-returns" element={<SalesTabs />} />
+            </Route>
+
             {/* ========================================================================= */}
             {/* PURCHASE ORDERS                                                           */}
             {/* ========================================================================= */}
@@ -659,6 +664,10 @@ const AppRoutes = () => {
 
             <Route element={<ProtectedRoute permission="expenses.view" />}>
               <Route path="/expenses" element={<PurchaseTabs />} />
+            </Route>
+
+            <Route element={<ProtectedRoute permissionAny={["purchase-returns.view", "expenses.view", "purchaseOrders.view"]} />}>
+              <Route path="/purchase-returns" element={<PurchaseTabs />} />
             </Route>
 
             <Route element={<ProtectedRoute permission="invoice.view" />}>

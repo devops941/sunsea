@@ -107,7 +107,7 @@ const ProductionOrderList: React.FC = () => {
             if (can("production_orders.view") || can("weekly_programs.view")) {
                 try {
                     const poRes = await productionOrderService.fetchAll({
-                        limit: 1000
+                        limit: 10
                     } as any);
                     poList = poRes.data || [];
                 } catch (err) {

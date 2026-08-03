@@ -75,6 +75,7 @@ export const createSupplierSchema = z.object({
     paymentTerms: z.enum(["Advance", "Net15", "Net30", "Net45", "Net60"]),
     leadTimeDays: z.number().int().min(0, "Lead time cannot be negative"),
     minOrderQty: z.number().optional().nullable(),
+    openingBalance: z.number().optional().nullable(),
     currency: z.string().length(3).default("INR"),
     bankIfsc: z.string().max(11).optional().nullable(),
     bankAccount: z

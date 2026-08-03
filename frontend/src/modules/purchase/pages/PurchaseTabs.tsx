@@ -1,7 +1,7 @@
 import React, { useMemo } from "react";
 import { Container } from "react-bootstrap";
 import { useLocation, useNavigate } from "react-router-dom";
-import { FaFileInvoiceDollar, FaUserCheck, FaCalendarAlt, FaTruck } from "react-icons/fa";
+import { FaFileInvoiceDollar, FaUserCheck, FaCalendarAlt, FaTruck, FaUndoAlt } from "react-icons/fa";
 import Tabs from "../../../components/ui/tab/Tabs";
 import type { TabItem } from "../../../components/ui/tab/Tabs";
 import { usePermission } from "../../../hooks/usePermission";
@@ -11,6 +11,7 @@ import POMDApproval from "../purchase-order/purchaseordeappovals/PurchaseOrderap
 import ExpensesList from "../../expenses/ExpensesList";
 import InvoiceList from "../purchase-order/invoice/InvoiceList";
 import SupplierListPage from "../../supplier/pages/SupplierList";
+import { PurchaseReturnPage } from "../../accounts/pages/returns/PurchaseReturnPage";
 
 const PurchaseTabs: React.FC = () => {
     const location = useLocation();
@@ -22,7 +23,8 @@ const PurchaseTabs: React.FC = () => {
         "/purchase-order-approvals": "approvals",
         "/suppliers": "suppliers",
         "/expenses": "expense",
-        "/invoice": "invoice"
+        "/invoice": "invoice",
+        "/purchase-returns": "purchasereturns"
     };
 
     const keyToPath: Record<string, string> = {
@@ -30,7 +32,8 @@ const PurchaseTabs: React.FC = () => {
         "approvals": "/purchase-order-approvals",
         "suppliers": "/suppliers",
         "expense": "/expenses",
-        "invoice": "/invoice"
+        "invoice": "/invoice",
+        "purchasereturns": "/purchase-returns"
     };
 
     const tabs = useMemo<TabItem[]>(() => {
@@ -54,6 +57,10 @@ const PurchaseTabs: React.FC = () => {
 
         if (can("expenses.view")) {
             result.push({ key: "expense", label: "Expenses", icon: <FaCalendarAlt />, content: <ExpensesList /> });
+        }
+
+        if (can("purchase-returns.view") || can("expenses.view") || can("purchaseOrders.view")) {
+            result.push({ key: "purchasereturns", label: "Purchase Return", icon: <FaUndoAlt />, content: <PurchaseReturnPage /> });
         }
 
         return result;

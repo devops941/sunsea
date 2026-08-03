@@ -40,6 +40,7 @@ export interface Supplier {
   leadTimeDays: number;
   minOrderQty?: number | null;
   currency: string;
+  openingBalance?: number | string | null;
   bankIfsc?: string | null;
   bankAccount?: string | null;
   bankHolder?: string | null;
@@ -80,6 +81,7 @@ export interface CreateSupplierDto {
   paymentTerms: string;
   leadTimeDays: number;
   minOrderQty?: number | null;
+  openingBalance?: number | null;
   currency: string;
   bankIfsc?: string | null;
   bankAccount?: string | null;
