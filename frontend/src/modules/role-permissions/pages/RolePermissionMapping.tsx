@@ -2,13 +2,14 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import {
   FaShieldAlt, FaSlidersH, FaCogs, FaUsersCog,
   FaBoxOpen, FaShoppingCart, FaWarehouse, FaChartBar,
-  FaLayerGroup, FaBox,
+  FaLayerGroup, FaBox, FaDollarSign, FaCalendarCheck,
 } from "react-icons/fa";
 import { toast } from "react-toastify";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import CommonLoader from "../../../components/ui/Loader/CommonLoader";
 import { useRoles } from "../../../hooks/useRoles";
 import { usePermissions } from "../../../hooks/usePermissions";
+import { useSocket } from "../../../providers/SocketProvider";
 import type { Permission } from "../../../features/permissions/types";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -108,6 +109,22 @@ const SECTION_STYLE: Record<string, {
     badgeInactive: "bg-pink-100 text-pink-700",
     iconClass: "text-pink-400",
     hex: "#db2777",
+  },
+  accounts: {
+    activeBg: "bg-green-700",
+    activeShadow: "shadow-green-200",
+    badgeActive: "bg-white/20 text-white",
+    badgeInactive: "bg-green-100 text-green-700",
+    iconClass: "text-green-500",
+    hex: "#15803d",
+  },
+  payroll: {
+    activeBg: "bg-cyan-600",
+    activeShadow: "shadow-cyan-200",
+    badgeActive: "bg-white/20 text-white",
+    badgeInactive: "bg-cyan-100 text-cyan-700",
+    iconClass: "text-cyan-500",
+    hex: "#0891b2",
   },
 };
 
@@ -242,6 +259,33 @@ const MODULE_GROUPS: ModuleGroup[] = [
       { key: "audit-reports", label: "Audit Reports" },
     ],
   },
+  {
+    id: "accounts",
+    groupName: "Accounts",
+    icon: <FaDollarSign />,
+    colorId: "accounts",
+    modules: [
+      { key: "accounts", label: "Accounts" },
+      { key: "payable", label: "Accounts Payable" },
+      { key: "receivable", label: "Accounts Receivable" },
+      { key: "vouchers", label: "Vouchers" },
+      { key: "petty-cash", label: "Petty Cash" },
+      { key: "chart-of-accounts", label: "Chart of Accounts" },
+    ],
+  },
+  {
+    id: "payroll",
+    groupName: "Payroll",
+    icon: <FaCalendarCheck />,
+    colorId: "payroll",
+    modules: [
+      { key: "payroll", label: "Payroll Dashboard" },
+      { key: "payroll-run", label: "Payroll Run" },
+      { key: "payroll-settings", label: "Payroll Settings" },
+      { key: "payroll-attendance", label: "Attendance" },
+      { key: "payroll-advance", label: "Salary Advance" },
+    ],
+  },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -300,6 +344,7 @@ const RolePermissionMapping: React.FC = () => {
     assignPermissionsToRole,
     removePermissionFromRole,
   } = usePermissions();
+  const { socket } = useSocket();
 
   const [selectedRoleId, setSelectedRoleId] = useState<string>("");
   const [activeGroupId, setActiveGroupId] = useState<string>("administration");
@@ -314,6 +359,19 @@ const RolePermissionMapping: React.FC = () => {
   useEffect(() => {
     if (selectedRoleId) loadRolePermissions(Number(selectedRoleId));
   }, [selectedRoleId, loadRolePermissions]);
+
+  // ── Socket.IO: real-time sync when another admin updates permissions ──────────
+  useEffect(() => {
+    if (!socket) return;
+    const onRolePermissionUpdated = ({ roleId }: { roleId: number }) => {
+      // Refresh only the role that was changed to keep the UI in sync
+      loadRolePermissions(roleId);
+    };
+    socket.on("rolePermission:updated", onRolePermissionUpdated);
+    return () => {
+      socket.off("rolePermission:updated", onRolePermissionUpdated);
+    };
+  }, [socket, loadRolePermissions]);
 
   const activeRoleId = Number(selectedRoleId);
 

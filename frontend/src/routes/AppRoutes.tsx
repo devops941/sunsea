@@ -694,32 +694,36 @@ const AppRoutes = () => {
             {/* ========================================================================= */}
             {/* ACCOUNTS & FINANCIALS                                                     */}
             {/* ========================================================================= */}
-            <Route path="/accounts" element={<AccountsTabs />} />
-            <Route path="/accounts/payable" element={<AccountsTabs />} />
-            <Route path="/accounts/payable/:supplierId" element={<SupplierBreakdownPage />} />
-            <Route path="/accounts/receivable" element={<AccountsTabs />} />
-            <Route path="/accounts/receivable/:customerId" element={<CustomerBreakdownPage />} />
-            <Route path="/accounts/ledger-statement" element={<AccountsTabs />} />
-            <Route path="/accounts/chart-of-accounts" element={<AccountsTabs />} />
-            <Route path="/accounts/vouchers" element={<AccountsTabs />} />
-            <Route path="/accounts/sales-returns" element={<AccountsTabs />} />
-            <Route path="/accounts/purchase-returns" element={<AccountsTabs />} />
-            <Route path="/accounts/petty-cash" element={<AccountsTabs />} />
-            <Route path="/accounts/trial-balance" element={<AccountsTabs />} />
-            <Route path="/accounts/profit-loss" element={<AccountsTabs />} />
+            <Route element={<ProtectedRoute permissionAny={["accounts.view", "payable.view", "receivable.view", "vouchers.view", "petty-cash.view", "chart-of-accounts.view"]} />}>
+              <Route path="/accounts" element={<AccountsTabs />} />
+              <Route path="/accounts/payable" element={<AccountsTabs />} />
+              <Route path="/accounts/payable/:supplierId" element={<SupplierBreakdownPage />} />
+              <Route path="/accounts/receivable" element={<AccountsTabs />} />
+              <Route path="/accounts/receivable/:customerId" element={<CustomerBreakdownPage />} />
+              <Route path="/accounts/ledger-statement" element={<AccountsTabs />} />
+              <Route path="/accounts/chart-of-accounts" element={<AccountsTabs />} />
+              <Route path="/accounts/vouchers" element={<AccountsTabs />} />
+              <Route path="/accounts/sales-returns" element={<AccountsTabs />} />
+              <Route path="/accounts/purchase-returns" element={<AccountsTabs />} />
+              <Route path="/accounts/petty-cash" element={<AccountsTabs />} />
+              <Route path="/accounts/trial-balance" element={<AccountsTabs />} />
+              <Route path="/accounts/profit-loss" element={<AccountsTabs />} />
+            </Route>
 
             <Route path="/settings" element={<Settings />} />
 
             {/* ========================================================================= */}
             {/* PAYROLL                                                                   */}
             {/* ========================================================================= */}
-            <Route path="/payroll" element={<PayrollDashboard />} />
-            <Route path="/payroll/run" element={<PayrollRun />} />
-            <Route path="/payroll/settings" element={<PayrollSettings />} />
-            <Route path="/payroll/attendance" element={<AttendancePage />} />
-            <Route path="/payroll/salary-advance" element={<SalaryAdvancePage />} />
-            <Route path="/payroll/monthly-report" element={<MonthlyPayrollReport />} />
-            <Route path="/payroll/weekly-report" element={<WeeklyPayrollReport />} />
+            <Route element={<ProtectedRoute permissionAny={["payroll.view", "payroll-run.view", "payroll-settings.view", "payroll-attendance.view", "payroll-advance.view"]} />}>
+              <Route path="/payroll" element={<PayrollDashboard />} />
+              <Route path="/payroll/run" element={<PayrollRun />} />
+              <Route path="/payroll/settings" element={<PayrollSettings />} />
+              <Route path="/payroll/attendance" element={<AttendancePage />} />
+              <Route path="/payroll/advance" element={<SalaryAdvancePage />} />
+              <Route path="/payroll/monthly-report" element={<MonthlyPayrollReport />} />
+              <Route path="/payroll/weekly-report" element={<WeeklyPayrollReport />} />
+            </Route>
 
           </Route>
         </Route>

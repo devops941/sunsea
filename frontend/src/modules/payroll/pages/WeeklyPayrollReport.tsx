@@ -5,6 +5,7 @@ import CustomButton from '../../../components/ui/custombutton/CustomButton';
 import ExportCSVButton from '../../../components/ui/ExportCSVButton/ExportCSVButton';
 import { payrollService } from '../../../services/payrollService';
 import type { ApiPayrollRun, ApiPayrollResult } from '../../../services/payrollService';
+import DataTable, { type DataTableColumn } from '../../../components/ui/table/DataTable';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const fmt = (n: number) => n.toLocaleString('en-IN');
@@ -81,7 +82,7 @@ const WeeklyPayrollReport: React.FC = () => {
   // ── Loading ──
   if (loading) {
     return (
-      <div className="min-h-screen bg-page flex items-center justify-center">
+      <div className="min-h-screen  flex items-center justify-center">
         <div className="text-center space-y-3">
           <Loader2 size={36} className="animate-spin text-primary mx-auto" />
           <p className="text-text-secondary text-sm">Loading weekly payroll reports…</p>
@@ -93,7 +94,7 @@ const WeeklyPayrollReport: React.FC = () => {
   // ── Error ──
   if (error) {
     return (
-      <div className="min-h-screen bg-page flex items-center justify-center">
+      <div className="min-h-screen  flex items-center justify-center">
         <div className="text-center space-y-4">
           <AlertTriangle size={36} className="text-red-500 mx-auto" />
           <p className="text-text-primary font-semibold">{error}</p>
@@ -106,7 +107,7 @@ const WeeklyPayrollReport: React.FC = () => {
   // ── Empty ──
   if (runs.length === 0) {
     return (
-      <div className="min-h-screen bg-page flex items-center justify-center">
+      <div className="min-h-screen  flex items-center justify-center">
         <div className="text-center space-y-3">
           <p className="text-text-primary font-semibold text-lg">No weekly payroll runs found</p>
           <p className="text-text-secondary text-sm">Run a weekly payroll to see the report here.</p>
@@ -135,8 +136,112 @@ const WeeklyPayrollReport: React.FC = () => {
     { header: 'Payment Mode',        accessor: (r: typeof csvData[0]) => r.paymentMode },
   ];
 
+  const reportColumns: DataTableColumn<ApiPayrollResult>[] = [
+    {
+      header: 'S.NO',
+      align: 'left',
+      render: (_, idx) => <span className="text-text-muted">{idx + 1}</span>,
+    },
+    {
+      header: 'EMP CODE',
+      align: 'left',
+      render: (r) => <span className="font-mono text-xs text-text-secondary">{r.employeeCode}</span>,
+    },
+    {
+      header: 'EMPLOYEE NAME',
+      align: 'left',
+      render: (r) => (
+        <div className="font-semibold text-text-primary flex items-center gap-1">
+          {r.hasVariance && <AlertTriangle size={12} className="text-amber-500 shrink-0" />}
+          <span>{r.employeeName}</span>
+        </div>
+      ),
+    },
+    {
+      header: 'DEPARTMENT',
+      align: 'left',
+      render: (r) => <span className="text-text-secondary">{r.department}</span>,
+    },
+    {
+      header: 'SALARY/DAY (₹)',
+      align: 'right',
+      render: (r) => <span className="font-mono">₹{fmt(Number(r.dailyRate))}</span>,
+    },
+    {
+      header: 'PRESENT',
+      align: 'right',
+      render: (r) => <span className="font-mono text-emerald-700 font-semibold">{r.presentDays}</span>,
+    },
+    {
+      header: 'ABSENT',
+      align: 'right',
+      render: (r) => (
+        <span className={`font-mono ${Number(r.absentDays) > 0 ? 'text-red-600 font-semibold' : 'text-text-muted'}`}>
+          {Number(r.absentDays) > 0 ? r.absentDays : '—'}
+        </span>
+      ),
+    },
+    {
+      header: 'HALF',
+      align: 'right',
+      render: (r) => (
+        <span className={`font-mono ${Number(r.halfDays) > 0 ? 'text-amber-600 font-semibold' : 'text-text-muted'}`}>
+          {Number(r.halfDays) > 0 ? r.halfDays : '—'}
+        </span>
+      ),
+    },
+    {
+      header: 'EARNED (₹)',
+      align: 'right',
+      render: (r) => <span className="font-mono">₹{fmt(Number(r.earnedSalary))}</span>,
+    },
+    {
+      header: 'OT PAY (₹)',
+      align: 'right',
+      render: (r) => (
+        <span className="font-mono text-emerald-700">
+          {Number(r.otPay) > 0 ? `₹${fmt(Number(r.otPay))}` : '—'}
+        </span>
+      ),
+    },
+    {
+      header: 'ADVANCE (₹)',
+      align: 'right',
+      render: (r) => (
+        <span className="font-mono text-amber-700">
+          {Number(r.salaryAdvance) > 0 ? `₹${fmt(Number(r.salaryAdvance))}` : '—'}
+        </span>
+      ),
+    },
+    {
+      header: 'PERM. DED. (₹)',
+      align: 'right',
+      render: (r) => (
+        <span className="font-mono text-red-600">
+          {Number(r.permissionDeduction) > 0 ? `₹${fmt(Number(r.permissionDeduction))}` : '—'}
+        </span>
+      ),
+    },
+    {
+      header: 'NET SALARY (₹)',
+      align: 'right',
+      render: (r) => <span className="font-mono font-bold text-text-primary">₹{fmt(Number(r.netSalary))}</span>,
+    },
+    {
+      header: 'MODE',
+      align: 'center',
+      render: (r) => (
+        <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+          r.paymentMode === 'BANK' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'
+        }`}>
+          {r.paymentMode}
+        </span>
+      ),
+    },
+  ];
+
   return (
-    <div className="min-h-screen bg-page p-6 space-y-5 print:p-0 print:bg-white">
+    <div className="min-h-screen p-6 space-y-5 print:p-0 print:bg-white">
 
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 print:hidden">
@@ -227,107 +332,33 @@ const WeeklyPayrollReport: React.FC = () => {
         <span className="ml-auto text-xs text-text-muted">{filtered.length} employee{filtered.length !== 1 ? 's' : ''}</span>
       </div>
 
-      {/* Table */}
+      {/* Table using reusable DataTable component */}
       <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm border-collapse">
-            <thead>
-              <tr className="bg-slate-800 text-white">
-                <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wide">S.No</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wide">Emp Code</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wide">Employee Name</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wide">Department</th>
-                <th className="text-right px-4 py-3 text-xs font-semibold uppercase tracking-wide">Salary/Day (₹)</th>
-                <th className="text-right px-4 py-3 text-xs font-semibold uppercase tracking-wide">Present</th>
-                <th className="text-right px-4 py-3 text-xs font-semibold uppercase tracking-wide">Absent</th>
-                <th className="text-right px-4 py-3 text-xs font-semibold uppercase tracking-wide">Half</th>
-                <th className="text-right px-4 py-3 text-xs font-semibold uppercase tracking-wide">Earned (₹)</th>
-                <th className="text-right px-4 py-3 text-xs font-semibold uppercase tracking-wide">OT Pay (₹)</th>
-                <th className="text-right px-4 py-3 text-xs font-semibold uppercase tracking-wide">Advance (₹)</th>
-                <th className="text-right px-4 py-3 text-xs font-semibold uppercase tracking-wide">Perm. Ded. (₹)</th>
-                <th className="text-right px-4 py-3 text-xs font-semibold uppercase tracking-wide">Net Salary (₹)</th>
-                <th className="text-center px-4 py-3 text-xs font-semibold uppercase tracking-wide">Mode</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={14} className="text-center py-12 text-text-muted">
-                    No employees match the selected filter.
-                  </td>
-                </tr>
-              ) : (
-                filtered.map((r, idx) => (
-                  <tr
-                    key={r.id}
-                    className={`border-b border-border transition-colors ${
-                      r.hasVariance
-                        ? 'bg-amber-50 border-l-4 border-l-amber-400'
-                        : idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'
-                    } hover:bg-blue-50/20`}
-                  >
-                    <td className="px-4 py-3 text-text-muted">{idx + 1}</td>
-                    <td className="px-4 py-3 font-mono text-xs text-text-secondary">
-                      {r.employeeCode}
-                    </td>
-                    <td className="px-4 py-3 font-semibold text-text-primary">
-                      {r.hasVariance && <AlertTriangle size={12} className="inline text-amber-500 mr-1" />}
-                      {r.employeeName}
-                    </td>
-                    <td className="px-4 py-3 text-text-secondary">{r.department}</td>
-                    <td className="px-4 py-3 text-right font-mono">₹{fmt(r.dailyRate)}</td>
-                    <td className="px-4 py-3 text-right font-mono text-emerald-700 font-semibold">{r.presentDays}</td>
-                    <td className={`px-4 py-3 text-right font-mono ${r.absentDays > 0 ? 'text-red-600' : 'text-text-muted'}`}>
-                      {r.absentDays > 0 ? r.absentDays : '—'}
-                    </td>
-                    <td className={`px-4 py-3 text-right font-mono ${r.halfDays > 0 ? 'text-amber-600' : 'text-text-muted'}`}>
-                      {r.halfDays > 0 ? r.halfDays : '—'}
-                    </td>
-                    <td className="px-4 py-3 text-right font-mono">₹{fmt(r.earnedSalary)}</td>
-                    <td className="px-4 py-3 text-right font-mono text-emerald-700">
-                      {r.otPay > 0 ? `₹${fmt(r.otPay)}` : '—'}
-                    </td>
-                    <td className="px-4 py-3 text-right font-mono text-amber-700">
-                      {r.salaryAdvance > 0 ? `₹${fmt(r.salaryAdvance)}` : '—'}
-                    </td>
-                    <td className="px-4 py-3 text-right font-mono text-red-600">
-                      {r.permissionDeduction > 0 ? `₹${fmt(r.permissionDeduction)}` : '—'}
-                    </td>
-                    <td className="px-4 py-3 text-right font-mono font-bold text-text-primary">
-                      ₹{fmt(r.netSalary)}
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                        r.paymentMode === 'BANK' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'
-                      }`}>
-                        {r.paymentMode}
-                      </span>
-                    </td>
-                  </tr>
-                ))
-              )}
+        <DataTable
+          columns={reportColumns}
+          data={filtered}
+          rowKey={(r) => r.id}
+          emptyMessage="No employees match the selected filter."
+          rowClassName={(r) => (r.hasVariance ? 'bg-amber-50 border-l-4 border-l-amber-400' : '')}
+          density="compact"
+        />
 
-              {/* Total row */}
-              {filtered.length > 0 && (
-                <tr className="bg-slate-100 border-t-2 border-slate-400 font-bold">
-                  <td colSpan={4} className="px-4 py-3 text-sm font-bold text-text-primary">
-                    TOTAL ({filtered.length} Employees)
-                  </td>
-                  <td className="px-4 py-3 text-right text-text-muted">—</td>
-                  <td className="px-4 py-3 text-right font-mono text-emerald-700">{totals.presentDays}</td>
-                  <td className="px-4 py-3 text-right font-mono text-red-600">{totals.absentDays}</td>
-                  <td className="px-4 py-3 text-right font-mono text-amber-600">{totals.halfDays}</td>
-                  <td className="px-4 py-3 text-right font-mono">₹{fmt(totals.earnedSalary)}</td>
-                  <td className="px-4 py-3 text-right font-mono text-emerald-700">₹{fmt(totals.otPay)}</td>
-                  <td className="px-4 py-3 text-right font-mono text-amber-700">₹{fmt(totals.salaryAdvance)}</td>
-                  <td className="px-4 py-3 text-right font-mono text-red-600">₹{fmt(totals.permissionDeduction)}</td>
-                  <td className="px-4 py-3 text-right font-mono text-primary text-base">₹{fmt(totals.netSalary)}</td>
-                  <td />
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+        {/* Total summary row */}
+        {filtered.length > 0 && (
+          <div className="bg-slate-100 border-t-2 border-slate-300 p-4 flex flex-wrap justify-between items-center text-xs font-mono">
+            <span className="font-bold text-slate-800 text-sm">TOTAL ({filtered.length} Employees)</span>
+            <div className="flex gap-4 flex-wrap justify-end font-semibold">
+              <span className="text-emerald-700">Present: {totals.presentDays}</span>
+              <span className="text-red-600">Absent: {totals.absentDays}</span>
+              <span className="text-amber-600">Half: {totals.halfDays}</span>
+              <span>Earned: ₹{fmt(totals.earnedSalary)}</span>
+              <span className="text-emerald-700">OT: ₹{fmt(totals.otPay)}</span>
+              <span className="text-amber-700">Adv: ₹{fmt(totals.salaryAdvance)}</span>
+              <span className="text-red-600">Perm Ded: ₹{fmt(totals.permissionDeduction)}</span>
+              <span className="font-bold text-primary text-sm">Net: ₹{fmt(totals.netSalary)}</span>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Summary cards */}

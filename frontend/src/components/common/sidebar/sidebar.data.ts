@@ -227,6 +227,14 @@ export const sidebarItems: SidebarItem[] = [
       "/accounts/purchase-returns",
       "/accounts/petty-cash",
     ],
+    permissionAny: [
+      "accounts.view",
+      "payable.view",
+      "receivable.view",
+      "vouchers.view",
+      "petty-cash.view",
+      "chart-of-accounts.view",
+    ],
   },
   // 12. Payroll
   {
@@ -239,6 +247,13 @@ export const sidebarItems: SidebarItem[] = [
       "/payroll/settings",
       "/payroll/weekly-report",
       "/payroll/monthly-report",
+    ],
+    permissionAny: [
+      "payroll.view",
+      "payroll-run.view",
+      "payroll-settings.view",
+      "payroll-attendance.view",
+      "payroll-advance.view",
     ],
   },
 ];
