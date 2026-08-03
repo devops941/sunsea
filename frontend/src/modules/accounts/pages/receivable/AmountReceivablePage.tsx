@@ -19,6 +19,8 @@ import { DATE_RANGE_OPTIONS } from "../../../../constants/selectOption";
 import { receivableService, type CustomerReceivableSummary } from "../../../../services/receivableService";
 import { customerService } from "../../../../services/customerService";
 
+import { useSocketSync } from "../../../../hooks/useSocketSync";
+
 export const AmountReceivablePage: React.FC = () => {
   const navigate = useNavigate();
 
@@ -74,7 +76,7 @@ export const AmountReceivablePage: React.FC = () => {
   useEffect(() => {
     const loadCustomers = async () => {
       try {
-        const res = await customerService.fetchAll({ limit: 1000 });
+        const res = await customerService.fetchAll({ limit: 10 });
         const list = Array.isArray(res) ? res : (res?.customers || []);
         setCustomersList(list);
       } catch (err) {
@@ -106,6 +108,11 @@ export const AmountReceivablePage: React.FC = () => {
   useEffect(() => {
     loadData();
   }, [asOnDate, startDate, endDate, customerId, search]);
+
+  useSocketSync("voucher", undefined, loadData);
+  useSocketSync("salesInvoice", undefined, loadData);
+  useSocketSync("salesReturn", undefined, loadData);
+  useSocketSync("customer", undefined, loadData);
 
   // Date range preset handler
   const handleDateRangeChange = (val: string) => {
@@ -278,6 +285,20 @@ export const AmountReceivablePage: React.FC = () => {
       ),
     },
   ];
+
+  // Pagination state (10 items per page)
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const pageSize = 10;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [asOnDate, startDate, endDate, customerId, search]);
+
+  const totalPages = Math.ceil(filteredCustomers.length / pageSize) || 1;
+  const paginatedCustomers = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredCustomers.slice(start, start + pageSize);
+  }, [filteredCustomers, currentPage]);
 
   return (
     <div className="w-full p-4 md:p-6 bg-slate-50 min-h-screen font-sans text-slate-800">
@@ -455,10 +476,15 @@ export const AmountReceivablePage: React.FC = () => {
         {/* DATA TABLE */}
         <DataTable
           columns={tableColumns.filter(c => typeof c.header === 'string' && visibleColumns.includes(c.header))}
-          data={filteredCustomers}
+          data={paginatedCustomers}
           rowKey={(item: any) => item.customerId}
           loading={loading}
           emptyMessage="No customer receivables matching the selected filter criteria."
+          pagination={{
+            currentPage,
+            totalPages,
+            onPageChange: setCurrentPage,
+          }}
         />
       </div>
     </div>

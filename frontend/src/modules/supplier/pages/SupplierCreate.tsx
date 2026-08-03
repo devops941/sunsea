@@ -147,6 +147,7 @@ const SupplierCreate: React.FC = () => {
         paymentTerms: "Net30",
         leadTimeDays: 7,
         minOrderQty: 0,
+        openingBalance: 0,
         currency: "INR",
         bankAccounts: [
             {
@@ -246,6 +247,7 @@ const SupplierCreate: React.FC = () => {
             paymentTerms: "Net30",
             leadTimeDays: 7,
             minOrderQty: 0,
+            openingBalance: 0,
             currency: "INR",
             bankAccounts: [
                 {
@@ -545,6 +547,7 @@ const SupplierCreate: React.FC = () => {
             paymentTerms: formData.paymentTerms,
             leadTimeDays: formData.leadTimeDays,
             minOrderQty: formData.minOrderQty,
+            openingBalance: formData.openingBalance,
             currency: formData.currency,
             bankAccount: formData.bankAccounts,
             status: formData.status,
@@ -955,6 +958,15 @@ const SupplierCreate: React.FC = () => {
                                         { value: "USD", label: "USD" },
                                     ]}
                                     error={errors.currency}
+                                    onChange={handleChange}
+                                />
+                                <TextInput
+                                    label="Opening Balance ₹"
+                                    name="openingBalance"
+                                    type="number"
+                                    value={String(formData.openingBalance)}
+                                    placeholder="0.00"
+                                    error={errors.openingBalance}
                                     onChange={handleChange}
                                 />
                                 <TextInput

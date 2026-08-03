@@ -3,6 +3,7 @@ import { LedgerType, VoucherType, Prisma } from "@prisma/client";
 import { ApiError } from "../../utils/ApiError";
 import { accountsService } from "../accounts/accounts.service";
 import { voucherPostingService } from "../accounts/voucherPosting.service";
+import { extractPaymentsArray } from "../../utils/payments";
 
 export interface SupplierPayableSummary {
   supplierId: number;
@@ -20,7 +21,7 @@ export interface SupplierPayableSummary {
   netBalance: number;
   balanceAsOnDate: number;
   overdueAmount: number;
-  dueDays: number;
+  dueDays: number | null;
   isOverdue: boolean;
 }
 
@@ -60,6 +61,8 @@ export interface SupplierPayableDetail {
     paymentMode?: string;
     referenceNo?: string;
     narration?: string;
+    postedToLedger?: boolean;
+    sourceVoucherId?: string;
   }>;
   statementEntries: Array<{
     id: string;
@@ -74,19 +77,6 @@ export interface SupplierPayableDetail {
   }>;
 }
 
-const extractPaymentsArray = (raw: any): any[] => {
-  if (!raw) return [];
-  if (Array.isArray(raw)) return raw;
-  if (typeof raw === "string") {
-    try {
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch (e) {
-      return [];
-    }
-  }
-  return [];
-};
 
 class PayableService {
   /**
@@ -98,14 +88,11 @@ class PayableService {
     endDate?: string;
     supplierId?: string | number;
     search?: string;
-  }): Promise<SupplierPayableSummary[]> {
-    // Auto-sync any unposted purchase & payment vouchers
-    try {
-      const { voucherPostingService } = require("./voucherPosting.service");
-      await voucherPostingService.syncUnpostedVouchers();
-    } catch (err) {
-      console.error("[PayableService] Sync unposted vouchers failed:", err);
-    }
+    page?: number;
+    limit?: number;
+  }): Promise<{ data: SupplierPayableSummary[]; total: number; page: number; totalPages: number }> {
+    const page = Math.max(1, params?.page || 1);
+    const limit = Math.max(1, params?.limit || 50);
 
     const cutoffDate = params?.asOnDate ? new Date(params.asOnDate) : new Date();
     if (params?.asOnDate) {
@@ -118,36 +105,60 @@ class PayableService {
 
     const supplierIdNum = params?.supplierId ? Number(params.supplierId) : undefined;
 
+    const whereClause: Prisma.SupplierWhereInput = {
+      ...(supplierIdNum && { id: supplierIdNum }),
+      ...(params?.search && {
+        OR: [
+          { legalName: { contains: params.search, mode: "insensitive" } },
+          { supplierCode: { contains: params.search, mode: "insensitive" } },
+        ],
+      }),
+    };
+
+    const total = await prisma.supplier.count({ where: whereClause });
+    const totalPages = Math.ceil(total / limit) || 1;
+
     const suppliers = await prisma.supplier.findMany({
-      where: {
-        ...(supplierIdNum && { id: supplierIdNum }),
-        ...(params?.search && {
-          OR: [
-            { legalName: { contains: params.search, mode: "insensitive" } },
-            { supplierCode: { contains: params.search, mode: "insensitive" } },
-          ],
-        }),
-      },
+      where: whereClause,
       orderBy: { legalName: "asc" },
+      skip: (page - 1) * limit,
+      take: limit,
     });
 
-    const results: SupplierPayableSummary[] = [];
+    const supplierIds = suppliers.map((s) => s.id);
 
-    for (const supplier of suppliers) {
-      const openingBalance = Number(supplier.openingBalance || 0);
+    // 1. Fetch existing ledgers in batch
+    const existingLedgers = await prisma.accountLedger.findMany({
+      where: { supplierId: { in: supplierIds } },
+    });
+    const ledgerMap = new Map<number, any>();
+    existingLedgers.forEach((l) => {
+      if (l.supplierId) ledgerMap.set(l.supplierId, l);
+    });
 
-      // Ensure supplier ledger exists
-      const ledger = await accountsService.ensureSupplierLedger(supplier);
+    // 2. Only ensure ledgers for suppliers missing a ledger
+    const missingSuppliers = suppliers.filter((s) => !ledgerMap.has(s.id));
+    if (missingSuppliers.length > 0) {
+      const createdLedgers = await Promise.all(
+        missingSuppliers.map((s) => accountsService.ensureSupplierLedger(s))
+      );
+      createdLedgers.forEach((l) => {
+        if (l.supplierId) ledgerMap.set(l.supplierId, l);
+      });
+    }
 
-      const voucherDateFilter: Prisma.DateTimeFilter = {
-        ...(startDateObj && { gte: startDateObj }),
-        ...(endDateObj ? { lte: endDateObj } : { lte: cutoffDate }),
-      };
+    const ledgerIds = Array.from(ledgerMap.values()).map((l) => l.id);
 
-      // Aggregate journal items up to cutoffDate
-      const journalItems = await prisma.journalItem.findMany({
+    const voucherDateFilter: Prisma.DateTimeFilter = {
+      ...(startDateObj && { gte: startDateObj }),
+      ...(endDateObj ? { lte: endDateObj } : { lte: cutoffDate }),
+    };
+
+    // 3. Fetch all journal items and GRN invoices for target suppliers in batch queries
+    const [allJournalItems, allGrnInvoices] = await Promise.all([
+      prisma.journalItem.findMany({
         where: {
-          OR: [{ debitLedgerId: ledger.id }, { creditLedgerId: ledger.id }],
+          OR: [{ debitLedgerId: { in: ledgerIds } }, { creditLedgerId: { in: ledgerIds } }],
           voucher: {
             date: voucherDateFilter,
           },
@@ -155,15 +166,50 @@ class PayableService {
         include: {
           voucher: true,
         },
-      });
+      }),
+      (prisma as any).grnInvoice.findMany({
+        where: {
+          supplierId: { in: supplierIds },
+        },
+      }),
+    ]);
+
+    // Group journal items by ledger ID
+    const itemsByLedger = new Map<number, typeof allJournalItems>();
+    for (const item of allJournalItems) {
+      if (item.debitLedgerId && ledgerIds.includes(item.debitLedgerId)) {
+        const list = itemsByLedger.get(item.debitLedgerId) || [];
+        list.push(item);
+        itemsByLedger.set(item.debitLedgerId, list);
+      }
+      if (item.creditLedgerId && ledgerIds.includes(item.creditLedgerId)) {
+        const list = itemsByLedger.get(item.creditLedgerId) || [];
+        list.push(item);
+        itemsByLedger.set(item.creditLedgerId, list);
+      }
+    }
+
+    // Group GRN invoices by supplier ID
+    const grnsBySupplier = new Map<number, any[]>();
+    for (const grn of allGrnInvoices) {
+      const list = grnsBySupplier.get(grn.supplierId) || [];
+      list.push(grn);
+      grnsBySupplier.set(grn.supplierId, list);
+    }
+
+    const data: SupplierPayableSummary[] = suppliers.map((supplier) => {
+      const openingBalance = Number(supplier.openingBalance || 0);
+      const ledger = ledgerMap.get(supplier.id);
+      const journalItems = ledger ? itemsByLedger.get(ledger.id) || [] : [];
+      const grnInvoices = grnsBySupplier.get(supplier.id) || [];
 
       let totalBilled = 0;
       let totalPaid = 0;
       let totalReturned = 0;
 
       for (const item of journalItems) {
-        let isCredit = item.creditLedgerId === ledger.id;
-        let isDebit = item.debitLedgerId === ledger.id;
+        let isCredit = item.creditLedgerId === ledger?.id;
+        let isDebit = item.debitLedgerId === ledger?.id;
 
         if (item.voucher.type === VoucherType.PURCHASE_RETURN) {
           isCredit = false;
@@ -185,13 +231,6 @@ class PayableService {
         }
       }
 
-      // Fetch GRN Invoices for this supplier
-      const grnInvoices = await (prisma as any).grnInvoice.findMany({
-        where: {
-          supplierId: supplier.id,
-        },
-      });
-
       let grnBilled = 0;
       let grnPaid = 0;
       for (const grn of grnInvoices) {
@@ -209,10 +248,27 @@ class PayableService {
       const debit = totalPaid + totalReturned;
       const balanceAsOnDate = netLiability;
       const isOverdue = balanceAsOnDate > 0;
-      const dueDays = isOverdue ? 30 : 0;
+
+      const earliestUnpaidDueDate = grnInvoices
+        .filter((g: any) => {
+          const b = Number(g.netAmount || g.subtotal || g.grandTotal || g.totalAmount || 0);
+          const pList = extractPaymentsArray(g.payments);
+          const pSum = pList.reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0);
+          const pAmt = Math.max(pSum, Number(g.paidAmount || 0));
+          return b - pAmt > 0 && g.billDueDate;
+        })
+        .map((g: any) => new Date(g.billDueDate))
+        .sort((a: Date, b: Date) => a.getTime() - b.getTime())[0];
+
+      const dueDays = isOverdue
+        ? earliestUnpaidDueDate
+          ? Math.max(0, Math.floor((cutoffDate.getTime() - earliestUnpaidDueDate.getTime()) / 86400000))
+          : null
+        : 0;
+
       const netBalance = balanceAsOnDate;
 
-      results.push({
+      return {
         supplierId: supplier.id,
         supplierCode: supplier.supplierCode,
         legalName: supplier.legalName,
@@ -230,23 +286,16 @@ class PayableService {
         overdueAmount: isOverdue ? balanceAsOnDate : 0,
         dueDays,
         isOverdue,
-      });
-    }
+      };
+    });
 
-    return results;
+    return { data, total, page, totalPages };
   }
 
   /**
    * Per-supplier invoice breakdown + payment history + statement.
    */
   async getSupplierPayableDetail(supplierId: number, options?: { startDate?: string; endDate?: string }): Promise<SupplierPayableDetail> {
-    try {
-      const { voucherPostingService } = require("./voucherPosting.service");
-      await voucherPostingService.syncUnpostedVouchers();
-    } catch (err) {
-      console.error("[PayableService] Sync unposted vouchers failed:", err);
-    }
-
     const supplier = await prisma.supplier.findUnique({
       where: { id: supplierId },
     });
@@ -256,7 +305,6 @@ class PayableService {
     }
 
     const ledger = await accountsService.ensureSupplierLedger(supplier);
-    await voucherPostingService.syncUnpostedVouchers();
     const statement = await accountsService.getLedgerStatement(ledger.id, options || {});
 
     // Fetch GRN Invoices for per-invoice breakdown
@@ -306,32 +354,69 @@ class PayableService {
 
     const paymentHistoryMap = new Map<string, any>();
 
+    // Step A: Index posted payment vouchers
     paymentItems.forEach((item) => {
-      paymentHistoryMap.set(item.voucher.id.toString(), {
-        id: item.voucher.id.toString(),
-        voucherNo: item.voucher.voucherNo,
-        date: item.voucher.date.toISOString().split("T")[0],
+      const v = item.voucher;
+      const voucherKey = v.id.toString();
+      paymentHistoryMap.set(voucherKey, {
+        id: voucherKey,
+        voucherId: voucherKey,
+        voucherNo: v.voucherNo,
+        date: v.date.toISOString().split("T")[0],
         amount: Number(item.debitAmount),
         paymentMode: undefined,
-        referenceNo: (item.voucher as any).referenceNo || undefined,
-        narration: item.narration || item.voucher.narration || undefined,
+        referenceNo: (v as any).referenceNo || undefined,
+        narration: item.narration || v.narration || undefined,
+        postedToLedger: true,
+        sourceVoucherId: voucherKey,
+        refDocId: v.refDocId || undefined,
       });
     });
 
-    // Extract payments recorded inside GRN Invoices payments JSON array
+    // Step B: Merge GRN JSON payment records into payment history map
     grnInvoices.forEach((grn: any) => {
       const pList = extractPaymentsArray(grn.payments);
       pList.forEach((p: any, idx: number) => {
-        const idKey = p.id || `grn-pmt-${grn.id}-${idx}`;
-        if (!paymentHistoryMap.has(idKey)) {
-          paymentHistoryMap.set(idKey, {
-            id: idKey,
+        const paymentId = p.id ? String(p.id) : `${grn.id}_pay_${idx}`;
+        const sourceVoucherId = p.sourceVoucherId ? String(p.sourceVoucherId) : undefined;
+
+        // Try finding matching posted voucher
+        let matchedVoucherKey: string | undefined = undefined;
+
+        if (sourceVoucherId && paymentHistoryMap.has(sourceVoucherId)) {
+          matchedVoucherKey = sourceVoucherId;
+        } else {
+          // Fallback matching by refDocId or voucherNo pattern
+          for (const [key, entry] of paymentHistoryMap.entries()) {
+            if (
+              entry.refDocId === paymentId ||
+              entry.refDocId === `${grn.id}_pay_${idx}` ||
+              (p.referenceNumber && entry.referenceNo === p.referenceNumber && Math.abs(entry.amount - Number(p.amount || 0)) < 0.01)
+            ) {
+              matchedVoucherKey = key;
+              break;
+            }
+          }
+        }
+
+        if (matchedVoucherKey) {
+          // Merge GRN payment details (mode & reference number) into the voucher record
+          const existingEntry = paymentHistoryMap.get(matchedVoucherKey);
+          existingEntry.paymentMode = p.paymentMethod || existingEntry.paymentMode;
+          existingEntry.referenceNo = p.referenceNumber || existingEntry.referenceNo;
+          if (p.id) existingEntry.grnPaymentId = p.id;
+        } else {
+          // GRN payment entry has no posted ledger voucher -> render as unposted row
+          const unpostedKey = `unposted-${paymentId}`;
+          paymentHistoryMap.set(unpostedKey, {
+            id: unpostedKey,
             voucherNo: p.referenceNumber || grn.grnNumber || `PAY-GRN-${grn.id}`,
             date: p.paymentDate ? new Date(p.paymentDate).toISOString().split("T")[0] : (grn.createdAt ? new Date(grn.createdAt).toISOString().split("T")[0] : ""),
             amount: Number(p.amount || 0),
             paymentMode: p.paymentMethod || undefined,
             referenceNo: p.referenceNumber || undefined,
             narration: `Payment for GRN ${grn.grnNumber || grn.invoiceNo || grn.id}`,
+            postedToLedger: false,
           });
         }
       });

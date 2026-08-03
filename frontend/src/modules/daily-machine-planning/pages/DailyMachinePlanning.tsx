@@ -189,7 +189,7 @@ const DailyMachinePlanning: React.FC = () => {
   // Load active orders for selection
   const loadActiveOrders = async () => {
     try {
-      const res = await productionOrderService.fetchAll({ limit: 1000 } as any);
+      const res = await productionOrderService.fetchAll({ limit: 10 } as any);
       const list = res.data || res || [];
       const poList = Array.isArray(list) ? list : ((list as any).data || []);
       

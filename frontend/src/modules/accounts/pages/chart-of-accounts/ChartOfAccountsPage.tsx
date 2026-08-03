@@ -16,6 +16,8 @@ import type { DataTableColumn } from "../../../../components/ui/table/DataTable"
 import DataTable from "../../../../components/ui/table/DataTable";
 import { accountService, type AccountLedger } from "../../../../services/accountService";
 
+import { useSocketSync } from "../../../../hooks/useSocketSync";
+
 export const ChartOfAccountsPage: React.FC = () => {
   const [ledgers, setLedgers] = useState<AccountLedger[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -42,7 +44,7 @@ export const ChartOfAccountsPage: React.FC = () => {
   const loadLedgers = async () => {
     setLoading(true);
     try {
-      const res = await accountService.fetchLedgers({ page: 1, limit: 1000 });
+      const res = await accountService.fetchLedgers({ page: 1, limit: 10 });
       setLedgers(res.ledgers || []);
     } catch (err: any) {
       toast.error(err?.message || "Failed to load Chart of Accounts");
@@ -54,6 +56,8 @@ export const ChartOfAccountsPage: React.FC = () => {
   useEffect(() => {
     loadLedgers();
   }, []);
+
+  useSocketSync("accountLedger", undefined, loadLedgers);
 
   const handleApplyFilters = () => {
     setSearchTerm(draftSearchTerm);
@@ -216,23 +220,36 @@ export const ChartOfAccountsPage: React.FC = () => {
     },
   ];
 
+  // Pagination state (10 items per page)
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const pageSize = 10;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedType]);
+
+  const totalPages = Math.ceil(filteredLedgers.length / pageSize) || 1;
+  const paginatedLedgers = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredLedgers.slice(start, start + pageSize);
+  }, [filteredLedgers, currentPage]);
+
   return (
-    <div className="w-full p-4 md:p-6 bg-slate-50 min-h-screen font-sans text-slate-800 space-y-6">
-      {/* UNIFIED HEADER CONTAINER MATCHING REPORT DESIGN SYSTEM */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        {/* Header Title Bar */}
-        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-4 border-b border-slate-200">
+    <div className="w-full p-4 md:p-6 bg-slate-50 min-h-screen font-sans text-slate-800">
+      {/* HEADER SECTION */}
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 mb-6">
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-slate-200">
           <div>
             <div className="flex items-center gap-3">
               <span className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-semibold uppercase tracking-wider border border-blue-200">
-                Master Accounts
+                Chart of Accounts
               </span>
             </div>
-            <h2 className="text-2xl font-bold text-slate-800 mt-2 flex items-center gap-2">
-              <FaSitemap className="text-blue-600 text-xl" /> Chart of Accounts
+            <h2 className="text-2xl font-bold text-slate-800 mt-1 flex items-center gap-2">
+              <FaSitemap className="text-blue-600 text-xl" /> General Ledger Structure
             </h2>
             <p className="text-xs text-slate-500 mt-1">
-              Master ledger directory for Assets, Liabilities, Income, Expenses, and Equity accounts
+              Double-entry account categories, asset/liability grouping & system ledgers
             </p>
           </div>
 
@@ -244,83 +261,85 @@ export const ChartOfAccountsPage: React.FC = () => {
             >
               <FaSync className={loading ? "animate-spin text-blue-600" : ""} /> Refresh
             </button>
-            <button
-              onClick={() => setShowModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold transition-all shadow-sm"
-            >
-              <FaPlus /> New Ledger Account
-            </button>
             <ExportCSVButton
               data={csvData}
               columns={csvColumns}
               filename={csvFilename}
               text="Export CSV"
             />
+            <button
+              onClick={() => setShowModal(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold transition-all shadow-sm"
+            >
+              <FaPlus /> New Ledger
+            </button>
           </div>
         </div>
 
-        {/* Integrated Filters Panel Directly In Header */}
-        <div className="p-4 bg-white">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex flex-wrap items-center gap-4 w-full sm:w-auto">
-              <div className="w-full sm:w-64">
-                <label className="block mb-1 text-[11px] uppercase tracking-wider text-slate-500 font-bold">Account Type</label>
-                <SelectInput
-                  name="draftSelectedType"
-                  value={draftSelectedType}
-                  options={[
-                    { label: "ASSET (Current/Fixed)", value: "ASSET" },
-                    { label: "LIABILITY (Creditors/Loans)", value: "LIABILITY" },
-                    { label: "INCOME (Sales/Revenue)", value: "INCOME" },
-                    { label: "EXPENSE (Direct/Indirect)", value: "EXPENSE" },
-                    { label: "EQUITY (Capital/Reserves)", value: "EQUITY" }
-                  ]}
-                  defaultOptionLabel="All Account Types"
-                  hideLabel={true}
-                  onChange={(e) => setDraftSelectedType(e.target.value)}
+        {/* REPORT FILTERS CONTROL PANEL */}
+        <div className="p-6 border-b border-slate-200 bg-slate-50">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block mb-1 text-[11px] uppercase tracking-wider text-slate-500 font-bold">Search Ledger</label>
+              <div className="relative">
+                <input
+                  type="text"
+                  className="w-full border border-slate-300 rounded-md pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 shadow-sm"
+                  value={draftSearchTerm}
+                  onChange={(e) => setDraftSearchTerm(e.target.value)}
+                  placeholder="Search code, name, group..."
                 />
-              </div>
-
-              <div className="w-full sm:w-64">
-                <label className="block mb-1 text-[11px] uppercase tracking-wider text-slate-500 font-bold">Search</label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    className="w-full border border-slate-300 rounded-md pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 shadow-sm"
-                    value={draftSearchTerm}
-                    onChange={(e) => setDraftSearchTerm(e.target.value)}
-                    placeholder="Search code, name, group..."
-                  />
-                  <FaSearch className="absolute left-3 top-3 text-slate-400 text-xs" />
-                </div>
+                <FaSearch className="absolute left-3 top-3 text-slate-400 text-xs" />
               </div>
             </div>
 
-            <div className="flex items-center gap-3 ml-auto pt-2 sm:pt-0">
-              <button
-                onClick={handleClearFilters}
-                className="px-4 py-2 text-sm font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-md transition-colors"
-              >
-                Clear All
-              </button>
-              <button
-                onClick={handleApplyFilters}
-                className="px-6 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-md shadow-sm transition-colors"
-              >
-                Apply Filters
-              </button>
+            <div>
+              <label className="block mb-1 text-[11px] uppercase tracking-wider text-slate-500 font-bold">Account Type</label>
+              <SelectInput
+                name="draftSelectedType"
+                value={draftSelectedType}
+                options={[
+                  { label: "All Account Types", value: "ALL" },
+                  { label: "Asset Accounts", value: "ASSET" },
+                  { label: "Liability Accounts", value: "LIABILITY" },
+                  { label: "Income Accounts", value: "INCOME" },
+                  { label: "Expense Accounts", value: "EXPENSE" },
+                ]}
+                hideLabel={true}
+                onChange={(e) => setDraftSelectedType(e.target.value)}
+              />
             </div>
+          </div>
+
+          <div className="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-slate-200">
+            <button
+              onClick={handleClearFilters}
+              className="px-4 py-2 text-sm font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-md transition-colors"
+            >
+              Clear All
+            </button>
+            <button
+              onClick={handleApplyFilters}
+              className="px-6 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-md shadow-sm transition-colors"
+            >
+              Apply Filters
+            </button>
           </div>
         </div>
       </div>
 
-      {/* DATA TABLE */}
+      {/* DATA TABLE WITH 10 ITEMS PAGINATION */}
       <DataTable
         columns={tableColumns}
-        data={filteredLedgers}
+        data={paginatedLedgers}
         rowKey={(item: AccountLedger) => item.id}
         loading={loading}
         emptyMessage="No account ledgers found matching criteria."
+        pagination={{
+          currentPage,
+          totalPages,
+          onPageChange: setCurrentPage,
+        }}
       />
 
       {/* CREATE LEDGER MODAL */}

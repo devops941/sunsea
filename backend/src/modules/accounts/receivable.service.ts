@@ -54,12 +54,16 @@ export interface CustomerReceivableDetail {
   }>;
   collectionHistory: Array<{
     id: string;
+    voucherId?: string;
     voucherNo: string;
     date: string;
     amount: number;
     paymentMode?: string;
     referenceNo?: string;
     narration?: string;
+    postedToLedger?: boolean;
+    sourceVoucherId?: string;
+    refDocId?: string;
   }>;
   statementEntries: Array<{
     id: string;
@@ -128,108 +132,108 @@ class ReceivableService {
       orderBy: { firmName: "asc" },
     });
 
-    const results: CustomerReceivableSummary[] = [];
+    const results: CustomerReceivableSummary[] = await Promise.all(
+      customers.map(async (customer) => {
+        const openingBalance = Number(customer.openingBalance || 0);
 
-    for (const customer of customers) {
-      const openingBalance = Number(customer.openingBalance || 0);
+        // Ensure customer ledger exists
+        const ledger = await accountsService.ensureCustomerLedger(customer);
 
-      // Ensure customer ledger exists
-      const ledger = await accountsService.ensureCustomerLedger(customer);
+        const voucherDateFilter: Prisma.DateTimeFilter = {
+          ...(startDateObj && { gte: startDateObj }),
+          ...(endDateObj ? { lte: endDateObj } : { lte: cutoffDate }),
+        };
 
-      const voucherDateFilter: Prisma.DateTimeFilter = {
-        ...(startDateObj && { gte: startDateObj }),
-        ...(endDateObj ? { lte: endDateObj } : { lte: cutoffDate }),
-      };
+        // Fetch journal items and Sales Invoices concurrently
+        const [journalItems, salesInvoices] = await Promise.all([
+          prisma.journalItem.findMany({
+            where: {
+              OR: [{ debitLedgerId: ledger.id }, { creditLedgerId: ledger.id }],
+              voucher: {
+                date: voucherDateFilter,
+              },
+            },
+            include: {
+              voucher: true,
+            },
+          }),
+          (prisma as any).salesInvoice.findMany({
+            where: {
+              customerId: customer.id,
+            },
+          }),
+        ]);
 
-      // Aggregate journal items up to cutoffDate
-      const journalItems = await prisma.journalItem.findMany({
-        where: {
-          OR: [{ debitLedgerId: ledger.id }, { creditLedgerId: ledger.id }],
-          voucher: {
-            date: voucherDateFilter,
-          },
-        },
-        include: {
-          voucher: true,
-        },
-      });
+        let totalBilled = 0;
+        let totalPaid = 0;
+        let totalReturned = 0;
 
-      let totalBilled = 0;
-      let totalPaid = 0;
-      let totalReturned = 0;
+        for (const item of journalItems) {
+          let isDebit = item.debitLedgerId === ledger.id;
+          let isCredit = item.creditLedgerId === ledger.id;
 
-      for (const item of journalItems) {
-        let isDebit = item.debitLedgerId === ledger.id;
-        let isCredit = item.creditLedgerId === ledger.id;
-
-        if (item.voucher.type === VoucherType.SALES_RETURN) {
-          isDebit = false;
-          isCredit = true;
-        }
-
-        const debitAmt = Number(item.debitAmount);
-        const creditAmt = Number(item.creditAmount);
-        const amt = debitAmt > 0 ? debitAmt : creditAmt;
-
-        if (isDebit) {
-          totalBilled += amt;
-        } else if (isCredit) {
           if (item.voucher.type === VoucherType.SALES_RETURN) {
-            totalReturned += amt;
-          } else {
-            totalPaid += amt;
+            isDebit = false;
+            isCredit = true;
+          }
+
+          const debitAmt = Number(item.debitAmount);
+          const creditAmt = Number(item.creditAmount);
+          const amt = debitAmt > 0 ? debitAmt : creditAmt;
+
+          if (isDebit) {
+            totalBilled += amt;
+          } else if (isCredit) {
+            if (item.voucher.type === VoucherType.SALES_RETURN) {
+              totalReturned += amt;
+            } else {
+              totalPaid += amt;
+            }
           }
         }
-      }
 
-      // Fetch Sales Invoices directly
-      const salesInvoices = await (prisma as any).salesInvoice.findMany({
-        where: {
+        let invoiceBilled = 0;
+        let invoicePaid = 0;
+        for (const inv of salesInvoices) {
+          invoiceBilled += Number(inv.grandTotal || inv.subTotal || 0);
+          const pList = extractPaymentsArray(inv.payments);
+          const pSum = pList.reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0);
+          invoicePaid += Math.max(pSum, Number((inv as any).paidAmount || 0));
+        }
+
+        totalBilled = Math.max(totalBilled, invoiceBilled);
+        totalPaid = Math.max(totalPaid, invoicePaid);
+
+        const netAsset = openingBalance + totalBilled - totalPaid - totalReturned;
+        const debit = totalBilled;
+        const credit = totalPaid + totalReturned;
+        const balanceAsOnDate = netAsset;
+        const isOverdue = balanceAsOnDate > 0;
+        const dueDays = isOverdue ? 30 : 0;
+        const netBalance = balanceAsOnDate;
+
+        return {
           customerId: customer.id,
-        },
-      });
-
-      let invoiceBilled = 0;
-      let invoicePaid = 0;
-      for (const inv of salesInvoices) {
-        invoiceBilled += Number(inv.grandTotal || inv.subTotal || 0);
-        const pList = extractPaymentsArray(inv.payments);
-        const pSum = pList.reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0);
-        invoicePaid += Math.max(pSum, Number((inv as any).paidAmount || 0));
-      }
-
-      totalBilled = Math.max(totalBilled, invoiceBilled);
-      totalPaid = Math.max(totalPaid, invoicePaid);
-
-      const netAsset = openingBalance + totalBilled - totalPaid - totalReturned;
-      const debit = totalBilled;
-      const credit = totalPaid + totalReturned;
-      const balanceAsOnDate = netAsset;
-      const isOverdue = balanceAsOnDate > 0;
-      const dueDays = isOverdue ? 30 : 0;
-      const netBalance = balanceAsOnDate;
-
-      results.push({
-        customerId: customer.id,
-        customerCode: customer.customerCode,
-        firmName: customer.firmName,
-        contactPerson: (customer as any).contactPersonName || (customer as any).primaryContactName || null,
-        gstin: customer.gstin,
-        phone: (customer as any).phone || (customer as any).mobile || null,
-        customerType: (customer as any).customerType || "CUSTOMER",
-        openingBalance,
-        totalBilled,
-        totalPaid,
-        totalReturned,
-        debit,
-        credit,
-        netBalance,
-        balanceAsOnDate,
-        overdueAmount: isOverdue ? balanceAsOnDate : 0,
-        dueDays,
-        isOverdue,
-      });
-    }
+          customerCode: customer.customerCode,
+          firmName: customer.firmName,
+          contactPerson: (customer as any).contactPersonName || (customer as any).primaryContactName || null,
+          gstin: customer.gstin,
+          phone: (customer as any).phone || (customer as any).mobile || null,
+          customerType: (customer as any).customerType || "CUSTOMER",
+          openingBalance,
+          totalBilled,
+          totalPaid,
+          totalReturned,
+          debit,
+          credit,
+          netBalance,
+          balanceAsOnDate,
+          overdueAmount: isOverdue ? balanceAsOnDate : 0,
+          dueDays,
+          isOverdue,
+        };
+      })
+    );
 
     return results;
   }
@@ -303,32 +307,69 @@ class ReceivableService {
 
     const collectionHistoryMap = new Map<string, any>();
 
+    // Step A: Index posted RECEIPT vouchers
     collectionItems.forEach((item) => {
-      collectionHistoryMap.set(item.voucher.id.toString(), {
-        id: item.voucher.id.toString(),
-        voucherNo: item.voucher.voucherNo,
-        date: item.voucher.date.toISOString().split("T")[0],
+      const v = item.voucher;
+      const voucherKey = v.id.toString();
+      collectionHistoryMap.set(voucherKey, {
+        id: voucherKey,
+        voucherId: voucherKey,
+        voucherNo: v.voucherNo,
+        date: v.date.toISOString().split("T")[0],
         amount: Number(item.creditAmount),
         paymentMode: undefined,
-        referenceNo: (item.voucher as any).referenceNo || undefined,
-        narration: item.narration || item.voucher.narration || undefined,
+        referenceNo: (v as any).referenceNo || undefined,
+        narration: item.narration || v.narration || undefined,
+        postedToLedger: true,
+        sourceVoucherId: voucherKey,
+        refDocId: v.refDocId || undefined,
       });
     });
 
-    // Extract payments recorded inside Sales Invoices payments JSON array
+    // Step B: Merge Sales Invoice JSON payment records into collection history map
     salesInvoices.forEach((inv: any) => {
       const pList = extractPaymentsArray(inv.payments);
       pList.forEach((p: any, idx: number) => {
-        const idKey = p.id || `inv-pmt-${inv.id}-${idx}`;
-        if (!collectionHistoryMap.has(idKey)) {
-          collectionHistoryMap.set(idKey, {
-            id: idKey,
+        const paymentId = p.id ? String(p.id) : `${inv.id}_pay_${idx}`;
+        const sourceVoucherId = p.sourceVoucherId ? String(p.sourceVoucherId) : undefined;
+
+        // Try finding matching posted voucher
+        let matchedVoucherKey: string | undefined = undefined;
+
+        if (sourceVoucherId && collectionHistoryMap.has(sourceVoucherId)) {
+          matchedVoucherKey = sourceVoucherId;
+        } else {
+          // Fallback matching by refDocId or voucherNo / reference number pattern
+          for (const [key, entry] of collectionHistoryMap.entries()) {
+            if (
+              entry.refDocId === paymentId ||
+              entry.refDocId === `${inv.id}_pay_${idx}` ||
+              (p.referenceNumber && entry.referenceNo === p.referenceNumber && Math.abs(entry.amount - Number(p.amount || 0)) < 0.01)
+            ) {
+              matchedVoucherKey = key;
+              break;
+            }
+          }
+        }
+
+        if (matchedVoucherKey) {
+          // Merge Sales Invoice payment details (mode & reference number) into the voucher record
+          const existingEntry = collectionHistoryMap.get(matchedVoucherKey);
+          existingEntry.paymentMode = p.paymentMethod || existingEntry.paymentMode;
+          existingEntry.referenceNo = p.referenceNumber || existingEntry.referenceNo;
+          if (p.id) existingEntry.salesPaymentId = p.id;
+        } else {
+          // Sales Invoice payment entry has no posted ledger voucher -> render as unposted row
+          const unpostedKey = `unposted-${paymentId}`;
+          collectionHistoryMap.set(unpostedKey, {
+            id: unpostedKey,
             voucherNo: p.referenceNumber || inv.invoiceNo || `RCT-INV-${inv.id}`,
             date: p.paymentDate ? new Date(p.paymentDate).toISOString().split("T")[0] : (inv.createdAt ? new Date(inv.createdAt).toISOString().split("T")[0] : ""),
             amount: Number(p.amount || 0),
             paymentMode: p.paymentMethod || undefined,
             referenceNo: p.referenceNumber || undefined,
             narration: `Receipt for Sales Invoice ${inv.invoiceNo}`,
+            postedToLedger: false,
           });
         }
       });

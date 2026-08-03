@@ -59,7 +59,7 @@ const WeeklyMachineScheduleEdit: React.FC = () => {
         const loadProductionOrders = async () => {
             setLoadingPo(true);
             try {
-                const res: any = await productionOrderService.fetchAll({ limit: 1000 } as any);
+                const res: any = await productionOrderService.fetchAll({ limit: 10 } as any);
                 const list = res.data || res || [];
                 const poList = Array.isArray(list) ? list : (list.data || []);
                 setProductionOrders(poList);

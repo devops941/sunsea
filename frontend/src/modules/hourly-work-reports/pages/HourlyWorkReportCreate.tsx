@@ -132,14 +132,14 @@ const HourlyWorkReportCreate: React.FC = () => {
         dispatch(fetchMachines());
         dispatch(fetchShifts());
         // Fetch Stores and Raw Materials (Wastage Products)
-        apiClient.get(config.store.base, { params: { limit: 1000 } }).then(res => {
+        apiClient.get(config.store.base, { params: { limit: 10 } }).then(res => {
             const data = res.data?.data;
             if (Array.isArray(data)) setStores(data);
             else if (data && Array.isArray(data.stores)) setStores(data.stores);
             else if (res.data && Array.isArray(res.data.stores)) setStores(res.data.stores);
         }).catch(err => console.error(err));
 
-        apiClient.get(config.rawMaterial.base, { params: { limit: 1000 } }).then(res => {
+        apiClient.get(config.rawMaterial.base, { params: { limit: 10 } }).then(res => {
             const data = res.data?.data;
             let list: any[] = [];
             if (Array.isArray(data)) list = data;

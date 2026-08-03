@@ -6,6 +6,8 @@ import { ApiResponse } from "../../utils/ApiResponse";
 import { ApiError } from "../../utils/ApiError";
 import { getIO } from "../../socket/socket";
 
+import { voucherPostingService } from "../accounts/voucherPosting.service";
+
 class GrnInvoiceController {
 
     create = asyncHandler(async (req: Request, res: Response) => {
@@ -24,6 +26,13 @@ class GrnInvoiceController {
             userId,
             companyId: company.id,
         }, req.file);
+
+        // Auto-post purchase and payment vouchers immediately on creation
+        try {
+            await voucherPostingService.postPurchaseVoucher(grnInvoice.id);
+        } catch (err) {
+            console.error("[GRN Controller] Voucher posting failed:", err);
+        }
 
         getIO().emit("grnInvoice:created", grnInvoice);
 
@@ -62,6 +71,13 @@ class GrnInvoiceController {
         const id = req.params.id as string;
 
         const grnInvoice = await grnInvoiceService.updateGrnInvoice(id, req.body, req.file);
+
+        // Auto-post purchase and payment vouchers immediately on update
+        try {
+            await voucherPostingService.postPurchaseVoucher(grnInvoice.id);
+        } catch (err) {
+            console.error("[GRN Controller] Voucher posting failed:", err);
+        }
 
         getIO().emit("grnInvoice:updated", grnInvoice);
 

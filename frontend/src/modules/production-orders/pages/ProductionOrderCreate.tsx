@@ -650,7 +650,7 @@ const ProductionOrderCreate: React.FC = () => {
             return [];
         };
 
-        storeService.fetchAll({ limit: 1000 }).then((r) => setStores(extractArray(r))).catch(() => { });
+        storeService.fetchAll({ limit: 10 }).then((r) => setStores(extractArray(r))).catch(() => { });
         productService.fetchAll().then((r) => setProducts(extractArray(r))).catch(() => { });
         billOfMaterialService.fetchAll().then((r) => setBoms(extractArray(r))).catch(() => { });
     }, []);

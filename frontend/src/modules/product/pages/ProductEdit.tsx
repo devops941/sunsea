@@ -139,7 +139,7 @@ const ProductEdit: React.FC = () => {
         loadColors({ isActive: true });
         loadSizes({ isActive: true });
 
-        storeService.fetchAll({ limit: 1000 })
+        storeService.fetchAll({ limit: 10 })
             .then(res => {
                 const data = Array.isArray(res?.stores) ? res.stores : Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
                 setStores(data);

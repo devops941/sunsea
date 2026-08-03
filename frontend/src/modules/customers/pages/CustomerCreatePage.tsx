@@ -71,6 +71,7 @@ const CustomerCreatePage: React.FC = () => {
 
     creditLimit: "",
     creditDays: "0",
+    openingBalance: "0",
 
     priceList: "Standard",
 
@@ -421,6 +422,7 @@ const CustomerCreatePage: React.FC = () => {
         addresses: addresses.map(addr => addr.address),
         creditLimit: Number(formData.creditLimit),
         creditDays: Number(formData.creditDays),
+        openingBalance: Number(formData.openingBalance || 0),
         bankAccount: activeBankAccounts.length > 0 ? activeBankAccounts : undefined,
         transports: activeTransports.length > 0 ? activeTransports : undefined,
         status: formData.isActive === "true" ? "Active" : "Inactive",
@@ -690,6 +692,9 @@ const CustomerCreatePage: React.FC = () => {
             <div>
               <h3 className="text-lg font-semibold text-slate-700 mb-2">Commercial Settings</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div>
+                  <TextInput label="Opening Balance ₹" name="openingBalance" type="number" value={formData.openingBalance} placeholder="0.00" onChange={handleChange} preventNegative error={errors.openingBalance} />
+                </div>
                 <div>
                   <TextInput label="Credit Limit ₹" name="creditLimit" type="number" value={formData.creditLimit} placeholder="30000" onChange={handleChange} preventNegative error={errors.creditLimit} />
                 </div>

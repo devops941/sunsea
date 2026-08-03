@@ -19,8 +19,11 @@ import { DATE_RANGE_OPTIONS } from "../../../../constants/selectOption";
 import { payableService, type SupplierPayableSummary } from "../../../../services/payableService";
 import { supplierService } from "../../../../services/supplierService";
 
+import { useSocketSync } from "../../../../hooks/useSocketSync";
+
 export const AmountPayablePage: React.FC = () => {
   const navigate = useNavigate();
+  const requestIdRef = React.useRef(0);
 
   // Applied filter state
   const [startDate, setStartDate] = useState<string>("");
@@ -30,6 +33,7 @@ export const AmountPayablePage: React.FC = () => {
   const [search, setSearch] = useState<string>("");
 
   // Draft filter state for Apply / Clear All
+  const [draftAsOnDate, setDraftAsOnDate] = useState<string>(asOnDate);
   const [draftStartDate, setDraftStartDate] = useState<string>(startDate);
   const [draftEndDate, setDraftEndDate] = useState<string>(endDate);
   const [dateRangePreset, setDateRangePreset] = useState<string>("custom");
@@ -41,40 +45,45 @@ export const AmountPayablePage: React.FC = () => {
   const [payables, setPayables] = useState<SupplierPayableSummary[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
-  // Columns & Column Toggle
-  const DEFAULT_COLUMNS = [
-    "#",
-    "CODE",
-    "SUPPLIER",
-    "INVOICED",
-    "PAID",
-    "DEBIT",
-    "CREDIT",
-    "NET BALANCE",
-    "ACTION"
+  // Columns & Column Toggle by stable IDs
+  const ALL_COLUMN_IDS = [
+    "index",
+    "code",
+    "supplier",
+    "invoiced",
+    "paid",
+    "debit",
+    "credit",
+    "netBalance",
+    "dueDays",
+    "action"
   ];
 
   const [visibleColumns, setVisibleColumns] = useState<string[]>(() => {
-    const saved = localStorage.getItem("amountPayableVisibleColumns");
+    const saved = localStorage.getItem("amountPayableVisibleColumns_v2");
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          const valid = parsed.filter((id: string) => ALL_COLUMN_IDS.includes(id));
+          if (valid.length > 0) return valid;
+        }
       } catch (e) {
-        return DEFAULT_COLUMNS;
+        return ALL_COLUMN_IDS;
       }
     }
-    return DEFAULT_COLUMNS;
+    return ALL_COLUMN_IDS;
   });
 
   useEffect(() => {
-    localStorage.setItem("amountPayableVisibleColumns", JSON.stringify(visibleColumns));
+    localStorage.setItem("amountPayableVisibleColumns_v2", JSON.stringify(visibleColumns));
   }, [visibleColumns]);
 
   // Load suppliers list for filter dropdown
   useEffect(() => {
     const loadSuppliers = async () => {
       try {
-        const res = await supplierService.fetchAll({ limit: 1000 });
+        const res = await supplierService.fetchAll({ limit: 10 });
         const list = Array.isArray(res) ? res : (res?.suppliers || []);
         setSuppliersList(list);
       } catch (err) {
@@ -84,28 +93,41 @@ export const AmountPayablePage: React.FC = () => {
     loadSuppliers();
   }, []);
 
-  // Fetch report data
   const loadData = async () => {
+    const reqId = ++requestIdRef.current;
     setLoading(true);
     try {
-      const data = await payableService.getPayableSummaries({
+      const res = await payableService.getPayableSummaries({
         asOnDate,
         startDate,
         endDate,
         supplierId,
         search,
+        limit: 10,
       });
-      setPayables(data || []);
+      if (reqId === requestIdRef.current) {
+        const list = Array.isArray(res) ? res : res.data || [];
+        setPayables(list);
+      }
     } catch (err: any) {
-      toast.error(err?.message || "Failed to load supplier payables");
+      if (reqId === requestIdRef.current) {
+        toast.error(err?.message || "Failed to load supplier payables");
+      }
     } finally {
-      setLoading(false);
+      if (reqId === requestIdRef.current) {
+        setLoading(false);
+      }
     }
   };
 
   useEffect(() => {
     loadData();
   }, [asOnDate, startDate, endDate, supplierId, search]);
+
+  useSocketSync("voucher", undefined, loadData);
+  useSocketSync("grnInvoice", undefined, loadData);
+  useSocketSync("purchaseReturn", undefined, loadData);
+  useSocketSync("supplier", undefined, loadData);
 
   // Date range preset handler
   const handleDateRangeChange = (val: string) => {
@@ -136,6 +158,7 @@ export const AmountPayablePage: React.FC = () => {
   };
 
   const handleApplyFilters = () => {
+    setAsOnDate(draftAsOnDate);
     setStartDate(draftStartDate);
     setEndDate(draftEndDate);
     setSupplierId(draftSupplierId);
@@ -143,12 +166,15 @@ export const AmountPayablePage: React.FC = () => {
   };
 
   const handleClearFilters = () => {
+    const todayStr = new Date().toISOString().split("T")[0];
+    setDraftAsOnDate(todayStr);
     setDraftStartDate("");
     setDraftEndDate("");
     setDateRangePreset("custom");
     setDraftSupplierId("");
     setDraftSearch("");
 
+    setAsOnDate(todayStr);
     setStartDate("");
     setEndDate("");
     setSupplierId("");
@@ -164,7 +190,7 @@ export const AmountPayablePage: React.FC = () => {
     return filteredSuppliers.reduce(
       (acc, curr) => {
         const d = curr.debit !== undefined ? curr.debit : (curr.totalPaid || 0) + (curr.totalReturned || 0);
-        const c = curr.credit !== undefined ? curr.credit : (curr.openingBalance || 0) + (curr.totalBilled || 0);
+        const c = curr.credit !== undefined ? curr.credit : (curr.totalBilled || 0);
         acc.totalOpening += curr.openingBalance || 0;
         acc.totalBilled += curr.totalBilled || 0;
         acc.totalPaid += curr.totalPaid || 0;
@@ -203,18 +229,21 @@ export const AmountPayablePage: React.FC = () => {
     };
   }, [filteredSuppliers, asOnDate]);
 
-  // Table Columns
-  const tableColumns: DataTableColumn<any>[] = [
+  // Table Columns with stable IDs
+  const tableColumns: (DataTableColumn<SupplierPayableSummary> & { id: string })[] = [
     {
+      id: "index",
       header: "#",
       width: "50px",
       render: (_item, index) => index + 1,
     },
     {
+      id: "code",
       header: "CODE",
       render: (item: any) => <span className="font-mono font-medium text-slate-700">{item.supplierCode}</span>,
     },
     {
+      id: "supplier",
       header: "SUPPLIER",
       render: (item: any) => (
         <div>
@@ -224,6 +253,7 @@ export const AmountPayablePage: React.FC = () => {
       ),
     },
     {
+      id: "invoiced",
       header: "INVOICED",
       render: (item: any) => (
         <div className="text-right font-mono text-slate-700">
@@ -232,6 +262,7 @@ export const AmountPayablePage: React.FC = () => {
       ),
     },
     {
+      id: "paid",
       header: "PAID",
       render: (item: any) => (
         <div className="text-right font-mono text-slate-700">
@@ -240,6 +271,7 @@ export const AmountPayablePage: React.FC = () => {
       ),
     },
     {
+      id: "debit",
       header: "DEBIT",
       render: (item: any) => (
         <div className="text-right font-mono text-slate-700">
@@ -248,6 +280,7 @@ export const AmountPayablePage: React.FC = () => {
       ),
     },
     {
+      id: "credit",
       header: "CREDIT",
       render: (item: any) => (
         <div className="text-right font-mono font-bold text-amber-800">
@@ -256,6 +289,7 @@ export const AmountPayablePage: React.FC = () => {
       ),
     },
     {
+      id: "netBalance",
       header: "NET BALANCE",
       render: (item: any) => (
         <div className="text-right font-mono font-bold text-slate-900">
@@ -266,6 +300,16 @@ export const AmountPayablePage: React.FC = () => {
       ),
     },
     {
+      id: "dueDays",
+      header: "DUE DAYS",
+      render: (item: any) => (
+        <div className="text-center font-mono text-xs text-slate-600">
+          {item.dueDays !== null && item.dueDays !== undefined ? `${item.dueDays} d` : "—"}
+        </div>
+      ),
+    },
+    {
+      id: "action",
       header: "ACTION",
       render: (item: any) => (
         <button
@@ -277,6 +321,21 @@ export const AmountPayablePage: React.FC = () => {
       ),
     },
   ];
+
+  // Pagination state (10 items per page)
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const pageSize = 10;
+
+  // Reset to page 1 when filters or data change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [asOnDate, startDate, endDate, supplierId, search]);
+
+  const totalPages = Math.ceil(filteredSuppliers.length / pageSize) || 1;
+  const paginatedSuppliers = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredSuppliers.slice(start, start + pageSize);
+  }, [filteredSuppliers, currentPage]);
 
   return (
     <div className="w-full p-4 md:p-6 bg-slate-50 min-h-screen font-sans text-slate-800">
@@ -314,7 +373,7 @@ export const AmountPayablePage: React.FC = () => {
           </div>
         </div>
 
-        {/* DASHBOARD CARDS (PRESERVED AS REQUESTED) */}
+        {/* DASHBOARD CARDS */}
         <div className="p-6 border-b border-slate-200 bg-slate-50/50">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
@@ -364,14 +423,23 @@ export const AmountPayablePage: React.FC = () => {
               <div className="text-2xl font-black text-slate-900 mt-2">
                 ₹ {totals.totalCredit.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </div>
-              <div className="text-xs text-slate-500 mt-1">Opening + Cumulative Purchases</div>
+              <div className="text-xs text-slate-500 mt-1">Cumulative Purchases</div>
             </div>
           </div>
         </div>
 
-        {/* REPORT FILTERS CONTROL PANEL (MATCHING SALES REPORT STYLE) */}
+        {/* REPORT FILTERS CONTROL PANEL */}
         <div className="p-6 border-b border-slate-200 bg-slate-50">
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
+            <div>
+              <label className="block mb-1 text-[11px] uppercase tracking-wider text-slate-500 font-bold">As On Date</label>
+              <DatePickerCalendar
+                name="draftAsOnDate"
+                value={draftAsOnDate}
+                onChange={(e) => setDraftAsOnDate(e.target.value)}
+              />
+            </div>
+
             <div>
               <label className="block mb-1 text-[11px] uppercase tracking-wider text-slate-500 font-bold">Date Range</label>
               <SelectInput
@@ -429,9 +497,15 @@ export const AmountPayablePage: React.FC = () => {
           <div className="flex items-center justify-between mt-6 pt-4 border-t border-slate-200">
             <div>
               <ColumnToggle
-                columns={tableColumns}
-                visibleColumns={visibleColumns}
-                setVisibleColumns={setVisibleColumns}
+                columns={tableColumns.map(c => ({ ...c, header: c.header }))}
+                visibleColumns={visibleColumns.map(id => {
+                  const col = tableColumns.find(c => c.id === id);
+                  return col ? col.header : id;
+                })}
+                setVisibleColumns={(newHeaders) => {
+                  const updatedIds = newHeaders.map(h => tableColumns.find(c => c.header === h)?.id || h);
+                  setVisibleColumns(updatedIds);
+                }}
               />
             </div>
             <div className="flex items-center gap-3">
@@ -451,13 +525,18 @@ export const AmountPayablePage: React.FC = () => {
           </div>
         </div>
 
-        {/* DATA TABLE */}
+        {/* DATA TABLE WITH 10 ITEMS PAGINATION */}
         <DataTable
-          columns={tableColumns.filter(c => typeof c.header === 'string' && visibleColumns.includes(c.header))}
-          data={filteredSuppliers}
+          columns={tableColumns.filter(c => visibleColumns.includes(c.id))}
+          data={paginatedSuppliers}
           rowKey={(item: any) => item.supplierId}
           loading={loading}
           emptyMessage="No supplier payables matching the selected filter criteria."
+          pagination={{
+            currentPage,
+            totalPages,
+            onPageChange: setCurrentPage,
+          }}
         />
       </div>
     </div>

@@ -18,6 +18,8 @@ import {
   type LedgerStatementResult
 } from "../../../../services/accountService";
 
+import { useSocketSync } from "../../../../hooks/useSocketSync";
+
 export const LedgerStatementPage: React.FC = () => {
   const [ledgers, setLedgers] = useState<AccountLedger[]>([]);
   const [selectedLedgerId, setSelectedLedgerId] = useState<number | null>(null);
@@ -38,7 +40,7 @@ export const LedgerStatementPage: React.FC = () => {
   useEffect(() => {
     const loadLedgerList = async () => {
       try {
-        const res = await accountService.fetchLedgers({ page: 1, limit: 1000 });
+        const res = await accountService.fetchLedgers({ page: 1, limit: 10 });
         setLedgers(res.ledgers || []);
         if (res.ledgers && res.ledgers.length > 0) {
           const firstId = String(res.ledgers[0].id);
@@ -69,10 +71,12 @@ export const LedgerStatementPage: React.FC = () => {
   };
 
   useEffect(() => {
-    if (selectedLedgerId) {
-      loadStatement();
-    }
-  }, [selectedLedgerId, startDate, endDate]);
+    loadStatement();
+  }, [selectedLedgerId, startDate, endDate, searchTerm]);
+
+  useSocketSync("voucher", undefined, loadStatement);
+  useSocketSync("accountLedger", undefined, loadStatement);
+  useSocketSync("journalItem", undefined, loadStatement);
 
   // Date range preset handler
   const handleDateRangeChange = (val: string) => {

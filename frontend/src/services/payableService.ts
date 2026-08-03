@@ -15,7 +15,7 @@ export interface SupplierPayableSummary {
   credit?: number;
   balanceAsOnDate: number;
   overdueAmount: number;
-  dueDays: number;
+  dueDays: number | null;
   isOverdue: boolean;
 }
 
@@ -70,8 +70,24 @@ export interface SupplierPayableDetail {
 }
 
 export const payableService = {
-  getPayableSummaries: async (params?: { asOnDate?: string; startDate?: string; endDate?: string; supplierId?: string | number; search?: string }): Promise<SupplierPayableSummary[]> => {
+  getPayableSummaries: async (params?: {
+    asOnDate?: string;
+    startDate?: string;
+    endDate?: string;
+    supplierId?: string | number;
+    search?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<{ data: SupplierPayableSummary[]; total: number; page: number; totalPages: number } | SupplierPayableSummary[]> => {
     const response = await apiClient.get("/accounts/payable", { params });
+    if (response.data?.data && Array.isArray(response.data.data)) {
+      return {
+        data: response.data.data,
+        total: response.data.total ?? response.data.data.length,
+        page: response.data.page ?? 1,
+        totalPages: response.data.totalPages ?? 1,
+      };
+    }
     return response.data?.data || response.data || [];
   },
 

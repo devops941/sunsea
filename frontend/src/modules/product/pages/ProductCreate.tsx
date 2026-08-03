@@ -116,7 +116,7 @@ const ProductCreatePage: React.FC = () => {
         };
         fetchCode();
 
-        storeService.fetchAll({ limit: 1000 })
+        storeService.fetchAll({ limit: 10 })
             .then(res => {
                 const data = Array.isArray(res?.stores) ? res.stores : Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
                 setStores(data);

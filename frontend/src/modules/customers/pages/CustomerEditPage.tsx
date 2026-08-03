@@ -493,393 +493,393 @@ const CustomerEditPage: React.FC = () => {
   }
 
   return (
-        <div className="w-full mx-auto">
-            <div className="bg-white shadow-sm border border-slate-200 overflow-visible">
-                <div className="px-6 py-5 border-b border-slate-200">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                        <h2 className="text-xl font-bold text-slate-800">Edit Customer</h2>
-                        <CustomButton
-                            text="Back to List"
-                            icon={FaArrowLeft}
-                            onClick={() => navigate("/customers")}
-                        />
-                    </div>
-                </div>
+    <div className="w-full mx-auto">
+      <div className="bg-white shadow-sm border border-slate-200 overflow-visible">
+        <div className="px-6 py-5 border-b border-slate-200">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <h2 className="text-xl font-bold text-slate-800">Edit Customer</h2>
+            <CustomButton
+              text="Back to List"
+              icon={FaArrowLeft}
+              onClick={() => navigate("/customers")}
+            />
+          </div>
+        </div>
 
-                <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4" noValidate>
+        <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4" noValidate>
 
-            {/* Identification & Status */}
-            <div>
-              <h3 className="text-lg font-semibold text-slate-700 mb-2">Identification & Status</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <div>
-                  <TextInput label="Customer ID / Code" name="customerId" value={formData.customerId} onChange={handleChange} disabled />
-                </div>
-                <div>
-                  <SelectInput
-                    label="Status"
-                    name="isActive"
-                    value={formData.isActive}
-                    options={[
-                      { value: "true", label: "Active" },
-                      { value: "false", label: "Inactive" },
-                    ]}
-                    onChange={handleChange}
-                  />
-                </div>
-                {/* <div>
+          {/* Identification & Status */}
+          <div>
+            <h3 className="text-lg font-semibold text-slate-700 mb-2">Identification & Status</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div>
+                <TextInput label="Customer ID / Code" name="customerId" value={formData.customerId} onChange={handleChange} disabled />
+              </div>
+              <div>
+                <SelectInput
+                  label="Status"
+                  name="isActive"
+                  value={formData.isActive}
+                  options={[
+                    { value: "true", label: "Active" },
+                    { value: "false", label: "Inactive" },
+                  ]}
+                  onChange={handleChange}
+                />
+              </div>
+              {/* <div>
                   <TextInput label="Created by-on" name="createdByOn" value={formData.createdByOn} onChange={handleChange} disabled />
                 </div> */}
+            </div>
+          </div>
+
+
+
+          {/* Basic Info */}
+          <div>
+            <h3 className="text-lg font-semibold text-slate-700 mb-2">Basic Information</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              <TextInput label="Firm / Legal Name" name="firmName" value={formData.firmName} placeholder="e.g. Murugan Plastics" required error={errors.firmName} onChange={handleChange} />
+              <div>
+                <TextInput label="Display Name" name="displayName" value={formData.displayName} placeholder="Murugan" error={errors.displayName} onChange={handleChange} />
+              </div>
+              <div>
+                <MultiSelect
+                  label="Customer Type"
+                  name="customerType"
+                  value={formData.customerType}
+                  required
+                  options={[
+                    { value: "B2B", label: "B2B (GST Registered)" },
+                    { value: "B2C", label: "B2C (Consumer)" },
+                    { value: "Export", label: "Export" },
+                  ]}
+                  onChange={handleMultiSelectChange}
+                  error={errors.customerType}
+                />
+              </div>
+              <div>
+                <TextInput label="Contact Person" name="contactPerson" value={formData.contactPerson} placeholder="Mr. S. Murugan" error={errors.contactPerson} onChange={handleChange} />
+              </div>
+              <div>
+                <TextInput label="Designation" name="designation" value={formData.designation} placeholder="Proprietor" error={errors.designation} onChange={handleChange} />
+              </div>
+              <div>
+                <IndiaPhoneInput
+                  multi
+                  label="Mobile Numbers"
+                  name="phones"
+                  value={phones}
+                  onChange={(e) => {
+                    setPhones(e.target.value);
+                    if (errors.mobile) {
+                      setErrors((prev) => ({ ...prev, mobile: "" }));
+                    }
+                  }}
+                  maxNumbers={5}
+                  error={errors.mobile}
+                />
+              </div>
+              <div>
+                <TextInput label="Email" name="email" type="email" value={formData.email} placeholder="x@y.com" error={errors.email} onChange={handleChange} />
               </div>
             </div>
+          </div>
 
 
 
-            {/* Basic Info */}
-            <div>
-              <h3 className="text-lg font-semibold text-slate-700 mb-2">Basic Information</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                <TextInput label="Firm / Legal Name" name="firmName" value={formData.firmName} placeholder="e.g. Murugan Plastics" required error={errors.firmName} onChange={handleChange} />
-                <div>
-                  <TextInput label="Display Name" name="displayName" value={formData.displayName} placeholder="Murugan" error={errors.displayName} onChange={handleChange} />
-                </div>
-                <div>
-                  <MultiSelect
-                    label="Customer Type"
-                    name="customerType"
-                    value={formData.customerType}
-                    required
-                    options={[
-                      { value: "B2B", label: "B2B (GST Registered)" },
-                      { value: "B2C", label: "B2C (Consumer)" },
-                      { value: "Export", label: "Export" },
-                    ]}
-                    onChange={handleMultiSelectChange}
-                    error={errors.customerType}
-                  />
-                </div>
-                <div>
-                  <TextInput label="Contact Person" name="contactPerson" value={formData.contactPerson} placeholder="Mr. S. Murugan" error={errors.contactPerson} onChange={handleChange} />
-                </div>
-                <div>
-                  <TextInput label="Designation" name="designation" value={formData.designation} placeholder="Proprietor" error={errors.designation} onChange={handleChange} />
-                </div>
-                <div>
-                  <IndiaPhoneInput
-                    multi
-                    label="Mobile Numbers"
-                    name="phones"
-                    value={phones}
-                    onChange={(e) => {
-                      setPhones(e.target.value);
-                      if (errors.mobile) {
-                        setErrors((prev) => ({ ...prev, mobile: "" }));
-                      }
-                    }}
-                    maxNumbers={5}
-                    error={errors.mobile}
-                  />
-                </div>
-                <div>
-                  <TextInput label="Email" name="email" type="email" value={formData.email} placeholder="x@y.com" error={errors.email} onChange={handleChange} />
-                </div>
+          {/* GST & Statutory */}
+          <div>
+            <h3 className="text-lg font-semibold text-slate-700 mb-2">GST & Statutory</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div>
+                <TextInput label="GSTIN (15 CHAR)" name="gstin" value={formData.gstin} placeholder="33AABC1234D1Z5" onChange={handleChange} error={errors.gstin} />
               </div>
             </div>
+          </div>
 
 
 
-            {/* GST & Statutory */}
-            <div>
-              <h3 className="text-lg font-semibold text-slate-700 mb-2">GST & Statutory</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <div>
-                  <TextInput label="GSTIN (15 CHAR)" name="gstin" value={formData.gstin} placeholder="33AABC1234D1Z5" onChange={handleChange} error={errors.gstin} />
-                </div>
-              </div>
-            </div>
-
-
-
-            {/* Billing & Shipping Address */}
-            <div>
-              <h3 className="text-lg font-semibold text-slate-700 mb-2">Billing & Shipping Address</h3>
-              <div className="grid grid-cols-1 gap-10">
-                {/* Billing */}
-                <div className="space-y-2">
-                  <h5 className="font-bold text-slate-700">Billing Address</h5>
-                  <AddressForm
-                    addressValue={formData.billingAddressLine1}
-                    onAddressChange={(v) => handleChange({ target: { name: "billingAddressLine1", value: v } })}
-                    addressError={errors.billingAddressLine1}
-
-                    countryValue={formData.billingCountry}
-                    onCountryChange={(v) => {
-                      setFormData(prev => {
-                        if (prev.billingCountry === v) return prev;
-                        return {
-                          ...prev,
-                          billingCountry: v,
-                          billingState: "",
-                          billingCity: "",
-                        };
-                      });
-                      setErrors(prev => ({ ...prev, billingCountry: "", billingState: "", billingCity: "" }));
-                    }}
-                    countryError={errors.billingCountry}
-
-                    stateValue={formData.billingState}
-                    onStateChange={(v) => {
-                      const gstCode = getGstStateCode(v);
-                      setFormData(prev => ({
-                        ...prev, billingState: v, billingCity: "", stateCode: gstCode || prev.stateCode,
-                      }));
-                      setErrors(prev => ({ ...prev, billingState: "", billingCity: "", stateCode: "" }));
-                    }}
-                    stateError={errors.billingState}
-
-                    cityValue={formData.billingCity}
-                    onCityChange={(v) => {
-                      setFormData(prev => ({ ...prev, billingCity: v }));
-                      setErrors(prev => ({ ...prev, billingCity: "" }));
-                    }}
-                    cityError={errors.billingCity}
-
-                    pincodeValue={formData.billingPincode}
-                    onPincodeChange={(v) => handleChange({ target: { name: "billingPincode", value: v } })}
-                    pincodeError={errors.billingPincode}
-                    required
-                  />
-                </div>
-
-                {/* Additional Addresses */}
-                <div className="space-y-4 col-span-full mt-6">
-                  <div className="flex items-center justify-between">
-                    <h5 className="font-bold text-slate-700">Additional Addresses</h5>
-                    <button
-                      type="button"
-                      onClick={addShippingAddress}
-                      className="text-sm px-3 py-1.5 bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100 font-medium border border-blue-200 transition-colors"
-                    >
-                      + Add Address
-                    </button>
-                  </div>
-
-                  {addresses.map((addr, index) => {
-                    const isThisSameAsBilling = addr.address.addressLine1 === formData.billingAddressLine1 &&
-                      addr.address.city === formData.billingCity &&
-                      addr.address.state === formData.billingState &&
-                      addr.address.pincode === formData.billingPincode &&
-                      !!formData.billingAddressLine1;
-
-                    const isAnyAddressSameAsBilling = addresses.some(a =>
-                      a.address.addressLine1 === formData.billingAddressLine1 &&
-                      a.address.city === formData.billingCity &&
-                      a.address.state === formData.billingState &&
-                      a.address.pincode === formData.billingPincode &&
-                      !!formData.billingAddressLine1
-                    );
-
-                    const showSameAsBillingCheckbox = isThisSameAsBilling || !isAnyAddressSameAsBilling;
-
-                    return (
-                      <div key={index} className="p-4 border border-slate-200 rounded-md bg-slate-50 relative">
-                        <div className="flex items-center justify-between mb-3 border-b border-slate-200 pb-2">
-                          <h4 className="text-sm font-semibold text-slate-700 uppercase">Address {index + 1}</h4>
-
-                          <div className="flex items-center gap-4">
-                            {showSameAsBillingCheckbox && (
-                              <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer hover:text-slate-800">
-                                <input
-                                  type="checkbox"
-                                  className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                                  checked={isThisSameAsBilling}
-                                  onChange={(e) => toggleSameAsBilling(index, e.target.checked)}
-                                />
-                                <span>Same as billing</span>
-                              </label>
-                            )}
-
-                            <button
-                              type="button"
-                              onClick={() => removeShippingAddress(index)}
-                              className="text-red-500 hover:text-red-700 p-1.5 bg-red-50 rounded"
-                              title="Remove Address"
-                            >
-                              <span className="font-bold">Remove</span>
-                            </button>
-                          </div>
-                        </div>
-                        <AddressForm
-                          addressValue={addr.address.addressLine1}
-                          onAddressChange={(v) => handleShippingAddressChange(index, "addressLine1", v)}
-                          addressError={errors[`addresses.${index}.address.addressLine1`]}
-
-                          countryValue="India"
-
-                          stateValue={addr.address.state}
-                          onStateChange={(v) => {
-                            handleShippingAddressChange(index, "state", v);
-                            handleShippingAddressChange(index, "city", "");
-                          }}
-                          stateError={errors[`addresses.${index}.address.state`]}
-
-                          cityValue={addr.address.city}
-                          onCityChange={(v) => handleShippingAddressChange(index, "city", v)}
-                          cityError={errors[`addresses.${index}.address.city`]}
-
-                          pincodeValue={addr.address.pincode}
-                          onPincodeChange={(v) => handleShippingAddressChange(index, "pincode", v)}
-                          pincodeError={errors[`addresses.${index}.address.pincode`]}
-                          required
-                        />
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-
-
-
-            {/* Commercial Settings */}
-            <div>
-              <h3 className="text-lg font-semibold text-slate-700 mb-2">Commercial Settings</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <div>
-                  <TextInput label="Credit Limit ₹" name="creditLimit" type="number" value={formData.creditLimit} placeholder="300000" onChange={handleChange} preventNegative error={errors.creditLimit} />
-                </div>
-                <div>
-                  <TextInput label="Credit Days (Net)" name="creditDays" value={formData.creditDays} onChange={handleChange} type="number" placeholder="30 days" preventNegative error={errors.creditDays} />
-                </div>
-              </div>
-            </div>
-
-
-
-            {/* BANK DETAILS */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-lg font-semibold text-slate-700">Bank Account Details</h3>
-                <CustomButton text="Add Bank Account" onClick={addBankAccount} type="button" />
-              </div>
-
-              <div className="space-y-6">
-                {formData.bankAccounts.map((bank, index) => (
-                  <div key={index} className="p-4 border border-slate-200 rounded-xl bg-white relative">
-                    {formData.bankAccounts.length > 1 && (
-                      <div className="absolute top-4 right-4">
-                        <button
-                          type="button"
-                          onClick={() => removeBankAccount(index)}
-                          className="text-red-500 hover:text-red-700 text-sm font-semibold transition-colors"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    )}
-                    <h6 className="font-bold text-slate-600 mb-2">Bank #{index + 1}</h6>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      <div>
-                        <TextInput label="Account Holder Name" name="bankHolderName" value={bank.bankHolderName} onChange={(e) => handleBankChange(index, e)} error={errors[`bankAccounts.${index}.bankHolderName`]} />
-                      </div>
-                      <div>
-                        <TextInput label="Bank Name" name="bankName" value={bank.bankName} onChange={(e) => handleBankChange(index, e)} error={errors[`bankAccounts.${index}.bankName`]} />
-                      </div>
-                      <div>
-                        <TextInput label="Account Number" name="accountNumber" value={bank.accountNumber} onChange={(e) => handleBankChange(index, e)} error={errors[`bankAccounts.${index}.accountNumber`]} />
-                      </div>
-                      <div>
-                        <TextInput label="IFSC Code" name="ifscCode" value={bank.ifscCode} onChange={(e) => handleBankChange(index, e)} error={errors[`bankAccounts.${index}.ifscCode`]} />
-                      </div>
-                      <div>
-                        <TextInput label="Branch Name" name="branchName" value={bank.branchName} onChange={(e) => handleBankChange(index, e)} error={errors[`bankAccounts.${index}.branchName`]} />
-                      </div>
-                      <div>
-                        <IndiaPhoneInput label="GPay / PhonePe Number" name="upiMobileNumber" value={bank.upiMobileNumber} placeholder="9876543210" onChange={(e) => handleBankChange(index, e as React.ChangeEvent<HTMLInputElement>)} error={errors[`bankAccounts.${index}.upiMobileNumber`]} />
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* TRANSPORT DETAILS */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-lg font-semibold text-slate-700">Transport Details</h3>
-                <CustomButton text="Add Transport" onClick={addTransport} type="button" />
-              </div>
-
+          {/* Billing & Shipping Address */}
+          <div>
+            <h3 className="text-lg font-semibold text-slate-700 mb-2">Billing & Shipping Address</h3>
+            <div className="grid grid-cols-1 gap-10">
+              {/* Billing */}
               <div className="space-y-2">
-                {formData.transports.map((transport, index) => (
-                  <div key={index} className="p-4 border border-slate-200 rounded-xl bg-white relative">
-                    {formData.transports.length > 1 && (
-                      <div className="absolute top-4 right-4">
-                        <button
-                          type="button"
-                          onClick={() => removeTransport(index)}
-                          className="text-red-500 hover:text-red-700 text-sm font-semibold transition-colors"
-                        >
-                          Remove
-                        </button>
+                <h5 className="font-bold text-slate-700">Billing Address</h5>
+                <AddressForm
+                  addressValue={formData.billingAddressLine1}
+                  onAddressChange={(v) => handleChange({ target: { name: "billingAddressLine1", value: v } })}
+                  addressError={errors.billingAddressLine1}
+
+                  countryValue={formData.billingCountry}
+                  onCountryChange={(v) => {
+                    setFormData(prev => {
+                      if (prev.billingCountry === v) return prev;
+                      return {
+                        ...prev,
+                        billingCountry: v,
+                        billingState: "",
+                        billingCity: "",
+                      };
+                    });
+                    setErrors(prev => ({ ...prev, billingCountry: "", billingState: "", billingCity: "" }));
+                  }}
+                  countryError={errors.billingCountry}
+
+                  stateValue={formData.billingState}
+                  onStateChange={(v) => {
+                    const gstCode = getGstStateCode(v);
+                    setFormData(prev => ({
+                      ...prev, billingState: v, billingCity: "", stateCode: gstCode || prev.stateCode,
+                    }));
+                    setErrors(prev => ({ ...prev, billingState: "", billingCity: "", stateCode: "" }));
+                  }}
+                  stateError={errors.billingState}
+
+                  cityValue={formData.billingCity}
+                  onCityChange={(v) => {
+                    setFormData(prev => ({ ...prev, billingCity: v }));
+                    setErrors(prev => ({ ...prev, billingCity: "" }));
+                  }}
+                  cityError={errors.billingCity}
+
+                  pincodeValue={formData.billingPincode}
+                  onPincodeChange={(v) => handleChange({ target: { name: "billingPincode", value: v } })}
+                  pincodeError={errors.billingPincode}
+                  required
+                />
+              </div>
+
+              {/* Additional Addresses */}
+              <div className="space-y-4 col-span-full mt-6">
+                <div className="flex items-center justify-between">
+                  <h5 className="font-bold text-slate-700">Additional Addresses</h5>
+                  <button
+                    type="button"
+                    onClick={addShippingAddress}
+                    className="text-sm px-3 py-1.5 bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100 font-medium border border-blue-200 transition-colors"
+                  >
+                    + Add Address
+                  </button>
+                </div>
+
+                {addresses.map((addr, index) => {
+                  const isThisSameAsBilling = addr.address.addressLine1 === formData.billingAddressLine1 &&
+                    addr.address.city === formData.billingCity &&
+                    addr.address.state === formData.billingState &&
+                    addr.address.pincode === formData.billingPincode &&
+                    !!formData.billingAddressLine1;
+
+                  const isAnyAddressSameAsBilling = addresses.some(a =>
+                    a.address.addressLine1 === formData.billingAddressLine1 &&
+                    a.address.city === formData.billingCity &&
+                    a.address.state === formData.billingState &&
+                    a.address.pincode === formData.billingPincode &&
+                    !!formData.billingAddressLine1
+                  );
+
+                  const showSameAsBillingCheckbox = isThisSameAsBilling || !isAnyAddressSameAsBilling;
+
+                  return (
+                    <div key={index} className="p-4 border border-slate-200 rounded-md bg-slate-50 relative">
+                      <div className="flex items-center justify-between mb-3 border-b border-slate-200 pb-2">
+                        <h4 className="text-sm font-semibold text-slate-700 uppercase">Address {index + 1}</h4>
+
+                        <div className="flex items-center gap-4">
+                          {showSameAsBillingCheckbox && (
+                            <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer hover:text-slate-800">
+                              <input
+                                type="checkbox"
+                                className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                checked={isThisSameAsBilling}
+                                onChange={(e) => toggleSameAsBilling(index, e.target.checked)}
+                              />
+                              <span>Same as billing</span>
+                            </label>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={() => removeShippingAddress(index)}
+                            className="text-red-500 hover:text-red-700 p-1.5 bg-red-50 rounded"
+                            title="Remove Address"
+                          >
+                            <span className="font-bold">Remove</span>
+                          </button>
+                        </div>
                       </div>
-                    )}
-                    <h6 className="font-bold text-slate-600 mb-2">Transport #{index + 1}</h6>
+                      <AddressForm
+                        addressValue={addr.address.addressLine1}
+                        onAddressChange={(v) => handleShippingAddressChange(index, "addressLine1", v)}
+                        addressError={errors[`addresses.${index}.address.addressLine1`]}
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-                      <div>
-                        <TextInput label="Transport Name" bottom={true} name="transportName" value={transport.transportName} onChange={(e) => handleTransportChange(index, e)} error={errors[`transports.${index}.transportName`]} />
-                      </div>
-                      <div>
-                        <IndiaPhoneInput label="Phone" name="phone" value={transport.phone} onChange={(e) => handleTransportChange(index, e as React.ChangeEvent<HTMLInputElement>)} error={errors[`transports.${index}.phone`]} />
-                      </div>
-                      <div className="lg:col-span-3 mt-4">
-                        <h6 className="font-semibold text-slate-700 mb-3">Transport Address</h6>
-                        <AddressForm
-                          addressValue={transport.addressLine1}
-                          onAddressChange={(v) => handleTransportAddressChange(index, "addressLine1", v)}
-                          addressError={errors[`transports.${index}.addressLine1`]}
+                        countryValue="India"
 
-                          countryValue={transport.country || "India"}
-                          onCountryChange={(v) => handleTransportAddressChange(index, "country", v)}
-                          countryError={errors[`transports.${index}.country`]}
+                        stateValue={addr.address.state}
+                        onStateChange={(v) => {
+                          handleShippingAddressChange(index, "state", v);
+                          handleShippingAddressChange(index, "city", "");
+                        }}
+                        stateError={errors[`addresses.${index}.address.state`]}
 
-                          stateValue={transport.state}
-                          onStateChange={(v) => {
-                            handleTransportAddressChange(index, "state", v);
-                            handleTransportAddressChange(index, "city", "");
-                          }}
-                          stateError={errors[`transports.${index}.state`]}
+                        cityValue={addr.address.city}
+                        onCityChange={(v) => handleShippingAddressChange(index, "city", v)}
+                        cityError={errors[`addresses.${index}.address.city`]}
 
-                          cityValue={transport.city}
-                          onCityChange={(v) => handleTransportAddressChange(index, "city", v)}
-                          cityError={errors[`transports.${index}.city`]}
-
-                          pincodeValue={transport.pincode}
-                          onPincodeChange={(v) => handleTransportAddressChange(index, "pincode", v)}
-                          pincodeError={errors[`transports.${index}.pincode`]}
-                        />
-                      </div>
+                        pincodeValue={addr.address.pincode}
+                        onPincodeChange={(v) => handleShippingAddressChange(index, "pincode", v)}
+                        pincodeError={errors[`addresses.${index}.address.pincode`]}
+                        required
+                      />
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
+          </div>
 
-            <div className="flex justify-end gap-3 pt-6 border-t border-slate-200">
-              <CustomButton
-                text="Cancel"
-                icon={FaArrowLeft}
-                onClick={() => navigate("/customers")}
-                type="button"
 
-              />
-              <CustomButton text={isSubmitting ? "Saving..." : "Update Customer"} icon={FaSave} type="submit" disabled={isSubmitting} />
+
+          {/* Commercial Settings */}
+          <div>
+            <h3 className="text-lg font-semibold text-slate-700 mb-2">Commercial Settings</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div>
+                <TextInput label="Credit Limit ₹" name="creditLimit" type="number" value={formData.creditLimit} placeholder="300000" onChange={handleChange} preventNegative error={errors.creditLimit} />
+              </div>
+              <div>
+                <TextInput label="Credit Days (Net)" name="creditDays" value={formData.creditDays} onChange={handleChange} type="number" placeholder="30 days" preventNegative error={errors.creditDays} />
+              </div>
             </div>
-          </form>
-        </div>
+          </div>
+
+
+
+          {/* BANK DETAILS */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-lg font-semibold text-slate-700">Bank Account Details</h3>
+              <CustomButton text="Add Bank Account" onClick={addBankAccount} type="button" />
+            </div>
+
+            <div className="space-y-6">
+              {formData.bankAccounts.map((bank, index) => (
+                <div key={index} className="p-4 border border-slate-200 rounded-xl bg-white relative">
+                  {formData.bankAccounts.length > 1 && (
+                    <div className="absolute top-4 right-4">
+                      <button
+                        type="button"
+                        onClick={() => removeBankAccount(index)}
+                        className="text-red-500 hover:text-red-700 text-sm font-semibold transition-colors"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  )}
+                  <h6 className="font-bold text-slate-600 mb-2">Bank #{index + 1}</h6>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div>
+                      <TextInput label="Account Holder Name" name="bankHolderName" value={bank.bankHolderName} onChange={(e) => handleBankChange(index, e)} error={errors[`bankAccounts.${index}.bankHolderName`]} />
+                    </div>
+                    <div>
+                      <TextInput label="Bank Name" name="bankName" value={bank.bankName} onChange={(e) => handleBankChange(index, e)} error={errors[`bankAccounts.${index}.bankName`]} />
+                    </div>
+                    <div>
+                      <TextInput label="Account Number" name="accountNumber" value={bank.accountNumber} onChange={(e) => handleBankChange(index, e)} error={errors[`bankAccounts.${index}.accountNumber`]} />
+                    </div>
+                    <div>
+                      <TextInput label="IFSC Code" name="ifscCode" value={bank.ifscCode} onChange={(e) => handleBankChange(index, e)} error={errors[`bankAccounts.${index}.ifscCode`]} />
+                    </div>
+                    <div>
+                      <TextInput label="Branch Name" name="branchName" value={bank.branchName} onChange={(e) => handleBankChange(index, e)} error={errors[`bankAccounts.${index}.branchName`]} />
+                    </div>
+                    <div>
+                      <IndiaPhoneInput label="GPay / PhonePe Number" name="upiMobileNumber" value={bank.upiMobileNumber} placeholder="9876543210" onChange={(e) => handleBankChange(index, e as React.ChangeEvent<HTMLInputElement>)} error={errors[`bankAccounts.${index}.upiMobileNumber`]} />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* TRANSPORT DETAILS */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-lg font-semibold text-slate-700">Transport Details</h3>
+              <CustomButton text="Add Transport" onClick={addTransport} type="button" />
+            </div>
+
+            <div className="space-y-2">
+              {formData.transports.map((transport, index) => (
+                <div key={index} className="p-4 border border-slate-200 rounded-xl bg-white relative">
+                  {formData.transports.length > 1 && (
+                    <div className="absolute top-4 right-4">
+                      <button
+                        type="button"
+                        onClick={() => removeTransport(index)}
+                        className="text-red-500 hover:text-red-700 text-sm font-semibold transition-colors"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  )}
+                  <h6 className="font-bold text-slate-600 mb-2">Transport #{index + 1}</h6>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                    <div>
+                      <TextInput label="Transport Name" bottom={true} name="transportName" value={transport.transportName} onChange={(e) => handleTransportChange(index, e)} error={errors[`transports.${index}.transportName`]} />
+                    </div>
+                    <div>
+                      <IndiaPhoneInput label="Phone" name="phone" value={transport.phone} onChange={(e) => handleTransportChange(index, e as React.ChangeEvent<HTMLInputElement>)} error={errors[`transports.${index}.phone`]} />
+                    </div>
+                    <div className="lg:col-span-3 mt-4">
+                      <h6 className="font-semibold text-slate-700 mb-3">Transport Address</h6>
+                      <AddressForm
+                        addressValue={transport.addressLine1}
+                        onAddressChange={(v) => handleTransportAddressChange(index, "addressLine1", v)}
+                        addressError={errors[`transports.${index}.addressLine1`]}
+
+                        countryValue={transport.country || "India"}
+                        onCountryChange={(v) => handleTransportAddressChange(index, "country", v)}
+                        countryError={errors[`transports.${index}.country`]}
+
+                        stateValue={transport.state}
+                        onStateChange={(v) => {
+                          handleTransportAddressChange(index, "state", v);
+                          handleTransportAddressChange(index, "city", "");
+                        }}
+                        stateError={errors[`transports.${index}.state`]}
+
+                        cityValue={transport.city}
+                        onCityChange={(v) => handleTransportAddressChange(index, "city", v)}
+                        cityError={errors[`transports.${index}.city`]}
+
+                        pincodeValue={transport.pincode}
+                        onPincodeChange={(v) => handleTransportAddressChange(index, "pincode", v)}
+                        pincodeError={errors[`transports.${index}.pincode`]}
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-6 border-t border-slate-200">
+            <CustomButton
+              text="Cancel"
+              icon={FaArrowLeft}
+              onClick={() => navigate("/customers")}
+              type="button"
+
+            />
+            <CustomButton text={isSubmitting ? "Saving..." : "Update Customer"} icon={FaSave} type="submit" disabled={isSubmitting} />
+          </div>
+        </form>
       </div>
+    </div>
   );
 };
 
