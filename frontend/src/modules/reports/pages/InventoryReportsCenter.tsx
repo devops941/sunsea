@@ -6,8 +6,9 @@ import { reportsService } from "../../../services/reportsService";
 import { storeService } from "../../../services/storeService";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import ExportCSVButton from "../../../components/ui/ExportCSVButton/ExportCSVButton";
-import type { DataTableColumn } from "../../../components/ui/table/DataTable";
+import ColumnToggle from "../../../components/ui/ColumnToggle/ColumnToggle";
 import DataTable from "../../../components/ui/table/DataTable";
+import type { DataTableColumn } from "../../../components/ui/table/DataTable";
 import { useSocketSync } from "../../../hooks/useSocketSync";
 
 const InventoryReportsCenter: React.FC = () => {
@@ -29,6 +30,26 @@ const InventoryReportsCenter: React.FC = () => {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [asOfDate, setAsOfDate] = useState("");
+
+  const DEFAULT_COLUMNS = [
+    "#", "DATE", "ITEM CODE", "ITEM NAME", "CATEGORY", "STORE", "START QTY", "EOD QTY"
+  ];
+
+  const [visibleColumns, setVisibleColumns] = useState<string[]>(() => {
+    const saved = localStorage.getItem("inventoryReportVisibleColumns");
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        return DEFAULT_COLUMNS;
+      }
+    }
+    return DEFAULT_COLUMNS;
+  });
+
+  useEffect(() => {
+    localStorage.setItem("inventoryReportVisibleColumns", JSON.stringify(visibleColumns));
+  }, [visibleColumns]);
 
   useEffect(() => {
     const loadStores = async () => {
@@ -55,15 +76,15 @@ const InventoryReportsCenter: React.FC = () => {
         page,
         limit: 10
       });
-      
+
       setBackendReports(res.data || []);
       if (res.asOf) {
-          setAsOfDate(res.asOf);
+        setAsOfDate(res.asOf);
       }
       if (res.pagination) {
-          setTotalPages(Math.ceil(res.pagination.total / res.pagination.limit) || 1);
+        setTotalPages(Math.ceil(res.pagination.total / res.pagination.limit) || 1);
       } else if (res.total) {
-          setTotalPages(Math.ceil(res.total / 10) || 1);
+        setTotalPages(Math.ceil(res.total / 10) || 1);
       }
     } catch (err) {
       console.error("Failed to load inventory report", err);
@@ -84,12 +105,12 @@ const InventoryReportsCenter: React.FC = () => {
       { header: "Item Code", accessor: (item: any) => item.itemCode },
       { header: "Item Name", accessor: (item: any) => item.itemName },
       { header: "Category", accessor: (item: any) => item.category },
-      { header: "UOM", accessor: (item: any) => item.uom },
       { header: "Store", accessor: (item: any) => stores.find(s => String(s.storeId) === String(item.storeId))?.storeName || item.storeId },
-      { header: "Start Qty", accessor: (item: any) => item.startQty },
-      { header: "EOD Qty", accessor: (item: any) => item.eodQty }
+      { header: "Date", accessor: (item: any) => item.snapshotDate ? new Date(item.snapshotDate).toLocaleDateString() : "-" },
+      { header: "Start Qty", accessor: (item: any) => (item.startQty !== null && item.startQty !== undefined && item.startQty !== '') ? `${item.startQty} ${item.uom ? item.uom.split(',')[0] : ''}`.trim() : "-" },
+      { header: "EOD Qty", accessor: (item: any) => (item.eodQty !== null && item.eodQty !== undefined && item.eodQty !== '') ? `${item.eodQty} ${item.uom ? item.uom.split(',')[0] : ''}`.trim() : "-" }
     ];
-    
+
     // For CSV, we ideally want all data, but here we just export the current page or loaded data
     return { csvData: backendReports, csvColumns: columns, csvFilename: `Inventory_Report_${date || asOfDate}.csv` };
   }, [backendReports, date, asOfDate, stores]);
@@ -122,6 +143,10 @@ const InventoryReportsCenter: React.FC = () => {
       render: (_item, index) => ((page - 1) * 10) + index + 1,
     },
     {
+      header: "DATE",
+      render: (item: any) => <span className="text-gray-500 font-medium">{item.snapshotDate ? new Date(item.snapshotDate).toLocaleDateString() : "-"}</span>
+    },
+    {
       header: "ITEM CODE",
       render: (item: any) => <span className="font-semibold text-gray-800">{item.itemCode || "-"}</span>
     },
@@ -134,25 +159,24 @@ const InventoryReportsCenter: React.FC = () => {
       render: (item: any) => <span className="text-sm font-medium">{item.category}</span>
     },
     {
-      header: "UOM",
-      render: (item: any) => item.uom || "-"
-    },
-    {
       header: "STORE",
       render: (item: any) => {
         const st = stores.find(s => String(s.storeId) === String(item.storeId));
         return st ? st.storeName : item.storeId;
       }
     },
+
     {
       header: "START QTY",
-      render: (item: any) => <span className="text-gray-600">{item.startQty}</span>
+      render: (item: any) => <span className="text-gray-600">{(item.startQty !== null && item.startQty !== undefined && item.startQty !== '') ? `${item.startQty} ${item.uom ? item.uom.split(',')[0] : ''}` : "-"}</span>
     },
     {
-      header: "EOD Qty",
-      render: (item: any) => <span className="text-blue-600 font-semibold">{item.eodQty}</span>
+      header: "EOD QTY",
+      render: (item: any) => <span className="text-blue-600 font-semibold">{(item.eodQty !== null && item.eodQty !== undefined && item.eodQty !== '') ? `${item.eodQty} ${item.uom ? item.uom.split(',')[0] : ''}` : "-"}</span>
     }
   ];
+
+  const finalColumns = tableColumns.filter(c => visibleColumns.includes(c.header as string));
 
   return (
     <div className="w-full">
@@ -166,7 +190,7 @@ const InventoryReportsCenter: React.FC = () => {
           <div className="flex flex-wrap items-center gap-3 relative w-full lg:w-auto">
             <ExportCSVButton
               data={csvData}
-              columns={csvColumns}
+              columns={csvColumns.filter(c => visibleColumns.map(v => v.toLowerCase()).includes(c.header.toLowerCase()))}
               filename={csvFilename}
               text="Export CSV"
             />
@@ -214,24 +238,33 @@ const InventoryReportsCenter: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-slate-200">
-            <button
-              onClick={handleClearFilters}
-              className="px-4 py-2 text-sm font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-md transition-colors"
-            >
-              Clear All
-            </button>
-            <button
-              onClick={handleApplyFilters}
-              className="px-6 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-md shadow-sm transition-colors"
-            >
-              Apply Filters
-            </button>
+          <div className="flex items-center justify-between mt-6 pt-4 border-t border-slate-200">
+            <div>
+              <ColumnToggle
+                columns={tableColumns}
+                visibleColumns={visibleColumns}
+                setVisibleColumns={setVisibleColumns}
+              />
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleClearFilters}
+                className="px-4 py-2 text-sm font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-md transition-colors"
+              >
+                Clear All
+              </button>
+              <button
+                onClick={handleApplyFilters}
+                className="px-6 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-md shadow-sm transition-colors"
+              >
+                Apply Filters
+              </button>
+            </div>
           </div>
         </div>
 
         <DataTable
-          columns={tableColumns}
+          columns={finalColumns}
           data={backendReports}
           rowKey={(row) => row.id || row.itemId || Math.random().toString()}
           loading={loadingBackend}
