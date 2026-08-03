@@ -14,6 +14,14 @@ export const SYSTEM_LEDGERS = [
   { code: "PCASH-001", name: "Petty Cash Account", type: LedgerType.ASSET, group: "Cash & Bank" },
   { code: "SRT-001", name: "Sales Return Account", type: LedgerType.INCOME, group: "Direct Income" },
   { code: "PRT-001", name: "Purchase Return Account", type: LedgerType.EXPENSE, group: "Direct Expenses" },
+  // GST Liability ledgers (output tax — collected from customers)
+  { code: "CGST-LIA-001", name: "CGST Payable", type: LedgerType.LIABILITY, group: "Tax Liabilities" },
+  { code: "SGST-LIA-001", name: "SGST Payable", type: LedgerType.LIABILITY, group: "Tax Liabilities" },
+  { code: "IGST-LIA-001", name: "IGST Payable", type: LedgerType.LIABILITY, group: "Tax Liabilities" },
+  // GST Input Credit ledgers (input tax — paid to suppliers)
+  { code: "CGST-REC-001", name: "CGST Input Credit", type: LedgerType.ASSET, group: "Tax Assets" },
+  { code: "SGST-REC-001", name: "SGST Input Credit", type: LedgerType.ASSET, group: "Tax Assets" },
+  { code: "IGST-REC-001", name: "IGST Input Credit", type: LedgerType.ASSET, group: "Tax Assets" },
 ];
 
 class AccountsService {
@@ -298,6 +306,134 @@ class AccountsService {
         customerId: customer.id,
       },
     });
+  }
+
+  async getTrialBalance() {
+    await this.ensureSystemLedgersExist();
+
+    const ledgers = await prisma.accountLedger.findMany({
+      include: {
+        debitItems: { include: { voucher: true } },
+        creditItems: { include: { voucher: true } },
+        customer: { select: { openingBalance: true } },
+        supplier: { select: { openingBalance: true } },
+      },
+      orderBy: { code: "asc" },
+    });
+
+    const rows = ledgers.map((ledger) => {
+      const isAssetOrExpense = ledger.type === LedgerType.ASSET || ledger.type === LedgerType.EXPENSE;
+
+      const totalDebit = ledger.debitItems.reduce((sum, item) => sum + Number(item.debitAmount), 0);
+      const totalCredit = ledger.creditItems.reduce((sum, item) => sum + Number(item.creditAmount), 0);
+
+      const openingBalance = Number(
+        (ledger.customer as any)?.openingBalance ||
+        (ledger.supplier as any)?.openingBalance ||
+        0
+      );
+
+      let closingBalance = 0;
+      if (isAssetOrExpense) {
+        closingBalance = openingBalance + totalDebit - totalCredit;
+      } else {
+        closingBalance = openingBalance + totalCredit - totalDebit;
+      }
+
+      return {
+        ledgerId: ledger.id,
+        code: ledger.code,
+        name: ledger.name,
+        type: ledger.type,
+        group: ledger.group,
+        openingBalance,
+        totalDebit,
+        totalCredit,
+        closingBalance,
+        debitBalance: isAssetOrExpense ? Math.max(0, closingBalance) : Math.max(0, -closingBalance),
+        creditBalance: isAssetOrExpense ? Math.max(0, -closingBalance) : Math.max(0, closingBalance),
+      };
+    });
+
+    const activeRows = rows.filter((r) => r.debitBalance > 0 || r.creditBalance > 0);
+    const totalDebitBalance = activeRows.reduce((sum, r) => sum + r.debitBalance, 0);
+    const totalCreditBalance = activeRows.reduce((sum, r) => sum + r.creditBalance, 0);
+
+    return {
+      rows: activeRows,
+      totalDebitBalance,
+      totalCreditBalance,
+      isBalanced: Math.abs(totalDebitBalance - totalCreditBalance) < 0.01,
+    };
+  }
+
+  async getProfitAndLoss(options: { startDate?: string; endDate?: string }) {
+    await this.ensureSystemLedgersExist();
+
+    const dateFilter: Prisma.VoucherWhereInput = {};
+    if (options.startDate || options.endDate) {
+      dateFilter.date = {
+        ...(options.startDate && { gte: new Date(options.startDate) }),
+        ...(options.endDate && { lte: new Date(options.endDate) }),
+      };
+    }
+
+    const ledgers = await prisma.accountLedger.findMany({
+      where: { type: { in: [LedgerType.INCOME, LedgerType.EXPENSE] } },
+      include: {
+        debitItems: {
+          where: Object.keys(dateFilter).length > 0 ? { voucher: dateFilter } : undefined,
+          include: { voucher: true },
+        },
+        creditItems: {
+          where: Object.keys(dateFilter).length > 0 ? { voucher: dateFilter } : undefined,
+          include: { voucher: true },
+        },
+      },
+      orderBy: { code: "asc" },
+    });
+
+    const incomeAccounts: any[] = [];
+    const expenseAccounts: any[] = [];
+
+    for (const ledger of ledgers) {
+      const totalDebit = ledger.debitItems.reduce((sum, item) => sum + Number(item.debitAmount), 0);
+      const totalCredit = ledger.creditItems.reduce((sum, item) => sum + Number(item.creditAmount), 0);
+
+      const netAmount =
+        ledger.type === LedgerType.INCOME ? totalCredit - totalDebit : totalDebit - totalCredit;
+
+      const item = {
+        ledgerId: ledger.id,
+        code: ledger.code,
+        name: ledger.name,
+        group: ledger.group,
+        totalDebit,
+        totalCredit,
+        netAmount,
+      };
+
+      if (ledger.type === LedgerType.INCOME) {
+        incomeAccounts.push(item);
+      } else {
+        expenseAccounts.push(item);
+      }
+    }
+
+    const totalIncome = incomeAccounts.reduce((sum, a) => sum + a.netAmount, 0);
+    const totalExpense = expenseAccounts.reduce((sum, a) => sum + a.netAmount, 0);
+    const netProfit = totalIncome - totalExpense;
+
+    return {
+      startDate: options.startDate || null,
+      endDate: options.endDate || null,
+      incomeAccounts,
+      expenseAccounts,
+      totalIncome,
+      totalExpense,
+      netProfit,
+      isProfit: netProfit >= 0,
+    };
   }
 
   async ensureSupplierLedger(supplier: { id: number; supplierCode: string; legalName: string }, txClient?: Prisma.TransactionClient) {

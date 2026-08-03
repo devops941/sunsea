@@ -8,7 +8,9 @@ import {
   FaSitemap,
   FaFileInvoiceDollar,
   FaUndoAlt,
-  FaCoins
+  FaCoins,
+  FaBalanceScale,
+  FaChartLine,
 } from "react-icons/fa";
 import Tabs from "../../../components/ui/tab/Tabs";
 import type { TabItem } from "../../../components/ui/tab/Tabs";
@@ -22,6 +24,8 @@ import { VoucherListPage } from "./vouchers/VoucherListPage";
 import { SalesReturnPage } from "./returns/SalesReturnPage";
 import { PurchaseReturnPage } from "./returns/PurchaseReturnPage";
 import { PettyCashPage } from "./petty-cash/PettyCashPage";
+import TrialBalancePage from "./reports/TrialBalancePage";
+import ProfitLossPage from "./reports/ProfitLossPage";
 
 const PlaceholderTab: React.FC<{ name: string }> = ({ name }) => (
   <div className="p-8 text-center bg-white border border-slate-200 rounded-xl shadow-sm my-4">
@@ -44,7 +48,9 @@ const AccountsTabs: React.FC = () => {
     "/accounts/vouchers": "vouchers",
     "/accounts/sales-returns": "sales-returns",
     "/accounts/purchase-returns": "purchase-returns",
-    "/accounts/petty-cash": "petty-cash"
+    "/accounts/petty-cash": "petty-cash",
+    "/accounts/trial-balance": "trial-balance",
+    "/accounts/profit-loss": "profit-loss",
   };
 
   const keyToPath: Record<string, string> = {
@@ -55,7 +61,9 @@ const AccountsTabs: React.FC = () => {
     vouchers: "/accounts/vouchers",
     "sales-returns": "/accounts/sales-returns",
     "purchase-returns": "/accounts/purchase-returns",
-    "petty-cash": "/accounts/petty-cash"
+    "petty-cash": "/accounts/petty-cash",
+    "trial-balance": "/accounts/trial-balance",
+    "profit-loss": "/accounts/profit-loss",
   };
 
   const activeTab = pathToKey[location.pathname] || "payable";
@@ -108,7 +116,19 @@ const AccountsTabs: React.FC = () => {
       label: "Petty Cash",
       icon: <FaCoins />,
       content: <PettyCashPage />
-    }
+    },
+    {
+      key: "trial-balance",
+      label: "Trial Balance",
+      icon: <FaBalanceScale />,
+      content: <TrialBalancePage />
+    },
+    {
+      key: "profit-loss",
+      label: "Profit & Loss",
+      icon: <FaChartLine />,
+      content: <ProfitLossPage />
+    },
   ];
 
   const handleTabChange = (key: string) => {

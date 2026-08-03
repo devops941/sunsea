@@ -6,6 +6,7 @@ import { asyncHandler } from "../../utils/asyncHandler";
 import { ApiResponse } from "../../utils/ApiResponse";
 import { ApiError } from "../../utils/ApiError";
 import { getIO } from "../../socket/socket";
+import { uploadToImageKit } from "../../config/imagekit";
 
 // ─── Helpers for FormData parsing ────────────────────────────────────────────
 
@@ -47,7 +48,7 @@ function parseDate(value: unknown): Date | null {
   return isNaN(d.getTime()) ? null : d;
 }
 
-function parseEmployeeBody(body: Record<string, any>, file?: Express.Multer.File) {
+function parseEmployeeBody(body: Record<string, any>) {
   const parsed: Record<string, any> = {};
 
   // ── Text fields passed through as-is (nullify empty strings) ──────────────
@@ -96,12 +97,14 @@ function parseEmployeeBody(body: Record<string, any>, file?: Express.Multer.File
   if ("tdsApplicable" in body) parsed.tdsApplicable = parseBool(body.tdsApplicable);
   if ("createLoginAccount" in body) parsed.createLoginAccount = parseBool(body.createLoginAccount);
 
-  // ── Photo upload ───────────────────────────────────────────────────────────
-  if (file) {
-    // Disk storage: use the relative path; memory storage: handled upstream
-    parsed.photoUrl = file.path
-      ? file.path.replace(/\\/g, "/")
-      : `/uploads/employees/${file.originalname}`;
+  // Photo upload is handled in the controller via ImageKit (async).
+
+  // ── Normalize lowercase enums expected by Prisma ─────────────────────────────
+  const lowercaseEnums = ["salaryType", "employeeType", "status", "gender", "maritalStatus"];
+  for (const field of lowercaseEnums) {
+    if (parsed[field] && typeof parsed[field] === "string") {
+      parsed[field] = parsed[field].toLowerCase();
+    }
   }
 
   // ── Nested loginAccount (may arrive as JSON string from FormData) ──────────
@@ -127,7 +130,22 @@ function parseEmployeeBody(body: Record<string, any>, file?: Express.Multer.File
 
 class EmployeeController {
   create = asyncHandler(async (req: Request, res: Response) => {
-    const data = parseEmployeeBody(req.body, req.file);
+    const data = parseEmployeeBody(req.body);
+
+    // Upload profile photo to ImageKit if provided
+    if (req.file?.buffer) {
+      try {
+        const ext = req.file.mimetype.split('/')[1] || 'jpg';
+        data.photoUrl = await uploadToImageKit(
+          req.file.buffer,
+          `emp-${Date.now()}.${ext}`,
+          '/sunsea-erp/employees',
+        );
+      } catch (err) {
+        console.error("ImageKit upload failed:", err);
+        // fall through — employee saved without photo
+      }
+    }
 
     const employee = await employeeService.create(data);
 
@@ -208,7 +226,21 @@ class EmployeeController {
 
   update = asyncHandler(async (req: Request, res: Response) => {
     const id = BigInt(String(req.params.id));
-    const data = parseEmployeeBody(req.body, req.file);
+    const data = parseEmployeeBody(req.body);
+
+    // Upload new profile photo to ImageKit if provided
+    if (req.file?.buffer) {
+      try {
+        const ext = req.file.mimetype.split('/')[1] || 'jpg';
+        data.photoUrl = await uploadToImageKit(
+          req.file.buffer,
+          `emp-${Date.now()}.${ext}`,
+          '/sunsea-erp/employees',
+        );
+      } catch (err) {
+        console.error("ImageKit upload failed:", err);
+      }
+    }
 
     const employee = await employeeService.update(id, data);
 

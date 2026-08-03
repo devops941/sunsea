@@ -50,7 +50,8 @@ class GrnInvoiceService {
         const itemsWithTotals = items.map((item) => {
             const qty = Number(item.quantity) || 0;
             const unitPrice = Number(item.unitPrice) || 0;
-            const lineSubtotal = qty * unitPrice;
+            const itemDiscountAmount = Number((item as any).discountAmount || 0);
+            const lineSubtotal = (qty * unitPrice) - itemDiscountAmount;
 
             const taxableAmount = lineSubtotal;
             const totalGstRate = Number(item.tax) || 0;
@@ -85,6 +86,7 @@ class GrnInvoiceService {
                 ...item,
                 quantity: qty,
                 unitPrice: unitPrice,
+                discountAmount: itemDiscountAmount,
                 tax: totalGstRate,
                 taxableAmount,
                 cgstRate,
@@ -251,6 +253,7 @@ class GrnInvoiceService {
                             uom: item.uom,
                             quantity: item.quantity,
                             unitPrice: item.unitPrice,
+                            discountAmount: item.discountAmount || 0,
                             tax: item.tax || 0,
                             taxableAmount: item.taxableAmount || 0,
                             cgstRate: item.cgstRate || 0,
@@ -649,6 +652,7 @@ class GrnInvoiceService {
                                 uom: item.uom,
                                 quantity: item.quantity,
                                 unitPrice: item.unitPrice,
+                                discountAmount: item.discountAmount || 0,
                                 tax: item.tax || 0,
                                 taxableAmount: item.taxableAmount || 0,
                                 cgstRate: item.cgstRate || 0,
