@@ -34,6 +34,7 @@ interface AttendanceInput {
   halfDays: number;
   otHours: number;
   lateMinutes: number;
+  dailyLateMinutes?: number[];  // per-day late minutes for per-day slab deduction
   permissionMinutes: number;
   advance: number;
 }
@@ -49,6 +50,7 @@ interface PayrollSettings {
   weekdayOtMultiplier: number;
   holidayOtMultiplier: number;
   maxOtHoursPerDay: number;
+  maxOtHoursPerWeek: number;
   otSlabs: Array<{ fromMinutes: number; toMinutes: number; amount: number }>;
   pfEnabled: boolean;
   pfWageFormula: string;
@@ -103,9 +105,10 @@ function applyRounding(value: number, rule: string): number {
   }
 }
 
+// toMinutes = 0 means "and above" (open-ended upper bound)
 function lookupSlab(minutes: number, slabs: Array<{ fromMinutes: number; toMinutes: number; amount: number }>): number {
   for (const slab of slabs) {
-    if (minutes >= slab.fromMinutes && minutes <= slab.toMinutes) return slab.amount;
+    if (minutes >= slab.fromMinutes && (slab.toMinutes === 0 || minutes <= slab.toMinutes)) return slab.amount;
   }
   return 0;
 }
@@ -261,17 +264,29 @@ function computeResult(
   const otEnabled = settings.otEnabled !== false; // treat null/undefined as enabled
   let otPay = 0;
   if (otEnabled && att.otHours > 0) {
-    const maxOtPerDay   = settings.maxOtHoursPerDay > 0 ? settings.maxOtHoursPerDay : 99;
-    const otH           = Math.min(att.otHours, maxOtPerDay * (att.presentDays || 1));
+    const maxOtPerDay   = settings.maxOtHoursPerDay  > 0 ? settings.maxOtHoursPerDay  : 99;
+    const maxOtPerWeek  = settings.maxOtHoursPerWeek > 0 ? settings.maxOtHoursPerWeek : 99;
+    // Cap at per-day limit × paid days, then further cap at the weekly ceiling
+    const otH           = Math.min(
+      att.otHours,
+      maxOtPerDay  * (att.presentDays || 1),
+      maxOtPerWeek * Math.ceil((att.presentDays || 1) / 5),  // weeks in period
+    );
     const workingHours  = settings.defaultWorkingHoursPerDay > 0 ? settings.defaultWorkingHoursPerDay : 8;
     const otMultiplier  = settings.weekdayOtMultiplier > 0 ? settings.weekdayOtMultiplier : 1.5;
 
     if (settings.otMethod === 'HOURLY_RATE' && settings.otRatePerHour > 0) {
+      // Flat monetary rate per OT hour × actual capped OT hours (e.g. ₹80/hr × 3hr = ₹240)
       otPay = otH * settings.otRatePerHour;
+    } else if (settings.otMethod === 'FIXED_AMOUNT' && settings.otRatePerHour > 0) {
+      // Single fixed allowance paid whenever any OT is recorded in the period (e.g. ₹500 flat)
+      // The field `otRatePerHour` stores the flat amount in this mode.
+      otPay = settings.otRatePerHour;
     } else if (settings.otMethod === 'SLAB' && settings.otSlabs?.length > 0) {
       otPay = lookupSlab(Math.round(otH * 60), settings.otSlabs);
     } else {
-      // PERCENTAGE_DAILY (default when no flat rate / slabs configured)
+      // PERCENTAGE_DAILY (default): derive hourly rate from daily salary, apply OT multiplier
+      // e.g. dailyRate=1000, 8hr/day → ₹125/hr × 1.5 × 3hr = ₹562.50
       otPay = (dailyRate / workingHours) * otH * otMultiplier;
     }
   }
@@ -318,11 +333,12 @@ function computeResult(
   // STEP 8 — Professional Tax
   // PT is a monthly statutory deduction. Skip for WEEKLY runs to avoid applying
   // it every week — it will be collected once during the monthly payroll run.
-  // Slab is applied to monthlySalary (not weekly gross).
+  // Company-wide setting is the primary gate: if professionalTaxEnabled = false,
+  // PT is NEVER deducted regardless of any per-employee flag.
+  // Slab is applied to monthlySalary (not earned/gross of this period).
   // ─────────────────────────────────────────────────────────────────────────────
-  const isPtApp = pc.professionalTax ?? (emp as any).professionalTax ?? true;
   let professionalTax = 0;
-  if ((isPtApp || settings.professionalTaxEnabled) && runType === 'MONTHLY') {
+  if (settings.professionalTaxEnabled && runType === 'MONTHLY') {
     const ptBasis = monthlySalary; // always use monthly salary as PT slab basis
     if (Number(settings.professionalTaxAmount) > 0) {
       professionalTax = Number(settings.professionalTaxAmount);
@@ -343,14 +359,27 @@ function computeResult(
   const perMinuteRate  = dailyRate / workingMins;
 
   // ─ Late entry deduction ─
+  // Per-day calculation: each day's late minutes are checked independently against slabs.
+  // If dailyLateMinutes[] is provided by the frontend, use it; otherwise fall back to total.
   let lateEntryDeduction = 0;
-  if (att.lateMinutes > (settings.lateEntryGraceMinutes || 0)) {
+  const graceMins = settings.lateEntryGraceMinutes || 0;
+  if (att.dailyLateMinutes && att.dailyLateMinutes.length > 0) {
+    // Per-day slab lookup
+    for (const dayLate of att.dailyLateMinutes) {
+      if (dayLate > graceMins) {
+        if (settings.lateEntrySlabs?.length > 0) {
+          lateEntryDeduction += lookupSlab(dayLate, settings.lateEntrySlabs);
+        } else {
+          lateEntryDeduction += Math.round(perMinuteRate * (dayLate - graceMins));
+        }
+      }
+    }
+  } else if (att.lateMinutes > graceMins) {
+    // Fallback: total late minutes (legacy — no per-day data)
     if (settings.lateEntrySlabs?.length > 0) {
       lateEntryDeduction = lookupSlab(att.lateMinutes, settings.lateEntrySlabs);
     } else {
-      // Fallback: deduct per-minute for minutes over grace period
-      const lateOver = att.lateMinutes - (settings.lateEntryGraceMinutes || 0);
-      lateEntryDeduction = Math.round(perMinuteRate * lateOver);
+      lateEntryDeduction = Math.round(perMinuteRate * (att.lateMinutes - graceMins));
     }
   }
 
@@ -531,7 +560,23 @@ class PayrollService {
   // ── Payroll Run ──────────────────────────────────────────────────────────────
   async listRuns(opts: { period?: string; type?: string; status?: string; page: number; limit: number }) {
     const where: Record<string, unknown> = {};
-    if (opts.period) where.period = opts.period;
+    if (opts.period) {
+      if (/^\d{4}-\d{2}$/.test(opts.period)) {
+        const [yearStr, monthStr] = opts.period.split('-');
+        const year = parseInt(yearStr, 10);
+        const month = parseInt(monthStr, 10);
+        const startOfMonth = new Date(year, month - 1, 1);
+        const endOfMonth   = new Date(year, month, 1);
+
+        where.OR = [
+          { period: opts.period },
+          { period: { startsWith: opts.period } },
+          { createdAt: { gte: startOfMonth, lt: endOfMonth } },
+        ];
+      } else {
+        where.period = opts.period;
+      }
+    }
     if (opts.type)   where.type   = opts.type;
     if (opts.status) where.status = opts.status;
 
@@ -598,6 +643,7 @@ class PayrollService {
       weekdayOtMultiplier:       Number(config.weekdayOtMultiplier),
       holidayOtMultiplier:       Number(config.holidayOtMultiplier),
       maxOtHoursPerDay:          Number(config.maxOtHoursPerDay),
+      maxOtHoursPerWeek:         Number(config.maxOtHoursPerWeek),
       otSlabs:                   (config.otSlabs as any[]) ?? [],
       pfEnabled:                 config.pfEnabled,
       pfWageFormula:             config.pfWageFormula,
@@ -949,6 +995,125 @@ class PayrollService {
     if (!adv) throw new ApiError(404, 'Advance not found');
     if (Number(adv.recoveredAmount) > 0) throw new ApiError(400, 'Cannot delete a partially or fully recovered advance');
     await prisma.salaryAdvance.delete({ where: { id } });
+  }
+
+  // ── Payslip ─────────────────────────────────────────────────────────────────
+  async getPayslip(runId: number, resultId: number) {
+    const result = await prisma.payrollResult.findFirst({
+      where: { id: resultId, payrollRunId: runId },
+      include: {
+        payrollRun: true,
+        employee: {
+          include: {
+            department:    true,
+            payrollConfig: true,
+          },
+        },
+      },
+    });
+    if (!result) throw new ApiError(404, 'Payslip not found');
+
+    const company = await prisma.company.findFirst({
+      select: {
+        companyName:  true,
+        legalName:    true,
+        addressLine1: true,
+        addressLine2: true,
+        city:         true,
+        state:        true,
+        zipcode:      true,
+        phone:        true,
+        email:        true,
+        website:      true,
+        gstin:        true,
+        logoUrl:      true,
+      },
+    });
+
+    // Aggregate late + permission minutes from attendance for this period
+    const attRecords = await prisma.attendanceRecord.findMany({
+      where: {
+        employeeId: result.employeeId,
+        period:     result.payrollRun.period,
+      },
+      select: { lateMinutes: true, permissionMinutes: true },
+    });
+    const lateMinutes       = attRecords.reduce((s, r) => s + r.lateMinutes,       0);
+    const permissionMinutes = attRecords.reduce((s, r) => s + r.permissionMinutes, 0);
+
+    const emp = result.employee;
+    const pc  = emp.payrollConfig;
+
+    return {
+      company,
+      run: {
+        id:       result.payrollRun.id,
+        runCode:  result.payrollRun.runCode,
+        period:   result.payrollRun.period,
+        type:     result.payrollRun.type,
+        status:   result.payrollRun.status,
+        lockedAt: result.payrollRun.lockedAt?.toISOString() ?? null,
+      },
+      employee: {
+        id:           emp.id.toString(),
+        empCode:      emp.empCode,
+        fullName:     emp.fullName,
+        designation:  emp.designation  ?? null,
+        employeeType: emp.employeeType ?? null,
+        pfNumber:     pc?.pfNumber     ?? emp.pfNumber   ?? null,
+        esiNumber:    pc?.esiNumber    ?? emp.esiNumber  ?? null,
+        uanNumber:    emp.uanNumber    ?? null,
+        panNumber:    emp.panNumber    ?? null,
+        bankName:     pc?.bankName     ?? emp.bankName   ?? null,
+        accountNumber: pc?.bankAccount ?? emp.accountNumber ?? null,
+        ifscCode:     pc?.ifscCode     ?? emp.ifscCode   ?? null,
+        department:   emp.department?.name ?? '',
+        dateOfJoining: emp.dateOfJoining?.toISOString() ?? null,
+        payrollConfig: pc ? {
+          salaryType:     pc.salaryType,
+          monthlySalary:  Number(pc.monthlySalary),
+          basicSalary:    Number(pc.basicSalary),
+          hra:            Number(pc.hra),
+          da:             Number(pc.da),
+          otherAllowance: Number(pc.otherAllowance),
+          paymentMode:    pc.paymentMode,
+        } : null,
+      },
+      result: {
+        id:                  result.id,
+        employeeCode:        result.employeeCode,
+        employeeName:        result.employeeName,
+        salaryType:          result.salaryType,
+        totalDays:           result.totalDays,
+        presentDays:         Number(result.presentDays),
+        absentDays:          Number(result.absentDays),
+        lopDays:             Number(result.lopDays),
+        halfDays:            Number(result.halfDays),
+        lateMinutes,
+        permissionMinutes,
+        dailyRate:           Number(result.dailyRate),
+        earnedSalary:        Number(result.earnedSalary),
+        grossSalary:         Number(result.grossSalary),
+        otHours:             Number(result.otHours),
+        otPay:               Number(result.otPay),
+        pfWage:              Number(result.pfWage),
+        employeePf:          Number(result.employeePf),
+        employerPf:          Number(result.employerPf),
+        employeeEsi:         Number(result.employeeEsi),
+        employerEsi:         Number(result.employerEsi),
+        pfApplicable:        result.pfApplicable,
+        esiApplicable:       result.esiApplicable,
+        professionalTax:     Number(result.professionalTax),
+        lateEntryDeduction:  Number(result.lateEntryDeduction),
+        permissionDeduction: Number(result.permissionDeduction),
+        salaryAdvance:       Number(result.salaryAdvance),
+        loanRecovery:        Number(result.loanRecovery),
+        otherDeductions:     Number(result.otherDeductions),
+        totalDeductions:     Number(result.totalDeductions),
+        netSalary:           Number(result.netSalary),
+        paymentMode:         result.paymentMode,
+      },
+    };
   }
 }
 

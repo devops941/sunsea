@@ -8,6 +8,7 @@ interface CommonLoaderProps {
 
 const CommonLoader: React.FC<CommonLoaderProps> = ({ text, image, fullScreen = true }) => {
   return (
+
     <div className={`relative flex items-center justify-center overflow-hidden ${fullScreen ? "min-h-screen" : "min-h-[200px] w-full py-8"}`}>
       <div className={`relative flex flex-col items-center rounded-3xl border border-white/10 bg-white/5 text-center backdrop-blur-xl ${fullScreen ? "mb-20" : ""}`}>
         {image && (
@@ -41,6 +42,7 @@ const CommonLoader: React.FC<CommonLoaderProps> = ({ text, image, fullScreen = t
         }
       `}</style>
     </div>
+    
   );
 };
 

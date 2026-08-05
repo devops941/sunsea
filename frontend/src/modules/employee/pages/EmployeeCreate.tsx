@@ -70,7 +70,7 @@ const TABS = [
   { id: 4, label: "Joining",          icon: FaCalendarAlt },
   { id: 5, label: "Payroll",          icon: FaMoneyBillWave},
   { id: 6, label: "Login Account",    icon: FaKey         },
-  { id: 7, label: "Audit",            icon: FaClipboardList},
+  // { id: 7, label: "Audit",            icon: FaClipboardList},
 ];
 
 // ─── form state ──────────────────────────────────────────────────────────────
@@ -262,10 +262,23 @@ const EmployeeCreatePage: React.FC = () => {
   }, [form.empCode, form.createLoginAccount]);
 
   // ── field change handler
+  // ── field change handler
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement> | { target: { name: string; value: any } }
   ) => {
-    const { name, value } = e.target;
+    let { name, value } = e.target;
+
+    // Field-level entry restrictions
+    if (name === "aadhaarNumber") {
+      value = String(value).replace(/\D/g, "").slice(0, 12);
+    } else if (name === "panNumber") {
+      value = String(value).toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10);
+    } else if (name === "drivingLicense") {
+      value = String(value).toUpperCase().replace(/[^A-Z0-9 -]/g, "").slice(0, 16);
+    } else if (name === "voterId") {
+      value = String(value).toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10);
+    }
+
     setForm((p) => {
       const next = { ...p, [name]: value };
 
@@ -332,20 +345,41 @@ const EmployeeCreatePage: React.FC = () => {
     if (!form.empCode.trim())   e.empCode  = "Employee code is required";
     if (!form.fullName.trim())  e.fullName = "Employee name is required";
 
-    // Contact
-    if (!form.officialMobile.trim())
-      e.officialMobile = "Official mobile is required";
-    else if (form.officialMobile.replace(/\D/g, "").replace(/^91/, "").length !== 10)
-      e.officialMobile = "Enter a valid 10-digit mobile number";
+    // Contact — Mobile & Email are optional; validate format if entered
+    if (form.officialMobile.trim()) {
+      if (form.officialMobile.replace(/\D/g, "").replace(/^91/, "").length !== 10)
+        e.officialMobile = "Enter a valid 10-digit mobile number";
+    }
 
-    if (!form.officialEmail.trim())
-      e.officialEmail = "Official email is required";
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.officialEmail.trim()))
-      e.officialEmail = "Enter a valid email address";
+    if (form.officialEmail.trim()) {
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.officialEmail.trim()))
+        e.officialEmail = "Enter a valid email address";
+    }
+
+    // Identity validation
+    if (form.aadhaarNumber.trim()) {
+      if (form.aadhaarNumber.trim().length !== 12)
+        e.aadhaarNumber = "Aadhaar number must be exactly 12 digits";
+    }
+
+    if (form.panNumber.trim()) {
+      if (!/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(form.panNumber.trim()))
+        e.panNumber = "Invalid PAN number format (e.g. ABCDE1234F)";
+    }
+
+    if (form.drivingLicense.trim()) {
+      const clean = form.drivingLicense.trim().replace(/[\s-]/g, "");
+      if (clean.length < 10 || clean.length > 16)
+        e.drivingLicense = "Invalid Driving License format (10-16 alphanumeric characters)";
+    }
+
+    if (form.voterId.trim()) {
+      if (!/^[A-Z]{3}[0-9]{7}$/.test(form.voterId.trim()))
+        e.voterId = "Invalid Voter ID format (e.g. ABC1234567)";
+    }
 
     // Official
     if (!form.departmentId)   e.departmentId  = "Department is required";
-    if (!form.designation.trim()) e.designation = "Designation is required";
 
     // Joining
     if (!form.dateOfJoining)  e.dateOfJoining = "Date of joining is required";
@@ -435,9 +469,9 @@ const EmployeeCreatePage: React.FC = () => {
 
       // Contact
       if (form.personalMobile)        fd.append("personalMobile",        form.personalMobile);
-      fd.append("mobile",                                                 form.officialMobile);
+      if (form.officialMobile)        fd.append("mobile",                form.officialMobile);
       if (form.personalEmail)         fd.append("personalEmail",         form.personalEmail);
-      fd.append("email",                                                  form.officialEmail);
+      if (form.officialEmail)         fd.append("email",                 form.officialEmail);
       if (form.emergencyContactName)  fd.append("emergencyContactName",  form.emergencyContactName);
       if (form.emergencyContactNumber) fd.append("emergencyContactNumber", form.emergencyContactNumber);
 
@@ -605,7 +639,7 @@ const EmployeeCreatePage: React.FC = () => {
           name="officialMobile"
           value={form.officialMobile}
           onChange={handleChange}
-          required
+          required={false}
           error={errors.officialMobile}
           placeholder="98765 43210"
         />
@@ -618,7 +652,7 @@ const EmployeeCreatePage: React.FC = () => {
           placeholder="98765 43210"
         />
         <TextInput label="Official Email Address" name="officialEmail" type="email"
-          value={form.officialEmail} onChange={handleChange} required error={errors.officialEmail} placeholder="official@company.com" />
+          value={form.officialEmail} onChange={handleChange} error={errors.officialEmail} placeholder="official@company.com" />
         <TextInput label="Personal Email Address" name="personalEmail" type="email"
           value={form.personalEmail} onChange={handleChange} placeholder="personal@email.com" />
         <TextInput label="Emergency Contact Name" name="emergencyContactName"
@@ -650,10 +684,10 @@ const EmployeeCreatePage: React.FC = () => {
     <div>
       <SectionHeader icon={FaIdCard} title="Identity Documents" />
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        <TextInput label="Aadhaar Number"       name="aadhaarNumber"  value={form.aadhaarNumber}  onChange={handleChange} placeholder="12-digit Aadhaar" />
-        <TextInput label="PAN Number"           name="panNumber"      value={form.panNumber}      onChange={handleChange} placeholder="e.g. ABCDE1234F" />
-        <TextInput label="Driving License"      name="drivingLicense" value={form.drivingLicense} onChange={handleChange} placeholder="Driving license number" />
-        <TextInput label="Voter ID"             name="voterId"        value={form.voterId}        onChange={handleChange} placeholder="Voter ID number" />
+        <TextInput label="Aadhaar Number"       name="aadhaarNumber"  value={form.aadhaarNumber}  onChange={handleChange} error={errors.aadhaarNumber} placeholder="12-digit Aadhaar" maxLength={12} />
+        <TextInput label="PAN Number"           name="panNumber"      value={form.panNumber}      onChange={handleChange} error={errors.panNumber} placeholder="e.g. ABCDE1234F" maxLength={10} />
+        <TextInput label="Driving License"      name="drivingLicense" value={form.drivingLicense} onChange={handleChange} error={errors.drivingLicense} placeholder="Driving license number" maxLength={16} />
+        <TextInput label="Voter ID"             name="voterId"        value={form.voterId}        onChange={handleChange} error={errors.voterId} placeholder="e.g. ABC1234567" maxLength={10} />
       </div>
 
       <div className="mt-6">
@@ -703,8 +737,8 @@ const EmployeeCreatePage: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
         <SelectInput label="Department" name="departmentId" value={form.departmentId} onChange={handleChange}
           required error={errors.departmentId} defaultOptionLabel="Select Department" options={departmentOptions} searchable />
-        <TextInput label="Designation" name="designation" value={form.designation} onChange={handleChange}
-          required error={errors.designation} placeholder="e.g. Senior Engineer" />
+        {/* <TextInput label="Designation" name="designation" value={form.designation} onChange={handleChange}
+          placeholder="e.g. Senior Engineer" /> */}
         <SelectInput label="Employee Type" name="employeeType" value={form.employeeType} onChange={handleChange}
           defaultOptionLabel="Select Type"
           options={["Permanent","Contract","Intern","Consultant","Operator","Supervisor"].map((t) => ({ value: t.toLowerCase(), label: t }))} />
@@ -720,7 +754,7 @@ const EmployeeCreatePage: React.FC = () => {
         <SectionHeader icon={FaCalendarAlt} title="Shift Assignment" color="text-amber-500" />
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           <SelectInput label="Shift" name="shiftId" value={form.shiftId} onChange={handleChange}
-            defaultOptionLabel="Select Shift" options={shiftOptions} />
+            defaultOptionLabel="Select Shift" options={shiftOptions} searchable />
         </div>
       </div>
     </div>
@@ -737,11 +771,11 @@ const EmployeeCreatePage: React.FC = () => {
           onChange={handleChange} placeholder="Select relieving date" />
         <TextInput label="Previous Experience" name="previousExperience" value={form.previousExperience}
           onChange={handleChange} placeholder="e.g. 2 years 3 months" />
-        <TextInput label="Current Experience" name="_exp" value={currentExperience} onChange={() => {}} disabled placeholder="Auto-calculated" />
-        <TextInput label="Probation Period (months)" name="probationPeriod" type="number"
-          value={form.probationPeriod} onChange={handleChange} placeholder="e.g. 3" />
-        <TextInput label="Notice Period (days)" name="noticePeriod" type="number"
-          value={form.noticePeriod} onChange={handleChange} placeholder="e.g. 30" />
+        {/* <TextInput label="Current Experience" name="_exp" value={currentExperience} onChange={() => {}} disabled placeholder="Auto-calculated" /> */}
+        {/* <TextInput label="Probation Period (months)" name="probationPeriod" type="number"
+          value={form.probationPeriod} onChange={handleChange} placeholder="e.g. 3" /> */}
+        {/* <TextInput label="Notice Period (days)" name="noticePeriod" type="number"
+          value={form.noticePeriod} onChange={handleChange} placeholder="e.g. 30" /> */}
       </div>
     </div>
   );
@@ -793,6 +827,7 @@ const EmployeeCreatePage: React.FC = () => {
     </div>
   );
 
+  /*
   // Tab 7 — Audit
   const renderTab7 = () => (
     <div>
@@ -805,10 +840,11 @@ const EmployeeCreatePage: React.FC = () => {
       </div>
     </div>
   );
+  */
 
   const tabRenderers = [
     renderTab0, renderTab1, renderTab2, renderTab3,
-    renderTab4, renderTab5, renderTab6, renderTab7,
+    renderTab4, renderTab5, renderTab6,
   ];
 
   // ─── render ───────────────────────────────────────────────────────────────
@@ -822,7 +858,16 @@ const EmployeeCreatePage: React.FC = () => {
             <h2 className="text-xl font-bold text-slate-800">Create Employee</h2>
             <p className="text-sm text-slate-400 mt-0.5">Fill in the details across all sections</p>
           </div>
-          <BackButton />
+          <div className="flex items-center gap-3">
+            <BackButton />
+            <CustomButton
+              text={isSubmitting ? "Saving..." : "Save Employee"}
+              icon={FaSave}
+              type="button"
+              disabled={isSubmitting}
+              onClick={handleSubmit}
+            />
+          </div>
         </div>
 
         {/* Tab bar */}

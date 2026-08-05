@@ -34,10 +34,11 @@ router.post ('/attendance',     validateMiddleware(bulkUpsertAttendanceSchema), 
 // ─── Payroll Runs ─────────────────────────────────────────────────────────────
 router.get  ('/runs',           validateMiddleware(listRunsSchema),               payrollController.listRuns);
 router.post ('/runs',           validateMiddleware(createPayrollRunSchema),       payrollController.computeRun);
-router.get  ('/runs/:id',       validateMiddleware(runActionSchema),              payrollController.getRun);
-router.post ('/runs/:id/approve', validateMiddleware(runActionSchema),            payrollController.approveRun);
-router.post ('/runs/:id/lock',    validateMiddleware(runActionSchema),            payrollController.lockRun);
-router.delete('/runs/:id',      validateMiddleware(runActionSchema),              payrollController.deleteRun);
+router.get  ('/runs/:id',                validateMiddleware(runActionSchema), payrollController.getRun);
+router.get  ('/runs/:id/payslip/:resultId',                                       payrollController.getPayslip);
+router.post ('/runs/:id/approve',        validateMiddleware(runActionSchema), payrollController.approveRun);
+router.post ('/runs/:id/lock',           validateMiddleware(runActionSchema), payrollController.lockRun);
+router.delete('/runs/:id',               validateMiddleware(runActionSchema), payrollController.deleteRun);
 
 // ─── Salary Advances ──────────────────────────────────────────────────────────
 router.get   ('/advances',       payrollController.listAdvances);

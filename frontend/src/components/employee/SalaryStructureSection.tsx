@@ -387,30 +387,30 @@ const SalaryStructureSection: React.FC<Props> = ({ form, onChange, onToggle, err
                     onChange={onChange}
                     placeholder="HRA amount"
                   />
-                  <TextInput
+                  {/* <TextInput
                     label="Conveyance Allowance (₹)"
                     name="conveyanceAllowance"
                     type="number"
                     value={form.conveyanceAllowance}
                     onChange={onChange}
                     placeholder="Transport / conveyance"
-                  />
-                  <TextInput
+                  /> */}
+                  {/* <TextInput
                     label="Medical Allowance (₹)"
                     name="medicalAllowance"
                     type="number"
                     value={form.medicalAllowance}
                     onChange={onChange}
                     placeholder="Medical reimbursement"
-                  />
-                  <TextInput
+                  /> */}
+                  {/* <TextInput
                     label="Special Allowance (₹)"
                     name="specialAllowance"
                     type="number"
                     value={form.specialAllowance}
                     onChange={onChange}
                     placeholder="Special / performance"
-                  />
+                  /> */}
                   <TextInput
                     label="Other Allowance (₹)"
                     name="otherAllowance"

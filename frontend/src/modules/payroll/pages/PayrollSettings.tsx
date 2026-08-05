@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { toast } from 'react-toastify';
 import { Plus, Trash2, Edit3, Check, X, AlertTriangle, Save, Info, Loader2 } from 'lucide-react';
+import CommonLoader from '../../../components/ui/Loader/CommonLoader';
 import Button from '../../../components/ui/Button/Button';
 import TextInput from '../../../components/form/TextInput/TextInput';
 import SelectInput from '../../../components/form/SelectInput/SelectInput';
@@ -114,7 +115,7 @@ const SlabConfigurator: React.FC<{
           bottom
         />
         <TextInput
-          label="To (min)"
+          label="To (min) — 0 = & above"
           name="slab-to"
           type="number"
           value={draft.toMinutes !== undefined && draft.toMinutes !== null ? String(draft.toMinutes) : ''}
@@ -184,7 +185,7 @@ const SlabConfigurator: React.FC<{
               {/* Range badge */}
               <div className="flex items-center gap-1.5 shrink-0">
                 <span className="px-2.5 py-1 text-xs font-medium bg-slate-100 text-text-secondary rounded-md">
-                  {s.fromMinutes} – {s.toMinutes} min
+                  {s.fromMinutes}{s.toMinutes === 0 ? '+ min' : ` – ${s.toMinutes} min`}
                 </span>
                 <span className="text-text-muted text-xs">→</span>
                 <span className="px-2.5 py-1 text-xs font-semibold bg-emerald-50 text-emerald-700 rounded-md font-mono">
@@ -577,16 +578,7 @@ const PayrollSettings: React.FC = () => {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-page flex items-center justify-center">
-        <div className="flex items-center gap-3 text-text-muted">
-          <Loader2 size={22} className="animate-spin text-primary" />
-          <span className="text-sm font-medium">Loading payroll settings…</span>
-        </div>
-      </div>
-    );
-  }
+  if (loading) return <CommonLoader text="Loading payroll settings…" />;
 
   if (error) {
     return (
@@ -688,8 +680,10 @@ const PayrollSettings: React.FC = () => {
                   ]}
                   onChange={e => set({ otMethod: e.target.value })}
                 />
-                {config.otMethod === 'HOURLY_RATE' && (
-                  <TextInput label="Rate per Hour (₹)" name="otRatePerHour" type="number"
+                {(config.otMethod === 'HOURLY_RATE' || config.otMethod === 'FIXED_AMOUNT') && (
+                  <TextInput
+                    label={config.otMethod === 'FIXED_AMOUNT' ? 'Fixed Amount per OT (₹)' : 'Rate per Hour (₹)'}
+                    name="otRatePerHour" type="number"
                     value={String(config.otRatePerHour ?? 0)}
                     onChange={e => set({ otRatePerHour: Number(e.target.value) })}
                   />
@@ -840,15 +834,15 @@ const PayrollSettings: React.FC = () => {
         </Section>
       ),
     },
-    {
-      key: 'components',
-      label: 'Salary Components',
-      content: (
-        <Section title="Salary Components">
-          <SalaryComponentsEditor comps={comps} onChange={handleCompChange} />
-        </Section>
-      ),
-    },
+    // {
+    //   key: 'components',
+    //   label: 'Salary Components',
+    //   content: (
+    //     <Section title="Salary Components">
+    //       <SalaryComponentsEditor comps={comps} onChange={handleCompChange} />
+    //     </Section>
+    //   ),
+    // },
     {
       key: 'deductions',
       label: 'Deductions',

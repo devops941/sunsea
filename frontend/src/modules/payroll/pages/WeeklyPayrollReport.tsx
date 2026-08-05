@@ -1,11 +1,18 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { ChevronLeft, ChevronRight, Printer, Lock, AlertTriangle, Loader2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Printer, AlertTriangle, FileDown } from 'lucide-react';
+import ViewButton from '../../../components/ui/viewbutton/ViewButton';
+import IconButton from '../../../components/ui/IconButton/IconButton';
 import { FiRefreshCw } from 'react-icons/fi';
 import CustomButton from '../../../components/ui/custombutton/CustomButton';
 import ExportCSVButton from '../../../components/ui/ExportCSVButton/ExportCSVButton';
+import CommonLoader from '../../../components/ui/Loader/CommonLoader';
+import { useSocket } from '../../../providers/SocketProvider';
 import { payrollService } from '../../../services/payrollService';
 import type { ApiPayrollRun, ApiPayrollResult } from '../../../services/payrollService';
 import DataTable, { type DataTableColumn } from '../../../components/ui/table/DataTable';
+import PayslipModal from '../components/PayslipModal';
+
+const PAGE_SIZE = 15;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const fmt = (n: number) => n.toLocaleString('en-IN');
@@ -19,11 +26,15 @@ const STATUS_COLOR: Record<string, string> = {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 const WeeklyPayrollReport: React.FC = () => {
+  const { socket }              = useSocket();
   const [runs, setRuns]         = useState<ApiPayrollRun[]>([]);
   const [runIdx, setRunIdx]     = useState(0);
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState<string | null>(null);
   const [filter, setFilter]     = useState<'ALL' | 'BANK' | 'CASH'>('ALL');
+  const [page, setPage]         = useState(1);
+  const [pdfLoadingIds, setPdfLoadingIds] = useState<Set<number>>(new Set());
+  const [payslipTarget, setPayslipTarget] = useState<{ runId: number; resultId: number; period: string; type: 'MONTHLY' | 'WEEKLY' } | null>(null);
 
   const fetchRuns = useCallback(async () => {
     try {
@@ -44,7 +55,26 @@ const WeeklyPayrollReport: React.FC = () => {
 
   useEffect(() => { fetchRuns(); }, [fetchRuns]);
 
+  // ── Socket: refresh when any payroll run changes ──────────────────────────
+  useEffect(() => {
+    if (!socket) return;
+    const onRefresh = () => fetchRuns();
+    socket.on('payroll:completed', onRefresh);
+    socket.on('payroll:approved',  onRefresh);
+    socket.on('payroll:locked',    onRefresh);
+    socket.on('payroll:deleted',   onRefresh);
+    return () => {
+      socket.off('payroll:completed', onRefresh);
+      socket.off('payroll:approved',  onRefresh);
+      socket.off('payroll:locked',    onRefresh);
+      socket.off('payroll:deleted',   onRefresh);
+    };
+  }, [socket, fetchRuns]);
+
   const run: ApiPayrollRun | undefined = runs[runIdx];
+
+  // Reset table page when run or filter changes
+  useEffect(() => { setPage(1); }, [runIdx, filter]);
 
   // Ensure full run details with results are loaded for the selected run
   useEffect(() => {
@@ -56,23 +86,72 @@ const WeeklyPayrollReport: React.FC = () => {
       }).catch(() => {});
     }
   }, [run?.id]);
-  const isLocked = run?.status === 'LOCKED';
+  // Direct PDF download for a row — guarded against double-click
+  const handleDirectPdf = async (r: ApiPayrollResult) => {
+    if (!run || pdfLoadingIds.has(r.id)) return;
+    setPdfLoadingIds((prev) => new Set(prev).add(r.id));
+    try {
+      const data = await payrollService.getPayslip(run.id, r.id);
+      const { default: PayslipDocumentComp } = await import('../components/PayslipDocument');
+      const { default: ReactDOMServer } = await import('react-dom/server');
+      const React2 = await import('react');
+      const html = ReactDOMServer.renderToStaticMarkup(
+        React2.createElement(PayslipDocumentComp, { data })
+      );
+      const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
+        import('html2canvas-pro'),
+        import('jspdf'),
+      ]);
+      const container = document.createElement('div');
+      container.style.cssText = 'position:fixed;left:-9999px;top:0;background:#fff;';
+      container.innerHTML = html;
+      document.body.appendChild(container);
+      const canvas = await html2canvas(container, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+      document.body.removeChild(container);
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      const pageW = pdf.internal.pageSize.getWidth();
+      const pageH = pdf.internal.pageSize.getHeight();
+      const ratio = pageW / canvas.width;
+      const imgH  = canvas.height * ratio;
+      const imgData = canvas.toDataURL('image/jpeg', 0.95);
+      let yPos = 0; let remaining = imgH;
+      while (remaining > 0) {
+        pdf.addImage(imgData, 'JPEG', 0, -yPos, pageW, imgH);
+        remaining -= pageH; yPos += pageH;
+        if (remaining > 0) pdf.addPage();
+      }
+      const code   = r.employeeCode.replace(/\s+/g, '');
+      const period = run.period;
+      const wMatch = period.match(/^(\d{4})-W(\d{2})$/);
+      const filename = wMatch
+        ? `PAYSLIP_${code}_WEEK${wMatch[2]}_${wMatch[1]}.pdf`
+        : `PAYSLIP_${code}_${period}.pdf`;
+      pdf.save(filename);
+    } catch (err) {
+      console.error('PDF generation failed', err);
+    } finally {
+      setPdfLoadingIds((prev) => { const s = new Set(prev); s.delete(r.id); return s; });
+    }
+  };
 
   const allResults: ApiPayrollResult[] = run?.results ?? [];
   const filtered = filter === 'ALL'
     ? allResults
     : allResults.filter((r) => r.paymentMode === filter);
 
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const pagedData  = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
   const totals = filtered.reduce(
     (acc, r) => ({
-      earnedSalary: acc.earnedSalary + r.earnedSalary,
-      otPay:        acc.otPay        + r.otPay,
-      salaryAdvance: acc.salaryAdvance + r.salaryAdvance,
-      permissionDeduction: acc.permissionDeduction + r.permissionDeduction,
-      netSalary:    acc.netSalary    + r.netSalary,
-      presentDays:  acc.presentDays  + r.presentDays,
-      absentDays:   acc.absentDays   + r.absentDays,
-      halfDays:     acc.halfDays     + r.halfDays,
+      earnedSalary:        acc.earnedSalary        + Number(r.earnedSalary || 0),
+      otPay:               acc.otPay               + Number(r.otPay || 0),
+      salaryAdvance:       acc.salaryAdvance       + Number(r.salaryAdvance || 0),
+      permissionDeduction: acc.permissionDeduction + Number(r.permissionDeduction || 0),
+      netSalary:           acc.netSalary           + Number(r.netSalary || 0),
+      presentDays:         acc.presentDays         + Number(r.presentDays || 0),
+      absentDays:          acc.absentDays          + Number(r.absentDays || 0),
+      halfDays:            acc.halfDays            + Number(r.halfDays || 0),
     }),
     { earnedSalary: 0, otPay: 0, salaryAdvance: 0, permissionDeduction: 0, netSalary: 0, presentDays: 0, absentDays: 0, halfDays: 0 }
   );
@@ -80,16 +159,7 @@ const WeeklyPayrollReport: React.FC = () => {
   const varianceCount = filtered.filter((r) => r.hasVariance).length;
 
   // ── Loading ──
-  if (loading) {
-    return (
-      <div className="min-h-screen  flex items-center justify-center">
-        <div className="text-center space-y-3">
-          <Loader2 size={36} className="animate-spin text-primary mx-auto" />
-          <p className="text-text-secondary text-sm">Loading weekly payroll reports…</p>
-        </div>
-      </div>
-    );
-  }
+  if (loading) return <CommonLoader text="Loading weekly payroll reports…" />;
 
   // ── Error ──
   if (error) {
@@ -238,6 +308,24 @@ const WeeklyPayrollReport: React.FC = () => {
         </span>
       ),
     },
+    {
+      header: 'ACTIONS',
+      align: 'center',
+      render: (r) => (
+        <div className="flex items-center justify-center gap-1">
+          <ViewButton
+            onClick={() => run && setPayslipTarget({ runId: run.id, resultId: r.id, period: run.period, type: 'WEEKLY' })}
+          />
+          <IconButton
+            icon={FileDown}
+            variant="success"
+            title={pdfLoadingIds.has(r.id) ? 'Generating…' : 'Download PDF'}
+            disabled={pdfLoadingIds.has(r.id)}
+            onClick={() => handleDirectPdf(r)}
+          />
+        </div>
+      ),
+    },
   ];
 
   return (
@@ -291,11 +379,11 @@ const WeeklyPayrollReport: React.FC = () => {
       </div>
 
       {/* Locked banner */}
-      {isLocked && (
+      {/* {isLocked && (
         <div className="flex items-center gap-3 p-3 bg-amber-50 border border-amber-300 rounded-lg text-sm text-amber-800 font-medium">
           <Lock size={16} /> This payroll period is LOCKED. Read-only view.
         </div>
-      )}
+      )} */}
 
       {/* Variance alert */}
       {varianceCount > 0 && (
@@ -336,11 +424,12 @@ const WeeklyPayrollReport: React.FC = () => {
       <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
         <DataTable
           columns={reportColumns}
-          data={filtered}
+          data={pagedData}
           rowKey={(r) => r.id}
           emptyMessage="No employees match the selected filter."
           rowClassName={(r) => (r.hasVariance ? 'bg-amber-50 border-l-4 border-l-amber-400' : '')}
           density="compact"
+          pagination={totalPages > 1 ? { currentPage: page, totalPages, onPageChange: setPage } : undefined}
         />
 
         {/* Total summary row */}
@@ -391,6 +480,17 @@ const WeeklyPayrollReport: React.FC = () => {
           </div>
         ))}
       </div>
+
+      {/* Payslip Modal */}
+      {payslipTarget && (
+        <PayslipModal
+          runId={payslipTarget.runId}
+          resultId={payslipTarget.resultId}
+          period={payslipTarget.period}
+          type={payslipTarget.type}
+          onClose={() => setPayslipTarget(null)}
+        />
+      )}
     </div>
   );
 };
