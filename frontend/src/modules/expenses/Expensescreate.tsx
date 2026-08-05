@@ -63,10 +63,11 @@ const ExpensesCreate: React.FC<ExpensesCreateProps> = ({
     const fetchSuppliers = async () => {
       try {
         const response = await apiClient.get("/suppliers");
-        if (response.data && response.data.success && Array.isArray(response.data.data)) {
-          const formatted = response.data.data.map((sup: any) => ({
+        const responseData = response.data?.data?.suppliers || response.data?.data;
+        if (Array.isArray(responseData)) {
+          const formatted = responseData.map((sup: any) => ({
             label: sup.legalName || sup.supplierCode,
-            value: sup.legalName || sup.supplierCode,
+            value: String(sup.id),
             id: sup.id,
           }));
           setSuppliers(formatted);
