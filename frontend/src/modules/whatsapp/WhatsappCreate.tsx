@@ -13,6 +13,7 @@ interface WhatsappConfigForm {
     wabaId: string;
     businessPhone: string;
     accessToken: string;
+    webhookVerifyToken: string;
 }
 
 const WhatsappCreatePage: React.FC = () => {
@@ -21,6 +22,7 @@ const WhatsappCreatePage: React.FC = () => {
         wabaId: "",
         businessPhone: "",
         accessToken: "",
+        webhookVerifyToken: "",
     };
 
     const [formData, setFormData] = useState<WhatsappConfigForm>(initialFormData);
@@ -31,18 +33,24 @@ const WhatsappCreatePage: React.FC = () => {
     const { can } = usePermission();
     const canEditWhatsapp = can("whatsapp.edit");
 
+    // Test message state
+    const [testPhone, setTestPhone] = useState("");
+    const [testMessage, setTestMessage] = useState("Hello from SUNSEA ERP! This is a test message.");
+    const [sending, setSending] = useState(false);
+
     // Fetch the existing configuration on mount
     useEffect(() => {
         const fetchConfig = async () => {
             try {
                 const response = await apiClient.get("/whatsapp/config");
                 if (response.data && response.data.success && response.data.data) {
-                    const { phoneNumberId, wabaId, businessPhone, hasAccessToken } = response.data.data;
+                    const { phoneNumberId, wabaId, businessPhone, hasAccessToken, webhookVerifyToken } = response.data.data;
                     setFormData({
                         phoneNumberId: phoneNumberId || "",
                         wabaId: wabaId || "",
                         businessPhone: businessPhone || "",
                         accessToken: hasAccessToken ? "••••••••••••••••••••" : "",
+                        webhookVerifyToken: webhookVerifyToken || "",
                     });
                     setIsEditing(true);
                 }
@@ -112,6 +120,7 @@ const WhatsappCreatePage: React.FC = () => {
                 wabaId: formData.wabaId.trim(),
                 businessPhone: formData.businessPhone.trim(),
                 accessToken: formData.accessToken.trim(),
+                webhookVerifyToken: formData.webhookVerifyToken.trim(),
             });
 
             if (response.data && response.data.success) {
@@ -125,6 +134,7 @@ const WhatsappCreatePage: React.FC = () => {
                     wabaId: formData.wabaId.trim(),
                     businessPhone: formData.businessPhone.trim(),
                     accessToken: "••••••••••••••••••••",
+                    webhookVerifyToken: formData.webhookVerifyToken.trim(),
                 });
                 setIsEditing(true);
                 setErrors({});
@@ -137,6 +147,34 @@ const WhatsappCreatePage: React.FC = () => {
             toast.error(errMsg);
         } finally {
             setSaving(false);
+        }
+    };
+
+    const handleSendTestMessage = async () => {
+        if (!testPhone.trim() || !testMessage.trim()) {
+            toast.warn("Please enter a test phone number and message.");
+            return;
+        }
+
+        setSending(true);
+        try {
+            const formattedPhone = testPhone.replace(/\D/g, ""); // Keep only digits
+            const response = await apiClient.post("/whatsapp/send", {
+                to: formattedPhone,
+                message: testMessage,
+            });
+
+            if (response.data && response.data.success) {
+                toast.success("Test message sent successfully!");
+            } else {
+                toast.error(response.data?.message || "Failed to send test message");
+            }
+        } catch (error: any) {
+            console.error("[WhatsApp Config] Error sending test message:", error);
+            const errMsg = error.response?.data?.message || "Error connecting to server";
+            toast.error(errMsg);
+        } finally {
+            setSending(false);
         }
     };
 
@@ -218,8 +256,16 @@ const WhatsappCreatePage: React.FC = () => {
                                     onChange={handleChange as any}
                                     onFocus={handleTokenFocus}
                                     error={errors.accessToken}
-
-
+                                />
+                            </div>
+                            <div className="lg:col-span-2 xl:col-span-1">
+                                <TextInput
+                                    label="Webhook Verify Token"
+                                    name="webhookVerifyToken"
+                                    value={formData.webhookVerifyToken}
+                                    placeholder="e.g. my_secret_token_123"
+                                    onChange={handleChange as any}
+                                    error={errors.webhookVerifyToken}
                                 />
                             </div>
                         </div>
@@ -239,6 +285,41 @@ const WhatsappCreatePage: React.FC = () => {
                         )}
                     </div>
                 </form>
+
+                {/* Test Message Section (Only show if config is saved/editing) */}
+                {isEditing && (
+                    <div className="px-6 py-6 border-t border-gray-200 bg-gray-50 rounded-b-lg">
+                        <h6 className="text-lg font-semibold text-gray-800 mb-4">Send a Test Message</h6>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <IndiaPhoneInput
+                                    label="Recipient Phone Number (with Country Code)"
+                                    name="testPhone"
+                                    value={testPhone}
+                                    placeholder="e.g. 919876543210"
+                                    onChange={(e) => setTestPhone(e.target.value)}
+                                />
+                            </div>
+                            <div>
+                                <TextInput
+                                    label="Test Message"
+                                    name="testMessage"
+                                    value={testMessage}
+                                    placeholder="Enter your test message here..."
+                                    onChange={(e) => setTestMessage(e.target.value)}
+                                />
+                            </div>
+                        </div>
+                        <div className="mt-4 flex justify-end">
+                            <CustomButton
+                                text={sending ? "Sending..." : "Send Test Message"}
+                                icon={FaWhatsapp}
+                                onClick={handleSendTestMessage}
+                                disabled={sending || !testPhone.trim() || !testMessage.trim()}
+                            />
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );

@@ -412,9 +412,10 @@ model WhatsappConfig {
   companyId     String   @unique @db.Uuid
   phoneNumberId String   @db.VarChar(50)
   wabaId        String   @db.VarChar(50)
-  businessPhone String   @db.VarChar(20)
-  accessToken   String
-  createdAt     DateTime @default(now()) @db.Timestamptz(6)
+  businessPhone      String   @db.VarChar(20)
+  accessToken        String
+  webhookVerifyToken String?  @db.VarChar(100)
+  createdAt          DateTime @default(now()) @db.Timestamptz(6)
   updatedAt     DateTime @updatedAt @db.Timestamptz(6)
   company       Company  @relation(fields: [companyId], references: [id])
 
