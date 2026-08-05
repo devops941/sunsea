@@ -67,4 +67,12 @@ router.post(
     purchaseOrderController.emailPoInvoice
 );
 
+router.post(
+    "/:id/whatsapp-po",
+    authMiddleware,
+    requirePermission("purchaseOrders.view"),
+    validateMiddleware(purchaseOrderIdRequestSchema),
+    purchaseOrderController.whatsappPO
+);
+
 export default router;

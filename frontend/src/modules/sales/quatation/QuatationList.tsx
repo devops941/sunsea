@@ -14,7 +14,8 @@ import SearchInput from "../../../components/ui/SearchInput/SearchInput";
 import CustomButton from "../../../components/ui/Button/Button";
 import { useSocketSync } from "../../../hooks/useSocketSync";
 import EmailButton from "../../../components/ui/EmailButton/EmailButton";
-import { Mail } from "lucide-react";
+import WhatsappButton from "../../../components/ui/WhatsappButton/WhatsappButton";
+import { Mail, MessageCircle } from "lucide-react";
 import EditButton from "../../../components/ui/EditButton/EditButton";
 
 const ITEMS_PER_PAGE = 10;
@@ -44,6 +45,12 @@ const QuotationList: React.FC = () => {
     const [emailSubject, setEmailSubject] = useState("");
     const [emailMessage, setEmailMessage] = useState("");
     const [sendingEmail, setSendingEmail] = useState(false);
+
+    const [showWhatsappModal, setShowWhatsappModal] = useState(false);
+    const [whatsappOrder, setWhatsappOrder] = useState<SalesOrder | null>(null);
+    const [recipientPhone, setRecipientPhone] = useState("");
+    const [whatsappMessage, setWhatsappMessage] = useState("");
+    const [sendingWhatsapp, setSendingWhatsapp] = useState(false);
 
     // ─── Fetch only CONFIRMED and MD_REJECTED orders ────────────────────────────
     const fetchOrders = useCallback(async () => {
@@ -136,6 +143,45 @@ const QuotationList: React.FC = () => {
         }
     };
 
+    const handleOpenWhatsappModal = async (item: SalesOrder) => {
+        try {
+            setSendingWhatsapp(true);
+            const fullItem = await salesOrderService.fetchById(item.id);
+            setWhatsappOrder(fullItem);
+            setRecipientPhone(fullItem.mobile || "");
+            setWhatsappMessage(`Dear ${fullItem.customer?.displayName || fullItem.customer?.firmName || "Customer"},\n\nPlease find the attached quotation for your reference.\n\nBest regards,\n${company?.companyName || "Sunsea"}`);
+            setShowWhatsappModal(true);
+        } catch (error: any) {
+            toast.error("Failed to load quotation details");
+        } finally {
+            setSendingWhatsapp(false);
+        }
+    };
+
+    const handleSendWhatsapp = async () => {
+        if (!whatsappOrder || !recipientPhone) {
+            toast.error("Recipient phone is required.");
+            return;
+        }
+        setSendingWhatsapp(true);
+        try {
+            const formattedPhone = recipientPhone.replace(/^\+/, "");
+            await salesOrderService.whatsappQuotation(
+                whatsappOrder.id,
+                formattedPhone,
+                whatsappMessage
+            );
+
+            toast.success("WhatsApp message sent successfully!");
+            setShowWhatsappModal(false);
+        } catch (err: any) {
+            console.error(err);
+            toast.error(err?.response?.data?.message || "Failed to send WhatsApp message");
+        } finally {
+            setSendingWhatsapp(false);
+        }
+    };
+
 
     const formatDate = (dateStr: string) => {
         if (!dateStr) return "N/A";
@@ -207,6 +253,7 @@ const QuotationList: React.FC = () => {
                                     <ViewButton onClick={() => handleOpenView(item)} />
                                     <EditButton onClick={() => handleOpenEdit(item)} />
                                     <EmailButton onClick={() => handleOpenEmailModal(item)} />
+                                    <WhatsappButton onClick={() => handleOpenWhatsappModal(item)} />
                                     {/* <DeleteButton onClick={() => triggerDelete(item.id)} /> */}
                                 </div>
                             ),
@@ -337,6 +384,78 @@ const QuotationList: React.FC = () => {
                 confirmIcon={Mail}
                 confirmVariant="primary"
                 isLoading={sendingEmail}
+            />
+
+            <CommonConfirmModal
+                show={showWhatsappModal}
+                onHide={() => setShowWhatsappModal(false)}
+                onConfirm={handleSendWhatsapp}
+                title="Send WhatsApp"
+                message={
+                    <div className="text-left mt-2 flex flex-col gap-3">
+                        <p className="text-sm text-slate-500 mb-2">Are you sure you want to send the quotation via WhatsApp?</p>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Phone Number (with country code, e.g. 919876543210)</label>
+                            {(() => {
+                                const phones = [];
+                                if (whatsappOrder?.customer) {
+                                    if (Array.isArray(whatsappOrder.customer.mobile)) {
+                                        whatsappOrder.customer.mobile.forEach((m: any) => {
+                                            if (m.number || m.value) phones.push({ label: m.label || "Mobile", number: m.number || m.value });
+                                        });
+                                    } else if (typeof whatsappOrder.customer.mobile === "string" && whatsappOrder.customer.mobile) {
+                                        phones.push({ label: "Mobile", number: whatsappOrder.customer.mobile });
+                                    }
+                                    if (typeof (whatsappOrder.customer as any).altPhone === "string" && (whatsappOrder.customer as any).altPhone) {
+                                        phones.push({ label: "Alternative", number: (whatsappOrder.customer as any).altPhone });
+                                    }
+                                }
+                                if (whatsappOrder?.mobile && !phones.find(p => p.number === whatsappOrder.mobile)) {
+                                    phones.push({ label: "Order Number", number: whatsappOrder.mobile });
+                                }
+
+                                if (phones.length > 1) {
+                                    return (
+                                        <select 
+                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white"
+                                            value={recipientPhone}
+                                            onChange={(e) => setRecipientPhone(e.target.value)}
+                                        >
+                                            {phones.map((p, idx) => (
+                                                <option key={idx} value={p.number}>
+                                                    {p.label ? `${p.label} (${p.number})` : p.number}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    );
+                                }
+                                return (
+                                    <input
+                                        type="text"
+                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                                        value={recipientPhone}
+                                        onChange={(e) => setRecipientPhone(e.target.value)}
+                                    />
+                                );
+                            })()}
+                        </div>
+                        {/* <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Message</label>
+                            <textarea
+                                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                                rows={4}
+                                value={whatsappMessage}
+                                onChange={(e) => setWhatsappMessage(e.target.value)}
+                            />
+                        </div> */}
+                    </div>
+                }
+                warningText="This will generate a PDF and send it to the customer's WhatsApp."
+                confirmText="Send WhatsApp"
+                loadingText="Sending..."
+                confirmIcon={MessageCircle}
+                confirmVariant="primary"
+                isLoading={sendingWhatsapp}
             />
         </div>
     );

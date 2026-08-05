@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { FaPlus, FaSearch, FaFileInvoice } from "react-icons/fa";
+import { FaPlus, FaSearch, FaFileInvoice, FaWhatsapp } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useSelector } from "react-redux";
@@ -10,6 +10,7 @@ import DeleteButton from "../../../../components/ui/DeleteButton/DeleteButton";
 import CustomButton from "../../../../components/ui/Button/Button";
 import CommonConfirmModal from "../../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import EmailButton from "../../../../components/ui/EmailButton/EmailButton";
+import WhatsappButton from "../../../../components/ui/WhatsappButton/WhatsappButton";
 import PurchaseOrderViewModal from "../components/PurchaseOrderViewModal";
 import { usePurchaseOrders } from "../../../../hooks/usePurchaseOrder";
 import { usePermission } from "../../../../hooks/usePermission";
@@ -69,6 +70,11 @@ const PurchaseOrderListPage: React.FC = () => {
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [emailPo, setEmailPo] = useState<any | null>(null);
   const [sendingEmail, setSendingEmail] = useState(false);
+
+  const [showWhatsappModal, setShowWhatsappModal] = useState(false);
+  const [whatsappPo, setWhatsappPo] = useState<any | null>(null);
+  const [recipientPhone, setRecipientPhone] = useState("");
+  const [sendingWhatsapp, setSendingWhatsapp] = useState(false);
 
   const hasActiveFilters = !!(statusFilter || fromDate || toDate);
   const activeFilterCount = [statusFilter, fromDate, toDate].filter(Boolean).length;
@@ -151,6 +157,52 @@ const PurchaseOrderListPage: React.FC = () => {
       toast.error(error?.response?.data?.message || "Failed to send email");
     } finally {
       setSendingEmail(false);
+    }
+  };
+
+  const handleOpenWhatsappModal = async (item: any) => {
+    try {
+      setSendingWhatsapp(true);
+      const fullItem = await purchaseOrderService.fetchById(item.id);
+      setWhatsappPo(fullItem);
+      
+      let rPhone = "";
+      if (fullItem.supplier?.mobile) {
+        if (Array.isArray(fullItem.supplier.mobile) && fullItem.supplier.mobile.length > 0) {
+            rPhone = fullItem.supplier.mobile[0].number || fullItem.supplier.mobile[0].value || "";
+        } else if (typeof fullItem.supplier.mobile === "string") {
+            rPhone = fullItem.supplier.mobile;
+        }
+      }
+      setRecipientPhone(rPhone);
+
+      setShowWhatsappModal(true);
+    } catch (error: any) {
+      toast.error("Failed to load PO details");
+    } finally {
+      setSendingWhatsapp(false);
+    }
+  };
+
+  const handleSendWhatsapp = async () => {
+    if (!whatsappPo || !recipientPhone) return;
+    setSendingWhatsapp(true);
+    try {
+      const formattedPhone = recipientPhone.replace(/^\+/, "");
+      const whatsappMessage = `Dear ${whatsappPo.supplier?.supplierName || "Supplier"},\n\nPlease find the attached Purchase Order ${whatsappPo.poNumber} for your reference.\n\nBest regards,\n${company?.companyName || "Company"}`;
+      
+      await purchaseOrderService.whatsappPO(whatsappPo.id, {
+        to: formattedPhone,
+        message: whatsappMessage
+      });
+
+      toast.success("WhatsApp message sent successfully!");
+      setShowWhatsappModal(false);
+      setWhatsappPo(null);
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || "Failed to send WhatsApp message");
+    } finally {
+      setSendingWhatsapp(false);
     }
   };
 
@@ -365,6 +417,10 @@ const PurchaseOrderListPage: React.FC = () => {
                           onClick={() => handleOpenEmailModal(item)} 
                           disabled={sendingEmail && emailPo?.id === item.id} 
                         />
+                        <WhatsappButton 
+                          onClick={() => handleOpenWhatsappModal(item)} 
+                          disabled={sendingWhatsapp && whatsappPo?.id === item.id} 
+                        />
                       </>
                     )}
                     {canDelete && item.status === "DRAFT" && (
@@ -402,6 +458,63 @@ const PurchaseOrderListPage: React.FC = () => {
           confirmVariant="primary"
           onConfirm={handleSendEmail}
           onHide={() => setShowEmailModal(false)}
+        />
+
+        <CommonConfirmModal
+          show={showWhatsappModal}
+          title="Send WhatsApp"
+          message={
+              <div className="text-left mt-2 flex flex-col gap-3">
+                  <p className="text-sm text-slate-500 mb-2">Are you sure you want to send the Purchase Order via WhatsApp?</p>
+                  <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Phone Number (with country code, e.g. 919876543210)</label>
+                      {(() => {
+                          const phones = [];
+                          if (whatsappPo?.supplier) {
+                              if (Array.isArray(whatsappPo.supplier.mobile)) {
+                                  whatsappPo.supplier.mobile.forEach((m: any) => {
+                                      if (m.number || m.value) phones.push({ label: m.label || "Mobile", number: m.number || m.value });
+                                  });
+                              } else if (typeof whatsappPo.supplier.mobile === "string" && whatsappPo.supplier.mobile) {
+                                  phones.push({ label: "Mobile", number: whatsappPo.supplier.mobile });
+                              }
+                              if (typeof whatsappPo.supplier.altPhone === "string" && whatsappPo.supplier.altPhone) {
+                                  phones.push({ label: "Alternative", number: whatsappPo.supplier.altPhone });
+                              }
+                          }
+
+                          if (phones.length > 1) {
+                              return (
+                                  <select 
+                                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white"
+                                      value={recipientPhone}
+                                      onChange={(e) => setRecipientPhone(e.target.value)}
+                                  >
+                                      {phones.map((p, idx) => (
+                                          <option key={idx} value={p.number}>
+                                              {p.label ? `${p.label} (${p.number})` : p.number}
+                                          </option>
+                                      ))}
+                                  </select>
+                              );
+                          }
+                          return (
+                              <input
+                                  type="text"
+                                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                                  value={recipientPhone}
+                                  onChange={(e) => setRecipientPhone(e.target.value)}
+                              />
+                          );
+                      })()}
+                  </div>
+              </div>
+          }
+          confirmText={sendingWhatsapp ? "Sending..." : "Send WhatsApp"}
+          confirmIcon={FaWhatsapp}
+          confirmVariant="primary"
+          onConfirm={handleSendWhatsapp}
+          onHide={() => setShowWhatsappModal(false)}
         />
       </div >
     </div >

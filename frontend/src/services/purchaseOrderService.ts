@@ -67,4 +67,12 @@ export const purchaseOrderService = {
     );
     return response.data;
   },
+
+  whatsappPO: async (id: string, whatsappData: { to: string, message?: string }): Promise<any> => {
+    const response = await apiClient.post(
+      `${config.purchaseOrder.base}/${id}/whatsapp-po`,
+      whatsappData
+    );
+    return response.data;
+  },
 };

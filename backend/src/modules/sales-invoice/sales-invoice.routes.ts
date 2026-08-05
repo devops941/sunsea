@@ -57,5 +57,12 @@ router.post(
   validateMiddleware(salesInvoiceIdRequestSchema),
   salesInvoiceController.emailInvoice
 );
+router.post(
+  "/:id/whatsapp-invoice",
+  authMiddleware,
+  requirePermission("sales-invoices.view"),
+  validateMiddleware(salesInvoiceIdRequestSchema),
+  salesInvoiceController.whatsappInvoice
+);
 
 export default router;

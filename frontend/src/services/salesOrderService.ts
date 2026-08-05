@@ -45,6 +45,7 @@ export interface SalesOrder {
         id: string;
         firmName: string;
         displayName: string;
+        mobile?: { label: string; number: string }[];
     };
     customerType?: string;
     mobile?: string | null;
@@ -310,6 +311,14 @@ export const salesOrderService = {
         const response = await apiClient.post(`${config.salesOrder.getById}/${id}/email-quotation`, {
             recipientEmail,
             subject,
+            message
+        });
+        return response.data?.data || response.data;
+    },
+
+    whatsappQuotation: async (id: number | string, to: string, message: string): Promise<any> => {
+        const response = await apiClient.post(`${config.salesOrder.getById}/${id}/whatsapp-quotation`, {
+            to,
             message
         });
         return response.data?.data || response.data;

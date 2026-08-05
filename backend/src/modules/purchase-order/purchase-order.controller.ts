@@ -10,6 +10,7 @@ import { ApiError } from "../../utils/ApiError";
 import { generatePoInvoiceHtml } from "../../templates/poInvoiceTemplate";
 import { generatePdfFromHtml } from "../../utils/pdfGenerator";
 import { sendEmail } from "../../utils/mailer";
+import { WhatsappService } from "../whatsappservice/whatsapp.service";
 
 class PurchaseOrderController {
 
@@ -66,7 +67,44 @@ class PurchaseOrderController {
     update = asyncHandler(async (req: Request, res: Response) => {
         const id = req.params.id as string;
 
+        const oldPo = await purchaseOrderService.getPurchaseOrderById(id);
         const po = await purchaseOrderService.updatePurchaseOrder(id, req.body);
+
+        if (oldPo.status !== "APPROVED" && po.status === "APPROVED") {
+            try {
+                const fullPo = await purchaseOrderService.getPurchaseOrderById(id);
+                const companyDetails = await prisma.company.findFirst();
+                const supplier = fullPo.supplier;
+                
+                let recipientPhone = "";
+                if (supplier?.mobile) {
+                    if (Array.isArray(supplier.mobile) && supplier.mobile.length > 0) {
+                        const firstMobile: any = supplier.mobile[0];
+                        recipientPhone = firstMobile.number || firstMobile.value || "";
+                    } else if (typeof supplier.mobile === "string") {
+                        recipientPhone = supplier.mobile as string;
+                    }
+                }
+                
+                if (!recipientPhone && supplier?.altPhone) {
+                    recipientPhone = supplier.altPhone;
+                }
+
+                if (recipientPhone && companyDetails && supplier) {
+                    const formattedPhone = recipientPhone.replace(/^\+/, "");
+                    const html = generatePoInvoiceHtml(fullPo, companyDetails, supplier);
+                    const pdfBuffer = await generatePdfFromHtml(html);
+                    const filename = `PO-${fullPo.poNumber}.pdf`;
+                    
+                    const mediaId = await WhatsappService.uploadMedia(pdfBuffer, filename, "application/pdf");
+                    const message = `Dear ${supplier.supplierName},\n\nYour Purchase Order ${fullPo.poNumber} has been approved. Please find the attached document for your reference.\n\nBest regards,\n${companyDetails.companyName}`;
+                    
+                    await WhatsappService.sendDocumentMessage(formattedPhone, mediaId, filename, message);
+                }
+            } catch (err) {
+                console.error("Failed to auto-send WhatsApp on PO approval", err);
+            }
+        }
 
         getIO().emit("purchaseOrder:updated", po);
 
@@ -126,6 +164,32 @@ class PurchaseOrderController {
         });
 
         res.status(200).json(new ApiResponse("Purchase Order invoice emailed successfully"));
+    });
+
+    whatsappPO = asyncHandler(async (req: Request, res: Response) => {
+        const id = req.params.id as string;
+        const { to, message } = req.body;
+
+        if (!to) {
+            throw new ApiError(400, "Recipient phone number is required");
+        }
+
+        const po = await purchaseOrderService.getPurchaseOrderById(id);
+        const companyDetails = await prisma.company.findFirst();
+        const supplier = po.supplier;
+
+        const html = generatePoInvoiceHtml(po, companyDetails, supplier);
+        const pdfBuffer = await generatePdfFromHtml(html);
+        
+        const filename = `PO-${po.poNumber}.pdf`;
+        
+        const { WhatsappService } = require("../whatsappservice/whatsapp.service");
+
+        const mediaId = await WhatsappService.uploadMedia(pdfBuffer, filename, "application/pdf");
+
+        await WhatsappService.sendDocumentMessage(to, mediaId, filename, message || `Purchase Order ${po.poNumber}`);
+
+        res.status(200).json(new ApiResponse("WhatsApp message sent successfully!"));
     });
 }
 
