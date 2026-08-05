@@ -1683,6 +1683,7 @@ const PayrollRun: React.FC = () => {
       halfDays:          0,
       otHours:           0,
       lateMinutes:       0,
+      dailyLateMinutes:  [],
       permissionMinutes: 0,
       advance:           0,
     }));
