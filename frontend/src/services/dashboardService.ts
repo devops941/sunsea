@@ -14,6 +14,7 @@ export interface DashboardSummary {
   rawMaterialStocks: any[];
   finishedGoodsStocks: any[];
   dailyPlans: any[];
+  salesInvoices?: any[];
 }
 
 const dashboardService = {

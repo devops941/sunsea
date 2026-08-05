@@ -76,6 +76,7 @@ const DashboardPage: React.FC = () => {
   const [rawMaterials, setRawMaterials] = useState<any[]>([]);
   const [productsCount, setProductsCount] = useState(0);
   const [employeesCount, setEmployeesCount] = useState(0);
+  const [salesInvoices, setSalesInvoices] = useState<any[]>([]);
 
   // ── Single Dashboard API ────────────────────────────────────
   const loadDashboard = useCallback(async () => {
@@ -93,6 +94,7 @@ const DashboardPage: React.FC = () => {
       setRawMaterials(data.rawMaterials || []);
       setProductsCount(data.productsCount || 0);
       setEmployeesCount(data.employeesCount || 0);
+      setSalesInvoices(data.salesInvoices || []);
     } catch (e) {
       console.error("Dashboard load error", e);
     } finally {
@@ -137,7 +139,13 @@ const DashboardPage: React.FC = () => {
       })
       .reduce((acc: number, s: any) => acc + (Number(s.netAmount) || 0), 0);
 
-    const pendingAmount = so.filter((s: any) => s.status !== 'COMPLETED' && s.status !== 'CANCELLED').reduce((acc: number, s: any) => acc + (Number(s.netAmount) || 0), 0);
+    // Pending amount = sum of (grandTotal - totalPaid) across all non-cancelled invoices
+    const pendingAmount = safe(salesInvoices).reduce((acc: number, inv: any) => {
+      const payments = Array.isArray(inv.payments) ? inv.payments : (typeof inv.payments === "string" ? JSON.parse(inv.payments || "[]") : []);
+      const totalPaid = payments.reduce((s: number, p: any) => s + Number(p.amount || 0), 0);
+      const balanceDue = Math.max(0, Number(inv.grandTotal) - totalPaid);
+      return acc + balanceDue;
+    }, 0);
     const uniqueCustomers = new Set(so.filter((s: any) => s.customer).map((s: any) => s.customer?.id || s.customer?.firmName)).size;
 
     return {
@@ -155,7 +163,7 @@ const DashboardPage: React.FC = () => {
       pendingAmount,
       uniqueCustomers,
     };
-  }, [productionOrders, salesOrders, purchaseOrders, rawMaterials, machines, weeklyPrograms, productsCount, employeesCount]);
+  }, [productionOrders, salesOrders, purchaseOrders, rawMaterials, machines, weeklyPrograms, productsCount, employeesCount, salesInvoices]);
 
   // Today's Tasks Stats
   const todayStats = useMemo(() => {

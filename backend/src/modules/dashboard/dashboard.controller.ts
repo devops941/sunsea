@@ -15,6 +15,7 @@ const dashboardController = {
         rawMaterials,
         finishedGoodsStocks,
         dailyPlans,
+        salesInvoices,
       ] = await Promise.all([
         // Sales Orders
         prisma.salesOrder.findMany({
@@ -114,6 +115,19 @@ const dashboardController = {
           orderBy: { productionDate: "desc" },
           take: 50,
         }).catch(() => []),
+
+        // Sales Invoices for pending amount
+        prisma.salesInvoice.findMany({
+          select: {
+            id: true,
+            grandTotal: true,
+            payments: true,
+            status: true,
+          },
+          where: {
+            status: { not: "CANCELLED" },
+          },
+        }).catch(() => []),
       ]);
 
       return res.status(200).json({
@@ -127,9 +141,10 @@ const dashboardController = {
           machines,
           weeklyPrograms,
           rawMaterials,
-          rawMaterialStocks: [], // No rawMaterialStock model
+          rawMaterialStocks: [],
           finishedGoodsStocks,
           dailyPlans,
+          salesInvoices,
         },
       });
     } catch (error) {
