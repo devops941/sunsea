@@ -406,8 +406,8 @@ const QuotationList: React.FC = () => {
                                     } else if (typeof whatsappOrder.customer.mobile === "string" && whatsappOrder.customer.mobile) {
                                         phones.push({ label: "Mobile", number: whatsappOrder.customer.mobile });
                                     }
-                                    if (typeof whatsappOrder.customer.altPhone === "string" && whatsappOrder.customer.altPhone) {
-                                        phones.push({ label: "Alternative", number: whatsappOrder.customer.altPhone });
+                                    if (typeof (whatsappOrder.customer as any).altPhone === "string" && (whatsappOrder.customer as any).altPhone) {
+                                        phones.push({ label: "Alternative", number: (whatsappOrder.customer as any).altPhone });
                                     }
                                 }
                                 if (whatsappOrder?.mobile && !phones.find(p => p.number === whatsappOrder.mobile)) {
