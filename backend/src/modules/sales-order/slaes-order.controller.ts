@@ -187,6 +187,39 @@ class SalesOrderController {
         return res.status(200).json(new ApiResponse("Email sent successfully!"));
     });
 
+    whatsappQuotation = asyncHandler(async (req: Request, res: Response) => {
+        const { id } = req.params;
+        const { to, message } = req.body;
+
+        if (!to) {
+            return res.status(400).json(new ApiResponse("Recipient phone number is required"));
+        }
+
+        const order = await salesOrderService.findById(Number(id));
+        if (!order) {
+            return res.status(404).json(new ApiResponse("Order not found"));
+        }
+
+        const company = await companyService.getCompany();
+
+        // 1. Generate PDF buffer
+        const htmlContent = generateQuotationHtml(order, company);
+        const pdfBuffer = await generatePdfFromHtml(htmlContent);
+        
+        const filename = `Quotation-${order.orderNo}.pdf`;
+        
+        const { WhatsappService } = require("../whatsappservice/whatsapp.service");
+
+        // 2. Upload media
+        const mediaId = await WhatsappService.uploadMedia(pdfBuffer, filename, "application/pdf");
+
+        // 3. Send message with the document
+        await WhatsappService.sendDocumentMessage(to, mediaId, filename, message || `Quotation for Order ${order.orderNo}`);
+
+        return res.status(200).json(new ApiResponse("WhatsApp message sent successfully!"));
+    });
+
+
     // ─── Private helper methods ──────────────────────────────────────
 
     private parseApprovalStatus(value: unknown): "APPROVED" | "REJECTED" | "PENDING" | undefined {

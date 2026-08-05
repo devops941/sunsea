@@ -167,6 +167,40 @@ class SalesInvoiceController {
 
     return res.status(200).json(new ApiResponse("Email sent successfully!"));
   });
+  whatsappInvoice = asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const { to, message } = req.body;
+
+    if (!to) {
+      return res.status(400).json(new ApiResponse("Recipient phone number is required"));
+    }
+
+    const company = await companyService.getCompany();
+    if (!company) {
+      return res.status(500).json(new ApiResponse("Company not found"));
+    }
+
+    const invoice = await salesInvoiceService.getSalesInvoiceById(id as string, company.id);
+    if (!invoice) {
+      return res.status(404).json(new ApiResponse("Invoice not found"));
+    }
+
+    // 1. Generate PDF buffer
+    const htmlContent = generateInvoiceHtml(invoice, company);
+    const pdfBuffer = await generatePdfFromHtml(htmlContent);
+    
+    const filename = `Invoice-${invoice.invoiceNo}.pdf`;
+    
+    const { WhatsappService } = require("../whatsappservice/whatsapp.service");
+
+    // 2. Upload media
+    const mediaId = await WhatsappService.uploadMedia(pdfBuffer, filename, "application/pdf");
+
+    // 3. Send message with the document
+    await WhatsappService.sendDocumentMessage(to, mediaId, filename, message || `Invoice ${invoice.invoiceNo}`);
+
+    return res.status(200).json(new ApiResponse("WhatsApp message sent successfully!"));
+  });
 }
 
 export const salesInvoiceController = new SalesInvoiceController();

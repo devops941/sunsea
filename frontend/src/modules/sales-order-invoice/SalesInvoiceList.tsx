@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from "react";
-import { FaPlus, FaTrash, FaEye } from "react-icons/fa";
+import { FaPlus, FaTrash, FaEye, FaWhatsapp } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 
@@ -14,6 +14,7 @@ import EditButton from "../../components/ui/EditButton/EditButton";
 import DataTable, { type DataTableColumn } from "../../components/ui/table/DataTable";
 import SearchInput from "../../components/ui/SearchInput/SearchInput";
 import EmailButton from "../../components/ui/EmailButton/EmailButton";
+import WhatsappButton from "../../components/ui/WhatsappButton/WhatsappButton";
 import { Mail } from "lucide-react";
 import { useAppSelector } from "../../hooks/reduxHooks";
 import { useSocketSync } from "../../hooks/useSocketSync";
@@ -53,6 +54,12 @@ const SalesInvoiceList: React.FC = () => {
     const [emailSubject, setEmailSubject] = useState("");
     const [emailMessage, setEmailMessage] = useState("");
     const [sendingEmail, setSendingEmail] = useState(false);
+
+    const [showWhatsappModal, setShowWhatsappModal] = useState(false);
+    const [whatsappInvoice, setWhatsappInvoice] = useState<any | null>(null);
+    const [recipientPhone, setRecipientPhone] = useState("");
+    const [whatsappMessage, setWhatsappMessage] = useState("");
+    const [sendingWhatsapp, setSendingWhatsapp] = useState(false);
 
     const fetchInvoices = useCallback(async () => {
         if (!can("sales-invoices.view")) return;
@@ -152,6 +159,56 @@ const SalesInvoiceList: React.FC = () => {
         }
     };
 
+    const handleOpenWhatsappModal = async (item: any) => {
+        try {
+            setSendingWhatsapp(true);
+            const fullItem = await salesInvoiceService.fetchById(item.id);
+            setWhatsappInvoice(fullItem);
+            
+            // Extract best mobile number from customer object
+            let rPhone = "";
+            if (fullItem.customer?.mobile) {
+                if (Array.isArray(fullItem.customer.mobile) && fullItem.customer.mobile.length > 0) {
+                    rPhone = fullItem.customer.mobile[0].number || fullItem.customer.mobile[0].value || "";
+                } else if (typeof fullItem.customer.mobile === "string") {
+                    rPhone = fullItem.customer.mobile;
+                }
+            }
+            setRecipientPhone(rPhone);
+            
+            setWhatsappMessage(`Dear ${fullItem.customer?.displayName || fullItem.customer?.firmName || "Customer"},\n\nPlease find the attached invoice for your reference.\n\nBest regards,\n${company?.companyName || "Sunsea"}`);
+            setShowWhatsappModal(true);
+        } catch (error: any) {
+            toast.error("Failed to load invoice details");
+        } finally {
+            setSendingWhatsapp(false);
+        }
+    };
+
+    const handleSendWhatsapp = async () => {
+        if (!whatsappInvoice || !recipientPhone) {
+            toast.error("Recipient phone is required.");
+            return;
+        }
+        setSendingWhatsapp(true);
+        try {
+            const formattedPhone = recipientPhone.replace(/^\+/, "");
+            await salesInvoiceService.whatsappInvoice(
+                whatsappInvoice.id,
+                formattedPhone,
+                whatsappMessage
+            );
+
+            toast.success("WhatsApp message sent successfully!");
+            setShowWhatsappModal(false);
+        } catch (err: any) {
+            console.error(err);
+            toast.error(err?.response?.data?.message || "Failed to send WhatsApp message");
+        } finally {
+            setSendingWhatsapp(false);
+        }
+    };
+
     const handleOpenView = async (item: any) => {
         navigate(`/sales-invoices/details/${item.id}`);
         // try {
@@ -207,6 +264,7 @@ const SalesInvoiceList: React.FC = () => {
             render: (item) => (
                 <div className="flex justify-start gap-2">
                     <EmailButton onClick={() => handleOpenEmailModal(item)} />
+                    <WhatsappButton onClick={() => handleOpenWhatsappModal(item)} />
                     <ViewButton onClick={() => handleOpenView(item)} />
                     {item.status !== "PAID" && (
                         <EditButton onClick={() => navigate(`/sales-invoices/edit/${item.id}`)} />
@@ -345,6 +403,66 @@ const SalesInvoiceList: React.FC = () => {
                 confirmIcon={Mail}
                 confirmVariant="primary"
                 isLoading={sendingEmail}
+            />
+
+            <CommonConfirmModal
+                show={showWhatsappModal}
+                onHide={() => setShowWhatsappModal(false)}
+                onConfirm={handleSendWhatsapp}
+                title="Send WhatsApp"
+                message={
+                    <div className="text-left mt-2 flex flex-col gap-3">
+                        <p className="text-sm text-slate-500 mb-2">Are you sure you want to send the invoice via WhatsApp?</p>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Phone Number (with country code, e.g. 919876543210)</label>
+                            {(() => {
+                                const phones = [];
+                                if (whatsappInvoice?.customer) {
+                                    if (Array.isArray(whatsappInvoice.customer.mobile)) {
+                                        whatsappInvoice.customer.mobile.forEach((m: any) => {
+                                            if (m.number || m.value) phones.push({ label: m.label || "Mobile", number: m.number || m.value });
+                                        });
+                                    } else if (typeof whatsappInvoice.customer.mobile === "string" && whatsappInvoice.customer.mobile) {
+                                        phones.push({ label: "Mobile", number: whatsappInvoice.customer.mobile });
+                                    }
+                                    if (typeof whatsappInvoice.customer.altPhone === "string" && whatsappInvoice.customer.altPhone) {
+                                        phones.push({ label: "Alternative", number: whatsappInvoice.customer.altPhone });
+                                    }
+                                }
+
+                                if (phones.length > 1) {
+                                    return (
+                                        <select 
+                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white"
+                                            value={recipientPhone}
+                                            onChange={(e) => setRecipientPhone(e.target.value)}
+                                        >
+                                            {phones.map((p, idx) => (
+                                                <option key={idx} value={p.number}>
+                                                    {p.label ? `${p.label} (${p.number})` : p.number}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    );
+                                }
+                                return (
+                                    <input
+                                        type="text"
+                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                                        value={recipientPhone}
+                                        onChange={(e) => setRecipientPhone(e.target.value)}
+                                    />
+                                );
+                            })()}
+                        </div>
+                    </div>
+                }
+                warningText="This will generate a PDF and send it to the customer's WhatsApp."
+                confirmText="Send WhatsApp"
+                loadingText="Sending..."
+                confirmIcon={FaWhatsapp}
+                confirmVariant="primary"
+                isLoading={sendingWhatsapp}
             />
         </div>
     );

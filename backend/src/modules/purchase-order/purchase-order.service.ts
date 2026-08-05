@@ -321,6 +321,8 @@ class PurchaseOrderService {
                         supplierCode: true,
                         email: true,
                         gstin: true,
+                        mobile: true,
+                        altPhone: true,
                     },
                 },
                 items: true,
@@ -341,6 +343,8 @@ class PurchaseOrderService {
                     supplierName: supplier.displayName || supplier.legalName,
                     email: supplier.email,
                     gstin: supplier.gstin,
+                    mobile: supplier.mobile,
+                    altPhone: supplier.altPhone,
                 }
                 : null,
         };

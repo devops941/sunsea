@@ -38,5 +38,13 @@ export const salesInvoiceService = {
     });
     return response.data?.data || response.data;
   },
+
+  whatsappInvoice: async (id: string, to: string, message: string): Promise<any> => {
+    const response = await apiClient.post(`${getBaseUrl()}/${id}/whatsapp-invoice`, {
+      to,
+      message,
+    });
+    return response.data?.data || response.data;
+  },
 };
 export default salesInvoiceService;

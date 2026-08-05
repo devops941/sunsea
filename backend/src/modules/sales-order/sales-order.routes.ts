@@ -73,6 +73,14 @@ router.post(
     SalesOrderController.emailQuotation
 );
 
+router.post(
+    "/:id/whatsapp-quotation",
+    authMiddleware,
+    requirePermission("sales-orders.view"),
+    validateMiddleware(salesOrderIdSchema),
+    SalesOrderController.whatsappQuotation
+);
+
 
 router.put(
     "/:id",
