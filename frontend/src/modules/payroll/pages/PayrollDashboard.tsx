@@ -4,7 +4,9 @@ import {
   Users, IndianRupee, Clock, CheckCircle2,
   CalendarDays, FileText, Settings, BarChart3, ChevronRight,
   PlayCircle, AlertCircle, Building2, Loader2, ClipboardList, Trash2, Wallet,
+  Calendar, RotateCcw,
 } from 'lucide-react';
+import CommonLoader from '../../../components/ui/Loader/CommonLoader';
 import { toast } from 'react-toastify';
 import { StatusBadge } from '../../../components/ui/StatusBadge/Badge';
 import CustomButton from '../../../components/ui/custombutton/CustomButton';
@@ -22,12 +24,21 @@ const fmt   = (n: number) => Number(n).toLocaleString('en-IN');
 const fmtRs = (n: number) => `₹${fmt(Math.round(Number(n)))}`;
 
 // ─── Component ────────────────────────────────────────────────────────────────
+const getCurrentMonth = () => {
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  return `${yyyy}-${mm}`;
+};
+
 const PayrollDashboard: React.FC = () => {
   const navigate = useNavigate();
 
+  const [selectedMonth, setSelectedMonth] = useState<string>(getCurrentMonth);
   const [runs,          setRuns]          = useState<ApiPayrollRun[]>([]);
   const [employees,     setEmployees]     = useState<ApiEmployeePayroll[]>([]);
   const [loading,       setLoading]       = useState(true);
+  const [runsLoading,   setRunsLoading]   = useState(false);
   const [error,         setError]         = useState('');
   const [deleteRunId,   setDeleteRunId]   = useState<number | null>(null);
   const [isDeleting,    setIsDeleting]    = useState(false);
@@ -50,8 +61,9 @@ const PayrollDashboard: React.FC = () => {
   useEffect(() => {
     const load = async () => {
       try {
+        setRunsLoading(true);
         const [runsData, empData] = await Promise.all([
-          payrollService.listRuns({ limit: 10 }),
+          payrollService.listRuns({ period: selectedMonth || undefined, limit: 50 }),
           payrollService.listEmployees(),
         ]);
         setRuns(runsData.runs);
@@ -60,23 +72,25 @@ const PayrollDashboard: React.FC = () => {
         setError(e?.response?.data?.message ?? 'Failed to load payroll data');
       } finally {
         setLoading(false);
+        setRunsLoading(false);
       }
     };
     load();
-  }, []);
+  }, [selectedMonth]);
 
   // ── Derived stats ──────────────────────────────────────────────────────────
   const totalEmployees = employees.length;
   const empWithPayroll = employees.filter(e => e.payrollConfig);
-  const lastLockedRun  = runs.find(r => r.status === 'LOCKED');
+  const lockedRuns     = runs.filter(r => r.status === 'LOCKED');
   const pendingRun     = runs.find(r => r.status === 'DRAFT');
-  const lastRunNet     = lastLockedRun ? Number(lastLockedRun.totalNetSalary) : 0;
+  const lastRunNet     = lockedRuns.reduce((sum, r) => sum + Number(r.totalNetSalary || 0), 0);
+  const lockedPeriods  = lockedRuns.map(r => r.period).join(', ');
 
   const categoryCounts = {
     FIXED_MONTHLY: employees.filter(e => e.payrollConfig?.salaryType === 'FIXED_MONTHLY').length,
     PF_MONTHLY:    employees.filter(e => e.payrollConfig?.salaryType === 'PF_MONTHLY').length,
     CASH_MONTHLY:  employees.filter(e => e.payrollConfig?.salaryType === 'CASH_MONTHLY').length,
-    DAILY_WEEKLY:  employees.filter(e => e.payrollConfig?.salaryType === 'DAILY_WEEKLY').length,
+    DAILY_WEEKLY:  employees.filter(e => e.payrollConfig?.salaryType === 'DAILY_WEEKLY' || e.payrollConfig?.salaryType === 'WEEKLY' || e.salaryType === 'daily' || e.salaryType === 'weekly').length,
   };
 
   const latestRun     = runs[0];
@@ -143,16 +157,7 @@ const PayrollDashboard: React.FC = () => {
     },
   ];
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-page flex items-center justify-center">
-        <div className="flex items-center gap-3 text-text-muted">
-          <Loader2 size={22} className="animate-spin text-primary" />
-          <span className="text-sm font-medium">Loading payroll data…</span>
-        </div>
-      </div>
-    );
-  }
+  if (loading) return <CommonLoader text="Loading payroll data…" />;
 
   if (error) {
     return (
@@ -188,14 +193,14 @@ const PayrollDashboard: React.FC = () => {
 
         <div className="flex gap-2.5">
           <Button
-            text="Run Weekly"
+            text="Generate Weekly"
             icon={CalendarDays as any}
             variant="secondary"
             size="sm"
             onClick={() => navigate('/payroll/run?type=weekly')}
           />
           <Button
-            text="Run Monthly"
+            text="Generate Monthly"
             icon={PlayCircle as any}
             variant="primary"
             size="sm"
@@ -223,11 +228,11 @@ const PayrollDashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Last Locked Run */}
+        {/* Last Pay Run */}
         <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm hover:shadow-md transition-all duration-200">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Last Locked Run</p>
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Last Pay Run</p>
               <h3 className="text-3xl font-extrabold text-slate-800 mt-2 tracking-tight">
                 {lastRunNet > 0 ? fmtRs(lastRunNet) : '—'}
               </h3>
@@ -238,7 +243,7 @@ const PayrollDashboard: React.FC = () => {
           </div>
           <div className="mt-3 flex items-center gap-1.5 text-xs text-slate-500 font-medium">
             <span className="inline-block w-2 h-2 rounded-full bg-emerald-500" />
-            <span>{lastLockedRun ? lastLockedRun.period : 'No locked run yet'}</span>
+            <span>{lockedPeriods ? lockedPeriods : 'No locked run yet'}</span>
           </div>
         </div>
 
@@ -303,8 +308,8 @@ const PayrollDashboard: React.FC = () => {
       <div className="bg-slate-100/80 border border-slate-200/60 p-1.5 rounded-2xl inline-flex flex-wrap items-center gap-1.5 w-full">
         {[
           { label: 'Overview',        path: '/payroll/dashboard',      icon: BarChart3,     active: true  },
-          { label: 'Run Weekly',      path: '/payroll/run?type=weekly',  icon: CalendarDays,  active: false },
-          { label: 'Run Monthly',     path: '/payroll/run?type=monthly', icon: PlayCircle,    active: false },
+          { label: 'Generate Weekly',      path: '/payroll/run?type=weekly',  icon: CalendarDays,  active: false },
+          { label: 'Generate Monthly',     path: '/payroll/run?type=monthly', icon: PlayCircle,    active: false },
           { label: 'Weekly Report',   path: '/payroll/weekly-report',    icon: FileText,      active: false },
           { label: 'Monthly Report',  path: '/payroll/monthly-report',   icon: FileText,      active: false },
           { label: 'Attendance',      path: '/payroll/attendance',       icon: ClipboardList, active: false },
@@ -328,14 +333,50 @@ const PayrollDashboard: React.FC = () => {
 
       {/* ── Recent Payroll Runs Table (Full Width 100%) ── */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between px-6 py-4 border-b border-slate-100 gap-3">
           <div className="flex items-center gap-2">
             <h2 className="text-base font-bold text-slate-800">Recent Payroll Runs</h2>
             <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-600">
               {runs.length}
             </span>
+            {runsLoading && <Loader2 size={16} className="animate-spin text-primary ml-2" />}
           </div>
-         
+
+          {/* Month Filter controls */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5">
+              <Calendar size={14} className="text-slate-400" />
+              <input
+                type="month"
+                value={selectedMonth}
+                onChange={(e) => setSelectedMonth(e.target.value)}
+                className="bg-transparent text-xs font-bold text-slate-700 outline-none cursor-pointer"
+              />
+            </div>
+
+            {selectedMonth !== getCurrentMonth() && (
+              <button
+                type="button"
+                onClick={() => setSelectedMonth(getCurrentMonth())}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+                title="Reset to current month"
+              >
+                <RotateCcw size={12} />
+                <span>Current Month</span>
+              </button>
+            )}
+
+            {selectedMonth !== '' && (
+              <button
+                type="button"
+                onClick={() => setSelectedMonth('')}
+                className="px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-500 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                title="Show all payroll runs"
+              >
+                All Months
+              </button>
+            )}
+          </div>
         </div>
 
         {runs.length === 0 ? (

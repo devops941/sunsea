@@ -73,6 +73,7 @@ export interface AttendanceInput {
   halfDays: number;
   otHours: number;
   lateMinutes: number;
+  dailyLateMinutes: number[];  // per-day late minutes for per-day slab deduction
   permissionMinutes: number;
   advance: number;
 }
@@ -152,6 +153,90 @@ export interface ApiSalaryAdvance {
   status: 'PENDING' | 'PARTIAL' | 'CLEARED';
   createdAt: string;
   employee: { empCode: string; fullName: string };
+}
+
+export interface ApiPayslipData {
+  company: {
+    companyName:  string;
+    legalName:    string | null;
+    addressLine1: string | null;
+    addressLine2: string | null;
+    city:         string | null;
+    state:        string | null;
+    zipcode:      string | null;
+    phone:        string | null;
+    email:        string | null;
+    website:      string | null;
+    gstin:        string | null;
+    logoUrl:      string | null;
+  } | null;
+  run: {
+    id:       number;
+    runCode:  string;
+    period:   string;
+    type:     'MONTHLY' | 'WEEKLY';
+    status:   string;
+    lockedAt: string | null;
+  };
+  employee: {
+    id:            string;
+    empCode:       string;
+    fullName:      string;
+    designation:   string | null;
+    employeeType:  string | null;
+    pfNumber:      string | null;
+    esiNumber:     string | null;
+    uanNumber:     string | null;
+    panNumber:     string | null;
+    bankName:      string | null;
+    accountNumber: string | null;
+    ifscCode:      string | null;
+    department:    string;
+    dateOfJoining: string | null;
+    payrollConfig: {
+      salaryType:     string;
+      monthlySalary:  number;
+      basicSalary:    number;
+      hra:            number;
+      da:             number;
+      otherAllowance: number;
+      paymentMode:    string;
+    } | null;
+  };
+  result: {
+    id:                  number;
+    employeeCode:        string;
+    employeeName:        string;
+    salaryType:          string;
+    totalDays:           number;
+    presentDays:         number;
+    absentDays:          number;
+    lopDays:             number;
+    halfDays:            number;
+    lateMinutes:         number;
+    permissionMinutes:   number;
+    dailyRate:           number;
+    earnedSalary:        number;
+    grossSalary:         number;
+    otHours:             number;
+    otPay:               number;
+    pfWage:              number;
+    employeePf:          number;
+    employerPf:          number;
+    employeeEsi:         number;
+    employerEsi:         number;
+    pfApplicable:        boolean;
+    esiApplicable:       boolean;
+    professionalTax:     number;
+    lateEntryDeduction:  number;
+    permissionDeduction: number;
+    salaryAdvance:       number;
+    loanRecovery:        number;
+    otherDeductions:     number;
+    totalDeductions:     number;
+    netSalary:           number;
+    paymentMode:         string;
+  };
 }
 
 // ─── Service ──────────────────────────────────────────────────────────────────
@@ -249,5 +334,11 @@ export const payrollService = {
 
   deleteAdvance: async (id: number): Promise<void> => {
     await apiClient.delete(`${BASE}/advances/${id}`);
+  },
+
+  // Payslip
+  getPayslip: async (runId: number, resultId: number): Promise<ApiPayslipData> => {
+    const { data } = await apiClient.get(`${BASE}/runs/${runId}/payslip/${resultId}`);
+    return data.data;
   },
 };

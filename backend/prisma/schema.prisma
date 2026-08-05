@@ -2373,6 +2373,8 @@ model PayrollResult {
   payrollRun          PayrollRun @relation(fields: [payrollRunId], references: [id], onDelete: Cascade)
   employee            Employee   @relation(fields: [employeeId], references: [id])
 
+  @@index([payrollRunId])
+  @@index([employeeId])
   @@map("payroll_results")
 }
 

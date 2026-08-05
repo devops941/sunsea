@@ -4,6 +4,7 @@ import {
   ArrowLeft, Save, Loader2, AlertCircle, RefreshCw,
   CheckCircle2, Users, Info, PlayCircle, Calendar, CalendarDays,
 } from 'lucide-react';
+import CommonLoader from '../../../components/ui/Loader/CommonLoader';
 import SelectInput from '../../../components/form/SelectInput/SelectInput';
 import { payrollService } from '../../../services/payrollService';
 import type { ApiEmployeePayroll, ApiPayrollConfig } from '../../../services/payrollService';
@@ -219,19 +220,21 @@ const AttendancePage: React.FC = () => {
   const [selected, setSelected] = useState<{ empId: number; empName: string; date: string } | null>(null);
 
   // ── Derived: employees filtered by salary type ────────────────────────────
+  const isWeeklyEmployee = (e: ApiEmployeePayroll) =>
+    e.payrollConfig?.salaryType === 'DAILY_WEEKLY' ||
+    e.payrollConfig?.salaryType === 'WEEKLY' ||
+    e.salaryType === 'daily' ||
+    e.salaryType === 'weekly';
+
   const filteredEmployees = useMemo((): ApiEmployeePayroll[] => {
     if (runType === 'MONTHLY') {
       // Monthly view: all employees EXCEPT daily/weekly wage
-      return employees.filter(e =>
-        !e.payrollConfig || e.payrollConfig.salaryType !== 'DAILY_WEEKLY'
-      );
+      return employees.filter(e => !isWeeklyEmployee(e));
     } else {
       // Weekly view: only daily/weekly wage employees
-      return employees.filter(e =>
-        e.payrollConfig?.salaryType === 'DAILY_WEEKLY'
-      );
+      return employees.filter(e => isWeeklyEmployee(e));
     }
-  }, [employees, runType]);
+  }, [employees, runType]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Derived: weeks within the selected month ──────────────────────────────
   const monthWeeks = useMemo(() => weeksOfMonth(year, month), [year, month]);
@@ -463,17 +466,10 @@ const AttendancePage: React.FC = () => {
   const totalCells = filteredEmployees.length * dates.length;
 
   // ─────────────────────────────────────────────────────────────────────────
-  if (loading) return (
-    <div className="min-h-screen bg-page flex items-center justify-center">
-      <div className="flex items-center gap-3 text-text-muted">
-        <Loader2 size={22} className="animate-spin text-primary" />
-        <span className="text-sm font-medium">Loading employees and payroll settings…</span>
-      </div>
-    </div>
-  );
+  if (loading) return <CommonLoader text="Loading employees and payroll settings…" />;
 
   return (
-    <div className="min-h-screen bg-page flex flex-col">
+    <div className="min-h-screen  flex flex-col">
 
       {/* ── Header ── */}
       <div className="bg-white border-b border-border px-6 py-4 sticky top-0 z-30">

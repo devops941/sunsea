@@ -129,6 +129,13 @@ class PayrollController {
     res.json(new ApiResponse('Payroll run deleted'));
   });
 
+  getPayslip = asyncHandler(async (req: Request, res: Response) => {
+    const runId    = parseInt(String(req.params.id),       10);
+    const resultId = parseInt(String(req.params.resultId), 10);
+    const data = await payrollService.getPayslip(runId, resultId);
+    res.json(new ApiResponse('Payslip fetched', data));
+  });
+
   // ── Salary Advances ──────────────────────────────────────────────────────────
 
   listAdvances = asyncHandler(async (req: Request, res: Response) => {

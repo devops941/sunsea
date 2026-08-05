@@ -41,11 +41,12 @@ export function countDays(
 /**
  * Look up the slab amount for a given number of minutes.
  * A slab matches when fromMinutes <= minutes <= toMinutes.
+ * When toMinutes = 0, it means "and above" (open-ended upper bound).
  * Returns 0 if no slab matches.
  */
 export function lookupSlab(minutes: number, slabs: SlabEntry[]): number {
   const match = slabs.find(
-    (s) => minutes >= s.fromMinutes && minutes <= s.toMinutes
+    (s) => minutes >= s.fromMinutes && (s.toMinutes === 0 || minutes <= s.toMinutes)
   );
   return match ? match.amount : 0;
 }
@@ -295,10 +296,11 @@ export function computeEmployeePayroll(
   }
 
   // 5. OT + permission + late entry
-  let totalOtHours  = 0;
-  let totalOtPay    = 0;
-  let totalPermMin  = 0;
-  let totalLateMin  = 0;
+  let totalOtHours       = 0;
+  let totalOtPay         = 0;
+  let totalPermMin       = 0;
+  let totalLateMin       = 0;
+  let totalLateDeduction = 0;
 
   for (const day of days) {
     const isHoliday   = day.status === 'HOLIDAY';
@@ -307,12 +309,14 @@ export function computeEmployeePayroll(
     totalOtPay   += computeOtPay(day.otHours, dailyRate, settings, isHoliday, isWeeklyOff);
     totalPermMin += day.permissionMinutes;
     totalLateMin += day.lateMinutes;
+    // Late deduction: calculated per day so each day's minutes are checked against slabs independently
+    totalLateDeduction += computeLateEntryDeduction(day.lateMinutes, settings);
   }
 
   totalOtHours = Math.min(totalOtHours, settings.maxOtHoursPerWeek);
   totalOtPay   = applyRounding(totalOtPay, settings.roundingRule, settings.decimalPrecision);
   const lateEntryDeduction = applyRounding(
-    computeLateEntryDeduction(totalLateMin, settings),
+    totalLateDeduction,
     settings.roundingRule,
     settings.decimalPrecision
   );

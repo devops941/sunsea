@@ -111,6 +111,7 @@ export const createPayrollRunSchema = z.object({
       halfDays:          z.number().min(0),
       otHours:           z.number().min(0).default(0),
       lateMinutes:       z.number().int().min(0).default(0),
+      dailyLateMinutes:  z.array(z.number().int().min(0)).optional(),
       permissionMinutes: z.number().int().min(0).default(0),
       advance:           z.number().min(0).default(0),
     })),

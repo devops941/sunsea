@@ -7,6 +7,7 @@ import {
   Building2, Wallet, TrendingUp, Info, Loader2, ClipboardList,
 } from 'lucide-react';
 import { useSocket } from '../../../providers/SocketProvider';
+import CommonLoader from '../../../components/ui/Loader/CommonLoader';
 import { payrollService } from '../../../services/payrollService';
 import type { ApiPayrollRun, ApiEmployeePayroll, AttendanceInput, ApiPayrollResult } from '../../../services/payrollService';
 import DataTable, { type DataTableColumn } from '../../../components/ui/table/DataTable';
@@ -100,7 +101,7 @@ const StepHeader: React.FC<{ current: number }> = ({ current }) => (
             <div className="flex flex-col items-center min-w-0">
               <div className={`w-9 h-9 rounded-full flex items-center justify-center border-2 font-bold text-sm transition-all ${
                 done   ? 'bg-emerald-500 border-emerald-500 text-white' :
-                active ? 'bg-primary border-primary text-white shadow-md shadow-red-200' :
+                active ? 'bg-primary border-primary text-white shadow-md' :
                          'bg-white border-border text-text-muted'
               }`}>
                 {done ? <Check size={16} /> : <step.icon size={14} />}
@@ -370,11 +371,11 @@ const Step2: React.FC<{
   // Summary totals
   const totals = rows.reduce(
     (acc, r) => ({
-      present: acc.present + r.presentDays,
-      absent:  acc.absent  + r.absentDays,
-      half:    acc.half    + r.halfDays,
-      ot:      acc.ot      + r.otHours,
-      adv:     acc.adv     + r.advance,
+      present: acc.present + Number(r.presentDays || 0),
+      absent:  acc.absent  + Number(r.absentDays || 0),
+      half:    acc.half    + Number(r.halfDays || 0),
+      ot:      acc.ot      + Number(r.otHours || 0),
+      adv:     acc.adv     + Number(r.advance || 0),
     }),
     { present: 0, absent: 0, half: 0, ot: 0, adv: 0 }
   );
@@ -1529,22 +1530,24 @@ const PayrollRun: React.FC = () => {
           halfDays:          0,
           otHours:           0,
           lateMinutes:       0,
+          dailyLateMinutes:  [],
           permissionMinutes: 0,
           advance:           0,
         }));
 
         let rows = defaultRows;
         if (filteredRecords.length > 0) {
-          type Agg = { present: number; absent: number; half: number; ot: number; late: number; perm: number; adv: number };
+          type Agg = { present: number; absent: number; half: number; ot: number; late: number; dailyLate: number[]; perm: number; adv: number };
           const agg: Record<number, Agg> = {};
           filteredRecords.forEach((r: any) => {
             const empId = Number(r.employeeId);
-            if (!agg[empId]) agg[empId] = { present: 0, absent: 0, half: 0, ot: 0, late: 0, perm: 0, adv: 0 };
+            if (!agg[empId]) agg[empId] = { present: 0, absent: 0, half: 0, ot: 0, late: 0, dailyLate: [], perm: 0, adv: 0 };
             if (r.status === 'PRESENT')   agg[empId].present++;
             if (r.status === 'ABSENT')    agg[empId].absent++;
             if (r.status === 'HALF_DAY')  agg[empId].half++;
             agg[empId].ot   += Number(r.otHours);
             agg[empId].late += Number(r.lateMinutes);
+            agg[empId].dailyLate.push(Number(r.lateMinutes));
             agg[empId].perm += Number(r.permissionMinutes);
             agg[empId].adv  += Number(r.salaryAdvance);
           });
@@ -1558,6 +1561,7 @@ const PayrollRun: React.FC = () => {
               halfDays:          a.half,
               otHours:           a.ot,
               lateMinutes:       a.late,
+              dailyLateMinutes:  a.dailyLate,
               permissionMinutes: a.perm,
               advance:           a.adv,
             };
@@ -1651,6 +1655,7 @@ const PayrollRun: React.FC = () => {
       halfDays:          0,
       otHours:           0,
       lateMinutes:       0,
+      dailyLateMinutes:  [],
       permissionMinutes: 0,
       advance:           0,
     })));
@@ -1737,16 +1742,17 @@ const PayrollRun: React.FC = () => {
     }
 
     // ── All employees complete — aggregate attendance ──────────────────────────
-    type Agg = { present: number; absent: number; half: number; ot: number; late: number; perm: number; adv: number };
+    type Agg = { present: number; absent: number; half: number; ot: number; late: number; dailyLate: number[]; perm: number; adv: number };
     const agg: Record<number, Agg> = {};
     allRecords.forEach((r: any) => {
       const empId = Number(r.employeeId);
-      if (!agg[empId]) agg[empId] = { present: 0, absent: 0, half: 0, ot: 0, late: 0, perm: 0, adv: 0 };
+      if (!agg[empId]) agg[empId] = { present: 0, absent: 0, half: 0, ot: 0, late: 0, dailyLate: [], perm: 0, adv: 0 };
       if (r.status === 'PRESENT')  agg[empId].present++;
       if (r.status === 'ABSENT')   agg[empId].absent++;
       if (r.status === 'HALF_DAY') agg[empId].half++;
       agg[empId].ot   += Number(r.otHours);
       agg[empId].late += Number(r.lateMinutes);
+      agg[empId].dailyLate.push(Number(r.lateMinutes));
       agg[empId].perm += Number(r.permissionMinutes);
     });
 
@@ -1793,12 +1799,13 @@ const PayrollRun: React.FC = () => {
         const a = agg[row.employeeId];
         return {
           ...row,
-          presentDays:       a?.present ?? 0,
-          absentDays:        a?.absent  ?? 0,
-          halfDays:          a?.half    ?? 0,
-          otHours:           a?.ot      ?? 0,
-          lateMinutes:       a?.late    ?? 0,
-          permissionMinutes: a?.perm    ?? 0,
+          presentDays:       a?.present   ?? 0,
+          absentDays:        a?.absent    ?? 0,
+          halfDays:          a?.half      ?? 0,
+          otHours:           a?.ot        ?? 0,
+          lateMinutes:       a?.late      ?? 0,
+          dailyLateMinutes:  a?.dailyLate ?? [],
+          permissionMinutes: a?.perm      ?? 0,
           advance:           advanceMap[row.employeeId] ?? 0,
         };
       });
@@ -1820,6 +1827,7 @@ const PayrollRun: React.FC = () => {
       halfDays:          r.halfDays,
       otHours:           r.otHours,
       lateMinutes:       r.lateMinutes,
+      dailyLateMinutes:  r.dailyLateMinutes ?? [],
       permissionMinutes: r.permissionMinutes,
       advance:           r.advance,
     }));
@@ -1869,7 +1877,7 @@ const PayrollRun: React.FC = () => {
       <div className="flex-1 p-6">
         {step === 1 && (
           loadingEmp
-            ? <div className="flex items-center justify-center py-20 text-text-muted"><Loader2 size={24} className="animate-spin mr-2" /> Loading employees…</div>
+            ? <CommonLoader text="Loading employees…" fullScreen={false} />
             : <Step1
                 runType={runType}       setRunType={setRunType}
                 month={month}           setMonth={setMonth}

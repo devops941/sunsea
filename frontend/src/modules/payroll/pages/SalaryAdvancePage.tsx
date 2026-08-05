@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { Wallet, Plus, Trash2, X, Loader2, AlertTriangle } from 'lucide-react';
+import CommonLoader from '../../../components/ui/Loader/CommonLoader';
 import { toast } from 'react-toastify';
 import { payrollService } from '../../../services/payrollService';
 import type { ApiSalaryAdvance, ApiEmployeePayroll } from '../../../services/payrollService';
@@ -56,7 +57,7 @@ const AddPanel: React.FC<AddPanelProps> = ({ employees, onClose, onSaved }) => {
       {/* backdrop */}
       <div className="flex-1 " onClick={onClose} />
       {/* panel */}
-      <div className="w-full max-w-md bg-white shadow-xl flex flex-col">
+      <div className="w-full max-w-md  shadow-xl flex flex-col">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
           <div className="flex items-center gap-2">
             <Wallet size={18} className="text-primary" />
@@ -235,10 +236,7 @@ const SalaryAdvancePage: React.FC = () => {
         </div>
 
         {loading ? (
-          <div className="flex items-center justify-center py-16 text-slate-400">
-            <Loader2 size={28} className="animate-spin mr-2" />
-            <span className="text-sm font-medium">Loading advances…</span>
-          </div>
+          <CommonLoader text="Loading advances…" fullScreen={false} />
         ) : advances.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-slate-400">
             <Wallet size={36} className="mb-2 opacity-30" />
