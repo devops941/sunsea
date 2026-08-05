@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import bcrypt from "bcrypt";
+import { WhatsappService } from "./whatsapp.service";
 import { asyncHandler } from "../../utils/asyncHandler";
 import { ApiError } from "../../utils/ApiError";
 import { ApiResponse } from "../../utils/ApiResponse";
@@ -32,24 +32,21 @@ class WhatsappController {
         wabaId: config.wabaId,
         businessPhone: config.businessPhone,
         hasAccessToken: !!config.accessToken,
+        webhookVerifyToken: config.webhookVerifyToken,
       })
     );
   });
 
   /**
    * Saves or updates the WhatsApp business configuration in the database.
-   * Access token is stored hashed.
+   * Access token is securely encrypted before storage.
    */
   saveConfig = asyncHandler(async (req: Request, res: Response) => {
-    const { phoneNumberId, wabaId, businessPhone, accessToken } = req.body;
+    const { phoneNumberId, wabaId, businessPhone, accessToken, webhookVerifyToken } = req.body;
 
     if (!phoneNumberId || !wabaId || !businessPhone || !accessToken) {
       throw new ApiError(400, "All fields (phoneNumberId, wabaId, businessPhone, accessToken) are required.");
     }
-
-    // if (!/^\d{10,15}$/.test(businessPhone)) {
-    //   throw new ApiError(400, "Business phone number must contain digits only (10 to 15 digits).");
-    // }
 
     // Get the default company
     const company = await prisma.company.findFirst();
@@ -64,42 +61,96 @@ class WhatsappController {
 
     let hashedAccessToken = existingConfig?.accessToken;
 
-    // Only hash and update the access token if it's not the placeholder
+    // Only encrypt and update the access token if it's not the placeholder
     if (accessToken !== "••••••••••••••••••••") {
-      hashedAccessToken = await bcrypt.hash(accessToken, 10);
+      hashedAccessToken = WhatsappService.encryptText(accessToken);
     }
 
     if (!hashedAccessToken) {
       throw new ApiError(400, "Access token is required.");
     }
 
-    // Upsert the configuration for the company
-    const config = await prisma.whatsappConfig.upsert({
+    const updatedConfig = await prisma.whatsappConfig.upsert({
       where: { companyId: company.id },
       update: {
-        phoneNumberId: phoneNumberId.trim(),
-        wabaId: wabaId.trim(),
-        businessPhone: businessPhone.trim(),
+        phoneNumberId,
+        wabaId,
+        businessPhone,
         accessToken: hashedAccessToken,
+        webhookVerifyToken,
       },
       create: {
         companyId: company.id,
-        phoneNumberId: phoneNumberId.trim(),
-        wabaId: wabaId.trim(),
-        businessPhone: businessPhone.trim(),
+        phoneNumberId,
+        wabaId,
+        businessPhone,
         accessToken: hashedAccessToken,
+        webhookVerifyToken,
       },
     });
 
     return res.status(200).json(
       new ApiResponse("WhatsApp configuration saved successfully", {
-        id: config.id,
-        phoneNumberId: config.phoneNumberId,
-        wabaId: config.wabaId,
-        businessPhone: config.businessPhone,
-        hasAccessToken: true,
+        phoneNumberId: updatedConfig.phoneNumberId,
+        wabaId: updatedConfig.wabaId,
+        businessPhone: updatedConfig.businessPhone,
+        hasAccessToken: !!updatedConfig.accessToken,
+        webhookVerifyToken: updatedConfig.webhookVerifyToken,
       })
     );
+  });
+
+  /**
+   * Send a WhatsApp message
+   */
+  sendMessage = asyncHandler(async (req: Request, res: Response) => {
+    const { to, message } = req.body;
+
+    if (!to || !message) {
+      throw new ApiError(400, "Recipient phone number (to) and message are required.");
+    }
+
+    const result = await WhatsappService.sendTemplateMessage(to, "hello_world");
+
+    return res.status(200).json(new ApiResponse("Message sent successfully", result));
+  });
+
+  /**
+   * GET /webhook - Verify webhook from Meta
+   */
+  verifyWebhook = asyncHandler(async (req: Request, res: Response) => {
+    const mode = req.query["hub.mode"];
+    const token = req.query["hub.verify_token"];
+    const challenge = req.query["hub.challenge"];
+
+    // Get the default company and its WhatsApp config
+    const company = await prisma.company.findFirst();
+    if (company) {
+      const config = await prisma.whatsappConfig.findUnique({
+        where: { companyId: company.id },
+      });
+
+      if (mode === "subscribe" && token === config?.webhookVerifyToken) {
+        // Validation successful
+        return res.status(200).send(challenge);
+      }
+    }
+
+    // Validation failed
+    return res.sendStatus(403);
+  });
+
+  /**
+   * POST /webhook - Receive incoming webhook events from Meta
+   */
+  handleWebhookEvent = asyncHandler(async (req: Request, res: Response) => {
+    const body = req.body;
+
+    // Log the incoming webhook event (for debugging)
+    console.log("Received WhatsApp Webhook Event:", JSON.stringify(body, null, 2));
+
+    // Acknowledge receipt of the webhook event
+    return res.sendStatus(200);
   });
 }
 
