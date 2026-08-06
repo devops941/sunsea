@@ -86,6 +86,15 @@ const Sidebar = () => {
     dispatch(logoutUser());
     navigate("/login");
   };
+  /** Returns the first path the user has permission for, falling back to menu.path */
+  const resolveMenuPath = useCallback((menu: (typeof sidebarItems)[0]): string => {
+    if (menu.pathsByPermission) {
+      const match = menu.pathsByPermission.find((p) => can(p.permission));
+      if (match) return match.path;
+    }
+    return menu.path ?? "/";
+  }, [can]);
+
   const filteredSidebarItems = useMemo(() => {
     return sidebarItems
       .map((item) => {
@@ -113,13 +122,13 @@ const Sidebar = () => {
       className={`h-screen bg-[#ffffff] text-[#2A3547] relative overflow-visible flex flex-col transition-[width] duration-300 ease-in-out z-50 border-r border-black/10  ${activeCollapsed ? "w-[80px]" : "w-[260px]"}`}
     >
       <div
-        className={`flex shrink-0 h-[72px] items-center ${activeCollapsed ? "justify-center gap-1" : "justify-between pl-4 pr-6"}`}
+        className={`flex shrink-0 h-[72px] items-center border-b border-gray-200/70 ${activeCollapsed ? "justify-center gap-1 px-2" : "justify-between pl-2 pr-3"}`}
       >
-        <div className={`bg-transparent flex items-center ${activeCollapsed ? "w-12 h-12 justify-center shrink-0 ml-1" : "flex-1 h-[56px] justify-start overflow-hidden"}`}>
+        <div className={`bg-transparent flex items-center ${activeCollapsed ? "w-12 h-12 justify-center shrink-0" : "flex-1 h-[54px] justify-start overflow-hidden pl-0"}`}>
           <img
             src={activeCollapsed ? (company?.faviconUrl || company?.logoUrl || Logo) : (company?.logoUrl || Logo)}
             alt={activeCollapsed ? "Company Favicon" : "Company Logo"}
-            className={`w-full h-full ${activeCollapsed ? "object-contain" : "object-contain object-left scale-110 ml-2"}`}
+            className={`max-h-full max-w-full object-contain ${activeCollapsed ? "mx-auto" : "object-left"}`}
           />
         </div>
         <div
@@ -141,10 +150,11 @@ const Sidebar = () => {
             // Use isMenuActive() instead of NavLink's isActive so that activePaths
             // are respected (NavLink's isActive only matches the exact `to` path).
             const menuActive = isMenuActive(menu);
+            const resolvedPath = resolveMenuPath(menu);
             return (
               <div key={menu.title} className="relative mb-2.5">
                 <NavLink
-                  to={menu.path}
+                  to={resolvedPath}
                   className={`w-full border-none outline-none cursor-pointer p-[10px_15px] rounded-sm flex items-center justify-between transition-all duration-300 hover:bg-gray-100 ${menuActive ? "!bg-gradient-to-r !from-blue-400 !to-primary !text-white font-semibold" : "bg-transparent text-[#2A3547]"} ${activeCollapsed ? "justify-center p-[14px]" : ""}`}
                 >
                   <div className={`flex items-center text-[15px] font-normal leading-[1.334rem] ${activeCollapsed ? "justify-center gap-0" : "gap-4"} ${menuActive ? "!text-white" : ""}`}>
