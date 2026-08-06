@@ -40,7 +40,7 @@ export const LedgerStatementPage: React.FC = () => {
   useEffect(() => {
     const loadLedgerList = async () => {
       try {
-        const res = await accountService.fetchLedgers({ page: 1, limit: 10 });
+        const res = await accountService.fetchLedgers({ page: 1, limit: 1000 });
         setLedgers(res.ledgers || []);
         if (res.ledgers && res.ledgers.length > 0) {
           const firstId = String(res.ledgers[0].id);

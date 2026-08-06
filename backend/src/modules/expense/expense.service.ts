@@ -21,7 +21,7 @@ class ExpenseService {
       throw new ApiError(409, `Expense number '${data.expenseNumber}' already exists for this company.`);
     }
 
-    return prisma.expense.create({
+    const newExpense = await prisma.expense.create({
       data: {
         ...data,
         date: data.date ? new Date(data.date) : undefined,
@@ -34,6 +34,32 @@ class ExpenseService {
         supplier: true,
       },
     });
+
+    // Automatically sync as Petty Cash "OUT" cash expense entry & post voucher
+    try {
+      const pcEntryNo = `PC-EXP-${newExpense.expenseNumber}`;
+      const pcEntry = await prisma.pettyCashEntry.create({
+        data: {
+          entryNo: pcEntryNo,
+          entryDate: newExpense.date || new Date(),
+          category: newExpense.expenseCategory || "General Expense",
+          description: `Expense (${newExpense.expenseNumber}): ${newExpense.expense}`,
+          amount: newExpense.amount,
+          type: "OUT",
+          paidTo: newExpense.supplier?.legalName || null,
+          receiptNo: newExpense.receiptInvoice || newExpense.expenseNumber,
+          companyId: currentUser.companyId,
+          createdBy: currentUser.userId,
+        },
+      });
+
+      const { voucherPostingService } = require("../accounts/voucherPosting.service");
+      await voucherPostingService.postPettyCashVoucher(pcEntry.id);
+    } catch (pcErr) {
+      console.error("[Petty Cash Sync Error]: Failed to create petty cash entry for expense", pcErr);
+    }
+
+    return newExpense;
   }
 
   /**
@@ -143,20 +169,51 @@ class ExpenseService {
       ...(data.supplierId !== undefined && { supplierId: data.supplierId ? Number(data.supplierId) : null }),
     };
 
-    return prisma.expense.update({
+    const updatedExpense = await prisma.expense.update({
       where: { id },
       data: updateData,
       include: {
         supplier: true,
       },
     });
+
+    // Update corresponding petty cash entry if exists
+    try {
+      const pcEntryNo = `PC-EXP-${updatedExpense.expenseNumber}`;
+      await prisma.pettyCashEntry.updateMany({
+        where: { entryNo: pcEntryNo },
+        data: {
+          entryDate: updatedExpense.date,
+          category: updatedExpense.expenseCategory || "General Expense",
+          description: `Expense (${updatedExpense.expenseNumber}): ${updatedExpense.expense}`,
+          amount: updatedExpense.amount,
+          paidTo: updatedExpense.supplier?.legalName || null,
+          receiptNo: updatedExpense.receiptInvoice || updatedExpense.expenseNumber,
+        },
+      });
+    } catch (pcErr) {
+      console.error("[Petty Cash Update Error]:", pcErr);
+    }
+
+    return updatedExpense;
   }
 
   /**
    * Deletes an expense by ID.
    */
   async deleteExpense(id: string, companyId: string) {
-    await this.getExpenseById(id, companyId);
+    const expense = await this.getExpenseById(id, companyId);
+    
+    // Delete corresponding petty cash entry if exists
+    try {
+      const pcEntryNo = `PC-EXP-${expense.expenseNumber}`;
+      await prisma.pettyCashEntry.deleteMany({
+        where: { entryNo: pcEntryNo },
+      });
+    } catch (pcErr) {
+      console.error("[Petty Cash Delete Error]:", pcErr);
+    }
+
     return prisma.expense.delete({
       where: { id },
     });

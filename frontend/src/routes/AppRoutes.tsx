@@ -12,6 +12,9 @@ import PoInvoicePage from "../modules/purchase/purchase-order/invoice/PoInvoiceP
 const Dashboard = lazy(() => import("../modules/dashboard/pages/DashboardPage"));
 // const OeeDashboard = lazy(() => import("../modules/dashboard/pages/OeeDashboard"));
 const CompanySettings = lazy(() => import("../modules/company/pages/CompanySettings"));
+const SupplierBreakdownPage = lazy(() => import("../modules/accounts/pages/payable/SupplierBreakdownPage"));
+const CustomerBreakdownPage = lazy(() => import("../modules/accounts/pages/receivable/CustomerBreakdownPage"));
+const AccountsTabs = lazy(() => import("../modules/accounts/pages/AccountsTabs"));
 
 const OrganizationTabs = lazy(() => import("../modules/company/pages/OrganizationTabs"));
 const InventoryTabs = lazy(() => import("../modules/stock/pages/InventoryTabs"));
@@ -164,9 +167,6 @@ const PurchaseOrderViewPage = lazy(() => import("../modules/purchase/purchase-or
 
 const InvoiceDetail = lazy(() => import("../modules/purchase/purchase-order/upcoming-orders/InvoiceDetailPage"));
 const SalesInvoiceForm = lazy(() => import("../modules/sales-order-invoice/SalesInvoiceCreate"));
-const AccountsTabs = lazy(() => import("../modules/accounts/pages/AccountsTabs"));
-const SupplierBreakdownPage = lazy(() => import("../modules/accounts/pages/payable/SupplierBreakdownPage"));
-const CustomerBreakdownPage = lazy(() => import("../modules/accounts/pages/receivable/CustomerBreakdownPage"));
 
 // Payroll
 const PayrollDashboard = lazy(() => import("../modules/payroll/pages/PayrollDashboard"));
@@ -724,6 +724,18 @@ const AppRoutes = () => {
               <Route path="/payroll/monthly-report" element={<MonthlyPayrollReport />} />
               <Route path="/payroll/weekly-report" element={<WeeklyPayrollReport />} />
             </Route>
+            {/* Accounts Module Routes */}
+            <Route path="/accounts/payable" element={<AccountsTabs />} />
+            <Route path="/accounts/payable/:supplierId" element={<SupplierBreakdownPage />} />
+            <Route path="/accounts/receivable" element={<AccountsTabs />} />
+            <Route path="/accounts/receivable/:customerId" element={<CustomerBreakdownPage />} />
+            <Route path="/accounts/ledger-statement" element={<AccountsTabs />} />
+            <Route path="/accounts/chart-of-accounts" element={<AccountsTabs />} />
+            <Route path="/accounts/vouchers" element={<AccountsTabs />} />
+            <Route path="/accounts/vouchers/*" element={<AccountsTabs />} />
+            <Route path="/accounts/sales-returns" element={<AccountsTabs />} />
+            <Route path="/accounts/purchase-returns" element={<AccountsTabs />} />
+            <Route path="/accounts/petty-cash" element={<AccountsTabs />} />
 
           </Route>
         </Route>

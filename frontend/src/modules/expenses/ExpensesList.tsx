@@ -199,21 +199,6 @@ const ExpensesList: React.FC = () => {
                 </option>
               ))}
             </select>
-            <select
-              className="border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-500"
-              value={filterStatus}
-              onChange={(e) => {
-                setFilterStatus(e.target.value);
-                setCurrentPage(1);
-              }}
-            >
-              <option value="">All Statuses</option>
-              {statuses.map((stat, idx) => (
-                <option key={idx} value={stat}>
-                  {stat === "Pending" ? "Pending Approval" : stat}
-                </option>
-              ))}
-            </select>
             <CustomButton
               text="Add Expense"
               icon={FaPlus}
@@ -263,21 +248,6 @@ const ExpensesList: React.FC = () => {
               render: (item) => item.supplier?.legalName || item.supplier || "N/A",
             },
             { header: "PAYMENT METHOD", accessor: "paymentMethod" },
-            {
-              header: "STATUS",
-              render: (item) => {
-                let badgeClass = "bg-slate-100 text-slate-800 border-slate-200";
-                if (item.status === "Approved") badgeClass = "bg-green-50 text-green-700 border-green-200";
-                else if (item.status === "Pending") badgeClass = "bg-yellow-50 text-yellow-700 border-yellow-200";
-                else if (item.status === "Rejected") badgeClass = "bg-red-50 text-red-700 border-red-200";
-
-                return (
-                  <span className={`px-2 py-1 rounded-full text-xs font-semibold border ${badgeClass}`}>
-                    {item.status === "Pending" ? "Pending Approval" : item.status}
-                  </span>
-                );
-              },
-            },
             {
               header: "ACTIONS",
               render: (item) => (

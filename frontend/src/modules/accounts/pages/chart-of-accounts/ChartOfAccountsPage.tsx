@@ -44,7 +44,7 @@ export const ChartOfAccountsPage: React.FC = () => {
   const loadLedgers = async () => {
     setLoading(true);
     try {
-      const res = await accountService.fetchLedgers({ page: 1, limit: 10 });
+      const res = await accountService.fetchLedgers({ page: 1, limit: 1000 });
       setLedgers(res.ledgers || []);
     } catch (err: any) {
       toast.error(err?.message || "Failed to load Chart of Accounts");

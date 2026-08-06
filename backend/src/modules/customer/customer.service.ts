@@ -6,6 +6,8 @@ import {
   CreateCustomerInput,
   UpdateCustomerInput,
 } from "./customer.validation";
+import { accountsService } from "../accounts/accounts.service";
+import { voucherPostingService } from "../accounts/voucherPosting.service";
 
 class CustomerService {
   async createCustomer(data: CreateCustomerInput, currentUser: { userId: string; companyId: string }) {
@@ -20,7 +22,7 @@ class CustomerService {
       throw new Error("Customer code already exists for this company");
     }
 
-    const { phones, addresses, ...restData } = data as any;
+    const { phones, addresses, openingBalance, ...restData } = data as any;
     const mobileData = phones || restData.mobile || null;
 
     const newCustomer = await prisma.customer.create({
@@ -30,6 +32,9 @@ class CustomerService {
         customerType: Array.isArray(restData.customerType) ? restData.customerType.join(",") : restData.customerType,
         companyId: currentUser.companyId,
         createdBy: currentUser.userId,
+        // Seed outstanding amount and opening balance (immutable after creation)
+        outstandingAmount: openingBalance ?? 0,
+        openingBalance: openingBalance ?? 0,
         ...(addresses && addresses.length > 0 && {
           addresses: {
             create: addresses.map((addr: any, index: number) => ({
@@ -43,6 +48,21 @@ class CustomerService {
       },
     });
 
+    // Auto-create AccountLedger under Sundry Debtors
+    try {
+      await accountsService.ensureCustomerLedger(newCustomer);
+      const opBal = Number(newCustomer.openingBalance || 0);
+      if (opBal > 0) {
+        const opType = (data.openingBalanceType || "DEBIT").toUpperCase() as "DEBIT" | "CREDIT";
+        await voucherPostingService.postCustomerOpeningBalanceVoucher(
+          { id: newCustomer.id, customerCode: newCustomer.customerCode, firmName: newCustomer.firmName },
+          opBal,
+          opType
+        );
+      }
+    } catch (err) {
+      console.error("Failed to auto-create customer ledger:", err);
+    }
 
     return newCustomer;
   }

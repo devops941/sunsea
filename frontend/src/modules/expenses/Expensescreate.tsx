@@ -62,12 +62,13 @@ const ExpensesCreate: React.FC<ExpensesCreateProps> = ({
   useEffect(() => {
     const fetchSuppliers = async () => {
       try {
-        const response = await apiClient.get("/suppliers");
-        const responseData = response.data?.data?.suppliers || response.data?.data;
-        if (Array.isArray(responseData)) {
-          const formatted = responseData.map((sup: any) => ({
-            label: sup.legalName || sup.supplierCode,
-            value: String(sup.id),
+        const response = await apiClient.get("/suppliers?limit=100");
+        const rawData = response.data?.data;
+        const list = Array.isArray(rawData) ? rawData : (Array.isArray(rawData?.suppliers) ? rawData.suppliers : []);
+        if (list.length > 0) {
+          const formatted = list.map((sup: any) => ({
+            label: `${sup.supplierCode ? sup.supplierCode + " - " : ""}${sup.legalName || "Supplier"}`,
+            value: sup.legalName || sup.supplierCode,
             id: sup.id,
           }));
           setSuppliers(formatted);
@@ -157,9 +158,6 @@ const ExpensesCreate: React.FC<ExpensesCreateProps> = ({
     if (!formData.paymentMethod.trim()) {
       newErrors.paymentMethod = "Payment Method is required";
     }
-    if (!formData.status.trim()) {
-      newErrors.status = "Status is required";
-    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -187,7 +185,7 @@ const ExpensesCreate: React.FC<ExpensesCreateProps> = ({
         amount: parseFloat(formData.amount),
         description: formData.description?.trim() || null,
         paymentMethod: formData.paymentMethod.trim(),
-        status: formData.status.trim(),
+        status: formData.status || "Approved",
         notes: formData.notes?.trim() || null,
         receiptInvoice: formData.receiptInvoice?.trim() || null,
         supplierId: supplierId,
@@ -346,17 +344,6 @@ const ExpensesCreate: React.FC<ExpensesCreateProps> = ({
                 disabled={saving}
                 onChange={handleChange}
                 error={errors.paymentMethod}
-              />
-
-              <SelectInput
-                label="Status *"
-                name="status"
-                value={formData.status}
-                options={statuses}
-                required
-                disabled={saving}
-                onChange={handleChange}
-                error={errors.status}
               />
 
               <FileUpload

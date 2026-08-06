@@ -72,6 +72,7 @@ const CustomerCreatePage: React.FC = () => {
     creditLimit: "",
     creditDays: "0",
     openingBalance: "0",
+    openingBalanceType: "DEBIT",
 
     priceList: "Standard",
 
@@ -423,6 +424,7 @@ const CustomerCreatePage: React.FC = () => {
         creditLimit: Number(formData.creditLimit),
         creditDays: Number(formData.creditDays),
         openingBalance: Number(formData.openingBalance || 0),
+        openingBalanceType: formData.openingBalanceType || "DEBIT",
         bankAccount: activeBankAccounts.length > 0 ? activeBankAccounts : undefined,
         transports: activeTransports.length > 0 ? activeTransports : undefined,
         status: formData.isActive === "true" ? "Active" : "Inactive",
@@ -693,7 +695,31 @@ const CustomerCreatePage: React.FC = () => {
               <h3 className="text-lg font-semibold text-slate-700 mb-2">Commercial Settings</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 <div>
-                  <TextInput label="Opening Balance ₹" name="openingBalance" type="number" value={formData.openingBalance} placeholder="0.00" onChange={handleChange} preventNegative error={errors.openingBalance} />
+                  <TextInput
+                    label="Opening Balance ₹"
+                    name="openingBalance"
+                    type="number"
+                    value={formData.openingBalance}
+                    placeholder="0.00"
+                    onChange={handleChange}
+                    preventNegative
+                    error={errors.openingBalance}
+                  />
+                  <p className="mt-1 text-xs text-amber-600 flex items-center gap-1">
+                    <span>⚠</span> Set once at creation. Cannot be edited later.
+                  </p>
+                </div>
+                <div>
+                  <SelectInput
+                    label="Opening Balance Type"
+                    name="openingBalanceType"
+                    value={formData.openingBalanceType}
+                    options={[
+                      { value: "DEBIT", label: "Debit (Customer owes us)" },
+                      { value: "CREDIT", label: "Credit (Advance received from customer)" },
+                    ]}
+                    onChange={handleChange}
+                  />
                 </div>
                 <div>
                   <TextInput label="Credit Limit ₹" name="creditLimit" type="number" value={formData.creditLimit} placeholder="30000" onChange={handleChange} preventNegative error={errors.creditLimit} />
@@ -702,6 +728,7 @@ const CustomerCreatePage: React.FC = () => {
                   <TextInput label="Credit Days (Net)" name="creditDays" value={formData.creditDays} onChange={handleChange} type="number" placeholder="30 days" preventNegative error={errors.creditDays} />
                 </div>
               </div>
+
             </div>
 
 

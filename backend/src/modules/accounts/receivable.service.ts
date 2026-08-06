@@ -169,6 +169,10 @@ class ReceivableService {
         let totalReturned = 0;
 
         for (const item of journalItems) {
+          if (item.voucher.refDocType === "CUSTOMER_OPENING_BALANCE" || item.narration?.includes("Opening balance")) {
+            continue;
+          }
+
           let isDebit = item.debitLedgerId === ledger.id;
           let isCredit = item.creditLedgerId === ledger.id;
 
@@ -192,17 +196,10 @@ class ReceivableService {
           }
         }
 
-        let invoiceBilled = 0;
-        let invoicePaid = 0;
-        for (const inv of salesInvoices) {
-          invoiceBilled += Number(inv.grandTotal || inv.subTotal || 0);
-          const pList = extractPaymentsArray(inv.payments);
-          const pSum = pList.reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0);
-          invoicePaid += Math.max(pSum, Number((inv as any).paidAmount || 0));
-        }
-
-        totalBilled = Math.max(totalBilled, invoiceBilled);
-        totalPaid = Math.max(totalPaid, invoicePaid);
+        // BUG-2 FIX (symmetric for customers): Do NOT use Math.max(ledger_total, invoice_raw_total).
+        // Invoice raw amounts duplicate what is already captured in journal items,
+        // including the opening-balance journal entry — causing the balance to appear doubled.
+        // Use only journal-item-based totals (CUSTOMER_OPENING_BALANCE is already excluded above).
 
         const netAsset = openingBalance + totalBilled - totalPaid - totalReturned;
         const debit = totalBilled;
@@ -402,7 +399,7 @@ class ReceivableService {
     let totalReturned = 0;
 
     statement.entries.forEach((e) => {
-      if (e.voucherType === "OPENING") return;
+      if (e.voucherType === "OPENING" || /opening balance/i.test(e.narration) || (e as any).refDocType === "CUSTOMER_OPENING_BALANCE") return;
       if (e.voucherType === VoucherType.SALES_RETURN) {
         totalReturned += e.credit || e.debit;
       } else if (e.voucherType === VoucherType.SALES) {
@@ -415,15 +412,8 @@ class ReceivableService {
       }
     });
 
-    let invBilled = 0;
-    let invPaid = 0;
-    invoices.forEach((inv: any) => {
-      invBilled += inv.amount;
-      invPaid += inv.paidAmount;
-    });
-
-    totalBilled = Math.max(totalBilled, invBilled);
-    totalPaid = Math.max(totalPaid, invPaid);
+    // BUG-2 FIX: Use only journal-entry-based totals (openingBalance entry already excluded above).
+    // Invoice-raw fallback caused double-counting when the opening balance voucher matched the invoice amount.
     const closingBalance = Number(customer.openingBalance || 0) + totalBilled - totalPaid - totalReturned;
 
     return {

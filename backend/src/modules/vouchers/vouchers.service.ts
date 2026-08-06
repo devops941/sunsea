@@ -250,6 +250,17 @@ class VouchersService {
       throw new ApiError(400, `Unbalanced voucher entry: Total Debit (${totalDebit.toFixed(2)}) must equal Total Credit (${totalCredit.toFixed(2)})`);
     }
 
+    // BUG 4 Guard: Return Refund vouchers must not reference Customer or Supplier ledgers
+    if (data.refDocType === "SALES_RETURN_REFUND" || data.refDocType === "PURCHASE_RETURN_REFUND") {
+      const ledgerIds = data.items.flatMap(i => [i.debitLedgerId, i.creditLedgerId]).filter(Boolean) as number[];
+      const partyLedger = await prisma.accountLedger.findFirst({
+        where: { id: { in: ledgerIds }, OR: [{ customerId: { not: null } }, { supplierId: { not: null } }] }
+      });
+      if (partyLedger) {
+        throw new ApiError(400, `Return refund vouchers must not directly touch Customer or Supplier ledgers (attempted on ledger ${partyLedger.code})`);
+      }
+    }
+
     return prisma.$transaction(async (tx) => {
       const voucher = await tx.voucher.create({
         data: {

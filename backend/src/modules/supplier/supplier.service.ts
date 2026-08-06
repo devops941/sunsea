@@ -7,6 +7,8 @@ import type {
   UpdateSupplierInput,
 } from "./supplier.validation";
 import { uploadToImageKit } from "../../utils/Imagekit";
+import { accountsService } from "../accounts/accounts.service";
+import { voucherPostingService } from "../accounts/voucherPosting.service";
 
 async function processBankAccounts(bankAccounts: any): Promise<any> {
   if (!Array.isArray(bankAccounts)) return bankAccounts;
@@ -42,7 +44,7 @@ class SupplierService {
       );
     }
 
-    const { addresses, userId, materialPrices, phones, ...supplierData } = data as any;
+    const { addresses, userId, materialPrices, phones, openingBalance, ...supplierData } = data as any;
 
     const processedBankAccount = await processBankAccounts(supplierData.bankAccount);
     const mobileData = phones || supplierData.mobile || null;
@@ -52,7 +54,7 @@ class SupplierService {
       mobile: mobileData as any,
       bankAccount: processedBankAccount as any,
       minOrderQty: supplierData.minOrderQty !== undefined && supplierData.minOrderQty !== null ? new Prisma.Decimal(supplierData.minOrderQty) : undefined,
-      openingBalance: supplierData.openingBalance !== undefined && supplierData.openingBalance !== null ? new Prisma.Decimal(supplierData.openingBalance) : undefined,
+      openingBalance: openingBalance !== undefined && openingBalance !== null ? new Prisma.Decimal(openingBalance) : new Prisma.Decimal(0),
       createdBy: userId,
       addresses: addresses && addresses.length > 0
         ? {
@@ -76,7 +78,25 @@ class SupplierService {
         : undefined,
     };
 
-    return supplierRepository.create(insertData);
+    const createdSupplier = await supplierRepository.create(insertData);
+
+    // Auto-create AccountLedger under Sundry Creditors
+    try {
+      await accountsService.ensureSupplierLedger(createdSupplier);
+      const opBal = Number(createdSupplier.openingBalance || 0);
+      if (opBal > 0) {
+        const opType = (data.openingBalanceType || "CREDIT").toUpperCase() as "DEBIT" | "CREDIT";
+        await voucherPostingService.postSupplierOpeningBalanceVoucher(
+          { id: createdSupplier.id, supplierCode: createdSupplier.supplierCode, legalName: createdSupplier.legalName },
+          opBal,
+          opType
+        );
+      }
+    } catch (err) {
+      console.error("Failed to auto-create supplier ledger/opening balance voucher:", err);
+    }
+
+    return createdSupplier;
   }
 
   async getNextSupplierCode() {

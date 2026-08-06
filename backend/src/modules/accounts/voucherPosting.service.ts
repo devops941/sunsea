@@ -533,7 +533,10 @@ class VoucherPostingService {
           where: { name: { contains: salesReturn.refundMode === "CASH" ? "Cash" : "Bank", mode: "insensitive" } },
         });
       }
-      if (payLedger) {
+      // BUG-4 FIX: Refund should debit Sales Return A/c, NOT the Customer ledger.
+      // Customer ledger was already credited by the Sales Return voucher above (reducing what they owe).
+      // The refund is purely: Sales Return A/c Dr | Cash/Bank Cr — customer balance is NOT touched again.
+      if (payLedger && salesReturnLedger) {
         await db.voucher.create({
           data: {
             voucherNo: `SRT-PAY-${salesReturn.returnNo}`,
@@ -545,16 +548,18 @@ class VoucherPostingService {
             items: {
               create: [
                 {
-                  debitLedgerId: customerLedger.id,
+                  // Debit Sales Return A/c (reducing the return liability), NOT the customer ledger
+                  debitLedgerId: salesReturnLedger.id,
                   debitAmount: grandTotal,
                   creditAmount: new Prisma.Decimal(0),
-                  narration: `Credit settled via refund`,
+                  narration: `Sales return refund settled via ${salesReturn.refundMode}`,
                 },
                 {
+                  // Credit Cash / Bank (asset decreases as cash goes out)
                   creditLedgerId: payLedger.id,
                   debitAmount: new Prisma.Decimal(0),
                   creditAmount: grandTotal,
-                  narration: `Refund paid via ${salesReturn.refundMode}`,
+                  narration: `Refund paid via ${salesReturn.refundMode} to ${salesReturn.customer.firmName}`,
                 },
               ],
             },
@@ -567,12 +572,117 @@ class VoucherPostingService {
   }
 
   /**
-   * Sync unposted GRN Invoices, Sales Invoices, and Payments to the Voucher table.
+   * Post a formal double-entry Voucher for a Petty Cash Entry.
+   * OUT: Debit Expense (EXP-001), Credit Petty Cash (PCASH-001)
+   * IN: Debit Petty Cash (PCASH-001), Credit Cash in Hand (CASH-001)
+   */
+  async postPettyCashVoucher(pettyCashEntryId: number | string, txClient?: Prisma.TransactionClient) {
+    const db = txClient || prisma;
+    const entryIdNum = Number(pettyCashEntryId);
+    if (isNaN(entryIdNum)) return null;
+
+    const entry = await db.pettyCashEntry.findUnique({
+      where: { id: entryIdNum },
+    });
+
+    if (!entry) return null;
+
+    const existingVoucher = await db.voucher.findFirst({
+      where: {
+        refDocType: "PETTY_CASH",
+        refDocId: String(entry.id),
+      },
+    });
+
+    if (existingVoucher) return existingVoucher;
+
+    await accountsService.ensureSystemLedgersExist(db);
+    const pcashLedger = await db.accountLedger.findUnique({ where: { code: "PCASH-001" } });
+    const expenseLedger = await db.accountLedger.findUnique({ where: { code: "EXP-001" } });
+    const cashLedger = await db.accountLedger.findUnique({ where: { code: "CASH-001" } });
+
+    if (!pcashLedger || !expenseLedger) {
+      console.warn("[Auto-Post Voucher] Missing system ledgers PCASH-001 or EXP-001.");
+      return null;
+    }
+
+    const amount = new Prisma.Decimal(entry.amount);
+    const voucherNo = `PC-${entry.entryNo}`;
+    const entryDate = entry.entryDate || new Date();
+
+    if (entry.type === "OUT") {
+      return db.voucher.create({
+        data: {
+          voucherNo,
+          type: VoucherType.EXPENSE,
+          date: entryDate,
+          narration: `Petty cash payment: ${entry.description || entry.category}${entry.paidTo ? ` to ${entry.paidTo}` : ""}`,
+          refDocType: "PETTY_CASH",
+          refDocId: String(entry.id),
+          items: {
+            create: [
+              {
+                debitLedgerId: expenseLedger.id,
+                debitAmount: amount,
+                creditAmount: new Prisma.Decimal(0),
+                narration: `${entry.category}: ${entry.description || ""}`,
+              },
+              {
+                creditLedgerId: pcashLedger.id,
+                debitAmount: new Prisma.Decimal(0),
+                creditAmount: amount,
+                narration: `Petty cash disbursed`,
+              },
+            ],
+          },
+        },
+      });
+    } else {
+      if (!cashLedger) return null;
+      return db.voucher.create({
+        data: {
+          voucherNo,
+          type: VoucherType.CONTRA,
+          date: entryDate,
+          narration: `Petty cash replenished: ${entry.description || entry.category}`,
+          refDocType: "PETTY_CASH",
+          refDocId: String(entry.id),
+          items: {
+            create: [
+              {
+                debitLedgerId: pcashLedger.id,
+                debitAmount: amount,
+                creditAmount: new Prisma.Decimal(0),
+                narration: `Petty cash fund replenished`,
+              },
+              {
+                creditLedgerId: cashLedger.id,
+                debitAmount: new Prisma.Decimal(0),
+                creditAmount: amount,
+                narration: `Cash transferred to petty cash`,
+              },
+            ],
+          },
+        },
+      });
+    }
+  }
+
+  /**
+   * Sync unposted GRN Invoices, Sales Invoices, Expenses, and Petty Cash entries to the Voucher table.
    * Uses set-based queries and parallel batches for efficiency.
    */
   async syncUnpostedVouchers() {
     try {
-      const [postedGrnVouchers, postedSalesVouchers, allGrnIds, allSalesIds] = await Promise.all([
+      const [
+        postedGrnVouchers,
+        postedSalesVouchers,
+        postedPettyCashVouchers,
+        allGrnIds,
+        allSalesIds,
+        allPettyCashEntries,
+        allExpenses,
+      ] = await Promise.all([
         prisma.voucher.findMany({
           where: { refDocType: "GRN_INVOICE" },
           select: { refDocId: true },
@@ -581,8 +691,16 @@ class VoucherPostingService {
           where: { refDocType: "SALES_INVOICE" },
           select: { refDocId: true },
         }),
+        prisma.voucher.findMany({
+          where: { refDocType: "PETTY_CASH" },
+          select: { refDocId: true },
+        }),
         prisma.grnInvoice.findMany({ select: { id: true } }),
         prisma.salesInvoice.findMany({ select: { id: true } }),
+        prisma.pettyCashEntry.findMany({ select: { id: true, entryNo: true } }),
+        prisma.expense.findMany({
+          include: { supplier: true },
+        }),
       ]);
 
       const postedGrnIds = new Set(postedGrnVouchers.map((v) => v.refDocId).filter(Boolean));
@@ -598,10 +716,204 @@ class VoucherPostingService {
       for (let i = 0; i < unpostedSalesIds.length; i += batchSize) {
         await Promise.all(unpostedSalesIds.slice(i, i + batchSize).map((id) => this.postSalesVoucher(id)));
       }
+
+      // Sync unposted Expense & Petty Cash entries
+      const existingEntryNos = new Set(allPettyCashEntries.map((e) => e.entryNo));
+      const pettyCashList: Array<{ id: number; entryNo: string }> = [...allPettyCashEntries];
+
+      for (const exp of allExpenses) {
+        const pcEntryNo = `PC-EXP-${exp.expenseNumber}`;
+        if (!existingEntryNos.has(pcEntryNo)) {
+          try {
+            const createdEntry = await prisma.pettyCashEntry.create({
+              data: {
+                entryNo: pcEntryNo,
+                entryDate: exp.date || new Date(),
+                category: exp.expenseCategory || "General Expense",
+                description: `Expense (${exp.expenseNumber}): ${exp.expense}`,
+                amount: exp.amount ? new Prisma.Decimal(exp.amount) : new Prisma.Decimal(0),
+                type: "OUT",
+                paidTo: exp.supplier?.legalName || null,
+                receiptNo: exp.expenseNumber,
+                companyId: exp.companyId,
+                createdBy: exp.createdBy,
+              },
+            });
+            pettyCashList.push({ id: createdEntry.id, entryNo: createdEntry.entryNo });
+          } catch (pcErr) {
+            console.error(`[Auto-Post Voucher Error] Syncing expense ${exp.expenseNumber} to petty cash failed:`, pcErr);
+          }
+        }
+      }
+
+      const postedPettyCashIds = new Set(postedPettyCashVouchers.map((v) => v.refDocId).filter(Boolean));
+      const unpostedPettyCashIds = pettyCashList.filter((p) => !postedPettyCashIds.has(String(p.id))).map((p) => p.id);
+
+      for (const id of unpostedPettyCashIds) {
+        await this.postPettyCashVoucher(id);
+      }
     } catch (err) {
       console.error("[Auto-Post Voucher Error] Syncing unposted vouchers failed:", err);
+    }
+  }
+
+  /**
+   * Post a formal double-entry Opening Balance Voucher for a Supplier.
+   */
+  async postSupplierOpeningBalanceVoucher(
+    supplier: { id: number; supplierCode: string; legalName: string },
+    amount: number,
+    type: "DEBIT" | "CREDIT" = "CREDIT",
+    txClient?: Prisma.TransactionClient
+  ) {
+    const db = txClient || prisma;
+    await accountsService.ensureSystemLedgersExist(db);
+    const supplierLedger = await accountsService.ensureSupplierLedger(supplier, db);
+    const eqLedger = await db.accountLedger.findUnique({ where: { code: "EQ-001" } });
+
+    if (!supplierLedger || !eqLedger) return null;
+
+    const opBal = new Prisma.Decimal(amount);
+    const isCredit = type === "CREDIT";
+
+    return db.voucher.create({
+      data: {
+        voucherNo: `JV-SUP-OP-${supplier.supplierCode || String(supplier.id).slice(-6)}`,
+        type: VoucherType.JOURNAL,
+        date: new Date(),
+        narration: `Opening balance for supplier ${supplier.legalName} (${type})`,
+        refDocType: "SUPPLIER_OPENING_BALANCE",
+        refDocId: String(supplier.id),
+        items: {
+          create: [
+            {
+              debitLedgerId: isCredit ? eqLedger.id : supplierLedger.id,
+              debitAmount: opBal,
+              creditAmount: new Prisma.Decimal(0),
+              narration: `Supplier opening balance debit`,
+            },
+            {
+              creditLedgerId: isCredit ? supplierLedger.id : eqLedger.id,
+              debitAmount: new Prisma.Decimal(0),
+              creditAmount: opBal,
+              narration: `Supplier opening balance credit`,
+            },
+          ],
+        },
+      },
+    });
+  }
+
+  /**
+   * Post a formal double-entry Opening Balance Voucher for a Customer.
+   */
+  async postCustomerOpeningBalanceVoucher(
+    customer: { id: string; customerCode: string; firmName: string },
+    amount: number,
+    type: "DEBIT" | "CREDIT" = "DEBIT",
+    txClient?: Prisma.TransactionClient
+  ) {
+    const db = txClient || prisma;
+    await accountsService.ensureSystemLedgersExist(db);
+    const customerLedger = await accountsService.ensureCustomerLedger(customer, db);
+    const eqLedger = await db.accountLedger.findUnique({ where: { code: "EQ-001" } });
+
+    if (!customerLedger || !eqLedger) return null;
+
+    const opBal = new Prisma.Decimal(amount);
+    const isDebit = type === "DEBIT";
+
+    return db.voucher.create({
+      data: {
+        voucherNo: `JV-CUST-OP-${customer.customerCode || String(customer.id).slice(-6)}`,
+        type: VoucherType.JOURNAL,
+        date: new Date(),
+        narration: `Opening balance for customer ${customer.firmName} (${type})`,
+        refDocType: "CUSTOMER_OPENING_BALANCE",
+        refDocId: String(customer.id),
+        items: {
+          create: [
+            {
+              debitLedgerId: isDebit ? customerLedger.id : eqLedger.id,
+              debitAmount: opBal,
+              creditAmount: new Prisma.Decimal(0),
+              narration: `Customer opening balance debit`,
+            },
+            {
+              creditLedgerId: isDebit ? eqLedger.id : customerLedger.id,
+              debitAmount: new Prisma.Decimal(0),
+              creditAmount: opBal,
+              narration: `Customer opening balance credit`,
+            },
+          ],
+        },
+      },
+    });
+  }
+
+  /**
+   * Automatically scan for and post missing double-entry opening balance vouchers
+   * for any customers and suppliers who have an opening balance in the database.
+   */
+  async syncMissingOpeningBalanceVouchers(txClient?: Prisma.TransactionClient) {
+    const db = txClient || prisma;
+    await accountsService.ensureSystemLedgersExist(db);
+
+    // 1. Sync Customer Opening Balance Vouchers
+    const customers = await db.customer.findMany({
+      where: { openingBalance: { gt: 0 } },
+    });
+
+    for (const cust of customers) {
+      const opBal = Number(cust.openingBalance || 0);
+      if (opBal <= 0) continue;
+
+      const existingVoucher = await db.voucher.findFirst({
+        where: {
+          refDocType: "CUSTOMER_OPENING_BALANCE",
+          refDocId: String(cust.id),
+        },
+      });
+
+      if (!existingVoucher) {
+        const opType = ((cust as any).openingBalanceType || "DEBIT").toUpperCase() as "DEBIT" | "CREDIT";
+        await this.postCustomerOpeningBalanceVoucher(
+          { id: cust.id, customerCode: cust.customerCode, firmName: cust.firmName },
+          opBal,
+          opType,
+          db
+        );
+      }
+    }
+
+    // 2. Sync Supplier Opening Balance Vouchers
+    const suppliers = await db.supplier.findMany({
+      where: { openingBalance: { gt: 0 } },
+    });
+
+    for (const supp of suppliers) {
+      const opBal = Number(supp.openingBalance || 0);
+      if (opBal <= 0) continue;
+
+      const existingVoucher = await db.voucher.findFirst({
+        where: {
+          refDocType: "SUPPLIER_OPENING_BALANCE",
+          refDocId: String(supp.id),
+        },
+      });
+
+      if (!existingVoucher) {
+        const opType = ((supp as any).openingBalanceType || "CREDIT").toUpperCase() as "DEBIT" | "CREDIT";
+        await this.postSupplierOpeningBalanceVoucher(
+          { id: supp.id, supplierCode: supp.supplierCode, legalName: supp.legalName },
+          opBal,
+          opType,
+          db
+        );
+      }
     }
   }
 }
 
 export const voucherPostingService = new VoucherPostingService();
+
