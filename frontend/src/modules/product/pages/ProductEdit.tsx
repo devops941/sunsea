@@ -139,17 +139,10 @@ const ProductEdit: React.FC = () => {
         loadColors({ isActive: true });
         loadSizes({ isActive: true });
 
-        storeService.fetchAll({ limit: 10 })
+        storeService.fetchAll({ storeCategory: "FINISHED_GOODS" })
             .then(res => {
                 const data = Array.isArray(res?.stores) ? res.stores : Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
                 setStores(data);
-                if (data.length > 0) {
-                    const fgStore = data.find((s: any) => s.storeName.toLowerCase().includes('finish'));
-                    setFormData(prev => ({
-                        ...prev,
-                        openingStockStoreId: prev.openingStockStoreId || (fgStore ? fgStore.storeId : data[0].storeId)
-                    }));
-                }
             }).catch(() => { });
 
         rawMaterialService.fetchAll({})

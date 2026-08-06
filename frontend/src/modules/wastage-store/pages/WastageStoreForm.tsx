@@ -80,7 +80,7 @@ const WastageStoreForm: React.FC = () => {
     const { rawMaterialCategories, loadCategories } = useRawMaterialCategories();
 
     useEffect(() => {
-        dispatch(fetchStores(undefined));
+        dispatch(fetchStores({ storeCategory: "WASTAGE" }));
         loadCategories();
 
         if (isEdit && locationState.state) {

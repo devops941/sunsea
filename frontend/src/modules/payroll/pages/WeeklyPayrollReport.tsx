@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { ChevronLeft, ChevronRight, Printer, AlertTriangle, FileDown } from 'lucide-react';
 import ViewButton from '../../../components/ui/viewbutton/ViewButton';
+import { usePermission } from '../../../hooks/usePermission';
 import IconButton from '../../../components/ui/IconButton/IconButton';
 import { FiRefreshCw } from 'react-icons/fi';
 import CustomButton from '../../../components/ui/custombutton/CustomButton';
@@ -26,6 +27,8 @@ const STATUS_COLOR: Record<string, string> = {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 const WeeklyPayrollReport: React.FC = () => {
+  const { can } = usePermission();
+  const canViewRun = can("payroll-run.view");
   const { socket }              = useSocket();
   const [runs, setRuns]         = useState<ApiPayrollRun[]>([]);
   const [runIdx, setRunIdx]     = useState(0);
@@ -313,9 +316,11 @@ const WeeklyPayrollReport: React.FC = () => {
       align: 'center',
       render: (r) => (
         <div className="flex items-center justify-center gap-1">
-          <ViewButton
-            onClick={() => run && setPayslipTarget({ runId: run.id, resultId: r.id, period: run.period, type: 'WEEKLY' })}
-          />
+          {canViewRun && (
+            <ViewButton
+              onClick={() => run && setPayslipTarget({ runId: run.id, resultId: r.id, period: run.period, type: 'WEEKLY' })}
+            />
+          )}
           <IconButton
             icon={FileDown}
             variant="success"

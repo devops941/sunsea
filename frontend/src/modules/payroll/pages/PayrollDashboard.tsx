@@ -18,6 +18,7 @@ import CommonConfirmModal from '../../../components/ui/CommonConfirmModal/Common
 import DataTable from '../../../components/ui/table/DataTable';
 import { payrollService } from '../../../services/payrollService';
 import type { ApiPayrollRun, ApiEmployeePayroll } from '../../../services/payrollService';
+import { usePermission } from '../../../hooks/usePermission';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const fmt   = (n: number) => Number(n).toLocaleString('en-IN');
@@ -33,6 +34,11 @@ const getCurrentMonth = () => {
 
 const PayrollDashboard: React.FC = () => {
   const navigate = useNavigate();
+  const { can } = usePermission();
+  const canCreateRun = can("payroll-run.create");
+  const canEditRun   = can("payroll-run.edit");
+  const canDeleteRun = can("payroll-run.delete");
+  const canViewRun   = can("payroll-run.view");
 
   const [selectedMonth, setSelectedMonth] = useState<string>(getCurrentMonth);
   const [runs,          setRuns]          = useState<ApiPayrollRun[]>([]);
@@ -137,17 +143,19 @@ const PayrollDashboard: React.FC = () => {
       align: 'right' as const,
       render: (r: ApiPayrollRun) => (
         <div className="flex items-center justify-end gap-2">
-          <ViewButton
-            onClick={() => navigate(r.type === 'WEEKLY' ? '/payroll/weekly-report' : '/payroll/monthly-report')}
-          />
+          {canViewRun && (
+            <ViewButton
+              onClick={() => navigate(r.type === 'WEEKLY' ? '/payroll/weekly-report' : '/payroll/monthly-report')}
+            />
+          )}
 
-          {(r.status === 'DRAFT' || r.status === 'APPROVED') && (
+          {canEditRun && (r.status === 'DRAFT' || r.status === 'APPROVED') && (
             <EditButton
               onClick={() => navigate(`/payroll/run?runId=${r.id}`)}
             />
           )}
 
-          {r.status !== 'LOCKED' && (
+          {canDeleteRun && r.status !== 'LOCKED' && (
             <DeleteButton
               onClick={() => setDeleteRunId(r.id)}
             />
@@ -177,7 +185,7 @@ const PayrollDashboard: React.FC = () => {
       {/* ── Header ── */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-extrabold text-slate-800 tracking-tight">Payroll Dashboard</h1>
+          <h1 className="text-2xl font-extrabold text-slate-800 tracking-tight"> </h1>
           <p className="text-xs text-slate-500 mt-1 flex items-center gap-1.5">
             <span>Sunsea Plastics</span>
             <span>•</span>
@@ -192,20 +200,24 @@ const PayrollDashboard: React.FC = () => {
         </div>
 
         <div className="flex gap-2.5">
-          <Button
-            text="Generate Weekly"
-            icon={CalendarDays as any}
-            variant="secondary"
-            size="sm"
-            onClick={() => navigate('/payroll/run?type=weekly')}
-          />
-          <Button
-            text="Generate Monthly"
-            icon={PlayCircle as any}
-            variant="primary"
-            size="sm"
-            onClick={() => navigate('/payroll/run?type=monthly')}
-          />
+          {canCreateRun && (
+            <Button
+              text="Generate Weekly"
+              icon={CalendarDays as any}
+              variant="secondary"
+              size="sm"
+              onClick={() => navigate('/payroll/run?type=weekly')}
+            />
+          )}
+          {canCreateRun && (
+            <Button
+              text="Generate Monthly"
+              icon={PlayCircle as any}
+              variant="primary"
+              size="sm"
+              onClick={() => navigate('/payroll/run?type=monthly')}
+            />
+          )}
         </div>
       </div>
 
@@ -307,15 +319,15 @@ const PayrollDashboard: React.FC = () => {
       {/* ── Module Navigation Tabs ── */}
       <div className="bg-slate-100/80 border border-slate-200/60 p-1.5 rounded-2xl inline-flex flex-wrap items-center gap-1.5 w-full">
         {[
-          { label: 'Overview',        path: '/payroll/dashboard',      icon: BarChart3,     active: true  },
-          { label: 'Generate Weekly',      path: '/payroll/run?type=weekly',  icon: CalendarDays,  active: false },
-          { label: 'Generate Monthly',     path: '/payroll/run?type=monthly', icon: PlayCircle,    active: false },
-          { label: 'Weekly Report',   path: '/payroll/weekly-report',    icon: FileText,      active: false },
-          { label: 'Monthly Report',  path: '/payroll/monthly-report',   icon: FileText,      active: false },
-          { label: 'Attendance',      path: '/payroll/attendance',       icon: ClipboardList, active: false },
-          { label: 'Salary Advance',  path: '/payroll/advance',          icon: Wallet,        active: false },
-          { label: 'Settings',        path: '/payroll/settings',         icon: Settings,      active: false },
-        ].map(tab => (
+          { label: 'Overview',         path: '/payroll/dashboard',        icon: BarChart3,     active: true,  show: true },
+          { label: 'Generate Weekly',  path: '/payroll/run?type=weekly',  icon: CalendarDays,  active: false, show: canCreateRun },
+          { label: 'Generate Monthly', path: '/payroll/run?type=monthly', icon: PlayCircle,    active: false, show: canCreateRun },
+          { label: 'Weekly Report',    path: '/payroll/weekly-report',    icon: FileText,      active: false, show: canViewRun },
+          { label: 'Monthly Report',   path: '/payroll/monthly-report',   icon: FileText,      active: false, show: canViewRun },
+          { label: 'Attendance',       path: '/payroll/attendance',       icon: ClipboardList, active: false, show: can("payroll-attendance.view") },
+          { label: 'Salary Advance',   path: '/payroll/advance',          icon: Wallet,        active: false, show: can("payroll-advance.view") },
+          { label: 'Settings',         path: '/payroll/settings',         icon: Settings,      active: false, show: can("payroll-settings.view") },
+        ].filter(t => t.show).map(tab => (
           <button
             key={tab.label}
             onClick={() => navigate(tab.path)}
@@ -383,12 +395,14 @@ const PayrollDashboard: React.FC = () => {
           <div className="flex flex-col items-center justify-center py-14 text-slate-400">
             <Clock size={36} className="mb-2 opacity-30" />
             <p className="text-sm font-medium">No payroll runs yet.</p>
-            <button
-              onClick={() => navigate('/payroll/run')}
-              className="mt-3 text-xs text-primary font-bold hover:underline"
-            >
-              Start your first run →
-            </button>
+            {canCreateRun && (
+              <button
+                onClick={() => navigate('/payroll/run')}
+                className="mt-3 text-xs text-primary font-bold hover:underline"
+              >
+                Start your first run →
+              </button>
+            )}
           </div>
         ) : (
           <div className="w-full overflow-x-auto">

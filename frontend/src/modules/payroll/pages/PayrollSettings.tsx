@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { toast } from 'react-toastify';
 import { Plus, Trash2, Edit3, Check, X, AlertTriangle, Save, Info, Loader2 } from 'lucide-react';
+import { usePermission } from '../../../hooks/usePermission';
 import CommonLoader from '../../../components/ui/Loader/CommonLoader';
 import Button from '../../../components/ui/Button/Button';
 import TextInput from '../../../components/form/TextInput/TextInput';
@@ -62,7 +63,8 @@ const SlabConfigurator: React.FC<{
   onChange: (s: SlabEntry[]) => void;
   title: string;
   warningNote?: string;
-}> = ({ slabs, onChange, title, warningNote }) => {
+  canEdit?: boolean;
+}> = ({ slabs, onChange, title, warningNote, canEdit = false }) => {
   const [editing, setEditing] = useState<string | null>(null);
   const [adding,  setAdding]  = useState(false);
   const [draft,   setDraft]   = useState<Partial<SlabEntry>>({});
@@ -153,7 +155,7 @@ const SlabConfigurator: React.FC<{
       {/* Header */}
       <div className="flex items-center justify-between">
         <h4 className="text-sm font-semibold text-text-primary">{title}</h4>
-        {!adding && !editing && (
+        {canEdit && !adding && !editing && (
           <button
             onClick={startAdd}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-primary border border-primary rounded-lg hover:bg-primary/5 transition-colors"
@@ -193,22 +195,24 @@ const SlabConfigurator: React.FC<{
                 </span>
               </div>
               {/* Actions */}
-              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button
-                  onClick={() => startEdit(s)}
-                  className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
-                  title="Edit slab"
-                >
-                  <Edit3 size={13} />
-                </button>
-                <button
-                  onClick={() => remove(s.id)}
-                  className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                  title="Delete slab"
-                >
-                  <Trash2 size={13} />
-                </button>
-              </div>
+              {canEdit && (
+                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button
+                    onClick={() => startEdit(s)}
+                    className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
+                    title="Edit slab"
+                  >
+                    <Edit3 size={13} />
+                  </button>
+                  <button
+                    onClick={() => remove(s.id)}
+                    className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                    title="Delete slab"
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -218,12 +222,14 @@ const SlabConfigurator: React.FC<{
       {slabs.length === 0 && !adding && (
         <div className="flex flex-col items-center justify-center py-6 border border-dashed border-border rounded-xl text-text-muted">
           <p className="text-xs">No slabs configured.</p>
-          <button
-            onClick={startAdd}
-            className="mt-2 text-xs text-primary font-semibold hover:underline"
-          >
-            + Add your first slab
-          </button>
+          {canEdit && (
+            <button
+              onClick={startAdd}
+              className="mt-2 text-xs text-primary font-semibold hover:underline"
+            >
+              + Add your first slab
+            </button>
+          )}
         </div>
       )}
 
@@ -237,7 +243,8 @@ const SlabConfigurator: React.FC<{
 const SalaryComponentsEditor: React.FC<{
   comps: SalaryComponent[];
   onChange: (comps: SalaryComponent[]) => void;
-}> = ({ comps, onChange }) => {
+  canEdit?: boolean;
+}> = ({ comps, onChange, canEdit = false }) => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft,     setDraft]     = useState<Partial<SalaryComponent>>({});
 
@@ -293,13 +300,15 @@ const SalaryComponentsEditor: React.FC<{
         <p className="text-xs text-text-secondary">
           Define earning and deduction components used in salary computation.
         </p>
-        <button
-          onClick={addNew}
-          disabled={!!editingId}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-primary border border-primary rounded-lg hover:bg-red-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          <Plus size={13} /> Add Component
-        </button>
+        {canEdit && (
+          <button
+            onClick={addNew}
+            disabled={!!editingId}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-primary border border-primary rounded-lg hover:bg-red-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <Plus size={13} /> Add Component
+          </button>
+        )}
       </div>
 
       <div className="border border-border rounded-xl overflow-hidden shadow-sm">
@@ -475,22 +484,26 @@ const SalaryComponentsEditor: React.FC<{
                     ))}
                     <td className="px-3 py-2.5">
                       <div className="flex items-center justify-center gap-1">
-                        <button
-                          onClick={() => startEdit(c)}
-                          disabled={!!editingId}
-                          title="Edit component"
-                          className="p-1.5 text-blue-500 hover:bg-blue-50 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                        >
-                          <Edit3 size={13} />
-                        </button>
-                        <button
-                          onClick={() => deleteComp(c.id)}
-                          disabled={!!editingId}
-                          title="Delete component"
-                          className="p-1.5 text-red-400 hover:bg-red-50 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                        >
-                          <Trash2 size={13} />
-                        </button>
+                        {canEdit && (
+                          <>
+                            <button
+                              onClick={() => startEdit(c)}
+                              disabled={!!editingId}
+                              title="Edit component"
+                              className="p-1.5 text-blue-500 hover:bg-blue-50 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                            >
+                              <Edit3 size={13} />
+                            </button>
+                            <button
+                              onClick={() => deleteComp(c.id)}
+                              disabled={!!editingId}
+                              title="Delete component"
+                              className="p-1.5 text-red-400 hover:bg-red-50 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -520,6 +533,9 @@ const Section: React.FC<{ title: string; children: React.ReactNode }> = ({ title
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 const PayrollSettings: React.FC = () => {
+  const { can } = usePermission();
+  const canEditSettings = can("payroll-settings.edit");
+
   const [config,   setConfig]  = useState<Partial<ApiPayrollConfig>>({});
   const [slabs,    setSlabs]   = useState<{ ot: SlabEntry[]; lateEntry: SlabEntry[]; perm: SlabEntry[] }>({ ot: [], lateEntry: [], perm: [] });
   const [comps,    setComps]   = useState<SalaryComponent[]>([]);
@@ -711,6 +727,7 @@ const PayrollSettings: React.FC = () => {
                   slabs={slabs.ot}
                   onChange={s => handleSlabChange('ot', s)}
                   warningNote="Slabs are non-linear — verify amounts don't decrease as duration increases."
+                  canEdit={canEditSettings}
                 />
               )}
             </>
@@ -815,6 +832,7 @@ const PayrollSettings: React.FC = () => {
             title="Late Entry Deduction Slabs"
             slabs={slabs.lateEntry}
             onChange={s => handleSlabChange('lateEntry', s)}
+            canEdit={canEditSettings}
             warningNote={
               slabs.lateEntry.length === 0
                 ? 'No slabs configured — per-minute fallback will be used. Add slabs below to apply fixed deduction amounts.'
@@ -825,6 +843,7 @@ const PayrollSettings: React.FC = () => {
             title="Permission Deduction Slabs"
             slabs={slabs.perm}
             onChange={s => handleSlabChange('perm', s)}
+            canEdit={canEditSettings}
             warningNote={
               slabs.perm.length === 0
                 ? 'No slabs configured — per-minute fallback will be used. Add slabs to apply fixed deduction amounts.'
@@ -905,15 +924,17 @@ const PayrollSettings: React.FC = () => {
                 Unsaved changes
               </span>
             )}
-            <Button
-              text={saving ? 'Saving…' : 'Save Changes'}
-              icon={saving ? (Loader2 as any) : (Save as any)}
-              variant="primary"
-              size="md"
-              disabled={saving || !isDirty}
-              onClick={handleSave}
-              className={saving ? "[&>svg]:animate-spin" : ""}
-            />
+            {canEditSettings && (
+              <Button
+                text={saving ? 'Saving…' : 'Save Changes'}
+                icon={saving ? (Loader2 as any) : (Save as any)}
+                variant="primary"
+                size="md"
+                disabled={saving || !isDirty}
+                onClick={handleSave}
+                className={saving ? "[&>svg]:animate-spin" : ""}
+              />
+            )}
           </div>
         </div>
       </div>

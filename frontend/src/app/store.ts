@@ -24,7 +24,6 @@ import machineReducer from "../features/machines/machineSlice";
 import weeklyProgramReducer from "../features/weekly-programs/weeklyProgramSlice";
 import productionOrderReducer from "../features/production-orders/productionOrderSlice";
 import hourlyProductionReducer from "../features/hourly-productions/hourlyProductionSlice";
-import storeTypeReducer from "../features/store-types/storeTypeSlice";
 import storeLocationReducer from "../features/locations/locationSlice";
 import profileReducer from "../features/profiles/profileSlice";
 import stockAdjustmentReducer from "../features/stock-adjustments/stockAdjustmentSlice";
@@ -70,7 +69,6 @@ export const store = configureStore({
         weeklyPrograms: weeklyProgramReducer,
         productionOrders: productionOrderReducer,
         hourlyProductions: hourlyProductionReducer,
-        storeTypes: storeTypeReducer,
         stockAdjustments: stockAdjustmentReducer,
         [baseApi.reducerPath]: baseApi.reducer,
         purchaseOrder: purchaseOrderReducer,

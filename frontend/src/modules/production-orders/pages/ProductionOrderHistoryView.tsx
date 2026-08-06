@@ -79,14 +79,21 @@ const ProductionOrderHistoryView: React.FC = () => {
         return new Date(dateString).toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" });
     };
 
-    const hasInsufficientStock = fullOrder?.products?.some((p: any) =>
+    const PRODUCTION_STARTED_STATUSES = [
+        "WEEKLY_SCHEDULED", "DAILY_PLANNED", "IN_PROGRESS", "IN_PRODUCTION",
+        "POST_PRODUCTION", "READY_FOR_DISPATCH", "PARTIAL_COMPLETED",
+        "COMPLETED_WITH_SHORTFALL", "DISPATCHED", "CLOSED", "CANCELLED"
+    ];
+    const productionHasStarted = PRODUCTION_STARTED_STATUSES.includes(fullOrder?.status);
+
+    const hasInsufficientStock = !productionHasStarted && fullOrder?.products?.some((p: any) =>
         p.rawMaterials?.some((rm: any) => {
             const stockRm = rawMaterialsMap.get(rm.rawMaterialId?.toString());
             const required = Number(rm.requiredQty || 0);
-            let available = stockRm 
-                ? Number(stockRm.onHandQty || 0) - Number(stockRm.reservedQty || 0) 
+            let available = stockRm
+                ? Number(stockRm.onHandQty || 0) - Number(stockRm.reservedQty || 0)
                 : Number(rm.availableStock || 0);
-            const isReservedStatus = ["RM_AVAILABLE", "READY_FOR_PLANNING", "SCHEDULED", "IN_PROGRESS", "IN PROGRESS"].includes(fullOrder?.status);
+            const isReservedStatus = ["RM_AVAILABLE", "READY_FOR_PLANNING", "SCHEDULED"].includes(fullOrder?.status);
             if (isReservedStatus && stockRm) {
                 available += required;
             }
@@ -225,7 +232,7 @@ const ProductionOrderHistoryView: React.FC = () => {
                                                         available += required;
                                                     }
                                                     const materialName = rm.materialName || stockRm?.materialName || rm.rawMaterialId;
-                                                    const isAvailable = rm.status ? rm.status === "AVAILABLE" : available >= required;
+                                                    const isAvailable = productionHasStarted || (rm.status ? rm.status === "AVAILABLE" : available >= required);
                                                     
                                                     let displayUom = stockRm?.baseUom?.split(',')[0] || rm.uom || stockRm?.uom || "KG";
                                                     if (displayUom.toLowerCase() === 'ea' || displayUom.toLowerCase() === 'each') {

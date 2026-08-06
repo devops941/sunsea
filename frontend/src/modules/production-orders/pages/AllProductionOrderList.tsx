@@ -159,6 +159,8 @@ const AllProductionOrderList: React.FC = () => {
                 const rawMaterials = item.items.flatMap((po: any) => po.draftRawMaterials || []);
                 const visibleRMs = rawMaterials.slice(0, 2);
                 const hiddenRMs = rawMaterials.slice(2);
+                const productionStartedStatuses = ["WEEKLY_SCHEDULED", "DAILY_PLANNED", "IN_PROGRESS", "IN_PRODUCTION", "POST_PRODUCTION", "READY_FOR_DISPATCH", "PARTIAL_COMPLETED", "COMPLETED_WITH_SHORTFALL", "DISPATCHED", "CLOSED", "CANCELLED"];
+                const inProduction = productionStartedStatuses.includes(item.status);
 
                 return (
                     <div className="flex flex-wrap gap-1 items-center">
@@ -167,13 +169,13 @@ const AllProductionOrderList: React.FC = () => {
                             const name = stockRm?.materialName || rm.rawMaterialId;
                             const availableStock = stockRm ? Number(stockRm.onHandQty || 0) : 0;
                             const reqQty = Number(rm.requiredQty || 0);
-                            const isAvailable = availableStock >= reqQty;
+                            const isAvailable = inProduction || availableStock >= reqQty;
                             return (
                                 <StatusBadge
                                     key={`${item.productionOrderId}-${rmIdx}`}
                                     status={isAvailable ? "AVAILABLE" : "INSUFFICIENT"}
                                     customText={name}
-                                    title={`Req: ${reqQty.toFixed(2)}, Avail: ${availableStock.toFixed(2)}`}
+                                    title={inProduction ? name : `Req: ${reqQty.toFixed(2)}, Avail: ${availableStock.toFixed(2)}`}
                                     className="fw-normal"
                                 />
                             );
@@ -206,7 +208,16 @@ const AllProductionOrderList: React.FC = () => {
         // },
         {
             header: "STATUS",
-            render: (item: any) => <StatusBadge status={item.status || 'CREATED'} />
+            render: (item: any) => {
+                const s = item.status || 'CREATED';
+                if (s === 'PARTIAL_COMPLETED') {
+                    return <StatusBadge status="PARTIALLY_DISPATCHED" customText="Partially Dispatched" />;
+                }
+                if (s === 'DISPATCHED') {
+                    return <StatusBadge status="COMPLETED" customText="Completed" />;
+                }
+                return <StatusBadge status={s} />;
+            }
         },
         {
             header: "CREATED DATE",
@@ -249,13 +260,14 @@ const AllProductionOrderList: React.FC = () => {
                                     { label: "Ready For Planning", value: "READY_FOR_PLANNING" },
                                     { label: "Weekly Scheduled", value: "WEEKLY_SCHEDULED" },
                                     { label: "Daily Planned", value: "DAILY_PLANNED" },
+                                    { label: "In Progress", value: "IN_PROGRESS" },
                                     { label: "In Production", value: "IN_PRODUCTION" },
                                     { label: "Post Production", value: "POST_PRODUCTION" },
                                     { label: "Ready For Dispatch", value: "READY_FOR_DISPATCH" },
-                                    { label: "Partial Completed", value: "PARTIAL_COMPLETED" },
+                                    { label: "Partially Dispatched", value: "PARTIAL_COMPLETED" },
                                     { label: "Completed With Shortfall", value: "COMPLETED_WITH_SHORTFALL" },
                                     { label: "Closed", value: "CLOSED" },
-                                    { label: "Dispatched", value: "DISPATCHED" },
+                                    { label: "Completed", value: "DISPATCHED" },
                                     { label: "Cancelled", value: "CANCELLED" },
                                 ]}
                             />

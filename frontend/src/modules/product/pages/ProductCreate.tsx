@@ -116,14 +116,10 @@ const ProductCreatePage: React.FC = () => {
         };
         fetchCode();
 
-        storeService.fetchAll({ limit: 10 })
+        storeService.fetchAll({ storeCategory: "FINISHED_GOODS" })
             .then(res => {
                 const data = Array.isArray(res?.stores) ? res.stores : Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
                 setStores(data);
-                const fgStore = data.find((s: any) => s.storeName.toLowerCase().includes('finish'));
-                if (fgStore) {
-                    setFormData(prev => ({ ...prev, openingStockStoreId: fgStore.storeId }));
-                }
             }).catch(() => { });
 
         rawMaterialService.fetchAll({})

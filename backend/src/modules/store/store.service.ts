@@ -16,7 +16,7 @@ class StoreService {
       data: {
         storeId: data.storeId,
         storeName: data.storeName,
-        storeTypeId: data.storeTypeId || undefined,
+        storeCategory: (data.storeCategory as any) || undefined,
         locationId: data.locationId || undefined,
         locationDesc: data.locationDesc || undefined,
         inchargeId: data.inchargeId ? BigInt(data.inchargeId) : undefined,
@@ -32,7 +32,7 @@ class StoreService {
 
   async findAll(params: {
     search?: string;
-    storeTypeId?: number;
+    storeCategory?: string;
     page?: number;
     limit?: number;
     sortBy?: string;
@@ -40,7 +40,7 @@ class StoreService {
   } = {}) {
     const {
       search,
-      storeTypeId,
+      storeCategory,
       page,
       limit,
       sortBy = "createdAt",
@@ -73,35 +73,24 @@ class StoreService {
             },
           },
         },
-        {
-          storeTypeRef: {
-            is: {
-              name: {
-                contains: search,
-                mode: "insensitive",
-              },
-            },
-          },
-        },
       ];
     }
 
-    if (storeTypeId) {
-      whereClause.storeTypeId = storeTypeId;
+    if (storeCategory) {
+      whereClause.storeCategory = storeCategory;
     }
 
     const queryOptions: any = {
       where: whereClause,
       include: {
         location: true,
-        storeTypeRef: true,
         incharge: {
           select: {
             fullName: true,
           },
         },
         _count: {
-          select: { 
+          select: {
             rawMaterials: true,
             finishedGoodsStocks: true,
           },
@@ -141,7 +130,6 @@ class StoreService {
       where: { storeId },
       include: {
         location: true,
-        storeTypeRef: true,
         incharge: {
           select: {
             fullName: true,
@@ -191,7 +179,7 @@ class StoreService {
       where: { storeId },
       data: {
         ...data,
-        storeTypeId: data.storeTypeId || undefined,
+        storeCategory: (data.storeCategory as any) || undefined,
         locationId: data.locationId || undefined,
         storeCode: data.storeCode || undefined,
         locationDesc: data.locationDesc || undefined,

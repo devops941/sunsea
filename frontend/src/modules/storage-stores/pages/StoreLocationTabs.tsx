@@ -30,13 +30,13 @@ const StoreLocationTabs: React.FC = () => {
 
     const allTabs: TabItem[] = [
         { key: "stores", label: "Storage Stores", icon: <FaWarehouse />, content: <StorageStoreList /> },
-        { key: "types", label: "Store Types", icon: <FaCogs />, content: <StoreTypeList /> },
+        { key: "types", label: "Store Categories", icon: <FaCogs />, content: <StoreTypeList /> },
         { key: "locations", label: "Locations", icon: <FaMapMarkerAlt />, content: <LocationList /> }
     ];
 
     const tabs = allTabs.filter(tab => {
         if (tab.key === "stores") return can("stores.view");
-        if (tab.key === "types") return can("store-types.view");
+        if (tab.key === "types") return true; // always show — static info page
         if (tab.key === "locations") return can("locations.view");
         return false;
     });

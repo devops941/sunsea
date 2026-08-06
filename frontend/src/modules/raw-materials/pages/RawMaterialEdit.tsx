@@ -236,7 +236,7 @@ const RawMaterialEdit: React.FC = () => {
     ], [gstTaxes, gstLoading]);
 
     useEffect(() => {
-        dispatch(fetchStores(undefined));
+        dispatch(fetchStores({ storeCategory: "RAW_MATERIAL" }));
         loadCategories();
         dispatch(fetchGstTaxes({ status: "ACTIVE" }));
         if (locationState.state) {

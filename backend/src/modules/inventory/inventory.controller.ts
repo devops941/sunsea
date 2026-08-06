@@ -92,13 +92,16 @@ class InventoryController {
 
   /**
    * POST /api/inventory/eod-stock/run-now
-   * Manual trigger endpoint to immediately execute the EOD stock snapshot
+   * Manual trigger endpoint to immediately execute the EOD stock snapshot.
+   * Accepts optional ?date=YYYY-MM-DD to re-run for a specific past date.
    */
   runNow = asyncHandler(async (req: Request, res: Response) => {
-    await runEodStockSnapshot();
+    const { date } = req.query;
+    const dateStr = date && typeof date === "string" ? date.split("T")[0] : undefined;
+    await runEodStockSnapshot(dateStr);
     return res.status(200).json({
       success: true,
-      message: "EOD stock snapshot executed successfully.",
+      message: `EOD stock snapshot executed successfully${dateStr ? ` for ${dateStr}` : ""}.`,
     });
   });
 }

@@ -4,6 +4,7 @@ import CommonLoader from '../../../components/ui/Loader/CommonLoader';
 import { toast } from 'react-toastify';
 import { payrollService } from '../../../services/payrollService';
 import type { ApiSalaryAdvance, ApiEmployeePayroll } from '../../../services/payrollService';
+import { usePermission } from '../../../hooks/usePermission';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const fmtRs = (n: number) => `₹${Number(n).toLocaleString('en-IN')}`;
@@ -152,6 +153,10 @@ const AddPanel: React.FC<AddPanelProps> = ({ employees, onClose, onSaved }) => {
 
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 const SalaryAdvancePage: React.FC = () => {
+  const { can } = usePermission();
+  const canCreateAdvance = can("payroll-advance.create");
+  const canDeleteAdvance = can("payroll-advance.delete");
+
   const [advances,  setAdvances]  = useState<ApiSalaryAdvance[]>([]);
   const [employees, setEmployees] = useState<ApiEmployeePayroll[]>([]);
   const [loading,   setLoading]   = useState(true);
@@ -207,13 +212,15 @@ const SalaryAdvancePage: React.FC = () => {
             <p className="text-xs text-slate-500">Record and track advances given to employees</p>
           </div>
         </div>
-        <button
-          onClick={() => setShowPanel(true)}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold bg-primary text-white hover:bg-primary/90 transition-colors shadow-sm"
-        >
-          <Plus size={16} />
-          Add Advance
-        </button>
+        {canCreateAdvance && (
+          <button
+            onClick={() => setShowPanel(true)}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold bg-primary text-white hover:bg-primary/90 transition-colors shadow-sm"
+          >
+            <Plus size={16} />
+            Add Advance
+          </button>
+        )}
       </div>
 
       {/* ── Error banner ── */}
@@ -241,12 +248,14 @@ const SalaryAdvancePage: React.FC = () => {
           <div className="flex flex-col items-center justify-center py-16 text-slate-400">
             <Wallet size={36} className="mb-2 opacity-30" />
             <p className="text-sm font-medium">No salary advances recorded yet.</p>
-            <button
-              onClick={() => setShowPanel(true)}
-              className="mt-3 text-xs text-primary font-bold hover:underline"
-            >
-              Add the first advance →
-            </button>
+            {canCreateAdvance && (
+              <button
+                onClick={() => setShowPanel(true)}
+                className="mt-3 text-xs text-primary font-bold hover:underline"
+              >
+                Add the first advance →
+              </button>
+            )}
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -266,7 +275,7 @@ const SalaryAdvancePage: React.FC = () => {
               <tbody className="divide-y divide-slate-50">
                 {advances.map(adv => {
                   const pending = Number(adv.amount) - Number(adv.recoveredAmount);
-                  const canDelete = adv.status === 'PENDING' && Number(adv.recoveredAmount) === 0;
+                  const canDelete = canDeleteAdvance && adv.status === 'PENDING' && Number(adv.recoveredAmount) === 0;
                   return (
                     <tr key={adv.id} className="hover:bg-slate-50/60 transition-colors">
                       <td className="px-5 py-3.5">

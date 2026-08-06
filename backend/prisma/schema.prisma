@@ -756,6 +756,7 @@ model Machine {
 model Store {
   storeId                   String                     @id @map("store_id") @db.VarChar(20)
   storeName                 String                     @map("store_name") @db.VarChar(120)
+  storeCategory             StoreCategory?             @map("store_category")
   locationId                String?                    @map("location_id") @db.VarChar(20)
   isActive                  Boolean                    @default(true) @map("is_active")
   createdAt                 DateTime                   @default(now()) @map("created_at")
@@ -769,7 +770,6 @@ model Store {
   locationDesc              String?                    @map("location_desc") @db.VarChar(120)
   status                    String                     @default("Active") @map("status") @db.VarChar(20)
   storeCode                 String?                    @unique @map("store_code") @db.VarChar(20)
-  storeTypeId               Int?                       @map("store_type_id")
   businessPlaceId           BigInt?
   finishedGoodsStocks       FinishedGoodsStock[]
   finishedGoodsTransactions FinishedGoodsTransaction[]
@@ -784,25 +784,10 @@ model Store {
   businessPlace             BusinessPlace?             @relation(fields: [businessPlaceId], references: [id])
   incharge                  Employee?                  @relation(fields: [inchargeId], references: [id])
   location                  Location?                  @relation(fields: [locationId], references: [locationId])
-  storeTypeRef              StoreType?                 @relation(fields: [storeTypeId], references: [id])
 
-  @@index([storeTypeId])
   @@index([isActive])
   @@index([locationId])
   @@map("stores")
-}
-
-model StoreType {
-  id          Int      @id @default(autoincrement())
-  code        String   @unique @db.VarChar(20)
-  name        String   @db.VarChar(50)
-  description String?  @db.VarChar(255)
-  isActive    Boolean  @default(true) @map("is_active")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-  stores      Store[]
-
-  @@map("store_types")
 }
 
 model StoreLocation {
@@ -2010,6 +1995,12 @@ enum WastageStatus {
   DRAFT
   APPROVED
   REJECTED
+}
+
+enum StoreCategory {
+  RAW_MATERIAL
+  FINISHED_GOODS
+  WASTAGE
 }
 
 enum AdjustmentStatus {

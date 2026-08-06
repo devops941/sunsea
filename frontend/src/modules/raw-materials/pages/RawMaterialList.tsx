@@ -60,7 +60,7 @@ const RawMaterialList: React.FC = () => {
 
     useEffect(() => {
         if (can("raw_materials.view")) {
-            dispatch(fetchStores(undefined));
+            dispatch(fetchStores({ storeCategory: "RAW_MATERIAL" }));
         }
     }, [dispatch, can]);
 

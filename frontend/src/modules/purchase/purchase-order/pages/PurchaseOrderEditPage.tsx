@@ -284,7 +284,7 @@ const PurchaseOrderEditPage: React.FC = () => {
     loadUsers();
     dispatch(fetchLocations(undefined));
     dispatch(fetchGstTaxes(undefined));
-    dispatch(fetchStores(undefined));
+    dispatch(fetchStores({ storeCategory: "RAW_MATERIAL" }));
     loadActiveUOMs();
   }, [loadSuppliers, loadUsers, dispatch, loadActiveUOMs]);
 

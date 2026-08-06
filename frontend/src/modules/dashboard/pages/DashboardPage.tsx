@@ -255,15 +255,16 @@ const DashboardPage: React.FC = () => {
 
     const data = Object.entries(itemMap)
       .map(([key, obj], i) => ({
-        name: obj.storeName,
+        name: obj.productName,
+        storeName: obj.storeName,
         value: 1, // Equal slice for each unique item
         displayValue: `${obj.qty} ${obj.uom}`.trim(),
-        products: obj.productName,
+        products: obj.storeName,
         color: PIE_COLORS[i % PIE_COLORS.length],
       }))
       .sort((a, b) => a.name.localeCompare(b.name));
 
-    return data.length > 0 ? data : [{ name: "No Stock", value: 1, displayValue: "0", products: "", color: "#cbd5e1" }];
+    return data.length > 0 ? data : [{ name: "No Stock", storeName: "", value: 1, displayValue: "0", products: "", color: "#cbd5e1" }];
   }, [rawMaterials]);
 
 

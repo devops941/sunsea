@@ -508,7 +508,18 @@ const ProductionOrderList: React.FC = () => {
             header: "ACTIONS",
             render: (item: any) => (
                 <div className="flex items-center gap-2 justify-start">
-                    {/* Assign to Weekly Scheduling — acts as both Check Material and Assign */}
+
+                    {/* PENDING_PLANNING with no PO yet → Create Production Order */}
+                    {item.status === "PENDING_PLANNING" && !item.primaryPO && can("production_orders.create") && (
+                        <IconButton
+                            variant="primary"
+                            title="Create Production Order"
+                            icon={FaPlus}
+                            onClick={() => handleCreateProductionOrder(item)}
+                        />
+                    )}
+
+                    {/* CREATED / PENDING_PLANNING / READY_FOR_PLANNING with PO → Assign to Weekly */}
                     {(item.status === "CREATED" || item.status === "PENDING_PLANNING" || item.status === "READY_FOR_PLANNING") && item.primaryPO && (can("weekly_programs.create") || can("production_orders.edit")) && (
                         <IconButton
                             variant="success"
@@ -518,17 +529,33 @@ const ProductionOrderList: React.FC = () => {
                         />
                     )}
 
-                    {/* WAITING_FOR_MATERIAL: Show Re-Check Raw Material button */}
+                    {/* WAITING_FOR_MATERIAL: Re-Check Raw Material + Reserve button */}
                     {item.status === "WAITING_FOR_MATERIAL" && item.primaryPO && can("production_orders.edit") && (
-                        <IconButton
-                            variant="info"
-                            title="Re-Check Raw Material Stock Availability"
-                            icon={FaSyncAlt}
-                            onClick={() => handleRecheckMaterials(item)}
-                        />
+                        <>
+                            <IconButton
+                                variant="info"
+                                title="Re-Check Raw Material Stock Availability"
+                                icon={FaSyncAlt}
+                                onClick={() => handleRecheckMaterials(item)}
+                            />
+                            <IconButton
+                                variant="success"
+                                title="Reserve Raw Materials"
+                                icon={FaCheckCircle}
+                                onClick={() => handleAllocateRM(item)}
+                            />
+                            {can("purchase_orders.create") && (
+                                <IconButton
+                                    variant="warning"
+                                    title="Create Purchase Order for Missing Materials"
+                                    icon={FaShoppingCart}
+                                    onClick={() => navigate(`/purchase-orders/create?po=${item.primaryPO?.productionOrderId}`)}
+                                />
+                            )}
+                        </>
                     )}
 
-                    {/* Legacy RM_PENDING handler */}
+                    {/* RM_PENDING: Reserve Raw Materials + Create Purchase Order */}
                     {item.status === "RM_PENDING" && can("production_orders.edit") && (
                         <IconButton
                             variant="success"
@@ -546,6 +573,7 @@ const ProductionOrderList: React.FC = () => {
                         />
                     )}
 
+                    {/* View Details */}
                     {item.primaryPO && can("production_orders.view") && (
                         <IconButton
                             variant="info"
@@ -559,6 +587,8 @@ const ProductionOrderList: React.FC = () => {
                             }}
                         />
                     )}
+
+                    {/* Edit & Delete */}
                     {item.primaryPO && !["IN_PRODUCTION", "POST_PRODUCTION", "READY_FOR_DISPATCH", "DISPATCHED", "CANCELLED", "CANCELED", "DELETED"].includes(item.primaryPO.status?.toUpperCase()) && (
                         <>
                             {can("production_orders.edit") && (

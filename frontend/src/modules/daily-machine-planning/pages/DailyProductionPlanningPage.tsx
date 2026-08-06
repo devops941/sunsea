@@ -571,26 +571,48 @@ const DailyProductionPlanningPage: React.FC = () => {
           }
         }
 
+        const thisPlanProducedQty = Array.isArray(plan.hourlyProductions)
+          ? plan.hourlyProductions
+              .filter((h: any) => Number(h.hourIndex) > 0)
+              .reduce((sum: number, h: any) => sum + Number(h.qtyProduced || 0), 0)
+          : 0;
+        const totalDispatchedOnPO = Array.isArray(plan.productionOrder?.goodsDispatchItems)
+          ? plan.productionOrder.goodsDispatchItems
+              .reduce((sum: number, d: any) => sum + Number(d.dispatchQty || 0), 0)
+          : 0;
+        const completedPlanStatus =
+          plan.productionOrder?.status === "DISPATCHED"
+            ? "DISPATCHED"
+            : plan.productionOrder?.status === "PARTIAL_COMPLETED" && thisPlanProducedQty > 0 && totalDispatchedOnPO >= thisPlanProducedQty
+            ? "PARTIALLY_DISPATCHED"
+            : "READY_FOR_DISPATCH";
+        const completedPlanLabel =
+          completedPlanStatus === "DISPATCHED"
+            ? "Dispatched"
+            : completedPlanStatus === "PARTIALLY_DISPATCHED"
+            ? "Partially Dispatched"
+            : "Ready for Dispatch";
+
         return (
           <div className="flex flex-col items-center gap-1">
             <div className="flex items-center gap-1.5">
-              <StatusBadge 
+              <StatusBadge
                 status={
                   plan.productionOrder?.status === "COMPLETED_WITH_SHORTFALL" || (plan.remarks?.includes("Permanently Stopped:") && producedQty < plannedQty && ["POST_PRODUCTION", "COMPLETED"].includes(plan.status))
                     ? "COMPLETED_WITH_SHORTFALL"
                     : plan.status === "STOPPED" || plan.status === "SHORT_CLOSED" || (plan.remarks?.includes("Short Closed:") && producedQty < plannedQty && ["POST_PRODUCTION", "COMPLETED"].includes(plan.status))
                     ? "SHORT_CLOSED"
                     : plan.status === "COMPLETED"
-                    ? (["DISPATCHED", "PARTIAL_COMPLETED", "READY_FOR_DISPATCH"].includes(plan.productionOrder?.status) ? plan.productionOrder.status : "COMPLETED")
+                    ? completedPlanStatus
                     : plan.status
                 }
                 customText={
                   plan.productionOrder?.status === "COMPLETED_WITH_SHORTFALL" || (plan.remarks?.includes("Permanently Stopped:") && producedQty < plannedQty && ["POST_PRODUCTION", "COMPLETED"].includes(plan.status))
-                    ? "Permanently Stopped" 
+                    ? "Permanently Stopped"
                     : plan.status === "STOPPED" || plan.status === "SHORT_CLOSED" || (plan.remarks?.includes("Short Closed:") && producedQty < plannedQty && ["POST_PRODUCTION", "COMPLETED"].includes(plan.status))
                     ? "Short Closed"
                     : plan.status === "COMPLETED"
-                    ? "Ready for Dispatch"
+                    ? completedPlanLabel
                     : undefined
                 }
               />

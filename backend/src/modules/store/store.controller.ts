@@ -18,7 +18,7 @@ class StoreController {
   findAll = asyncHandler(async (req: Request, res: Response) => {
     const {
       search,
-      storeTypeId,
+      storeCategory,
       page,
       limit,
       sortBy,
@@ -27,9 +27,7 @@ class StoreController {
 
     const stores = await storeService.findAll({
       search: search as string | undefined,
-      storeTypeId: storeTypeId
-        ? parseInt(storeTypeId as string, 10)
-        : undefined,
+      storeCategory: storeCategory as string | undefined,
       page: page ? parseInt(page as string, 10) : undefined,
       limit: limit ? parseInt(limit as string, 10) : undefined,
       sortBy: sortBy as string | undefined,

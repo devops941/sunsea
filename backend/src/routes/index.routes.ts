@@ -17,7 +17,6 @@ import productRoutes from "../modules/product/product.routes";
 import companyRoutes from "../modules/company/company.routes";
 import shiftRoutes from "../modules/shift/shift.routes";
 import storeRoutes from "../modules/store/store.routes";
-import storeTypeRoutes from "../modules/store-type/store-type.routes";
 import rawMaterialRoutes from "../modules/raw-material/raw-material.routes";
 import rawMaterialCategoryRoutes from "../modules/raw-material-category/raw-material-category.routes";
 import rawMaterialStockRoutes from "../modules/raw-material-stock/raw-material-stock.routes";
@@ -85,7 +84,6 @@ router.use("/products", productRoutes);
 router.use("/companies", companyRoutes);
 
 router.use("/stores", storeRoutes);
-router.use("/store-types", storeTypeRoutes);
 router.use("/raw-material-categories", rawMaterialCategoryRoutes);
 router.use("/raw-materials", rawMaterialRoutes);
 router.use("/raw-material-stocks", rawMaterialStockRoutes);

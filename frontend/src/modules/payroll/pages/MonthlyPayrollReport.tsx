@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { AlertTriangle, ChevronLeft, ChevronRight, Printer, FileDown, Users, TrendingUp, TrendingDown, Wallet, Shield, Clock } from 'lucide-react';
 import ViewButton from '../../../components/ui/viewbutton/ViewButton';
+import { usePermission } from '../../../hooks/usePermission';
 import IconButton from '../../../components/ui/IconButton/IconButton';
 import { FiRefreshCw } from 'react-icons/fi';
 import CustomButton from '../../../components/ui/custombutton/CustomButton';
@@ -34,6 +35,8 @@ type ViewMode = 'ALL' | 'PF' | 'CASH';
 
 // ─── Component ────────────────────────────────────────────────────────────────
 const MonthlyPayrollReport: React.FC = () => {
+  const { can } = usePermission();
+  const canViewRun = can("payroll-run.view");
   const { socket }    = useSocket();
   const [runs, setRuns]       = useState<ApiPayrollRun[]>([]);
   const [runIdx, setRunIdx]   = useState(0);
@@ -263,9 +266,11 @@ const MonthlyPayrollReport: React.FC = () => {
     align: 'center',
     render: (r) => (
       <div className="flex items-center justify-center gap-1">
-        <ViewButton
-          onClick={() => run && setPayslipTarget({ runId: run.id, resultId: r.id, period: run.period, type: 'MONTHLY' })}
-        />
+        {canViewRun && (
+          <ViewButton
+            onClick={() => run && setPayslipTarget({ runId: run.id, resultId: r.id, period: run.period, type: 'MONTHLY' })}
+          />
+        )}
         <IconButton
           icon={FileDown}
           variant="success"

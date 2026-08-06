@@ -50,31 +50,17 @@ const InventoryTabs: React.FC = () => {
         if (!canViewRaw && !canViewFG) return [];
 
         return stores.map((store) => {
-            const storeTypeCode = store.storeTypeRef?.code?.toLowerCase() || "";
-            const storeTypeName = store.storeTypeRef?.name?.toLowerCase() || "";
-            const storeName = (store.storeName || "").toLowerCase();
-
-            const isFinishedGoods =
-                String(store.storeTypeId) === "2" ||
-                storeTypeCode === "fg" ||
-                storeTypeCode === "finished" ||
-                storeTypeCode === "finished_goods" ||
-                storeTypeName.includes("finished") ||
-                storeName.includes("finished");
+            const isFinishedGoods = store.storeCategory === "FINISHED_GOODS";
 
             if (isFinishedGoods && !canViewFG) return null;
             if (!isFinishedGoods && !canViewRaw) return null;
 
-            return {
-                key: `store_${store.storeId}`,
-                label: store.storeName,
-                icon: isFinishedGoods ? <FaBoxOpen /> : <FaBoxes />,
-                content: isFinishedGoods ? (
-                    <FinishedStockList storeId={store.storeId} />
-                ) : (
-                    <StockList storeId={store.storeId} />
-                )
-            };
+            const icon = isFinishedGoods ? <FaBoxOpen /> : <FaBoxes />;
+            const content = isFinishedGoods
+                ? <FinishedStockList storeId={store.storeId} />
+                : <StockList storeId={store.storeId} />;
+
+            return { key: `store_${store.storeId}`, label: store.storeName, icon, content };
         }).filter((t) => t !== null) as TabItem[];
     }, [stores, can]);
 

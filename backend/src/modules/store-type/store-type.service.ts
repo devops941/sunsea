@@ -2,9 +2,11 @@ import { prisma } from "../../config/prisma";
 import { ApiError } from "../../utils/ApiError";
 import { CreateStoreTypeInput, UpdateStoreTypeInput } from "./store-type.validation";
 
+const db = prisma as any;
+
 class StoreTypeService {
   async create(data: CreateStoreTypeInput) {
-    const existing = await prisma.storeType.findUnique({
+    const existing = await db.storeType?.findUnique({
       where: { code: data.code },
     });
 
@@ -12,7 +14,7 @@ class StoreTypeService {
       throw new ApiError(409, `Store Type with code ${data.code} already exists`);
     }
 
-    return prisma.storeType.create({
+    return db.storeType?.create({
       data: {
         code: data.code,
         name: data.name,
@@ -22,46 +24,46 @@ class StoreTypeService {
     });
   }
 
-async findAll(params: {
-  page?: number;
-  limit?: number;
-  search?: string;
-  sortBy?: string;
-  sortOrder?: "asc" | "desc";
-} = {}) {
+  async findAll(params: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    sortBy?: string;
+    sortOrder?: "asc" | "desc";
+  } = {}) {
 
-  const {
-    page,
-    limit,
-    search,
-    sortBy = "name",
-    sortOrder = "asc",
-  } = params;
+    const {
+      page,
+      limit,
+      search,
+      sortBy = "name",
+      sortOrder = "asc",
+    } = params;
 
-  const where: any = {};
+    const where: any = {};
 
-  if (search) {
-    where.OR = [
-      {
-        code: {
-          contains: search,
-          mode: "insensitive",
+    if (search) {
+      where.OR = [
+        {
+          code: {
+            contains: search,
+            mode: "insensitive",
+          },
         },
-      },
-      {
-        name: {
-          contains: search,
-          mode: "insensitive",
+        {
+          name: {
+            contains: search,
+            mode: "insensitive",
+          },
         },
-      },
-      {
-        description: {
-          contains: search,
-          mode: "insensitive",
+        {
+          description: {
+            contains: search,
+            mode: "insensitive",
+          },
         },
-      },
-    ];
-  }
+      ];
+    }
 
     const queryOptions: any = {
       where,
@@ -75,30 +77,30 @@ async findAll(params: {
       },
     };
 
-  if (page !== undefined || limit !== undefined) {
-    const p = page || 1;
-    const l = limit || 10;
+    if (page !== undefined || limit !== undefined) {
+      const p = page || 1;
+      const l = limit || 10;
 
-    queryOptions.skip = (p - 1) * l;
-    queryOptions.take = l;
+      queryOptions.skip = (p - 1) * l;
+      queryOptions.take = l;
+    }
+
+    const [storeTypes, total] = await Promise.all([
+      db.storeType?.findMany ? db.storeType.findMany(queryOptions) : [],
+      db.storeType?.count ? db.storeType.count({ where }) : 0,
+    ]);
+
+    return {
+      storeTypes,
+      total,
+      page: page || 1,
+      limit: limit || total,
+      totalPages: limit ? Math.ceil(total / limit) : 1,
+    };
   }
 
-  const [storeTypes, total] = await Promise.all([
-    prisma.storeType.findMany(queryOptions),
-    prisma.storeType.count({ where }),
-  ]);
-
-  return {
-    storeTypes,
-    total,
-    page: page || 1,
-    limit: limit || total,
-    totalPages: limit ? Math.ceil(total / limit) : 1,
-  };
-}
-
   async findById(id: number) {
-    const storeType = await prisma.storeType.findUnique({
+    const storeType = await db.storeType?.findUnique({
       where: { id },
     });
 
@@ -114,7 +116,7 @@ async findAll(params: {
 
     // If code is updated, check for conflicts
     if (data.code) {
-      const existing = await prisma.storeType.findUnique({
+      const existing = await db.storeType?.findUnique({
         where: { code: data.code },
       });
 
@@ -123,7 +125,7 @@ async findAll(params: {
       }
     }
 
-    return prisma.storeType.update({
+    return db.storeType?.update({
       where: { id },
       data,
     });
@@ -133,21 +135,21 @@ async findAll(params: {
     await this.findById(id);
 
     // Check if any stores are using this type
-    const storesUsingType = await prisma.store.count({
+    const storesUsingType = await db.store?.count({
       where: { storeTypeId: id },
-    });
+    }) || 0;
 
     if (storesUsingType > 0) {
       throw new ApiError(400, `Cannot delete Store Type because it is already assigned in Storage Store Management.`);
     }
 
-    return prisma.storeType.delete({
+    return db.storeType?.delete({
       where: { id },
     });
   }
 
   async getNextId() {
-    const lastStoreType = await prisma.storeType.findFirst({
+    const lastStoreType = await db.storeType?.findFirst({
       orderBy: { id: "desc" },
     });
 
@@ -156,7 +158,7 @@ async findAll(params: {
     }
 
     // Attempt to parse out numbers from something like "ST-RAW" or "ST001"
-    const match = lastStoreType.code.match(/\d+$/);
+    const match = lastStoreType.code?.match(/\d+$/);
     if (!match) {
       // If no digits found, default fallback
       const random = Math.floor(100 + Math.random() * 900);

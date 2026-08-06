@@ -77,7 +77,7 @@ const HROrganizationTabs: React.FC = () => {
 
     // Determine active tab from URL; verify key exists in filtered tabs before using it
     const pathKey = pathToKey[location.pathname];
-    const activeTab = (pathKey && tabs.some(t => t.key === pathKey)) ? pathKey : tabs[0]?.key || "employees";
+    const activeTab = (pathKey && tabs.some(t => t.key === pathKey)) ? pathKey : tabs[0]?.key || "machines";
 
     const handleTabChange = (key: string) => {
         const targetPath = keyToPath[key];

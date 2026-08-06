@@ -168,7 +168,7 @@ const PurchaseOrderCreatePage: React.FC = () => {
     loadSuppliers();
     dispatch(fetchLocations(undefined));
     dispatch(fetchGstTaxes(undefined));
-    dispatch(fetchStores(undefined));
+    dispatch(fetchStores({ storeCategory: "RAW_MATERIAL" }));
     loadActiveUOMs();
   }, [loadSuppliers, dispatch, loadActiveUOMs]);
 

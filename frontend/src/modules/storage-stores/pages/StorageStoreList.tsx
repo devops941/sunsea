@@ -8,9 +8,9 @@ import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
 import { fetchStores, deleteStore, createStore, updateStore } from "../../../features/stores/storeSlice";
 import { fetchLocations } from "../../../features/locations/locationSlice";
 import { fetchEmployees } from "../../../features/employee/employeeSlice";
-import { fetchStoreTypes } from "../../../features/store-types/storeTypeSlice";
 import { storeService } from "../../../services/storeService";
 import type { Store } from "../../../features/stores/types";
+import { STORE_CATEGORY_OPTIONS, STORE_CATEGORY_LABELS } from "../../../features/stores/types";
 import { useRoles } from "../../../hooks/useRoles";
 
 import ViewButton from "../../../components/ui/viewbutton/ViewButton";
@@ -33,7 +33,7 @@ const ITEMS_PER_PAGE = 10;
 const initialFormState = {
     storeId: "",
     storeName: "",
-    storeTypeId: "",
+    storeCategory: "",
     locationId: "",
     inchargeId: "",
     gstPlace: "",
@@ -51,10 +51,10 @@ const storeSchema = z.object({
             "Store Name can only contain letters, numbers, spaces, &, (, ), and -"
         ),
 
-    storeTypeId: z
+    storeCategory: z
         .string()
         .trim()
-        .min(1, "Store Type is required"),
+        .min(1, "Store Category is required"),
 
     inchargeId: z
         .string()
@@ -83,16 +83,13 @@ const StorageStoreList: React.FC = () => {
     // For form dependencies
     const { data: locations } = useAppSelector(state => state.locations);
     const { employees } = useAppSelector((state: any) => state.employees || { employees: [] });
-    const { data: storeTypes } = useAppSelector(state => state.storeTypes);
     const { roles, loadRoles } = useRoles();
 
     useEffect(() => { if (error) toast.error(error); }, [error]);
-    const [storeTypeFilter, setStoreTypeFilter] = useState("");
-    const storeTypeOptions = [
-        { label: "All Store Types", value: "" },
-        { label: "Raw Material Store", value: "1" },
-        { label: "Finished Goods Store", value: "2" },
-        { label: "Scrap Store", value: "3" },
+    const [storeCategoryFilter, setStoreCategoryFilter] = useState("");
+    const storeCategoryFilterOptions = [
+        { label: "All Categories", value: "" },
+        ...STORE_CATEGORY_OPTIONS,
     ];
     const [searchTerm, setSearchTerm] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
@@ -116,7 +113,6 @@ const StorageStoreList: React.FC = () => {
     useEffect(() => {
         if (can("locations.view")) dispatch(fetchLocations(undefined));
         if (can("employees.view")) dispatch(fetchEmployees(undefined));
-        if (can("store-types.view")) dispatch(fetchStoreTypes(undefined));
         if (can("roles.view")) loadRoles();
     }, [dispatch, loadRoles, can]);
 
@@ -125,7 +121,7 @@ const StorageStoreList: React.FC = () => {
             dispatch(
                 fetchStores({
                     search: searchTerm,
-                    storeTypeId: storeTypeFilter,
+                    storeCategory: storeCategoryFilter,
                     page: currentPage,
                     limit: ITEMS_PER_PAGE,
                     sortBy: "storeId",
@@ -133,7 +129,7 @@ const StorageStoreList: React.FC = () => {
                 })
             );
         }
-    }, [dispatch, searchTerm, storeTypeFilter, currentPage, can]);
+    }, [dispatch, searchTerm, storeCategoryFilter, currentPage, can]);
 
     useSocketSync("store", undefined, fetchStoreData);
 
@@ -182,7 +178,7 @@ const StorageStoreList: React.FC = () => {
         setFormData({
             storeId: item.storeId,
             storeName: item.storeName || "",
-            storeTypeId: item.storeTypeId ? item.storeTypeId.toString() : "",
+            storeCategory: item.storeCategory || "",
             locationId: item.locationId || "",
             inchargeId: item.inchargeId ? item.inchargeId.toString() : "",
             gstPlace: item.gstPlace || "",
@@ -269,7 +265,7 @@ const StorageStoreList: React.FC = () => {
             const payload = {
                 storeId: formData.storeId,
                 storeName: formData.storeName,
-                storeTypeId: formData.storeTypeId ? Number(formData.storeTypeId) : undefined,
+                storeCategory: formData.storeCategory || undefined,
                 locationId: formData.locationId || undefined,
                 inchargeId: formData.inchargeId || undefined,
                 gstPlace: formData.gstPlace || undefined,
@@ -304,13 +300,13 @@ const StorageStoreList: React.FC = () => {
                         <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
                             <div className="w-48">
                                 <SelectInput
-                                    label="Store Type"
+                                    label="Store Category"
                                     hideLabel={true}
-                                    name="storeTypeFilter"
-                                    value={storeTypeFilter}
-                                    options={storeTypeOptions}
+                                    name="storeCategoryFilter"
+                                    value={storeCategoryFilter}
+                                    options={storeCategoryFilterOptions}
                                     onChange={(e) => {
-                                        setStoreTypeFilter(e.target.value);
+                                        setStoreCategoryFilter(e.target.value);
                                         setCurrentPage(1);
                                     }}
                                 />
@@ -355,7 +351,7 @@ const StorageStoreList: React.FC = () => {
                                 { header: "#", width: "60px", render: (_item, index) => startIndex + index + 1, align: "center" },
                                 { header: "STORE ID", accessor: "storeId" },
                                 { header: "STORE NAME", accessor: "storeName" },
-                                { header: "STORE TYPE", render: (item) => item.storeTypeRef?.name || "N/A" },
+                                { header: "CATEGORY", render: (item) => item.storeCategory ? STORE_CATEGORY_LABELS[item.storeCategory] : "N/A" },
                                 { header: "LOCATION", render: (item) => (item as any).location?.locationName || "N/A" },
                                 { header: "INCHARGE", render: (item) => item.incharge?.fullName || "N/A" },
                                 {
@@ -432,18 +428,15 @@ const StorageStoreList: React.FC = () => {
                             />
 
                             <SelectInput
-                                label="Store Type"
-                                name="storeTypeId"
-                                value={formData.storeTypeId}
+                                label="Store Category"
+                                name="storeCategory"
+                                value={formData.storeCategory}
                                 options={[
-                                    { label: "Select a store type", value: "" },
-                                    ...storeTypes.filter(st => st.isActive).map(st => ({
-                                        label: st.name,
-                                        value: st.id.toString()
-                                    }))
+                                    { label: "Select a category", value: "" },
+                                    ...STORE_CATEGORY_OPTIONS
                                 ]}
                                 required
-                                error={errors.storeTypeId}
+                                error={errors.storeCategory}
                                 onChange={handleChange}
                             />
 
@@ -523,7 +516,7 @@ const StorageStoreList: React.FC = () => {
                             fields: [
                                 { label: "Store ID", value: selectedItem.storeId },
                                 { label: "Store Name", value: selectedItem.storeName },
-                                { label: "Store Type", value: selectedItem.storeTypeRef?.name || "N/A" },
+                                { label: "Store Category", value: selectedItem.storeCategory ? STORE_CATEGORY_LABELS[selectedItem.storeCategory] : "N/A" },
                                 { label: "Location", value: (selectedItem as any).location?.locationName || "N/A" },
                                 { label: "Incharge", value: selectedItem.incharge?.fullName || "N/A" },
                                 { label: "Cost Method", value: selectedItem.costMethod || "N/A" },

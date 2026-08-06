@@ -1,10 +1,23 @@
+export type StoreCategory = "RAW_MATERIAL" | "FINISHED_GOODS" | "WASTAGE";
+
+export const STORE_CATEGORY_LABELS: Record<StoreCategory, string> = {
+  RAW_MATERIAL: "Raw Material Store",
+  FINISHED_GOODS: "Finished Goods Store",
+  WASTAGE: "Wastage Store",
+};
+
+export const STORE_CATEGORY_OPTIONS = [
+  { label: "Raw Material Store", value: "RAW_MATERIAL" },
+  { label: "Finished Goods Store", value: "FINISHED_GOODS" },
+  { label: "Wastage Store", value: "WASTAGE" },
+];
+
 export interface Store {
-  id?: number | string; // Typically backend uses UUIDs or specific ID formats. In the payload it was STR002.
+  id?: number | string;
   storeId: string;
   storeCode?: string | null;
   storeName: string;
-  storeTypeId?: number | null;
-  storeTypeRef?: { id: number; name: string; code: string } | null;
+  storeCategory?: StoreCategory | null;
   locationId?: string | null;
   locationDesc?: string | null;
   inchargeId?: string | number | null;
@@ -24,7 +37,7 @@ export interface CreateStoreDto {
   storeId: string;
   storeCode?: string | null;
   storeName: string;
-  storeTypeId?: number;
+  storeCategory?: StoreCategory | null;
   locationId?: string | null;
   locationDesc?: string | null;
   inchargeId?: string | number | null;
@@ -38,7 +51,7 @@ export interface CreateStoreDto {
 export interface UpdateStoreDto {
   storeCode?: string | null;
   storeName?: string;
-  storeTypeId?: number;
+  storeCategory?: StoreCategory | null;
   locationId?: string | null;
   locationDesc?: string | null;
   inchargeId?: string | number | null;
@@ -50,10 +63,10 @@ export interface UpdateStoreDto {
 }
 
 export interface StoreState {
-    data: Store[];
-    total: number;
-    page: number;
-    totalPages: number;
-    loading: boolean;
-    error: string | null;
+  data: Store[];
+  total: number;
+  page: number;
+  totalPages: number;
+  loading: boolean;
+  error: string | null;
 }
