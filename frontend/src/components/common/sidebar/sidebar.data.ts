@@ -54,6 +54,12 @@ export const sidebarItems: SidebarItem[] = [
     title: "HR & Organization",
     icon: FiUsers,
     path: "/machines",
+    pathsByPermission: [
+      { permission: "machines.view", path: "/machines" },
+      { permission: "machine-assignments.view", path: "/machines/assignments" },
+      { permission: "employees.view", path: "/employees" },
+      { permission: "shifts.view", path: "/shifts" },
+    ],
     activePaths: [
       "/employees",
       "/machines",
@@ -72,6 +78,14 @@ export const sidebarItems: SidebarItem[] = [
     title: "Product Setup",
     icon: FiDatabase,
     path: "/uoms",
+    pathsByPermission: [
+      { permission: "uoms.view", path: "/uoms" },
+      { permission: "categories.view", path: "/categories" },
+      { permission: "raw_material_categories.view", path: "/raw-material-categories" },
+      { permission: "raw_materials.view", path: "/raw-materials" },
+      { permission: "wastage-store.view", path: "/wastage-store" },
+      { permission: "products.view", path: "/products" },
+    ],
     activePaths: [
       "/products",
       "/categories",
