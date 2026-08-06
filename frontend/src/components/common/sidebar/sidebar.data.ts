@@ -26,6 +26,16 @@ export const sidebarItems: SidebarItem[] = [
     title: "Administration",
     icon: FiSettings,
     path: "/company/view",
+    pathsByPermission: [
+      { permission: "company-settings.view", path: "/company/view" },
+      { permission: "roles.view", path: "/roles" },
+      { permission: "departments.view", path: "/departments" },
+      { permission: "role-permissions.view", path: "/role-permissions" },
+      { permission: "gst_tax.view", path: "/settings/gst-taxes" },
+      { permission: "whatsapp.view", path: "/whatsapp" },
+      { permission: "email-config.view", path: "/email-config" },
+      { permission: "invoice-settings.view", path: "/settings/invoice" },
+    ],
     activePaths: [
       "/company/view",
       "/settings/company",
@@ -110,12 +120,21 @@ export const sidebarItems: SidebarItem[] = [
     title: "Purchase",
     icon: FiShoppingBag,
     path: "/suppliers",
+    pathsByPermission: [
+      { permission: "suppliers.view", path: "/suppliers" },
+      { permission: "purchaseOrders.view", path: "/purchase-orders" },
+      { permission: "purchase-order-approvals.view", path: "/purchase-order-approvals" },
+      { permission: "invoice.view", path: "/invoice" },
+      { permission: "expenses.view", path: "/expenses" },
+      { permission: "purchase-returns.view", path: "/purchase-returns" },
+    ],
     activePaths: [
       "/suppliers",
       "/purchase-orders",
       "/purchase-order-approvals",
       "/expenses",
       "/invoice",
+      "/purchase-returns",
     ],
     permissionAny: [
       "suppliers.view",
@@ -123,6 +142,7 @@ export const sidebarItems: SidebarItem[] = [
       "purchase-order-approvals.view",
       "invoice.view",
       "expenses.view",
+      "purchase-returns.view",
     ],
   },
   // 6. Sales
@@ -130,6 +150,15 @@ export const sidebarItems: SidebarItem[] = [
     title: "Sales",
     icon: FiShoppingCart,
     path: "/customers",
+    pathsByPermission: [
+      { permission: "customers.view", path: "/customers" },
+      { permission: "sales-orders.view", path: "/sales-order" },
+      { permission: "draft-orders.view", path: "/draft-order" },
+      { permission: "quotations.view", path: "/quatation-order" },
+      { permission: "pending-quotations.view", path: "/pending-quotations" },
+      { permission: "sales-invoices.view", path: "/sales-invoices" },
+      { permission: "sales-returns.view", path: "/sales-returns" },
+    ],
     activePaths: [
       "/customers",
       "/sales-order",
@@ -137,6 +166,7 @@ export const sidebarItems: SidebarItem[] = [
       "/quatation-order",
       "/pending-quotations",
       "/sales-invoices",
+      "/sales-returns",
     ],
     permissionAny: [
       "customers.view",
@@ -145,6 +175,7 @@ export const sidebarItems: SidebarItem[] = [
       "quotations.view",
       "pending-quotations.view",
       "sales-invoices.view",
+      "sales-returns.view",
     ],
   },
   // 7. Production
@@ -152,6 +183,17 @@ export const sidebarItems: SidebarItem[] = [
     title: "Production",
     icon: FiTool,
     path: "/allproduction-orders",
+    pathsByPermission: [
+      { permission: "production_orders.view", path: "/allproduction-orders" },
+      { permission: "weekly_programs.view", path: "/weekly-machine-schedules" },
+      { permission: "daily-machine-planning.view", path: "/daily-machine-planning" },
+      { permission: "hourly_productions.view", path: "/hourly-work-reports" },
+      { permission: "production-wastages.view", path: "/production-wastages" },
+      { permission: "goods-dispatch.view", path: "/production/goods-dispatch" },
+      { permission: "shift-execution.view", path: "/shift-execution" },
+      { permission: "oee-dashboard.view", path: "/oee-dashboard" },
+      { permission: "bill_of_materials.view", path: "/bill-of-materials" },
+    ],
     activePaths: [
       "/approved-sales-orders",
       "/production-orders",
@@ -183,6 +225,13 @@ export const sidebarItems: SidebarItem[] = [
     title: "Inventory",
     icon: FiBox,
     path: "/stock",
+    pathsByPermission: [
+      { permission: "raw_material_stocks.view", path: "/stock" },
+      { permission: "finished_goods_stocks.view", path: "/finished-stock" },
+      { permission: "wastage-stock.view", path: "/wastage-stock" },
+      { permission: "stock-adjustments.view", path: "/inventory/stock-adjustments" },
+      { permission: "eod-stock.view", path: "/inventory/eod-stock" },
+    ],
     activePaths: [
       "/stock",
       "/inventory/stock-adjustments",
@@ -203,15 +252,28 @@ export const sidebarItems: SidebarItem[] = [
     title: "Store & Locations",
     icon: FiMapPin,
     path: "/storage-stores",
+    pathsByPermission: [
+      { permission: "stores.view", path: "/storage-stores" },
+      { permission: "store-types.view", path: "/store-types" },
+      { permission: "locations.view", path: "/locations" },
+    ],
     activePaths: ["/storage-stores", "/store-types", "/locations"],
     permissionAny: ["stores.view", "store-types.view", "locations.view"],
   },
- 
-  // 11. Accounts
+
+  // 10. Accounts
   {
     title: "Accounts",
     icon: FiDollarSign,
     path: "/accounts/payable",
+    pathsByPermission: [
+      { permission: "payable.view", path: "/accounts/payable" },
+      { permission: "receivable.view", path: "/accounts/receivable" },
+      { permission: "accounts.view", path: "/accounts" },
+      { permission: "vouchers.view", path: "/accounts/vouchers" },
+      { permission: "petty-cash.view", path: "/accounts/petty-cash" },
+      { permission: "chart-of-accounts.view", path: "/accounts/chart-of-accounts" },
+    ],
     activePaths: [
       "/accounts/payable",
       "/accounts/receivable",
@@ -231,11 +293,18 @@ export const sidebarItems: SidebarItem[] = [
       "chart-of-accounts.view",
     ],
   },
-  // 12. Payroll
+  // 11. Payroll
   {
     title: "Payroll",
     icon: FiClock,
     path: "/payroll",
+    pathsByPermission: [
+      { permission: "payroll.view", path: "/payroll" },
+      { permission: "payroll-run.view", path: "/payroll/run" },
+      { permission: "payroll-settings.view", path: "/payroll/settings" },
+      { permission: "payroll-attendance.view", path: "/payroll/attendance" },
+      { permission: "payroll-advance.view", path: "/payroll/advance" },
+    ],
     activePaths: [
       "/payroll",
       "/payroll/run",
@@ -251,11 +320,18 @@ export const sidebarItems: SidebarItem[] = [
       "payroll-advance.view",
     ],
   },
-   // 10. Reports
+  // 12. Reports
   {
     title: "Reports",
     icon: FiBarChart2,
     path: "/reports/sales",
+    pathsByPermission: [
+      { permission: "sales-reports.view", path: "/reports/sales" },
+      { permission: "purchase-reports.view", path: "/reports/purchase" },
+      { permission: "inventory-reports.view", path: "/reports/inventory" },
+      { permission: "production-reports.view", path: "/reports/production" },
+      { permission: "audit-reports.view", path: "/reports/audit" },
+    ],
     activePaths: [
       "/reports/sales",
       "/reports/purchase",
