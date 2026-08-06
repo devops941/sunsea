@@ -123,6 +123,12 @@ export class DailyPlanRepository {
                 productionSteps: { orderBy: { stepOrder: 'asc' } }
               }
             },
+            goodsDispatchItems: {
+              where: {
+                dispatch: { status: { notIn: ["GATE_REJECTED", "STORE_REJECTED"] } }
+              },
+              select: { dispatchQty: true }
+            },
           },
         },
         machine: true,

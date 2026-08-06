@@ -53,7 +53,7 @@ export const sidebarItems: SidebarItem[] = [
   {
     title: "HR & Organization",
     icon: FiUsers,
-    path: "/employees",
+    path: "/machines",
     activePaths: [
       "/employees",
       "/machines",
@@ -71,7 +71,7 @@ export const sidebarItems: SidebarItem[] = [
   {
     title: "Product Setup",
     icon: FiDatabase,
-    path: "/products",
+    path: "/uoms",
     activePaths: [
       "/products",
       "/categories",
@@ -192,26 +192,7 @@ export const sidebarItems: SidebarItem[] = [
     activePaths: ["/storage-stores", "/store-types", "/locations"],
     permissionAny: ["stores.view", "store-types.view", "locations.view"],
   },
-  // 10. Reports
-  {
-    title: "Reports",
-    icon: FiBarChart2,
-    path: "/reports/sales",
-    activePaths: [
-      "/reports/sales",
-      "/reports/purchase",
-      "/reports/inventory",
-      "/reports/production",
-      "/reports/audit",
-    ],
-    permissionAny: [
-      "sales-reports.view",
-      "purchase-reports.view",
-      "inventory-reports.view",
-      "production-reports.view",
-      "audit-reports.view",
-    ],
-  },
+ 
   // 11. Accounts
   {
     title: "Accounts",
@@ -254,6 +235,26 @@ export const sidebarItems: SidebarItem[] = [
       "payroll-settings.view",
       "payroll-attendance.view",
       "payroll-advance.view",
+    ],
+  },
+   // 10. Reports
+  {
+    title: "Reports",
+    icon: FiBarChart2,
+    path: "/reports/sales",
+    activePaths: [
+      "/reports/sales",
+      "/reports/purchase",
+      "/reports/inventory",
+      "/reports/production",
+      "/reports/audit",
+    ],
+    permissionAny: [
+      "sales-reports.view",
+      "purchase-reports.view",
+      "inventory-reports.view",
+      "production-reports.view",
+      "audit-reports.view",
     ],
   },
 ];

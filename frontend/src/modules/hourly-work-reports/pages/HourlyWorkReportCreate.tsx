@@ -111,7 +111,8 @@ const HourlyWorkReportCreate: React.FC = () => {
     // Wastage Audit State
     const [logWastage, setLogWastage] = useState(false);
     const [wastages, setWastages] = useState<any[]>([]);
-    const [stores, setStores] = useState<any[]>([]);
+    const [wastageStores, setWastageStores] = useState<any[]>([]);
+    const [rawMaterialStores, setRawMaterialStores] = useState<any[]>([]);
     const [rawMaterials, setRawMaterials] = useState<any[]>([]);
     const [rawMaterialsUsed, setRawMaterialsUsed] = useState<any[]>([]);
     const [rawMaterialOptions, setRawMaterialOptions] = useState<any[]>([]);
@@ -131,12 +132,24 @@ const HourlyWorkReportCreate: React.FC = () => {
     useEffect(() => {
         dispatch(fetchMachines());
         dispatch(fetchShifts());
-        // Fetch Stores and Raw Materials (Wastage Products)
-        apiClient.get(config.store.base, { params: { limit: 10 } }).then(res => {
+        // Fetch WASTAGE stores (for Wastage Products section)
+        apiClient.get(config.store.base, { params: { storeCategory: "WASTAGE", limit: 100 } }).then(res => {
             const data = res.data?.data;
-            if (Array.isArray(data)) setStores(data);
-            else if (data && Array.isArray(data.stores)) setStores(data.stores);
-            else if (res.data && Array.isArray(res.data.stores)) setStores(res.data.stores);
+            let list: any[] = [];
+            if (Array.isArray(data)) list = data;
+            else if (data && Array.isArray(data.stores)) list = data.stores;
+            else if (res.data && Array.isArray(res.data.stores)) list = res.data.stores;
+            setWastageStores(list);
+        }).catch(err => console.error(err));
+
+        // Fetch RAW_MATERIAL stores (for Returned Raw Materials section)
+        apiClient.get(config.store.base, { params: { storeCategory: "RAW_MATERIAL", limit: 100 } }).then(res => {
+            const data = res.data?.data;
+            let list: any[] = [];
+            if (Array.isArray(data)) list = data;
+            else if (data && Array.isArray(data.stores)) list = data.stores;
+            else if (res.data && Array.isArray(res.data.stores)) list = res.data.stores;
+            setRawMaterialStores(list);
         }).catch(err => console.error(err));
 
         apiClient.get(config.rawMaterial.base, { params: { limit: 10 } }).then(res => {
@@ -1145,7 +1158,7 @@ const HourlyWorkReportCreate: React.FC = () => {
                                                                         }}
                                                                         options={[
                                                                             { label: "Select Store", value: "" },
-                                                                            ...stores.map((s: any) => ({ label: s.storeName, value: s.storeId }))
+                                                                            ...wastageStores.map((s: any) => ({ label: s.storeName, value: s.storeId }))
                                                                         ]}
                                                                         required
                                                                         error={w.storeError}
@@ -1292,7 +1305,7 @@ const HourlyWorkReportCreate: React.FC = () => {
                                                                     value={rm.storeId}
                                                                     options={[
                                                                         { value: "", label: "-- Select Store --" },
-                                                                        ...stores.map((s: any) => ({
+                                                                        ...rawMaterialStores.map((s: any) => ({
                                                                             value: s.storeId,
                                                                             label: s.storeName || s.storeId
                                                                         }))

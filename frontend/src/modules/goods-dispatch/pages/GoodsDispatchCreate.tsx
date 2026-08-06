@@ -54,7 +54,7 @@ const GoodsDispatchCreate: React.FC = () => {
 
   useEffect(() => {
     dispatch(fetchEligibleOrders({}));
-    dispatch(fetchStores({ limit: 100 }));
+    dispatch(fetchStores({ storeCategory: "FINISHED_GOODS", limit: 100 }));
   }, [dispatch]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {

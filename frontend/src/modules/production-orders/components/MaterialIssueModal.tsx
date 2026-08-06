@@ -57,7 +57,7 @@ export const MaterialIssueModal: React.FC<MaterialIssueModalProps> = ({
     }>>([]);
 
     useEffect(() => {
-        storeService.fetchAll()
+        storeService.fetchAll({ storeCategory: "RAW_MATERIAL" })
             .then((res) => {
                 const data = Array.isArray(res?.stores) ? res.stores : Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
                 setStores(data);

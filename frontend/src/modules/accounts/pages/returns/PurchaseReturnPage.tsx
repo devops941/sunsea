@@ -49,7 +49,7 @@ export const PurchaseReturnPage: React.FC = () => {
         returnService.fetchPurchaseReturns(),
         supplierService.fetchAll({ page: 1, limit: 10 }),
         rawMaterialService.fetchAll(),
-        storeService.fetchAll({ limit: 10 }),
+        storeService.fetchAll({ storeCategory: "RAW_MATERIAL", limit: 100 }),
       ]);
       setReturns(rData || []);
       const sList = Array.isArray(sRes) ? sRes : sRes?.suppliers || [];

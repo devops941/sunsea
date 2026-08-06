@@ -58,7 +58,7 @@ const ProductMasterTabs: React.FC = () => {
         return false;
     });
 
-    let activeTab = pathToKey[location.pathname] || "products";
+    let activeTab = pathToKey[location.pathname] || "uoms";
     if (tabs.length > 0 && !tabs.find(t => t.key === activeTab)) {
         activeTab = tabs[0].key;
     }

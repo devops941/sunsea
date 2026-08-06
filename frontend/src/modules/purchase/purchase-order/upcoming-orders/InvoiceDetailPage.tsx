@@ -151,7 +151,7 @@ const InvoiceDetailPage: React.FC = () => {
     useEffect(() => {
         dispatch(fetchLocations(undefined));
         dispatch(fetchGstTaxes(undefined));
-        dispatch(fetchStores(undefined));
+        dispatch(fetchStores({ storeCategory: "RAW_MATERIAL" }));
         loadActiveUOMs();
         purchaseOrderService
             .fetchAll({ status: "OPEN,PARTIALLY_RECEIVED" as any })

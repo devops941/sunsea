@@ -60,7 +60,7 @@ const WastageStoreList: React.FC = () => {
 
     useEffect(() => {
         if (can("wastage-store.view")) {
-            dispatch(fetchStores(undefined));
+            dispatch(fetchStores({ storeCategory: "WASTAGE" }));
         }
     }, [dispatch, can]);
 

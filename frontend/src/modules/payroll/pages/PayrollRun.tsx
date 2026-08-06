@@ -7,6 +7,7 @@ import {
   Building2, Wallet, TrendingUp, Info, Loader2, ClipboardList,
 } from 'lucide-react';
 import { useSocket } from '../../../providers/SocketProvider';
+import { usePermission } from '../../../hooks/usePermission';
 import CommonLoader from '../../../components/ui/Loader/CommonLoader';
 import { payrollService } from '../../../services/payrollService';
 import type { ApiPayrollRun, ApiEmployeePayroll, AttendanceInput, ApiPayrollResult } from '../../../services/payrollService';
@@ -950,6 +951,8 @@ const Step4: React.FC<{
   onBack: () => void;
   onApproved: (updated: ApiPayrollRun) => void;
 }> = ({ run, onBack, onApproved }) => {
+  const { can } = usePermission();
+  const canEditRun = can("payroll-run.edit");
   const [declared, setDeclared] = useState(false);
   const [loading,  setLoading]  = useState(false);
   const [error,    setError]    = useState('');
@@ -1051,15 +1054,17 @@ const Step4: React.FC<{
         <button onClick={onBack} className="inline-flex items-center gap-2 px-4 py-2 border border-border text-text-secondary rounded-lg text-sm font-semibold hover:bg-slate-50 transition-colors">
           <ChevronLeft size={16} /> Back to Preview
         </button>
-        <button onClick={handleApprove} disabled={!declared || loading}
-          className={`inline-flex items-center gap-2 px-6 py-2.5 rounded-lg font-semibold text-sm shadow-sm transition-all ${
-            declared && !loading ? 'bg-primary text-white hover:bg-red-700' : 'bg-slate-200 text-slate-400 cursor-not-allowed'
-          }`}>
-          {loading
-            ? <><Loader2 size={15} className="animate-spin" /> Approving…</>
-            : <><CheckCircle2 size={15} /> Approve Payroll</>
-          }
-        </button>
+        {canEditRun && (
+          <button onClick={handleApprove} disabled={!declared || loading}
+            className={`inline-flex items-center gap-2 px-6 py-2.5 rounded-lg font-semibold text-sm shadow-sm transition-all ${
+              declared && !loading ? 'bg-primary text-white hover:bg-red-700' : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+            }`}>
+            {loading
+              ? <><Loader2 size={15} className="animate-spin" /> Approving…</>
+              : <><CheckCircle2 size={15} /> Approve Payroll</>
+            }
+          </button>
+        )}
       </div>
     </div>
   );
@@ -1071,6 +1076,8 @@ const Step5: React.FC<{
   onBack: () => void;
 }> = ({ run, onBack }) => {
   const navigate   = useNavigate();
+  const { can } = usePermission();
+  const canEditRun = can("payroll-run.edit");
   const [showModal, setShowModal] = useState(false);
   const [loading,   setLoading]   = useState(false);
   const [locked,    setLocked]    = useState(false);
@@ -1340,10 +1347,12 @@ const Step5: React.FC<{
           <button className="inline-flex items-center gap-2 px-4 py-2 border border-border text-text-secondary rounded-lg text-sm font-semibold hover:bg-slate-50 transition-colors">
             <Download size={15} /> Generate Payslips
           </button>
-          <button onClick={() => setShowModal(true)}
-            className="inline-flex items-center gap-2 px-6 py-2.5 bg-emerald-600 text-white rounded-lg font-semibold text-sm hover:bg-emerald-700 transition-colors shadow-sm">
-            <Lock size={14} /> Lock & Finalise
-          </button>
+          {canEditRun && (
+            <button onClick={() => setShowModal(true)}
+              className="inline-flex items-center gap-2 px-6 py-2.5 bg-emerald-600 text-white rounded-lg font-semibold text-sm hover:bg-emerald-700 transition-colors shadow-sm">
+              <Lock size={14} /> Lock & Finalise
+            </button>
+          )}
         </div>
       </div>
 

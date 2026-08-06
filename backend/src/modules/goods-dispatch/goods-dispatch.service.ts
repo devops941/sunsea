@@ -35,7 +35,8 @@ export class GoodsDispatchService {
     const where: any = {
       // ✅ STEP 7–8: IN_PRODUCTION and later statuses are eligible for dispatch
       // FG stock is NOT created at COMPLETED — it is created here at dispatch receipt
-      status: { in: ["IN_PRODUCTION", "POST_PRODUCTION", "READY_FOR_DISPATCH", "COMPLETED", "PARTIAL_COMPLETED", "COMPLETED_WITH_SHORTFALL", "CLOSED"] },
+      // IN_PROGRESS is included because syncProductionOrderQuantities sets it when target not yet met
+      status: { in: ["IN_PROGRESS", "IN_PRODUCTION", "POST_PRODUCTION", "READY_FOR_DISPATCH", "COMPLETED", "PARTIAL_COMPLETED", "COMPLETED_WITH_SHORTFALL", "CLOSED"] },
     };
 
     if (filters.productItemId) where.productItemId = BigInt(filters.productItemId);
@@ -58,7 +59,8 @@ export class GoodsDispatchService {
       where: {
         ...where,
         // ✅ Eligible for dispatch: production started and at least some qty produced
-        status: { in: ["IN_PRODUCTION", "POST_PRODUCTION", "READY_FOR_DISPATCH", "COMPLETED", "PARTIAL_COMPLETED", "COMPLETED_WITH_SHORTFALL", "CLOSED"] },
+        // IN_PROGRESS is set by syncProductionOrderQuantities when target not yet met
+        status: { in: ["IN_PROGRESS", "IN_PRODUCTION", "POST_PRODUCTION", "READY_FOR_DISPATCH", "COMPLETED", "PARTIAL_COMPLETED", "COMPLETED_WITH_SHORTFALL", "CLOSED"] },
       },
       include: {
         productItem: true,
@@ -93,10 +95,10 @@ export class GoodsDispatchService {
         (sum, item) => sum + Number(item.dispatchQty),
         0
       );
-      
+
       // Calculate dispatchable produced qty
       let dispatchableProducedQty = 0;
-      if (["IN_PRODUCTION", "POST_PRODUCTION", "PARTIAL_COMPLETED", "COMPLETED_WITH_SHORTFALL", "CLOSED"].includes(o.status)) {
+      if (["IN_PROGRESS", "IN_PRODUCTION", "POST_PRODUCTION", "PARTIAL_COMPLETED", "COMPLETED_WITH_SHORTFALL", "CLOSED"].includes(o.status)) {
         // For active production or partial/short-closed, only count quantities from plans that finished post-production OR were stopped/short-closed
         const finishedPlans = o.dailyProductionPlans.filter((p: any) => 
           p.status === "COMPLETED" || p.status === "SHORT_CLOSED" || p.status === "STOPPED"
@@ -104,10 +106,13 @@ export class GoodsDispatchService {
         dispatchableProducedQty = finishedPlans.reduce((sum, p) => {
           return sum + p.hourlyProductions.reduce((hSum: number, h: any) => hSum + Number(h.qtyProduced), 0);
         }, 0);
-        // Fallback: if no finished plans found, use the PO's producedQty directly
+        // Fallback: if finished plans exist but hourlyProductions returned 0 (FK not set),
+        // OR if no finished plans at all — use the PO's producedQty directly
         if (dispatchableProducedQty === 0 && Number(o.producedQty) > 0) {
           dispatchableProducedQty = Number(o.producedQty);
         }
+        // Additional safety: never allow dispatchableProducedQty to exceed producedQty
+        dispatchableProducedQty = Math.min(dispatchableProducedQty, Number(o.producedQty));
       } else {
         // For fully completed (READY_FOR_DISPATCH / COMPLETED), everything produced is dispatchable
         dispatchableProducedQty = Number(o.producedQty);
@@ -158,7 +163,7 @@ export class GoodsDispatchService {
       }
 
       // ✅ STEP 7–8: IN_PRODUCTION and later statuses can be dispatched
-      if (!['IN_PRODUCTION', 'POST_PRODUCTION', 'READY_FOR_DISPATCH', 'COMPLETED', 'PARTIAL_COMPLETED', 'COMPLETED_WITH_SHORTFALL', 'CLOSED'].includes(po.status)) {
+      if (!['IN_PROGRESS', 'IN_PRODUCTION', 'POST_PRODUCTION', 'READY_FOR_DISPATCH', 'COMPLETED', 'PARTIAL_COMPLETED', 'COMPLETED_WITH_SHORTFALL', 'CLOSED'].includes(po.status)) {
         throw new ApiError(
           400,
           `Production Order ${item.productionOrderId} is not eligible for dispatch. ` +

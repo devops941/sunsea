@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+const StoreCategoryEnum = z.enum(["RAW_MATERIAL", "FINISHED_GOODS", "WASTAGE"]);
+
 /**
  * Create Store Validation
  */
@@ -15,7 +17,7 @@ export const createStoreSchema = z.object({
       .min(1, "Store Name is required")
       .max(50, "Store Name cannot exceed 50 characters"),
 
-    storeTypeId: z.coerce.number().optional().nullable(),
+    storeCategory: StoreCategoryEnum.optional().nullable(),
 
     locationId: z
       .string()

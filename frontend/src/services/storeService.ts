@@ -6,7 +6,7 @@ export const storeService = {
   fetchAll: async (
     params?: {
       search?: string;
-      storeTypeId?: string;
+      storeCategory?: string;
       page?: number;
       limit?: number;
       sortBy?: string;

@@ -8,6 +8,7 @@ import CommonLoader from '../../../components/ui/Loader/CommonLoader';
 import SelectInput from '../../../components/form/SelectInput/SelectInput';
 import { payrollService } from '../../../services/payrollService';
 import type { ApiEmployeePayroll, ApiPayrollConfig } from '../../../services/payrollService';
+import { usePermission } from '../../../hooks/usePermission';
 
 // ─── Status Config ────────────────────────────────────────────────────────────
 const STATUSES = ['PRESENT', 'ABSENT', 'HALF_DAY', 'WEEKLY_OFF', 'HOLIDAY', 'LEAVE_PAID', 'LEAVE_UNPAID'] as const;
@@ -196,6 +197,8 @@ const CellEditPanel: React.FC<{
 // ─── Main Page ────────────────────────────────────────────────────────────────
 const AttendancePage: React.FC = () => {
   const navigate  = useNavigate();
+  const { can } = usePermission();
+  const canEditAttendance = can("payroll-attendance.edit");
   const now       = new Date();
 
   // ── Period state ──────────────────────────────────────────────────────────
@@ -500,11 +503,13 @@ const AttendancePage: React.FC = () => {
               className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-semibold border border-primary text-primary rounded-lg hover:bg-red-50 transition-colors">
               <PlayCircle size={14} /> Run Payroll
             </button>
-            <button onClick={handleSave} disabled={saving}
-              className="inline-flex items-center gap-2 px-5 py-2 bg-primary text-white rounded-lg text-sm font-semibold hover:bg-red-700 transition-colors shadow-sm disabled:opacity-60">
-              {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-              {saving ? 'Saving…' : runType === 'WEEKLY' && fullMonthMode ? 'Save Full Month' : 'Save Attendance'}
-            </button>
+            {canEditAttendance && (
+              <button onClick={handleSave} disabled={saving}
+                className="inline-flex items-center gap-2 px-5 py-2 bg-primary text-white rounded-lg text-sm font-semibold hover:bg-red-700 transition-colors shadow-sm disabled:opacity-60">
+                {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                {saving ? 'Saving…' : runType === 'WEEKLY' && fullMonthMode ? 'Save Full Month' : 'Save Attendance'}
+              </button>
+            )}
           </div>
         </div>
 

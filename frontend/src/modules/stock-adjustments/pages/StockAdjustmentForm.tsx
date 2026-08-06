@@ -148,7 +148,7 @@ const StockAdjustmentForm: React.FC = () => {
   useEffect(() => {
     dispatch(fetchRawMaterials(undefined));
     dispatch(fetchProducts(undefined));
-    dispatch(fetchStores(undefined));
+    dispatch(fetchStores(undefined)); // Stock adjustment handles both RM and FG — show all stores
     dispatch(fetchFinishedGoodsStocks({}));
     dispatch(fetchProductionOrdersForIssue());
     return () => { dispatch(clearCurrent()); };
