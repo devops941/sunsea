@@ -148,6 +148,7 @@ const SupplierCreate: React.FC = () => {
         leadTimeDays: 7,
         minOrderQty: 0,
         openingBalance: 0,
+        openingBalanceType: "CREDIT",
         currency: "INR",
         bankAccounts: [
             {
@@ -224,7 +225,7 @@ const SupplierCreate: React.FC = () => {
             legalName: "",
             displayName: "",
             vendorType: "Manufacturer",
-            category: [],
+            category: [] as string[],
             rawMaterialCategories: "",
             contactPerson: "",
             designation: "",
@@ -248,6 +249,7 @@ const SupplierCreate: React.FC = () => {
             leadTimeDays: 7,
             minOrderQty: 0,
             openingBalance: 0,
+            openingBalanceType: "CREDIT",
             currency: "INR",
             bankAccounts: [
                 {
@@ -547,8 +549,9 @@ const SupplierCreate: React.FC = () => {
             paymentTerms: formData.paymentTerms,
             leadTimeDays: formData.leadTimeDays,
             minOrderQty: formData.minOrderQty,
-            openingBalance: formData.openingBalance,
             currency: formData.currency,
+            openingBalance: Number(formData.openingBalance || 0),
+            openingBalanceType: formData.openingBalanceType || "CREDIT",
             bankAccount: formData.bankAccounts,
             status: formData.status,
             addresses,
@@ -561,11 +564,11 @@ const SupplierCreate: React.FC = () => {
         };
 
         try {
-            await addSupplier(payload as any);
+            await addSupplier(payload);
             toast.success("Supplier created successfully!");
             navigate("/suppliers");
         } catch (err: any) {
-            toast.error(err || "Failed to create supplier");
+            toast.error(typeof err === "string" ? err : err?.message || "Failed to create supplier");
         } finally {
             setIsSubmitting(false);
         }
@@ -961,15 +964,6 @@ const SupplierCreate: React.FC = () => {
                                     onChange={handleChange}
                                 />
                                 <TextInput
-                                    label="Opening Balance ₹"
-                                    name="openingBalance"
-                                    type="number"
-                                    value={String(formData.openingBalance)}
-                                    placeholder="0.00"
-                                    error={errors.openingBalance}
-                                    onChange={handleChange}
-                                />
-                                <TextInput
                                     label="Min Order Qty (MOQ)"
                                     name="minOrderQty"
                                     value={String(formData.minOrderQty)}
@@ -977,8 +971,33 @@ const SupplierCreate: React.FC = () => {
                                     error={errors.minOrderQty}
                                     onChange={handleChange}
                                 />
+                                <div>
+                                    <TextInput
+                                        label="Opening Balance ₹"
+                                        name="openingBalance"
+                                        type="number"
+                                        value={String(formData.openingBalance)}
+                                        placeholder="0.00"
+                                        error={errors.openingBalance}
+                                        onChange={handleChange}
+                                    />
+                                    <p className="mt-1 text-xs text-amber-600 flex items-center gap-1">
+                                        <span>⚠</span> Set once at creation. Cannot be edited later.
+                                    </p>
+                                </div>
+                                <SelectInput
+                                    label="Opening Balance Type"
+                                    name="openingBalanceType"
+                                    value={formData.openingBalanceType}
+                                    options={[
+                                        { value: "CREDIT", label: "Credit (We owe supplier)" },
+                                        { value: "DEBIT", label: "Debit (Advance paid to supplier)" },
+                                    ]}
+                                    onChange={handleChange}
+                                />
                             </div>
                         </div>
+
 
 
                         {/* BANK DETAILS */}

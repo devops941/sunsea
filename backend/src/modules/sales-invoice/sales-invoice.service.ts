@@ -281,6 +281,14 @@ class SalesInvoiceService {
         });
       }
 
+      // Auto-post double-entry SALES Voucher
+      try {
+        const { voucherPostingService } = require("../accounts/voucherPosting.service");
+        await voucherPostingService.postSalesVoucher(invoice.id, tx);
+      } catch (vErr) {
+        console.error("[Auto-Post Voucher Error] Failed to post Sales Voucher for invoice:", vErr);
+      }
+
       return serializeInvoice(invoice);
     }, {
       maxWait: 10000,

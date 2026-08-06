@@ -54,8 +54,11 @@ export const createCustomerSchema = z.object({
 
   creditLimit: z.number().optional(),
   creditDays: z.number().optional(),
-  openingBalance: z.number().optional(),
   priceList: z.string().optional(),
+
+  // Opening balance — set once at creation, never editable
+  openingBalance: z.number().min(0, "Opening balance cannot be negative").optional().default(0),
+  openingBalanceType: z.enum(["DEBIT", "CREDIT"]).optional().default("DEBIT"),
 
   collectionAgentId: z.coerce.bigint().nullable().optional(),
 
@@ -109,7 +112,8 @@ export const createCustomerSchema = z.object({
   aiRiskBand: z.string().optional(),
 });
 
-export const updateCustomerSchema = createCustomerSchema.partial();
+// openingBalance is intentionally excluded from updates — it is immutable after creation
+export const updateCustomerSchema = createCustomerSchema.omit({ openingBalance: true }).partial();
 
 export const createCustomerRequestSchema = z.object({
   body: createCustomerSchema,

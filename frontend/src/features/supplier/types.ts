@@ -41,8 +41,8 @@ export interface Supplier {
   minOrderQty?: number | null;
   currency: string;
   openingBalance?: number | string | null;
+  openingBalanceType?: string | null;
   bankIfsc?: string | null;
-  bankAccount?: string | null;
   bankHolder?: string | null;
   upiId?: string | null;
   onTimePct?: number | null;
@@ -50,17 +50,19 @@ export interface Supplier {
   addresses?: SupplierAddress[];
   createdAt: string;
   updatedAt: string;
-  rawMaterialCategories?: string[];
+  rawMaterialCategories?: string | string[];
+  bankAccount?: any;
   materialPrices?: any[];
 }
 
 export interface CreateSupplierDto {
-  companyId: string;
+  companyId?: string;
   supplierCode: string;
   legalName: string;
   displayName?: string | null;
   vendorType: string;
   category: string;
+  rawMaterialCategories?: string;
   contactPerson?: string | null;
   designation?: string | null;
   mobile: any;
@@ -82,9 +84,10 @@ export interface CreateSupplierDto {
   leadTimeDays: number;
   minOrderQty?: number | null;
   openingBalance?: number | null;
+  openingBalanceType?: string;
   currency: string;
   bankIfsc?: string | null;
-  bankAccount?: string | null;
+  bankAccount?: any;
   bankHolder?: string | null;
   upiId?: string | null;
   status?: string;

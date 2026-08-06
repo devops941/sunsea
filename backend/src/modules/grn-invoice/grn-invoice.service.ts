@@ -412,6 +412,15 @@ class GrnInvoiceService {
                 });
             }
 
+            // Auto-post double-entry PURCHASE Voucher & PAYMENT Vouchers
+            try {
+                const { voucherPostingService } = require("../accounts/voucherPosting.service");
+                await voucherPostingService.postPurchaseVoucher(grnInvoice.id, tx);
+                await voucherPostingService.postPaymentVouchersForGRN(grnInvoice.id, tx);
+            } catch (vErr) {
+                console.error("[Auto-Post Voucher Error] Failed to post Purchase/Payment Voucher for GRN:", vErr);
+            }
+
             return grnInvoice;
         }, { timeout: 30000, maxWait: 10000 });
     }
@@ -581,7 +590,7 @@ class GrnInvoiceService {
 
             let processedPayments = existing.payments ? (typeof existing.payments === "string" ? JSON.parse(existing.payments) : existing.payments) as any[] : [];
             let computedStatus = existing.paymentStatus;
-            
+
             if (rawPayments) {
                 processedPayments = rawPayments.map((p: any) => ({
                     id: p.id || crypto.randomUUID(),
@@ -1048,6 +1057,13 @@ class GrnInvoiceService {
                         });
                     }
                 }
+            }
+
+            try {
+                const { voucherPostingService } = require("../accounts/voucherPosting.service");
+                await voucherPostingService.postPaymentVouchersForGRN(updated.id, tx);
+            } catch (vErr) {
+                console.error("[Auto-Post Voucher Error] Failed to post Payment Vouchers for updated GRN:", vErr);
             }
 
             return updated;

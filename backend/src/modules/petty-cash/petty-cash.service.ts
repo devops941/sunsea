@@ -117,75 +117,8 @@ class PettyCashService {
 
     // Auto-post to ledger (double-entry bookkeeping)
     try {
-      await accountsService.ensureSystemLedgersExist();
-      const pcashLedger = await prisma.accountLedger.findUnique({ where: { code: "PCASH-001" } });
-      const expenseLedger = await prisma.accountLedger.findUnique({ where: { code: "EXP-001" } });
-
-      if (pcashLedger && expenseLedger) {
-        const amount = new Prisma.Decimal(data.amount);
-        const voucherNo = `PC-${entryNo}`;
-
-        if (data.type === "OUT") {
-          // Petty cash OUT: Debit Expense, Credit Petty Cash
-          await prisma.voucher.create({
-            data: {
-              voucherNo,
-              type: VoucherType.EXPENSE,
-              date: entryDate,
-              narration: `Petty cash payment: ${data.description || data.category}${data.paidTo ? ` to ${data.paidTo}` : ""}`,
-              refDocType: "PETTY_CASH",
-              refDocId: String(entry.id),
-              items: {
-                create: [
-                  {
-                    debitLedgerId: expenseLedger.id,
-                    debitAmount: amount,
-                    creditAmount: new Prisma.Decimal(0),
-                    narration: `${data.category}: ${data.description || ""}`,
-                  },
-                  {
-                    creditLedgerId: pcashLedger.id,
-                    debitAmount: new Prisma.Decimal(0),
-                    creditAmount: amount,
-                    narration: `Petty cash disbursed`,
-                  },
-                ],
-              },
-            },
-          });
-        } else {
-          // Petty cash IN (replenishment): Debit Petty Cash, Credit Cash
-          const cashLedger = await prisma.accountLedger.findUnique({ where: { code: "CASH-001" } });
-          if (cashLedger) {
-            await prisma.voucher.create({
-              data: {
-                voucherNo,
-                type: VoucherType.CONTRA,
-                date: entryDate,
-                narration: `Petty cash replenished: ${data.description || data.category}`,
-                refDocType: "PETTY_CASH",
-                refDocId: String(entry.id),
-                items: {
-                  create: [
-                    {
-                      debitLedgerId: pcashLedger.id,
-                      debitAmount: amount,
-                      creditAmount: new Prisma.Decimal(0),
-                      narration: `Petty cash fund replenished`,
-                    },
-                    {
-                      creditLedgerId: cashLedger.id,
-                      debitAmount: new Prisma.Decimal(0),
-                      creditAmount: amount,
-                      narration: `Cash transferred to petty cash`,
-                    },
-                  ],
-                },
-              },
-            });
-          }
-        }
-      }
+      const { voucherPostingService } = require("../accounts/voucherPosting.service");
+      await voucherPostingService.postPettyCashVoucher(entry.id);
     } catch (err) {
       console.error("[PettyCashService] Auto-post to ledger failed:", err);
       // Don't fail the entry creation if ledger posting fails

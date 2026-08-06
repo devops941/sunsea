@@ -75,7 +75,6 @@ export const createSupplierSchema = z.object({
     paymentTerms: z.enum(["Advance", "Net15", "Net30", "Net45", "Net60"]),
     leadTimeDays: z.number().int().min(0, "Lead time cannot be negative"),
     minOrderQty: z.number().optional().nullable(),
-    openingBalance: z.number().optional().nullable(),
     currency: z.string().length(3).default("INR"),
     bankIfsc: z.string().max(11).optional().nullable(),
     bankAccount: z
@@ -95,6 +94,9 @@ export const createSupplierSchema = z.object({
     bankHolder: z.string().max(80).optional().nullable(),
     upiId: z.string().max(50).optional().nullable(),
     status: z.enum(["Active", "Backup", "Inactive", "Blacklisted"]).default("Active"),
+    // Opening balance — set once at creation, never editable
+    openingBalance: z.number().min(0, "Opening balance cannot be negative").optional().default(0),
+    openingBalanceType: z.enum(["CREDIT", "DEBIT"]).optional().default("CREDIT"),
     addresses: z.array(supplierAddressInputSchema).optional(),
     materialPrices: z
       .array(
@@ -113,7 +115,8 @@ export const createSupplierSchema = z.object({
  * Update Supplier Validation
  */
 export const updateSupplierSchema = z.object({
-  body: createSupplierSchema.shape.body.partial(),
+  // openingBalance is intentionally excluded from updates — it is immutable after creation
+  body: createSupplierSchema.shape.body.omit({ openingBalance: true }).partial(),
   params: z.object({
     id: z.string(),
   }),

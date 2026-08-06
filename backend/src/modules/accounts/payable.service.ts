@@ -208,6 +208,10 @@ class PayableService {
       let totalReturned = 0;
 
       for (const item of journalItems) {
+        if (item.voucher.refDocType === "SUPPLIER_OPENING_BALANCE" || item.narration?.includes("Opening balance")) {
+          continue;
+        }
+
         let isCredit = item.creditLedgerId === ledger?.id;
         let isDebit = item.debitLedgerId === ledger?.id;
 
@@ -231,17 +235,10 @@ class PayableService {
         }
       }
 
-      let grnBilled = 0;
-      let grnPaid = 0;
-      for (const grn of grnInvoices) {
-        grnBilled += Number(grn.netAmount || grn.subtotal || grn.grandTotal || grn.totalAmount || 0);
-        const pList = extractPaymentsArray(grn.payments);
-        const pSum = pList.reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0);
-        grnPaid += Math.max(pSum, Number(grn.paidAmount || 0));
-      }
-
-      totalBilled = Math.max(totalBilled, grnBilled);
-      totalPaid = Math.max(totalPaid, grnPaid);
+      // BUG-2 FIX: Do NOT use Math.max(ledger_total, grn_raw_total).
+      // GRN raw amounts independently duplicate what was already captured in journal items,
+      // including the opening-balance journal voucher amount — causing the balance to appear doubled.
+      // Instead, derive totals purely from journal items (SUPPLIER_OPENING_BALANCE is already skipped above).
 
       const netLiability = openingBalance + totalBilled - totalPaid - totalReturned;
       const credit = totalBilled;
@@ -431,7 +428,7 @@ class PayableService {
     let totalReturned = 0;
 
     statement.entries.forEach((e) => {
-      if (e.voucherType === "OPENING") return;
+      if (e.voucherType === "OPENING" || /opening balance/i.test(e.narration) || (e as any).refDocType === "SUPPLIER_OPENING_BALANCE") return;
       if (e.voucherType === VoucherType.PURCHASE_RETURN) {
         totalReturned += e.debit || e.credit;
       } else if (e.voucherType === VoucherType.PURCHASE) {
@@ -444,15 +441,8 @@ class PayableService {
       }
     });
 
-    let grnBilled = 0;
-    let grnPaid = 0;
-    invoices.forEach((inv: any) => {
-      grnBilled += inv.amount;
-      grnPaid += inv.paidAmount;
-    });
-
-    totalBilled = Math.max(totalBilled, grnBilled);
-    totalPaid = Math.max(totalPaid, grnPaid);
+    // BUG-2 FIX: Use only journal-entry-based totals (openingBalance entry already excluded above).
+    // GRN-raw fallback caused double-counting when the opening balance voucher matched the GRN amount.
     const closingBalance = Number(supplier.openingBalance || 0) + totalBilled - totalPaid - totalReturned;
 
     return {

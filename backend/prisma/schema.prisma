@@ -345,6 +345,7 @@ model Customer {
   id                   String                   @id @default(uuid()) @db.Uuid
   transports           Json?
   openingBalance       Decimal                  @default(0) @db.Decimal(14, 2)
+  openingBalanceType   String                   @default("DEBIT") @db.VarChar(10)
   addresses            CustomerAddress[]
   collectionAgent      Employee?                @relation("EmployeeCollectionAgent", fields: [collectionAgentId], references: [id])
   company              Company                  @relation(fields: [companyId], references: [id])
@@ -525,6 +526,7 @@ model Supplier {
   rawMaterialCategories String?                 @map("raw_material_categories") @db.VarChar(255)
   whatsapp              String?                 @map("whatsapp") @db.VarChar(15)
   openingBalance        Decimal                 @default(0) @map("opening_balance") @db.Decimal(14, 2)
+  openingBalanceType    String                  @default("CREDIT") @map("opening_balance_type") @db.VarChar(10)
   id                    Int                     @id @default(autoincrement())
   materialPrices        SupplierMaterialPrice[]
   expenses              Expense[]
@@ -662,11 +664,11 @@ model Product {
   uom                       UnitOfMeasure?             @relation(fields: [uomId], references: [id], onDelete: Restrict)
   salesInvoiceItems         SalesInvoiceItem[]
   salesOrderItems           SalesOrderItem[]           @relation("SalesOrderItemProduct")
+  salesReturnItems          SalesReturnItem[]
   StockAdjustmentItem       StockAdjustmentItem[]
   weeklyPrograms            WeeklyMachineProgram[]     @relation("ProductWeeklyPrograms")
   shiftRecords              ProductShiftRecord[]
   capacityHistories         ProductCapacityHistory[]
-  salesReturnItems          SalesReturnItem[]
 
   @@index([categoryId])
   @@index([subCategoryId])
@@ -872,9 +874,9 @@ model RawMaterial {
   category                RawMaterialCategory?     @relation(fields: [categoryId], references: [id])
   gstTaxRate              GstTaxRate?              @relation(fields: [gstTaxRateId], references: [id])
   storeLocation           StoreLocation?           @relation(fields: [locationId], references: [id])
+  purchaseReturnItems     PurchaseReturnItem[]
   store                   Store?                   @relation("StoreToRawMaterial", fields: [storeId], references: [storeId])
   StockAdjustmentItem     StockAdjustmentItem[]
-  purchaseReturnItems     PurchaseReturnItem[]
 
   @@index([categoryId])
   @@index([storeId])
@@ -2036,6 +2038,7 @@ enum LedgerType {
   LIABILITY
   EXPENSE
   INCOME
+  EQUITY
 }
 
 enum VoucherType {

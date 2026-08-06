@@ -22,6 +22,8 @@ export const SYSTEM_LEDGERS = [
   { code: "CGST-REC-001", name: "CGST Input Credit", type: LedgerType.ASSET, group: "Tax Assets" },
   { code: "SGST-REC-001", name: "SGST Input Credit", type: LedgerType.ASSET, group: "Tax Assets" },
   { code: "IGST-REC-001", name: "IGST Input Credit", type: LedgerType.ASSET, group: "Tax Assets" },
+  // System Equity ledger for double-entry opening balances
+  { code: "EQ-001", name: "Opening Balance Equity", type: LedgerType.EQUITY, group: "Equity" },
 ];
 
 class AccountsService {
@@ -156,6 +158,13 @@ class AccountsService {
   }
 
   async getLedgerStatement(id: number, options: { startDate?: string; endDate?: string }) {
+    try {
+      const { voucherPostingService } = require("./voucherPosting.service");
+      await voucherPostingService.syncUnpostedVouchers();
+    } catch (err) {
+      console.error("[AccountsService] Sync unposted vouchers failed:", err);
+    }
+
     const ledger = await this.getLedgerById(id);
 
     const dateFilter: Prisma.VoucherWhereInput = {};
@@ -169,7 +178,15 @@ class AccountsService {
     const journalItems = await prisma.journalItem.findMany({
       where: {
         OR: [{ debitLedgerId: id }, { creditLedgerId: id }],
-        voucher: dateFilter,
+        voucher: {
+          ...dateFilter,
+          // Exclude opening balance vouchers — they are already represented by the
+          // synthetic "Opening Balance b/f" row built from party.openingBalance field.
+          // Including them here causes the running balance to be doubled.
+          refDocType: {
+            notIn: ["SUPPLIER_OPENING_BALANCE", "CUSTOMER_OPENING_BALANCE"],
+          },
+        },
       },
       include: {
         voucher: true,
@@ -266,6 +283,7 @@ class AccountsService {
         id: item.id.toString(),
         voucherNo: item.voucher.voucherNo,
         voucherType: item.voucher.type,
+        refDocType: item.voucher.refDocType,
         date: item.voucher.date.toISOString().split("T")[0],
         narration: item.narration || item.voucher.narration || "",
         particulars: getParticularsLabel(item, isDebit),
@@ -285,31 +303,11 @@ class AccountsService {
     };
   }
 
-  async ensureCustomerLedger(customer: { id: string; customerCode: string; firmName: string }, txClient?: Prisma.TransactionClient) {
-    const db = txClient || prisma;
-    const existing = await db.accountLedger.findUnique({
-      where: { customerId: customer.id },
-    });
-
-    if (existing) return existing;
-
-    const ledgerCode = `CUST-${customer.customerCode}`;
-    const codeExists = await db.accountLedger.findUnique({ where: { code: ledgerCode } });
-    const finalCode = codeExists ? `CUST-${customer.customerCode}-${Date.now().toString().slice(-4)}` : ledgerCode;
-
-    return db.accountLedger.create({
-      data: {
-        code: finalCode,
-        name: customer.firmName,
-        type: LedgerType.ASSET,
-        group: "Sundry Debtors",
-        customerId: customer.id,
-      },
-    });
-  }
-
   async getTrialBalance() {
     await this.ensureSystemLedgersExist();
+
+    const { voucherPostingService } = require("./voucherPosting.service");
+    await voucherPostingService.syncMissingOpeningBalanceVouchers();
 
     const ledgers = await prisma.accountLedger.findMany({
       include: {
@@ -335,9 +333,9 @@ class AccountsService {
 
       let closingBalance = 0;
       if (isAssetOrExpense) {
-        closingBalance = openingBalance + totalDebit - totalCredit;
+        closingBalance = totalDebit - totalCredit;
       } else {
-        closingBalance = openingBalance + totalCredit - totalDebit;
+        closingBalance = totalCredit - totalDebit;
       }
 
       return {
@@ -436,27 +434,51 @@ class AccountsService {
     };
   }
 
-  async ensureSupplierLedger(supplier: { id: number; supplierCode: string; legalName: string }, txClient?: Prisma.TransactionClient) {
+  /**
+   * Shared party ledger creation helper for both Customers and Suppliers.
+   * Prevents drift between customer and supplier Chart of Accounts registration paths.
+   */
+  async ensurePartyLedger(
+    party: {
+      type: "CUSTOMER" | "SUPPLIER";
+      id: string | number;
+      code: string;
+      name: string;
+    },
+    txClient?: Prisma.TransactionClient
+  ) {
     const db = txClient || prisma;
+    const isCustomer = party.type === "CUSTOMER";
+
     const existing = await db.accountLedger.findUnique({
-      where: { supplierId: supplier.id },
+      where: isCustomer ? { customerId: String(party.id) } : { supplierId: Number(party.id) },
     });
 
     if (existing) return existing;
 
-    const ledgerCode = `SUPP-${supplier.supplierCode}`;
+    const prefix = isCustomer ? "CUST" : "SUPP";
+    const ledgerCode = `${prefix}-${party.code}`;
     const codeExists = await db.accountLedger.findUnique({ where: { code: ledgerCode } });
-    const finalCode = codeExists ? `SUPP-${supplier.supplierCode}-${Date.now().toString().slice(-4)}` : ledgerCode;
+    const finalCode = codeExists ? `${prefix}-${party.code}-${Date.now().toString().slice(-4)}` : ledgerCode;
 
     return db.accountLedger.create({
       data: {
         code: finalCode,
-        name: supplier.legalName,
-        type: LedgerType.LIABILITY,
-        group: "Sundry Creditors",
-        supplierId: supplier.id,
+        name: party.name,
+        type: isCustomer ? LedgerType.ASSET : LedgerType.LIABILITY,
+        group: isCustomer ? "Sundry Debtors" : "Sundry Creditors",
+        customerId: isCustomer ? String(party.id) : null,
+        supplierId: !isCustomer ? Number(party.id) : null,
       },
     });
+  }
+
+  async ensureCustomerLedger(customer: { id: string; customerCode: string; firmName: string }, txClient?: Prisma.TransactionClient) {
+    return this.ensurePartyLedger({ type: "CUSTOMER", id: customer.id, code: customer.customerCode, name: customer.firmName }, txClient);
+  }
+
+  async ensureSupplierLedger(supplier: { id: number; supplierCode: string; legalName: string }, txClient?: Prisma.TransactionClient) {
+    return this.ensurePartyLedger({ type: "SUPPLIER", id: supplier.id, code: supplier.supplierCode, name: supplier.legalName }, txClient);
   }
 }
 
