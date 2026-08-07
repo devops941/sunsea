@@ -205,48 +205,88 @@ export const MaterialIssueModal: React.FC<MaterialIssueModalProps> = ({
         }
     }, [show, rawMaterials, rawMaterialsMap, defaultStoreId, dailyPlanQty, totalTargetQty, productionOrderId]);
 
+    /** Normalize UOM aliases to canonical short form */
+    const normalizeUomLocal = (uom: string): string => {
+        const u = (uom || "").trim().toLowerCase();
+        if (u === "kilogram" || u === "kilograms") return "kg";
+        if (u === "gram" || u === "grams") return "g";
+        if (u === "ton" || u === "tonne" || u === "tonnes" || u === "tons") return "t";
+        if (u === "liter" || u === "litre" || u === "liters" || u === "litres" || u === "ltr") return "l";
+        if (u === "milliliter" || u === "millilitre" || u === "milliliters" || u === "millilitres" || u === "ml") return "ml";
+        if (u === "meter" || u === "meters" || u === "metre" || u === "metres") return "m";
+        if (u === "centimeter" || u === "centimetre" || u === "centimeters" || u === "centimetres") return "cm";
+        if (u === "millimeter" || u === "millimetre" || u === "millimeters" || u === "millimetres") return "mm";
+        if (u === "pcs" || u === "piece" || u === "pieces" || u === "ea" || u === "each") return "pcs";
+        if (u === "box" || u === "boxes") return "box";
+        if (u === "dozen" || u === "dz") return "dz";
+        return u;
+    };
+
+    /**
+     * Convert qty from selectedUom to the raw material's primary base UOM.
+     * Used for validation (compare against availableStock which is in primary UOM).
+     */
     const convertToBaseQty = (qty: number, selectedUom: string, primaryBaseUom: string): number => {
         if (!selectedUom || !primaryBaseUom || qty === 0) return qty;
-        const sel = selectedUom.toLowerCase().trim();
-        const primary = primaryBaseUom.toLowerCase().split(',')[0].trim();
-
+        const sel = normalizeUomLocal(selectedUom);
+        const primary = normalizeUomLocal(primaryBaseUom.split(',')[0]);
         if (sel === primary) return qty;
-
-        // Weight/Mass conversions (Primary is KG)
-        if ((primary === "kg" || primary === "kilogram") && sel === "g") return qty / 1000;
-        if ((primary === "kg" || primary === "kilogram") && (sel === "ton" || sel === "t")) return qty * 1000;
-        if ((primary === "g" || primary === "gram") && sel === "kg") return qty * 1000;
-
-        // Liquid/Volume conversions (Primary is L)
-        if ((primary === "l" || primary === "litre" || primary === "liter") && sel === "ml") return qty / 1000;
-        if ((primary === "ml") && (sel === "l" || sel === "litre" || sel === "liter")) return qty * 1000;
-
-        // Length conversions (Primary is M)
-        if ((primary === "m" || primary === "meter") && sel === "cm") return qty / 100;
-        if ((primary === "m" || primary === "meter") && sel === "mm") return qty / 1000;
+        // Weight: kg ↔ g ↔ t
+        if (primary === "kg" && sel === "g") return qty / 1000;
+        if (primary === "kg" && sel === "t") return qty * 1000;
+        if (primary === "g" && sel === "kg") return qty * 1000;
+        if (primary === "g" && sel === "t") return qty * 1_000_000;
+        if (primary === "t" && sel === "kg") return qty / 1000;
+        if (primary === "t" && sel === "g") return qty / 1_000_000;
+        // Volume: l ↔ ml
+        if (primary === "l" && sel === "ml") return qty / 1000;
+        if (primary === "ml" && sel === "l") return qty * 1000;
+        // Length: m ↔ cm ↔ mm
+        if (primary === "m" && sel === "cm") return qty / 100;
+        if (primary === "m" && sel === "mm") return qty / 1000;
         if (primary === "cm" && sel === "m") return qty * 100;
+        if (primary === "cm" && sel === "mm") return qty / 10;
         if (primary === "mm" && sel === "m") return qty * 1000;
-
+        if (primary === "mm" && sel === "cm") return qty * 10;
+        // Count: pcs ↔ dz ↔ box
+        if (primary === "dz" && sel === "pcs") return qty / 12;
+        if (primary === "pcs" && sel === "dz") return qty * 12;
+        if (primary === "box" && sel === "pcs") return qty / 12;
+        if (primary === "pcs" && sel === "box") return qty * 12;
         return qty;
     };
 
+    /**
+     * Convert displayed quantity when user switches UOM selector.
+     * Converts the current display value from oldUom → newUom so the display stays consistent.
+     */
     const convertQtyForUomChange = (qty: number, oldUom: string, newUom: string): number => {
-        if (!qty || !oldUom || !newUom || oldUom.toLowerCase() === newUom.toLowerCase()) return qty;
-        const oldU = oldUom.toLowerCase().trim();
-        const newU = newUom.toLowerCase().trim();
-
-        // Weight
+        if (!qty || !oldUom || !newUom) return qty;
+        const oldU = normalizeUomLocal(oldUom);
+        const newU = normalizeUomLocal(newUom);
+        if (oldU === newU) return qty;
+        // Weight: kg ↔ g ↔ t
         if (oldU === "kg" && newU === "g") return qty * 1000;
+        if (oldU === "kg" && newU === "t") return qty / 1000;
         if (oldU === "g" && newU === "kg") return qty / 1000;
-
-        // Liquid
+        if (oldU === "g" && newU === "t") return qty / 1_000_000;
+        if (oldU === "t" && newU === "kg") return qty * 1000;
+        if (oldU === "t" && newU === "g") return qty * 1_000_000;
+        // Volume: l ↔ ml
         if (oldU === "l" && newU === "ml") return qty * 1000;
         if (oldU === "ml" && newU === "l") return qty / 1000;
-
-        // Length
+        // Length: m ↔ cm ↔ mm
         if (oldU === "m" && newU === "cm") return qty * 100;
+        if (oldU === "m" && newU === "mm") return qty * 1000;
         if (oldU === "cm" && newU === "m") return qty / 100;
-
+        if (oldU === "cm" && newU === "mm") return qty * 10;
+        if (oldU === "mm" && newU === "m") return qty / 1000;
+        if (oldU === "mm" && newU === "cm") return qty / 10;
+        // Count: pcs ↔ dz ↔ box
+        if (oldU === "pcs" && newU === "dz") return qty / 12;
+        if (oldU === "dz" && newU === "pcs") return qty * 12;
+        if (oldU === "pcs" && newU === "box") return qty / 12;
+        if (oldU === "box" && newU === "pcs") return qty * 12;
         return qty;
     };
 
@@ -396,15 +436,18 @@ export const MaterialIssueModal: React.FC<MaterialIssueModalProps> = ({
         try {
             await productionOrderService.issueMaterials(productionOrderId, {
                 items: issueItems.map(i => {
-                    const primaryUom = i.primaryUom || "KG";
-                    const baseQty = parseFloat(convertToBaseQty(i.qty, i.uom, primaryUom).toFixed(4));
-                    const isDifferentUnit = i.uom.toLowerCase() !== primaryUom.toLowerCase();
-                    const note = isDifferentUnit ? `Issued ${i.qty} ${i.uom} (= ${baseQty} ${primaryUom})` : undefined;
+                    const primaryUom = i.primaryUom || "kg";
+                    const selectedUom = i.uom || primaryUom;
+                    const isDifferentUnit = normalizeUomLocal(selectedUom) !== normalizeUomLocal(primaryUom);
+                    const baseQtyForNote = parseFloat(convertToBaseQty(i.qty, selectedUom, primaryUom).toFixed(4));
+                    const note = isDifferentUnit ? `Issued ${i.qty} ${selectedUom} (= ${baseQtyForNote} ${primaryUom})` : undefined;
                     const remarks = i.remarks ? (isDifferentUnit ? `${i.remarks} (${note})` : i.remarks) : note;
                     return {
                         rawMaterialId: i.rawMaterialId,
                         storeId: i.storeId,
-                        qty: baseQty,
+                        // Send raw user-entered quantity + selectedUom; backend does the conversion.
+                        qty: i.qty,
+                        selectedUom,
                         remarks: remarks || undefined
                     };
                 })

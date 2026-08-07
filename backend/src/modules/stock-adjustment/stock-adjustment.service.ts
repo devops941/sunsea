@@ -1,5 +1,6 @@
 import { prisma } from "../../config/prisma";
 import { ApiError } from "../../utils/ApiError";
+import { getIO } from "../../socket/socket";
 
 export class StockAdjustmentService {
   static async getNextAdjustmentNumber(): Promise<string> {
@@ -117,6 +118,7 @@ export class StockAdjustmentService {
               adjustedQty: true,
               difference: true,
               storeId: true,
+              remarks: true,
               rawMaterial: { select: { materialName: true, baseUom: true } },
               store: { select: { storeName: true } },
               product: { select: { productName: true, productCode: true } },
@@ -396,6 +398,9 @@ export class StockAdjustmentService {
           updatedBy: userId,
         },
       });
+    }).then((result) => {
+      try { getIO().emit("inventory:stockUpdated", { type: "stock_adjustment" }); } catch (_) {}
+      return result;
     });
   }
 

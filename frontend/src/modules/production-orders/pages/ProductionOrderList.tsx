@@ -238,8 +238,8 @@ const ProductionOrderList: React.FC = () => {
             // Combine both mapped and directMapped
             let combinedList = [...mapped, ...directMapped];
 
-            // Filter out DISPATCHED and CANCELLED items from the active board
-            combinedList = combinedList.filter(item => !["DISPATCHED", "CANCELLED", "CANCELED", "DELETED"].includes(item.status?.toUpperCase()));
+            // Filter out DISPATCHED, CANCELLED, and AVAILABLE items from the active board
+            combinedList = combinedList.filter(item => !["DISPATCHED", "CANCELLED", "CANCELED", "DELETED", "AVAILABLE"].includes(item.status?.toUpperCase()));
 
             setTotalItems(combinedList.length);
 
@@ -538,20 +538,20 @@ const ProductionOrderList: React.FC = () => {
                                 icon={FaSyncAlt}
                                 onClick={() => handleRecheckMaterials(item)}
                             />
-                            <IconButton
+                            {/* <IconButton
                                 variant="success"
                                 title="Reserve Raw Materials"
                                 icon={FaCheckCircle}
                                 onClick={() => handleAllocateRM(item)}
-                            />
-                            {can("purchase_orders.create") && (
+                            /> */}
+                            {/* {can("purchase_orders.create") && (
                                 <IconButton
                                     variant="warning"
                                     title="Create Purchase Order for Missing Materials"
                                     icon={FaShoppingCart}
                                     onClick={() => navigate(`/purchase-orders/create?po=${item.primaryPO?.productionOrderId}`)}
                                 />
-                            )}
+                            )} */}
                         </>
                     )}
 
@@ -564,14 +564,14 @@ const ProductionOrderList: React.FC = () => {
                             onClick={() => handleAllocateRM(item)}
                         />
                     )}
-                    {item.status === "RM_PENDING" && can("purchase_orders.create") && (
+                    {/* {item.status === "RM_PENDING" && can("purchase_orders.create") && (
                         <IconButton
                             variant="warning"
                             title="Create Raw Material Purchase Order"
                             icon={FaShoppingCart}
                             onClick={() => navigate(`/purchase-orders/create?po=${item.primaryPO?.productionOrderId}`)}
                         />
-                    )}
+                    )} */}
 
                     {/* View Details */}
                     {item.primaryPO && can("production_orders.view") && (

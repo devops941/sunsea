@@ -173,7 +173,7 @@ const StockAdjustmentView: React.FC = () => {
             <InfoField label="Created By" value={currentAdjustment.createdByUser?.fullName || currentAdjustment.createdBy} />
             {currentAdjustment.reason && (
               <div className="col-span-2 sm:col-span-3 lg:col-span-6">
-                <InfoField label="Reason / Notes" value={currentAdjustment.reason} />
+                <InfoField label="Adjusted By" value={currentAdjustment.reason} />
               </div>
             )}
           </div>
@@ -299,14 +299,24 @@ const StockAdjustmentView: React.FC = () => {
                     const uomLower = rawUom.split(",")[0].trim().toLowerCase();
                     const itemUom = (uomLower === "ea" || uomLower === "each") ? "pcs" : uomLower;
 
+                    const isWastage = item.itemType === "WASTAGE" || item.rawMaterial?.itemType === "WASTAGE";
+                    const isRM = (item.itemType === "RAW_MATERIAL" || !!item.rawMaterial) && !isWastage;
+                    const typeLabel = isWastage ? "Wastage Product" : isRM ? "Raw Material" : "Finished Goods";
+
+                    const itemName = item.rawMaterial?.materialName || item.product?.productName || item.rawMaterialId || item.productItemId || "—";
+                    const itemCode = item.rawMaterial?.rawMaterialId || item.product?.productCode || "";
+
                     return (
                       <tr key={item.id || idx} className="hover:bg-slate-50/60 transition-colors">
                         <td className="px-4 py-3">
-                          <StatusBadge status={item.itemType} customText={item.itemType === "RAW_MATERIAL" ? "Raw Material" : "Product"} />
+                          <StatusBadge 
+                            status={isWastage ? "WASTAGE" : (isRM ? "RAW_MATERIAL" : "FINISHED_GOODS")} 
+                            customText={typeLabel} 
+                          />
                         </td>
                         <td className="px-4 py-3">
-                          <div className="font-semibold text-slate-700">{item.itemType === "RAW_MATERIAL" ? item.rawMaterial?.materialName : item.product?.productName}</div>
-                          <div className="text-xs text-slate-400 font-mono mt-0.5">{item.itemType === "RAW_MATERIAL" ? item.rawMaterialId : item.product?.productCode}</div>
+                          <div className="font-semibold text-slate-700">{itemName}</div>
+                          {itemCode && <div className="text-xs text-slate-400 font-mono mt-0.5">{itemCode}</div>}
                         </td>
                         <td className="px-4 py-3 text-slate-600">{item.store?.storeName || "—"}</td>
                         <td className="px-4 py-3 text-right font-mono text-xs text-slate-600">{Number(item.currentQty).toFixed(3)} {itemUom}</td>

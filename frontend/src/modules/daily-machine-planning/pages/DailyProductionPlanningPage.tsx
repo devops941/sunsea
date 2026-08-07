@@ -23,6 +23,7 @@ import IconButton from "../../../components/ui/IconButton/IconButton";
 import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
 import ViewButton from "../../../components/ui/viewbutton/ViewButton";
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
+import DatePickerCalendar from "../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 import DataTable, { type DataTableColumn } from "../../../components/ui/table/DataTable";
 import TextArea from "../../../components/form/TextArea/TextArea";
 import FilterPopover from "../../../components/ui/FilterPopover/FilterPopover";
@@ -95,7 +96,7 @@ const DailyProductionPlanningPage: React.FC = () => {
   const handleApplyFilters = () => {
     setFilterDate(draftFilterDate);
     setFilterStatus(draftFilterStatus);
-    setDraftFilterMachine(filterMachine);
+    setFilterMachine(draftFilterMachine);
   };
 
   const handleClearFilters = () => {
@@ -277,8 +278,12 @@ const DailyProductionPlanningPage: React.FC = () => {
     if (!nextStatus) return;
 
     if (nextStatus === "COMPLETED" && producedQty === 0) {
-      toast.warning("Cannot mark as completed without logging any production!");
-      return;
+      // Allow closing permanently stopped plans that had no production at all
+      const isPermanentStop = plan?.productionOrder?.status === "COMPLETED_WITH_SHORTFALL";
+      if (!isPermanentStop) {
+        toast.warning("Cannot mark as completed without logging any production!");
+        return;
+      }
     }
 
     if (nextStatus === "IN_PROGRESS" && (plan.status === "PLANNED" || plan.status === "DRAFT")) {
@@ -777,7 +782,22 @@ const DailyProductionPlanningPage: React.FC = () => {
         }
 
         // SHORT_CLOSED: force-stopped plan — can still do post production for the produced qty if not already completed
-        const isPermanentlyStopped = plan.productionOrder?.status === "COMPLETED_WITH_SHORTFALL" || plan.status === "COMPLETED" || plan.status === "COMPLETED_WITH_SHORTFALL";
+        // Only applies when the plan itself is already in POST_PRODUCTION (or beyond).
+        // STOPPED/SHORT_CLOSED plans must first move to POST_PRODUCTION before advancing steps.
+        const isPermanentlyStopped = (plan.productionOrder?.status === "COMPLETED_WITH_SHORTFALL" || plan.status === "COMPLETED" || plan.status === "COMPLETED_WITH_SHORTFALL")
+          && !["STOPPED", "SHORT_CLOSED"].includes(plan.status);
+        if (isPermanentlyStopped && plan.currentProductionStep !== "Completed") {
+          // Zero production — plan was stopped before any work began, just close it out
+          if (producedQty === 0) {
+            canAdvance = true;
+            targetNextStatus = "COMPLETED";
+            dynamicActionTitle = "Close Plan (No Production)";
+            dynamicActionIcon = FaCheckCircle;
+            dynamicActionVariant = "success";
+            dynamicModalTitle = "Close Plan";
+            dynamicModalMessage = "This plan was permanently stopped with no production logged. Close it out?";
+          }
+        }
         if (isPermanentlyStopped && plan.currentProductionStep !== "Completed" && producedQty > 0) {
           const customSteps = plan.productionOrder?.productItem?.productionSteps || [];
           if (customSteps.length > 0) {
@@ -957,9 +977,8 @@ const DailyProductionPlanningPage: React.FC = () => {
             >
               <div className="mb-3">
                 <label className="block mb-1 text-[11px] uppercase tracking-wider text-gray-500 font-semibold">Date</label>
-                <input
-                  type="date"
-                  className="w-full border border-gray-200 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                <DatePickerCalendar
+                  name="filterDate"
                   value={draftFilterDate}
                   onChange={(e) => setDraftFilterDate(e.target.value)}
                 />

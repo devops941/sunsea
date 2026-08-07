@@ -173,11 +173,16 @@ const ProductionOrderHistoryView: React.FC = () => {
                                         <div>
                                             <StatusBadge status={displayOrder?.status} />
                                         </div>
-                                        {fullOrder?.productionOrderHistories?.some((h: any) => h.toStatus === "COMPLETED_WITH_SHORTFALL") && (
-                                            <span className="text-[10px] text-red-600 font-bold uppercase leading-none mt-0.5 whitespace-nowrap">
-                                                Force Stopped / Short-Closed
-                                            </span>
-                                        )}
+                                        {(displayOrder?.status === "COMPLETED_WITH_SHORTFALL" || fullOrder?.status === "COMPLETED_WITH_SHORTFALL") && (() => {
+                                            const target = Number(fullOrder?.targetQty || displayOrder?.targetQty || 0);
+                                            const produced = Number(fullOrder?.producedQty || displayOrder?.producedQty || 0);
+                                            const shortfall = Math.max(0, target - produced);
+                                            return (
+                                                <span className="inline-flex items-center gap-1 text-[10px] text-red-600 font-bold uppercase leading-none mt-0.5 whitespace-nowrap">
+                                                    Shortfall: {shortfall} pcs
+                                                </span>
+                                            );
+                                        })()}
                                     </div>
                                 </div>
                             </div>
@@ -284,9 +289,25 @@ const ProductionOrderHistoryView: React.FC = () => {
                             const plans: any[] = [];
                             
                             if (fullOrder?.dailyProductionPlans && fullOrder.dailyProductionPlans.length > 0) {
-                                fullOrder.dailyProductionPlans.forEach((plan: any) => {
+                                // Sort by creation order (oldest first) so cumulative dispatch qty fills correctly
+                                const sortedPlans = [...fullOrder.dailyProductionPlans].sort((a: any, b: any) => {
+                                    const dateA = new Date(a.productionDate || 0).getTime();
+                                    const dateB = new Date(b.productionDate || 0).getTime();
+                                    if (dateA !== dateB) return dateA - dateB;
+                                    // Same date: use createdAt for true creation order
+                                    const createdA = new Date(a.createdAt || 0).getTime();
+                                    const createdB = new Date(b.createdAt || 0).getTime();
+                                    return createdA - createdB;
+                                });
+                                sortedPlans.forEach((plan: any) => {
                                     const hourlySum = plan.hourlyProductions?.reduce((acc: number, curr: any) => acc + Number(curr.qtyProduced || 0), 0) || 0;
-                                    const producedForPlan = hourlySum > 0 ? hourlySum : (plan.status === 'COMPLETED' ? Number(plan.plannedQty || 0) : 0);
+                                    // For permanently stopped plans (PO = COMPLETED_WITH_SHORTFALL) with no hourly logs,
+                                    // use 0 — do NOT fall back to plannedQty, as nothing was actually produced.
+                                    // For other COMPLETED plans with no logs (legacy/edge case), fall back to plannedQty.
+                                    const isPermanentStopPlan = plan.productionOrder?.status === 'COMPLETED_WITH_SHORTFALL';
+                                    const producedForPlan = hourlySum > 0
+                                        ? hourlySum
+                                        : (plan.status === 'COMPLETED' && !isPermanentStopPlan ? Number(plan.plannedQty || 0) : 0);
                                     plans.push({
                                         id: plan.dailyPlanId,
                                         date: plan.productionDate ? new Date(plan.productionDate).toLocaleDateString() : '-',
@@ -352,12 +373,23 @@ const ProductionOrderHistoryView: React.FC = () => {
                                                 <tbody className="divide-y divide-slate-100">
                                                     {plans.length > 0 ? (
                                                         plans.map((plan: any, idx: number) => {
-                                                            cumulativeProduced += plan.producedQty;
-                                                            const isPlanDispatched = totalDispatchedQty > 0 && cumulativeProduced <= totalDispatchedQty + 0.001;
-                                                            const isReadyForDispatch = plan.status === 'COMPLETED' || fullOrder?.status === 'READY_FOR_DISPATCH' || fullOrder?.status === 'COMPLETED';
+                                                            // Only COMPLETED plans with actual production contribute to dispatch.
+                                                            // POST_PRODUCTION / STOPPED plans haven't finished yet.
+                                                            // Plans closed with 0 production (no-production close) are excluded entirely.
+                                                            const hasProduction = plan.producedQty > 0;
+                                                            const isFinalized = plan.status === 'COMPLETED' && hasProduction;
+                                                            if (isFinalized) {
+                                                                cumulativeProduced += plan.producedQty;
+                                                            }
+                                                            const isPlanDispatched = isFinalized && totalDispatchedQty > 0 && cumulativeProduced <= totalDispatchedQty + 0.001;
+                                                            // Ready for Dispatch: plan is fully complete with production but not yet dispatched
+                                                            const isReadyForDispatch = isFinalized && !isPlanDispatched;
 
                                                             let dispatchBadge = <span className="inline-flex items-center px-3 py-1 bg-slate-100 text-slate-600 rounded-full text-xs font-semibold whitespace-nowrap">Not Dispatched</span>;
-                                                            if (isPlanDispatched) {
+                                                            if (!hasProduction && plan.status === 'COMPLETED') {
+                                                                // Closed with no production — nothing to dispatch
+                                                                dispatchBadge = <span className="inline-flex items-center px-3 py-1 bg-slate-100 text-slate-500 rounded-full text-xs font-semibold whitespace-nowrap">No Production</span>;
+                                                            } else if (isPlanDispatched) {
                                                                 dispatchBadge = <span className="inline-flex items-center px-3 py-1 bg-green-100 text-green-800 border border-green-200 rounded-full text-xs font-semibold whitespace-nowrap">Dispatched</span>;
                                                             } else if (isReadyForDispatch) {
                                                                 dispatchBadge = <span className="inline-flex items-center px-3 py-1 bg-blue-100 text-blue-800 border border-blue-200 rounded-full text-xs font-semibold whitespace-nowrap">Ready for Dispatch</span>;

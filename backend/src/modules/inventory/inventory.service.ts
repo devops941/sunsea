@@ -188,8 +188,7 @@ class InventoryService {
       };
     }
 
-    // ── PAST DATE: DB snapshots + augment missing items ───────────────────────
-    // Build DB where clause
+    // ── PAST DATE: Only return locked DB snapshots (historical data only) ────────
     const where: any = {
       snapshotDate: date,
       ...(catFilter && { category: catFilter }),
@@ -203,11 +202,15 @@ class InventoryService {
       }),
     };
 
-    // Fetch ALL snapshots for this date (no pagination yet — need to augment)
-    const allSnapshots = await prisma.eodStockSnapshot.findMany({
-      where,
-      orderBy: { itemName: "asc" },
-    });
+    const [allSnapshots, total] = await Promise.all([
+      prisma.eodStockSnapshot.findMany({
+        where,
+        orderBy: { itemName: "asc" },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      prisma.eodStockSnapshot.count({ where }),
+    ]);
 
     const snapshotRows = allSnapshots.map((s) => ({
       id: s.id.toString(),
@@ -223,110 +226,7 @@ class InventoryService {
       recordedAt: s.recordedAt,
     }));
 
-    // Build set of already-snapshotted keys
-    const snappedKeys = new Set(allSnapshots.map((s) => `${s.category}_${s.itemId}_${s.storeId}`));
-
-    // Fetch active items not in snapshot to augment the list
-    const [rawMaterials, stockRows, allProducts] = await Promise.all([
-      prisma.rawMaterial.findMany({ where: { isActive: true } }),
-      prisma.finishedGoodsStock.findMany({
-        include: { product: { include: { uom: true } } },
-      }),
-      prisma.product.findMany({ where: { isActive: true }, include: { uom: true } }),
-    ]);
-
-    const missingRows: any[] = [];
-
-    // Missing raw materials / wastage
-    for (const rm of rawMaterials) {
-      const storeIdVal = rm.storeId || "DEFAULT";
-      const cat = rm.itemType === "WASTAGE" ? "WASTAGE" : "RAW_MATERIAL";
-      const key = `${cat}_${rm.rawMaterialId}_${storeIdVal}`;
-      if (snappedKeys.has(key)) continue;
-
-      // Apply same filters
-      if (catFilter && cat !== catFilter) continue;
-      if (storeId && storeIdVal !== storeId) continue;
-
-      const row = {
-        id: `missing-${cat}-${rm.rawMaterialId}-${storeIdVal}`,
-        category: cat as any,
-        itemId: rm.rawMaterialId,
-        itemCode: rm.rawMaterialId,
-        itemName: rm.materialName,
-        uom: rm.baseUom,
-        storeId: storeIdVal,
-        snapshotDate: date,
-        startQty: Number(rm.onHandQty) || 0,
-        eodQty: Number(rm.onHandQty) || 0,
-        recordedAt: null,  // null = not snapshotted for this date
-      };
-      if (!search || matchesSearch(row, search)) missingRows.push(row);
-    }
-
-    // Missing finished goods (from stock rows)
-    const seenProductIds = new Set<string>();
-    for (const row of stockRows) {
-      if (!row.product?.isActive) continue;
-      const itemIdStr = String(row.productItemId);
-      seenProductIds.add(itemIdStr);
-
-      const key = `FINISHED_PRODUCT_${itemIdStr}_${row.storeId}`;
-      if (snappedKeys.has(key)) continue;
-      if (catFilter && catFilter !== "FINISHED_PRODUCT") continue;
-      if (storeId && row.storeId !== storeId) continue;
-
-      const r = {
-        id: `missing-FINISHED_PRODUCT-${itemIdStr}-${row.storeId}`,
-        category: "FINISHED_PRODUCT" as any,
-        itemId: itemIdStr,
-        itemCode: row.product.productCode,
-        itemName: row.product.productName,
-        uom: row.product.uom?.uomName ?? null,
-        storeId: row.storeId,
-        snapshotDate: date,
-        startQty: Number(row.onHandQty) || 0,
-        eodQty: Number(row.onHandQty) || 0,
-        recordedAt: null,
-      };
-      if (!search || matchesSearch(r, search)) missingRows.push(r);
-    }
-
-    // Missing finished goods (products with no stock row)
-    for (const prod of allProducts) {
-      const itemIdStr = String(prod.id);
-      if (seenProductIds.has(itemIdStr)) continue;
-      const storeIdVal = "DEFAULT";
-      const key = `FINISHED_PRODUCT_${itemIdStr}_${storeIdVal}`;
-      if (snappedKeys.has(key)) continue;
-      if (catFilter && catFilter !== "FINISHED_PRODUCT") continue;
-      if (storeId && storeIdVal !== storeId) continue;
-
-      const r = {
-        id: `missing-FINISHED_PRODUCT-${itemIdStr}-${storeIdVal}`,
-        category: "FINISHED_PRODUCT" as any,
-        itemId: itemIdStr,
-        itemCode: prod.productCode,
-        itemName: prod.productName,
-        uom: prod.uom?.uomName ?? null,
-        storeId: storeIdVal,
-        snapshotDate: date,
-        startQty: 0,
-        eodQty: 0,
-        recordedAt: null,
-      };
-      if (!search || matchesSearch(r, search)) missingRows.push(r);
-    }
-
-    // Merge: locked snapshots first, then missing items (sorted by name within each group)
-    missingRows.sort((a, b) => a.itemName.localeCompare(b.itemName));
-    const combined = [...snapshotRows, ...missingRows];
-
-    const total = combined.length;
-    return {
-      data: combined.slice((page - 1) * limit, page * limit),
-      total,
-    };
+    return { data: snapshotRows, total };
   }
 }
 

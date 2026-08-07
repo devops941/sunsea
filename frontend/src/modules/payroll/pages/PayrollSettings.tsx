@@ -628,12 +628,12 @@ const PayrollSettings: React.FC = () => {
               value={String(config.fixedDays ?? 26)}
               onChange={e => set({ fixedDays: Number(e.target.value) })}
             />
-            <TextInput label="Working Hours / Day" name="defaultWorkingHoursPerDay" type="number"
+            {/* <TextInput label="Working Hours / Day" name="defaultWorkingHoursPerDay" type="number"
               value={String(config.defaultWorkingHoursPerDay ?? 8)}
               onChange={e => set({ defaultWorkingHoursPerDay: Number(e.target.value) })}
-            />
+            /> */}
           </div>
-          <div>
+          {/* <div>
             <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-2">Weekly Off Days</p>
             <div className="flex flex-wrap gap-3">
               {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map((d, i) => (
@@ -646,7 +646,7 @@ const PayrollSettings: React.FC = () => {
                 />
               ))}
             </div>
-          </div>
+          </div> */}
         </Section>
       ),
     },

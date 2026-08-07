@@ -15,6 +15,7 @@ import SearchInput from "../../../components/ui/SearchInput/SearchInput";
 import FilterPopover from "../../../components/ui/FilterPopover/FilterPopover";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import ViewButton from "../../../components/ui/viewbutton/ViewButton";
+import DatePickerCalendar from "../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 import { formatDate } from "../../../utils/dateUtils";
 
 const ITEMS_PER_PAGE = 10;
@@ -41,6 +42,111 @@ const ADJUSTMENT_TYPE_BADGE: Record<string, string> = {
   OPENING_STOCK: "dark",
   MANUAL_CORRECTION: "light",
   OTHER: "secondary",
+};
+
+const getReasonLabel = (reasonStr?: string) => {
+  if (!reasonStr) return "";
+  const REASONS: Record<string, string> = {
+    PHYSICAL_COUNT_VARIANCE: "Physical Count Variance",
+    DAMAGED_GOODS: "Damaged Goods",
+    EXPIRED_STOCK: "Expired Stock",
+    PRODUCTION_CONSUMPTION: "Production Consumption",
+    SUPPLIER_RETURN: "Supplier Return",
+    CUSTOMER_RETURN: "Customer Return",
+    WASTAGE: "Wastage",
+    SCRAP: "Scrap",
+    OPENING_STOCK: "Opening Stock",
+    MANUAL_CORRECTION: "Manual Correction",
+    OTHER: "Other",
+  };
+  return REASONS[reasonStr] || reasonStr;
+};
+
+const getAdjustmentDisplayReason = (item: any) => {
+  const firstItem = item.items?.[0];
+  
+  if (firstItem?.remarks && firstItem.remarks.trim()) {
+    const parts = firstItem.remarks.trim().split(" - ");
+    return parts[0];
+  }
+
+  if (firstItem?.reason && firstItem.reason.trim()) {
+    return getReasonLabel(firstItem.reason.trim());
+  }
+
+  if (item.remarks && item.remarks.trim()) {
+    const parts = item.remarks.trim().split(" - ");
+    return parts[0];
+  }
+
+  if (item.reason && item.reason.trim()) {
+    const r = item.reason.trim();
+    const label = getReasonLabel(r);
+    if (label !== r || r.toLowerCase() === "other") {
+      return label;
+    }
+  }
+
+  return "—";
+};
+
+const getStockAdjustmentTypeInfo = (item: any) => {
+  const diff = Number(item.items?.[0]?.difference || 0);
+  const type = item.adjustmentType || "";
+
+  if (diff < 0) {
+    return { label: "Stock Decrease", variant: "danger" };
+  }
+  if (diff > 0) {
+    return { label: "Stock Increase", variant: "success" };
+  }
+  
+  if (
+    type === "STOCK_DECREASE" ||
+    type === "DAMAGE" ||
+    type === "SCRAP" ||
+    type === "PRODUCTION_MATERIAL_ISSUE"
+  ) {
+    return { label: "Stock Decrease", variant: "danger" };
+  }
+  
+  return { label: "Stock Increase", variant: "success" };
+};
+
+const getStockAdjustmentSourceInfo = (item: any) => {
+  const poId = item.productionOrderId;
+  const srcDoc = (item.sourceDocument || "").toLowerCase();
+  const type = (item.adjustmentType || "").toLowerCase();
+
+  if (poId || type.includes("production") || type.includes("pmi") || srcDoc.includes("prod") || srcDoc.includes("pmi")) {
+    return {
+      module: "Production",
+      detail: poId ? `PO: ${poId}` : (item.sourceDocId ? `#${item.sourceDocId}` : ""),
+      badgeClass: "bg-blue-50 text-blue-700 border-blue-200",
+    };
+  }
+
+  if (srcDoc.includes("purchase") || srcDoc.includes("grn") || srcDoc.includes("po-rec")) {
+    return {
+      module: "Purchase",
+      detail: item.sourceDocId ? `#${item.sourceDocId}` : "",
+      badgeClass: "bg-purple-50 text-purple-700 border-purple-200",
+    };
+  }
+
+  if (srcDoc.includes("sales") || srcDoc.includes("so") || srcDoc.includes("dispatch")) {
+    return {
+      module: "Sales",
+      detail: item.sourceDocId ? `#${item.sourceDocId}` : "",
+      badgeClass: "bg-amber-50 text-amber-700 border-amber-200",
+    };
+  }
+
+  return {
+    module: "Manual",
+    detail: "",
+    badgeClass: "bg-slate-100 text-slate-600 border-slate-200",
+  };
 };
 
 const getPrimaryUom = (uomStr?: string) => {
@@ -224,11 +330,10 @@ const StockAdjustmentList: React.FC = () => {
                 <label className="block mb-1 text-[11px] uppercase tracking-wider text-slate-500 font-semibold">
                   From Date
                 </label>
-                <input
-                  type="date"
-                  className="w-full border border-slate-200 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary text-slate-700"
+                <DatePickerCalendar
+                  name="fromDate"
                   value={draftDateFrom}
-                  max={draftDateTo || undefined}
+                  maxDate={draftDateTo || undefined}
                   onChange={(e) => setDraftDateFrom(e.target.value)}
                 />
               </div>
@@ -237,11 +342,10 @@ const StockAdjustmentList: React.FC = () => {
                 <label className="block mb-1 text-[11px] uppercase tracking-wider text-slate-500 font-semibold">
                   To Date
                 </label>
-                <input
-                  type="date"
-                  className="w-full border border-slate-200 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary text-slate-700"
+                <DatePickerCalendar
+                  name="toDate"
                   value={draftDateTo}
-                  min={draftDateFrom || undefined}
+                  minDate={draftDateFrom || undefined}
                   onChange={(e) => setDraftDateTo(e.target.value)}
                 />
               </div>
@@ -279,16 +383,37 @@ const StockAdjustmentList: React.FC = () => {
             },
             {
               header: "TYPE",
-              render: (item) => getTypeBadge(item.adjustmentType || "STOCK_INCREASE")
+              render: (item) => {
+                const info = getStockAdjustmentTypeInfo(item);
+                return (
+                  <span
+                    className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${
+                      info.variant === "success"
+                        ? "bg-green-100 text-green-700 border border-green-200"
+                        : "bg-red-100 text-red-700 border border-red-200"
+                    }`}
+                  >
+                    {info.label}
+                  </span>
+                );
+              }
             },
             {
-              header: "PRODUCTION ORDER",
+              header: "SOURCE",
               render: (item) => {
-                const poId = item.productionOrderId;
-                if (poId) {
-                  return <span className="text-blue-600 font-semibold">{poId}</span>;
-                }
-                return <span className="text-slate-400">—</span>;
+                const src = getStockAdjustmentSourceInfo(item);
+                return (
+                  <div>
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold border ${src.badgeClass}`}>
+                      {src.module}
+                    </span>
+                    {src.detail && (
+                      <div className="text-xs text-slate-500 font-mono mt-0.5 font-medium">
+                        {src.detail}
+                      </div>
+                    )}
+                  </div>
+                );
               }
             },
             {
@@ -333,8 +458,9 @@ const StockAdjustmentList: React.FC = () => {
                 const firstItem = item.items?.[0];
                 if (!firstItem || firstItem.currentQty == null) return <span className="text-slate-400">—</span>;
                 const qty = Number(firstItem.currentQty);
-                const uom = firstItem.product?.baseUom || firstItem.rawMaterial?.baseUom || firstItem.uom || "";
-                const uomStr = uom ? ` ${getPrimaryUom(uom)}` : "";
+                const uom = firstItem.uom || firstItem.product?.baseUom || firstItem.rawMaterial?.baseUom || "";
+                const primaryUom = getPrimaryUom(uom);
+                const uomStr = primaryUom ? ` ${primaryUom}` : "";
                 return (
                   <div>
                     <span className="font-semibold text-slate-700 text-sm">{qty}{uomStr}</span>
@@ -352,10 +478,11 @@ const StockAdjustmentList: React.FC = () => {
                 if (!firstItem || firstItem.adjustedQty == null) return <span className="text-slate-400">—</span>;
                 const qty = Number(firstItem.adjustedQty);
                 const diff = Number(firstItem.difference || 0);
-                const uom = firstItem.product?.baseUom || firstItem.rawMaterial?.baseUom || firstItem.uom || "";
-                const uomStr = uom ? ` ${getPrimaryUom(uom)}` : "";
+                const uom = firstItem.uom || firstItem.product?.baseUom || firstItem.rawMaterial?.baseUom || "";
+                const primaryUom = getPrimaryUom(uom);
+                const uomStr = primaryUom ? ` ${primaryUom}` : "";
                 const diffColor = diff > 0 ? "text-green-600 bg-green-50 border border-green-200" : diff < 0 ? "text-red-600 bg-red-50 border border-red-200" : "text-slate-500 bg-slate-50";
-                const diffSign = diff > 0 ? `+${diff}` : `${diff}`;
+                const diffSign = diff > 0 ? `+${diff}${primaryUom ? ` ${primaryUom}` : ''}` : `${diff}${primaryUom ? ` ${primaryUom}` : ''}`;
                 return (
                   <div>
                     <div className="flex items-center gap-1.5 flex-wrap">
@@ -375,14 +502,25 @@ const StockAdjustmentList: React.FC = () => {
             },
             {
               header: "REASON",
-              render: (item) => (
-                <span
-                  title={item.reason}
-                  className="inline-block max-w-[150px] overflow-hidden text-ellipsis whitespace-nowrap text-slate-600"
-                >
-                  {item.reason || "—"}
-                </span>
-              )
+              render: (item) => {
+                const firstItem = item.items?.[0];
+                const displayReason = getAdjustmentDisplayReason(item);
+                const fullTooltip = firstItem?.remarks || displayReason;
+
+                return (
+                  <div>
+                    <span
+                      title={fullTooltip}
+                      className="inline-block max-w-[200px] overflow-hidden text-ellipsis whitespace-nowrap text-slate-700 font-medium"
+                    >
+                      {displayReason}
+                    </span>
+                    {item.items && item.items.length > 1 && (
+                      <div className="text-[10px] text-slate-400 mt-0.5">+{item.items.length - 1} more</div>
+                    )}
+                  </div>
+                );
+              }
             },
             {
               header: "ACTIONS",

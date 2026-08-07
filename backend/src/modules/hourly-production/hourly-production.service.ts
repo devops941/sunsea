@@ -4,6 +4,60 @@ import { CreateHourlyProductionInput, UpdateHourlyProductionInput } from "./hour
 import weeklyProgramService from "../weekly-machine-program/weekly-program.service";
 import oeeService from "../oee/oee.service";
 import { MachineOperationAssignmentService } from "../machine-operation-assignment/machine-operation-assignment.service";
+import { getIO } from "../../socket/socket";
+
+/** Normalize UOM aliases to canonical short form (mirrors frontend normalizeUom) */
+function normalizeUom(uom: string): string {
+  const u = (uom || "").trim().toLowerCase();
+  if (u === "kilogram" || u === "kilograms") return "kg";
+  if (u === "gram" || u === "grams") return "g";
+  if (u === "ton" || u === "tonne" || u === "tonnes" || u === "tons") return "t";
+  if (u === "liter" || u === "litre" || u === "liters" || u === "litres" || u === "ltr") return "l";
+  if (u === "milliliter" || u === "millilitre" || u === "milliliters" || u === "millilitres" || u === "ml") return "ml";
+  if (u === "meter" || u === "meters" || u === "metre" || u === "metres") return "m";
+  if (u === "centimeter" || u === "centimetre" || u === "centimeters" || u === "centimetres") return "cm";
+  if (u === "millimeter" || u === "millimetre" || u === "millimeters" || u === "millimetres") return "mm";
+  if (u === "pcs" || u === "piece" || u === "pieces" || u === "ea" || u === "each") return "pcs";
+  if (u === "box" || u === "boxes") return "box";
+  if (u === "dozen" || u === "dz") return "dz";
+  return u;
+}
+
+/** Convert qty from selectedUom to the raw material's baseUom (primary unit) */
+function convertToBaseUom(qty: number, selectedUom: string, baseUomStr: string): number {
+  if (!baseUomStr || !selectedUom) return qty;
+  const primary = normalizeUom(baseUomStr.split(",")[0]);
+  const selected = normalizeUom(selectedUom);
+  if (primary === selected) return qty;
+
+  // Weight: kg ↔ g ↔ t
+  if (primary === "kg" && selected === "g") return qty / 1000;
+  if (primary === "kg" && selected === "t") return qty * 1000;
+  if (primary === "g" && selected === "kg") return qty * 1000;
+  if (primary === "g" && selected === "t") return qty * 1_000_000;
+  if (primary === "t" && selected === "kg") return qty / 1000;
+  if (primary === "t" && selected === "g") return qty / 1_000_000;
+
+  // Volume: l ↔ ml
+  if (primary === "l" && selected === "ml") return qty / 1000;
+  if (primary === "ml" && selected === "l") return qty * 1000;
+
+  // Length: m ↔ cm ↔ mm
+  if (primary === "m" && selected === "cm") return qty / 100;
+  if (primary === "m" && selected === "mm") return qty / 1000;
+  if (primary === "cm" && selected === "m") return qty * 100;
+  if (primary === "cm" && selected === "mm") return qty / 10;
+  if (primary === "mm" && selected === "m") return qty * 1000;
+  if (primary === "mm" && selected === "cm") return qty * 10;
+
+  // Count: pcs ↔ dz ↔ box
+  if (primary === "dz" && selected === "pcs") return qty / 12;
+  if (primary === "pcs" && selected === "dz") return qty * 12;
+  if (primary === "box" && selected === "pcs") return qty / 12;
+  if (primary === "pcs" && selected === "box") return qty * 12;
+
+  return qty;
+}
 
 function getMondayAndDayOfWeek(dateInput: Date | string) {
   let date: Date;
@@ -520,7 +574,7 @@ class HourlyProductionService {
               storeId: wastage.storeId,
               wastageType: "SCRAP",
               quantity: wastage.quantity,
-              uom: wastage.uom || "KG",
+              uom: wastage.selectedUom || wastage.uom || "kg",
               status: "APPROVED",
               createdBy: userId,
               approvedBy: userId,
@@ -534,13 +588,20 @@ class HourlyProductionService {
           });
 
           if (targetProduct) {
+            // Convert wastage quantity to the raw material's base UOM before adding to stock.
+            // Frontend also does this conversion, but we re-do it server-side as a safety net
+            // in case selectedUom/baseUom are provided explicitly in the payload.
+            const rmBaseUom = String(targetProduct.baseUom || "kg");
+            const selectedUom = wastage.selectedUom || wastage.baseUom || rmBaseUom;
+            const convertedQty = convertToBaseUom(Number(wastage.quantity), selectedUom, rmBaseUom);
+
             const currentQty = Number(targetProduct.onHandQty ?? 0);
-            const newOnHand = currentQty + Number(wastage.quantity);
+            const newOnHand = currentQty + convertedQty;
 
             await tx.rawMaterial.update({
               where: { rawMaterialId: wastage.targetWastageProductId },
               data: {
-                onHandQty: { increment: wastage.quantity },
+                onHandQty: { increment: convertedQty },
                 lastMovementAt: new Date()
               }
             });
@@ -550,7 +611,7 @@ class HourlyProductionService {
                 storeId: wastage.storeId || targetProduct.storeId || "STORE-001",
                 rawMaterialId: wastage.targetWastageProductId,
                 txnType: "WASTAGE_RECEIPT",
-                qty: wastage.quantity,
+                qty: convertedQty,
                 remarks: `Received from Hourly Production Auto-log #${wastageNo}`,
                 productionOrderId: data.productionOrderId,
               }
@@ -564,7 +625,7 @@ class HourlyProductionService {
                 storeId: wastage.storeId || targetProduct.storeId,
                 currentQty,
                 adjustedQty: newOnHand,
-                difference: Number(wastage.quantity),
+                difference: convertedQty,
                 unitCost: Number(targetProduct.avgCost ?? 0),
                 remarks: `Wastage entry #${wastageNo}`,
               }
@@ -579,13 +640,18 @@ class HourlyProductionService {
           });
 
           if (targetProduct) {
+            // Convert return quantity to the raw material's base UOM before deducting/adding to stock.
+            const rmBaseUom = String(targetProduct.baseUom || "kg");
+            const selectedUom = rm.selectedUom || rm.uom || rmBaseUom;
+            const convertedQty = convertToBaseUom(Number(rm.quantity), selectedUom, rmBaseUom);
+
             const currentQty = Number(targetProduct.onHandQty ?? 0);
-            const newOnHand = currentQty + Number(rm.quantity);
+            const newOnHand = currentQty + convertedQty;
 
             await tx.rawMaterial.update({
               where: { rawMaterialId: rm.rawMaterialId },
               data: {
-                onHandQty: { increment: rm.quantity },
+                onHandQty: { increment: convertedQty },
                 lastMovementAt: new Date()
               }
             });
@@ -595,7 +661,7 @@ class HourlyProductionService {
                 storeId: rm.storeId || targetProduct.storeId || "STORE-001",
                 rawMaterialId: rm.rawMaterialId,
                 txnType: "RETURN",
-                qty: rm.quantity,
+                qty: convertedQty,
                 remarks: `Returned remaining raw materials in Hourly Production`,
                 productionOrderId: data.productionOrderId,
               }
@@ -609,7 +675,7 @@ class HourlyProductionService {
                 storeId: rm.storeId || targetProduct.storeId,
                 currentQty,
                 adjustedQty: newOnHand,
-                difference: Number(rm.quantity),
+                difference: convertedQty,
                 unitCost: Number(targetProduct.avgCost ?? 0),
                 remarks: `Returned raw material in Shift Log`,
               }
@@ -636,6 +702,8 @@ class HourlyProductionService {
         // OEE calculation errors should not fail the main operation
         console.error("OEE snapshot recalculation failed:", e);
       }
+      // Notify EOD stock page to refresh live quantities
+      try { getIO().emit("inventory:stockUpdated", { type: "hourly_production" }); } catch (_) {}
       return result;
     });
   }
@@ -876,7 +944,10 @@ class HourlyProductionService {
         ...updated,
         ...highCheckResult,
       };
-    }, { timeout: 15000 });
+    }, { timeout: 15000 }).then((result) => {
+      try { getIO().emit("inventory:stockUpdated", { type: "hourly_production" }); } catch (_) {}
+      return result;
+    });
   }
 
   async delete(hourlyProductionId: bigint) {

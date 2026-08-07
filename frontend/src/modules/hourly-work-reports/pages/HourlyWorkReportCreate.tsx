@@ -38,25 +38,55 @@ const getUomOptions = (baseUom: string) => {
     });
 };
 
-const convertToPrimaryUom = (qty: number, selectedUom: string, baseUomStr: string) => {
-    if (!baseUomStr) return qty;
-    const uoms = baseUomStr.split(",").map(u => u.trim().toLowerCase());
+/** Normalize UOM aliases to canonical short form */
+const normalizeUom = (uom: string): string => {
+    const u = uom.trim().toLowerCase();
+    if (u === "kilogram" || u === "kilograms") return "kg";
+    if (u === "gram" || u === "grams") return "g";
+    if (u === "ton" || u === "tonne" || u === "tonnes" || u === "tons") return "t";
+    if (u === "liter" || u === "litre" || u === "liters" || u === "litres" || u === "ltr") return "l";
+    if (u === "milliliter" || u === "millilitre" || u === "milliliters" || u === "millilitres" || u === "ml") return "ml";
+    if (u === "meter" || u === "meters" || u === "metre" || u === "metres") return "m";
+    if (u === "centimeter" || u === "centimetre" || u === "centimeters" || u === "centimetres") return "cm";
+    if (u === "millimeter" || u === "millimetre" || u === "millimeters" || u === "millimetres") return "mm";
+    if (u === "pcs" || u === "piece" || u === "pieces" || u === "ea" || u === "each") return "pcs";
+    if (u === "box" || u === "boxes") return "box";
+    if (u === "dozen" || u === "dz") return "dz";
+    return u;
+};
+
+const convertToPrimaryUom = (qty: number, selectedUom: string, baseUomStr: string): number => {
+    if (!baseUomStr || !selectedUom) return qty;
+    const uoms = baseUomStr.split(",").map(u => normalizeUom(u));
     const primary = uoms[0];
-    const selected = selectedUom.toLowerCase();
+    const selected = normalizeUom(selectedUom);
     if (primary === selected) return qty;
 
-    // Weight conversions
+    // Weight: kg ↔ g ↔ t
     if (primary === "kg" && selected === "g") return qty / 1000;
-    if (primary === "kg" && (selected === "ton" || selected === "t")) return qty * 1000;
+    if (primary === "kg" && selected === "t") return qty * 1000;
     if (primary === "g" && selected === "kg") return qty * 1000;
+    if (primary === "g" && selected === "t") return qty * 1_000_000;
+    if (primary === "t" && selected === "kg") return qty / 1000;
+    if (primary === "t" && selected === "g") return qty / 1_000_000;
 
-    // Volume conversions
-    if ((primary === "l" || primary === "ltr") && selected === "ml") return qty / 1000;
-    if (primary === "ml" && (selected === "l" || selected === "ltr")) return qty * 1000;
+    // Volume: l ↔ ml
+    if (primary === "l" && selected === "ml") return qty / 1000;
+    if (primary === "ml" && selected === "l") return qty * 1000;
 
-    // Dozen conversions
-    if (primary === "dz" && selected === "ea") return qty / 12;
-    if (primary === "ea" && selected === "dz") return qty * 12;
+    // Length: m ↔ cm ↔ mm
+    if (primary === "m" && selected === "cm") return qty / 100;
+    if (primary === "m" && selected === "mm") return qty / 1000;
+    if (primary === "cm" && selected === "m") return qty * 100;
+    if (primary === "cm" && selected === "mm") return qty / 10;
+    if (primary === "mm" && selected === "m") return qty * 1000;
+    if (primary === "mm" && selected === "cm") return qty * 10;
+
+    // Count: pcs ↔ dz ↔ box
+    if (primary === "dz" && selected === "pcs") return qty / 12;
+    if (primary === "pcs" && selected === "dz") return qty * 12;
+    if (primary === "box" && selected === "pcs") return qty / 12;
+    if (primary === "pcs" && selected === "box") return qty * 12;
 
     return qty;
 };
@@ -152,7 +182,7 @@ const HourlyWorkReportCreate: React.FC = () => {
             setRawMaterialStores(list);
         }).catch(err => console.error(err));
 
-        apiClient.get(config.rawMaterial.base, { params: { limit: 10 } }).then(res => {
+        apiClient.get(config.rawMaterial.base, { params: { limit: 500 } }).then(res => {
             const data = res.data?.data;
             let list: any[] = [];
             if (Array.isArray(data)) list = data;
@@ -587,30 +617,36 @@ const HourlyWorkReportCreate: React.FC = () => {
                 wastages: (isFinalHour || stopPlanEarly)
                     ? wastages.map((w) => {
                         const matched = rawMaterials.find((r: any) => r.rawMaterialId === w.targetWastageProductId);
-                        let baseUomStr = matched?.baseUom || "KG";
+                        let baseUomStr = matched?.baseUom || "kg";
                         if (Array.isArray(matched?.baseUom)) baseUomStr = matched.baseUom.join(',');
                         else if (typeof matched?.baseUom === "string" && matched.baseUom.startsWith("[")) {
                             try { baseUomStr = JSON.parse(matched.baseUom).join(','); } catch (e) { }
                         }
-                        const qty = Number(w.quantity) || 0;
-                        const finalQty = convertToPrimaryUom(qty, w.selectedUom || "", baseUomStr);
+                        const primaryUom = baseUomStr.split(",")[0] || "kg";
+                        const selectedUom = w.selectedUom || primaryUom;
+                        // Send the raw user-entered quantity + selectedUom.
+                        // The backend will do the actual conversion to primaryUom.
                         return {
                             storeId: w.storeId,
                             targetWastageProductId: w.targetWastageProductId,
-                            quantity: finalQty,
+                            quantity: Number(w.quantity) || 0,
+                            selectedUom,
                         };
                     })
                     : [],
                 rawMaterialsUsed: (isFinalHour || stopPlanEarly)
                     ? rawMaterialsUsed.map((rm) => {
                         const matched = rawMaterialOptions.find((r: any) => r.rawMaterialId === rm.rawMaterialId);
-                        const baseUomStr = matched?.baseUom || "";
-                        const qty = Number(rm.quantity) || 0;
-                        const finalQty = convertToPrimaryUom(qty, rm.uom || "", baseUomStr);
+                        const baseUomStr = matched?.baseUom || rm.uom || "kg";
+                        const primaryUom = baseUomStr.split(",")[0] || "kg";
+                        // Use selectedUom (user's chosen unit), fall back to primary UOM.
+                        const selectedUom = rm.selectedUom || primaryUom;
+                        // Send raw user-entered quantity + selectedUom; backend does conversion.
                         return {
                             storeId: rm.storeId,
                             rawMaterialId: rm.rawMaterialId,
-                            quantity: finalQty,
+                            quantity: Number(rm.quantity) || 0,
+                            selectedUom,
                         };
                     })
                     : [],
@@ -630,25 +666,32 @@ const HourlyWorkReportCreate: React.FC = () => {
             // Handle Stop Plan Early
             if (stopPlanEarly && dailyPlanId) {
                 try {
-                    // CARRY_FORWARD → STOPPED (Short Closed, carry forward remaining from planning page)
-                    // FORCE_COMPLETE → STOPPED with "Short Closed:" remarks so the Daily Planning page
-                    //   shows "Move to Post Production" (→) button, allowing post-production steps to run.
-                    //   Setting COMPLETED would skip post-production entirely.
-                    const stopStatus = "STOPPED";
-                    const remarksPrefix = stopOption === "CARRY_FORWARD" ? "Short Closed" : "Short Closed";
+                    // CARRY_FORWARD → STOPPED: daily plan stops, PO stays open, remaining qty can be
+                    //   carried forward to a new daily plan from the Daily Planning page.
+                    // FORCE_COMPLETE → POST_PRODUCTION + shortClosePO: true: PO is permanently locked
+                    //   (COMPLETED_WITH_SHORTFALL), all other active plans cascade-stopped, produced
+                    //   qty flows immediately into post-production → dispatch.
+                    const isCompleteStop = stopOption === "FORCE_COMPLETE";
+                    const stopStatus = isCompleteStop ? "POST_PRODUCTION" : "STOPPED";
+                    const remarksPrefix = isCompleteStop ? "Permanently Stopped" : "Short Closed";
                     const stopRemarks = activePlan?.remarks
                         ? `${activePlan.remarks} | ${remarksPrefix}: ${stopPlanReason.trim()}`
                         : `${remarksPrefix}: ${stopPlanReason.trim()}`;
 
-                    await apiClient.put(`/daily-production-plans/${dailyPlanId}`, {
+                    const stopPayload: any = {
                         status: stopStatus,
                         remarks: stopRemarks,
-                        plannedHours: Number(hourIndex)
-                    });
+                        plannedHours: Number(hourIndex),
+                    };
+                    if (isCompleteStop) {
+                        stopPayload.shortClosePO = true;
+                    }
+
+                    await apiClient.put(`/daily-production-plans/${dailyPlanId}`, stopPayload);
                     toast.success(
-                        stopOption === "CARRY_FORWARD"
-                            ? "Production stopped. You can carry forward the remaining quantity from the planning page."
-                            : "Production stopped. Go to Daily Planning to continue post-production."
+                        isCompleteStop
+                            ? "Production permanently stopped. Proceeding to post-production."
+                            : "Production stopped. You can carry forward the remaining quantity from the planning page."
                     );
                 } catch (err: any) {
                     console.error("Failed to stop production plan early", err);
@@ -994,21 +1037,31 @@ const HourlyWorkReportCreate: React.FC = () => {
                             )}
                         </div>
 
-                        {/* Stop Plan Early Section (only if not final hour) */}
-                        {hourOptions.length > 0 && Number(hourIndex) < hourOptions.length && (
+                        {/* Stop Section — shown on all hours when a dailyPlanId is present */}
+                        {hourOptions.length > 0 && dailyPlanId && (
                             <div className="mt-8 pt-6 border-t border-slate-200">
-                                {/* <Form.Check
+                                <Form.Check
                                     type="switch"
                                     id="stop-plan-early-switch"
-                                    label={<span className="font-semibold text-red-600 ml-3 text-base">Stop Production Plan after this hour</span>}
+                                    label={
+                                        <span className="font-semibold text-red-600 ml-3 text-base">
+                                            {Number(hourIndex) === hourOptions.length
+                                                ? "Permanently Stop this Production Order"
+                                                : "Stop Production Plan after this hour"}
+                                        </span>
+                                    }
                                     checked={stopPlanEarly}
                                     onChange={(e) => {
                                         setStopPlanEarly(e.target.checked);
                                         if (!e.target.checked) {
                                             setFormErrors((prev) => ({ ...prev, stopPlanReason: "" }));
                                         }
+                                        // Final hour stop is always a Complete Stop — lock the PO
+                                        if (Number(hourIndex) === hourOptions.length) {
+                                            setStopOption("FORCE_COMPLETE");
+                                        }
                                     }}
-                                /> */}
+                                />
                                 {stopPlanEarly && (
                                     <div className="mt-3 bg-slate-50/50 p-5 rounded-xl border border-slate-100 w-full flex flex-col gap-4">
                                         <div className="w-full">
@@ -1017,7 +1070,7 @@ const HourlyWorkReportCreate: React.FC = () => {
                                                 name="stopPlanReason"
                                                 value={stopPlanReason}
                                                 required
-                                                placeholder="e.g. Urgent plan PO2 required on this machine"
+                                                placeholder="e.g. Target not met — permanently closing this PO"
                                                 error={formErrors.stopPlanReason}
                                                 onChange={(e) => {
                                                     setStopPlanReason(e.target.value);
@@ -1026,56 +1079,67 @@ const HourlyWorkReportCreate: React.FC = () => {
                                                 width="100%"
                                             />
                                         </div>
-                                        <div className="w-full">
-                                            <label className="block text-xs font-bold text-slate-500 uppercase mb-2">
-                                                Stop Action Type *
-                                            </label>
-                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-1">
-                                                <div
-                                                    className={`cursor-pointer border rounded-xl p-3 flex flex-col transition-all ${stopOption === "FORCE_COMPLETE"
-                                                            ? "border-rose-500 bg-rose-50/50 ring-2 ring-rose-500/20"
-                                                            : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
-                                                        }`}
-                                                    onClick={() => setStopOption("FORCE_COMPLETE")}
-                                                >
-                                                    <div className="flex items-center gap-2 font-semibold text-slate-800 text-sm">
-                                                        <input
-                                                            type="radio"
-                                                            name="stopOption"
-                                                            checked={stopOption === "FORCE_COMPLETE"}
-                                                            onChange={() => setStopOption("FORCE_COMPLETE")}
-                                                            className="text-rose-600 focus:ring-rose-500"
-                                                        />
-                                                        Completed Stop
-                                                    </div>
-                                                    <span className="text-[11px] text-slate-500 mt-1 pl-5">
-                                                        Stop production without carrying forward any quantity.
-                                                    </span>
-                                                </div>
 
-                                                <div
-                                                    className={`cursor-pointer border rounded-xl p-3 flex flex-col transition-all ${stopOption === "CARRY_FORWARD"
-                                                            ? "border-amber-500 bg-amber-50/50 ring-2 ring-amber-500/20"
-                                                            : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
-                                                        }`}
-                                                    onClick={() => setStopOption("CARRY_FORWARD")}
-                                                >
-                                                    <div className="flex items-center gap-2 font-semibold text-slate-800 text-sm">
-                                                        <input
-                                                            type="radio"
-                                                            name="stopOption"
-                                                            checked={stopOption === "CARRY_FORWARD"}
-                                                            onChange={() => setStopOption("CARRY_FORWARD")}
-                                                            className="text-amber-600 focus:ring-amber-500"
-                                                        />
-                                                        Stop & Carry Forward
+                                        {/* Non-final hour: let user choose between Complete Stop and Carry Forward */}
+                                        {Number(hourIndex) < hourOptions.length && (
+                                            <div className="w-full">
+                                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">
+                                                    Stop Action Type *
+                                                </label>
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-1">
+                                                    <div
+                                                        className={`cursor-pointer border rounded-xl p-3 flex flex-col transition-all ${stopOption === "FORCE_COMPLETE"
+                                                                ? "border-rose-500 bg-rose-50/50 ring-2 ring-rose-500/20"
+                                                                : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+                                                            }`}
+                                                        onClick={() => setStopOption("FORCE_COMPLETE")}
+                                                    >
+                                                        <div className="flex items-center gap-2 font-semibold text-slate-800 text-sm">
+                                                            <input
+                                                                type="radio"
+                                                                name="stopOption"
+                                                                checked={stopOption === "FORCE_COMPLETE"}
+                                                                onChange={() => setStopOption("FORCE_COMPLETE")}
+                                                                className="text-rose-600 focus:ring-rose-500"
+                                                            />
+                                                            Completed Stop
+                                                        </div>
+                                                        <span className="text-[11px] text-slate-500 mt-1 pl-5">
+                                                            Stop production without carrying forward any quantity.
+                                                        </span>
                                                     </div>
-                                                    <span className="text-[11px] text-slate-500 mt-1 pl-5">
-                                                        Carry forward the remaining <strong>{Math.max(0, remainingQtyForShift - (Number(qtyProduced) || 0))} pcs</strong> to a new daily plan.
-                                                    </span>
+
+                                                    <div
+                                                        className={`cursor-pointer border rounded-xl p-3 flex flex-col transition-all ${stopOption === "CARRY_FORWARD"
+                                                                ? "border-amber-500 bg-amber-50/50 ring-2 ring-amber-500/20"
+                                                                : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+                                                            }`}
+                                                        onClick={() => setStopOption("CARRY_FORWARD")}
+                                                    >
+                                                        <div className="flex items-center gap-2 font-semibold text-slate-800 text-sm">
+                                                            <input
+                                                                type="radio"
+                                                                name="stopOption"
+                                                                checked={stopOption === "CARRY_FORWARD"}
+                                                                onChange={() => setStopOption("CARRY_FORWARD")}
+                                                                className="text-amber-600 focus:ring-amber-500"
+                                                            />
+                                                            Stop & Carry Forward
+                                                        </div>
+                                                        <span className="text-[11px] text-slate-500 mt-1 pl-5">
+                                                            Carry forward the remaining <strong>{Math.max(0, remainingQtyForShift - (Number(qtyProduced) || 0))} pcs</strong> to a new daily plan.
+                                                        </span>
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
+                                        )}
+
+                                        {/* Final hour: always Complete Stop — just show info */}
+                                        {Number(hourIndex) === hourOptions.length && (
+                                            <div className="bg-rose-50 border border-rose-200 rounded-lg p-3 text-xs text-rose-700 leading-relaxed">
+                                                <strong>Complete Stop:</strong> The Production Order will be permanently locked. No new daily plans can be created for this PO. All produced quantity will proceed to post-production and dispatch.
+                                            </div>
+                                        )}
                                     </div>
                                 )}
                             </div>
@@ -1119,7 +1183,7 @@ const HourlyWorkReportCreate: React.FC = () => {
                                             text=" Add Wastage Product"
                                             onClick={() => {
                                                 setFormErrors((prev) => ({ ...prev, logWastage: "" }));
-                                                setWastages([...wastages, { storeId: "", targetWastageProductId: "", quantity: "", storeError: "", productError: "", quantityError: "" }]);
+                                                setWastages([...wastages, { storeId: "", targetWastageProductId: "", quantity: "", uom: "", selectedUom: "", storeError: "", productError: "", quantityError: "" }]);
                                             }}
                                         />
                                     </div>
@@ -1181,14 +1245,18 @@ const HourlyWorkReportCreate: React.FC = () => {
                                                                             newW[index].productError = "";
                                                                             const rm = rawMaterials.find(r => r.rawMaterialId === e.target.value);
                                                                             if (rm) {
-                                                                                let uoms = rm.baseUom || "KG";
+                                                                                let uoms = rm.baseUom || "kg";
                                                                                 if (Array.isArray(rm.baseUom)) uoms = rm.baseUom.join(',');
                                                                                 else if (typeof rm.baseUom === "string" && rm.baseUom.startsWith("[")) {
                                                                                     try { uoms = JSON.parse(rm.baseUom).join(','); } catch (e) { }
                                                                                 }
                                                                                 newW[index].uom = uoms;
-                                                                                const opts = getUomOptions(uoms);
-                                                                                newW[index].selectedUom = opts.length > 0 ? opts[0].value : "";
+                                                                                // Only reset selectedUom to primary if none was set yet.
+                                                                                // This prevents overwriting the UOM the user already chose.
+                                                                                if (!newW[index].selectedUom) {
+                                                                                    const opts = getUomOptions(uoms);
+                                                                                    newW[index].selectedUom = opts.length > 0 ? opts[0].value : "";
+                                                                                }
                                                                             } else {
                                                                                 newW[index].uom = "";
                                                                                 newW[index].selectedUom = "";
@@ -1223,6 +1291,12 @@ const HourlyWorkReportCreate: React.FC = () => {
                                                                         hideLabel
                                                                         name={`quantity-${index}`}
                                                                         value={w.quantity}
+                                                                        uom={w.selectedUom || undefined}
+                                                                        onUomChange={(uomVal) => {
+                                                                            const newW = [...wastages];
+                                                                            newW[index].selectedUom = uomVal;
+                                                                            setWastages(newW);
+                                                                        }}
                                                                         onChange={(e) => {
                                                                             const newW = [...wastages];
                                                                             newW[index].quantity = e.target.value;
@@ -1277,7 +1351,7 @@ const HourlyWorkReportCreate: React.FC = () => {
                                         icon={FaPlus}
                                         text=" Add Raw Material"
                                         onClick={() => {
-                                            setRawMaterialsUsed([...rawMaterialsUsed, { storeId: "", rawMaterialId: "", quantity: "", uom: "", storeError: "", productError: "", quantityError: "" }]);
+                                            setRawMaterialsUsed([...rawMaterialsUsed, { storeId: "", rawMaterialId: "", quantity: "", uom: "", selectedUom: "", storeError: "", productError: "", quantityError: "" }]);
                                         }}
                                     />
                                 </div>
@@ -1352,10 +1426,17 @@ const HourlyWorkReportCreate: React.FC = () => {
                                                                         const matchedRm = rawMaterialOptions.find((r: any) => r.rawMaterialId === e.target.value);
                                                                         if (matchedRm) {
                                                                             const base = matchedRm.baseUom || "";
+                                                                            newRm[index].uom = base;
                                                                             const opts = getUomOptions(base);
-                                                                            newRm[index].uom = opts.length > 0 ? opts[0].value : "";
+                                                                            // Only reset selectedUom if it's empty or not valid for this product's UOM list.
+                                                                            const currentSelected = newRm[index].selectedUom || "";
+                                                                            const isValidForProduct = opts.some(o => o.value === currentSelected);
+                                                                            if (!currentSelected || !isValidForProduct) {
+                                                                                newRm[index].selectedUom = opts.length > 0 ? opts[0].value : "";
+                                                                            }
                                                                         } else {
                                                                             newRm[index].uom = "";
+                                                                            newRm[index].selectedUom = "";
                                                                         }
                                                                         setRawMaterialsUsed(newRm);
                                                                     }}
@@ -1368,19 +1449,22 @@ const HourlyWorkReportCreate: React.FC = () => {
                                                                     hideLabel
                                                                     name={`rm-qty-${index}`}
                                                                     value={rm.quantity}
+                                                                    uom={rm.selectedUom || undefined}
+                                                                    onUomChange={(uomVal) => {
+                                                                        const newRm = [...rawMaterialsUsed];
+                                                                        newRm[index].selectedUom = uomVal;
+                                                                        setRawMaterialsUsed(newRm);
+                                                                    }}
                                                                     onChange={(e) => {
                                                                         const newRm = [...rawMaterialsUsed];
                                                                         newRm[index].quantity = e.target.value;
                                                                         if (e.target.uom) {
-                                                                            newRm[index].uom = e.target.uom;
+                                                                            newRm[index].selectedUom = e.target.uom;
                                                                         }
                                                                         newRm[index].quantityError = "";
                                                                         setRawMaterialsUsed(newRm);
                                                                     }}
-                                                                    baseUoms={
-                                                                        rawMaterialOptions.find((r: any) => r.rawMaterialId === rm.rawMaterialId)?.baseUom || "KG"
-                                                                    }
-                                                                    uom={rm.uom}
+                                                                    baseUoms={rm.uom || "KG"}
                                                                     required
                                                                     error={rm.quantityError}
                                                                 />

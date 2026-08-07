@@ -212,6 +212,53 @@ const rawMaterialSchema = z
         }
     );
 
+const normalizeUom = (uom: string): string => {
+    const u = uom.trim().toLowerCase();
+    if (u === "kilogram" || u === "kilograms") return "kg";
+    if (u === "gram" || u === "grams") return "g";
+    if (u === "ton" || u === "tonne" || u === "tonnes" || u === "tons") return "t";
+    if (u === "liter" || u === "litre" || u === "liters" || u === "litres" || u === "ltr") return "l";
+    if (u === "milliliter" || u === "millilitre" || u === "milliliters" || u === "millilitres" || u === "ml") return "ml";
+    if (u === "meter" || u === "meters" || u === "metre" || u === "metres" || u === "mtr") return "m";
+    if (u === "centimeter" || u === "centimeters" || u === "centimetre" || u === "centimetres") return "cm";
+    if (u === "millimeter" || u === "millimeters" || u === "millimetre" || u === "millimetres") return "mm";
+    if (u === "pcs" || u === "piece" || u === "pieces" || u === "ea" || u === "each") return "pcs";
+    if (u === "box" || u === "boxes") return "box";
+    if (u === "dozen" || u === "dz") return "dz";
+    return u;
+};
+
+const convertToPrimaryUom = (qty: number, selectedUom: string, baseUomStr: string): number => {
+    if (!baseUomStr || !selectedUom) return qty;
+    const uoms = baseUomStr.split(",").map(u => normalizeUom(u.trim()));
+    const primary = uoms[0];
+    const selected = normalizeUom(selectedUom);
+    if (primary === selected) return qty;
+    // Weight: kg ↔ g ↔ t
+    if (primary === "kg" && selected === "g") return qty / 1000;
+    if (primary === "kg" && selected === "t") return qty * 1000;
+    if (primary === "g" && selected === "kg") return qty * 1000;
+    if (primary === "g" && selected === "t") return qty * 1_000_000;
+    if (primary === "t" && selected === "kg") return qty / 1000;
+    if (primary === "t" && selected === "g") return qty / 1_000_000;
+    // Volume: l ↔ ml
+    if (primary === "l" && selected === "ml") return qty / 1000;
+    if (primary === "ml" && selected === "l") return qty * 1000;
+    // Length: m ↔ cm ↔ mm
+    if (primary === "m" && selected === "cm") return qty / 100;
+    if (primary === "m" && selected === "mm") return qty / 1000;
+    if (primary === "cm" && selected === "m") return qty * 100;
+    if (primary === "cm" && selected === "mm") return qty / 10;
+    if (primary === "mm" && selected === "m") return qty * 1000;
+    if (primary === "mm" && selected === "cm") return qty * 10;
+    // Count: pcs ↔ dz ↔ box
+    if (primary === "dz" && selected === "pcs") return qty / 12;
+    if (primary === "pcs" && selected === "dz") return qty * 12;
+    if (primary === "box" && selected === "pcs") return qty / 12;
+    if (primary === "pcs" && selected === "box") return qty * 12;
+    return qty;
+};
+
 const RawMaterialCreate: React.FC = () => {
     const navigate = useNavigate();
     const dispatch = useAppDispatch();
@@ -219,6 +266,11 @@ const RawMaterialCreate: React.FC = () => {
     const [formData, setFormData] = useState(initialFormState);
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    // Per-field UOM tracking (independent of baseUom order)
+    const [openingStockUom, setOpeningStockUom] = useState("");
+    const [minimumStockUom, setMinimumStockUom] = useState("");
+    const [reorderLevelUom, setReorderLevelUom] = useState("");
 
     const { data: stores } = useAppSelector(state => state.stores);
     const { rawMaterialCategories, loadCategories } = useRawMaterialCategories();
@@ -250,6 +302,13 @@ const RawMaterialCreate: React.FC = () => {
     useSocketSync("rawMaterialCategory", undefined, fetchCategoriesData);
     useSocketSync("gstTax", undefined, fetchGstData);
 
+    // Reset per-field UOM selections when baseUom changes
+    useEffect(() => {
+        setOpeningStockUom("");
+        setMinimumStockUom("");
+        setReorderLevelUom("");
+    }, [formData.baseUom]);
+
     useEffect(() => {
         fetchStoresData();
         fetchCategoriesData();
@@ -264,14 +323,6 @@ const RawMaterialCreate: React.FC = () => {
         };
         getNextId();
     }, [fetchStoresData, fetchCategoriesData, fetchGstData]);
-
-    const handleUomSelectInQuantity = (selectedUom: string) => {
-        if (!formData.baseUom) return;
-        const list = formData.baseUom.split(",").map(u => u.trim()).filter(Boolean);
-        const rest = list.filter(u => u.toLowerCase() !== selectedUom.toLowerCase());
-        const reordered = [selectedUom, ...rest].join(",");
-        setFormData(prev => ({ ...prev, baseUom: reordered }));
-    };
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target as any;
@@ -293,6 +344,9 @@ const RawMaterialCreate: React.FC = () => {
     const handleClear = () => {
         setFormData(prev => ({ ...initialFormState, rawMaterialId: prev.rawMaterialId }));
         setErrors({});
+        setOpeningStockUom("");
+        setMinimumStockUom("");
+        setReorderLevelUom("");
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -318,6 +372,23 @@ const RawMaterialCreate: React.FC = () => {
 
         setIsSubmitting(true);
         try {
+            const primaryUom = formData.baseUom.split(",")[0]?.trim() || "";
+            const convertedOnHandQty = convertToPrimaryUom(
+                formData.onHandQty ? Number(formData.onHandQty) : 0,
+                openingStockUom || primaryUom,
+                formData.baseUom
+            );
+            const convertedMinStock = convertToPrimaryUom(
+                formData.minimumStock ? Number(formData.minimumStock) : 0,
+                minimumStockUom || primaryUom,
+                formData.baseUom
+            );
+            const convertedReorderLevel = convertToPrimaryUom(
+                formData.reorderLevel ? Number(formData.reorderLevel) : 0,
+                reorderLevelUom || primaryUom,
+                formData.baseUom
+            );
+
             await dispatch(
                 createRawMaterial({
                     ...formData,
@@ -326,13 +397,9 @@ const RawMaterialCreate: React.FC = () => {
                         ? Number(formData.categoryId)
                         : null,
 
-                    minimumStock: formData.minimumStock
-                        ? Number(formData.minimumStock)
-                        : null,
+                    minimumStock: convertedMinStock,
 
-                    reorderLevel: formData.reorderLevel
-                        ? Number(formData.reorderLevel)
-                        : null,
+                    reorderLevel: convertedReorderLevel,
 
                     leadTimeDays: formData.leadTimeDays
                         ? Number(formData.leadTimeDays)
@@ -342,9 +409,7 @@ const RawMaterialCreate: React.FC = () => {
                         ? Number(formData.unitPrice)
                         : null,
 
-                    onHandQty: formData.onHandQty
-                        ? Number(formData.onHandQty)
-                        : 0,
+                    onHandQty: convertedOnHandQty,
 
                     reservedQty: formData.reservedQty
                         ? Number(formData.reservedQty)
@@ -485,7 +550,8 @@ const RawMaterialCreate: React.FC = () => {
                                 name="onHandQty"
                                 value={formData.onHandQty}
                                 baseUoms={formData.baseUom}
-                                onUomChange={handleUomSelectInQuantity}
+                                uom={openingStockUom || undefined}
+                                onUomChange={setOpeningStockUom}
                                 required
                                 error={errors.onHandQty}
                                 onChange={handleChange}
@@ -495,7 +561,8 @@ const RawMaterialCreate: React.FC = () => {
                                 name="minimumStock"
                                 value={formData.minimumStock}
                                 baseUoms={formData.baseUom}
-                                onUomChange={handleUomSelectInQuantity}
+                                uom={minimumStockUom || undefined}
+                                onUomChange={setMinimumStockUom}
                                 required
                                 error={errors.minimumStock}
                                 onChange={handleChange}
@@ -505,7 +572,8 @@ const RawMaterialCreate: React.FC = () => {
                                 name="reorderLevel"
                                 value={formData.reorderLevel}
                                 baseUoms={formData.baseUom}
-                                onUomChange={handleUomSelectInQuantity}
+                                uom={reorderLevelUom || undefined}
+                                onUomChange={setReorderLevelUom}
                                 required
                                 error={errors.reorderLevel}
                                 onChange={handleChange}
