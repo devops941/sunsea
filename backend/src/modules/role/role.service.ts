@@ -12,14 +12,19 @@ export const createRole = async (
   });
 };
 
+const SUPER_ADMIN_FILTER = [
+  { code: { in: ["ROLE_ADMIN", "SUPER_ADMIN", "super_admin", "superadmin"] } },
+  { name: { contains: "Super Admin", mode: "insensitive" } },
+  { name: { contains: "superadmin", mode: "insensitive" } },
+];
+
 export const getAllRoles = async (page?: number, limit?: number, search?: string) => {
   const where: any = {
-    // Never expose the Super Admin role in the management list
-    NOT: { code: "ROLE_ADMIN" },
+    NOT: SUPER_ADMIN_FILTER,
   };
   if (search) {
     where.AND = [
-      { NOT: { code: "ROLE_ADMIN" } },
+      { NOT: SUPER_ADMIN_FILTER },
       { OR: [
         { code: { contains: search, mode: "insensitive" } },
         { name: { contains: search, mode: "insensitive" } },

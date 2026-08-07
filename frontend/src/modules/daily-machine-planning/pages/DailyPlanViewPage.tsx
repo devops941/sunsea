@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useCallback } from "react";
 import { FaArrowLeft, FaIndustry, FaChartBar, FaCheckCircle, FaBoxOpen, FaTruck, FaArrowRight, FaShare, FaClipboardList, FaCalendarAlt } from "react-icons/fa";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 
@@ -8,6 +8,7 @@ import { oeeService } from "../../../services/oeeService";
 import { weeklyProgramService } from "../../../services/weeklyProgramService";
 import { dailyPlanService } from "../../../services/dailyPlanService";
 import { productCapacityHistoryService } from "../../../services/productCapacityHistoryService";
+import { useSocketSync } from "../../../hooks/useSocketSync";
 
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import DataTable, { type DataTableColumn } from "../../../components/ui/table/DataTable";
@@ -31,85 +32,87 @@ const DailyPlanViewPage: React.FC = () => {
   const [poHistoryPlans, setPOHistoryPlans] = useState<any[]>([]);
   const [machineProductCapacity, setMachineProductCapacity] = useState<number | null>(null);
 
-  useEffect(() => {
+  const fetchAllData = useCallback(async () => {
     if (!viewPlan?.productionOrderId && !viewPlan?.dailyPlanId) return;
+    let currentPlan = viewPlan;
 
-    const fetchAllData = async () => {
-      let currentPlan = viewPlan;
-
-      // If we only have ID (from direct link), fetch the full plan first
-      if (!currentPlan.productionOrderId && currentPlan.dailyPlanId) {
-        try {
-          const res = await dailyPlanService.getById(currentPlan.dailyPlanId);
-          if (res) {
-            currentPlan = res;
-            setViewPlan(currentPlan);
-          }
-        } catch (e) {
-          console.error("Failed to fetch plan details", e);
-          return;
+    // If we only have ID (from direct link), fetch the full plan first
+    if (!currentPlan.productionOrderId && currentPlan.dailyPlanId) {
+      try {
+        const res = await dailyPlanService.getById(currentPlan.dailyPlanId);
+        if (res) {
+          currentPlan = res;
+          setViewPlan(currentPlan);
         }
+      } catch (e) {
+        console.error("Failed to fetch plan details", e);
+        return;
       }
+    }
 
-      setLoadingViewLogs(true);
-      apiClient.get(config.hourlyProduction.base, {
-        params: {
-          machineId: currentPlan.machineId,
-          shiftId: currentPlan.shiftId,
-          productionDate: currentPlan.productionDate?.split("T")[0],
-          productionOrderId: currentPlan.productionOrderId,
-        }
-      }).then(res => {
-        if (res.data?.success) setViewHourlyLogs((res.data.data || []).filter((h: any) => Number(h.hourIndex) > 0));
-        else setViewHourlyLogs([]);
-      }).catch(() => setViewHourlyLogs([])
-      ).finally(() => setLoadingViewLogs(false));
-
-      oeeService.getProductionOrderOee(currentPlan.productionOrderId)
-        .then((data: any) => setViewPlanOeeSummary(data))
-        .catch(() => setViewPlanOeeSummary(null));
-
-      if (currentPlan.weeklyProgramId) {
-        setLoadingWeekly(true);
-        weeklyProgramService.getById(currentPlan.weeklyProgramId)
-          .then((res: any) => {
-            const data = res?.data || res;
-            setWeeklyProgram(data);
-          })
-          .catch(() => setWeeklyProgram(null))
-          .finally(() => setLoadingWeekly(false));
+    setLoadingViewLogs(true);
+    apiClient.get(config.hourlyProduction.base, {
+      params: {
+        machineId: currentPlan.machineId,
+        shiftId: currentPlan.shiftId,
+        productionDate: currentPlan.productionDate?.split("T")[0],
+        productionOrderId: currentPlan.productionOrderId,
       }
+    }).then(res => {
+      if (res.data?.success) setViewHourlyLogs((res.data.data || []).filter((h: any) => Number(h.hourIndex) > 0));
+      else setViewHourlyLogs([]);
+    }).catch(() => setViewHourlyLogs([])
+    ).finally(() => setLoadingViewLogs(false));
 
-      if (currentPlan.productionOrderId) {
-        setLoadingPOHistory(true);
-        dailyPlanService.getAll({ productionOrderId: currentPlan.productionOrderId })
-          .then((res: any) => {
-            let plans: any[] = [];
-            if (Array.isArray(res)) plans = res;
-            else if (Array.isArray(res?.data)) plans = res.data;
-            else if (Array.isArray(res?.data?.dailyPlans)) plans = res.data.dailyPlans;
-            else if (Array.isArray(res?.dailyPlans)) plans = res.dailyPlans;
-            plans.sort((a: any, b: any) => new Date(b.productionDate || 0).getTime() - new Date(a.productionDate || 0).getTime());
-            setPOHistoryPlans(plans);
-          })
-          .catch(() => setPOHistoryPlans([]))
-          .finally(() => setLoadingPOHistory(false));
-      }
+    oeeService.getProductionOrderOee(currentPlan.productionOrderId)
+      .then((data: any) => setViewPlanOeeSummary(data))
+      .catch(() => setViewPlanOeeSummary(null));
 
-      if (currentPlan.machineId && currentPlan.productionOrder?.productItem?.id) {
-        productCapacityHistoryService.fetchByProductAndMachine(Number(currentPlan.productionOrder.productItem.id), currentPlan.machineId)
-          .then((rec: any) => {
-            if (rec && rec.newCapacity != null) setMachineProductCapacity(Number(rec.newCapacity));
-            else setMachineProductCapacity(null);
-          })
-          .catch(() => setMachineProductCapacity(null));
-      } else {
-        setMachineProductCapacity(null);
-      }
-    };
+    if (currentPlan.weeklyProgramId) {
+      setLoadingWeekly(true);
+      weeklyProgramService.getById(currentPlan.weeklyProgramId)
+        .then((res: any) => {
+          const data = res?.data || res;
+          setWeeklyProgram(data);
+        })
+        .catch(() => setWeeklyProgram(null))
+        .finally(() => setLoadingWeekly(false));
+    }
 
+    if (currentPlan.productionOrderId) {
+      setLoadingPOHistory(true);
+      dailyPlanService.getAll({ productionOrderId: currentPlan.productionOrderId })
+        .then((res: any) => {
+          let plans: any[] = [];
+          if (Array.isArray(res)) plans = res;
+          else if (Array.isArray(res?.data)) plans = res.data;
+          else if (Array.isArray(res?.data?.dailyPlans)) plans = res.data.dailyPlans;
+          else if (Array.isArray(res?.dailyPlans)) plans = res.dailyPlans;
+          plans.sort((a: any, b: any) => new Date(b.productionDate || 0).getTime() - new Date(a.productionDate || 0).getTime());
+          setPOHistoryPlans(plans);
+        })
+        .catch(() => setPOHistoryPlans([]))
+        .finally(() => setLoadingPOHistory(false));
+    }
+
+    if (currentPlan.machineId && currentPlan.productionOrder?.productItem?.id) {
+      productCapacityHistoryService.fetchByProductAndMachine(Number(currentPlan.productionOrder.productItem.id), currentPlan.machineId)
+        .then((rec: any) => {
+          if (rec && rec.newCapacity != null) setMachineProductCapacity(Number(rec.newCapacity));
+          else setMachineProductCapacity(null);
+        })
+        .catch(() => setMachineProductCapacity(null));
+    } else {
+      setMachineProductCapacity(null);
+    }
+  }, [viewPlan?.dailyPlanId, viewPlan?.productionOrderId]);
+
+  useEffect(() => {
     fetchAllData();
-  }, [viewPlan?.dailyPlanId]);
+  }, [fetchAllData]);
+
+  useSocketSync("dailyPlan", undefined, fetchAllData);
+  useSocketSync("hourlyProduction", undefined, fetchAllData);
 
   const handleLogHourly = (plan: any) => {
     navigate("/hourly-work-reports/create", {

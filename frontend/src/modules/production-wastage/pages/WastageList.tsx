@@ -136,13 +136,13 @@ const WastageList: React.FC = () => {
           <div>
             <h2 className="text-2xl font-bold text-slate-800">Production Wastage Auditing</h2>
           </div>
-          <div className="flex items-center gap-3">
+          {/* <div className="flex items-center gap-3">
             <CustomButton
               text="Add Wastage Log"
               onClick={() => navigate("/production-wastages/create")}
               icon={FaPlus}
             />
-          </div>
+          </div> */}
         </div>
 
         {/* Table */}

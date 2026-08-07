@@ -630,11 +630,15 @@ const HourlyWorkReportCreate: React.FC = () => {
             // Handle Stop Plan Early
             if (stopPlanEarly && dailyPlanId) {
                 try {
+                    // CARRY_FORWARD → STOPPED (Short Closed, carry forward remaining from planning page)
+                    // FORCE_COMPLETE → STOPPED with "Short Closed:" remarks so the Daily Planning page
+                    //   shows "Move to Post Production" (→) button, allowing post-production steps to run.
+                    //   Setting COMPLETED would skip post-production entirely.
+                    const stopStatus = "STOPPED";
+                    const remarksPrefix = stopOption === "CARRY_FORWARD" ? "Short Closed" : "Short Closed";
                     const stopRemarks = activePlan?.remarks
-                        ? `${activePlan.remarks} | Stopped: ${stopPlanReason.trim()}`
-                        : `Stopped: ${stopPlanReason.trim()}`;
-
-                    const stopStatus = stopOption === "CARRY_FORWARD" ? "STOPPED" : "COMPLETED";
+                        ? `${activePlan.remarks} | ${remarksPrefix}: ${stopPlanReason.trim()}`
+                        : `${remarksPrefix}: ${stopPlanReason.trim()}`;
 
                     await apiClient.put(`/daily-production-plans/${dailyPlanId}`, {
                         status: stopStatus,
@@ -644,7 +648,7 @@ const HourlyWorkReportCreate: React.FC = () => {
                     toast.success(
                         stopOption === "CARRY_FORWARD"
                             ? "Production stopped. You can carry forward the remaining quantity from the planning page."
-                            : "Production plan short-closed successfully."
+                            : "Production stopped. Go to Daily Planning to continue post-production."
                     );
                 } catch (err: any) {
                     console.error("Failed to stop production plan early", err);
@@ -993,7 +997,7 @@ const HourlyWorkReportCreate: React.FC = () => {
                         {/* Stop Plan Early Section (only if not final hour) */}
                         {hourOptions.length > 0 && Number(hourIndex) < hourOptions.length && (
                             <div className="mt-8 pt-6 border-t border-slate-200">
-                                <Form.Check
+                                {/* <Form.Check
                                     type="switch"
                                     id="stop-plan-early-switch"
                                     label={<span className="font-semibold text-red-600 ml-3 text-base">Stop Production Plan after this hour</span>}
@@ -1004,7 +1008,7 @@ const HourlyWorkReportCreate: React.FC = () => {
                                             setFormErrors((prev) => ({ ...prev, stopPlanReason: "" }));
                                         }
                                     }}
-                                />
+                                /> */}
                                 {stopPlanEarly && (
                                     <div className="mt-3 bg-slate-50/50 p-5 rounded-xl border border-slate-100 w-full flex flex-col gap-4">
                                         <div className="w-full">
@@ -1083,7 +1087,7 @@ const HourlyWorkReportCreate: React.FC = () => {
                                 <div className="bg-amber-50 border border-amber-200 p-4 flex items-start gap-3 rounded-xl mb-5">
                                     <div>
                                         <span className="text-sm font-bold text-amber-900 block mb-1">
-                                            {stopPlanEarly ? "🛑 Production Stopped — Log Wastage (Optional)" : "✅ Final Hour — Log Shift Wastage (Required)"}
+                                            {stopPlanEarly ? "🛑 Production Stopped — Log Wastage (Optional)" : "Final Hour — Log Shift Wastage (Required)"}
                                         </span>
                                         <p className="text-xs text-amber-700 leading-relaxed mb-0">
                                             {stopPlanEarly
@@ -1328,7 +1332,14 @@ const HourlyWorkReportCreate: React.FC = () => {
                                                                     options={[
                                                                         { value: "", label: "-- Select Raw Material --" },
                                                                         ...rawMaterialOptions
-                                                                            .filter((r: any) => rm.storeId ? r.storeId === rm.storeId : true)
+                                                                            .filter((r: any) => {
+                                                                                if (r.itemType === "WASTAGE") return false;
+                                                                                if (r.store?.storeCategory === "WASTAGE") return false;
+                                                                                if (r.store?.storeName?.toLowerCase().includes("wastage")) return false;
+                                                                                if (r.category?.categoryName?.toLowerCase().includes("wastage")) return false;
+                                                                                if (r.materialName?.toLowerCase().startsWith("wastage")) return false;
+                                                                                return rm.storeId ? String(r.storeId) === String(rm.storeId) : true;
+                                                                            })
                                                                             .map((r: any) => ({
                                                                                 value: r.rawMaterialId,
                                                                                 label: `${r.rawMaterialId} - ${r.materialName}`

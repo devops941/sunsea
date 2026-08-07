@@ -179,7 +179,12 @@ export const ProductionOrderViewModal: React.FC<ProductionOrderViewModalProps> =
                                             )}
                                         </div>
                                     </div>
-
+                                    <div className="col-span-1 md:col-span-3 pt-2 border-t border-slate-200 mt-2">
+                                        <div className="text-xs text-slate-500 font-medium mb-1 uppercase">Remarks / Notes</div>
+                                        <div className="font-medium text-slate-800 bg-white p-3 rounded-lg border border-slate-200 text-sm whitespace-pre-wrap">
+                                            {fullOrder?.remarks || order.remarks || <span className="text-slate-400 font-normal italic">No remarks provided</span>}
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
 
@@ -326,6 +331,8 @@ export const ProductionOrderViewModal: React.FC<ProductionOrderViewModalProps> =
                                                         <span>Target: <span className="text-slate-800 font-bold">{targetVal}</span></span>
                                                         <span>|</span>
                                                         <span>Produced: <span className="text-green-600 font-bold">{producedVal}</span></span>
+                                                        <span>|</span>
+                                                        <span>Dispatched: <span className="text-blue-600 font-bold">{totalDispatchedQty}</span></span>
                                                         {hasShortfallStop && (
                                                             <>
                                                                 <span>|</span>

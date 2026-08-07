@@ -59,7 +59,16 @@ const MachineCreate: React.FC = () => {
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     const fetchRoles = useCallback(() => {
-        machineOperationAssignmentService.getRoles().then(res => setRoles(res.data || []));
+        machineOperationAssignmentService.getRoles().then(res => {
+            const raw = res.data || [];
+            setRoles(raw.filter((r: any) => 
+                !r.name?.toLowerCase().includes("super admin") &&
+                !r.name?.toLowerCase().includes("superadmin") &&
+                !r.code?.toLowerCase().includes("super_admin") &&
+                !r.code?.toLowerCase().includes("superadmin") &&
+                r.code?.toLowerCase() !== "role_admin"
+            ));
+        });
     }, []);
 
     const fetchEmployees = useCallback(() => {

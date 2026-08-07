@@ -7,7 +7,14 @@ export class MachineOperationAssignmentService {
    */
   static async getRoles() {
     return prisma.role.findMany({
-      where: { status: "active" },
+      where: {
+        status: "active",
+        NOT: [
+          { code: { in: ["ROLE_ADMIN", "SUPER_ADMIN", "super_admin", "superadmin"] } },
+          { name: { contains: "Super Admin", mode: "insensitive" } },
+          { name: { contains: "superadmin", mode: "insensitive" } },
+        ],
+      },
       orderBy: { name: "asc" },
       select: {
         id: true,

@@ -24,6 +24,7 @@ import { SparklineCard } from "../components/SparklineCard";
 import { Card } from "../components/Card";
 import SalesPurchaseTrendChart from "../components/SalesPurchaseTrendChart";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "../../../components/ui/chart";
+import { usePermission } from "../../../hooks/usePermission";
 
 /* ════════════════════════════════════════════════════════════════
    COLOUR PALETTE
@@ -62,6 +63,17 @@ const inventoryChartConfig = {
    MAIN DASHBOARD
    ════════════════════════════════════════════════════════════════ */
 const DashboardPage: React.FC = () => {
+  const { can, isSuperAdmin } = usePermission();
+
+  // Dashboard widget visibility — super admin always sees everything
+  const showOverview     = isSuperAdmin || can("dash-overview.view");
+  const showTrend        = isSuperAdmin || can("dash-trend.view");
+  const showTasks        = isSuperAdmin || can("dash-tasks.view");
+  const showInventory    = isSuperAdmin || can("dash-inventory.view");
+  const showMachines     = isSuperAdmin || can("dash-machines.view");
+  const showTopProducts  = isSuperAdmin || can("dash-top-products.view");
+  const showRecentSales  = isSuperAdmin || can("dash-recent-sales.view");
+
   const [loadingInitial, setLoadingInitial] = useState(true);
 
   // All data from single API
@@ -344,31 +356,36 @@ const DashboardPage: React.FC = () => {
 
 
         {/* ══ ROW 1 – Top Stat Cards ══ */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
-          <SparklineCard title="Last Month Income" value={`₹${topStats.lastMonthRevenue.toLocaleString()}`} icon={FaCalendarAlt} iconBg="" gradient="bg-gradient-to-br from-violet-500 via-purple-600 to-indigo-700" />
-          <SparklineCard title="Total Income" value={`₹${topStats.totalRevenue.toLocaleString()}`} icon={FaMoneyBillWave} iconBg="" gradient="bg-gradient-to-br from-emerald-400 via-teal-500 to-cyan-600" />
-          <SparklineCard title="Customers" value={topStats.uniqueCustomers} icon={FaUserFriends} iconBg="" gradient="bg-gradient-to-br from-sky-400 via-blue-500 to-indigo-600" />
-          <SparklineCard title="Pending Amount" value={`₹${topStats.pendingAmount.toLocaleString()}`} icon={FaHourglassHalf} iconBg="" gradient="bg-gradient-to-br from-orange-400 via-amber-500 to-yellow-500" />
-          <SparklineCard title="Products" value={topStats.products} icon={FaBoxOpen} iconBg="" gradient="bg-gradient-to-br from-rose-400 via-pink-500 to-fuchsia-600" />
-        </div>
+        {showOverview && (
+          <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
+            <SparklineCard title="Last Month Income" value={`₹${topStats.lastMonthRevenue.toLocaleString()}`} icon={FaCalendarAlt} iconBg="" gradient="bg-gradient-to-br from-violet-500 via-purple-600 to-indigo-700" />
+            <SparklineCard title="Total Income" value={`₹${topStats.totalRevenue.toLocaleString()}`} icon={FaMoneyBillWave} iconBg="" gradient="bg-gradient-to-br from-emerald-400 via-teal-500 to-cyan-600" />
+            <SparklineCard title="Customers" value={topStats.uniqueCustomers} icon={FaUserFriends} iconBg="" gradient="bg-gradient-to-br from-sky-400 via-blue-500 to-indigo-600" />
+            <SparklineCard title="Pending Amount" value={`₹${topStats.pendingAmount.toLocaleString()}`} icon={FaHourglassHalf} iconBg="" gradient="bg-gradient-to-br from-orange-400 via-amber-500 to-yellow-500" />
+            <SparklineCard title="Products" value={topStats.products} icon={FaBoxOpen} iconBg="" gradient="bg-gradient-to-br from-rose-400 via-pink-500 to-fuchsia-600" />
+          </div>
+        )}
 
         {/* ══════════════════════════════════════════════════════
            ROW 2.5  –  Trend Chart (Full Width)
            ══════════════════════════════════════════════════════ */}
-        <div className="mb-6">
-          <SalesPurchaseTrendChart
-            salesOrders={salesOrders}
-            purchaseOrders={purchaseOrders}
-            productionOrders={productionOrders}
-          />
-        </div>
+        {showTrend && (
+          <div className="mb-6">
+            <SalesPurchaseTrendChart
+              salesOrders={salesOrders}
+              purchaseOrders={purchaseOrders}
+              productionOrders={productionOrders}
+            />
+          </div>
+        )}
 
         {/* ══════════════════════════════════════════════════════
            ROW 2b  –  Today's Tasks | Inventory Doughnut
            ══════════════════════════════════════════════════════ */}
+        {(showTasks || showInventory) && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-6">
           {/* Today's Tasks List */}
-          <Card title="Today's Tasks" badge="Live" className="min-h-[340px]">
+          {showTasks && <Card title="Today's Tasks" badge="Live" className="min-h-[340px]">
             <div className="flex flex-col gap-4 h-full">
               {todayStats.tasksList.length > 0 ? (
                 todayStats.tasksList.map((task: any, i: number) => {
@@ -408,10 +425,10 @@ const DashboardPage: React.FC = () => {
                 </div>
               )}
             </div>
-          </Card>
+          </Card>}
 
           {/* Inventory Doughnut */}
-          <Card title="Stock by Store" badge="Raw Materials">
+          {showInventory && <Card title="Stock by Store" badge="Raw Materials">
             <div className="flex flex-col items-center justify-center h-[200px] relative">
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none mt-2">
                 <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Items</span>
@@ -462,16 +479,18 @@ const DashboardPage: React.FC = () => {
                 </div>
               ))}
             </div>
-          </Card>
+          </Card>}
         </div>
+        )}
 
         {/* ══════════════════════════════════════════════════════
            ROW 3  –  Machine Utilization | Top Products | Recent Sales
            ══════════════════════════════════════════════════════ */}
+        {(showMachines || showTopProducts || showRecentSales) && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-6">
 
           {/* Machine Utilization */}
-          <Card title="Machine Overview" badge="Live">
+          {showMachines && <Card title="Machine Overview" badge="Live">
             <div className="flex flex-col gap-3">
               {machineList.length === 0 ? (
                 <div className="flex items-center justify-center py-8 text-slate-400 text-sm font-medium">No Machines</div>
@@ -493,10 +512,10 @@ const DashboardPage: React.FC = () => {
                 ))
               )}
             </div>
-          </Card>
+          </Card>}
 
           {/* Top Products List */}
-          <Card title="Top Products" badge="By stock level" className="min-h-[370px]">
+          {showTopProducts && <Card title="Top Products" badge="By stock level" className="min-h-[370px]">
             <div className="flex flex-col gap-3">
               {topProducts.length === 0 ? (
                 <div className="flex items-center justify-center h-full text-slate-400 text-sm font-medium">No Products</div>
@@ -530,10 +549,10 @@ const DashboardPage: React.FC = () => {
                 })
               )}
             </div>
-          </Card>
+          </Card>}
 
           {/* Recent Sales Orders */}
-          <Card title="Recent Sales Orders" badge="Latest 5">
+          {showRecentSales && <Card title="Recent Sales Orders" badge="Latest 5">
             <div className="flex flex-col gap-3">
               {recentSales.length === 0 ? (
                 <div className="flex items-center justify-center py-8 text-slate-400 text-sm font-medium">No Sales Orders</div>
@@ -556,8 +575,9 @@ const DashboardPage: React.FC = () => {
                 ))
               )}
             </div>
-          </Card>
+          </Card>}
         </div>
+        )}
 
         {/* Footer */}
         <DashboardFooter />

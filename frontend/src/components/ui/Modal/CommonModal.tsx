@@ -8,8 +8,22 @@ export interface CommonModalProps {
     children: React.ReactNode;
     footer?: React.ReactNode;
     overflowVisible?: boolean;
-    maxWidth?: "sm" | "md" | "lg" | "xl" | "2xl" | "3xl" | "4xl" | "5xl" | "full";
+    maxWidth?: "sm" | "md" | "lg" | "xl" | "2xl" | "3xl" | "4xl" | "5xl" | "6xl" | "7xl" | "full";
 }
+
+const maxWidthMap: Record<string, string> = {
+    sm: "max-w-sm",
+    md: "max-w-md",
+    lg: "max-w-lg",
+    xl: "max-w-xl",
+    "2xl": "max-w-2xl",
+    "3xl": "max-w-3xl",
+    "4xl": "max-w-4xl",
+    "5xl": "max-w-5xl",
+    "6xl": "max-w-6xl",
+    "7xl": "max-w-7xl",
+    full: "max-w-[95vw]",
+};
 
 const CommonModal: React.FC<CommonModalProps> = ({ show, onHide, title, children, footer, overflowVisible, maxWidth = "lg" }) => {
     // Handle escape key to close
@@ -23,10 +37,12 @@ const CommonModal: React.FC<CommonModalProps> = ({ show, onHide, title, children
 
     if (!show) return null;
 
+    const widthClass = maxWidthMap[maxWidth] || "max-w-6xl";
+
     return (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200">
             <div
-                className={`bg-white rounded-xl shadow-xl w-full max-w-${maxWidth} animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh] ${overflowVisible ? 'overflow-visible' : 'overflow-hidden'}`}
+                className={`bg-white rounded-xl shadow-xl w-full ${widthClass} animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh] ${overflowVisible ? 'overflow-visible' : 'overflow-hidden'}`}
                 role="dialog"
                 aria-modal="true"
             >
@@ -42,7 +58,7 @@ const CommonModal: React.FC<CommonModalProps> = ({ show, onHide, title, children
                 </div>
 
                 {/* Body */}
-                <div className={`p-6 ${overflowVisible ? 'overflow-visible' : 'overflow-y-auto'}`}>
+                <div className={`flex-1 p-6 min-h-0 ${overflowVisible ? 'overflow-visible' : 'overflow-y-auto'}`}>
                     {children}
                 </div>
 

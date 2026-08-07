@@ -131,7 +131,22 @@ const StorageStoreList: React.FC = () => {
         }
     }, [dispatch, searchTerm, storeCategoryFilter, currentPage, can]);
 
+    const fetchLocationsData = useCallback(() => {
+        if (can("locations.view")) dispatch(fetchLocations(undefined));
+    }, [can, dispatch]);
+
+    const fetchEmployeesData = useCallback(() => {
+        if (can("employees.view")) dispatch(fetchEmployees(undefined));
+    }, [can, dispatch]);
+
+    const fetchRolesData = useCallback(() => {
+        if (can("roles.view")) loadRoles();
+    }, [can, loadRoles]);
+
     useSocketSync("store", undefined, fetchStoreData);
+    useSocketSync("storeLocation", undefined, fetchLocationsData);
+    useSocketSync("employee", undefined, fetchEmployeesData);
+    useSocketSync("role", undefined, fetchRolesData);
 
     useEffect(() => {
         const timer = setTimeout(() => {

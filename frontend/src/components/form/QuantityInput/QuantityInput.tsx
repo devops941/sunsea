@@ -29,7 +29,40 @@ const QuantityInput: React.FC<QuantityInputProps> = ({
   uom,
   onUomChange,
 }) => {
-  const uomList = baseUoms ? baseUoms.split(",").map((u) => u.trim()).filter(Boolean) : [];
+  const rawList = baseUoms ? baseUoms.split(",").map((u) => u.trim()).filter(Boolean) : [];
+  
+  const expandUoms = (list: string[]): string[] => {
+    const res: string[] = [];
+    const source = list.length > 0 ? list : [uom || "kg"];
+    source.forEach(u => {
+      const cleaned = u.trim();
+      const lower = cleaned.toLowerCase();
+      if (lower === "kg" || lower === "g" || lower === "kilogram" || lower === "gram") {
+        if (!res.some(r => r.toLowerCase() === "kg")) res.push("kg");
+        if (!res.some(r => r.toLowerCase() === "g")) res.push("g");
+      } else if (lower === "l" || lower === "ml" || lower === "litre" || lower === "liter") {
+        if (!res.some(r => r.toLowerCase() === "l")) res.push("l");
+        if (!res.some(r => r.toLowerCase() === "ml")) res.push("ml");
+      } else if (lower === "pcs" || lower === "ea" || lower === "each" || lower === "box") {
+        if (!res.some(r => r.toLowerCase() === "pcs")) res.push("pcs");
+        if (!res.some(r => r.toLowerCase() === "box")) res.push("box");
+      } else if (lower === "m" || lower === "cm" || lower === "mm" || lower === "meter") {
+        if (!res.some(r => r.toLowerCase() === "m")) res.push("m");
+        if (!res.some(r => r.toLowerCase() === "cm")) res.push("cm");
+        if (!res.some(r => r.toLowerCase() === "mm")) res.push("mm");
+      } else {
+        if (!res.some(r => r.toLowerCase() === lower)) res.push(cleaned);
+      }
+    });
+    if (res.length <= 1) {
+      const first = (res[0] || "kg").toLowerCase();
+      if (first !== "g") res.push("g");
+      else res.unshift("kg");
+    }
+    return res;
+  };
+
+  const uomList = expandUoms(rawList);
   
   // Track selected UOM locally if not controlled from parent
   const [localUom, setLocalUom] = useState<string>("");

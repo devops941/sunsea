@@ -6,6 +6,7 @@ import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
 import { fetchMachines } from "../../../features/machines/machineSlice";
 import { weeklyProgramService } from "../../../services/weeklyProgramService";
 import { productionOrderService } from "../../../services/productionOrderService";
+import { useSocketSync } from "../../../hooks/useSocketSync";
 import TextInput from "../../../components/form/TextInput/TextInput";
 
 import apiClient from "../../../api/apiClient";
@@ -180,6 +181,11 @@ const DailyMachinePlanning: React.FC = () => {
   useEffect(() => {
     fetchWeeklyPrograms();
   }, [fetchWeeklyPrograms]);
+
+  useSocketSync("dailyPlan", undefined, fetchWeeklyPrograms);
+  useSocketSync("weeklyProgram", undefined, fetchWeeklyPrograms);
+  useSocketSync("hourlyProduction", undefined, fetchWeeklyPrograms);
+  useSocketSync("productionOrder", undefined, fetchWeeklyPrograms);
 
   // Filter programs based on Search Term and Status Filter
   const filteredPrograms = useMemo(() => {

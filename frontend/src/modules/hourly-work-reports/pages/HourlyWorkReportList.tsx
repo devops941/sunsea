@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { FaChevronLeft, FaChevronRight, FaChevronDown, FaChevronUp } from "react-icons/fa";
+import CommonModal from "../../../components/ui/Modal/CommonModal";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 
@@ -522,74 +523,107 @@ const HourlyWorkReportList: React.FC = () => {
             />
 
             {/* View Modal for Completed Shifts */}
-            {showViewModal && selectedViewGroup && (
-                <div className="modal show d-block" tabIndex={-1} style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-                    <div className="modal-dialog modal-xl modal-dialog-centered">
-                        <div className="modal-content">
-                            <div className="modal-header border-bottom-0 pb-0">
-                                <h5 className="modal-title fw-bold" style={{ color: "var(--color-primary)" }}>
-                                    HOURLY ENTRIES DETAILS - {selectedViewGroup.shiftName}
-                                </h5>
-                                <button type="button" className="btn-close" onClick={() => setShowViewModal(false)}></button>
+            {selectedViewGroup && (
+                <CommonModal
+                    show={showViewModal}
+                    onHide={() => setShowViewModal(false)}
+                    title={
+                        <span className="text-indigo-700 font-bold tracking-wide uppercase text-sm">
+                            Hourly Entries — {selectedViewGroup.shiftName}
+                        </span>
+                    }
+                    maxWidth="5xl"
+                >
+                    {/* Summary info strip */}
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-5 p-4 bg-slate-50 rounded-xl border border-slate-200">
+                        <div>
+                            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">Date</div>
+                            <div className="text-sm font-semibold text-slate-700">
+                                {new Date(selectedViewGroup.productionDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                             </div>
-                            <div className="modal-body p-4">
-                                <div className="d-flex gap-4 mb-4 pb-3 border-bottom text-muted small">
-                                    <div><strong>Date:</strong> {new Date(selectedViewGroup.productionDate).toLocaleDateString()}</div>
-                                    <div><strong>Machine:</strong> {selectedViewGroup.machineName}</div>
-                                    <div><strong>Product:</strong> {selectedViewGroup.productName}</div>
-                                    <div><strong>PO:</strong> {selectedViewGroup.productionOrderId}</div>
-                                    <div><strong>Operator:</strong> {selectedViewGroup.hours && selectedViewGroup.hours.length > 0 ? [...new Set(selectedViewGroup.hours.map((h: any) => h.operatorName || h.operatorId).filter(Boolean))].join(", ") : "N/A"}</div>
-                                </div>
-                                <div className="table-responsive">
-                                    <table className="master-data-table text-center align-middle mb-0" style={{ minWidth: '800px' }}>
-                                        <thead>
-                                            <tr>
-                                                <th className="py-3 px-3 text-uppercase" style={{ letterSpacing: '0.5px', fontSize: '11px' }}>Hour Index</th>
-                                                <th className="py-3 px-3 text-uppercase" style={{ letterSpacing: '0.5px', fontSize: '11px' }}>Produced Qty</th>
-                                                <th className="py-3 px-3 text-uppercase" style={{ letterSpacing: '0.5px', fontSize: '11px' }}>Reject Qty</th>
-                                                <th className="py-3 px-3 text-uppercase" style={{ letterSpacing: '0.5px', fontSize: '11px' }}>Scrap Qty</th>
-                                                <th className="py-3 px-3 text-uppercase" style={{ letterSpacing: '0.5px', fontSize: '11px' }}>Downtime</th>
-                                                <th className="py-3 px-3 text-uppercase" style={{ letterSpacing: '0.5px', fontSize: '11px' }}>Operator</th>
-                                                <th className="py-3 px-3 text-uppercase" style={{ letterSpacing: '0.5px', fontSize: '11px' }}>Remarks</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {selectedViewGroup.hours.map((hour: any, idx: number) => (
-                                                <tr key={hour.hourlyProductionId || idx} className="bg-white border-bottom">
-                                                    <td className="fw-bold py-3">{hour.hourIndex}</td>
-                                                    <td className="text-success fw-bold py-3">{hour.qtyProduced}</td>
-                                                    <td className="text-danger fw-semibold py-3">{hour.rejectQty}</td>
-                                                    <td className="text-warning fw-semibold py-3">{hour.scrapQty}</td>
-                                                    <td className="text-muted py-3">{hour.downtime > 0 ? `${hour.downtime} m` : "-"}</td>
-                                                    <td className="py-3">{hour.operatorName || "-"}</td>
-                                                    <td className="py-3">{hour.remarks || "-"}</td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                        <tfoot>
-                                            <tr className="bg-light">
-                                                <td className="fw-bold text-end py-3">TOTAL</td>
-                                                <td className={`fw-bold fs-6 py-3 ${selectedViewGroup.totalQtyProduced >= selectedViewGroup.plannedQty ? 'text-success' : 'text-danger'}`}>
-                                                    {selectedViewGroup.totalQtyProduced}
-                                                </td>
-                                                <td className="text-danger fw-bold fs-6 py-3">{selectedViewGroup.totalRejectQty}</td>
-                                                <td className="text-warning fw-bold fs-6 py-3">{selectedViewGroup.totalScrapQty}</td>
-                                                <td colSpan={3} className="text-muted fw-bold py-3 text-start ps-4">
-                                                    Planned Qty: <span className="text-dark fs-6 ms-2">{selectedViewGroup.plannedQty}</span>
-                                                    {selectedViewGroup.totalQtyProduced < selectedViewGroup.plannedQty && (
-                                                        <span className="ms-3 text-danger fw-bold" style={{ fontSize: '12px' }}>
-                                                            Target Not Reached ({selectedViewGroup.plannedQty - selectedViewGroup.totalQtyProduced} Short)
-                                                        </span>
-                                                    )}
-                                                </td>
-                                            </tr>
-                                        </tfoot>
-                                    </table>
-                                </div>
+                        </div>
+                        <div>
+                            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">Machine</div>
+                            <div className="text-sm font-semibold text-slate-700">{selectedViewGroup.machineName}</div>
+                        </div>
+                        <div>
+                            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">Product</div>
+                            <div className="text-sm font-semibold text-slate-700">{selectedViewGroup.productName}</div>
+                        </div>
+                        <div>
+                            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">PO ID</div>
+                            <div className="text-sm font-semibold text-indigo-600">{selectedViewGroup.productionOrderId}</div>
+                        </div>
+                        <div>
+                            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">Operator(s)</div>
+                            <div className="text-sm font-semibold text-slate-700">
+                                {selectedViewGroup.hours && selectedViewGroup.hours.length > 0
+                                    ? [...new Set(selectedViewGroup.hours.map((h: any) => h.operatorName || h.operatorId).filter(Boolean))].join(", ")
+                                    : "N/A"}
                             </div>
                         </div>
                     </div>
-                </div>
+
+                    {/* Hourly entries table */}
+                    <div className="overflow-x-auto rounded-xl border border-slate-200">
+                        <table className="w-full text-sm">
+                            <thead>
+                                <tr className="bg-slate-100 border-b border-slate-200">
+                                    <th className="py-3 px-4 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">Hour</th>
+                                    <th className="py-3 px-4 text-center text-[11px] font-bold uppercase tracking-wider text-slate-500">Produced</th>
+                                    <th className="py-3 px-4 text-center text-[11px] font-bold uppercase tracking-wider text-slate-500">Reject</th>
+                                    <th className="py-3 px-4 text-center text-[11px] font-bold uppercase tracking-wider text-slate-500">Scrap</th>
+                                    <th className="py-3 px-4 text-center text-[11px] font-bold uppercase tracking-wider text-slate-500">Downtime</th>
+                                    <th className="py-3 px-4 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">Operator</th>
+                                    <th className="py-3 px-4 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">Remarks</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {selectedViewGroup.hours.map((hour: any, idx: number) => {
+                                    const hasIssues = hour.rejectQty > 0 || hour.scrapQty > 0 || hour.downtime > 0;
+                                    return (
+                                        <tr key={hour.hourlyProductionId || idx} className={`border-b border-slate-100 ${hasIssues ? "bg-red-50" : "bg-white"}`}>
+                                            <td className="py-3 px-4 font-bold text-slate-700">Hour {hour.hourIndex}</td>
+                                            <td className="py-3 px-4 text-center font-bold text-emerald-600">{hour.qtyProduced} <span className="text-xs text-slate-400 font-normal">{selectedViewGroup.uom}</span></td>
+                                            <td className="py-3 px-4 text-center font-semibold text-red-500">{hour.rejectQty || 0}</td>
+                                            <td className="py-3 px-4 text-center font-semibold text-amber-500">{hour.scrapQty || 0}</td>
+                                            <td className="py-3 px-4 text-center text-slate-500">{hour.downtime > 0 ? `${hour.downtime} min` : "—"}</td>
+                                            <td className="py-3 px-4 text-slate-700">{hour.operatorName || hour.operatorId || "—"}</td>
+                                            <td className="py-3 px-4 text-slate-500 text-xs">{hour.remarks || "—"}</td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                            <tfoot>
+                                <tr className="bg-slate-50 border-t-2 border-slate-300">
+                                    <td className="py-3 px-4 font-bold text-slate-600 uppercase text-xs tracking-wide">Total</td>
+                                    <td className={`py-3 px-4 text-center font-bold text-lg ${selectedViewGroup.totalQtyProduced >= selectedViewGroup.plannedQty ? "text-emerald-600" : "text-red-500"}`}>
+                                        {selectedViewGroup.totalQtyProduced}
+                                        <span className="text-xs font-normal text-slate-400 ml-1">{selectedViewGroup.uom}</span>
+                                    </td>
+                                    <td className="py-3 px-4 text-center font-bold text-red-500">{selectedViewGroup.totalRejectQty}</td>
+                                    <td className="py-3 px-4 text-center font-bold text-amber-500">{selectedViewGroup.totalScrapQty}</td>
+                                    <td className="py-3 px-4 text-center text-slate-500 font-semibold">
+                                        {selectedViewGroup.totalDowntime > 0 ? `${selectedViewGroup.totalDowntime} min` : "—"}
+                                    </td>
+                                    <td colSpan={2} className="py-3 px-4 text-slate-500 text-xs">
+                                        <span className="font-semibold text-slate-600">Planned:</span> {selectedViewGroup.plannedQty} {selectedViewGroup.uom}
+                                        {selectedViewGroup.totalQtyProduced < selectedViewGroup.plannedQty && (
+                                            <span className="ml-3 text-red-500 font-bold">
+                                                ↓ {selectedViewGroup.plannedQty - selectedViewGroup.totalQtyProduced} {selectedViewGroup.uom} short
+                                            </span>
+                                        )}
+                                        {selectedViewGroup.totalQtyProduced > selectedViewGroup.plannedQty && (
+                                            <span className="ml-3 text-emerald-600 font-bold">
+                                                ↑ +{selectedViewGroup.totalQtyProduced - selectedViewGroup.plannedQty} {selectedViewGroup.uom} extra
+                                            </span>
+                                        )}
+                                    </td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </CommonModal>
             )}
         </div>
     );

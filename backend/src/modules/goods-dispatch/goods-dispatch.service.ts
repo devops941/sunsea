@@ -99,22 +99,32 @@ export class GoodsDispatchService {
       // Calculate dispatchable produced qty
       let dispatchableProducedQty = 0;
       if (["IN_PROGRESS", "IN_PRODUCTION", "POST_PRODUCTION", "PARTIAL_COMPLETED", "COMPLETED_WITH_SHORTFALL", "CLOSED"].includes(o.status)) {
-        // For active production or partial/short-closed, only count quantities from plans that finished post-production OR were stopped/short-closed
-        const finishedPlans = o.dailyProductionPlans.filter((p: any) => 
-          p.status === "COMPLETED" || p.status === "SHORT_CLOSED" || p.status === "STOPPED"
-        );
-        dispatchableProducedQty = finishedPlans.reduce((sum, p) => {
+        // Only count plans that have truly finished production and are ready for dispatch:
+        // - COMPLETED plans (went through full post-production workflow)
+        // - SHORT_CLOSED plans (explicitly short-closed, production done)
+        // - STOPPED plans ONLY if they produced >= their planned qty (cascade-stopped after completing production)
+        //   Partial STOPPED plans (cascade-stopped mid-production, produced < planned) are NOT yet dispatchable
+        const dispatchablePlans = o.dailyProductionPlans.filter((p: any) => {
+          if (p.status === "COMPLETED" || p.status === "SHORT_CLOSED") return true;
+          if (p.status === "STOPPED") {
+            const planProduced = p.hourlyProductions.reduce((s: number, h: any) => s + Number(h.qtyProduced), 0);
+            const planPlanned = Number(p.plannedQty || 0);
+            // Only count STOPPED plans that completed their planned production
+            return planProduced >= planPlanned && planPlanned > 0;
+          }
+          return false;
+        });
+        dispatchableProducedQty = dispatchablePlans.reduce((sum: number, p: any) => {
           return sum + p.hourlyProductions.reduce((hSum: number, h: any) => hSum + Number(h.qtyProduced), 0);
         }, 0);
-        // Fallback: if finished plans exist but hourlyProductions returned 0 (FK not set),
-        // OR if no finished plans at all — use the PO's producedQty directly
+        // Fallback: if no dispatchable plans found but PO has producedQty, use PO value
         if (dispatchableProducedQty === 0 && Number(o.producedQty) > 0) {
           dispatchableProducedQty = Number(o.producedQty);
         }
-        // Additional safety: never allow dispatchableProducedQty to exceed producedQty
+        // Safety: never exceed PO's total producedQty
         dispatchableProducedQty = Math.min(dispatchableProducedQty, Number(o.producedQty));
       } else {
-        // For fully completed (READY_FOR_DISPATCH / COMPLETED), everything produced is dispatchable
+        // For fully completed PO, everything produced is dispatchable
         dispatchableProducedQty = Number(o.producedQty);
       }
 

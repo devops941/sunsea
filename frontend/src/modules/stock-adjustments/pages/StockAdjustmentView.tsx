@@ -241,29 +241,39 @@ const StockAdjustmentView: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {currentAdjustment.items?.map((item: any, idx: number) => (
-                    <tr key={item.id || idx} className="hover:bg-slate-50/60 transition-colors">
-                      <td className="px-4 py-3">
-                        <code className="text-xs bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-mono">{item.rawMaterialId}</code>
-                      </td>
-                      <td className="px-4 py-3 font-semibold text-slate-700">{item.rawMaterial?.materialName || item.rawMaterialId}</td>
-                      <td className="px-4 py-3 text-slate-600">{item.store?.storeName || item.storeId}</td>
-                      <td className="px-4 py-3 text-right font-mono text-xs text-slate-600">{Number(item.currentQty).toFixed(3)}</td>
-                      <td className="px-4 py-3 text-right font-mono text-xs text-slate-600">{Number(item.adjustedQty).toFixed(3)}</td>
-                      <td className="px-4 py-3 text-right">
-                        <span className="font-bold text-red-600 font-mono text-xs">{Math.abs(Number(item.difference)).toFixed(3)}</span>
-                      </td>
-                      <td className="px-4 py-3">
-                        {item.remarks ? (
-                          <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-800 border border-amber-200 rounded-lg px-2.5 py-1 text-xs font-medium max-w-[200px] break-words leading-snug">
-                            {item.remarks}
-                          </span>
-                        ) : (
-                          <span className="text-slate-300 text-xs">—</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                  {currentAdjustment.items?.map((item: any, idx: number) => {
+                    const rawUom = item.uom ||
+                      (item.itemType === "PRODUCT"
+                        ? item.product?.uom || item.product?.baseUom
+                        : (item.rawMaterial?.baseUom || item.rawMaterial?.uom)
+                      ) || "kg";
+                    const uomLower = rawUom.split(",")[0].trim().toLowerCase();
+                    const itemUom = (uomLower === "ea" || uomLower === "each") ? "pcs" : uomLower;
+
+                    return (
+                      <tr key={item.id || idx} className="hover:bg-slate-50/60 transition-colors">
+                        <td className="px-4 py-3">
+                          <code className="text-xs bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-mono">{item.rawMaterialId}</code>
+                        </td>
+                        <td className="px-4 py-3 font-semibold text-slate-700">{item.rawMaterial?.materialName || item.rawMaterialId}</td>
+                        <td className="px-4 py-3 text-slate-600">{item.store?.storeName || item.storeId}</td>
+                        <td className="px-4 py-3 text-right font-mono text-xs text-slate-600">{Number(item.currentQty).toFixed(3)} {itemUom}</td>
+                        <td className="px-4 py-3 text-right font-mono text-xs text-slate-600">{Number(item.adjustedQty).toFixed(3)} {itemUom}</td>
+                        <td className="px-4 py-3 text-right">
+                          <span className="font-bold text-red-600 font-mono text-xs">{Math.abs(Number(item.difference)).toFixed(3)} {itemUom}</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          {item.remarks ? (
+                            <div className="bg-slate-50 border-l-2 border-slate-400 text-slate-700 text-xs px-2.5 py-1 rounded-r-md font-medium inline-block max-w-xs leading-normal">
+                              {item.remarks}
+                            </div>
+                          ) : (
+                            <span className="text-slate-300 text-xs">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                   {(!currentAdjustment.items || currentAdjustment.items.length === 0) && (
                     <tr><td colSpan={7} className="text-center py-10 text-slate-400 text-sm">No items found</td></tr>
                   )}
@@ -281,6 +291,14 @@ const StockAdjustmentView: React.FC = () => {
                 <tbody className="divide-y divide-slate-100">
                   {currentAdjustment.items?.map((item: any, idx: number) => {
                     const diff = Number(item.difference);
+                    const rawUom = item.uom ||
+                      (item.itemType === "PRODUCT"
+                        ? item.product?.uom || item.product?.baseUom
+                        : (item.rawMaterial?.baseUom || item.rawMaterial?.uom)
+                      ) || "kg";
+                    const uomLower = rawUom.split(",")[0].trim().toLowerCase();
+                    const itemUom = (uomLower === "ea" || uomLower === "each") ? "pcs" : uomLower;
+
                     return (
                       <tr key={item.id || idx} className="hover:bg-slate-50/60 transition-colors">
                         <td className="px-4 py-3">
@@ -291,18 +309,18 @@ const StockAdjustmentView: React.FC = () => {
                           <div className="text-xs text-slate-400 font-mono mt-0.5">{item.itemType === "RAW_MATERIAL" ? item.rawMaterialId : item.product?.productCode}</div>
                         </td>
                         <td className="px-4 py-3 text-slate-600">{item.store?.storeName || "—"}</td>
-                        <td className="px-4 py-3 text-right font-mono text-xs text-slate-600">{Number(item.currentQty).toFixed(3)}</td>
-                        <td className="px-4 py-3 text-right font-mono text-xs text-slate-600">{Number(item.adjustedQty).toFixed(3)}</td>
+                        <td className="px-4 py-3 text-right font-mono text-xs text-slate-600">{Number(item.currentQty).toFixed(3)} {itemUom}</td>
+                        <td className="px-4 py-3 text-right font-mono text-xs text-slate-600">{Number(item.adjustedQty).toFixed(3)} {itemUom}</td>
                         <td className="px-4 py-3 text-right">
                           <span className={`font-bold font-mono text-xs ${diff > 0 ? "text-emerald-600" : diff < 0 ? "text-red-600" : "text-slate-500"}`}>
-                            {diff > 0 ? `+${diff.toFixed(3)}` : diff.toFixed(3)}
+                            {diff > 0 ? `+${diff.toFixed(3)}` : diff.toFixed(3)} {itemUom}
                           </span>
                         </td>
                          <td className="px-4 py-3">
                           {item.remarks ? (
-                            <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-800 border border-amber-200 rounded-lg px-2.5 py-1 text-xs font-medium max-w-[200px] break-words leading-snug">
+                            <div className="bg-slate-50 border-l-2 border-slate-400 text-slate-700 text-xs px-2.5 py-1 rounded-r-md font-medium inline-block max-w-xs leading-normal">
                               {item.remarks}
-                            </span>
+                            </div>
                           ) : (
                             <span className="text-slate-300 text-xs">—</span>
                           )}

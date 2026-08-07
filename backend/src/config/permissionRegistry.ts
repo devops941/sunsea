@@ -16,6 +16,15 @@ export interface ModulePermission {
 }
 
 export const PERMISSION_REGISTRY: ModulePermission[] = [
+  // ── Dashboard Widgets ────────────────────────────────────────────────────────
+  { module: "dash-overview",      actions: ["view"], description: "Dashboard Overview Stats" },
+  { module: "dash-trend",         actions: ["view"], description: "Dashboard Sales & Purchase Trend" },
+  { module: "dash-tasks",         actions: ["view"], description: "Dashboard Today's Tasks" },
+  { module: "dash-inventory",     actions: ["view"], description: "Dashboard Stock / Inventory" },
+  { module: "dash-machines",      actions: ["view"], description: "Dashboard Machine Overview" },
+  { module: "dash-top-products",  actions: ["view"], description: "Dashboard Top Products" },
+  { module: "dash-recent-sales",  actions: ["view"], description: "Dashboard Recent Sales Orders" },
+
   // ── Administration ──────────────────────────────────────────────────────────
   { module: "users",             actions: ["view","create","edit","delete"], description: "System Users" },
   { module: "roles",             actions: ["view","create","edit","delete"], description: "User Roles" },

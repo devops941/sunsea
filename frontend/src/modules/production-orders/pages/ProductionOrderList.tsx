@@ -637,12 +637,12 @@ const ProductionOrderList: React.FC = () => {
                 ],
             },
             {
-                title: "Schedule Details",
+                title: "Schedule & Additional Details",
                 fields: [
                     { label: "Order Date", value: formatDate(fullOrder?.orderDate || selectedItem.orderDate) },
                     { label: "Due Date", value: formatDate(fullOrder?.dueDate || selectedItem.dueDate) },
                     { label: "Order Type", value: fullOrder?.orderType || selectedItem.orderType || "-" },
-
+                    { label: "Remarks", value: fullOrder?.remarks || selectedItem.remarks || "N/A" },
                 ],
             },
         ]

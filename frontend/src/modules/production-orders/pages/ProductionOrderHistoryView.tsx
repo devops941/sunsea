@@ -321,6 +321,8 @@ const ProductionOrderHistoryView: React.FC = () => {
                                                     <span>Target: <span className="text-slate-800 font-bold text-base">{targetVal}</span></span>
                                                     <span>|</span>
                                                     <span>Produced: <span className="text-green-600 font-bold text-base">{producedVal}</span></span>
+                                                    <span>|</span>
+                                                    <span>Dispatched: <span className="text-blue-600 font-bold text-base">{totalDispatchedQty}</span></span>
                                                     {hasShortfallStop && (
                                                         <>
                                                             <span>|</span>

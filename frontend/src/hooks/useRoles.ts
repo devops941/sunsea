@@ -1,4 +1,4 @@
-import React, { useCallback } from "react";
+import React, { useCallback, useMemo } from "react";
 import { useAppDispatch, useAppSelector } from "./reduxHooks";
 import { fetchRoles, createRole, updateRole, deleteRole, roleCreated, roleUpdated, roleDeleted } from "../features/roles/roleSlice";
 import type { Role, CreateRoleDto, UpdateRoleDto } from "../features/roles/types";
@@ -6,7 +6,22 @@ import { useSocketSync } from "./useSocketSync";
 
 export const useRoles = () => {
   const dispatch = useAppDispatch();
-  const { data: roles, total, loading, error } = useAppSelector((state) => state.roles);
+  const { data: rawRoles, total, loading, error } = useAppSelector((state) => state.roles);
+
+  const roles = useMemo(() => {
+    if (!rawRoles) return [];
+    return rawRoles.filter((role) => {
+      const nameLower = (role.name || "").toLowerCase();
+      const codeLower = (role.code || "").toLowerCase();
+      return (
+        !nameLower.includes("super admin") &&
+        !nameLower.includes("superadmin") &&
+        !codeLower.includes("super_admin") &&
+        !codeLower.includes("superadmin") &&
+        codeLower !== "role_admin"
+      );
+    });
+  }, [rawRoles]);
 
   const loadRoles = useCallback((page?: number, limit?: number, search?: string) => {
     dispatch(fetchRoles({ page, limit, search }));

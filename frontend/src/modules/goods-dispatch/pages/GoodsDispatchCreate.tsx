@@ -23,6 +23,12 @@ import SearchInput from "../../../components/ui/SearchInput/SearchInput";
 
 import { usePermission } from "../../../hooks/usePermission";
 
+const formatUOM = (code: string | null | undefined) => {
+  if (!code) return "pcs";
+  const lower = code.toLowerCase().trim();
+  return lower === "ea" || lower === "each" ? "pcs" : code;
+};
+
 const GoodsDispatchCreate: React.FC = () => {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
@@ -216,7 +222,7 @@ const GoodsDispatchCreate: React.FC = () => {
       accessor: "producedQty",
       render: (item: any) => (
         <span className="text-gray-700">
-          {item.producedQty} {item.uom?.toLowerCase() === 'each' ? 'pcs' : item.uom}
+          {item.producedQty} {formatUOM(item.uom)}
         </span>
       ),
     },
@@ -237,7 +243,7 @@ const GoodsDispatchCreate: React.FC = () => {
       accessor: "pendingDispatchQty",
       render: (item: any) => (
         <span className="font-bold text-[#5D87FF]">
-          {item.pendingDispatchQty} {item.uom?.toLowerCase() === 'each' ? 'pcs' : item.uom}
+          {item.pendingDispatchQty} {formatUOM(item.uom)}
         </span>
       ),
     },
@@ -342,7 +348,7 @@ const GoodsDispatchCreate: React.FC = () => {
                               <td className="px-4 py-4 font-semibold text-slate-900 align-top">{po.productionOrderId}</td>
                               <td className="px-4 py-4 text-slate-600 align-top">{po.productItem?.productName}</td>
                               <td className="px-4 py-4 text-center text-slate-600 font-medium align-top">
-                                {po.pendingDispatchQty} {po.uom?.toLowerCase() === 'each' ? 'pcs' : po.uom}
+                                {po.pendingDispatchQty} {formatUOM(po.uom)}
                               </td>
                               <td className="px-4 py-3 align-top">
                                 <div className="flex flex-col gap-2.5">
@@ -362,7 +368,7 @@ const GoodsDispatchCreate: React.FC = () => {
                                       }
                                       className="w-24 px-3 py-1.5 border border-slate-300 rounded-md text-sm font-medium focus:ring-2 focus:ring-[#5D87FF] focus:border-[#5D87FF] outline-none transition-all shadow-sm"
                                     />
-                                    <span className="text-sm font-medium text-slate-500">{po.uom?.toLowerCase() === 'each' ? 'pcs' : po.uom}</span>
+                                    <span className="text-sm font-medium text-slate-500">{formatUOM(po.uom)}</span>
                                   </div>
                                   <input
                                     type="text"

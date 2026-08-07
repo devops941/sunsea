@@ -68,7 +68,14 @@ const BillOfMaterialCreate: React.FC = () => {
                 setProducts(fetchedProducts);
 
                 const fetchedRawMaterials = await rawMaterialService.fetchAll();
-                setRawMaterials(fetchedRawMaterials);
+                const validRawMaterials = (fetchedRawMaterials || []).filter((rm: any) =>
+                    rm.itemType !== "WASTAGE" &&
+                    rm.store?.storeCategory !== "WASTAGE" &&
+                    !rm.store?.storeName?.toLowerCase().includes("wastage") &&
+                    !rm.category?.categoryName?.toLowerCase().includes("wastage") &&
+                    !rm.materialName?.toLowerCase().startsWith("wastage")
+                );
+                setRawMaterials(validRawMaterials);
 
                 const fetchedUoms = await uomService.fetchAll();
                 setUoms(fetchedUoms);
