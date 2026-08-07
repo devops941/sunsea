@@ -443,7 +443,7 @@ const AllSalesOrderList: React.FC = () => {
 
             {/* Off-screen section for PDF generation */}
             {estimateOrder && (
-                <div id="pdf-estimate-section" style={{ position: "absolute", left: "-9999px", top: "0", width: "794px", background: "white" }}>
+                <div id="pdf-estimate-section" style={{ position: "absolute", left: "-9999px", top: "0", width: "794px", minHeight: "1123px", background: "white" }}>
                     <DocumentPrintLayout subtitle="Sales Order" title="ESTIMATE">
                         <SalesOrderEstimateContent
                             estimateOrder={estimateOrder}

@@ -59,6 +59,7 @@ const employeeBodySchema = z.object({
   motherName: z.string().optional().nullable(),
   spouseName: z.string().optional().nullable(),
   guardianName: z.string().optional().nullable(),
+  guardianRelationship: z.string().optional().nullable(),
 
   // ── Section 4: Identity Documents ────────────────────────────────────────
   aadhaarNumber: z.string().optional().nullable(),
@@ -80,6 +81,7 @@ const employeeBodySchema = z.object({
 
   // ── Section 6: Official Info ─────────────────────────────────────────────
   departmentId: z.number().optional().nullable(),
+  roleId: z.number().optional().nullable(),
   designation: z.string().optional().nullable(),
   employeeType: z
     .enum(["permanent", "contract", "intern", "consultant", "operator", "supervisor"])
@@ -106,6 +108,7 @@ const employeeBodySchema = z.object({
 
   // ── Section 9: Payroll & Statutory ───────────────────────────────────────
   salaryType: z.enum(["monthly", "weekly", "daily", "hourly"]).optional().nullable(),
+  paymentMode: z.string().optional().nullable(),
   basicSalary: z.number().optional().nullable(),
   grossSalary: z.number().optional().nullable(),
   pfApplicable: z.boolean().optional(),

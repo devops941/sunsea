@@ -378,7 +378,7 @@ const GrnInvoiceViewPage: React.FC = () => {
                         {/* GST Tax Invoice Card */}
                         <div
                             id="printable-grn-invoice-card"
-                            className="font-[Arial,sans-serif] text-black bg-white border-[1.5px] border-black w-full box-border text-[14px] shadow-lg font-medium"
+                            className="font-[Arial,sans-serif] text-black bg-white border-[1.5px] border-black w-full min-h-[265mm] flex flex-col justify-between box-border text-[14px] shadow-lg font-medium"
                         >
                             {/* Top bar */}
                             <div className="flex justify-between items-center px-3 pt-2 text-[13px] font-semibold">
@@ -657,7 +657,7 @@ const MetaRow: React.FC<{ label: string; value: string }> = ({ label, value }) =
     </div>
 );
 
-const Th: React.FC<{ children: React.ReactNode; w?: string; align?: "left" | "center" | "right" }> = ({ children, w, align = "left" }) => (
+const Th: React.FC<{ children?: React.ReactNode; w?: string; align?: "left" | "center" | "right" }> = ({ children, w, align = "left" }) => (
     <th
         className={`border border-black px-2 py-1 font-bold bg-[#f7f7f7] text-${align}`}
         style={w ? { width: w } : undefined}
@@ -666,7 +666,7 @@ const Th: React.FC<{ children: React.ReactNode; w?: string; align?: "left" | "ce
     </th>
 );
 
-const Td: React.FC<{ children: React.ReactNode; align?: "left" | "center" | "right" }> = ({ children, align = "left" }) => (
+const Td: React.FC<{ children?: React.ReactNode; align?: "left" | "center" | "right" }> = ({ children, align = "left" }) => (
     <td className={`border border-black px-2 py-1 align-middle text-${align}`}>{children}</td>
 );
 

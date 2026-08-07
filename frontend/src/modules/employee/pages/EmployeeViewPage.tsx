@@ -260,48 +260,51 @@ function PayrollSection({ employee, payrollConfig }: { employee: any; payrollCon
         </>
       )}
 
-      {/* ── Statutory Flags ── */}
-      <SubHeader text="Statutory Deductions" />
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <StatFlag label="PF Applicable"    value={!!employee.pfApplicable}    />
-        <StatFlag label="ESI Applicable"   value={!!employee.esiApplicable}   />
-        <StatFlag label="Professional Tax" value={!!employee.professionalTax} />
-        <StatFlag label="TDS Applicable"   value={!!employee.tdsApplicable}   />
-      </div>
+      {/* ── Statutory Flags & Estimates (only for Bank Transfer) ── */}
+      {employee.paymentMode === 'BANK' && (
+        <>
+          <SubHeader text="Statutory Deductions" />
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+            <StatFlag label="PF Applicable"    value={!!employee.pfApplicable}    />
+            <StatFlag label="ESI Applicable"   value={!!employee.esiApplicable}   />
+            <StatFlag label="Professional Tax" value={!!employee.professionalTax} />
+          </div>
 
-      {/* PF / ESI / UAN numbers */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-5 mb-6">
-        <InfoRow label="PF Number"  value={employee.pfNumber}  />
-        <InfoRow label="UAN Number" value={employee.uanNumber} />
-        <InfoRow label="ESIC Number" value={employee.esiNumber} />
-      </div>
+          {/* PF / ESI / UAN numbers */}
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-5 mb-6">
+            <InfoRow label="PF Number"  value={employee.pfNumber}  />
+            <InfoRow label="UAN Number" value={employee.uanNumber} />
+            <InfoRow label="ESIC Number" value={employee.esiNumber} />
+          </div>
 
-      {/* ── Statutory Estimates ── */}
-      <SubHeader text="Estimated Statutory Contributions" />
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-        <CalcCard
-          label="Estimated Employee PF / Month"
-          amount={employee.pfApplicable ? formatINR(pf) : "₹0.00"}
-          note={
-            !employee.pfApplicable
-              ? "PF not applicable"
-              : `${pfRate}% of ${pfWageFormula === "GROSS" ? "Gross" : "Basic"} (capped at ${formatINR(maxPf)})`
-          }
-          color="blue"
-        />
-        <CalcCard
-          label="Estimated Employee ESI / Month"
-          amount={employee.esiApplicable ? formatINR(esi) : "₹0.00"}
-          note={
-            !employee.esiApplicable
-              ? "ESI not applicable"
-              : esi === 0
-              ? `Gross salary exceeds ESI ceiling (${formatINR(maxEsi)})`
-              : `${esiRate}% of Gross Salary`
-          }
-          color="emerald"
-        />
-      </div>
+          {/* ── Statutory Estimates ── */}
+          <SubHeader text="Estimated Statutory Contributions" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <CalcCard
+              label="Estimated Employee PF / Month"
+              amount={employee.pfApplicable ? formatINR(pf) : "₹0.00"}
+              note={
+                !employee.pfApplicable
+                  ? "PF not applicable"
+                  : `${pfRate}% of ${pfWageFormula === "GROSS" ? "Gross" : "Basic"} (capped at ${formatINR(maxPf)})`
+              }
+              color="blue"
+            />
+            <CalcCard
+              label="Estimated Employee ESI / Month"
+              amount={employee.esiApplicable ? formatINR(esi) : "₹0.00"}
+              note={
+                !employee.esiApplicable
+                  ? "ESI not applicable"
+                  : esi === 0
+                  ? `Gross salary exceeds ESI ceiling (${formatINR(maxEsi)})`
+                  : `${esiRate}% of Gross Salary`
+              }
+              color="emerald"
+            />
+          </div>
+        </>
+      )}
 
       {/* ── Bank Details ── */}
       <SubHeader text="Bank Details" />
@@ -447,6 +450,7 @@ export default function EmployeeViewPage() {
         <InfoRow label="Mother's Name" value={employee.motherName} />
         <InfoRow label="Spouse's Name" value={employee.spouseName} />
         <InfoRow label="Guardian's Name" value={employee.guardianName} />
+        <InfoRow label="Guardian Relationship" value={employee.guardianRelationship} />
       </Section>
 
       {/* 4. Identity Documents */}
@@ -486,7 +490,7 @@ export default function EmployeeViewPage() {
       {/* 6. Official Info */}
       <Section icon={FaBriefcase} title="Official Information">
         <InfoRow label="Department" value={employee.department?.name} />
-        {/* <InfoRow label="Designation" value={employee.designation} /> */}
+        <InfoRow label="Role" value={employee.role?.name || employee.user?.role?.name} />
         <InfoRow label="Employee Type" value={employee.employeeType ? employee.employeeType.charAt(0).toUpperCase() + employee.employeeType.slice(1) : null} />
         <InfoRow label="Status" value={<StatusBadge status={STATUS_MAP[employee.status] ?? employee.status?.toUpperCase() ?? "INACTIVE"} />} />
       </Section>

@@ -633,3 +633,45 @@ ul {
     display: none !important;
     /* Chrome, Safari, new Edge */
 }
+
+/* Global Print Styles */
+@media print {
+    .no-print, .print\:hidden {
+        display: none !important;
+    }
+
+    body * {
+        visibility: hidden;
+    }
+
+    #print-only-estimate-section,
+    #print-only-estimate-section *,
+    #printable-invoice-card,
+    #printable-invoice-card *,
+    #printable-po-invoice-card,
+    #printable-po-invoice-card *,
+    #printable-grn-invoice-card,
+    #printable-grn-invoice-card * {
+        visibility: visible !important;
+    }
+
+    #print-only-estimate-section,
+    #printable-invoice-card,
+    #printable-po-invoice-card,
+    #printable-grn-invoice-card {
+        position: absolute !important;
+        left: 0 !important;
+        top: 0 !important;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #fff !important;
+        box-shadow: none !important;
+    }
+
+    html, body {
+        height: auto !important;
+        overflow: visible !important;
+        background: #fff !important;
+    }
+}
