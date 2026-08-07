@@ -467,7 +467,96 @@ const SalaryStructureSection: React.FC<Props> = ({ form, onChange, onToggle, err
                   />
                 </>
               )}
+
+              {/* ── Allowance & Component Breakdown (Bank Transfer Only) ── */}
+              {form.paymentMode === 'BANK' && (
+                <>
+                  <TextInput
+                    label="Basic Salary (₹)"
+                    name="basicSalary"
+                    type="number"
+                    value={form.basicSalary}
+                    onChange={onChange}
+                    error={errors.basicSalary}
+                    placeholder="Basic salary"
+                  />
+                  <TextInput
+                    label="DA (Dearness Allowance) (₹)"
+                    name="da"
+                    type="number"
+                    value={form.da}
+                    onChange={onChange}
+                    error={errors.da}
+                    placeholder="DA amount"
+                  />
+                  <TextInput
+                    label="HRA (House Rent Allowance) (₹)"
+                    name="hra"
+                    type="number"
+                    value={form.hra}
+                    onChange={onChange}
+                    error={errors.hra}
+                    placeholder="HRA amount"
+                  />
+                  <TextInput
+                    label="Other Allowance (₹)"
+                    name="otherAllowance"
+                    type="number"
+                    value={form.otherAllowance}
+                    onChange={onChange}
+                    error={errors.otherAllowance}
+                    placeholder="Other allowance"
+                  />
+                </>
+              )}
             </div>
+
+            {/* Live component balance calculator for Bank Transfer */}
+            {form.paymentMode === 'BANK' && primaryAmount > 0 && (
+              <div className="mt-4 text-xs font-medium">
+                {(() => {
+                  const gross = primaryAmount;
+                  const basic = parseFloat(form.basicSalary || '0') || 0;
+                  const da = parseFloat(form.da || '0') || 0;
+                  const hra = parseFloat(form.hra || '0') || 0;
+                  const other = parseFloat(form.otherAllowance || '0') || 0;
+                  const total = basic + da + hra + other;
+                  const diff = gross - total;
+
+                  if (Math.abs(diff) < 0.01) {
+                    return (
+                      <div className="flex items-center justify-between text-emerald-700 bg-emerald-50 border border-emerald-200 p-3 rounded-xl shadow-xs">
+                        <span className="font-semibold flex items-center gap-1.5">
+                          ✓ Salary components sum (Basic + DA + HRA + Other) equals Gross Salary (₹{gross.toLocaleString('en-IN')})
+                        </span>
+                        <span className="font-mono text-[11px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-md">100% Matched</span>
+                      </div>
+                    );
+                  }
+
+                  if (diff > 0) {
+                    return (
+                      <div className="flex items-center justify-between text-amber-900 bg-amber-50 border border-amber-200 p-3 rounded-xl shadow-xs">
+                        <div>
+                          <span className="font-bold">⚠️ Remaining Balance: ₹{diff.toLocaleString('en-IN')}</span>
+                          <span className="ml-1 text-slate-600">
+                            (Total components: ₹{total.toLocaleString('en-IN')} / Gross: ₹{gross.toLocaleString('en-IN')})
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="flex items-center justify-between text-rose-700 bg-rose-50 border border-rose-200 p-3 rounded-xl shadow-xs">
+                      <span className="font-semibold">
+                        ❌ Components sum (₹{total.toLocaleString('en-IN')}) exceeds Gross Salary (₹{gross.toLocaleString('en-IN')}) by ₹{Math.abs(diff).toLocaleString('en-IN')}
+                      </span>
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
 
             {/* Overtime eligible — shown for Daily and Hourly */}
             {(salaryType === 'DAILY' || salaryType === 'HOURLY') && (

@@ -89,6 +89,9 @@ function parseEmployeeBody(body: Record<string, any>) {
   if ("probationPeriod" in body) parsed.probationPeriod = parseNum(body.probationPeriod) ?? null;
   if ("noticePeriod" in body) parsed.noticePeriod = parseNum(body.noticePeriod) ?? null;
   if ("basicSalary" in body) parsed.basicSalary = parseNum(body.basicSalary) ?? null;
+  if ("da" in body) parsed.da = parseNum(body.da) ?? null;
+  if ("hra" in body) parsed.hra = parseNum(body.hra) ?? null;
+  if ("otherAllowance" in body) parsed.otherAllowance = parseNum(body.otherAllowance) ?? null;
   if ("grossSalary" in body) parsed.grossSalary = parseNum(body.grossSalary) ?? null;
 
   // ── Boolean fields ─────────────────────────────────────────────────────────

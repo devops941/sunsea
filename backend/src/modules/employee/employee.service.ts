@@ -6,7 +6,7 @@ import bcrypt from "bcrypt";
 
 class EmployeeService {
   async create(data: any) {
-    const { createLoginAccount, loginAccount, ...employeeData } = data;
+    const { createLoginAccount, loginAccount, da, hra, otherAllowance, ...employeeData } = data;
 
     if (employeeData.createdBy && employeeData.createdBy.startsWith("admin_")) {
       employeeData.createdBy = null;
@@ -68,6 +68,40 @@ class EmployeeService {
       // Create employee
       const employee = await tx.employee.create({
         data: employeeData,
+      });
+
+      // Upsert payroll config for the created employee
+      await tx.employeePayrollConfig.upsert({
+        where: { employeeId: employee.id },
+        create: {
+          employeeId: employee.id,
+          salaryType: employeeData.salaryType ? String(employeeData.salaryType).toUpperCase() : "MONTHLY",
+          monthlySalary: Number(employeeData.grossSalary || 0),
+          basicSalary: Number(employeeData.basicSalary || 0),
+          da: Number(da || 0),
+          hra: Number(hra || 0),
+          otherAllowance: Number(otherAllowance || 0),
+          bankAccount: employeeData.accountNumber || null,
+          ifscCode: employeeData.ifscCode || null,
+          bankName: employeeData.bankName || null,
+          pfNumber: employeeData.pfNumber || null,
+          esiNumber: employeeData.esiNumber || null,
+          paymentMode: employeeData.paymentMode ? String(employeeData.paymentMode).toUpperCase() : "CASH",
+        },
+        update: {
+          salaryType: employeeData.salaryType ? String(employeeData.salaryType).toUpperCase() : "MONTHLY",
+          monthlySalary: Number(employeeData.grossSalary || 0),
+          basicSalary: Number(employeeData.basicSalary || 0),
+          da: Number(da || 0),
+          hra: Number(hra || 0),
+          otherAllowance: Number(otherAllowance || 0),
+          bankAccount: employeeData.accountNumber || null,
+          ifscCode: employeeData.ifscCode || null,
+          bankName: employeeData.bankName || null,
+          pfNumber: employeeData.pfNumber || null,
+          esiNumber: employeeData.esiNumber || null,
+          paymentMode: employeeData.paymentMode ? String(employeeData.paymentMode).toUpperCase() : "CASH",
+        },
       });
 
       // Create login account if requested
@@ -172,7 +206,7 @@ class EmployeeService {
     const [employees, total] = await Promise.all([
       prisma.employee.findMany({
         where,
-        include: { user: { include: { role: true } }, role: true, department: true, shift: true },
+        include: { user: { include: { role: true } }, role: true, department: true, shift: true, payrollConfig: true },
         orderBy: { createdAt: "desc" },
         skip: (page - 1) * limit,
         take: limit,
@@ -180,8 +214,19 @@ class EmployeeService {
       prisma.employee.count({ where }),
     ]);
 
+    const mappedEmployees = employees.map((emp: any) => {
+      const e = { ...emp };
+      if (emp.payrollConfig) {
+        if (!e.basicSalary && emp.payrollConfig.basicSalary) e.basicSalary = emp.payrollConfig.basicSalary;
+        if (!e.da && emp.payrollConfig.da) e.da = emp.payrollConfig.da;
+        if (!e.hra && emp.payrollConfig.hra) e.hra = emp.payrollConfig.hra;
+        if (!e.otherAllowance && emp.payrollConfig.otherAllowance) e.otherAllowance = emp.payrollConfig.otherAllowance;
+      }
+      return e;
+    });
+
     return {
-      employees,
+      employees: mappedEmployees,
       total,
       page,
       totalPages: Math.ceil(total / limit),
@@ -196,6 +241,7 @@ class EmployeeService {
         role: true,
         department: true,
         shift: true,
+        payrollConfig: true,
       },
     });
 
@@ -203,14 +249,30 @@ class EmployeeService {
       throw new ApiError(404, "Employee not found");
     }
 
-    return employee;
+    const empObj: any = { ...employee };
+    if (employee.payrollConfig) {
+      if ((empObj.basicSalary === null || empObj.basicSalary === undefined || Number(empObj.basicSalary) === 0) && employee.payrollConfig.basicSalary) {
+        empObj.basicSalary = employee.payrollConfig.basicSalary;
+      }
+      if ((empObj.da === null || empObj.da === undefined) && employee.payrollConfig.da) {
+        empObj.da = employee.payrollConfig.da;
+      }
+      if ((empObj.hra === null || empObj.hra === undefined) && employee.payrollConfig.hra) {
+        empObj.hra = employee.payrollConfig.hra;
+      }
+      if ((empObj.otherAllowance === null || empObj.otherAllowance === undefined) && employee.payrollConfig.otherAllowance) {
+        empObj.otherAllowance = employee.payrollConfig.otherAllowance;
+      }
+    }
+
+    return empObj;
   }
 
   async update(id: bigint, data: any) {
     // Check if employee exists
     await this.findById(id);
 
-    const { createLoginAccount, loginAccount, ...employeeData } = data;
+    const { createLoginAccount, loginAccount, da, hra, otherAllowance, ...employeeData } = data;
 
     if (employeeData.updatedBy && employeeData.updatedBy.startsWith("admin_")) {
       employeeData.updatedBy = null;
@@ -247,6 +309,40 @@ class EmployeeService {
       const employee = await tx.employee.update({
         where: { id },
         data: employeeData,
+      });
+
+      // Upsert payroll config for the updated employee
+      await tx.employeePayrollConfig.upsert({
+        where: { employeeId: id },
+        create: {
+          employeeId: id,
+          salaryType: employeeData.salaryType ? String(employeeData.salaryType).toUpperCase() : "MONTHLY",
+          monthlySalary: Number(employeeData.grossSalary || 0),
+          basicSalary: Number(employeeData.basicSalary || 0),
+          da: Number(da || 0),
+          hra: Number(hra || 0),
+          otherAllowance: Number(otherAllowance || 0),
+          bankAccount: employeeData.accountNumber || null,
+          ifscCode: employeeData.ifscCode || null,
+          bankName: employeeData.bankName || null,
+          pfNumber: employeeData.pfNumber || null,
+          esiNumber: employeeData.esiNumber || null,
+          paymentMode: employeeData.paymentMode ? String(employeeData.paymentMode).toUpperCase() : "CASH",
+        },
+        update: {
+          ...(employeeData.salaryType && { salaryType: String(employeeData.salaryType).toUpperCase() }),
+          ...(employeeData.grossSalary !== undefined && { monthlySalary: Number(employeeData.grossSalary || 0) }),
+          ...(employeeData.basicSalary !== undefined && { basicSalary: Number(employeeData.basicSalary || 0) }),
+          ...(da !== undefined && { da: Number(da || 0) }),
+          ...(hra !== undefined && { hra: Number(hra || 0) }),
+          ...(otherAllowance !== undefined && { otherAllowance: Number(otherAllowance || 0) }),
+          ...(employeeData.accountNumber !== undefined && { bankAccount: employeeData.accountNumber || null }),
+          ...(employeeData.ifscCode !== undefined && { ifscCode: employeeData.ifscCode || null }),
+          ...(employeeData.bankName !== undefined && { bankName: employeeData.bankName || null }),
+          ...(employeeData.pfNumber !== undefined && { pfNumber: employeeData.pfNumber || null }),
+          ...(employeeData.esiNumber !== undefined && { esiNumber: employeeData.esiNumber || null }),
+          ...(employeeData.paymentMode !== undefined && { paymentMode: String(employeeData.paymentMode).toUpperCase() }),
+        },
       });
 
       if (createLoginAccount && loginAccount) {
