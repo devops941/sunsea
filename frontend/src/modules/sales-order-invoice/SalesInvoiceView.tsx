@@ -354,220 +354,249 @@ const SalesInvoiceView: React.FC = () => {
                         {/* GST Tax Invoice Card */}
                         <div
                             id="printable-invoice-card"
-                            className="font-[Arial,sans-serif] text-black bg-white border-[1.5px] border-black w-full box-border text-[14px] shadow-lg font-medium"
+                            className="font-[Arial,sans-serif] text-black bg-white border-[1.5px] border-black w-full min-h-[265mm] flex flex-col justify-between box-border text-[14px] shadow-lg font-medium"
                         >
-                            {/* Top bar */}
-                            <div className="flex justify-between items-center px-3 pt-2 text-[13px] font-semibold">
-                                <div>GSTIN : {company?.gstin || "-"}</div>
-                                <div className="italic">Triplicate Copy</div>
-                            </div>
-
-                            {/* Header */}
-                            <div className="text-center border-b-[1.5px] border-black px-3 pb-2">
-                                <div className="text-sm uppercase font-bold tracking-[2px]">Tax Invoice</div>
-                                <h1 className="text-2xl font-extrabold m-0 tracking-[1px] mt-1">
-                                    {company?.legalName || company?.companyName || "Company Name"}
-                                </h1>
-                                <div className="text-[13px] mt-1">
-                                    {company?.addressLine1}
-                                    {company?.city && `, ${company.city}`}
-                                    {company?.state && `, ${company.state}`}
-                                    {company?.pincode && ` - ${company.pincode}`}
+                            <div>
+                                {/* Top bar */}
+                                <div className="flex justify-between items-center px-3 pt-2 text-[13px] font-semibold">
+                                    <div>GSTIN : {company?.gstin || "-"}</div>
+                                    <div className="italic">Triplicate Copy</div>
                                 </div>
-                            </div>
 
-                            {/* Invoice meta block */}
-                            <div className="flex border-b-[1.5px] border-black">
-                                <div className="flex-1 border-r-[1.5px] border-black p-2 space-y-1">
-                                    <MetaRow label="Invoice No." value={invoice.invoiceNo} />
-                                    <MetaRow label="Dated" value={formatDate(invoice.invoiceDate)} />
-                                    <MetaRow label="Place of Supply" value={invoice.customer?.billingState || "-"} />
-                                    <MetaRow label="Due Date" value={formatDate(invoice.dueDate)} />
-                                    <MetaRow label="Reverse Charge" value="N" />
-                                    <MetaRow label="GR/RR No" value="" />
-                                </div>
-                                <div className="flex-1 p-2 space-y-1">
-
-                                    <MetaRow label="Transport" value={invoice.salesOrder?.transportName || "—"} />
-                                    <MetaRow label="Vehicle No" value="—" />
-                                    <MetaRow label="Station" value={getTransportStation(invoice.customer, invoice.salesOrder?.transportName)} />
-                                    <MetaRow label="E-way Bill no" value="—" />
-                                    {invoice.salesOrder?.orderNo && (
-                                        <MetaRow label="Ref. Order No." value={invoice.salesOrder.orderNo} />
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Billed To / Shipped To */}
-                            <div className="flex border-b-[1.5px] border-black">
-                                <div className="flex-1 border-r-[1.5px] border-black p-2">
-                                    <div className="font-bold mb-1">Billed to :</div>
-                                    <div className="font-semibold">
-                                        {invoice.customer?.displayName || invoice.customer?.firmName || "N/A"}
-                                    </div>
-                                    <div className="font-semibold">
-                                        {invoice.customer?.billingAddressLine1}<br />
-                                        {invoice.customer?.billingCity}, {invoice.customer?.billingState} - {invoice.customer?.billingPincode}
-                                    </div>
-                                    {invoice.customer?.gstin && (
-                                        <div className="mt-1">GSTIN / UIN : {invoice.customer.gstin}</div>
-                                    )}
-                                    {(invoice.salesOrder?.mobile || getMobileFromCustomer(invoice.customer)) && (
-                                        <div className="mt-1 font-semibold">Mobile: {invoice.salesOrder?.mobile || getMobileFromCustomer(invoice.customer)}</div>
-                                    )}
-                                </div>
-                                <div className="flex-1 p-2">
-                                    <div className="font-bold mb-1">Shipped to :</div>
-                                    <div className="font-semibold">
-                                        {invoice.customer?.displayName || invoice.customer?.firmName || "N/A"}
-                                    </div>
-                                    <div className="font-semibold">
-                                        {invoice.salesOrder?.shippingAddressLine1 || invoice.customer?.shippingAddressLine1 || invoice.customer?.billingAddressLine1}<br />
-                                        {invoice.salesOrder?.shippingCity || invoice.customer?.shippingCity || invoice.customer?.billingCity}, {invoice.salesOrder?.shippingState || invoice.customer?.shippingState || invoice.customer?.billingState} - {invoice.salesOrder?.shippingPincode || invoice.customer?.shippingPincode || invoice.customer?.billingPincode}
+                                {/* Header */}
+                                <div className="text-center border-b-[1.5px] border-black px-3 pb-2">
+                                    <div className="text-sm uppercase font-bold tracking-[2px]">Tax Invoice</div>
+                                    <h1 className="text-2xl font-extrabold m-0 tracking-[1px] mt-1">
+                                        {company?.legalName || company?.companyName || "Company Name"}
+                                    </h1>
+                                    <div className="text-[13px] mt-1">
+                                        {company?.addressLine1}
+                                        {company?.city && `, ${company.city}`}
+                                        {company?.state && `, ${company.state}`}
+                                        {company?.pincode && ` - ${company.pincode}`}
                                     </div>
                                 </div>
-                            </div>
 
-                            {/* Items Table */}
-                            <table className="w-full border-collapse text-[13px]">
-                                <thead>
-                                    <tr>
-                                        <Th w="35px">S.N.</Th>
-                                        <Th>Description of Goods</Th>
-                                        <Th w="60px">HSN/SAC</Th>
-                                        <Th w="55px" align="right">Qty.</Th>
-                                        <Th w="45px">Unit</Th>
-                                        <Th w="60px" align="right">Price</Th>
-                                        {isInterState ? (
-                                            <>
-                                                <Th w="50px">IGST Rate</Th>
-                                                <Th w="65px" align="right">IGST Amt</Th>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <Th w="50px">CGST Rate</Th>
-                                                <Th w="65px" align="right">CGST Amt</Th>
-                                                <Th w="50px">SGST Rate</Th>
-                                                <Th w="65px" align="right">SGST Amt</Th>
-                                            </>
+                                {/* Invoice meta block */}
+                                <div className="flex border-b-[1.5px] border-black">
+                                    <div className="flex-1 border-r-[1.5px] border-black p-2 space-y-1">
+                                        <MetaRow label="Invoice No." value={invoice.invoiceNo} />
+                                        <MetaRow label="Dated" value={formatDate(invoice.invoiceDate)} />
+                                        <MetaRow label="Place of Supply" value={invoice.customer?.billingState || "-"} />
+                                        <MetaRow label="Due Date" value={formatDate(invoice.dueDate)} />
+                                        <MetaRow label="Reverse Charge" value="N" />
+                                        <MetaRow label="GR/RR No" value="" />
+                                    </div>
+                                    <div className="flex-1 p-2 space-y-1">
+
+                                        <MetaRow label="Transport" value={invoice.salesOrder?.transportName || "—"} />
+                                        <MetaRow label="Vehicle No" value="—" />
+                                        <MetaRow label="Station" value={getTransportStation(invoice.customer, invoice.salesOrder?.transportName)} />
+                                        <MetaRow label="E-way Bill no" value="—" />
+                                        {invoice.salesOrder?.orderNo && (
+                                            <MetaRow label="Ref. Order No." value={invoice.salesOrder.orderNo} />
                                         )}
-                                        <Th w="70px" align="right">Amount(Rs.)</Th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {itemsWithTax.map((item: any, idx: number) => (
-                                        <tr key={item.id || idx}>
-                                            <Td align="center">{idx + 1}.</Td>
-                                            <Td>{item.product?.productName || "N/A"}</Td>
-                                            <Td align="center">{item.hsnCode}</Td>
-                                            <Td align="right">{item.qty}</Td>
-                                            <Td align="center">{item.unit}</Td>
-                                            <Td align="right">{item.rate.toFixed(2)}</Td>
-                                            {isInterState ? (
-                                                <>
-                                                    <Td align="center">{item.igstRate}%</Td>
-                                                    <Td align="right">{item.igstAmount.toFixed(2)}</Td>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <Td align="center">{item.cgstRate}%</Td>
-                                                    <Td align="right">{item.cgstAmount.toFixed(2)}</Td>
-                                                    <Td align="center">{item.sgstRate}%</Td>
-                                                    <Td align="right">{item.sgstAmount.toFixed(2)}</Td>
-                                                </>
-                                            )}
-                                            <Td align="right">{item.amount.toFixed(2)}</Td>
-                                        </tr>
-                                    ))}
-                                    {(!invoice.items || invoice.items.length === 0) && (
-                                        <tr>
-                                            <td colSpan={isInterState ? 8 : 9} className="border border-black px-2 py-4 text-center text-slate-500">
-                                                No items found for this invoice.
-                                            </td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                                <tfoot>
-                                    <tr>
-                                        <td colSpan={isInterState ? 7 : 10} className="border border-black px-2 py-1 text-right font-bold">
-                                            Grand Total
-                                        </td>
-                                        <td className="border border-black px-2 py-1 text-right font-bold">
-                                            {formatMoney(grandTotal)}
-                                        </td>
-                                    </tr>
-                                </tfoot>
-                            </table>
+                                    </div>
+                                </div>
 
-                            {/* Tax Summary */}
-                            {taxSummary.length > 0 && (
-                                <table className="w-full border-collapse text-[13px] mt-2">
+                                {/* Billed To / Shipped To */}
+                                <div className="flex border-b-[1.5px] border-black">
+                                    <div className="flex-1 border-r-[1.5px] border-black p-2">
+                                        <div className="font-bold mb-1">Billed to :</div>
+                                        <div className="font-semibold">
+                                            {invoice.customer?.displayName || invoice.customer?.firmName || "N/A"}
+                                        </div>
+                                        <div className="font-semibold">
+                                            {invoice.customer?.billingAddressLine1}<br />
+                                            {invoice.customer?.billingCity}, {invoice.customer?.billingState} - {invoice.customer?.billingPincode}
+                                        </div>
+                                        {invoice.customer?.gstin && (
+                                            <div className="mt-1">GSTIN / UIN : {invoice.customer.gstin}</div>
+                                        )}
+                                        {(invoice.salesOrder?.mobile || getMobileFromCustomer(invoice.customer)) && (
+                                            <div className="mt-1 font-semibold">Mobile: {invoice.salesOrder?.mobile || getMobileFromCustomer(invoice.customer)}</div>
+                                        )}
+                                    </div>
+                                    <div className="flex-1 p-2">
+                                        <div className="font-bold mb-1">Shipped to :</div>
+                                        <div className="font-semibold">
+                                            {invoice.customer?.displayName || invoice.customer?.firmName || "N/A"}
+                                        </div>
+                                        <div className="font-semibold">
+                                            {invoice.salesOrder?.shippingAddressLine1 || invoice.customer?.shippingAddressLine1 || invoice.customer?.billingAddressLine1}<br />
+                                            {invoice.salesOrder?.shippingCity || invoice.customer?.shippingCity || invoice.customer?.billingCity}, {invoice.salesOrder?.shippingState || invoice.customer?.shippingState || invoice.customer?.billingState} - {invoice.salesOrder?.shippingPincode || invoice.customer?.shippingPincode || invoice.customer?.billingPincode}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Items Table */}
+                                <table className="w-full border-collapse text-[13px]">
                                     <thead>
                                         <tr>
-                                            <Th w="60px">Tax Rate</Th>
-                                            <Th align="right">Taxable Amt.</Th>
+                                            <Th w="35px">S.N.</Th>
+                                            <Th>Description of Goods</Th>
+                                            <Th w="60px">HSN/SAC</Th>
+                                            <Th w="55px" align="right">Qty.</Th>
+                                            <Th w="45px">Unit</Th>
+                                            <Th w="60px" align="right">Price</Th>
                                             {isInterState ? (
-                                                <Th align="right">IGST Amt.</Th>
+                                                <>
+                                                    <Th w="50px">IGST Rate</Th>
+                                                    <Th w="65px" align="right">IGST Amt</Th>
+                                                </>
                                             ) : (
                                                 <>
-                                                    <Th align="right">CGST Amt.</Th>
-                                                    <Th align="right">SGST Amt.</Th>
+                                                    <Th w="50px">CGST Rate</Th>
+                                                    <Th w="65px" align="right">CGST Amt</Th>
+                                                    <Th w="50px">SGST Rate</Th>
+                                                    <Th w="65px" align="right">SGST Amt</Th>
                                                 </>
                                             )}
-                                            <Th align="right">Total Tax</Th>
+                                            <Th w="70px" align="right">Amount(Rs.)</Th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {taxSummary.map((row, i) => (
-                                            <tr key={i}>
-                                                <Td align="center">{row.taxRate}%</Td>
-                                                <Td align="right">{row.taxableAmt.toFixed(2)}</Td>
+                                        {itemsWithTax.map((item: any, idx: number) => (
+                                            <tr key={item.id || idx} style={{ height: "30px" }}>
+                                                <Td align="center">{idx + 1}.</Td>
+                                                <Td>{item.product?.productName || "N/A"}</Td>
+                                                <Td align="center">{item.hsnCode}</Td>
+                                                <Td align="right">{item.qty}</Td>
+                                                <Td align="center">{item.unit}</Td>
+                                                <Td align="right">{item.rate.toFixed(2)}</Td>
                                                 {isInterState ? (
-                                                    <Td align="right">{row.igstAmt.toFixed(2)}</Td>
+                                                    <>
+                                                        <Td align="center">{item.igstRate}%</Td>
+                                                        <Td align="right">{item.igstAmount.toFixed(2)}</Td>
+                                                    </>
                                                 ) : (
                                                     <>
-                                                        <Td align="right">{row.cgstAmt.toFixed(2)}</Td>
-                                                        <Td align="right">{row.sgstAmt.toFixed(2)}</Td>
+                                                        <Td align="center">{item.cgstRate}%</Td>
+                                                        <Td align="right">{item.cgstAmount.toFixed(2)}</Td>
+                                                        <Td align="center">{item.sgstRate}%</Td>
+                                                        <Td align="right">{item.sgstAmount.toFixed(2)}</Td>
                                                     </>
                                                 )}
-                                                <Td align="right">{row.totalTax.toFixed(2)}</Td>
+                                                <Td align="right">{item.amount.toFixed(2)}</Td>
                                             </tr>
                                         ))}
+                                        {/* Clean empty rows filling out A4 sheet */}
+                                        {Array.from({ length: Math.max(0, 10 - itemsWithTax.length) }).map((_, idx) => (
+                                            <tr key={`empty-${idx}`} style={{ height: "30px" }}>
+                                                <Td align="center"></Td>
+                                                <Td></Td>
+                                                <Td align="center"></Td>
+                                                <Td align="right"></Td>
+                                                <Td align="center"></Td>
+                                                <Td align="right"></Td>
+                                                {isInterState ? (
+                                                    <>
+                                                        <Td align="center"></Td>
+                                                        <Td align="right"></Td>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Td align="center"></Td>
+                                                        <Td align="right"></Td>
+                                                        <Td align="center"></Td>
+                                                        <Td align="right"></Td>
+                                                    </>
+                                                )}
+                                                <Td align="right"></Td>
+                                            </tr>
+                                        ))}
+                                        {(!invoice.items || invoice.items.length === 0) && (
+                                            <tr>
+                                                <td colSpan={isInterState ? 8 : 9} className="border border-black px-2 py-4 text-center text-slate-500">
+                                                    No items found for this invoice.
+                                                </td>
+                                            </tr>
+                                        )}
                                     </tbody>
+                                    <tfoot>
+                                        <tr>
+                                            <td colSpan={isInterState ? 7 : 10} className="border border-black px-2 py-1 text-right font-bold">
+                                                Grand Total
+                                            </td>
+                                            <td className="border border-black px-2 py-1 text-right font-bold">
+                                                {formatMoney(grandTotal)}
+                                            </td>
+                                        </tr>
+                                    </tfoot>
                                 </table>
-                            )}
 
-                            {/* Amount in words */}
-                            <div className="px-2 py-2 border-t border-black text-[14px] font-medium">
-                                Rupees {amountInWords}
+                                {/* Tax Summary */}
+                                {taxSummary.length > 0 && (
+                                    <table className="w-full border-collapse text-[13px] mt-2">
+                                        <thead>
+                                            <tr>
+                                                <Th w="60px">Tax Rate</Th>
+                                                <Th align="right">Taxable Amt.</Th>
+                                                {isInterState ? (
+                                                    <Th align="right">IGST Amt.</Th>
+                                                ) : (
+                                                    <>
+                                                        <Th align="right">CGST Amt.</Th>
+                                                        <Th align="right">SGST Amt.</Th>
+                                                    </>
+                                                )}
+                                                <Th align="right">Total Tax</Th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {taxSummary.map((row, i) => (
+                                                <tr key={i}>
+                                                    <Td align="center">{row.taxRate}%</Td>
+                                                    <Td align="right">{row.taxableAmt.toFixed(2)}</Td>
+                                                    {isInterState ? (
+                                                        <Td align="right">{row.igstAmt.toFixed(2)}</Td>
+                                                    ) : (
+                                                        <>
+                                                            <Td align="right">{row.cgstAmt.toFixed(2)}</Td>
+                                                            <Td align="right">{row.sgstAmt.toFixed(2)}</Td>
+                                                        </>
+                                                    )}
+                                                    <Td align="right">{row.totalTax.toFixed(2)}</Td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                )}
+
+                                {/* Amount in words */}
+                                <div className="px-2 py-2 border-t border-black text-[14px] font-medium">
+                                    Rupees {amountInWords}
+                                </div>
                             </div>
 
-                            {/* Bank details */}
-                            <div className="px-2 py-2 border-t border-black text-[13px]">
-                                <span className="font-bold">Bank Details :</span> BANK NAME : {company?.bankName || "BANK OF BARODA"}
-                                &nbsp;&nbsp; BRANCH : {company?.bankBranch || "PALGHAR BRANCH"} <br />
-                                A/c No : {company?.bankAccountNo || "123456789012"} &nbsp;&nbsp; IFSC CODE : {company?.bankIfsc || "BARB0PALGHA"}
-                            </div>
-
-                            {/* Notes */}
-                            {invoice.notes && (
+                            <div>
+                                {/* Bank details */}
                                 <div className="px-2 py-2 border-t border-black text-[13px]">
-                                    <span className="font-bold">Notes :</span> {invoice.notes}
+                                    <span className="font-bold">Bank Details :</span> BANK NAME : {company?.bankName || "BANK OF BARODA"}
+                                    &nbsp;&nbsp; BRANCH : {company?.bankBranch || "PALGHAR BRANCH"} <br />
+                                    A/c No : {company?.bankAccountNo || "123456789012"} &nbsp;&nbsp; IFSC CODE : {company?.bankIfsc || "BARB0PALGHA"}
                                 </div>
-                            )}
 
-                            {/* Footer: Terms + Signature */}
-                            <div className="flex border-t-[1.5px] border-black text-[13px]">
-                                <div className="flex-1 border-r border-black p-2">
-                                    <div className="font-bold mb-1">Terms &amp; Conditions</div>
-                                    <div>E &amp; O.E.</div>
-                                    <div>1. Goods once sold will not be taken back.</div>
-                                    <div>2. Interest @ 18% p.a. will be charged if the payment is not made within the stipulated time.</div>
-                                </div>
-                                <div className="flex-1 p-2 flex flex-col justify-between">
-                                    <div className="font-bold">Receiver's Signature :</div>
-                                    <div className="text-right font-bold mt-6">
-                                        For {company?.legalName || company?.companyName || "Company"}
+                                {/* Notes */}
+                                {invoice.notes && (
+                                    <div className="px-2 py-2 border-t border-black text-[13px]">
+                                        <span className="font-bold">Notes :</span> {invoice.notes}
+                                    </div>
+                                )}
+
+                                {/* Footer: Terms + Signature */}
+                                <div className="flex border-t-[1.5px] border-black text-[13px]">
+                                    <div className="flex-1 border-r border-black p-2">
+                                        <div className="font-bold mb-1">Terms &amp; Conditions</div>
+                                        <div>E &amp; O.E.</div>
+                                        <div>1. Goods once sold will not be taken back.</div>
+                                        <div>2. Interest @ 18% p.a. will be charged if the payment is not made within the stipulated time.</div>
+                                    </div>
+                                    <div className="flex-1 p-2 flex flex-col justify-between">
+                                        <div className="font-bold">Receiver's Signature :</div>
+                                        <div className="text-right font-bold mt-6">
+                                            For {company?.legalName || company?.companyName || "Company"}
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -587,7 +616,7 @@ const MetaRow: React.FC<{ label: string; value: string }> = ({ label, value }) =
     </div>
 );
 
-const Th: React.FC<{ children: React.ReactNode; w?: string; align?: "left" | "center" | "right" }> = ({ children, w, align = "left" }) => (
+const Th: React.FC<{ children?: React.ReactNode; w?: string; align?: "left" | "center" | "right" }> = ({ children, w, align = "left" }) => (
     <th
         className={`border border-black px-2 py-1 font-bold bg-[#f7f7f7] text-${align}`}
         style={w ? { width: w } : undefined}
@@ -596,7 +625,7 @@ const Th: React.FC<{ children: React.ReactNode; w?: string; align?: "left" | "ce
     </th>
 );
 
-const Td: React.FC<{ children: React.ReactNode; align?: "left" | "center" | "right" }> = ({ children, align = "left" }) => (
+const Td: React.FC<{ children?: React.ReactNode; align?: "left" | "center" | "right" }> = ({ children, align = "left" }) => (
     <td className={`border border-black px-2 py-1 align-middle text-${align}`}>{children}</td>
 );
 

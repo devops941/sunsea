@@ -58,7 +58,7 @@ function parseEmployeeBody(body: Record<string, any>) {
     "bloodGroup", "gender", "maritalStatus", "status",
     "personalMobile", "personalEmail",
     "emergencyContactName", "emergencyContactNumber",
-    "fatherName", "motherName", "spouseName", "guardianName",
+    "fatherName", "motherName", "spouseName", "guardianName", "guardianRelationship",
     "aadhaarNumber", "panNumber", "drivingLicense", "voterId",
     "permanentAddressLine1", "permanentAddressLine2",
     "permanentCity", "permanentState", "permanentPincode",
@@ -67,7 +67,7 @@ function parseEmployeeBody(body: Record<string, any>) {
     "designation", "employeeType",
     "previousExperience",
     "shiftId",
-    "salaryType",
+    "salaryType", "paymentMode",
     "bankName", "bankBranch", "accountNumber", "ifscCode", "accountHolderName",
     "pfNumber", "uanNumber", "esiNumber",
   ];
@@ -85,6 +85,7 @@ function parseEmployeeBody(body: Record<string, any>) {
 
   // ── Numeric fields ─────────────────────────────────────────────────────────
   if ("departmentId" in body) parsed.departmentId = parseNum(body.departmentId) ?? null;
+  if ("roleId" in body) parsed.roleId = parseNum(body.roleId) ?? null;
   if ("probationPeriod" in body) parsed.probationPeriod = parseNum(body.probationPeriod) ?? null;
   if ("noticePeriod" in body) parsed.noticePeriod = parseNum(body.noticePeriod) ?? null;
   if ("basicSalary" in body) parsed.basicSalary = parseNum(body.basicSalary) ?? null;

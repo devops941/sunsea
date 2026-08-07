@@ -103,10 +103,10 @@ class EmployeeService {
         });
       }
 
-      // Return employee with user included
+      // Return employee with user & role included
       return tx.employee.findUnique({
         where: { id: employee.id },
-        include: { user: { include: { role: true } }, department: true, shift: true },
+        include: { user: { include: { role: true } }, role: true, department: true, shift: true },
       });
     }))!;
 
@@ -172,7 +172,7 @@ class EmployeeService {
     const [employees, total] = await Promise.all([
       prisma.employee.findMany({
         where,
-        include: { user: { include: { role: true } }, department: true, shift: true },
+        include: { user: { include: { role: true } }, role: true, department: true, shift: true },
         orderBy: { createdAt: "desc" },
         skip: (page - 1) * limit,
         take: limit,
@@ -193,6 +193,7 @@ class EmployeeService {
       where: { id },
       include: {
         user: { include: { role: true } },
+        role: true,
         department: true,
         shift: true,
       },

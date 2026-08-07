@@ -104,6 +104,7 @@ interface FormState {
   motherName: string;
   spouseName: string;
   guardianName: string;
+  guardianRelationship: string;
   aadhaarNumber: string;
   panNumber: string;
   drivingLicense: string;
@@ -181,7 +182,7 @@ const INITIAL_STATE: FormState = {
   maritalStatus: "", employeeStatus: "active", photoFile: null, photoPreview: "", existingPhotoUrl: "",
   personalMobile: "", officialMobile: "", personalEmail: "", officialEmail: "",
   emergencyContactName: "", emergencyContactNumber: "",
-  fatherName: "", motherName: "", spouseName: "", guardianName: "",
+  fatherName: "", motherName: "", spouseName: "", guardianName: "", guardianRelationship: "",
   aadhaarNumber: "", panNumber: "", drivingLicense: "", voterId: "",
   permAddress1: "", permAddress2: "", permCity: "", permState: "", permPincode: "",
   sameAsPermanent: false,
@@ -300,6 +301,7 @@ const EmployeeEdit: React.FC = () => {
         motherName: emp.motherName || "",
         spouseName: emp.spouseName || "",
         guardianName: emp.guardianName || "",
+        guardianRelationship: emp.guardianRelationship || "",
         aadhaarNumber: emp.aadhaarNumber || "",
         panNumber: emp.panNumber || "",
         drivingLicense: emp.drivingLicense || "",
@@ -355,7 +357,7 @@ const EmployeeEdit: React.FC = () => {
         createLoginAccount: !!emp.user,
         username: emp.user?.username || "",
         password: "",
-        roleId: emp.user?.roleId ? String(emp.user.roleId) : "",
+        roleId: emp.roleId ? String(emp.roleId) : (emp.user?.roleId ? String(emp.user.roleId) : ""),
         mustChangePw: !!emp.user?.mustChangePw,
         loginEnabled: emp.user ? emp.user.status === "active" : true,
         createdBy: emp.createdByUser?.username || emp.createdBy || "",
@@ -508,12 +510,12 @@ const EmployeeEdit: React.FC = () => {
       e.hourlySalary = "Hourly rate is required";
 
     // PF validation
-    if (form.pfApplicable) {
+    if (form.paymentMode === "BANK" && form.pfApplicable) {
       if (!form.uanNumber.trim()) e.uanNumber = "UAN Number is required when PF is applicable";
     }
 
     // ESI validation
-    if (form.esiApplicable) {
+    if (form.paymentMode === "BANK" && form.esiApplicable) {
       if (!form.esiNumber.trim()) e.esiNumber = "ESIC Number is required when ESI is applicable";
     }
 
@@ -573,10 +575,11 @@ const EmployeeEdit: React.FC = () => {
       if (form.emergencyContactName) fd.append("emergencyContactName", form.emergencyContactName);
       if (form.emergencyContactNumber) fd.append("emergencyContactNumber", form.emergencyContactNumber);
 
-      if (form.fatherName) fd.append("fatherName", form.fatherName);
-      if (form.motherName) fd.append("motherName", form.motherName);
-      if (form.spouseName) fd.append("spouseName", form.spouseName);
-      if (form.guardianName) fd.append("guardianName", form.guardianName);
+      if (form.fatherName)           fd.append("fatherName",           form.fatherName);
+      if (form.motherName)           fd.append("motherName",           form.motherName);
+      if (form.spouseName)           fd.append("spouseName",           form.spouseName);
+      if (form.guardianName)         fd.append("guardianName",         form.guardianName);
+      if (form.guardianRelationship) fd.append("guardianRelationship", form.guardianRelationship);
 
       if (form.aadhaarNumber) fd.append("aadhaarNumber", form.aadhaarNumber);
       if (form.panNumber) fd.append("panNumber", form.panNumber);
@@ -595,7 +598,8 @@ const EmployeeEdit: React.FC = () => {
       if (form.presPincode)  fd.append("presentPincode",        form.presPincode);
 
       if (form.departmentId) fd.append("departmentId", form.departmentId);
-      if (form.designation) fd.append("designation", form.designation);
+      if (form.roleId)       fd.append("roleId",       form.roleId);
+      if (form.designation)  fd.append("designation",  form.designation);
       if (form.employeeType) fd.append("employeeType", form.employeeType);
 
       if (form.dateOfJoining) fd.append("dateOfJoining", form.dateOfJoining);
@@ -620,13 +624,19 @@ const EmployeeEdit: React.FC = () => {
       } else if (st === "HOURLY") {
         if (form.hourlySalary)  fd.append("grossSalary", form.hourlySalary);
       }
-      fd.append("pfApplicable", String(form.pfApplicable));
-      if (form.pfApplicable && form.pfNumber) fd.append("pfNumber", form.pfNumber);
-      if (form.pfApplicable && form.uanNumber) fd.append("uanNumber", form.uanNumber);
-      fd.append("esiApplicable", String(form.esiApplicable));
-      if (form.esiApplicable && form.esiNumber) fd.append("esiNumber", form.esiNumber);
-      fd.append("professionalTax", String(form.professionalTax));
-      fd.append("tdsApplicable", String(form.tdsApplicable));
+      // Statutory (only for Bank Transfer)
+      if (form.paymentMode === "BANK") {
+        fd.append("pfApplicable",    String(form.pfApplicable));
+        if (form.pfApplicable && form.pfNumber)  fd.append("pfNumber",  form.pfNumber);
+        if (form.pfApplicable && form.uanNumber) fd.append("uanNumber", form.uanNumber);
+        fd.append("esiApplicable",   String(form.esiApplicable));
+        if (form.esiApplicable && form.esiNumber) fd.append("esiNumber", form.esiNumber);
+        fd.append("professionalTax", String(form.professionalTax));
+      } else {
+        fd.append("pfApplicable",    "false");
+        fd.append("esiApplicable",   "false");
+        fd.append("professionalTax", "false");
+      }
       fd.append("paymentMode", form.paymentMode || "CASH");
       if (form.bankName) fd.append("bankName", form.bankName);
       if (form.bankBranch) fd.append("bankBranch", form.bankBranch);
@@ -750,10 +760,11 @@ const EmployeeEdit: React.FC = () => {
     <div>
       <SectionHeader icon={FaUsers} title="Family Details" />
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        <TextInput label="Father Name" name="fatherName" value={form.fatherName} onChange={handleChange} placeholder="Father's name" />
-        <TextInput label="Mother Name" name="motherName" value={form.motherName} onChange={handleChange} placeholder="Mother's name" />
-        <TextInput label="Husband / Wife Name" name="spouseName" value={form.spouseName} onChange={handleChange} placeholder="Spouse's name" />
-        <TextInput label="Guardian Name" name="guardianName" value={form.guardianName} onChange={handleChange} placeholder="Guardian's name" />
+        <TextInput label="Father Name"           name="fatherName"           value={form.fatherName}           onChange={handleChange} placeholder="Father's name" />
+        <TextInput label="Mother Name"           name="motherName"           value={form.motherName}           onChange={handleChange} placeholder="Mother's name" />
+        <TextInput label="Husband / Wife Name"   name="spouseName"           value={form.spouseName}           onChange={handleChange} placeholder="Spouse's name" />
+        <TextInput label="Guardian Name"         name="guardianName"         value={form.guardianName}         onChange={handleChange} placeholder="Guardian's name" />
+        <TextInput label="Guardian Relationship" name="guardianRelationship" value={form.guardianRelationship} onChange={handleChange} placeholder="e.g. Uncle, Brother, etc." />
       </div>
     </div>
   );

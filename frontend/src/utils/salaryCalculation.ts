@@ -66,7 +66,7 @@ export function deriveFromWeekly(
 
   const dailyWage = daysPerWeek > 0 ? weeklySalary / daysPerWeek : 0;
   const hourlyWage = hoursPerDay > 0 ? dailyWage / hoursPerDay : 0;
-  const monthlyEquivalent = (weeklySalary * 52) / 12;
+  const monthlyEquivalent = (dailyWage * 30);
 
   return { dailyWage, hourlyWage, weeklyEquivalent: weeklySalary, monthlyEquivalent };
 }
@@ -118,8 +118,8 @@ export function formatINR(amount: number): string {
 export function calcMethodLabel(method: string): string {
   const map: Record<string, string> = {
     CALENDAR_DAYS: 'Calendar Days (30)',
-    WORKING_DAYS:  'Working Days',
-    FIXED_DAYS:    'Fixed Days',
+    WORKING_DAYS: 'Working Days',
+    FIXED_DAYS: 'Fixed Days',
   };
   return map[method] ?? method;
 }
