@@ -23,6 +23,7 @@ import BackButton from "../../../components/ui/BackButton/BackButton";
 import TextInput from "../../../components/form/TextInput/TextInput";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import QuantityInput from "../../../components/form/QuantityInput/QuantityInput";
+import DatePickerCalendar from "../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 import { formatDate } from "../../../utils/dateUtils";
 
 // ──────────────────────────────────────────
@@ -72,6 +73,7 @@ const adjustmentItemSchema = z.object({
   currentQty: z.number({ message: "Current qty must be a number" }),
   adjustedQty: z.number({ message: "Adjusted qty must be a number" }).min(0, "Cannot be negative"),
   difference: z.number(),
+  reason: z.string().min(1, "Reason is required"),
   remarks: z.string().optional().nullable(),
 }).refine(item => {
   if (item.itemType === "RAW_MATERIAL" || item.itemType === "WASTAGE") return !!item.rawMaterialId;
@@ -407,11 +409,77 @@ const StockAdjustmentForm: React.FC = () => {
     });
   };
 
-  const handleItemDifferenceChange = (index: number, newDiff: number) => {
+  const convertToPrimaryBaseQty = (qty: number, selectedUom?: string, baseUomStr?: string): number => {
+    if (!qty || !selectedUom || !baseUomStr) return qty;
+    
+    const sel = selectedUom.toLowerCase().trim();
+    const primary = baseUomStr.split(',')[0].trim().toLowerCase();
+
+    if (sel === primary) return qty;
+
+    // Weight / Mass (Primary is kg)
+    if (primary === "kg" || primary === "kilogram" || primary === "kgs" || primary === "kilo") {
+        if (sel === "g" || sel === "gram" || sel === "gm" || sel === "grams") return qty / 1000;
+        if (sel === "t" || sel === "ton" || sel === "tons") return qty * 1000;
+    }
+    if (primary === "g" || primary === "gram" || primary === "gm" || primary === "grams") {
+        if (sel === "kg" || sel === "kilogram" || sel === "kgs") return qty * 1000;
+        if (sel === "t" || sel === "ton" || sel === "tons") return qty * 1000000;
+    }
+
+    // Volume / Liquid (Primary is l or L)
+    if (primary === "l" || primary === "ltr" || primary === "litre" || primary === "liter" || primary === "litres") {
+        if (sel === "ml" || sel === "milliliter" || sel === "milliliters") return qty / 1000;
+    }
+    if (primary === "ml" || primary === "milliliter") {
+        if (sel === "l" || sel === "ltr" || sel === "litre" || sel === "liter") return qty * 1000;
+    }
+
+    // Length (Primary is m or meter)
+    if (primary === "m" || primary === "meter" || primary === "mtr" || primary === "meters") {
+        if (sel === "cm" || sel === "centimeter" || sel === "centimeters") return qty / 100;
+        if (sel === "mm" || sel === "millimeter" || sel === "millimeters") return qty / 1000;
+    }
+    if (primary === "cm" || primary === "centimeter") {
+        if (sel === "m" || sel === "meter" || sel === "mtr") return qty * 100;
+        if (sel === "mm" || sel === "millimeter") return qty / 10;
+    }
+    if (primary === "mm" || primary === "millimeter") {
+        if (sel === "m" || sel === "meter" || sel === "mtr") return qty * 1000;
+        if (sel === "cm" || sel === "centimeter") return qty * 10;
+    }
+
+    // Count (Primary is pcs / ea)
+    if (primary === "pcs" || primary === "ea" || primary === "each" || primary === "piece") {
+        if (sel === "dz" || sel === "dozen") return qty * 12;
+    }
+
+    return qty;
+  };
+
+  const formatCleanNumber = (val: number): string => {
+    if (Number.isInteger(val)) return String(val);
+    return Number(val.toFixed(3)).toString();
+  };
+
+  const handleItemDifferenceChange = (
+    index: number,
+    rawVal: number | string,
+    selectedUom?: string
+  ) => {
     const updatedItems = [...formData.items];
     const item = { ...updatedItems[index] };
-    item.difference = newDiff;
-    item.adjustedQty = Number(item.currentQty || 0) + newDiff;
+
+    const uom = selectedUom || item.selectedUom || getPrimaryUom(item.uom);
+    item.selectedUom = uom;
+
+    const valNum = Number(rawVal || 0);
+    item.adjustInputValue = rawVal;
+
+    const diffInBase = convertToPrimaryBaseQty(valNum, uom, item.uom);
+    item.difference = diffInBase;
+    item.adjustedQty = Number(item.currentQty || 0) + diffInBase;
+
     updatedItems[index] = item;
     setFormData({ ...formData, items: updatedItems });
   };
@@ -499,7 +567,7 @@ const StockAdjustmentForm: React.FC = () => {
       type: "FINISHED_GOODS" as const,
       typeLabel: "Finished Goods",
       category: p.category?.name || p.category?.categoryName || "",
-      uom: getPrimaryUom(p.uom?.code || p.uom?.uomCode || "pcs"),
+      uom: p.uom?.code || p.uom?.uomCode || p.baseUom || "pcs",
     })),
     ...rawMaterials
       .filter((rm) => rm.itemType !== "WASTAGE")
@@ -511,7 +579,7 @@ const StockAdjustmentForm: React.FC = () => {
         type: "RAW_MATERIAL" as const,
         typeLabel: "Raw Material",
         category: rm.category?.name || "",
-        uom: getPrimaryUom(rm.baseUom || "kg"),
+        uom: rm.baseUom || "kg",
       })),
     ...rawMaterials
       .filter((rm) => rm.itemType === "WASTAGE")
@@ -523,7 +591,7 @@ const StockAdjustmentForm: React.FC = () => {
         type: "WASTAGE" as const,
         typeLabel: "Wastage Product",
         category: rm.category?.name || "",
-        uom: getPrimaryUom(rm.baseUom || "kg"),
+        uom: rm.baseUom || "kg",
       })),
   ];
 
@@ -587,7 +655,8 @@ const StockAdjustmentForm: React.FC = () => {
           name: item.name,
           itemCode: item.itemCode,
           categoryName: item.category,
-          uom: getPrimaryUom(item.uom),
+          uom: item.uom,
+          selectedUom: getPrimaryUom(item.uom),
         },
       ],
     });
@@ -675,6 +744,8 @@ const StockAdjustmentForm: React.FC = () => {
       currentQty: Number(item.currentQty),
       adjustedQty: Number(item.adjustedQty),
       difference: Number(item.difference),
+      reason: item.reason || "",
+      uom: item.selectedUom || item.uom,
       remarks: [
         REASON_OPTIONS.find((o) => o.value === item.reason)?.label || item.reason,
         item.notes,
@@ -741,17 +812,22 @@ const StockAdjustmentForm: React.FC = () => {
               </p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <TextInput
-                label="Date"
-                required
-                name="adjustmentDate"
-                type="date"
-                value={formData.adjustmentDate}
-                onChange={(e) =>
-                  setFormData({ ...formData, adjustmentDate: e.target.value })
-                }
-                error={errors.adjustmentDate}
-              />
+              <div>
+                <label className="block mb-1 text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  Date <span className="text-red-500">*</span>
+                </label>
+                <DatePickerCalendar
+                  name="adjustmentDate"
+                  value={formData.adjustmentDate}
+                  onChange={(e) =>
+                    setFormData({ ...formData, adjustmentDate: e.target.value })
+                  }
+                  required
+                />
+                {errors.adjustmentDate && (
+                  <p className="text-xs text-red-500 mt-1 font-medium">{errors.adjustmentDate}</p>
+                )}
+              </div>
               <TextInput
                 label="Adjusted By"
                 name="reason"
@@ -1041,7 +1117,7 @@ const StockAdjustmentForm: React.FC = () => {
                         New Total
                       </th>
                       <th className="px-4 py-3.5 text-left text-xs font-bold text-slate-600 uppercase tracking-wider min-w-[160px]">
-                        Reason
+                        Reason <span className="text-rose-500">*</span>
                       </th>
                       <th className="px-4 py-3.5 text-left text-xs font-bold text-slate-600 uppercase tracking-wider min-w-[200px]">
                         Notes
@@ -1052,10 +1128,14 @@ const StockAdjustmentForm: React.FC = () => {
                   <tbody className="divide-y divide-slate-100">
                     {formData.items.length > 0 ? (
                       formData.items.map((item: any, index: number) => {
-                        const diff = Number(item.difference || 0);
+                        const diffInBase = Number(item.difference || 0);
                         const current = Number(item.currentQty || 0);
-                        const newTotal = current + diff;
-                        const uom = getPrimaryUom(item.uom || "pcs");
+                        const newTotalNum = current + diffInBase;
+                        const newTotal = formatCleanNumber(newTotalNum);
+                        const baseUom = getPrimaryUom(item.uom || "pcs");
+
+                        const currentInputVal = item.adjustInputValue !== undefined ? item.adjustInputValue : (diffInBase === 0 ? "" : diffInBase);
+                        const selectedUom = item.selectedUom || baseUom;
 
                         return (
                           <tr key={index} className="hover:bg-slate-50/60 transition-colors group">
@@ -1098,7 +1178,7 @@ const StockAdjustmentForm: React.FC = () => {
                             <td className="px-4 py-4 align-middle text-center">
                               <span className="font-bold text-slate-800 text-base">
                                 {current}
-                                {uom}
+                                {baseUom}
                               </span>
                             </td>
 
@@ -1109,19 +1189,24 @@ const StockAdjustmentForm: React.FC = () => {
                                   text=""
                                   icon={FaMinus}
                                   size="sm"
-                                  onClick={() => handleItemDifferenceChange(index, diff - 1)}
+                                  onClick={() => {
+                                    const numVal = Number(currentInputVal || 0);
+                                    handleItemDifferenceChange(index, numVal - 1, selectedUom);
+                                  }}
                                   className="!bg-white !text-slate-700 hover:!bg-slate-100 !border !border-slate-200 !px-3 !h-10"
                                 />
                                 <div className="flex-1 min-w-[140px] [&_.mb-4]:!mb-0">
                                   <QuantityInput
                                     hideLabel={true}
                                     name={`difference-${index}`}
-                                    value={diff === 0 ? "" : diff}
+                                    value={currentInputVal}
                                     baseUoms={item.uom || "pcs"}
+                                    uom={selectedUom}
                                     onChange={(e: any) =>
                                       handleItemDifferenceChange(
                                         index,
-                                        e.target.value === "" ? 0 : Number(e.target.value)
+                                        e.target.value,
+                                        e.target.uom
                                       )
                                     }
                                     disabled={false}
@@ -1132,7 +1217,10 @@ const StockAdjustmentForm: React.FC = () => {
                                   text=""
                                   icon={FaPlus}
                                   size="sm"
-                                  onClick={() => handleItemDifferenceChange(index, diff + 1)}
+                                  onClick={() => {
+                                    const numVal = Number(currentInputVal || 0);
+                                    handleItemDifferenceChange(index, numVal + 1, selectedUom);
+                                  }}
                                   className="!bg-white !text-slate-700 hover:!bg-slate-100 !border !border-slate-200 !px-3 !h-10"
                                 />
                               </div>
@@ -1142,18 +1230,22 @@ const StockAdjustmentForm: React.FC = () => {
                             <td className="px-4 py-4 align-middle text-center">
                               <div className="font-bold text-slate-900 text-base">
                                 {newTotal}
-                                {uom}
+                                {baseUom}
                               </div>
                               <div
                                 className={`text-xs font-bold mt-0.5 ${
-                                  diff > 0
+                                  diffInBase > 0
                                     ? "text-green-600"
-                                    : diff < 0
+                                    : diffInBase < 0
                                     ? "text-red-600"
                                     : "text-slate-400"
                                 }`}
                               >
-                                {diff > 0 ? `+${diff}${uom}` : `${diff}${uom}`}
+                                {diffInBase > 0
+                                  ? `+${currentInputVal}${selectedUom}`
+                                  : diffInBase < 0
+                                  ? `${currentInputVal}${selectedUom}`
+                                  : `0${selectedUom}`}
                               </div>
                             </td>
 
@@ -1171,6 +1263,8 @@ const StockAdjustmentForm: React.FC = () => {
                                     ...REASON_OPTIONS,
                                   ]}
                                   onChange={(e: any) => handleItemChange(index, "reason", e.target.value)}
+                                  error={errors[`items.${index}.reason`]}
+                                  required
                                 />
                               </div>
                             </td>

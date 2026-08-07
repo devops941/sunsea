@@ -47,17 +47,41 @@ const SelectInput: React.FC<SelectInputProps> = ({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const portalRef = useRef<HTMLDivElement>(null);
 
-  // Calculate dropdown position for portal rendering
+  // Calculate dropdown position for portal rendering (auto-flip upwards if near bottom of viewport)
   const updateDropdownPosition = useCallback(() => {
     if (triggerRef.current) {
       const rect = triggerRef.current.getBoundingClientRect();
-      setDropdownStyle({
+      const viewportHeight = window.innerHeight;
+      const spaceBelow = viewportHeight - rect.bottom;
+      const spaceAbove = rect.top;
+      const dropdownEstHeight = 240;
+
+      let style: React.CSSProperties = {
         position: "fixed",
-        top: `${rect.bottom + 4}px`,
         left: `${rect.left}px`,
         width: `${rect.width}px`,
         zIndex: 100000,
-      });
+      };
+
+      if (spaceBelow < dropdownEstHeight && spaceAbove > spaceBelow) {
+        // Open UPWARDS
+        const maxH = Math.min(240, spaceAbove - 16);
+        style = {
+          ...style,
+          bottom: `${viewportHeight - rect.top + 4}px`,
+          maxHeight: `${Math.max(120, maxH)}px`,
+        };
+      } else {
+        // Open DOWNWARDS
+        const maxH = Math.min(240, spaceBelow - 16);
+        style = {
+          ...style,
+          top: `${rect.bottom + 4}px`,
+          maxHeight: `${Math.max(120, maxH)}px`,
+        };
+      }
+
+      setDropdownStyle(style);
     }
   }, []);
 
@@ -195,7 +219,7 @@ const SelectInput: React.FC<SelectInputProps> = ({
               </div>
             )}
 
-            <div className="overflow-y-auto">
+            <div className="overflow-y-auto min-h-0 flex-1">
               {defaultOptionLabel && !searchTerm && (
                 <div
                   onClick={() => handleSelect("")}

@@ -319,12 +319,12 @@ const PayrollDashboard: React.FC = () => {
       {/* ── Module Navigation Tabs ── */}
       <div className="bg-slate-100/80 border border-slate-200/60 p-1.5 rounded-2xl inline-flex flex-wrap items-center gap-1.5 w-full">
         {[
-          { label: 'Overview',         path: '/payroll/dashboard',        icon: BarChart3,     active: true,  show: true },
-          { label: 'Generate Weekly',  path: '/payroll/run?type=weekly',  icon: CalendarDays,  active: false, show: canCreateRun },
-          { label: 'Generate Monthly', path: '/payroll/run?type=monthly', icon: PlayCircle,    active: false, show: canCreateRun },
+          // { label: 'Overview',         path: '/payroll/dashboard',        icon: BarChart3,     active: true,  show: true },
+          { label: 'Attendance',       path: '/payroll/attendance',       icon: ClipboardList, active: false, show: can("payroll-attendance.view") },
+          // { label: 'Generate Weekly',  path: '/payroll/run?type=weekly',  icon: CalendarDays,  active: false, show: canCreateRun },
+          // { label: 'Generate Monthly', path: '/payroll/run?type=monthly', icon: PlayCircle,    active: false, show: canCreateRun },
           { label: 'Weekly Report',    path: '/payroll/weekly-report',    icon: FileText,      active: false, show: canViewRun },
           { label: 'Monthly Report',   path: '/payroll/monthly-report',   icon: FileText,      active: false, show: canViewRun },
-          { label: 'Attendance',       path: '/payroll/attendance',       icon: ClipboardList, active: false, show: can("payroll-attendance.view") },
           { label: 'Salary Advance',   path: '/payroll/advance',          icon: Wallet,        active: false, show: can("payroll-advance.view") },
           { label: 'Settings',         path: '/payroll/settings',         icon: Settings,      active: false, show: can("payroll-settings.view") },
         ].filter(t => t.show).map(tab => (

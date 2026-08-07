@@ -54,12 +54,12 @@ const AddPanel: React.FC<AddPanelProps> = ({ employees, onClose, onSaved }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-40 flex">
+    <div className="fixed inset-0 z-50 flex">
       {/* backdrop */}
-      <div className="flex-1 " onClick={onClose} />
+      <div className="flex-1 bg-black/40 backdrop-blur-xs transition-opacity" onClick={onClose} />
       {/* panel */}
-      <div className="w-full max-w-md  shadow-xl flex flex-col">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+      <div className="w-full max-w-md bg-white border-l border-slate-200 shadow-2xl flex flex-col h-full relative z-10">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-white">
           <div className="flex items-center gap-2">
             <Wallet size={18} className="text-primary" />
             <h2 className="text-base font-bold text-slate-800">Add Salary Advance</h2>
@@ -69,14 +69,14 @@ const AddPanel: React.FC<AddPanelProps> = ({ employees, onClose, onSaved }) => {
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-6 py-5 space-y-4 bg-white">
           {/* Employee */}
           <div>
             <label className="block text-xs font-semibold text-slate-600 mb-1">Employee <span className="text-red-500">*</span></label>
             <select
               value={employeeId}
               onChange={e => setEmployeeId(e.target.value)}
-              className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary/30"
+              className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary/30 bg-white"
               required
             >
               <option value="">Select employee…</option>
@@ -98,7 +98,7 @@ const AddPanel: React.FC<AddPanelProps> = ({ employees, onClose, onSaved }) => {
               value={amount}
               onChange={e => setAmount(e.target.value)}
               placeholder="0.00"
-              className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary/30"
+              className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary/30 bg-white"
               required
             />
           </div>
@@ -110,7 +110,7 @@ const AddPanel: React.FC<AddPanelProps> = ({ employees, onClose, onSaved }) => {
               type="date"
               value={date}
               onChange={e => setDate(e.target.value)}
-              className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary/30"
+              className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary/30 bg-white"
               required
             />
           </div>
@@ -124,12 +124,12 @@ const AddPanel: React.FC<AddPanelProps> = ({ employees, onClose, onSaved }) => {
               value={reason}
               onChange={e => setReason(e.target.value)}
               placeholder="e.g. Medical emergency"
-              className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary/30"
+              className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary/30 bg-white"
             />
           </div>
         </form>
 
-        <div className="px-6 py-4 border-t border-slate-100 flex gap-3 justify-end">
+        <div className="px-6 py-4 border-t border-slate-100 flex gap-3 justify-end bg-white">
           <button
             type="button"
             onClick={onClose}
@@ -200,7 +200,7 @@ const SalaryAdvancePage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 p-6 space-y-6">
+    <div className="min-h-screen bg-white p-6 space-y-6">
       {/* ── Header ── */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">

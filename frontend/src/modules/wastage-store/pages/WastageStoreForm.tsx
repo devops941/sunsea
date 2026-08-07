@@ -66,6 +66,49 @@ const wastageSchema = z.object({
         .optional(),
 });
 
+const normalizeUom = (uom: string): string => {
+    const u = uom.trim().toLowerCase();
+    if (u === "kilogram" || u === "kilograms") return "kg";
+    if (u === "gram" || u === "grams") return "g";
+    if (u === "ton" || u === "tonne" || u === "tonnes" || u === "tons") return "t";
+    if (u === "liter" || u === "litre" || u === "liters" || u === "litres" || u === "ltr") return "l";
+    if (u === "milliliter" || u === "millilitre" || u === "milliliters" || u === "millilitres" || u === "ml") return "ml";
+    if (u === "meter" || u === "meters" || u === "metre" || u === "metres" || u === "mtr") return "m";
+    if (u === "centimeter" || u === "centimeters" || u === "centimetre" || u === "centimetres") return "cm";
+    if (u === "millimeter" || u === "millimeters" || u === "millimetre" || u === "millimetres") return "mm";
+    if (u === "pcs" || u === "piece" || u === "pieces" || u === "ea" || u === "each") return "pcs";
+    if (u === "box" || u === "boxes") return "box";
+    if (u === "dozen" || u === "dz") return "dz";
+    return u;
+};
+
+const convertToPrimaryUom = (qty: number, selectedUom: string, baseUomStr: string): number => {
+    if (!baseUomStr || !selectedUom) return qty;
+    const uoms = baseUomStr.split(",").map(u => normalizeUom(u.trim()));
+    const primary = uoms[0];
+    const selected = normalizeUom(selectedUom);
+    if (primary === selected) return qty;
+    if (primary === "kg" && selected === "g") return qty / 1000;
+    if (primary === "kg" && selected === "t") return qty * 1000;
+    if (primary === "g" && selected === "kg") return qty * 1000;
+    if (primary === "g" && selected === "t") return qty * 1_000_000;
+    if (primary === "t" && selected === "kg") return qty / 1000;
+    if (primary === "t" && selected === "g") return qty / 1_000_000;
+    if (primary === "l" && selected === "ml") return qty / 1000;
+    if (primary === "ml" && selected === "l") return qty * 1000;
+    if (primary === "m" && selected === "cm") return qty / 100;
+    if (primary === "m" && selected === "mm") return qty / 1000;
+    if (primary === "cm" && selected === "m") return qty * 100;
+    if (primary === "cm" && selected === "mm") return qty / 10;
+    if (primary === "mm" && selected === "m") return qty * 1000;
+    if (primary === "mm" && selected === "cm") return qty * 10;
+    if (primary === "dz" && selected === "pcs") return qty / 12;
+    if (primary === "pcs" && selected === "dz") return qty * 12;
+    if (primary === "box" && selected === "pcs") return qty / 12;
+    if (primary === "pcs" && selected === "box") return qty * 12;
+    return qty;
+};
+
 const WastageStoreForm: React.FC = () => {
     const navigate = useNavigate();
     const locationState = useLocation();
@@ -76,6 +119,7 @@ const WastageStoreForm: React.FC = () => {
     const [formData, setFormData] = useState(initialFormState);
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [openingStockUom, setOpeningStockUom] = useState("");
 
     const { data: stores } = useAppSelector(state => state.stores);
     const { rawMaterialCategories, loadCategories } = useRawMaterialCategories();
@@ -90,6 +134,11 @@ const WastageStoreForm: React.FC = () => {
 
     useSocketSync("store", undefined, fetchStoresData);
     useSocketSync("rawMaterialCategory", undefined, fetchCategoriesData);
+
+    // Reset opening stock UOM selection when baseUom changes
+    useEffect(() => {
+        setOpeningStockUom("");
+    }, [formData.baseUom]);
 
     useEffect(() => {
         fetchStoresData();
@@ -120,14 +169,6 @@ const WastageStoreForm: React.FC = () => {
         }
     }, [dispatch, loadCategories, isEdit, locationState.state]);
 
-    const handleUomSelectInQuantity = (selectedUom: string) => {
-        if (!formData.baseUom) return;
-        const list = formData.baseUom.split(",").map(u => u.trim()).filter(Boolean);
-        const rest = list.filter(u => u.toLowerCase() !== selectedUom.toLowerCase());
-        const reordered = [selectedUom, ...rest].join(",");
-        setFormData(prev => ({ ...prev, baseUom: reordered }));
-    };
-
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
@@ -150,6 +191,7 @@ const WastageStoreForm: React.FC = () => {
             });
         } else {
             setFormData(prev => ({ ...initialFormState, rawMaterialId: prev.rawMaterialId }));
+            setOpeningStockUom("");
         }
         setErrors({});
     };
@@ -177,10 +219,17 @@ const WastageStoreForm: React.FC = () => {
 
         setIsSubmitting(true);
         try {
+            const primaryUom = formData.baseUom.split(",")[0]?.trim() || "";
+            const convertedOnHandQty = convertToPrimaryUom(
+                formData.onHandQty ? Number(formData.onHandQty) : 0,
+                openingStockUom || primaryUom,
+                formData.baseUom
+            );
+
             const payload = {
                 ...formData,
                 categoryId: formData.categoryId ? Number(formData.categoryId) : undefined,
-                onHandQty: Number(formData.onHandQty),
+                onHandQty: convertedOnHandQty,
                 isActive: formData.status === "Active",
                 itemType: "WASTAGE"
             } as any;
@@ -277,7 +326,8 @@ const WastageStoreForm: React.FC = () => {
                             name="onHandQty"
                             value={formData.onHandQty}
                             baseUoms={formData.baseUom}
-                            onUomChange={handleUomSelectInQuantity}
+                            uom={openingStockUom || undefined}
+                            onUomChange={setOpeningStockUom}
                             onChange={handleChange}
                             error={errors.onHandQty}
                             required

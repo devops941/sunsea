@@ -4,6 +4,54 @@ import { CreateProductionOrderInput, UpdateProductionOrderInput, ProductionOrder
 import { Prisma } from "@prisma/client";
 import { StatusSyncService } from "../../utils/status-sync.util";
 
+/** Normalize UOM aliases to canonical short form */
+function normalizeUom(uom: string): string {
+  const u = (uom || "").trim().toLowerCase();
+  if (u === "kilogram" || u === "kilograms") return "kg";
+  if (u === "gram" || u === "grams") return "g";
+  if (u === "ton" || u === "tonne" || u === "tonnes" || u === "tons") return "t";
+  if (u === "liter" || u === "litre" || u === "liters" || u === "litres" || u === "ltr") return "l";
+  if (u === "milliliter" || u === "millilitre" || u === "milliliters" || u === "millilitres" || u === "ml") return "ml";
+  if (u === "meter" || u === "meters" || u === "metre" || u === "metres") return "m";
+  if (u === "centimeter" || u === "centimetre" || u === "centimeters" || u === "centimetres") return "cm";
+  if (u === "millimeter" || u === "millimetre" || u === "millimeters" || u === "millimetres") return "mm";
+  if (u === "pcs" || u === "piece" || u === "pieces" || u === "ea" || u === "each") return "pcs";
+  if (u === "box" || u === "boxes") return "box";
+  if (u === "dozen" || u === "dz") return "dz";
+  return u;
+}
+
+/** Convert qty from selectedUom to baseUom (primary unit of the raw material) */
+function convertToBaseUom(qty: number, selectedUom: string, baseUomStr: string): number {
+  if (!baseUomStr || !selectedUom) return qty;
+  const primary = normalizeUom(baseUomStr.split(",")[0]);
+  const selected = normalizeUom(selectedUom);
+  if (primary === selected) return qty;
+  // Weight: kg ↔ g ↔ t
+  if (primary === "kg" && selected === "g") return qty / 1000;
+  if (primary === "kg" && selected === "t") return qty * 1000;
+  if (primary === "g" && selected === "kg") return qty * 1000;
+  if (primary === "g" && selected === "t") return qty * 1_000_000;
+  if (primary === "t" && selected === "kg") return qty / 1000;
+  if (primary === "t" && selected === "g") return qty / 1_000_000;
+  // Volume: l ↔ ml
+  if (primary === "l" && selected === "ml") return qty / 1000;
+  if (primary === "ml" && selected === "l") return qty * 1000;
+  // Length: m ↔ cm ↔ mm
+  if (primary === "m" && selected === "cm") return qty / 100;
+  if (primary === "m" && selected === "mm") return qty / 1000;
+  if (primary === "cm" && selected === "m") return qty * 100;
+  if (primary === "cm" && selected === "mm") return qty / 10;
+  if (primary === "mm" && selected === "m") return qty * 1000;
+  if (primary === "mm" && selected === "cm") return qty * 10;
+  // Count: pcs ↔ dz ↔ box
+  if (primary === "dz" && selected === "pcs") return qty / 12;
+  if (primary === "pcs" && selected === "dz") return qty * 12;
+  if (primary === "box" && selected === "pcs") return qty / 12;
+  if (primary === "pcs" && selected === "box") return qty * 12;
+  return qty;
+}
+
 // ============================================================
 // STATUS TRANSITION RULES (ERP Standard Manufacturing Flow)
 // CREATED → READY_FOR_PLANNING ↔ WAITING_FOR_MATERIAL
@@ -940,7 +988,7 @@ class ProductionOrderService {
   // Now gated: only READY_FOR_PLANNING or WEEKLY_SCHEDULED orders.
   async issueMaterials(
     productionOrderId: string,
-    data: { items: { rawMaterialId: string; storeId: string; qty: number; remarks?: string }[] },
+    data: { items: { rawMaterialId: string; storeId: string; qty: number; selectedUom?: string; remarks?: string }[] },
     userId?: string
   ) {
     const { items } = data;
@@ -1039,14 +1087,19 @@ class ProductionOrderService {
       });
 
       for (const item of items) {
-        const { rawMaterialId, storeId, qty, remarks } = item;
+        const { rawMaterialId, storeId, qty, selectedUom, remarks } = item;
 
         const rm = await tx.rawMaterial.findUnique({ where: { rawMaterialId } });
         if (!rm) throw new ApiError(404, `Raw Material with ID ${rawMaterialId} not found`);
 
+        // Convert qty from the user's selected UOM to the raw material's base UOM.
+        const rmBaseUom = String(rm.baseUom || "kg");
+        const issueUom = selectedUom || rmBaseUom;
+        const convertedQty = convertToBaseUom(qty, issueUom, rmBaseUom);
+
         const currentQty = rm.onHandQty;
-        const newOnHand = Number(rm.onHandQty) - qty;
-        const newReserved = Math.max(0, Number(rm.reservedQty) - qty);
+        const newOnHand = Number(rm.onHandQty) - convertedQty;
+        const newReserved = Math.max(0, Number(rm.reservedQty) - convertedQty);
 
         await tx.rawMaterial.update({
           where: { rawMaterialId },
@@ -1058,7 +1111,7 @@ class ProductionOrderService {
             storeId,
             rawMaterialId,
             txnType: "RAW_MATERIAL_ISSUE",
-            qty: -qty,
+            qty: -convertedQty,
             remarks: remarks || `Issued for Production Order ${productionOrderId}`,
             productionOrderId,
           },
@@ -1072,7 +1125,7 @@ class ProductionOrderService {
             storeId,
             currentQty,
             adjustedQty: newOnHand,
-            difference: -qty,
+            difference: -convertedQty,
             remarks: remarks || `Issued for Production Order ${productionOrderId}`,
           },
         });

@@ -604,7 +604,7 @@ const AttendancePage: React.FC = () => {
         <div className="w-px h-5 bg-border" />
 
         {/* Bulk actions */}
-        <button onClick={applyCompanySchedule}
+        {/* <button onClick={applyCompanySchedule}
           title={`Marks ${weeklyOffDays.map(d => DAY_FULL[d]).join(', ')} as Weekly Off; all other days as Present`}
           className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary bg-red-50 border border-primary/30 px-3 py-1.5 rounded-lg hover:bg-red-100 transition-colors">
           <Calendar size={12} />
@@ -614,7 +614,7 @@ const AttendancePage: React.FC = () => {
               ({weeklyOffDays.map(d => DAY_ABBR[d]).join(', ')} off)
             </span>
           )}
-        </button>
+        </button> */}
 
         <button onClick={clearAll}
           className="text-xs font-semibold text-slate-600 bg-slate-100 border border-slate-200 px-3 py-1.5 rounded-lg hover:bg-slate-200 transition-colors">
@@ -630,14 +630,14 @@ const AttendancePage: React.FC = () => {
           Changes will overwrite on next save.
         </div>
       )}
-      {weeklyOffDays.length > 0 && (
+      {/* {weeklyOffDays.length > 0 && (
         <div className="bg-amber-50 border-b border-amber-200 px-6 py-2 flex items-center gap-2 text-xs text-amber-700">
           <Info size={13} />
           Company weekly off days:
           <strong className="ml-1">{weeklyOffDays.map(d => DAY_FULL[d]).join(', ')}</strong>.
           Click "Apply Company Schedule" to auto-fill these as WO.
         </div>
-      )}
+      )} */}
 
       {/* ── Legend ── */}
       <div className="bg-white border-b border-border px-6 py-2 flex flex-wrap items-center gap-3">
