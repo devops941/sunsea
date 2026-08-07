@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { FaBoxes, FaPlus, FaTimes, FaTrash } from "react-icons/fa";
+import { FaBoxes, FaPlus, FaTimes, FaTrash, FaEraser, FaSave } from "react-icons/fa";
 import { toast } from "react-toastify";
 import { returnService, type PurchaseReturn } from "../../../../services/returnService";
 import { supplierService } from "../../../../services/supplierService";
@@ -8,16 +8,29 @@ import { grnInvoiceService } from "../../../../services/grnInvoiceService";
 import { storeService } from "../../../../services/storeService";
 import { useAppSelector } from "../../../../hooks/reduxHooks";
 
+import DataTable from "../../../../components/ui/table/DataTable";
+import SearchInput from "../../../../components/ui/SearchInput/SearchInput";
+import ViewButton from "../../../../components/ui/viewbutton/ViewButton";
+import CustomButton from "../../../../components/ui/Button/Button";
+import CommonModal from "../../../../components/ui/Modal/CommonModal";
+import SelectInput from "../../../../components/form/SelectInput/SelectInput";
+import TextInput from "../../../../components/form/TextInput/TextInput";
+
 interface FormReturnRow {
   rawMaterialId: string;
   materialName: string;
   quantity: number;
+  purchasedQty: number;
+  alreadyReturnedQty: number;
   maxReturnable: number;
   unitPrice: number;
   reason?: string;
+  isGrnLinked?: boolean;
 }
 
 import { useSocketSync } from "../../../../hooks/useSocketSync";
+
+const ITEMS_PER_PAGE = 10;
 
 export const PurchaseReturnPage: React.FC = () => {
   const [returns, setReturns] = useState<PurchaseReturn[]>([]);
@@ -27,6 +40,10 @@ export const PurchaseReturnPage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [showModal, setShowModal] = useState<boolean>(false);
   const [submitting, setSubmitting] = useState<boolean>(false);
+  const [selectedViewReturn, setSelectedViewReturn] = useState<PurchaseReturn | null>(null);
+
+  const [searchTerm, setSearchTerm] = useState<string>("");
+  const [currentPage, setCurrentPage] = useState<number>(1);
 
   const { data: company } = useAppSelector((state) => state.company);
 
@@ -47,7 +64,7 @@ export const PurchaseReturnPage: React.FC = () => {
     try {
       const [rData, sRes, mRes, stRes] = await Promise.all([
         returnService.fetchPurchaseReturns(),
-        supplierService.fetchAll({ page: 1, limit: 10 }),
+        supplierService.fetchAll({ limit: 1000 }),
         rawMaterialService.fetchAll(),
         storeService.fetchAll({ storeCategory: "RAW_MATERIAL", limit: 100 }),
       ]);
@@ -72,6 +89,7 @@ export const PurchaseReturnPage: React.FC = () => {
   useSocketSync("purchaseReturn", undefined, loadData);
   useSocketSync("grnInvoice", undefined, loadData);
   useSocketSync("supplier", undefined, loadData);
+  useSocketSync("rawMaterial", undefined, loadData);
 
   // When Supplier changes, fetch GRN Invoices
   useEffect(() => {
@@ -95,7 +113,7 @@ export const PurchaseReturnPage: React.FC = () => {
     fetchGrns();
   }, [supplierId]);
 
-  // When GRN Invoice changes, fetch line items
+  // When GRN Invoice changes, fetch line items & calculate remaining returnable quantities
   useEffect(() => {
     if (!selectedGrnId) {
       setReturnRows([]);
@@ -110,18 +128,37 @@ export const PurchaseReturnPage: React.FC = () => {
           setSelectedStoreId(grn.storeId);
         }
 
+        // Calculate already returned quantities for this GRN
+        const previousReturns = returns.filter(
+          (r) => String(r.grnInvoiceId) === String(selectedGrnId) && r.status !== "CANCELLED"
+        );
+        const alreadyReturnedMap = new Map<string, number>();
+        previousReturns.forEach((ret) => {
+          (ret.items || []).forEach((ritem: any) => {
+            const rmId = String(ritem.rawMaterialId);
+            alreadyReturnedMap.set(rmId, (alreadyReturnedMap.get(rmId) || 0) + Number(ritem.quantity));
+          });
+        });
+
         if (grn && Array.isArray(grn.items)) {
           const initialRows: FormReturnRow[] = grn.items.map((item: any) => {
-            const rmId = item.rawMaterialId || item.productId || item.id;
-            const matchedMat = materials.find((m) => m.rawMaterialId === rmId || m.id === rmId);
+            const rmId = String(item.productId || item.rawMaterialId || item.id);
+            const matchedMat = materials.find((m) => String(m.rawMaterialId || m.id) === rmId);
             const nameDisplay = matchedMat?.materialName || item.description || `Material #${rmId}`;
+            const purchasedQty = Number(item.quantity) || 0;
+            const alreadyReturnedQty = alreadyReturnedMap.get(rmId) || 0;
+            const maxReturnable = Math.max(0, purchasedQty - alreadyReturnedQty);
+
             return {
               rawMaterialId: rmId,
               materialName: nameDisplay,
               quantity: 0,
-              maxReturnable: Number(item.quantity),
+              purchasedQty,
+              alreadyReturnedQty,
+              maxReturnable,
               unitPrice: Number(item.unitPrice),
               reason: "",
+              isGrnLinked: true,
             };
           });
           setReturnRows(initialRows);
@@ -134,29 +171,30 @@ export const PurchaseReturnPage: React.FC = () => {
     };
 
     fetchGrnDetails();
-  }, [selectedGrnId, materials]);
+  }, [selectedGrnId, materials, returns]);
 
   const handleAddManualRow = () => {
     if (materials.length === 0) return;
     const first = materials[0];
-    const rmId = first.rawMaterialId || first.id;
+    const rmId = String(first.rawMaterialId || first.id);
     setReturnRows((prev) => [
       ...prev,
       {
         rawMaterialId: rmId,
         materialName: first.materialName || first.name || `Material #${rmId}`,
         quantity: 1,
+        purchasedQty: 0,
+        alreadyReturnedQty: 0,
         maxReturnable: 99999,
         unitPrice: Number(first.unitPrice || 0),
         reason: "",
+        isGrnLinked: false,
       },
     ]);
   };
 
-  const [selectedViewReturn, setSelectedViewReturn] = useState<PurchaseReturn | null>(null);
-
   const handleRowMaterialChange = (index: number, rmId: string) => {
-    const matchedMat = materials.find((m) => (m.rawMaterialId || m.id) === rmId);
+    const matchedMat = materials.find((m) => String(m.rawMaterialId || m.id) === rmId);
     setReturnRows((prev) => {
       const updated = [...prev];
       updated[index].rawMaterialId = rmId;
@@ -170,6 +208,9 @@ export const PurchaseReturnPage: React.FC = () => {
     setReturnRows((prev) => {
       const updated = [...prev];
       const max = updated[index].maxReturnable;
+      if (qtyVal > max) {
+        toast.warning(`Maximum returnable quantity for ${updated[index].materialName} is ${max}`);
+      }
       const validQty = Math.max(0, Math.min(qtyVal, max));
       updated[index].quantity = validQty;
       return updated;
@@ -253,324 +294,365 @@ export const PurchaseReturnPage: React.FC = () => {
     setNarration("");
   };
 
+  const filteredReturns = returns.filter((r) => {
+    if (!searchTerm) return true;
+    const term = searchTerm.toLowerCase();
+    return (
+      r.returnNo?.toLowerCase().includes(term) ||
+      r.supplier?.legalName?.toLowerCase().includes(term) ||
+      r.grnInvoice?.invoiceNo?.toLowerCase().includes(term) ||
+      r.reason?.toLowerCase().includes(term)
+    );
+  });
+
+  const totalPages = Math.ceil(filteredReturns.length / ITEMS_PER_PAGE) || 1;
+  const paginatedReturns = filteredReturns.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+    <div className="bg-white rounded-xl shadow-xs border border-slate-100 p-4 space-y-4">
+      {/* Header & Controls */}
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6">
         <div>
-          <div className="flex items-center gap-2 text-sm text-slate-500 mb-1">
-            <span>Accounts</span>
-            <span>/</span>
-            <span className="text-slate-900 font-medium">Purchase Returns</span>
-          </div>
-          <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-            <FaBoxes className="text-amber-600" /> Purchase Return (Debit Note)
-          </h1>
+          <h1 className="text-xl font-bold text-slate-900">Purchase Returns (Debit Note)</h1>
+          <p className="text-sm text-slate-500 mt-1">
+            Manage supplier purchase returns, stock deductions, and debit notes.
+          </p>
         </div>
-        <button
-          onClick={() => {
-            resetForm();
-            setShowModal(true);
-          }}
-          className="flex items-center gap-2 px-4 py-2.5 bg-amber-600 text-white rounded-lg hover:bg-amber-700 font-medium transition shadow-sm"
-        >
-          <FaPlus /> Process Purchase Return
-        </button>
+        <div className="flex flex-wrap items-center gap-3 relative w-full lg:w-auto">
+          <SearchInput
+            value={searchTerm}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              setCurrentPage(1);
+            }}
+            placeholder="Search returns..."
+          />
+          <CustomButton
+            text="Process Purchase Return"
+            icon={FaPlus}
+            onClick={() => {
+              resetForm();
+              setShowModal(true);
+            }}
+          />
+        </div>
       </div>
 
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="p-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
-          <h2 className="font-semibold text-slate-800">Purchase Return Records</h2>
-          <span className="text-xs text-slate-500 font-mono">Count: {returns.length}</span>
-        </div>
-        {loading ? (
-          <div className="p-8 text-center text-slate-500">Loading purchase returns...</div>
-        ) : returns.length === 0 ? (
-          <div className="p-12 text-center text-slate-400">No purchase return records found.</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm text-slate-600">
-              <thead className="bg-slate-100 text-slate-700 uppercase font-semibold text-xs border-b border-slate-200">
-                <tr>
-                  <th className="px-4 py-3">Return No</th>
-                  <th className="px-4 py-3">Date</th>
-                  <th className="px-4 py-3">Supplier</th>
-                  <th className="px-4 py-3">GRN Invoice</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3 text-right">Grand Total (₹)</th>
-                  <th className="px-4 py-3">Reason</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200">
-                {returns.map((r) => (
-                  <tr key={r.id} className="hover:bg-slate-50 transition">
-                    <td className="px-4 py-3 font-mono font-medium text-amber-600">
-                      <button
-                        onClick={() => setSelectedViewReturn(r)}
-                        className="hover:underline text-left font-bold"
-                        title="Click to view PO Return Details"
-                      >
-                        {r.returnNo}
-                      </button>
-                    </td>
-                    <td className="px-4 py-3">{new Date(r.returnDate).toLocaleDateString("en-IN")}</td>
-                    <td className="px-4 py-3 font-medium text-slate-900">{r.supplier?.legalName || "-"}</td>
-                    <td className="px-4 py-3 font-mono text-xs text-slate-600">
-                      {r.grnInvoice?.invoiceNo || (r.grnInvoiceId ? `GRN #${r.grnInvoiceId}` : "-")}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
-                        {r.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-right font-semibold text-slate-900">
-                      ₹{Number(r.grandTotal).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                    </td>
-                    <td className="px-4 py-3 text-slate-500 max-w-xs truncate">{r.reason || "-"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 overflow-y-auto">
-          <div className="bg-white rounded-xl shadow-xl border border-slate-200 w-full max-w-3xl overflow-hidden my-8">
-            <div className="p-5 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
-              <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                <FaBoxes className="text-amber-600" /> New Purchase Return (Debit Note)
-              </h3>
-              <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600 p-1">
-                <FaTimes />
+      {/* Table */}
+      <DataTable
+        data={paginatedReturns}
+        rowKey={(item) => item.id}
+        loading={loading}
+        emptyMessage="No purchase return records found."
+        pagination={{
+          currentPage,
+          totalPages,
+          onPageChange: (page) => setCurrentPage(page),
+        }}
+        columns={[
+          {
+            header: "#",
+            width: "60px",
+            render: (_item, index) => (currentPage - 1) * ITEMS_PER_PAGE + index + 1,
+          },
+          {
+            header: "RETURN NO",
+            render: (item) => (
+              <button
+                onClick={() => setSelectedViewReturn(item)}
+                className="font-mono font-bold text-amber-600 hover:underline text-left"
+                title="Click to view PO Return Details"
+              >
+                {item.returnNo}
               </button>
-            </div>
-            <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">Supplier *</label>
-                  <select
-                    value={supplierId}
-                    onChange={(e) => setSupplierId(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:outline-none"
-                    required
-                  >
-                    <option value="">Select Supplier</option>
-                    {suppliers.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.supplierCode} - {s.legalName}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">Original GRN Invoice</label>
-                  <select
-                    value={selectedGrnId}
-                    onChange={(e) => setSelectedGrnId(e.target.value)}
-                    disabled={!supplierId}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:outline-none disabled:bg-slate-100"
-                  >
-                    <option value="">-- Direct Return (No GRN Link) --</option>
-                    {supplierInvoices.map((grn) => (
-                      <option key={grn.id} value={grn.id}>
-                        {grn.invoiceNo || grn.grnNumber} (₹{Number(grn.netAmount || grn.subtotal || grn.grandTotal || 0).toFixed(2)}) - {new Date(grn.receiveDate || grn.createdAt).toLocaleDateString("en-IN")}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+            ),
+          },
+          {
+            header: "DATE",
+            render: (item) => new Date(item.returnDate).toLocaleDateString("en-IN"),
+          },
+          {
+            header: "SUPPLIER",
+            render: (item) => item.supplier?.legalName || "-",
+          },
+          {
+            header: "GRN INVOICE",
+            render: (item) => item.grnInvoice?.invoiceNo || (item.grnInvoiceId ? `GRN #${item.grnInvoiceId}` : "-"),
+          },
+          {
+            header: "STATUS",
+            render: (item) => (
+              <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
+                {item.status}
+              </span>
+            ),
+          },
+          {
+            header: "GRAND TOTAL",
+            align: "right",
+            render: (item) => (
+              <span className="font-semibold text-blue-600">
+                ₹{Number(item.grandTotal).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+              </span>
+            ),
+          },
+          {
+            header: "REASON",
+            render: (item) => <span className="text-slate-500 max-w-xs truncate block">{item.reason || "-"}</span>,
+          },
+          {
+            header: "ACTIONS",
+            render: (item) => (
+              <div className="flex items-center gap-2">
+                <ViewButton onClick={() => setSelectedViewReturn(item)} />
               </div>
+            ),
+          },
+        ]}
+      />
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">
-                    Store / Warehouse {!selectedGrnId && "*"}
-                  </label>
-                  <select
-                    value={selectedStoreId}
-                    onChange={(e) => setSelectedStoreId(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:outline-none"
-                    required={!selectedGrnId}
-                  >
-                    <option value="">Select Store</option>
-                    {stores.map((st) => (
-                      <option key={st.storeId || st.id} value={st.storeId || st.id}>
-                        {st.storeCode ? `${st.storeCode} - ` : ""}{st.storeName || st.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+      <CommonModal
+        show={showModal}
+        onHide={() => setShowModal(false)}
+        title="New Purchase Return (Debit Note)"
+        maxWidth="3xl"
+        footer={
+          <div className="flex items-center justify-end gap-2 w-full">
+            <CustomButton
+              text="Clear"
+              icon={FaEraser}
+              onClick={resetForm}
+              disabled={submitting}
+              type="button"
+            />
+            <CustomButton
+              type="submit"
+              text={submitting ? "Processing Return..." : "Submit Return"}
+              icon={FaSave}
+              variant="primary"
+              disabled={submitting}
+              onClick={handleSubmit}
+            />
+          </div>
+        }
+      >
+        <form onSubmit={handleSubmit} className="space-y-4 p-1">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <SelectInput
+              label="SUPPLIER"
+              name="supplierId"
+              value={supplierId}
+              required
+              defaultOptionLabel="Select Supplier"
+              searchable
+              options={suppliers.map((s) => ({
+                label: `${s.supplierCode} - ${s.legalName}`,
+                value: String(s.id),
+              }))}
+              onChange={(e) => setSupplierId(e.target.value)}
+            />
 
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">Refund / Settlement Mode *</label>
-                  <select
-                    value={refundMode}
-                    onChange={(e) => setRefundMode(e.target.value as any)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:outline-none"
-                  >
-                    <option value="CREDIT_NOTE">Debit Note (Adjust against supplier ledger)</option>
-                    <option value="CASH">Cash Refund (Receive Cash-in-Hand)</option>
-                    <option value="BANK">Bank Refund (Receive in Bank Account)</option>
-                  </select>
-                </div>
-              </div>
+            <SelectInput
+              label="ORIGINAL GRN INVOICE"
+              name="selectedGrnId"
+              value={selectedGrnId}
+              disabled={!supplierId}
+              defaultOptionLabel="-- Direct Return (No GRN Link) --"
+              searchable
+              options={supplierInvoices.map((grn) => ({
+                label: `${grn.invoiceNo || grn.grnNumber} (₹${Number(grn.netAmount || grn.subtotal || grn.grandTotal || 0).toFixed(2)}) - ${new Date(grn.receiveDate || grn.createdAt).toLocaleDateString("en-IN")}`,
+                value: String(grn.id),
+              }))}
+              onChange={(e) => setSelectedGrnId(e.target.value)}
+            />
+          </div>
 
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <SelectInput
+              label="STORE / WAREHOUSE"
+              name="selectedStoreId"
+              value={selectedStoreId}
+              required={!selectedGrnId}
+              defaultOptionLabel="Select Store"
+              options={stores.map((st) => ({
+                label: `${st.storeCode ? `${st.storeCode} - ` : ""}${st.storeName || st.name}`,
+                value: String(st.storeId || st.id),
+              }))}
+              onChange={(e) => setSelectedStoreId(e.target.value)}
+            />
+
+            <SelectInput
+              label="REFUND / SETTLEMENT MODE"
+              name="refundMode"
+              value={refundMode}
+              required
+              options={[
+                { label: "Debit Note (Adjust against supplier ledger)", value: "CREDIT_NOTE" },
+                { label: "Cash Refund (Receive Cash-in-Hand)", value: "CASH" },
+                { label: "Bank Refund (Receive in Bank Account)", value: "BANK" },
+              ]}
+              onChange={(e) => setRefundMode(e.target.value as any)}
+            />
+          </div>
+
+          <TextInput
+            label="REASON FOR RETURN"
+            name="reason"
+            value={reason}
+            required
+            placeholder="e.g. Damaged material / Substandard quality"
+            onChange={(e) => setReason(e.target.value)}
+          />
+
+          {/* Items Section */}
+          <div className="pt-2">
+            <div className="flex items-center justify-between mb-2">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">Reason for Return *</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Damaged material / Substandard quality"
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:outline-none"
-                  required
-                />
-              </div>
-
-              {/* Items Section */}
-              <div className="pt-2">
-                <div className="flex items-center justify-between mb-2">
-                  <label className="block text-xs font-semibold text-slate-700 uppercase">Return Raw Materials</label>
-                  <div className="flex items-center gap-3">
-                    {fetchingGrn && <span className="text-xs text-amber-600 animate-pulse font-medium">Fetching GRN items...</span>}
-                    <button
-                      type="button"
-                      onClick={handleAddManualRow}
-                      className="text-xs font-semibold text-amber-700 hover:text-amber-800 bg-amber-50 px-2.5 py-1 rounded border border-amber-200"
-                    >
-                      + Add Item Row
-                    </button>
-                  </div>
-                </div>
-
-                {returnRows.length === 0 ? (
-                  <div className="p-4 border border-dashed border-slate-300 rounded-lg text-center text-xs text-slate-500">
-                    Select a GRN Invoice or click "+ Add Item Row" to select raw materials to return.
-                  </div>
-                ) : (
-                  <div className="border border-slate-200 rounded-lg overflow-hidden">
-                    <table className="w-full text-left text-xs text-slate-700">
-                      <thead className="bg-slate-100 uppercase font-semibold text-slate-600 border-b border-slate-200">
-                        <tr>
-                          <th className="px-3 py-2">Raw Material</th>
-                          <th className="px-3 py-2 w-28 text-center">Return Qty</th>
-                          <th className="px-3 py-2 w-32 text-right">Unit Price (₹)</th>
-                          <th className="px-3 py-2 w-32 text-right">Line Total (₹)</th>
-                          <th className="px-3 py-2 w-10 text-center"></th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-200 bg-white">
-                        {returnRows.map((row, idx) => {
-                          const lineTot = row.quantity * row.unitPrice;
-                          return (
-                            <tr key={idx} className="hover:bg-slate-50">
-                              <td className="px-3 py-2">
-                                <select
-                                  value={row.rawMaterialId}
-                                  onChange={(e) => handleRowMaterialChange(idx, e.target.value)}
-                                  className="w-full px-2 py-1 border border-slate-300 rounded text-xs font-medium focus:outline-none focus:ring-1 focus:ring-amber-500"
-                                >
-                                  {materials.map((m) => {
-                                    const rmId = m.rawMaterialId || m.id;
-                                    const matName = m.materialName || m.name || m.materialCode || rmId;
-                                    return (
-                                      <option key={rmId} value={rmId}>
-                                        {rmId} - {matName}
-                                      </option>
-                                    );
-                                  })}
-                                </select>
-                                {row.maxReturnable < 99999 && (
-                                  <div className="text-[10px] text-slate-400 mt-0.5 font-mono">
-                                    GRN Qty: {row.maxReturnable} (Max Returnable: {row.maxReturnable})
-                                  </div>
-                                )}
-                              </td>
-                              <td className="px-3 py-2 text-center">
-                                <input
-                                  type="number"
-                                  min="0"
-                                  max={row.maxReturnable}
-                                  step="0.01"
-                                  value={row.quantity || ""}
-                                  onChange={(e) => handleRowQuantityChange(idx, parseFloat(e.target.value) || 0)}
-                                  className="w-20 px-2 py-1 border border-slate-300 rounded text-center font-bold text-amber-700 focus:outline-none focus:ring-1 focus:ring-amber-500"
-                                />
-                              </td>
-                              <td className="px-3 py-2 text-right">
-                                <input
-                                  type="number"
-                                  min="0"
-                                  step="0.01"
-                                  value={row.unitPrice || ""}
-                                  onChange={(e) => handleRowPriceChange(idx, parseFloat(e.target.value) || 0)}
-                                  className="w-24 px-2 py-1 border border-slate-300 rounded text-right font-mono focus:outline-none focus:ring-1 focus:ring-amber-500"
-                                />
-                              </td>
-                              <td className="px-3 py-2 text-right font-mono font-semibold text-slate-900">
-                                ₹{lineTot.toFixed(2)}
-                              </td>
-                              <td className="px-3 py-2 text-center">
-                                <button
-                                  type="button"
-                                  onClick={() => handleRemoveRow(idx)}
-                                  className="text-slate-400 hover:text-rose-600 p-1"
-                                  title="Remove item"
-                                >
-                                  <FaTrash size={12} />
-                                </button>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
+                <label className="block text-xs font-semibold text-slate-700 uppercase">Return Raw Materials</label>
+                {selectedGrnId && (
+                  <p className="text-[11px] text-amber-700 font-medium">
+                    Showing purchased items from selected GRN/PO. Only purchased items can be returned.
+                  </p>
                 )}
               </div>
-
-              {/* Totals Summary */}
-              {returnRows.length > 0 && (
-                <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 flex flex-col items-end space-y-1 text-xs">
-                  <div className="flex justify-between w-48 font-bold text-slate-900 text-sm">
-                    <span>Grand Total:</span>
-                    <span className="font-mono text-amber-700">₹{grandTotal.toFixed(2)}</span>
-                  </div>
-                </div>
-              )}
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">Narration / Internal Notes</label>
-                <textarea
-                  rows={2}
-                  placeholder="Additional accounting notes..."
-                  value={narration}
-                  onChange={(e) => setNarration(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:outline-none"
-                />
+              <div className="flex items-center gap-3">
+                {fetchingGrn && <span className="text-xs text-blue-600 animate-pulse font-medium">Fetching GRN items...</span>}
+                {!selectedGrnId && (
+                  <CustomButton
+                    text="Add Item Row"
+                    icon={FaPlus}
+                    onClick={handleAddManualRow}
+                    type="button"
+                  />
+                )}
               </div>
+            </div>
 
-              <div className="pt-4 border-t border-slate-200 flex justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setShowModal(false)}
-                  className="px-4 py-2 text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg font-medium text-sm"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-medium text-sm disabled:opacity-50 shadow-sm"
-                >
-                  {submitting ? "Processing Return..." : "Submit Return"}
-                </button>
+            {returnRows.length === 0 ? (
+              <div className="p-4 border border-dashed border-slate-200 rounded-lg text-center text-xs text-slate-400">
+                {selectedGrnId ? "No returnable items found for this GRN." : "Select a GRN Invoice or click '+ Add Item Row' to select raw materials."}
               </div>
-            </form>
+            ) : (
+              <div className="border border-slate-200 rounded-lg overflow-hidden">
+                <table className="w-full text-left text-xs text-slate-700">
+                  <thead className="bg-slate-50 uppercase font-semibold text-slate-600 border-b border-slate-200">
+                    <tr>
+                      <th className="px-3 py-2">Raw Material</th>
+                      <th className="px-3 py-2 w-28 text-center">Return Qty</th>
+                      <th className="px-3 py-2 w-32 text-right">Unit Price (₹)</th>
+                      <th className="px-3 py-2 w-32 text-right">Line Total (₹)</th>
+                      {!selectedGrnId && <th className="px-3 py-2 w-10 text-center"></th>}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200 bg-white">
+                    {returnRows.map((row, idx) => {
+                      const lineTot = row.quantity * row.unitPrice;
+                      return (
+                        <tr key={idx} className="hover:bg-slate-50">
+                          <td className="px-3 py-2">
+                            {row.isGrnLinked ? (
+                              <div>
+                                <div className="font-bold text-slate-800 text-xs">
+                                  {row.materialName}
+                                </div>
+                                <div className="flex items-center gap-2 text-[10px] text-slate-500 mt-0.5 font-mono">
+                                  <span>Purchased Qty: <strong className="text-slate-700">{row.purchasedQty}</strong></span>
+                                  {row.alreadyReturnedQty > 0 && (
+                                    <span>| Already Returned: <strong className="text-amber-700">{row.alreadyReturnedQty}</strong></span>
+                                  )}
+                                  <span>| Max Returnable: <strong className="text-emerald-700">{row.maxReturnable}</strong></span>
+                                </div>
+                              </div>
+                            ) : (
+                              <select
+                                value={row.rawMaterialId}
+                                onChange={(e) => handleRowMaterialChange(idx, e.target.value)}
+                                className="w-full px-2 py-1 border border-slate-200 rounded text-xs font-medium focus:outline-none focus:border-blue-500"
+                              >
+                                {materials.map((m) => {
+                                  const rmId = String(m.rawMaterialId || m.id);
+                                  const matName = m.materialName || m.name || m.materialCode || rmId;
+                                  return (
+                                    <option key={rmId} value={rmId}>
+                                      {rmId} - {matName}
+                                    </option>
+                                  );
+                                })}
+                              </select>
+                            )}
+                          </td>
+                          <td className="px-3 py-2 text-center">
+                            <input
+                              type="number"
+                              min="0"
+                              max={row.maxReturnable}
+                              step="0.01"
+                              value={row.quantity || ""}
+                              placeholder="0"
+                              disabled={row.maxReturnable <= 0}
+                              onChange={(e) => handleRowQuantityChange(idx, parseFloat(e.target.value) || 0)}
+                              className="w-20 px-2 py-1 border border-slate-200 rounded text-center font-bold text-blue-600 focus:outline-none focus:border-blue-500 disabled:bg-slate-100 disabled:text-slate-400"
+                            />
+                          </td>
+                          <td className="px-3 py-2 text-right">
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={row.unitPrice || ""}
+                              disabled={row.isGrnLinked}
+                              onChange={(e) => handleRowPriceChange(idx, parseFloat(e.target.value) || 0)}
+                              className="w-24 px-2 py-1 border border-slate-200 rounded text-right font-mono focus:outline-none focus:border-blue-500 disabled:bg-slate-50 disabled:text-slate-700"
+                            />
+                          </td>
+                          <td className="px-3 py-2 text-right font-mono font-semibold text-slate-900">
+                            ₹{lineTot.toFixed(2)}
+                          </td>
+                          {!selectedGrnId && (
+                            <td className="px-3 py-2 text-center">
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveRow(idx)}
+                                className="text-slate-400 hover:text-rose-600 p-1"
+                                title="Remove item"
+                              >
+                                <FaTrash size={12} />
+                              </button>
+                            </td>
+                          )}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
-        </div>
-      )}
+
+          {/* Totals Summary */}
+          {returnRows.length > 0 && (
+            <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 flex flex-col items-end space-y-1 text-xs">
+              <div className="flex justify-between w-48 font-bold text-slate-900 text-sm">
+                <span>Grand Total:</span>
+                <span className="font-mono text-blue-600">₹{grandTotal.toFixed(2)}</span>
+              </div>
+            </div>
+          )}
+
+          <TextInput
+            label="NARRATION / INTERNAL NOTES"
+            name="narration"
+            value={narration}
+            as="textarea"
+            rows={2}
+            placeholder="Additional accounting notes..."
+            onChange={(e) => setNarration(e.target.value)}
+          />
+        </form>
+      </CommonModal>
       {/* PO Return Detail Modal */}
       {selectedViewReturn && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 overflow-y-auto">

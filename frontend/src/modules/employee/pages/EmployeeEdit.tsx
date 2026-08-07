@@ -6,7 +6,7 @@ import {
   FaUser, FaPhone, FaUsers, FaIdCard, FaMapMarkerAlt,
   FaBriefcase, FaCalendarAlt, FaClock, FaMoneyBillWave, FaKey,
   FaClipboardList, FaSave, FaChevronLeft, FaChevronRight, FaCamera,
-  FaRandom,
+  FaRandom, FaEye, FaEyeSlash,
 } from "react-icons/fa";
 
 import TextInput from "../../../components/form/TextInput/TextInput";
@@ -17,6 +17,7 @@ import BackButton from "../../../components/ui/BackButton/BackButton";
 import DatePickerCalendar from "../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 import { useDepartments } from "../../../hooks/useDepartments";
 import { useRoles } from "../../../hooks/useRoles";
+import { useSocketSync } from "../../../hooks/useSocketSync";
 import { employeeService } from "../../../services/employeeService";
 import apiClient from "../../../api/apiClient";
 import SalaryStructureSection from "../../../components/employee/SalaryStructureSection";
@@ -246,16 +247,34 @@ const EmployeeEdit: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [shifts, setShifts] = useState<{ id: string | number; name: string }[]>([]);
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({});
+  const [showPassword, setShowPassword] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
 
-  // ── load dropdowns + shifts + employee data
-  useEffect(() => {
-    loadDepartments();
-    loadRoles();
+  const fetchShifts = React.useCallback(() => {
     apiClient.get("/shifts").then((res) => {
       const data = res.data?.data || res.data || [];
       setShifts(Array.isArray(data) ? data : []);
     }).catch(() => {});
+  }, []);
+
+  const fetchDeps = React.useCallback(() => {
+    loadDepartments();
+  }, [loadDepartments]);
+
+  const fetchRls = React.useCallback(() => {
+    loadRoles();
+  }, [loadRoles]);
+
+  // Real-time socket sync for dropdowns (Departments, Roles, Shifts)
+  useSocketSync("department", undefined, fetchDeps);
+  useSocketSync("role", undefined, fetchRls);
+  useSocketSync("shift", undefined, fetchShifts);
+
+  // ── load dropdowns + shifts + employee data
+  useEffect(() => {
+    fetchDeps();
+    fetchRls();
+    fetchShifts();
 
     if (!id) return;
     setIsLoading(true);
@@ -441,7 +460,9 @@ const EmployeeEdit: React.FC = () => {
         e.officialMobile = "Enter a valid 10-digit mobile number";
     }
 
-    if (form.officialEmail.trim()) {
+    if (form.createLoginAccount && !form.officialEmail.trim()) {
+      e.officialEmail = "Official email is required when login account is enabled";
+    } else if (form.officialEmail.trim()) {
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.officialEmail.trim()))
         e.officialEmail = "Enter a valid email address";
     }
@@ -469,8 +490,11 @@ const EmployeeEdit: React.FC = () => {
     }
 
     if (!form.departmentId) e.departmentId = "Department is required";
-    if (form.createLoginAccount && !form.roleId) e.roleId = "Role is required";
-    if (form.createLoginAccount && !form.username.trim()) e.username = "Username is required";
+    if (form.createLoginAccount) {
+      if (!form.roleId.trim()) e.roleId = "Role is required when login account is enabled";
+      if (!form.username.trim()) e.username = "Username is required";
+      else if (form.username.trim().length < 3) e.username = "Username must be at least 3 characters";
+    }
 
     // Payroll — validate primary salary field per type
     const st = (form.salaryType || "").toUpperCase();
@@ -485,13 +509,12 @@ const EmployeeEdit: React.FC = () => {
 
     // PF validation
     if (form.pfApplicable) {
-      if (!form.pfNumber.trim()) e.pfNumber = "PF Number is required when PF is applicable";
       if (!form.uanNumber.trim()) e.uanNumber = "UAN Number is required when PF is applicable";
     }
 
     // ESI validation
     if (form.esiApplicable) {
-      if (!form.esiNumber.trim()) e.esiNumber = "ESI Number is required when ESI is applicable";
+      if (!form.esiNumber.trim()) e.esiNumber = "ESIC Number is required when ESI is applicable";
     }
 
     // Bank validation
@@ -515,6 +538,22 @@ const EmployeeEdit: React.FC = () => {
   const handleSubmit = async () => {
     if (!validate() || isSubmitting || !id) return;
     setIsSubmitting(true);
+
+    // Check duplicate employee code
+    try {
+      const res = await employeeService.fetchAll();
+      const list = Array.isArray(res) ? res : res.data || [];
+      const duplicate = list.find((e: any) => e.empCode?.trim().toLowerCase() === form.empCode.trim().toLowerCase() && String(e.id) !== String(id));
+      if (duplicate) {
+        setErrors(p => ({ ...p, empCode: "Employee code already exists" }));
+        toast.error("Employee code already exists");
+        setIsSubmitting(false);
+        return;
+      }
+    } catch (err) {
+      // Continue if search check fails
+    }
+
     try {
       const fd = new FormData();
       fd.append("empCode", form.empCode);
@@ -625,7 +664,7 @@ const EmployeeEdit: React.FC = () => {
     <div>
       <SectionHeader icon={FaUser} title="Basic Information" />
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-        <TextInput label="Employee Code" name="empCode" value={form.empCode} onChange={handleChange} disabled required error={errors.empCode} placeholder="Auto-generated" />
+        <TextInput label="Employee Code" name="empCode" value={form.empCode} onChange={handleChange} required error={errors.empCode} placeholder="e.g. EMP001" disabled/>
         <TextInput label="Employee Name" name="fullName" value={form.fullName} onChange={handleChange} required error={errors.fullName} placeholder="Full name" />
         <SelectInput label="Gender" name="gender" value={form.gender} onChange={handleChange}
           defaultOptionLabel="Select Gender"
@@ -783,11 +822,13 @@ const EmployeeEdit: React.FC = () => {
   const renderTab5 = () => (
     <div>
       <SectionHeader icon={FaBriefcase} title="Official Information" />
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
         <SelectInput label="Department" name="departmentId" value={form.departmentId} onChange={handleChange}
           required error={errors.departmentId}
           defaultOptionLabel="Select Department" options={departmentOptions} searchable />
-        {/* <TextInput label="Designation" name="designation" value={form.designation} onChange={handleChange} placeholder="e.g. Senior Engineer" /> */}
+        <SelectInput label="Role" name="roleId" value={form.roleId} onChange={handleChange}
+          required={form.createLoginAccount} error={errors.roleId}
+          defaultOptionLabel="Select Role" options={roleOptions} searchable />
         <SelectInput label="Employee Type" name="employeeType" value={form.employeeType} onChange={handleChange}
           defaultOptionLabel="Select Type"
           options={["Permanent","Contract","Intern","Consultant","Operator","Supervisor"].map((t) => ({ value: t.toLowerCase(), label: t }))} />
@@ -849,20 +890,37 @@ const EmployeeEdit: React.FC = () => {
       </div>
 
       {form.createLoginAccount && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 p-5 bg-slate-50 rounded-xl border border-slate-100">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 p-5 bg-slate-50 rounded-xl border border-slate-100">
           <TextInput label="Username" name="username" value={form.username} onChange={handleChange} required error={errors.username} placeholder="Login username" />
-          <TextInput label="Official Email" name="_officialEmailDisplay" value={form.officialEmail} onChange={() => {}} disabled placeholder="From Contact tab" />
-          <SelectInput label="Role" name="roleId" value={form.roleId} onChange={handleChange}
-            required error={errors.roleId}
-            defaultOptionLabel="Select Role" options={roleOptions} searchable />
+          <TextInput
+            label="Official Email Address"
+            name="officialEmail"
+            type="email"
+            value={form.officialEmail}
+            onChange={handleChange}
+            required={form.createLoginAccount}
+            error={errors.officialEmail}
+            placeholder="official@company.com"
+          />
           <div className="flex flex-col gap-2">
             <TextInput
               label="Password"
               name="password"
-              type="password"
+              type={showPassword ? "text" : "password"}
               value={form.password}
               onChange={handleChange}
               placeholder="Leave blank to keep current password"
+              trailingIcon={
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  className="text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer"
+                  tabIndex={-1}
+                  title={showPassword ? "Hide Password" : "Show Password"}
+                >
+                  {showPassword ? <FaEyeSlash size={16} /> : <FaEye size={16} />}
+                </button>
+              }
             />
             <button
               type="button"

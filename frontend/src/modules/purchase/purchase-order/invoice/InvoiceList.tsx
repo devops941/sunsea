@@ -28,6 +28,18 @@ const formatDate = (val: string | null | undefined) => {
     return new Date(val).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
 };
 
+const calculatePendingAmount = (item: any) => {
+    const status = (item.paymentStatus || "").toUpperCase();
+    if (status === "CLOSED" || status === "PAID") return 0;
+    const net = Number(item.netAmount || 0);
+    const rawPayments = Array.isArray(item.payments)
+        ? item.payments
+        : (typeof item.payments === "string" ? JSON.parse(item.payments || "[]") : []);
+    const paid = rawPayments.reduce((sum: number, p: any) => sum + Number(p?.amount || 0), 0);
+    const pending = net - paid;
+    return pending > 0 ? pending : 0;
+};
+
 const InvoiceList: React.FC = () => {
     const navigate = useNavigate();
     const [data, setData] = useState<any[]>([]);
@@ -145,6 +157,17 @@ const InvoiceList: React.FC = () => {
                                     {formatMoney(item.netAmount)}
                                 </span>
                             ),
+                        },
+                        {
+                            header: "PENDING PAYMENT",
+                            render: (item) => {
+                                const pending = calculatePendingAmount(item);
+                                return (
+                                    <span className={`font-semibold ${pending > 0 ? "text-amber-600" : "text-slate-400"}`}>
+                                        {formatMoney(pending)}
+                                    </span>
+                                );
+                            },
                         },
                         {
                             header: "STATUS",

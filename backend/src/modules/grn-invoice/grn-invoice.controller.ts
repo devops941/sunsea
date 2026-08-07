@@ -35,6 +35,11 @@ class GrnInvoiceController {
         }
 
         getIO().emit("grnInvoice:created", grnInvoice);
+        try {
+            getIO().emit("voucher:created", { source: "grnInvoice" });
+            getIO().emit("payment:created", { source: "grnInvoice" });
+            getIO().emit("accountLedger:updated", { source: "grnInvoice" });
+        } catch (e) {}
 
         return res.status(201).json(
             new ApiResponse("GRN / Invoice created successfully", grnInvoice)
@@ -80,6 +85,11 @@ class GrnInvoiceController {
         }
 
         getIO().emit("grnInvoice:updated", grnInvoice);
+        try {
+            getIO().emit("voucher:updated", { source: "grnInvoice" });
+            getIO().emit("payment:updated", { source: "grnInvoice" });
+            getIO().emit("accountLedger:updated", { source: "grnInvoice" });
+        } catch (e) {}
 
         return res.status(200).json(
             new ApiResponse("GRN / Invoice updated successfully", grnInvoice)

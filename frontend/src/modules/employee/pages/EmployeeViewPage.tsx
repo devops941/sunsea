@@ -273,7 +273,7 @@ function PayrollSection({ employee, payrollConfig }: { employee: any; payrollCon
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-5 mb-6">
         <InfoRow label="PF Number"  value={employee.pfNumber}  />
         <InfoRow label="UAN Number" value={employee.uanNumber} />
-        <InfoRow label="ESI Number" value={employee.esiNumber} />
+        <InfoRow label="ESIC Number" value={employee.esiNumber} />
       </div>
 
       {/* ── Statutory Estimates ── */}
@@ -486,7 +486,7 @@ export default function EmployeeViewPage() {
       {/* 6. Official Info */}
       <Section icon={FaBriefcase} title="Official Information">
         <InfoRow label="Department" value={employee.department?.name} />
-        <InfoRow label="Designation" value={employee.designation} />
+        {/* <InfoRow label="Designation" value={employee.designation} /> */}
         <InfoRow label="Employee Type" value={employee.employeeType ? employee.employeeType.charAt(0).toUpperCase() + employee.employeeType.slice(1) : null} />
         <InfoRow label="Status" value={<StatusBadge status={STATUS_MAP[employee.status] ?? employee.status?.toUpperCase() ?? "INACTIVE"} />} />
       </Section>
@@ -494,8 +494,8 @@ export default function EmployeeViewPage() {
       {/* 7. Joining Details */}
       <Section icon={FaCalendarAlt} title="Joining Details">
         <InfoRow label="Date of Joining" value={formatDate(employee.dateOfJoining)} />
-        <InfoRow label="Probation Period" value={employee.probationPeriod != null ? `${employee.probationPeriod} days` : null} />
-        <InfoRow label="Notice Period" value={employee.noticePeriod != null ? `${employee.noticePeriod} days` : null} />
+        {/* <InfoRow label="Probation Period" value={employee.probationPeriod != null ? `${employee.probationPeriod} days` : null} />
+        <InfoRow label="Notice Period" value={employee.noticePeriod != null ? `${employee.noticePeriod} days` : null} /> */}
         <InfoRow label="Relieving Date" value={formatDate(employee.relievingDate)} />
         <InfoRow label="Previous Experience" value={employee.previousExperience} />
       </Section>

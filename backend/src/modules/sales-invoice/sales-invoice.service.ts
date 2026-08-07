@@ -92,7 +92,7 @@ class SalesInvoiceService {
     const totalPaid = Math.round(processedPayments.reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0) * 100) / 100;
     const computedStatus = totalPaid === 0 ? "UNPAID" : (totalPaid >= Number(grandTotal) ? "PAID" : "PARTIALLY_PAID");
 
-    return prisma.$transaction(async (tx) => {
+    const invoice = await prisma.$transaction(async (tx) => {
       // Check if invoice number matches current year sequence
       // If it is in the current year, increment the setting's currentSequenceNumber
       const settings = await tx.invoiceSetting.findUnique({
@@ -281,19 +281,21 @@ class SalesInvoiceService {
         });
       }
 
-      // Auto-post double-entry SALES Voucher
-      try {
-        const { voucherPostingService } = require("../accounts/voucherPosting.service");
-        await voucherPostingService.postSalesVoucher(invoice.id, tx);
-      } catch (vErr) {
-        console.error("[Auto-Post Voucher Error] Failed to post Sales Voucher for invoice:", vErr);
-      }
-
-      return serializeInvoice(invoice);
+      return invoice;
     }, {
       maxWait: 10000,
       timeout: 30000,
     });
+
+    // Auto-post double-entry SALES Voucher after invoice creation transaction has committed
+    try {
+      const { voucherPostingService } = require("../accounts/voucherPosting.service");
+      await voucherPostingService.postSalesVoucher(invoice.id);
+    } catch (vErr) {
+      console.error("[Auto-Post Voucher Error] Failed to post Sales Voucher for invoice:", vErr);
+    }
+
+    return serializeInvoice(invoice);
   }
 
   async getAllSalesInvoices(params: {

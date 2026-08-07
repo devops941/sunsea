@@ -34,6 +34,15 @@ class VouchersController {
       const input = createVoucherSchema.parse(req.body);
       const createdBy = (req as any).user?.id || (req as any).user?.userId;
       const voucher = await vouchersService.createVoucher(input, createdBy);
+
+      try {
+        const { getIO } = require("../../socket/socket");
+        const io = getIO();
+        io.emit("voucher:created", voucher);
+        io.emit("payment:created", voucher);
+        io.emit("accountLedger:updated", { source: "voucher" });
+      } catch (e) {}
+
       return res.status(201).json({
         success: true,
         message: "Voucher created successfully",

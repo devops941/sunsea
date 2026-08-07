@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useSelector } from "react-redux";
@@ -6,7 +6,7 @@ import {
   FaUser, FaPhone, FaIdCard, FaMapMarkerAlt,
   FaBriefcase, FaCalendarAlt, FaMoneyBillWave, FaKey,
   FaClipboardList, FaSave, FaChevronLeft, FaChevronRight, FaCamera,
-  FaRandom,
+  FaRandom, FaEye, FaEyeSlash, FaCheck, FaTimes, FaSpinner,
 } from "react-icons/fa";
 
 import TextInput from "../../../components/form/TextInput/TextInput";
@@ -18,6 +18,7 @@ import DatePickerCalendar from "../../../components/ui/DatePickerCalendar/DatePi
 import IndiaPhoneInput from "../../../components/ui/PhoneInput/PhoneInput";
 import { useDepartments } from "../../../hooks/useDepartments";
 import { useRoles } from "../../../hooks/useRoles";
+import { useSocketSync } from "../../../hooks/useSocketSync";
 import { employeeService } from "../../../services/employeeService";
 import apiClient from "../../../api/apiClient";
 import SalaryStructureSection from "../../../components/employee/SalaryStructureSection";
@@ -236,30 +237,70 @@ const EmployeeCreatePage: React.FC = () => {
   const [form,         setForm]         = useState<FormState>(INITIAL);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [shifts,       setShifts]       = useState<{ id: string | number; name: string }[]>([]);
-  const [errors,       setErrors]       = useState<Partial<Record<keyof FormState, string>>>({});
+  const [errors,       setErrors]       = useState<Partial<Record<keyof FormState, string>>>({}); 
+  const [showPassword, setShowPassword] = useState(false);
+  const [usernameStatus, setUsernameStatus] = useState<"idle" | "checking" | "available" | "taken">("idle");
   const photoInputRef = useRef<HTMLInputElement>(null);
+  const usernameCheckTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // ── init
-  useEffect(() => {
-    (async () => {
-      try {
-        const code = await employeeService.fetchNextCode();
-        if (code) setForm((p) => ({ ...p, empCode: code }));
-      } catch { /* silent */ }
-    })();
-    loadDepartments();
-    loadRoles();
+  const fetchShifts = useCallback(() => {
     apiClient.get("/shifts").then((res) => {
       const data = res.data?.data || res.data || [];
       setShifts(Array.isArray(data) ? data : []);
     }).catch(() => {});
-  }, [loadDepartments, loadRoles]);
+  }, []);
 
-  // ── auto-suggest username from empCode
+  const fetchDeps = useCallback(() => {
+    loadDepartments();
+  }, [loadDepartments]);
+
+  const fetchRls = useCallback(() => {
+    loadRoles();
+  }, [loadRoles]);
+
+  // Real-time socket sync for dropdowns (Departments, Roles, Shifts)
+  useSocketSync("department", undefined, fetchDeps);
+  useSocketSync("role", undefined, fetchRls);
+  useSocketSync("shift", undefined, fetchShifts);
+
+  // ── init
   useEffect(() => {
-    if (!form.createLoginAccount || form.username) return;
-    if (form.empCode) setForm((p) => ({ ...p, username: p.empCode.toLowerCase() }));
-  }, [form.empCode, form.createLoginAccount]);
+    fetchDeps();
+    fetchRls();
+    fetchShifts();
+  }, [fetchDeps, fetchRls, fetchShifts]);
+
+  // ── debounced username availability check
+  useEffect(() => {
+    if (!form.createLoginAccount || !form.username.trim()) {
+      setUsernameStatus("idle");
+      return;
+    }
+    if (form.username.trim().length < 3) {
+      setUsernameStatus("idle");
+      return;
+    }
+    setUsernameStatus("checking");
+    if (usernameCheckTimer.current) clearTimeout(usernameCheckTimer.current);
+    usernameCheckTimer.current = setTimeout(() => {
+      apiClient.get(`/users/check-username/${encodeURIComponent(form.username.trim())}`)
+        .then((res) => {
+          const data = res.data?.data || res.data;
+          setUsernameStatus(data?.available ? "available" : "taken");
+          if (!data?.available) {
+            setErrors((p) => ({ ...p, username: "Username is already taken" }));
+          } else {
+            setErrors((p) => ({ ...p, username: undefined }));
+          }
+        })
+        .catch(() => {
+          setUsernameStatus("idle");
+        });
+    }, 500);
+    return () => {
+      if (usernameCheckTimer.current) clearTimeout(usernameCheckTimer.current);
+    };
+  }, [form.username, form.createLoginAccount]);
 
   // ── field change handler
   // ── field change handler
@@ -351,7 +392,10 @@ const EmployeeCreatePage: React.FC = () => {
         e.officialMobile = "Enter a valid 10-digit mobile number";
     }
 
-    if (form.officialEmail.trim()) {
+    // Official email is required when Create Login Account is enabled
+    if (form.createLoginAccount && !form.officialEmail.trim()) {
+      e.officialEmail = "Official email is required when login account is enabled";
+    } else if (form.officialEmail.trim()) {
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.officialEmail.trim()))
         e.officialEmail = "Enter a valid email address";
     }
@@ -401,13 +445,12 @@ const EmployeeCreatePage: React.FC = () => {
 
     // PF validation
     if (form.pfApplicable) {
-      if (!form.pfNumber.trim()) e.pfNumber = "PF Number is required when PF is applicable";
       if (!form.uanNumber.trim()) e.uanNumber = "UAN Number is required when PF is applicable";
     }
 
     // ESI validation
     if (form.esiApplicable) {
-      if (!form.esiNumber.trim()) e.esiNumber = "ESI Number is required when ESI is applicable";
+      if (!form.esiNumber.trim()) e.esiNumber = "ESIC Number is required when ESI is applicable";
     }
 
     // Bank validation
@@ -423,6 +466,8 @@ const EmployeeCreatePage: React.FC = () => {
     if (form.createLoginAccount) {
       if (!form.roleId.trim())    e.roleId   = "Role is required";
       if (!form.username.trim())  e.username = "Username is required";
+      else if (form.username.trim().length < 3) e.username = "Username must be at least 3 characters";
+      else if (usernameStatus === "taken") e.username = "Username is already taken";
       if (!form.password.trim())  e.password = "Password is required";
       else if (form.password.length < 8) e.password = "Password must be at least 8 characters";
     }
@@ -652,7 +697,7 @@ const EmployeeCreatePage: React.FC = () => {
           placeholder="98765 43210"
         />
         <TextInput label="Official Email Address" name="officialEmail" type="email"
-          value={form.officialEmail} onChange={handleChange} error={errors.officialEmail} placeholder="official@company.com" />
+          value={form.officialEmail} onChange={handleChange} required={form.createLoginAccount} error={errors.officialEmail} placeholder="official@company.com" />
         <TextInput label="Personal Email Address" name="personalEmail" type="email"
           value={form.personalEmail} onChange={handleChange} placeholder="personal@email.com" />
         <TextInput label="Emergency Contact Name" name="emergencyContactName"
@@ -734,11 +779,11 @@ const EmployeeCreatePage: React.FC = () => {
   const renderTab3 = () => (
     <div>
       <SectionHeader icon={FaBriefcase} title="Official Information" />
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
         <SelectInput label="Department" name="departmentId" value={form.departmentId} onChange={handleChange}
           required error={errors.departmentId} defaultOptionLabel="Select Department" options={departmentOptions} searchable />
-        {/* <TextInput label="Designation" name="designation" value={form.designation} onChange={handleChange}
-          placeholder="e.g. Senior Engineer" /> */}
+        <SelectInput label="Role" name="roleId" value={form.roleId} onChange={handleChange}
+          required={form.createLoginAccount} error={errors.roleId} defaultOptionLabel="Select Role" options={roleOptions} searchable />
         <SelectInput label="Employee Type" name="employeeType" value={form.employeeType} onChange={handleChange}
           defaultOptionLabel="Select Type"
           options={["Permanent","Contract","Intern","Consultant","Operator","Supervisor"].map((t) => ({ value: t.toLowerCase(), label: t }))} />
@@ -802,16 +847,53 @@ const EmployeeCreatePage: React.FC = () => {
       </div>
 
       {form.createLoginAccount && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 p-5 bg-slate-50 rounded-xl border border-slate-100">
-          <TextInput label="Username" name="username" value={form.username} onChange={handleChange}
-            required error={errors.username} placeholder="Login username" />
-          <TextInput label="Official Email" name="_officialEmailDisplay" value={form.officialEmail}
-            onChange={() => {}} disabled placeholder="From Contact tab" />
-          <SelectInput label="Role" name="roleId" value={form.roleId} onChange={handleChange}
-            required error={errors.roleId} defaultOptionLabel="Select Role" options={roleOptions} searchable />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 p-5 bg-slate-50 rounded-xl border border-slate-100">
+          <div className="flex flex-col gap-1">
+            <TextInput label="Username" name="username" value={form.username} onChange={handleChange}
+              required error={errors.username} placeholder="Enter unique username" />
+            {form.username.trim().length >= 3 && usernameStatus !== "idle" && (
+              <div className={`flex items-center gap-1.5 text-xs font-medium ${
+                usernameStatus === "checking" ? "text-slate-400" :
+                usernameStatus === "available" ? "text-emerald-600" : "text-red-500"
+              }`}>
+                {usernameStatus === "checking" && <><FaSpinner className="animate-spin" size={11} /> Checking availability...</>}
+                {usernameStatus === "available" && <><FaCheck size={11} /> Username is available</>}
+                {usernameStatus === "taken" && <><FaTimes size={11} /> Username is already taken</>}
+              </div>
+            )}
+          </div>
+          <TextInput
+            label="Official Email Address"
+            name="officialEmail"
+            type="email"
+            value={form.officialEmail}
+            onChange={handleChange}
+            required={form.createLoginAccount}
+            error={errors.officialEmail}
+            placeholder="official@company.com"
+          />
           <div className="flex flex-col gap-2">
-            <TextInput label="Password" name="password" type="password" value={form.password}
-              onChange={handleChange} required error={errors.password} placeholder="Minimum 8 characters" />
+            <TextInput
+              label="Password"
+              name="password"
+              type={showPassword ? "text" : "password"}
+              value={form.password}
+              onChange={handleChange}
+              required
+              error={errors.password}
+              placeholder="Minimum 8 characters"
+              trailingIcon={
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  className="text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer"
+                  tabIndex={-1}
+                  title={showPassword ? "Hide Password" : "Show Password"}
+                >
+                  {showPassword ? <FaEyeSlash size={16} /> : <FaEye size={16} />}
+                </button>
+              }
+            />
             <button type="button"
               onClick={() => setForm((p) => ({ ...p, password: generatePassword() }))}
               className="flex items-center gap-2 text-xs font-semibold text-primary hover:underline self-start">

@@ -194,7 +194,7 @@ class GrnInvoiceService {
         const referenceNumber = lastPayment ? lastPayment.referenceNumber : null;
         const paymentDate = lastPayment ? new Date(lastPayment.paymentDate) : null;
 
-        return prisma.$transaction(async (tx) => {
+        const grnInvoice = await prisma.$transaction(async (tx) => {
             // Create GRN Invoice
             const grnInvoice = await tx.grnInvoice.create({
                 data: {
@@ -412,17 +412,19 @@ class GrnInvoiceService {
                 });
             }
 
-            // Auto-post double-entry PURCHASE Voucher & PAYMENT Vouchers
-            try {
-                const { voucherPostingService } = require("../accounts/voucherPosting.service");
-                await voucherPostingService.postPurchaseVoucher(grnInvoice.id, tx);
-                await voucherPostingService.postPaymentVouchersForGRN(grnInvoice.id, tx);
-            } catch (vErr) {
-                console.error("[Auto-Post Voucher Error] Failed to post Purchase/Payment Voucher for GRN:", vErr);
-            }
-
             return grnInvoice;
         }, { timeout: 30000, maxWait: 10000 });
+
+        // Auto-post double-entry PURCHASE Voucher & PAYMENT Vouchers after GRN transaction has committed
+        try {
+            const { voucherPostingService } = require("../accounts/voucherPosting.service");
+            await voucherPostingService.postPurchaseVoucher(grnInvoice.id);
+            await voucherPostingService.postPaymentVouchersForGRN(grnInvoice.id);
+        } catch (vErr) {
+            console.error("[Auto-Post Voucher Error] Failed to post Purchase/Payment Voucher for GRN:", vErr);
+        }
+
+        return grnInvoice;
     }
 
     // ── Get All ─────────────────────────────────────────────────────────────────
@@ -560,7 +562,7 @@ class GrnInvoiceService {
 
         const rawPayments = data.payments ? (typeof data.payments === "string" ? JSON.parse(data.payments) : data.payments) : undefined;
 
-        return prisma.$transaction(async (tx) => {
+        const updated = await prisma.$transaction(async (tx) => {
             let subtotal = Number(existing.subtotal);
             let totalDiscount = Number(existing.totalDiscount);
             let totalTax = Number(existing.totalTax);
@@ -1059,15 +1061,17 @@ class GrnInvoiceService {
                 }
             }
 
-            try {
-                const { voucherPostingService } = require("../accounts/voucherPosting.service");
-                await voucherPostingService.postPaymentVouchersForGRN(updated.id, tx);
-            } catch (vErr) {
-                console.error("[Auto-Post Voucher Error] Failed to post Payment Vouchers for updated GRN:", vErr);
-            }
-
             return updated;
         });
+
+        try {
+            const { voucherPostingService } = require("../accounts/voucherPosting.service");
+            await voucherPostingService.postPaymentVouchersForGRN(updated.id);
+        } catch (vErr) {
+            console.error("[Auto-Post Voucher Error] Failed to post Payment Vouchers for updated GRN:", vErr);
+        }
+
+        return updated;
     }
 
     // ── Delete ──────────────────────────────────────────────────────────────────

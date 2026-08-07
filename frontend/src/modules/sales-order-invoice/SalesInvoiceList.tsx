@@ -32,6 +32,18 @@ const getMobileFromCustomer = (cust: any) => {
     return "";
 };
 
+const calculateSalesPendingAmount = (item: any) => {
+    const status = (item.status || "").toUpperCase();
+    if (status === "PAID" || status === "CLOSED") return 0;
+    const net = Number(item.grandTotal || 0);
+    const rawPayments = Array.isArray(item.payments)
+        ? item.payments
+        : (typeof item.payments === "string" ? JSON.parse(item.payments || "[]") : []);
+    const paid = rawPayments.reduce((sum: number, p: any) => sum + Number(p?.amount || 0), 0);
+    const pending = net - paid;
+    return pending > 0 ? pending : 0;
+};
+
 const SalesInvoiceList: React.FC = () => {
     const navigate = useNavigate();
     const { can } = usePermission();
@@ -253,6 +265,17 @@ const SalesInvoiceList: React.FC = () => {
         {
             header: "NET AMOUNT",
             render: (item) => <span className="font-bold text-emerald-600">{formatCurrency(item.grandTotal)}</span>,
+        },
+        {
+            header: "PENDING PAYMENT",
+            render: (item) => {
+                const pending = calculateSalesPendingAmount(item);
+                return (
+                    <span className={`font-semibold ${pending > 0 ? "text-amber-600" : "text-slate-400"}`}>
+                        {formatCurrency(pending)}
+                    </span>
+                );
+            },
         },
         {
             header: "STATUS",

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { FaSave, FaEraser, FaPlus, FaTimes } from "react-icons/fa";
 import { toast } from "react-toastify";
 import { useNavigate, useParams } from "react-router-dom";
@@ -10,6 +10,7 @@ import BackButton from "../../../components/ui/BackButton/BackButton";
 import { machineOperationAssignmentService } from "../../../services/machineOperationAssignmentService";
 import { machineService } from "../../../services/machineService";
 import { shiftService } from "../../../services/shiftService";
+import { useSocketSync } from "../../../hooks/useSocketSync";
 
 export const MachineAssignmentForm: React.FC = () => {
   const { id } = useParams<{ id?: string }>();
@@ -74,31 +75,49 @@ export const MachineAssignmentForm: React.FC = () => {
   const [employeesByRole, setEmployeesByRole] = useState<Record<string, any[]>>({});
 
   // 1. Fetch reference data (Machines & Roles & Shifts)
-  useEffect(() => {
-    const loadRefData = async () => {
-      try {
-        const [mRes, rRes, sRes] = await Promise.all([
-          machineService.getAll().catch(() => []),
-          machineOperationAssignmentService.getRoles().catch(() => ({ data: [] })),
-          shiftService.fetchAll().catch(() => []),
-        ]);
+  const fetchRefData = useCallback(async () => {
+    try {
+      const [mRes, rRes, sRes] = await Promise.all([
+        machineService.getAll().catch(() => []),
+        machineOperationAssignmentService.getRoles().catch(() => ({ data: [] })),
+        shiftService.fetchAll().catch(() => []),
+      ]);
 
-        const machineList = Array.isArray(mRes) ? mRes : mRes.data || [];
-        setMachines(machineList.filter((m: any) => m.isActive !== false));
+      const machineList = Array.isArray(mRes) ? mRes : mRes.data || [];
+      setMachines(machineList.filter((m: any) => m.isActive !== false));
 
-        const roleList = rRes.data || [];
-        setRoles(roleList);
+      const roleList = rRes.data || [];
+      setRoles(roleList);
 
-        const shiftList = Array.isArray(sRes) ? sRes : (sRes as any).data || [];
-        setShifts(shiftList.filter((s: any) => s.isActive !== false));
-      } catch (err: any) {
-        console.error("Failed to load reference data:", err);
-        toast.error("Failed to load form reference data");
-      }
-    };
-
-    loadRefData();
+      const shiftList = Array.isArray(sRes) ? sRes : (sRes as any).data || [];
+      setShifts(shiftList.filter((s: any) => s.isActive !== false));
+    } catch (err: any) {
+      console.error("Failed to load reference data:", err);
+      toast.error("Failed to load form reference data");
+    }
   }, []);
+
+  const refreshEmployees = useCallback(() => {
+    // Re-fetch employees for all currently selected roles
+    const roleIds = new Set<string>();
+    if (formData.inchargeRoleId) roleIds.add(formData.inchargeRoleId);
+    formData.operators.forEach(op => { if (op.roleId) roleIds.add(op.roleId); });
+    roleIds.forEach(roleId => {
+      machineOperationAssignmentService.getEmployeesByRole(Number(roleId))
+        .then(res => setEmployeesByRole(prev => ({ ...prev, [roleId]: res.data || [] })))
+        .catch(err => console.error(err));
+    });
+  }, [formData.inchargeRoleId, formData.operators]);
+
+  // Real-time socket sync for dropdowns
+  useSocketSync("machine", undefined, fetchRefData);
+  useSocketSync("role", undefined, fetchRefData);
+  useSocketSync("shift", undefined, fetchRefData);
+  useSocketSync("employee", undefined, refreshEmployees);
+
+  useEffect(() => {
+    fetchRefData();
+  }, [fetchRefData]);
 
   // 2. Fetch single assignment data if editing
   useEffect(() => {
@@ -179,7 +198,7 @@ export const MachineAssignmentForm: React.FC = () => {
   };
 
   const fetchEmployeesForRole = async (roleId: string) => {
-    if (!roleId || employeesByRole[roleId]) return;
+    if (!roleId) return;
     try {
       const res = await machineOperationAssignmentService.getEmployeesByRole(Number(roleId));
       setEmployeesByRole((prev) => ({ ...prev, [roleId]: res.data || [] }));

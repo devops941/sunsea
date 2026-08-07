@@ -17,6 +17,7 @@ import MachineViewModal from "../components/MachineViewModal";
 import SearchInput from "../../../components/ui/SearchInput/SearchInput";
 import { useEmployees } from "../../../hooks/useEmployees";
 import { usePermission } from "../../../hooks/usePermission";
+import { useSocketSync } from "../../../hooks/useSocketSync";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -41,14 +42,20 @@ const MachineList: React.FC = () => {
     const [showViewModal, setShowViewModal] = useState(false);
     const [selectedMachine, setSelectedMachine] = useState<any | null>(null);
 
-    useEffect(() => {
+    const reloadMachines = useCallback(() => {
         if (can("machines.view")) {
             dispatch(fetchMachines());
         }
+    }, [dispatch, can]);
+
+    useSocketSync("machine", undefined, reloadMachines);
+
+    useEffect(() => {
+        reloadMachines();
         if (can("employees.view")) {
             loadEmployees();
         }
-    }, [dispatch, loadEmployees, can]);
+    }, [reloadMachines, loadEmployees, can]);
 
     useEffect(() => {
         if (error) {

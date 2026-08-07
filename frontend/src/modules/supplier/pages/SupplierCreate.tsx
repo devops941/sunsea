@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { FaSave, FaEraser, FaPlus, FaTrash, FaArrowLeft } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -23,6 +23,7 @@ import IndiaPhoneInput, { type PhoneEntry } from "../../../components/ui/PhoneIn
 
 import { validatePhoneNumber } from "../../../components/ui/PhoneInput/PhoneInput";
 import BackButton from "../../../components/ui/BackButton/BackButton";
+import { useSocketSync } from "../../../hooks/useSocketSync";
 
 
 const supplierFormSchema = z.object({
@@ -385,42 +386,50 @@ const SupplierCreate: React.FC = () => {
         }));
     };
 
+    const fetchCode = useCallback(async () => {
+        try {
+            const nextCode = await supplierService.fetchNextCode();
+            if (nextCode) {
+                setFormData(prev => ({ ...prev, supplierCode: nextCode }));
+            }
+        } catch (err) {
+            console.error("Error fetching next supplier code:", err);
+        }
+    }, []);
+
+    const loadRefData = useCallback(async () => {
+        try {
+            // Fetch categories
+            const categoriesRes = await rawMaterialCategoryService.fetchAll();
+            const categoriesList = Array.isArray(categoriesRes)
+                ? categoriesRes
+                : categoriesRes?.rawMaterialCategories || [];
+
+            const catOpts = categoriesList.map((c: any) => ({
+                value: String(c.id),
+                label: c.name,
+            }));
+            setCategoryOptions(catOpts);
+
+            // Fetch raw materials
+            const materials = await rawMaterialService.fetchAll();
+            setAllRawMaterials(materials);
+        } catch (err) {
+            console.error("Error loading categories and raw materials:", err);
+        }
+    }, []);
+
+    // Real-time socket sync for dropdown references and auto-generated code
+    useSocketSync("rmCategory", undefined, loadRefData);
+    useSocketSync("rawMaterial", undefined, loadRefData);
+    useSocketSync("supplier", undefined, fetchCode);
+
     useEffect(() => {
-        const fetchCode = async () => {
-            try {
-                const nextCode = await supplierService.fetchNextCode();
-
-                if (nextCode) {
-                    setFormData(prev => ({ ...prev, supplierCode: nextCode }));
-                }
-            } catch (err) {
-                console.error("Error fetching next supplier code:", err);
-            }
-        };
-        const loadData = async () => {
-            try {
-                // Fetch categories
-                const categoriesRes = await rawMaterialCategoryService.fetchAll();
-                const categoriesList = Array.isArray(categoriesRes)
-                    ? categoriesRes
-                    : categoriesRes?.rawMaterialCategories || [];
-
-                const catOpts = categoriesList.map((c: any) => ({
-                    value: String(c.id),
-                    label: c.name,
-                }));
-                setCategoryOptions(catOpts);
-
-                // Fetch raw materials
-                const materials = await rawMaterialService.fetchAll();
-                setAllRawMaterials(materials);
-            } catch (err) {
-                console.error("Error loading categories and raw materials:", err);
-            }
-        };
         fetchCode();
-        loadData();
-    }, []); const addShippingAddress = () => {
+        loadRefData();
+    }, [fetchCode, loadRefData]);
+
+    const addShippingAddress = () => {
         setAddresses(prev => [
             ...prev,
             {
