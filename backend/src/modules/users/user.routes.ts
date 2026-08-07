@@ -6,7 +6,8 @@ import {
   updateProfile,
   getAllUsers,
   getUserById,
-  updateUserStatus
+  updateUserStatus,
+  checkUsername
 } from "./user.controller";
 
 import { authMiddleware } from "../../middleware/auth.middleware";
@@ -50,6 +51,12 @@ router.get(
   authMiddleware,
   requirePermission("users.view"),
   getAllUsers
+);
+
+router.get(
+  "/check-username/:username",
+  authMiddleware,
+  checkUsername
 );
 
 router.get(

@@ -21,6 +21,7 @@ import { useEmployees } from "../../../hooks/useEmployees";
 import { customerService } from "../../../services/customerService";
 import DatePickerCalendar from "../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 import { COLOUR_OPTIONS, CUSTOMER_TYPE_OPTIONS, DISPATCH_TYPE_OPTIONS, ORDER_TYPE_OPTIONS } from "../../../constants/selectOption";
+import { useSocketSync } from "../../../hooks/useSocketSync";
 
 const orderItemSchema = z.object({
     productCode: z.string().min(1, "Product is required"),
@@ -255,6 +256,10 @@ const SalesOrderForm: React.FC = () => {
     const { loadCustomers, customers } = useCustomers();
     const { loadProducts, products } = useProducts();
     const { employees, loadEmployees } = useEmployees();
+
+    useSocketSync("customer", undefined, loadCustomers);
+    useSocketSync("product", undefined, loadProducts);
+    useSocketSync("employee", undefined, loadEmployees);
     const justResetRef = React.useRef(false);
 
     // ─── Reset form when location state changes ──────────────────────

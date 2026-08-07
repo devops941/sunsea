@@ -217,6 +217,10 @@ class EmployeeService {
 
     const updatedEmployee = (await prisma.$transaction(async (tx) => {
       // Check unique identity fields against OTHER employees
+      if (employeeData.empCode) {
+        const existing = await tx.employee.findUnique({ where: { empCode: employeeData.empCode } });
+        if (existing && existing.id !== id) throw new ApiError(400, "Employee code already exists");
+      }
       if (employeeData.aadhaarNumber) {
         const existing = await tx.employee.findUnique({ where: { aadhaarNumber: employeeData.aadhaarNumber } });
         if (existing && existing.id !== id) throw new ApiError(400, "Aadhaar number already exists");

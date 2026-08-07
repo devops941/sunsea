@@ -9,6 +9,7 @@ export interface SalesReturnItem {
   taxRate?: number;
   lineTotal?: number;
   reason?: string;
+  description?: string;
   product?: { id: number; productName: string };
 }
 
@@ -54,6 +55,7 @@ export interface PurchaseReturnItem {
   unitPrice: number;
   lineTotal?: number;
   reason?: string;
+  description?: string;
   rawMaterial?: { rawMaterialId: string; name?: string; materialName?: string };
 }
 

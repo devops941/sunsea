@@ -56,17 +56,20 @@ const MachineAssignmentList: React.FC = () => {
   const navigate = useNavigate();
 
   // Fetch reference lists for filter dropdowns
-  useEffect(() => {
-    const loadFiltersData = async () => {
-      try {
-        const mRes = await machineService.getAll();
-        setMachines(Array.isArray(mRes) ? mRes : mRes.data || []);
-      } catch (_err) {
-        console.error("Failed to load filter references:", _err);
-      }
-    };
-    loadFiltersData();
+  const loadFiltersData = useCallback(async () => {
+    try {
+      const mRes = await machineService.getAll();
+      setMachines(Array.isArray(mRes) ? mRes : mRes.data || []);
+    } catch (_err) {
+      console.error("Failed to load filter references:", _err);
+    }
   }, []);
+
+  useSocketSync("machine", undefined, loadFiltersData);
+
+  useEffect(() => {
+    loadFiltersData();
+  }, [loadFiltersData]);
 
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(e.target.value);

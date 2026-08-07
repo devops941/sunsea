@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useSelector } from "react-redux";
 
 import { FaSave, FaEraser, FaPlus, FaTrash, FaArrowLeft, FaTimes } from "react-icons/fa";
@@ -21,6 +21,7 @@ import IndiaPhoneInput, { type PhoneEntry, validatePhoneNumber } from "../../../
 import CityStateSelect from "../../../components/ui/CityStateSelect/CityStateSelect";
 import type { StateCityOption } from "../../../components/ui/CityStateSelect/CityStateSelect";
 import AddressForm from "../../../components/form/AddressFrom/AddressFrom";
+import { useSocketSync } from "../../../hooks/useSocketSync";
 
 
 
@@ -279,30 +280,34 @@ const SupplierEdit: React.FC = () => {
     }, [supplierData]);
 
     // Fetch categories and raw materials on mount
-    useEffect(() => {
-        const loadData = async () => {
-            try {
-                // Fetch categories
-                const categoriesRes = await rawMaterialCategoryService.fetchAll();
-                const categoriesList = Array.isArray(categoriesRes)
-                    ? categoriesRes
-                    : categoriesRes?.rawMaterialCategories || [];
+    const loadRefData = useCallback(async () => {
+        try {
+            // Fetch categories
+            const categoriesRes = await rawMaterialCategoryService.fetchAll();
+            const categoriesList = Array.isArray(categoriesRes)
+                ? categoriesRes
+                : categoriesRes?.rawMaterialCategories || [];
 
-                const catOpts = categoriesList.map((c: any) => ({
-                    value: String(c.id),
-                    label: c.name,
-                }));
-                setCategoryOptions(catOpts);
+            const catOpts = categoriesList.map((c: any) => ({
+                value: String(c.id),
+                label: c.name,
+            }));
+            setCategoryOptions(catOpts);
 
-                // Fetch raw materials
-                const materials = await rawMaterialService.fetchAll();
-                setAllRawMaterials(materials);
-            } catch (err) {
-                console.error("Error loading categories and raw materials:", err);
-            }
-        };
-        loadData();
+            // Fetch raw materials
+            const materials = await rawMaterialService.fetchAll();
+            setAllRawMaterials(materials);
+        } catch (err) {
+            console.error("Error loading categories and raw materials:", err);
+        }
     }, []);
+
+    useSocketSync("rmCategory", undefined, loadRefData);
+    useSocketSync("rawMaterial", undefined, loadRefData);
+
+    useEffect(() => {
+        loadRefData();
+    }, [loadRefData]);
 
     // Sync selected parent categories and filter options when supplierData or allRawMaterials changes
     useEffect(() => {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { FaSave, FaEraser, FaArrowLeft } from "react-icons/fa";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -12,6 +12,7 @@ import { updateMachine } from "../../../features/machines/machineSlice";
 import { machineOperationAssignmentService } from "../../../services/machineOperationAssignmentService";
 import { machineService } from "../../../services/machineService";
 import BackButton from "../../../components/ui/BackButton/BackButton";
+import { useSocketSync } from "../../../hooks/useSocketSync";
 
 const machineSchema = z.object({
     machineId: z.string().min(1, "Machine ID is required").max(20, "Maximum 20 characters allowed"),
@@ -62,25 +63,31 @@ const MachineEdit: React.FC = () => {
     // BUG-MAC fix: track API fetch loading state
     const [fetchingData, setFetchingData] = useState(false);
 
-    useEffect(() => {
+    const fetchRoles = useCallback(() => {
         machineOperationAssignmentService.getRoles().then(res => setRoles(res.data || []));
     }, []);
 
-    useEffect(() => {
-        const loadEmp = async () => {
-            try {
-                if (!inchargeRoleId) {
-                    setEmployees([]);
-                    return;
-                }
-                const res = await machineOperationAssignmentService.getEmployeesByRole(Number(inchargeRoleId));
-                setEmployees(res.data || []);
-            } catch (err) {
-                console.error(err);
-            }
-        };
-        loadEmp();
+    const fetchEmployees = useCallback(() => {
+        if (!inchargeRoleId) {
+            setEmployees([]);
+            return;
+        }
+        machineOperationAssignmentService.getEmployeesByRole(Number(inchargeRoleId))
+            .then(res => setEmployees(res.data || []))
+            .catch(err => console.error(err));
     }, [inchargeRoleId]);
+
+    // Real-time socket sync for dropdowns
+    useSocketSync("role", undefined, fetchRoles);
+    useSocketSync("employee", undefined, fetchEmployees);
+
+    useEffect(() => {
+        fetchRoles();
+    }, [fetchRoles]);
+
+    useEffect(() => {
+        fetchEmployees();
+    }, [fetchEmployees]);
 
     useEffect(() => {
         if (locationState.state) {

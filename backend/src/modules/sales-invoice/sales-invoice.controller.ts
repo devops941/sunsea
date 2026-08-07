@@ -38,6 +38,11 @@ class SalesInvoiceController {
     }
 
     getIO().emit("salesInvoice:created", salesInvoice);
+    try {
+      getIO().emit("voucher:created", { source: "salesInvoice" });
+      getIO().emit("payment:created", { source: "salesInvoice" });
+      getIO().emit("accountLedger:updated", { source: "salesInvoice" });
+    } catch (e) {}
 
     return res.status(201).json(
       new ApiResponse("Sales Invoice created successfully", salesInvoice)
@@ -94,6 +99,11 @@ class SalesInvoiceController {
     await salesInvoiceService.deleteSalesInvoice(id, companyId);
 
     getIO().emit("salesInvoice:deleted", { id });
+    try {
+      getIO().emit("voucher:deleted", { id });
+      getIO().emit("payment:deleted", { id });
+      getIO().emit("accountLedger:updated", { source: "salesInvoice" });
+    } catch (e) {}
 
     return res.status(200).json(
       new ApiResponse("Sales Invoice deleted successfully")
@@ -126,6 +136,11 @@ class SalesInvoiceController {
     }
 
     getIO().emit("salesInvoice:updated", salesInvoice);
+    try {
+      getIO().emit("voucher:updated", { source: "salesInvoice" });
+      getIO().emit("payment:updated", { source: "salesInvoice" });
+      getIO().emit("accountLedger:updated", { source: "salesInvoice" });
+    } catch (e) {}
 
     return res.status(200).json(
       new ApiResponse("Sales Invoice updated successfully", salesInvoice)

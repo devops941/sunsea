@@ -77,6 +77,10 @@ export const LedgerStatementPage: React.FC = () => {
   useSocketSync("voucher", undefined, loadStatement);
   useSocketSync("accountLedger", undefined, loadStatement);
   useSocketSync("journalItem", undefined, loadStatement);
+  useSocketSync("payment", undefined, loadStatement);
+  useSocketSync("grnInvoice", undefined, loadStatement);
+  useSocketSync("salesInvoice", undefined, loadStatement);
+  useSocketSync("expense", undefined, loadStatement);
 
   // Date range preset handler
   const handleDateRangeChange = (val: string) => {

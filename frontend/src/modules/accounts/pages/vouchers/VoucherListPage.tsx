@@ -73,6 +73,9 @@ export const VoucherListPage: React.FC = () => {
   }, [typeFilter, startDate, endDate, searchTerm, page]);
 
   useSocketSync("voucher", undefined, loadVouchers);
+  useSocketSync("payment", undefined, loadVouchers);
+  useSocketSync("grnInvoice", undefined, loadVouchers);
+  useSocketSync("salesInvoice", undefined, loadVouchers);
 
   // Date range preset handler
   const handleDateRangeChange = (val: string) => {

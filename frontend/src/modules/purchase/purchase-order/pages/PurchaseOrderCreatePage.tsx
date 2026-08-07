@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { FaSave, FaPaperPlane, FaPlus, FaTrash, FaUser, FaMapMarkerAlt, FaBoxOpen, FaInfoCircle } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -27,6 +27,7 @@ import { useAppDispatch, useAppSelector } from "../../../../hooks/reduxHooks";
 import { fetchLocations } from "../../../../features/locations/locationSlice";
 import { selectActiveGstTaxes, fetchGstTaxes } from "../../../../features/gst/gstSlice";
 import { fetchStores } from "../../../../features/stores/storeSlice";
+import { useSocketSync } from "../../../../hooks/useSocketSync";
 
 const initialFormData = {
   poNumber: "",
@@ -162,41 +163,51 @@ const PurchaseOrderCreatePage: React.FC = () => {
   const [isSubmittingForApproval, setIsSubmittingForApproval] = useState(false);
 
   // ============================================================
-  // FETCH DATA
+  // FETCH DATA & REAL-TIME SOCKET SYNC
   // ============================================================
+  const refreshSuppliers = useCallback(() => {
+    loadSuppliers({ limit: 10 });
+  }, [loadSuppliers]);
+
+  const refreshRawMaterials = useCallback(async () => {
+    try {
+      const materials = await rawMaterialService.fetchAll();
+      setRawMaterials(materials ?? []);
+    } catch {
+      console.error("Failed to load raw materials");
+    }
+  }, []);
+
+  const refreshStores = useCallback(() => {
+    dispatch(fetchStores({ storeCategory: "RAW_MATERIAL" }));
+  }, [dispatch]);
+
+  const fetchNextCode = useCallback(async () => {
+    try {
+      const nextCode = await purchaseOrderService.fetchNextCode();
+      if (nextCode) {
+        setFormData((prev) => ({ ...prev, poNumber: nextCode }));
+      }
+    } catch (err) {
+      console.error("Error fetching next PO code:", err);
+    }
+  }, []);
+
+  // Real-time socket listeners
+  useSocketSync("supplier", undefined, refreshSuppliers);
+  useSocketSync("rawMaterial", undefined, refreshRawMaterials);
+  useSocketSync("store", undefined, refreshStores);
+  useSocketSync("purchaseOrder", undefined, fetchNextCode);
+
   useEffect(() => {
-    loadSuppliers();
+    refreshSuppliers();
     dispatch(fetchLocations(undefined));
     dispatch(fetchGstTaxes(undefined));
-    dispatch(fetchStores({ storeCategory: "RAW_MATERIAL" }));
+    refreshStores();
     loadActiveUOMs();
-  }, [loadSuppliers, dispatch, loadActiveUOMs]);
-
-  useEffect(() => {
-    const fetchRawMaterials = async () => {
-      try {
-        const materials = await rawMaterialService.fetchAll();
-        setRawMaterials(materials);
-      } catch {
-        toast.error("Failed to load raw materials");
-      }
-    };
-    fetchRawMaterials();
-  }, []);
-
-  useEffect(() => {
-    const fetchNextCode = async () => {
-      try {
-        const nextCode = await purchaseOrderService.fetchNextCode();
-        if (nextCode) {
-          setFormData((prev) => ({ ...prev, poNumber: nextCode }));
-        }
-      } catch (err) {
-        console.error("Error fetching next PO code:", err);
-      }
-    };
+    refreshRawMaterials();
     fetchNextCode();
-  }, []);
+  }, [refreshSuppliers, dispatch, refreshStores, loadActiveUOMs, refreshRawMaterials, fetchNextCode]);
 
   useEffect(() => {
     setFormData((prev) => ({

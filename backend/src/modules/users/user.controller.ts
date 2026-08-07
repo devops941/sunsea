@@ -141,3 +141,27 @@ export const updateUserStatus = asyncHandler(
     return;
   }
 );
+
+export const checkUsername = asyncHandler(
+  async (
+    req: Request,
+    res: Response
+  ) => {
+    const username = String(req.params.username);
+
+    const result =
+      await userService.checkUsernameAvailable(
+        username
+      );
+
+    res.status(200).json(
+      new ApiResponse(
+        result.available
+          ? "Username is available"
+          : "Username is already taken",
+        result
+      )
+    );
+    return;
+  }
+);

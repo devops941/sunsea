@@ -18,6 +18,18 @@ class ReturnsController {
       const input = createSalesReturnSchema.parse(req.body);
       const createdBy = (req as any).user?.id || (req as any).user?.userId;
       const data = await returnsService.createSalesReturn(input, createdBy);
+
+      try {
+        const { getIO } = require("../../socket/socket");
+        const io = getIO();
+        io.emit("salesReturn:created", data);
+        io.emit("voucher:created", { source: "salesReturn" });
+        io.emit("payment:created", { source: "salesReturn" });
+        io.emit("accountLedger:updated", { source: "salesReturn" });
+      } catch (sErr) {
+        console.error("[Socket Emit Error] salesReturn:created", sErr);
+      }
+
       return res.status(201).json({ success: true, message: "Sales return created", data });
     } catch (error) {
       next(error);
@@ -39,6 +51,19 @@ class ReturnsController {
       const input = createPurchaseReturnSchema.parse(req.body);
       const createdBy = (req as any).user?.id || (req as any).user?.userId;
       const data = await returnsService.createPurchaseReturn(input, createdBy);
+
+      try {
+        const { getIO } = require("../../socket/socket");
+        const io = getIO();
+        io.emit("purchaseReturn:created", data);
+        io.emit("rawMaterial:updated", { source: "purchaseReturn" });
+        io.emit("voucher:created", { source: "purchaseReturn" });
+        io.emit("payment:created", { source: "purchaseReturn" });
+        io.emit("accountLedger:updated", { source: "purchaseReturn" });
+      } catch (sErr) {
+        console.error("[Socket Emit Error] purchaseReturn:created", sErr);
+      }
+
       return res.status(201).json({ success: true, message: "Purchase return created", data });
     } catch (error) {
       next(error);

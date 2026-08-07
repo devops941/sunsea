@@ -31,7 +31,7 @@ class ReturnsService {
     const customer = await prisma.customer.findUnique({ where: { id: data.customerId } });
     if (!customer) throw new ApiError(404, "Customer not found");
 
-    return prisma.$transaction(
+    const salesReturn = await prisma.$transaction(
       async (tx) => {
         let storeIdForRestock = "MAIN_STORE";
 
@@ -137,11 +137,17 @@ class ReturnsService {
           },
         });
 
-        // 4. Post Double-Entry Accounting Voucher(s)
-        await voucherPostingService.postSalesReturnVoucher(salesReturn.id, tx);
-
         return salesReturn;
       }, { maxWait: 10000, timeout: 30000 });
+
+      // 4. Post Double-Entry Accounting Voucher(s) after return transaction has committed
+      try {
+        await voucherPostingService.postSalesReturnVoucher(salesReturn.id);
+      } catch (vErr) {
+        console.error("[Auto-Post Voucher Error] Failed to post Sales Return Voucher:", vErr);
+      }
+
+      return salesReturn;
   }
 
   // --- PURCHASE RETURN ---
@@ -161,7 +167,7 @@ class ReturnsService {
     const supplier = await prisma.supplier.findUnique({ where: { id: data.supplierId } });
     if (!supplier) throw new ApiError(404, "Supplier not found");
 
-    return prisma.$transaction(
+    const purchaseReturn = await prisma.$transaction(
       async (tx) => {
         let storeIdForDeduction: string | null = (data as any).storeId || null;
 
@@ -204,9 +210,14 @@ class ReturnsService {
               if (itemInput.quantity > remainingReturnable) {
                 throw new ApiError(
                   400,
-                  `Cannot return ${itemInput.quantity} units of raw material ${itemInput.rawMaterialId}. Original GRN qty: ${originalQty}, already returned: ${alreadyReturned}, max returnable: ${remainingReturnable}.`
+                  `Cannot return ${itemInput.quantity} units of raw material ${itemInput.rawMaterialId}. Original purchased qty: ${originalQty}, already returned: ${alreadyReturned}, max returnable: ${remainingReturnable}.`
                 );
               }
+            } else {
+              throw new ApiError(
+                400,
+                `Raw material ${itemInput.rawMaterialId} was not purchased in GRN/PO ${grnInvoice.invoiceNo || grnInvoice.grnNumber}`
+              );
             }
           }
         }
@@ -321,33 +332,20 @@ class ReturnsService {
           });
         }
 
-        // 4. Post Purchase Return Voucher (Debit: Supplier Ledger, Credit: Purchase Return Account)
-        await accountsService.ensureSystemLedgersExist(tx);
-        const supplierLedger = await accountsService.ensureSupplierLedger(supplier, tx);
-        let purchaseReturnLedger = await tx.accountLedger.findUnique({ where: { code: "PRT-001" } });
-        if (!purchaseReturnLedger) {
-          const prList = await tx.accountLedger.findMany({
-            where: { name: { contains: "Purchase Return", mode: "insensitive" } },
-          });
-          purchaseReturnLedger = prList.length > 0 ? prList[0] : null;
-        }
-        const purchaseReturnLedgerId = purchaseReturnLedger ? purchaseReturnLedger.id : supplierLedger.id;
-
-        await vouchersService.autoPostVoucher({
-          type: VoucherType.PURCHASE_RETURN,
-          refDocType: "PURCHASE_RETURN",
-          refDocId: purchaseReturn.id,
-          debitLedgerId: supplierLedger.id,
-          creditLedgerId: purchaseReturnLedgerId,
-          amount: grandTotal,
-          narration: `Purchase Return ${returnNo} for Supplier ${supplier.legalName}`,
-          createdBy,
-        });
-
         return purchaseReturn;
       },
       { maxWait: 10000, timeout: 30000 }
     );
+
+    // 4. Post Purchase Return Voucher (Debit: Supplier Ledger, Credit: Purchase Return Account) after return transaction commits
+    try {
+      const { voucherPostingService } = require("../accounts/voucherPosting.service");
+      await voucherPostingService.postPurchaseReturnVoucher(purchaseReturn.id);
+    } catch (vErr) {
+      console.error("[Auto-Post Voucher Error] Failed to post Purchase Return Voucher:", vErr);
+    }
+
+    return purchaseReturn;
   }
 }
 

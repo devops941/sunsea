@@ -6,13 +6,24 @@ import {
   FaPlus,
   FaTimes,
   FaFilter,
-  FaCalendarAlt
+  FaCalendarAlt,
+  FaEraser,
+  FaSave,
+  FaWallet
 } from "react-icons/fa";
 import { toast } from "react-toastify";
 import { pettyCashService, type PettyCashEntry, type PettyCashSummary } from "../../../../services/pettyCashService";
 import { useAppSelector } from "../../../../hooks/reduxHooks";
 
+import DataTable from "../../../../components/ui/table/DataTable";
+import SearchInput from "../../../../components/ui/SearchInput/SearchInput";
+import CustomButton from "../../../../components/ui/Button/Button";
+import CommonModal from "../../../../components/ui/Modal/CommonModal";
+import SelectInput from "../../../../components/form/SelectInput/SelectInput";
+import TextInput from "../../../../components/form/TextInput/TextInput";
 import { useSocketSync } from "../../../../hooks/useSocketSync";
+
+const ITEMS_PER_PAGE = 10;
 
 export const PettyCashPage: React.FC = () => {
   const [entries, setEntries] = useState<PettyCashEntry[]>([]);
@@ -28,9 +39,11 @@ export const PettyCashPage: React.FC = () => {
   const { data: company } = useAppSelector((state) => state.company);
 
   // Filters
+  const [searchTerm, setSearchTerm] = useState<string>("");
   const [typeFilter, setTypeFilter] = useState<"ALL" | "IN" | "OUT">("ALL");
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
+  const [currentPage, setCurrentPage] = useState<number>(1);
 
   // Form State
   const [type, setType] = useState<"IN" | "OUT">("OUT");
@@ -84,12 +97,9 @@ export const PettyCashPage: React.FC = () => {
         receiptNo: receiptNo || undefined,
         entryDate,
       });
-      toast.success("Petty Cash entry recorded!");
+      toast.success("Petty Cash entry recorded successfully!");
       setShowModal(false);
-      setAmount("");
-      setDescription("");
-      setPaidTo("");
-      setReceiptNo("");
+      resetForm();
       loadData();
     } catch (err: any) {
       toast.error(err?.response?.data?.message || err?.message || "Failed to create entry");
@@ -98,288 +108,327 @@ export const PettyCashPage: React.FC = () => {
     }
   };
 
+  const resetForm = () => {
+    setType("OUT");
+    setCategory("Office Expenses");
+    setAmount("");
+    setDescription("");
+    setPaidTo("");
+    setReceiptNo("");
+    setEntryDate(new Date().toISOString().split("T")[0]);
+  };
+
+  const filteredEntries = entries.filter((e) => {
+    if (!searchTerm) return true;
+    const term = searchTerm.toLowerCase();
+    return (
+      e.entryNo?.toLowerCase().includes(term) ||
+      e.category?.toLowerCase().includes(term) ||
+      e.description?.toLowerCase().includes(term) ||
+      e.paidTo?.toLowerCase().includes(term) ||
+      e.receiptNo?.toLowerCase().includes(term)
+    );
+  });
+
+  const totalPages = Math.ceil(filteredEntries.length / ITEMS_PER_PAGE) || 1;
+  const paginatedEntries = filteredEntries.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+    <div className="bg-white rounded-xl shadow-xs border border-slate-100 p-4 space-y-4">
+      {/* Header & Controls */}
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-2">
         <div>
-          <div className="flex items-center gap-2 text-sm text-slate-500 mb-1">
-            <span>Accounts</span>
-            <span>/</span>
-            <span className="text-slate-900 font-medium">Petty Cash</span>
-          </div>
-          <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-            <FaCoins className="text-amber-500" /> Petty Cash Register
-          </h1>
+          <h1 className="text-xl font-bold text-slate-900">Petty Cash Register</h1>
+          <p className="text-sm text-slate-500 mt-1">
+            Manage daily cash disbursements, replenishments, and petty expenses audit log.
+          </p>
         </div>
-        <button
-          onClick={() => setShowModal(true)}
-          className="flex items-center gap-2 px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg font-medium transition shadow-sm"
-        >
-          <FaPlus /> Record Cash Entry
-        </button>
+        <div className="flex flex-wrap items-center gap-3 relative w-full lg:w-auto">
+          <SearchInput
+            value={searchTerm}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              setCurrentPage(1);
+            }}
+            placeholder="Search entries..."
+          />
+          <CustomButton
+            text="Record Cash Entry"
+            icon={FaPlus}
+            onClick={() => {
+              resetForm();
+              setShowModal(true);
+            }}
+          />
+        </div>
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-emerald-50/50 p-4 rounded-xl border border-emerald-100 flex items-center justify-between">
           <div>
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Cash IN</span>
-            <div className="text-2xl font-extrabold text-emerald-600 mt-1">
+            <span className="text-xs font-semibold text-emerald-800 uppercase tracking-wider">Total Cash IN</span>
+            <div className="text-2xl font-extrabold text-emerald-600 font-mono mt-1">
               ₹{summary.totalIn.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
             </div>
           </div>
-          <div className="p-3 bg-emerald-100 text-emerald-600 rounded-xl">
-            <FaArrowDown className="text-xl" />
+          <div className="p-3 bg-emerald-100 text-emerald-700 rounded-xl shadow-xs">
+            <FaArrowDown className="text-lg" />
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+        <div className="bg-rose-50/50 p-4 rounded-xl border border-rose-100 flex items-center justify-between">
           <div>
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Cash OUT</span>
-            <div className="text-2xl font-extrabold text-red-600 mt-1">
+            <span className="text-xs font-semibold text-rose-800 uppercase tracking-wider">Total Cash OUT</span>
+            <div className="text-2xl font-extrabold text-rose-600 font-mono mt-1">
               ₹{summary.totalOut.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
             </div>
           </div>
-          <div className="p-3 bg-red-100 text-red-600 rounded-xl">
-            <FaArrowUp className="text-xl" />
+          <div className="p-3 bg-rose-100 text-rose-700 rounded-xl shadow-xs">
+            <FaArrowUp className="text-lg" />
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+        <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100 flex items-center justify-between">
           <div>
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Cash Balance on Hand</span>
-            <div className="text-2xl font-extrabold text-amber-600 mt-1">
+            <span className="text-xs font-semibold text-blue-800 uppercase tracking-wider">Cash Balance on Hand</span>
+            <div className="text-2xl font-extrabold text-blue-600 font-mono mt-1">
               ₹{summary.currentBalance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
             </div>
           </div>
-          <div className="p-3 bg-amber-100 text-amber-600 rounded-xl">
-            <FaCoins className="text-xl" />
+          <div className="p-3 bg-blue-100 text-blue-700 rounded-xl shadow-xs">
+            <FaWallet className="text-lg" />
           </div>
         </div>
       </div>
 
-      {/* Filter Bar */}
-      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
-        <div className="flex items-center gap-2">
-          <FaFilter className="text-slate-400" />
-          <span className="text-xs font-semibold text-slate-500 uppercase">Filter Type:</span>
-          <select
+      {/* Filters Bar */}
+      <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 flex flex-col md:flex-row items-center justify-between gap-4">
+        <div className="w-full md:w-64">
+          <SelectInput
+            label=""
+            name="typeFilter"
             value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value as any)}
-            className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:outline-none"
-          >
-            <option value="ALL">All Entries</option>
-            <option value="IN">Cash IN (Receipts)</option>
-            <option value="OUT">Cash OUT (Expenses)</option>
-          </select>
+            hideLabel
+            options={[
+              { label: "All Entry Types", value: "ALL" },
+              { label: "Cash IN (Receipts)", value: "IN" },
+              { label: "Cash OUT (Expenses)", value: "OUT" },
+            ]}
+            onChange={(e) => {
+              setTypeFilter(e.target.value as any);
+              setCurrentPage(1);
+            }}
+          />
         </div>
 
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1 text-xs text-slate-500">
+        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+          <div className="flex items-center gap-2 text-xs font-semibold text-slate-600">
             <FaCalendarAlt className="text-slate-400" />
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className="px-2 py-1 border border-slate-300 rounded-lg text-xs"
-            />
-            <span>to</span>
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              className="px-2 py-1 border border-slate-300 rounded-lg text-xs"
-            />
+            <span>Date Range:</span>
           </div>
+          <input
+            type="date"
+            value={startDate}
+            onChange={(e) => {
+              setStartDate(e.target.value);
+              setCurrentPage(1);
+            }}
+            className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs bg-white focus:outline-none focus:border-blue-500"
+          />
+          <span className="text-xs text-slate-400">to</span>
+          <input
+            type="date"
+            value={endDate}
+            onChange={(e) => {
+              setEndDate(e.target.value);
+              setCurrentPage(1);
+            }}
+            className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs bg-white focus:outline-none focus:border-blue-500"
+          />
         </div>
       </div>
 
-      {/* Table */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="p-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
-          <h2 className="font-semibold text-slate-800">Petty Cash Transactions</h2>
-          <span className="text-xs text-slate-500 font-mono">Total Records: {entries.length}</span>
-        </div>
+      {/* DataTable */}
+      <DataTable
+        data={paginatedEntries}
+        rowKey={(item) => item.id}
+        loading={loading}
+        emptyMessage="No petty cash transactions found."
+        pagination={{
+          currentPage,
+          totalPages,
+          onPageChange: (page) => setCurrentPage(page),
+        }}
+        columns={[
+          {
+            header: "#",
+            width: "60px",
+            render: (_item, index) => (currentPage - 1) * ITEMS_PER_PAGE + index + 1,
+          },
+          {
+            header: "ENTRY NO",
+            render: (item) => (
+              <span className="font-mono font-bold text-slate-800">
+                {item.entryNo}
+              </span>
+            ),
+          },
+          {
+            header: "DATE",
+            render: (item) => new Date(item.entryDate).toLocaleDateString("en-IN"),
+          },
+          {
+            header: "TYPE",
+            render: (item) => (
+              <span
+                className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                  item.type === "IN"
+                    ? "bg-emerald-100 text-emerald-800"
+                    : "bg-rose-100 text-rose-800"
+                }`}
+              >
+                {item.type === "IN" ? "CASH IN" : "CASH OUT"}
+              </span>
+            ),
+          },
+          {
+            header: "CATEGORY",
+            render: (item) => <span className="font-medium text-slate-900">{item.category}</span>,
+          },
+          {
+            header: "DESCRIPTION",
+            render: (item) => <span className="text-slate-600 max-w-xs truncate block">{item.description}</span>,
+          },
+          {
+            header: "PAID TO / FROM",
+            render: (item) => <span className="text-slate-500">{item.paidTo || "-"}</span>,
+          },
+          {
+            header: "AMOUNT",
+            align: "right",
+            render: (item) => (
+              <span
+                className={`font-mono font-bold ${
+                  item.type === "IN" ? "text-emerald-600" : "text-rose-600"
+                }`}
+              >
+                {item.type === "IN" ? "+" : "-"}₹
+                {Number(item.amount).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+              </span>
+            ),
+          },
+        ]}
+      />
 
-        {loading ? (
-          <div className="p-8 text-center text-slate-500">Loading petty cash register...</div>
-        ) : entries.length === 0 ? (
-          <div className="p-12 text-center text-slate-400">No petty cash transactions found.</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm text-slate-600">
-              <thead className="bg-slate-100 text-slate-700 uppercase font-semibold text-xs border-b border-slate-200">
-                <tr>
-                  <th className="px-4 py-3">Entry No</th>
-                  <th className="px-4 py-3">Date</th>
-                  <th className="px-4 py-3">Type</th>
-                  <th className="px-4 py-3">Category</th>
-                  <th className="px-4 py-3">Description</th>
-                  <th className="px-4 py-3">Paid To / From</th>
-                  <th className="px-4 py-3 text-right">Amount (₹)</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200">
-                {entries.map((e) => (
-                  <tr key={e.id} className="hover:bg-slate-50 transition">
-                    <td className="px-4 py-3 font-mono font-medium text-amber-600">{e.entryNo}</td>
-                    <td className="px-4 py-3">{new Date(e.entryDate).toLocaleDateString("en-IN")}</td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`inline-flex px-2 py-0.5 rounded-full text-xs font-semibold ${
-                          e.type === "IN"
-                            ? "bg-emerald-100 text-emerald-800"
-                            : "bg-red-100 text-red-800"
-                        }`}
-                      >
-                        {e.type === "IN" ? "CASH IN" : "CASH OUT"}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 font-medium text-slate-900">{e.category}</td>
-                    <td className="px-4 py-3 text-slate-600 max-w-xs truncate">{e.description}</td>
-                    <td className="px-4 py-3 text-slate-500">{e.paidTo || "-"}</td>
-                    <td
-                      className={`px-4 py-3 text-right font-bold ${
-                        e.type === "IN" ? "text-emerald-600" : "text-red-600"
-                      }`}
-                    >
-                      {e.type === "IN" ? "+" : "-"}₹
-                      {Number(e.amount).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      {/* Record Cash Entry Modal */}
+      <CommonModal
+        show={showModal}
+        onHide={() => setShowModal(false)}
+        title="New Petty Cash Entry"
+        maxWidth="lg"
+        footer={
+          <div className="flex items-center justify-end gap-2 w-full">
+            <CustomButton
+              text="Clear"
+              icon={FaEraser}
+              onClick={resetForm}
+              disabled={submitting}
+              type="button"
+            />
+            <CustomButton
+              type="submit"
+              text={submitting ? "Saving..." : "Save Petty Cash Entry"}
+              icon={FaSave}
+              variant="primary"
+              disabled={submitting}
+              onClick={handleSubmit}
+            />
           </div>
-        )}
-      </div>
+        }
+      >
+        <form onSubmit={handleSubmit} className="space-y-4 p-1">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <SelectInput
+              label="TRANSACTION TYPE"
+              name="type"
+              value={type}
+              required
+              options={[
+                { label: "CASH OUT (Expense)", value: "OUT" },
+                { label: "CASH IN (Cash Replenishment)", value: "IN" },
+              ]}
+              onChange={(e) => setType(e.target.value as "IN" | "OUT")}
+            />
 
-      {/* Entry Modal */}
-      {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-xl shadow-xl border border-slate-200 w-full max-w-lg overflow-hidden">
-            <div className="p-5 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
-              <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                <FaCoins className="text-amber-500" /> New Petty Cash Entry
-              </h3>
-              <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600 p-1">
-                <FaTimes />
-              </button>
-            </div>
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">Transaction Type</label>
-                  <select
-                    value={type}
-                    onChange={(e) => setType(e.target.value as "IN" | "OUT")}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-semibold focus:ring-2 focus:ring-amber-500 focus:outline-none"
-                  >
-                    <option value="OUT">CASH OUT (Expense)</option>
-                    <option value="IN">CASH IN (Cash Replenishment)</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">Date</label>
-                  <input
-                    type="date"
-                    value={entryDate}
-                    onChange={(e) => setEntryDate(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:outline-none"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">Category</label>
-                <select
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:outline-none"
-                >
-                  <option value="Office Expenses">Office Expenses</option>
-                  <option value="Tea & Refreshments">Tea & Refreshments</option>
-                  <option value="Local Conveyance">Local Conveyance</option>
-                  <option value="Stationery & Printing">Stationery & Printing</option>
-                  <option value="Maintenance & Repair">Maintenance & Repair</option>
-                  <option value="Cash Deposit / Replenishment">Cash Deposit / Replenishment</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">
-                  Amount (₹) <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  placeholder="0.00"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-semibold focus:ring-2 focus:ring-amber-500 focus:outline-none"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">
-                  Description <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Purchased office stationery"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:outline-none"
-                  required
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">Paid To / From</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Local Vendor / John"
-                    value={paidTo}
-                    onChange={(e) => setPaidTo(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">Receipt No</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. REC-102"
-                    value={receiptNo}
-                    onChange={(e) => setReceiptNo(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="pt-4 border-t border-slate-200 flex justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setShowModal(false)}
-                  className="px-4 py-2 text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg font-medium text-sm"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg font-medium text-sm disabled:opacity-50"
-                >
-                  {submitting ? "Saving..." : "Save Petty Cash Entry"}
-                </button>
-              </div>
-            </form>
+            <TextInput
+              label="ENTRY DATE"
+              name="entryDate"
+              type="date"
+              value={entryDate}
+              required
+              onChange={(e) => setEntryDate(e.target.value)}
+            />
           </div>
-        </div>
-      )}
+
+          <SelectInput
+            label="CATEGORY"
+            name="category"
+            value={category}
+            required
+            options={[
+              { label: "Office Expenses", value: "Office Expenses" },
+              { label: "Tea & Refreshments", value: "Tea & Refreshments" },
+              { label: "Local Conveyance", value: "Local Conveyance" },
+              { label: "Stationery & Printing", value: "Stationery & Printing" },
+              { label: "Maintenance & Repair", value: "Maintenance & Repair" },
+              { label: "Cash Deposit / Replenishment", value: "Cash Deposit / Replenishment" },
+            ]}
+            onChange={(e) => setCategory(e.target.value)}
+          />
+
+          <TextInput
+            label="AMOUNT (₹)"
+            name="amount"
+            type="number"
+            step="0.01"
+            value={amount}
+            required
+            placeholder="0.00"
+            onChange={(e) => setAmount(e.target.value)}
+          />
+
+          <TextInput
+            label="DESCRIPTION"
+            name="description"
+            value={description}
+            required
+            placeholder="e.g. Purchased office stationery"
+            onChange={(e) => setDescription(e.target.value)}
+          />
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <TextInput
+              label="PAID TO / FROM"
+              name="paidTo"
+              value={paidTo}
+              placeholder="e.g. Local Vendor / John"
+              onChange={(e) => setPaidTo(e.target.value)}
+            />
+
+            <TextInput
+              label="RECEIPT NO"
+              name="receiptNo"
+              value={receiptNo}
+              placeholder="e.g. REC-102"
+              onChange={(e) => setReceiptNo(e.target.value)}
+            />
+          </div>
+        </form>
+      </CommonModal>
     </div>
   );
 };

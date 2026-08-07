@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Container, Row, Col, Table } from "react-bootstrap";
 import { FaSave, FaPlus, FaTrash, FaInfoCircle, FaUser, FaMapMarkerAlt, FaBoxOpen, FaPaperPlane } from "react-icons/fa";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
@@ -28,6 +28,7 @@ import BackButton from "../../../../components/ui/BackButton/BackButton";
 import AddressForm from "../../../../components/form/AddressFrom/AddressFrom";
 import { useUsers } from "../../../../hooks/useUsers";
 import { getUomMultiplier } from "./PurchaseOrderCreatePage";
+import { useSocketSync } from "../../../../hooks/useSocketSync";
 
 
 
@@ -277,16 +278,37 @@ const PurchaseOrderEditPage: React.FC = () => {
   const [roundingSign, setRoundingSign] = useState<"+" | "-">("+");
   const [roundingValue, setRoundingValue] = useState<number>(0);
   // ============================================================
-  // LOAD DATA
+  // LOAD DATA & REAL-TIME SOCKET SYNC
   // ============================================================
+  const refreshSuppliers = useCallback(() => {
+    loadSuppliers({ limit: 1000 });
+  }, [loadSuppliers]);
+
+  const refreshRawMaterials = useCallback(async () => {
+    try {
+      const materials = await rawMaterialService.fetchAll();
+      setRawMaterials(materials ?? []);
+    } catch {
+      console.error("Failed to load raw materials");
+    }
+  }, []);
+
+  const refreshStores = useCallback(() => {
+    dispatch(fetchStores({ storeCategory: "RAW_MATERIAL" }));
+  }, [dispatch]);
+
+  useSocketSync("supplier", undefined, refreshSuppliers);
+  useSocketSync("rawMaterial", undefined, refreshRawMaterials);
+  useSocketSync("store", undefined, refreshStores);
+
   useEffect(() => {
-    loadSuppliers();
+    refreshSuppliers();
     loadUsers();
     dispatch(fetchLocations(undefined));
     dispatch(fetchGstTaxes(undefined));
-    dispatch(fetchStores({ storeCategory: "RAW_MATERIAL" }));
+    refreshStores();
     loadActiveUOMs();
-  }, [loadSuppliers, loadUsers, dispatch, loadActiveUOMs]);
+  }, [refreshSuppliers, loadUsers, dispatch, refreshStores, loadActiveUOMs]);
 
   useEffect(() => {
     let mounted = true;

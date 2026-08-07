@@ -35,10 +35,18 @@ class ExpenseService {
       },
     });
 
-    // Automatically sync as Petty Cash "OUT" cash expense entry & post voucher
+    // Post a direct EXPENSE voucher to the correct Cash/Bank ledger
+    try {
+      const { voucherPostingService } = require("../accounts/voucherPosting.service");
+      await voucherPostingService.postExpenseVoucher(newExpense.id, data.paymentMethod);
+    } catch (voucherErr) {
+      console.error("[Expense Voucher Posting Error]: Failed to post expense voucher", voucherErr);
+    }
+
+    // Also create a Petty Cash entry for petty cash tracking (record-keeping only, no voucher posting)
     try {
       const pcEntryNo = `PC-EXP-${newExpense.expenseNumber}`;
-      const pcEntry = await prisma.pettyCashEntry.create({
+      await prisma.pettyCashEntry.create({
         data: {
           entryNo: pcEntryNo,
           entryDate: newExpense.date || new Date(),
@@ -52,9 +60,6 @@ class ExpenseService {
           createdBy: currentUser.userId,
         },
       });
-
-      const { voucherPostingService } = require("../accounts/voucherPosting.service");
-      await voucherPostingService.postPettyCashVoucher(pcEntry.id);
     } catch (pcErr) {
       console.error("[Petty Cash Sync Error]: Failed to create petty cash entry for expense", pcErr);
     }
@@ -177,6 +182,21 @@ class ExpenseService {
       },
     });
 
+    // Delete old EXPENSE voucher and re-post with updated data
+    try {
+      const oldVoucher = await prisma.voucher.findFirst({
+        where: { refDocType: "EXPENSE", refDocId: id },
+      });
+      if (oldVoucher) {
+        await prisma.journalItem.deleteMany({ where: { voucherId: oldVoucher.id } });
+        await prisma.voucher.delete({ where: { id: oldVoucher.id } });
+      }
+      const { voucherPostingService } = require("../accounts/voucherPosting.service");
+      await voucherPostingService.postExpenseVoucher(id, updatedExpense.paymentMethod);
+    } catch (voucherErr) {
+      console.error("[Expense Voucher Update Error]:", voucherErr);
+    }
+
     // Update corresponding petty cash entry if exists
     try {
       const pcEntryNo = `PC-EXP-${updatedExpense.expenseNumber}`;
@@ -204,6 +224,19 @@ class ExpenseService {
   async deleteExpense(id: string, companyId: string) {
     const expense = await this.getExpenseById(id, companyId);
     
+    // Delete associated EXPENSE voucher and its journal items
+    try {
+      const voucher = await prisma.voucher.findFirst({
+        where: { refDocType: "EXPENSE", refDocId: id },
+      });
+      if (voucher) {
+        await prisma.journalItem.deleteMany({ where: { voucherId: voucher.id } });
+        await prisma.voucher.delete({ where: { id: voucher.id } });
+      }
+    } catch (voucherErr) {
+      console.error("[Expense Voucher Delete Error]:", voucherErr);
+    }
+
     // Delete corresponding petty cash entry if exists
     try {
       const pcEntryNo = `PC-EXP-${expense.expenseNumber}`;

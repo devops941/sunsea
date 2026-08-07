@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { FaTimes, FaUserCheck, FaCogs, FaCheck, FaInfoCircle, FaPlus } from "react-icons/fa";
 import { toast } from "react-toastify";
 import CustomButton from "../../../components/ui/Button/Button";
@@ -8,6 +8,7 @@ import DatePickerCalendar from "../../../components/ui/DatePickerCalendar/DatePi
 import { machineOperationAssignmentService } from "../../../services/machineOperationAssignmentService";
 import { machineService } from "../../../services/machineService";
 import { shiftService } from "../../../services/shiftService";
+import { useSocketSync } from "../../../hooks/useSocketSync";
 
 interface Props {
   isOpen: boolean;
@@ -59,34 +60,52 @@ export const MachineAssignmentFormModal: React.FC<Props> = ({
   const [loading, setLoading] = useState(false);
   const [inchargeAutoFilled, setInchargeAutoFilled] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [employeesByRole, setEmployeesByRole] = useState<Record<string, any[]>>({});
 
   // 1. Fetch reference data (Machines & Roles)
+  const fetchRefData = useCallback(async () => {
+    try {
+      const [mRes, rRes, sRes] = await Promise.all([
+        machineService.getAll().catch(() => []),
+        machineOperationAssignmentService.getRoles().catch(() => ({ data: [] })),
+        shiftService.fetchAll().catch(() => []),
+      ]);
+
+      const machineList = Array.isArray(mRes) ? mRes : mRes.data || [];
+      setMachines(machineList.filter((m: any) => m.isActive !== false));
+
+      const roleList = rRes.data || [];
+      setRoles(roleList);
+
+      const shiftList = Array.isArray(sRes) ? sRes : (sRes as any).data || [];
+      setShifts(shiftList.filter((s: any) => s.isActive !== false));
+    } catch (err: any) {
+      console.error("Failed to load reference data:", err);
+    }
+  }, []);
+
+  const refreshEmployees = useCallback(() => {
+    // Re-fetch employees for all currently selected roles
+    const roleIds = new Set<string>();
+    if (formData.inchargeRoleId) roleIds.add(formData.inchargeRoleId);
+    formData.operators.forEach(op => { if (op.roleId) roleIds.add(op.roleId); });
+    roleIds.forEach(roleId => {
+      machineOperationAssignmentService.getEmployeesByRole(Number(roleId))
+        .then(res => setEmployeesByRole(prev => ({ ...prev, [roleId]: res.data || [] })))
+        .catch(err => console.error(err));
+    });
+  }, [formData.inchargeRoleId, formData.operators]);
+
+  // Real-time socket sync for dropdowns
+  useSocketSync("machine", undefined, fetchRefData);
+  useSocketSync("role", undefined, fetchRefData);
+  useSocketSync("shift", undefined, fetchRefData);
+  useSocketSync("employee", undefined, refreshEmployees);
+
   useEffect(() => {
     if (!isOpen) return;
-
-    const loadRefData = async () => {
-      try {
-        const [mRes, rRes, sRes] = await Promise.all([
-          machineService.getAll().catch(() => []),
-          machineOperationAssignmentService.getRoles().catch(() => ({ data: [] })),
-          shiftService.fetchAll().catch(() => []),
-        ]);
-
-        const machineList = Array.isArray(mRes) ? mRes : mRes.data || [];
-        setMachines(machineList.filter((m: any) => m.isActive !== false));
-
-        const roleList = rRes.data || [];
-        setRoles(roleList);
-
-        const shiftList = Array.isArray(sRes) ? sRes : (sRes as any).data || [];
-        setShifts(shiftList.filter((s: any) => s.isActive !== false));
-      } catch (err: any) {
-        console.error("Failed to load reference data:", err);
-      }
-    };
-
-    loadRefData();
-  }, [isOpen]);
+    fetchRefData();
+  }, [isOpen, fetchRefData]);
 
   // Populate data when editing or initialData opens
   useEffect(() => {
@@ -159,10 +178,9 @@ export const MachineAssignmentFormModal: React.FC<Props> = ({
     }
   };
 
-  const [employeesByRole, setEmployeesByRole] = useState<Record<string, any[]>>({});
 
   const fetchEmployeesForRole = async (roleId: string) => {
-    if (!roleId || employeesByRole[roleId]) return;
+    if (!roleId) return;
     try {
       const res = await machineOperationAssignmentService.getEmployeesByRole(Number(roleId));
       setEmployeesByRole((prev) => ({ ...prev, [roleId]: res.data || [] }));

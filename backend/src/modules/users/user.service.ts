@@ -153,6 +153,11 @@ export class UserService {
 }
 
 
+  async checkUsernameAvailable(username: string): Promise<{ available: boolean }> {
+    const existingUser = await userRepository.findByUsername(username);
+    return { available: !existingUser };
+  }
+
   private formatUser(user: any): UserResponse {
     return {
       userId: user.userId,

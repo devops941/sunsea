@@ -158,7 +158,7 @@ const PayslipDocument = React.forwardRef<HTMLDivElement, PayslipDocumentProps>(
       ['Dated',        periodShort(run.period, run.type)],
       ['Payment Mode', result.paymentMode],
       ['PF Number',    employee.pfNumber  ?? '—'],
-      ['ESI Number',   employee.esiNumber ?? '—'],
+      ['ESIC Number',  employee.esiNumber ?? '—'],
       ['UAN Number',   employee.uanNumber ?? '—'],
       ['PAN Number',   employee.panNumber ?? '—'],
     ];

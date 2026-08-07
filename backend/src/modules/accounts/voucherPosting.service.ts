@@ -1,8 +1,102 @@
 import { prisma } from "../../config/prisma";
 import { VoucherType, Prisma } from "@prisma/client";
 import { accountsService } from "./accounts.service";
-
 import { extractPaymentsArray } from "../../utils/payments";
+import crypto from "crypto";
+
+/**
+ * Generates a stable payment reference ID based on payment properties and array index if p.id is missing.
+ * Including the index prevents hash collisions between multiple identical payments in the same parent document.
+ */
+function deriveStablePaymentRefId(parentId: string, prefix: string, p: any, index: number): string {
+  if (p.id) return String(p.id);
+  const rawAmt = p.amount !== undefined && p.amount !== null ? String(p.amount) : "0";
+  const dateStr = p.paymentDate ? new Date(p.paymentDate).toISOString() : "";
+  const method = p.paymentMethod || "";
+  const ref = p.referenceNumber || "";
+  const hashInput = `${parentId}:${index}:${rawAmt}:${dateStr}:${method}:${ref}`;
+  const hash = crypto.createHash("sha256").update(hashInput).digest("hex").slice(0, 12);
+  return `${parentId}_${prefix}_${hash}`;
+}
+
+/*
+ * Database Schema Requirement Notice:
+ * Safe duplicate protection in `safeCreateVoucher` relies on a composite unique constraint on `(refDocType, refDocId)`
+ * in the Prisma schema:
+ *
+ * model Voucher {
+ *   ...
+ *   refDocType String
+ *   refDocId   String
+ *   @@unique([refDocType, refDocId])
+ * }
+ */
+
+/**
+ * Helper to safely create a voucher and gracefully handle concurrent creation / unique constraint races.
+ * NOTE: Duplicate protection relies on the unique constraint `@@unique([refDocType, refDocId])` on the Voucher model in schema.prisma.
+ *
+ * Postgres Transaction Recovery Rationale:
+ * We chose Approach (a) (SQL SAVEPOINT / ROLLBACK TO SAVEPOINT via $executeRawUnsafe) because inside an interactive Postgres
+ * transaction, a failed statement (P2002 unique constraint error) marks the Postgres transaction block as ABORTED.
+ * Without rolling back to a SAVEPOINT before executing the fallback query, any subsequent commands (like `db.voucher.findFirst`)
+ * inside the `catch` block would fail with "current transaction is aborted, commands ignored until end of transaction block".
+ */
+async function safeCreateVoucher(
+  db: Prisma.TransactionClient | typeof prisma,
+  data: Prisma.VoucherCreateInput,
+  refDocType: string,
+  refDocId: string
+) {
+  const savepointName = `sp_vch_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+  const isTx = "$executeRawUnsafe" in db && typeof (db as any).$executeRawUnsafe === "function";
+
+  if (isTx) {
+    try {
+      await (db as any).$executeRawUnsafe(`SAVEPOINT ${savepointName}`);
+    } catch {
+      // Ignore if savepoints are not supported in execution context
+    }
+  }
+
+  try {
+    const created = await db.voucher.create({
+      data,
+      include: { items: true },
+    });
+    if (isTx) {
+      try {
+        await (db as any).$executeRawUnsafe(`RELEASE SAVEPOINT ${savepointName}`);
+      } catch {
+        // Ignore release errors
+      }
+    }
+    try {
+      const { getIO } = require("../../socket/socket");
+      const io = getIO();
+      io.emit("voucher:created", created);
+      io.emit("payment:created", created);
+      io.emit("accountLedger:updated", { source: "voucherPosting" });
+    } catch {}
+    return created;
+  } catch (err: any) {
+    if (err.code === "P2002" || err.message?.includes("Unique constraint")) {
+      if (isTx) {
+        try {
+          await (db as any).$executeRawUnsafe(`ROLLBACK TO SAVEPOINT ${savepointName}`);
+        } catch {
+          // Ignore rollback errors
+        }
+      }
+      const existing = await db.voucher.findFirst({
+        where: { refDocType, refDocId },
+        include: { items: true },
+      });
+      if (existing) return existing;
+    }
+    throw err;
+  }
+}
 
 class VoucherPostingService {
   /**
@@ -10,8 +104,18 @@ class VoucherPostingService {
    * Debit: Purchase Account (PURCH-001)
    * Credit: Supplier Account Ledger
    */
-  async postPurchaseVoucher(grnInvoiceId: string, txClient?: Prisma.TransactionClient) {
-    const db = txClient || prisma;
+  async postPurchaseVoucher(grnInvoiceId: string, txClient?: Prisma.TransactionClient): Promise<any> {
+    if (!txClient) {
+      // Configured with generous maxWait & timeout to handle multi-step postings with many payments without hitting Prisma's 5s default limit.
+      return prisma.$transaction(
+        async (tx) => {
+          return this.postPurchaseVoucher(grnInvoiceId, tx);
+        },
+        { maxWait: 10000, timeout: 30000 }
+      );
+    }
+    const db = txClient;
+
     const grnInvoice = await db.grnInvoice.findUnique({
       where: { id: grnInvoiceId },
       include: { supplier: true },
@@ -46,19 +150,34 @@ class VoucherPostingService {
       const totalCgst = Number(g.totalCgst || 0);
       const totalSgst = Number(g.totalSgst || 0);
       const totalIgst = Number(g.totalIgst || 0);
-      const purchaseBase = netAmountNum - totalCgst - totalSgst - totalIgst;
+      const totalGst = totalCgst + totalSgst + totalIgst;
 
+      // Validation: Ensure total GST does not exceed the net invoice amount.
+      // If total GST > netAmountNum (due to inconsistent/corrupted source data), the purchase base
+      // would be negative and posting a voucher would result in unbalanced debits and credits.
+      if (totalGst > netAmountNum) {
+        console.error(
+          `[Auto-Post Voucher Error] Inconsistent GST data on GRN Invoice ${grnInvoice.id}: ` +
+            `Total GST (${totalGst}) exceeds Net Amount (${netAmountNum}). Voucher posting aborted.`
+        );
+        return null;
+      }
+
+      const purchaseBase = netAmountNum - totalGst;
       const voucherNo = `PUR-${grnInvoice.grnNumber || grnInvoice.id.slice(-6)}`;
       const date = grnInvoice.grnDate || grnInvoice.createdAt;
 
-      const journalItemsToCreate: any[] = [
-        {
+      const journalItemsToCreate: any[] = [];
+
+      // Only include Purchase Ledger debit line if purchaseBase is strictly > 0 (avoid 0-amount lines when GST equals full total)
+      if (purchaseBase > 0) {
+        journalItemsToCreate.push({
           debitLedgerId: purchaseLedger.id,
-          debitAmount: new Prisma.Decimal(purchaseBase > 0 ? purchaseBase : netAmountNum),
+          debitAmount: new Prisma.Decimal(purchaseBase),
           creditAmount: new Prisma.Decimal(0),
           narration: `Purchase of raw materials / goods (base excl. GST)`,
-        },
-      ];
+        });
+      }
 
       // Add GST input credit entries if GST breakdown is available
       if (totalCgst > 0 || totalSgst > 0 || totalIgst > 0) {
@@ -105,8 +224,9 @@ class VoucherPostingService {
         narration: `Liability payable to ${grnInvoice.supplier.legalName}`,
       });
 
-      voucher = await db.voucher.create({
-        data: {
+      voucher = await safeCreateVoucher(
+        db,
+        {
           voucherNo,
           type: VoucherType.PURCHASE,
           date,
@@ -115,8 +235,9 @@ class VoucherPostingService {
           refDocId: grnInvoice.id,
           items: { create: journalItemsToCreate },
         },
-        include: { items: true },
-      });
+        "GRN_INVOICE",
+        grnInvoice.id
+      );
     }
 
     // Also post payment vouchers for any payments on this GRN Invoice
@@ -130,8 +251,18 @@ class VoucherPostingService {
    * Debit: Supplier Account Ledger (Liability decrease)
    * Credit: Cash in Hand (CASH-001) or Main Bank Account (BANK-001) (Asset decrease)
    */
-  async postPaymentVouchersForGRN(grnInvoiceId: string, txClient?: Prisma.TransactionClient) {
-    const db = txClient || prisma;
+  async postPaymentVouchersForGRN(grnInvoiceId: string, txClient?: Prisma.TransactionClient): Promise<any[]> {
+    if (!txClient) {
+      // Configured with generous maxWait & timeout to handle GRN invoices with many payment lines
+      return prisma.$transaction(
+        async (tx) => {
+          return this.postPaymentVouchersForGRN(grnInvoiceId, tx);
+        },
+        { maxWait: 10000, timeout: 30000 }
+      );
+    }
+    const db = txClient;
+
     const grnInvoice = await db.grnInvoice.findUnique({
       where: { id: grnInvoiceId },
       include: { supplier: true },
@@ -157,10 +288,11 @@ class VoucherPostingService {
 
     for (let index = 0; index < rawPayments.length; index++) {
       const p = rawPayments[index];
-      const amountNum = Math.round((Number(p.amount) || 0) * 100) / 100;
-      if (amountNum <= 0) continue;
+      const rawAmt = p.amount !== undefined && p.amount !== null ? p.amount : 0;
+      const amountDec = new Prisma.Decimal(rawAmt).toDecimalPlaces(2);
+      if (amountDec.lte(0)) continue;
 
-      const refDocId = p.id ? String(p.id) : `${grnInvoice.id}_pay_${index}`;
+      const refDocId = deriveStablePaymentRefId(grnInvoice.id, "pay", p, index);
 
       const existing = await db.voucher.findFirst({
         where: {
@@ -182,13 +314,13 @@ class VoucherPostingService {
       const payLedgerId = isCash ? cashLedger.id : bankLedger.id;
       const payLedgerName = isCash ? "Cash in Hand" : "Main Bank Account";
 
-      const amountDec = new Prisma.Decimal(amountNum);
       const suffix = rawPayments.length > 1 ? `-${index + 1}` : "";
       const voucherNo = `PAY-${grnInvoice.grnNumber || grnInvoice.invoiceNo || grnInvoice.id.slice(-6)}${suffix}`;
       const pDate = p.paymentDate ? new Date(p.paymentDate) : (grnInvoice.grnDate || grnInvoice.createdAt);
 
-      const voucher = await db.voucher.create({
-        data: {
+      const voucher = await safeCreateVoucher(
+        db,
+        {
           voucherNo,
           type: VoucherType.PAYMENT,
           date: pDate,
@@ -212,8 +344,9 @@ class VoucherPostingService {
             ],
           },
         },
-        include: { items: true },
-      });
+        "GRN_PAYMENT",
+        refDocId
+      );
 
       p.sourceVoucherId = String(voucher.id);
       postedVouchers.push(voucher);
@@ -237,8 +370,18 @@ class VoucherPostingService {
    * Debit: Customer Account Ledger
    * Credit: Sales Account (SALES-001)
    */
-  async postSalesVoucher(salesInvoiceId: string, txClient?: Prisma.TransactionClient) {
-    const db = txClient || prisma;
+  async postSalesVoucher(salesInvoiceId: string, txClient?: Prisma.TransactionClient): Promise<any> {
+    if (!txClient) {
+      // Configured with generous maxWait & timeout to handle multi-step postings for sales invoices with many receipts
+      return prisma.$transaction(
+        async (tx) => {
+          return this.postSalesVoucher(salesInvoiceId, tx);
+        },
+        { maxWait: 10000, timeout: 30000 }
+      );
+    }
+    const db = txClient;
+
     const salesInvoice = await db.salesInvoice.findUnique({
       where: { id: salesInvoiceId },
       include: { customer: true, items: true },
@@ -276,7 +419,20 @@ class VoucherPostingService {
       const totalCgst = items.reduce((s: number, i: any) => s + Number(i.cgstAmount || 0), 0);
       const totalSgst = items.reduce((s: number, i: any) => s + Number(i.sgstAmount || 0), 0);
       const totalIgst = items.reduce((s: number, i: any) => s + Number(i.igstAmount || 0), 0);
-      const salesBase = grandTotalNum - totalCgst - totalSgst - totalIgst;
+      const totalGst = totalCgst + totalSgst + totalIgst;
+
+      // Validation: Ensure total GST does not exceed the grand total amount.
+      // If total GST > grandTotalNum (due to inconsistent/corrupted source data), the sales base
+      // would be negative and posting a voucher would result in unbalanced debits and credits.
+      if (totalGst > grandTotalNum) {
+        console.error(
+          `[Auto-Post Voucher Error] Inconsistent GST data on Sales Invoice ${salesInvoice.id}: ` +
+            `Total GST (${totalGst}) exceeds Grand Total (${grandTotalNum}). Voucher posting aborted.`
+        );
+        return null;
+      }
+
+      const salesBase = grandTotalNum - totalGst;
 
       const salesJournalItems: any[] = [
         // Debit Customer for full grand total
@@ -286,14 +442,17 @@ class VoucherPostingService {
           creditAmount: new Prisma.Decimal(0),
           narration: `Receivable from ${salesInvoice.customer.firmName}`,
         },
-        // Credit Sales Account for base amount (excl. GST)
-        {
+      ];
+
+      // Only include Sales Ledger credit line if salesBase is strictly > 0 (avoid 0-amount lines when GST equals full total)
+      if (salesBase > 0) {
+        salesJournalItems.push({
           creditLedgerId: salesLedger.id,
           debitAmount: new Prisma.Decimal(0),
-          creditAmount: new Prisma.Decimal(salesBase > 0 ? salesBase : grandTotalNum),
+          creditAmount: new Prisma.Decimal(salesBase),
           narration: `Revenue credited to Sales Account`,
-        },
-      ];
+        });
+      }
 
       // Credit GST liability ledgers if GST breakdown available
       if (totalCgst > 0 || totalSgst > 0 || totalIgst > 0) {
@@ -332,8 +491,9 @@ class VoucherPostingService {
         }
       }
 
-      voucher = await db.voucher.create({
-        data: {
+      voucher = await safeCreateVoucher(
+        db,
+        {
           voucherNo,
           type: VoucherType.SALES,
           date,
@@ -342,8 +502,9 @@ class VoucherPostingService {
           refDocId: salesInvoice.id,
           items: { create: salesJournalItems },
         },
-        include: { items: true },
-      });
+        "SALES_INVOICE",
+        salesInvoice.id
+      );
     }
 
     // Also post receipt vouchers for any payments on this Sales Invoice
@@ -357,8 +518,18 @@ class VoucherPostingService {
    * Debit: Cash in Hand (CASH-001) or Main Bank Account (BANK-001) (Asset increase)
    * Credit: Customer Account Ledger (Asset / Receivable decrease)
    */
-  async postReceiptVouchersForSales(salesInvoiceId: string, txClient?: Prisma.TransactionClient) {
-    const db = txClient || prisma;
+  async postReceiptVouchersForSales(salesInvoiceId: string, txClient?: Prisma.TransactionClient): Promise<any[]> {
+    if (!txClient) {
+      // Configured with generous maxWait & timeout to handle sales invoices with many receipt lines
+      return prisma.$transaction(
+        async (tx) => {
+          return this.postReceiptVouchersForSales(salesInvoiceId, tx);
+        },
+        { maxWait: 10000, timeout: 30000 }
+      );
+    }
+    const db = txClient;
+
     const salesInvoice = await db.salesInvoice.findUnique({
       where: { id: salesInvoiceId },
       include: { customer: true },
@@ -384,10 +555,11 @@ class VoucherPostingService {
 
     for (let index = 0; index < rawPayments.length; index++) {
       const p = rawPayments[index];
-      const amountNum = Math.round((Number(p.amount) || 0) * 100) / 100;
-      if (amountNum <= 0) continue;
+      const rawAmt = p.amount !== undefined && p.amount !== null ? p.amount : 0;
+      const amountDec = new Prisma.Decimal(rawAmt).toDecimalPlaces(2);
+      if (amountDec.lte(0)) continue;
 
-      const refDocId = p.id ? String(p.id) : `${salesInvoice.id}_rcpt_${index}`;
+      const refDocId = deriveStablePaymentRefId(salesInvoice.id, "rcpt", p, index);
 
       const existing = await db.voucher.findFirst({
         where: {
@@ -406,13 +578,13 @@ class VoucherPostingService {
       const payLedgerId = isCash ? cashLedger.id : bankLedger.id;
       const payLedgerName = isCash ? "Cash in Hand" : "Main Bank Account";
 
-      const amountDec = new Prisma.Decimal(amountNum);
       const suffix = rawPayments.length > 1 ? `-${index + 1}` : "";
       const voucherNo = `RCT-${salesInvoice.invoiceNo || salesInvoice.id.slice(-6)}${suffix}`;
       const pDate = p.paymentDate ? new Date(p.paymentDate) : (salesInvoice.invoiceDate || salesInvoice.createdAt);
 
-      const voucher = await db.voucher.create({
-        data: {
+      const voucher = await safeCreateVoucher(
+        db,
+        {
           voucherNo,
           type: VoucherType.RECEIPT,
           date: pDate,
@@ -436,8 +608,9 @@ class VoucherPostingService {
             ],
           },
         },
-        include: { items: true },
-      });
+        "SALES_PAYMENT",
+        refDocId
+      );
 
       p.sourceVoucherId = String(voucher.id);
       postedVouchers.push(voucher);
@@ -462,8 +635,18 @@ class VoucherPostingService {
    * Credit: Customer Account Ledger
    * Plus optional settlement payment voucher if refundMode is CASH or BANK.
    */
-  async postSalesReturnVoucher(salesReturnId: string, txClient?: Prisma.TransactionClient) {
-    const db = txClient || prisma;
+  async postSalesReturnVoucher(salesReturnId: string, txClient?: Prisma.TransactionClient): Promise<any> {
+    if (!txClient) {
+      // Configured with generous maxWait & timeout for transaction atomicity
+      return prisma.$transaction(
+        async (tx) => {
+          return this.postSalesReturnVoucher(salesReturnId, tx);
+        },
+        { maxWait: 10000, timeout: 30000 }
+      );
+    }
+    const db = txClient;
+
     const salesReturn = await db.salesReturn.findUnique({
       where: { id: salesReturnId },
       include: { customer: true },
@@ -497,8 +680,9 @@ class VoucherPostingService {
     const grandTotal = new Prisma.Decimal(salesReturn.grandTotal);
     const voucherNo = `SRT-${salesReturn.returnNo}`;
 
-    const voucher = await db.voucher.create({
-      data: {
+    const voucher = await safeCreateVoucher(
+      db,
+      {
         voucherNo,
         type: VoucherType.SALES_RETURN,
         date: salesReturn.returnDate,
@@ -522,9 +706,19 @@ class VoucherPostingService {
           ],
         },
       },
-      include: { items: true },
-    });
+      "SALES_RETURN",
+      salesReturn.id
+    );
 
+    // Accounting Semantics Note for Refund Vouchers:
+    // This refund entry (Dr Customer Ledger / Cr Cash-or-Bank) assumes that the customer
+    // has already paid for the invoice being returned, and is now receiving a direct cash/bank refund.
+    // - Main Sales Return Voucher: Dr Sales Return A/c | Cr Customer Ledger (reduces customer receivable)
+    // - Refund Voucher: Dr Customer Ledger | Cr Cash/Bank (re-instates customer balance, reduces cash/bank asset)
+    // Net Customer Ledger Impact: Zero (receivable reduced by return, offset by cash payout).
+    // Net Business Impact: Dr Sales Return A/c | Cr Cash/Bank.
+    // If the business model changes (e.g. return reducing an unpaid customer balance without cash payout),
+    // do not set refundMode = CASH/BANK.
     if (salesReturn.refundMode === "CASH" || salesReturn.refundMode === "BANK") {
       const payLedgerCode = salesReturn.refundMode === "CASH" ? "CASH-001" : "BANK-001";
       let payLedger = await db.accountLedger.findUnique({ where: { code: payLedgerCode } });
@@ -533,12 +727,11 @@ class VoucherPostingService {
           where: { name: { contains: salesReturn.refundMode === "CASH" ? "Cash" : "Bank", mode: "insensitive" } },
         });
       }
-      // BUG-4 FIX: Refund should debit Sales Return A/c, NOT the Customer ledger.
-      // Customer ledger was already credited by the Sales Return voucher above (reducing what they owe).
-      // The refund is purely: Sales Return A/c Dr | Cash/Bank Cr — customer balance is NOT touched again.
-      if (payLedger && salesReturnLedger) {
-        await db.voucher.create({
-          data: {
+
+      if (payLedger && customerLedger) {
+        await safeCreateVoucher(
+          db,
+          {
             voucherNo: `SRT-PAY-${salesReturn.returnNo}`,
             type: VoucherType.PAYMENT,
             date: salesReturn.returnDate,
@@ -548,14 +741,12 @@ class VoucherPostingService {
             items: {
               create: [
                 {
-                  // Debit Sales Return A/c (reducing the return liability), NOT the customer ledger
-                  debitLedgerId: salesReturnLedger.id,
+                  debitLedgerId: customerLedger.id,
                   debitAmount: grandTotal,
                   creditAmount: new Prisma.Decimal(0),
-                  narration: `Sales return refund settled via ${salesReturn.refundMode}`,
+                  narration: `Refund paid to ${salesReturn.customer.firmName} via ${salesReturn.refundMode}`,
                 },
                 {
-                  // Credit Cash / Bank (asset decreases as cash goes out)
                   creditLedgerId: payLedger.id,
                   debitAmount: new Prisma.Decimal(0),
                   creditAmount: grandTotal,
@@ -564,9 +755,93 @@ class VoucherPostingService {
               ],
             },
           },
-        });
+          "SALES_RETURN_REFUND",
+          salesReturn.id
+        );
       }
     }
+
+    return voucher;
+  }
+
+  /**
+   * Post a formal double-entry Voucher for a Purchase Return.
+   * Debit: Supplier Ledger (reduces supplier payable)
+   * Credit: Purchase Return Account (PRT-001)
+   */
+  async postPurchaseReturnVoucher(purchaseReturnId: string, txClient?: Prisma.TransactionClient): Promise<any> {
+    if (!txClient) {
+      return prisma.$transaction(
+        async (tx) => {
+          return this.postPurchaseReturnVoucher(purchaseReturnId, tx);
+        },
+        { maxWait: 10000, timeout: 30000 }
+      );
+    }
+    const db = txClient;
+
+    const purchaseReturn = await db.purchaseReturn.findUnique({
+      where: { id: purchaseReturnId },
+      include: { supplier: true },
+    });
+
+    if (!purchaseReturn || !purchaseReturn.supplier) {
+      console.warn(`[Auto-Post Voucher] Purchase Return ${purchaseReturnId} not found or missing supplier.`);
+      return null;
+    }
+
+    await accountsService.ensureSystemLedgersExist(db);
+    const supplierLedger = await accountsService.ensureSupplierLedger(purchaseReturn.supplier, db);
+    let purchaseReturnLedger = await db.accountLedger.findUnique({ where: { code: "PRT-001" } });
+    if (!purchaseReturnLedger) {
+      const prList = await db.accountLedger.findMany({
+        where: { name: { contains: "Purchase Return", mode: "insensitive" } },
+      });
+      purchaseReturnLedger = prList.length > 0 ? prList[0] : null;
+    }
+
+    if (!purchaseReturnLedger || !supplierLedger) {
+      console.error("[Auto-Post Voucher Error] Missing purchase return or supplier ledger");
+      return null;
+    }
+
+    const existing = await db.voucher.findFirst({
+      where: { refDocType: "PURCHASE_RETURN", refDocId: purchaseReturn.id },
+    });
+    if (existing) return existing;
+
+    const grandTotal = new Prisma.Decimal(purchaseReturn.grandTotal);
+    const voucherNo = `PRT-${purchaseReturn.returnNo}`;
+
+    const voucher = await safeCreateVoucher(
+      db,
+      {
+        voucherNo,
+        type: VoucherType.PURCHASE_RETURN,
+        date: purchaseReturn.returnDate,
+        narration: `Purchase return posted for ${purchaseReturn.returnNo}${purchaseReturn.grnInvoiceId ? ` against GRN invoice ${purchaseReturn.grnInvoiceId}` : ""}`,
+        refDocType: "PURCHASE_RETURN",
+        refDocId: purchaseReturn.id,
+        items: {
+          create: [
+            {
+              debitLedgerId: supplierLedger.id,
+              debitAmount: grandTotal,
+              creditAmount: new Prisma.Decimal(0),
+              narration: `Payable reduced for ${purchaseReturn.supplier.legalName}`,
+            },
+            {
+              creditLedgerId: purchaseReturnLedger.id,
+              debitAmount: new Prisma.Decimal(0),
+              creditAmount: grandTotal,
+              narration: `Purchase return — goods returned to ${purchaseReturn.supplier.legalName}`,
+            },
+          ],
+        },
+      },
+      "PURCHASE_RETURN",
+      purchaseReturn.id
+    );
 
     return voucher;
   }
@@ -611,8 +886,9 @@ class VoucherPostingService {
     const entryDate = entry.entryDate || new Date();
 
     if (entry.type === "OUT") {
-      return db.voucher.create({
-        data: {
+      return safeCreateVoucher(
+        db,
+        {
           voucherNo,
           type: VoucherType.EXPENSE,
           date: entryDate,
@@ -636,11 +912,14 @@ class VoucherPostingService {
             ],
           },
         },
-      });
-    } else {
+        "PETTY_CASH",
+        String(entry.id)
+      );
+    } else if (entry.type === "IN") {
       if (!cashLedger) return null;
-      return db.voucher.create({
-        data: {
+      return safeCreateVoucher(
+        db,
+        {
           voucherNo,
           type: VoucherType.CONTRA,
           date: entryDate,
@@ -664,8 +943,116 @@ class VoucherPostingService {
             ],
           },
         },
-      });
+        "PETTY_CASH",
+        String(entry.id)
+      );
+    } else {
+      console.error(`[Auto-Post Voucher Error] Invalid petty cash entry type "${entry.type}" for entry ${entry.id}`);
+      return null;
     }
+  }
+
+  /**
+   * Determine the correct credit ledger code based on the expense's paymentMethod.
+   *   "Cash"                          → CASH-001 (Cash in Hand)
+   *   "Bank Transfer" / GPay / PhonePe / Credit Card / Debit Card → BANK-001 (Main Bank Account)
+   *   Fallback (empty or unknown)     → PCASH-001 (Petty Cash)
+   */
+  private getCreditLedgerCodeForExpense(paymentMethod?: string): string {
+    if (!paymentMethod) return "PCASH-001";
+
+    const method = paymentMethod.trim().toLowerCase();
+
+    if (method === "cash") return "CASH-001";
+
+    if (
+      method === "bank transfer" ||
+      method === "gpay" ||
+      method === "phonepe" ||
+      method === "credit card" ||
+      method === "debit card"
+    ) {
+      return "BANK-001";
+    }
+
+    return "PCASH-001";
+  }
+
+  /**
+   * Post a formal double-entry EXPENSE Voucher directly.
+   *   Debit  : General Expenses  (EXP-001)  — records the expense
+   *   Credit : Cash / Bank / Petty Cash      — reduces the paying account
+   *
+   * Uses refDocType = "EXPENSE" so duplicates are prevented by the unique constraint.
+   */
+  async postExpenseVoucher(
+    expenseId: string,
+    paymentMethod?: string,
+    txClient?: Prisma.TransactionClient
+  ) {
+    const db = txClient || prisma;
+
+    const expense = await db.expense.findUnique({
+      where: { id: expenseId },
+      include: { supplier: true },
+    });
+
+    if (!expense) return null;
+
+    // Check if a voucher was already posted for this expense
+    const existingVoucher = await db.voucher.findFirst({
+      where: {
+        refDocType: "EXPENSE",
+        refDocId: expense.id,
+      },
+    });
+
+    if (existingVoucher) return existingVoucher;
+
+    await accountsService.ensureSystemLedgersExist(db);
+
+    const expenseLedger = await db.accountLedger.findUnique({ where: { code: "EXP-001" } });
+    const creditLedgerCode = this.getCreditLedgerCodeForExpense(paymentMethod || expense.paymentMethod);
+    const creditLedger = await db.accountLedger.findUnique({ where: { code: creditLedgerCode } });
+
+    if (!expenseLedger || !creditLedger) {
+      console.warn(`[Auto-Post Expense Voucher] Missing system ledgers EXP-001 or ${creditLedgerCode}.`);
+      return null;
+    }
+
+    const amount = new Prisma.Decimal(expense.amount);
+    const voucherNo = `EXP-${expense.expenseNumber}`;
+    const entryDate = expense.date || new Date();
+
+    return safeCreateVoucher(
+      db,
+      {
+        voucherNo,
+        type: VoucherType.EXPENSE,
+        date: entryDate,
+        narration: `Expense: ${expense.expense}${expense.supplier ? ` — ${expense.supplier.legalName}` : ""}`,
+        refDocType: "EXPENSE",
+        refDocId: expense.id,
+        items: {
+          create: [
+            {
+              debitLedgerId: expenseLedger.id,
+              debitAmount: amount,
+              creditAmount: new Prisma.Decimal(0),
+              narration: `${expense.expenseCategory}: ${expense.expense}`,
+            },
+            {
+              creditLedgerId: creditLedger.id,
+              debitAmount: new Prisma.Decimal(0),
+              creditAmount: amount,
+              narration: `Paid via ${paymentMethod || expense.paymentMethod || "Cash"}`,
+            },
+          ],
+        },
+      },
+      "EXPENSE",
+      expense.id
+    );
   }
 
   /**
@@ -673,13 +1060,19 @@ class VoucherPostingService {
    * Uses set-based queries and parallel batches for efficiency.
    */
   async syncUnpostedVouchers() {
+    const failedPostings: Array<{ id: string | number; docType: string; reason: string }> = [];
+
     try {
       const [
         postedGrnVouchers,
         postedSalesVouchers,
+        postedPurchaseReturnVouchers,
+        postedSalesReturnVouchers,
         postedPettyCashVouchers,
         allGrnIds,
         allSalesIds,
+        allPurchaseReturnIds,
+        allSalesReturnIds,
         allPettyCashEntries,
         allExpenses,
       ] = await Promise.all([
@@ -692,11 +1085,21 @@ class VoucherPostingService {
           select: { refDocId: true },
         }),
         prisma.voucher.findMany({
+          where: { refDocType: "PURCHASE_RETURN" },
+          select: { refDocId: true },
+        }),
+        prisma.voucher.findMany({
+          where: { refDocType: "SALES_RETURN" },
+          select: { refDocId: true },
+        }),
+        prisma.voucher.findMany({
           where: { refDocType: "PETTY_CASH" },
           select: { refDocId: true },
         }),
         prisma.grnInvoice.findMany({ select: { id: true } }),
         prisma.salesInvoice.findMany({ select: { id: true } }),
+        prisma.purchaseReturn.findMany({ select: { id: true } }),
+        prisma.salesReturn.findMany({ select: { id: true } }),
         prisma.pettyCashEntry.findMany({ select: { id: true, entryNo: true } }),
         prisma.expense.findMany({
           include: { supplier: true },
@@ -705,16 +1108,77 @@ class VoucherPostingService {
 
       const postedGrnIds = new Set(postedGrnVouchers.map((v) => v.refDocId).filter(Boolean));
       const postedSalesIds = new Set(postedSalesVouchers.map((v) => v.refDocId).filter(Boolean));
+      const postedPRIds = new Set(postedPurchaseReturnVouchers.map((v) => v.refDocId).filter(Boolean));
+      const postedSRIds = new Set(postedSalesReturnVouchers.map((v) => v.refDocId).filter(Boolean));
 
       const unpostedGrnIds = allGrnIds.filter((g) => !postedGrnIds.has(g.id)).map((g) => g.id);
       const unpostedSalesIds = allSalesIds.filter((s) => !postedSalesIds.has(s.id)).map((s) => s.id);
+      const unpostedPRIds = allPurchaseReturnIds.filter((p) => !postedPRIds.has(p.id)).map((p) => p.id);
+      const unpostedSRIds = allSalesReturnIds.filter((s) => !postedSRIds.has(s.id)).map((s) => s.id);
 
       const batchSize = 10;
       for (let i = 0; i < unpostedGrnIds.length; i += batchSize) {
-        await Promise.all(unpostedGrnIds.slice(i, i + batchSize).map((id) => this.postPurchaseVoucher(id)));
+        const batch = unpostedGrnIds.slice(i, i + batchSize);
+        await Promise.all(
+          batch.map(async (id) => {
+            try {
+              const res = await this.postPurchaseVoucher(id);
+              if (!res) {
+                failedPostings.push({ id, docType: "GRN_INVOICE", reason: "Returned null (missing ledger or missing document)" });
+              }
+            } catch (err: any) {
+              failedPostings.push({ id, docType: "GRN_INVOICE", reason: err?.message || String(err) });
+            }
+          })
+        );
       }
+
       for (let i = 0; i < unpostedSalesIds.length; i += batchSize) {
-        await Promise.all(unpostedSalesIds.slice(i, i + batchSize).map((id) => this.postSalesVoucher(id)));
+        const batch = unpostedSalesIds.slice(i, i + batchSize);
+        await Promise.all(
+          batch.map(async (id) => {
+            try {
+              const res = await this.postSalesVoucher(id);
+              if (!res) {
+                failedPostings.push({ id, docType: "SALES_INVOICE", reason: "Returned null (missing ledger or missing document)" });
+              }
+            } catch (err: any) {
+              failedPostings.push({ id, docType: "SALES_INVOICE", reason: err?.message || String(err) });
+            }
+          })
+        );
+      }
+
+      for (let i = 0; i < unpostedPRIds.length; i += batchSize) {
+        const batch = unpostedPRIds.slice(i, i + batchSize);
+        await Promise.all(
+          batch.map(async (id) => {
+            try {
+              const res = await this.postPurchaseReturnVoucher(id);
+              if (!res) {
+                failedPostings.push({ id, docType: "PURCHASE_RETURN", reason: "Returned null (missing ledger or missing document)" });
+              }
+            } catch (err: any) {
+              failedPostings.push({ id, docType: "PURCHASE_RETURN", reason: err?.message || String(err) });
+            }
+          })
+        );
+      }
+
+      for (let i = 0; i < unpostedSRIds.length; i += batchSize) {
+        const batch = unpostedSRIds.slice(i, i + batchSize);
+        await Promise.all(
+          batch.map(async (id) => {
+            try {
+              const res = await this.postSalesReturnVoucher(id);
+              if (!res) {
+                failedPostings.push({ id, docType: "SALES_RETURN", reason: "Returned null (missing ledger or missing document)" });
+              }
+            } catch (err: any) {
+              failedPostings.push({ id, docType: "SALES_RETURN", reason: err?.message || String(err) });
+            }
+          })
+        );
       }
 
       // Sync unposted Expense & Petty Cash entries
@@ -740,8 +1204,9 @@ class VoucherPostingService {
               },
             });
             pettyCashList.push({ id: createdEntry.id, entryNo: createdEntry.entryNo });
-          } catch (pcErr) {
+          } catch (pcErr: any) {
             console.error(`[Auto-Post Voucher Error] Syncing expense ${exp.expenseNumber} to petty cash failed:`, pcErr);
+            failedPostings.push({ id: exp.id, docType: "EXPENSE_PETTY_CASH_SYNC", reason: pcErr?.message || String(pcErr) });
           }
         }
       }
@@ -750,11 +1215,24 @@ class VoucherPostingService {
       const unpostedPettyCashIds = pettyCashList.filter((p) => !postedPettyCashIds.has(String(p.id))).map((p) => p.id);
 
       for (const id of unpostedPettyCashIds) {
-        await this.postPettyCashVoucher(id);
+        try {
+          const res = await this.postPettyCashVoucher(id);
+          if (!res) {
+            failedPostings.push({ id, docType: "PETTY_CASH", reason: "Returned null (missing ledger or invalid entry type)" });
+          }
+        } catch (err: any) {
+          failedPostings.push({ id, docType: "PETTY_CASH", reason: err?.message || String(err) });
+        }
+      }
+
+      if (failedPostings.length > 0) {
+        console.warn(`[Auto-Post Voucher Sync Warning] Completed with ${failedPostings.length} failed posting(s):`, failedPostings);
       }
     } catch (err) {
       console.error("[Auto-Post Voucher Error] Syncing unposted vouchers failed:", err);
     }
+
+    return { failedPostings };
   }
 
   /**
@@ -776,8 +1254,9 @@ class VoucherPostingService {
     const opBal = new Prisma.Decimal(amount);
     const isCredit = type === "CREDIT";
 
-    return db.voucher.create({
-      data: {
+    return safeCreateVoucher(
+      db,
+      {
         voucherNo: `JV-SUP-OP-${supplier.supplierCode || String(supplier.id).slice(-6)}`,
         type: VoucherType.JOURNAL,
         date: new Date(),
@@ -801,7 +1280,9 @@ class VoucherPostingService {
           ],
         },
       },
-    });
+      "SUPPLIER_OPENING_BALANCE",
+      String(supplier.id)
+    );
   }
 
   /**
@@ -823,8 +1304,9 @@ class VoucherPostingService {
     const opBal = new Prisma.Decimal(amount);
     const isDebit = type === "DEBIT";
 
-    return db.voucher.create({
-      data: {
+    return safeCreateVoucher(
+      db,
+      {
         voucherNo: `JV-CUST-OP-${customer.customerCode || String(customer.id).slice(-6)}`,
         type: VoucherType.JOURNAL,
         date: new Date(),
@@ -848,7 +1330,9 @@ class VoucherPostingService {
           ],
         },
       },
-    });
+      "CUSTOMER_OPENING_BALANCE",
+      String(customer.id)
+    );
   }
 
   /**
@@ -916,4 +1400,3 @@ class VoucherPostingService {
 }
 
 export const voucherPostingService = new VoucherPostingService();
-
