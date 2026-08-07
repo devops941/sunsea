@@ -461,6 +461,20 @@ const EmployeeCreatePage: React.FC = () => {
       if (!form.accountNumber.trim())      e.accountNumber = "Account Number is required for Bank Transfers";
       if (!form.ifscCode.trim())            e.ifscCode = "IFSC Code is required for Bank Transfers";
       if (!form.accountHolderName.trim())  e.accountHolderName = "Account Holder Name is required for Bank Transfers";
+
+      // Validate component breakdown sum matches gross salary
+      const gross = parseFloat(form.monthlySalary || form.weeklySalary || form.dailySalary || form.hourlySalary || "0") || 0;
+      if (gross > 0) {
+        const basic = parseFloat(form.basicSalary || "0") || 0;
+        const da = parseFloat(form.da || "0") || 0;
+        const hra = parseFloat(form.hra || "0") || 0;
+        const other = parseFloat(form.otherAllowance || "0") || 0;
+        const sum = basic + da + hra + other;
+
+        if (Math.abs(sum - gross) > 0.01) {
+          e.otherAllowance = `Salary components sum (₹${sum.toLocaleString('en-IN')}) must equal Gross Salary (₹${gross.toLocaleString('en-IN')})`;
+        }
+      }
     }
 
     // Login account
@@ -566,15 +580,20 @@ const EmployeeCreatePage: React.FC = () => {
       // grossSalary stores the primary salary amount regardless of type
       if (st === "MONTHLY") {
         if (form.monthlySalary) fd.append("grossSalary", form.monthlySalary);
-        if (form.basicSalary)   fd.append("basicSalary", form.basicSalary);
       } else if (st === "WEEKLY") {
         if (form.weeklySalary)  fd.append("grossSalary", form.weeklySalary);
-        if (form.basicSalary)   fd.append("basicSalary", form.basicSalary);
       } else if (st === "DAILY") {
         if (form.dailySalary)   fd.append("grossSalary", form.dailySalary);
-        if (form.dailySalary)   fd.append("basicSalary", form.dailySalary);
       } else if (st === "HOURLY") {
         if (form.hourlySalary)  fd.append("grossSalary", form.hourlySalary);
+      }
+
+      // Bank Transfer salary components
+      if (form.paymentMode === "BANK") {
+        if (form.basicSalary)    fd.append("basicSalary", form.basicSalary);
+        if (form.da)             fd.append("da", form.da);
+        if (form.hra)            fd.append("hra", form.hra);
+        if (form.otherAllowance) fd.append("otherAllowance", form.otherAllowance);
       }
       // Statutory (only for Bank Transfer)
       if (form.paymentMode === "BANK") {

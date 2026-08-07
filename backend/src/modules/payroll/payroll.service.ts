@@ -338,7 +338,8 @@ function computeResult(
   // Slab is applied to monthlySalary (not earned/gross of this period).
   // ─────────────────────────────────────────────────────────────────────────────
   let professionalTax = 0;
-  if (settings.professionalTaxEnabled && runType === 'MONTHLY') {
+  const isPtApp = (emp as any).professionalTax ?? (pc as any)?.professionalTax ?? false;
+  if ((settings.professionalTaxEnabled || isPtApp) && runType === 'MONTHLY') {
     const ptBasis = monthlySalary; // always use monthly salary as PT slab basis
     if (Number(settings.professionalTaxAmount) > 0) {
       professionalTax = Number(settings.professionalTaxAmount);
@@ -500,6 +501,23 @@ class PayrollService {
       update: data,
       create: { employeeId, salaryType: 'CASH_MONTHLY', monthlySalary: 0, basicSalary: 0, ...data },
     });
+
+    // Keep Employee table in sync
+    const empUpdate: Record<string, any> = {};
+    if (data.monthlySalary !== undefined) empUpdate.grossSalary = data.monthlySalary;
+    if (data.basicSalary !== undefined) empUpdate.basicSalary = data.basicSalary;
+    if (data.bankAccount !== undefined) empUpdate.accountNumber = data.bankAccount;
+    if (data.bankName !== undefined) empUpdate.bankName = data.bankName;
+    if (data.ifscCode !== undefined) empUpdate.ifscCode = data.ifscCode;
+    if (data.paymentMode !== undefined) empUpdate.paymentMode = data.paymentMode;
+
+    if (Object.keys(empUpdate).length > 0) {
+      await prisma.employee.update({
+        where: { id: employeeId },
+        data: empUpdate,
+      }).catch(() => {});
+    }
+
     getIO().emit('payroll:employee:updated', cfg);
     return cfg;
   }

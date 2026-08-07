@@ -331,13 +331,13 @@ const EmployeeEdit: React.FC = () => {
         weeklySalary:       emp.salaryType?.toLowerCase() === "weekly"  ? String(emp.grossSalary || "") : "",
         dailySalary:        emp.salaryType?.toLowerCase() === "daily"   ? String(emp.grossSalary || "") : "",
         hourlySalary:       emp.salaryType?.toLowerCase() === "hourly"  ? String(emp.grossSalary || "") : "",
-        basicSalary:        emp.basicSalary  ? String(emp.basicSalary)  : "",
-        da:                 emp.da           ? String(emp.da)           : "",
-        hra:                emp.hra          ? String(emp.hra)          : "",
+        basicSalary:        emp.basicSalary !== undefined && emp.basicSalary !== null ? String(emp.basicSalary) : (emp.payrollConfig?.basicSalary ? String(emp.payrollConfig.basicSalary) : ""),
+        da:                 emp.da !== undefined && emp.da !== null ? String(emp.da) : (emp.payrollConfig?.da ? String(emp.payrollConfig.da) : ""),
+        hra:                emp.hra !== undefined && emp.hra !== null ? String(emp.hra) : (emp.payrollConfig?.hra ? String(emp.payrollConfig.hra) : ""),
         conveyanceAllowance: "",
         medicalAllowance:   "",
         specialAllowance:   "",
-        otherAllowance:     emp.otherAllowance ? String(emp.otherAllowance) : "",
+        otherAllowance:     emp.otherAllowance !== undefined && emp.otherAllowance !== null ? String(emp.otherAllowance) : (emp.payrollConfig?.otherAllowance ? String(emp.payrollConfig.otherAllowance) : ""),
         overtimeEligible:   false,
         minWorkingHours:    "",
         maxWorkingHours:    "",
@@ -526,6 +526,20 @@ const EmployeeEdit: React.FC = () => {
       if (!form.accountNumber.trim())      e.accountNumber = "Account Number is required for Bank Transfers";
       if (!form.ifscCode.trim())            e.ifscCode = "IFSC Code is required for Bank Transfers";
       if (!form.accountHolderName.trim())  e.accountHolderName = "Account Holder Name is required for Bank Transfers";
+
+      // Validate component breakdown sum matches gross salary
+      const gross = parseFloat(form.monthlySalary || form.weeklySalary || form.dailySalary || form.hourlySalary || "0") || 0;
+      if (gross > 0) {
+        const basic = parseFloat(form.basicSalary || "0") || 0;
+        const da = parseFloat(form.da || "0") || 0;
+        const hra = parseFloat(form.hra || "0") || 0;
+        const other = parseFloat(form.otherAllowance || "0") || 0;
+        const sum = basic + da + hra + other;
+
+        if (Math.abs(sum - gross) > 0.01) {
+          e.otherAllowance = `Salary components sum (₹${sum.toLocaleString('en-IN')}) must equal Gross Salary (₹${gross.toLocaleString('en-IN')})`;
+        }
+      }
     }
 
     setErrors(e);
@@ -614,15 +628,20 @@ const EmployeeEdit: React.FC = () => {
       const st = (form.salaryType || "MONTHLY").toUpperCase();
       if (st === "MONTHLY") {
         if (form.monthlySalary) fd.append("grossSalary", form.monthlySalary);
-        if (form.basicSalary)   fd.append("basicSalary", form.basicSalary);
       } else if (st === "WEEKLY") {
         if (form.weeklySalary)  fd.append("grossSalary", form.weeklySalary);
-        if (form.basicSalary)   fd.append("basicSalary", form.basicSalary);
       } else if (st === "DAILY") {
         if (form.dailySalary)   fd.append("grossSalary", form.dailySalary);
-        if (form.dailySalary)   fd.append("basicSalary", form.dailySalary);
       } else if (st === "HOURLY") {
         if (form.hourlySalary)  fd.append("grossSalary", form.hourlySalary);
+      }
+
+      // Bank Transfer salary components
+      if (form.paymentMode === "BANK") {
+        if (form.basicSalary)    fd.append("basicSalary", form.basicSalary);
+        if (form.da)             fd.append("da", form.da);
+        if (form.hra)            fd.append("hra", form.hra);
+        if (form.otherAllowance) fd.append("otherAllowance", form.otherAllowance);
       }
       // Statutory (only for Bank Transfer)
       if (form.paymentMode === "BANK") {
