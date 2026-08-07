@@ -270,7 +270,12 @@ const StockAdjustmentList: React.FC = () => {
             {
               header: "ADJUSTMENT NO",
               accessor: "adjustmentNumber",
-              render: (item) => <span className="font-semibold text-slate-700">{item.adjustmentNumber}</span>
+              render: (item) => (
+                <div>
+                  <div className="font-semibold text-slate-700">{item.adjustmentNumber}</div>
+                  <div className="text-xs text-slate-400 font-medium">{formatDate(item.adjustmentDate)}</div>
+                </div>
+              )
             },
             {
               header: "TYPE",
@@ -369,18 +374,6 @@ const StockAdjustmentList: React.FC = () => {
               }
             },
             {
-              header: "DATE",
-              render: (item) => formatDate(item.adjustmentDate)
-            },
-            {
-              header: "ITEMS",
-              render: (item) => (
-                <span className="px-2 py-1 bg-slate-100 text-slate-600 rounded text-xs font-semibold border border-slate-200">
-                  {item.items?.length || 0} item{(item.items?.length || 0) !== 1 ? "s" : ""}
-                </span>
-              )
-            },
-            {
               header: "REASON",
               render: (item) => (
                 <span
@@ -390,14 +383,6 @@ const StockAdjustmentList: React.FC = () => {
                   {item.reason || "—"}
                 </span>
               )
-            },
-            {
-              header: "CREATED BY",
-              render: (item) => <span className="text-slate-500 text-sm">{item.createdByUser?.fullName || item.createdBy || "—"}</span>
-            },
-            {
-              header: "STATUS",
-              render: (item) => <StatusBadge status={item.status} />
             },
             {
               header: "ACTIONS",

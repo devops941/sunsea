@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { FaSave, FaEraser } from "react-icons/fa";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -16,6 +16,7 @@ import { createRawMaterial, updateRawMaterial } from "../../../features/raw-mate
 import { fetchStores } from "../../../features/stores/storeSlice";
 import { rawMaterialService } from "../../../services/rawMaterialService";
 import { useRawMaterialCategories } from "../../../hooks/useRawMaterialCategories";
+import { useSocketSync } from "../../../hooks/useSocketSync";
 
 const initialFormState = {
     rawMaterialId: "",
@@ -79,9 +80,20 @@ const WastageStoreForm: React.FC = () => {
     const { data: stores } = useAppSelector(state => state.stores);
     const { rawMaterialCategories, loadCategories } = useRawMaterialCategories();
 
-    useEffect(() => {
+    const fetchStoresData = useCallback(() => {
         dispatch(fetchStores({ storeCategory: "WASTAGE" }));
+    }, [dispatch]);
+
+    const fetchCategoriesData = useCallback(() => {
         loadCategories();
+    }, [loadCategories]);
+
+    useSocketSync("store", undefined, fetchStoresData);
+    useSocketSync("rawMaterialCategory", undefined, fetchCategoriesData);
+
+    useEffect(() => {
+        fetchStoresData();
+        fetchCategoriesData();
 
         if (isEdit && locationState.state) {
             setFormData({
@@ -107,6 +119,14 @@ const WastageStoreForm: React.FC = () => {
             getNextId();
         }
     }, [dispatch, loadCategories, isEdit, locationState.state]);
+
+    const handleUomSelectInQuantity = (selectedUom: string) => {
+        if (!formData.baseUom) return;
+        const list = formData.baseUom.split(",").map(u => u.trim()).filter(Boolean);
+        const rest = list.filter(u => u.toLowerCase() !== selectedUom.toLowerCase());
+        const reordered = [selectedUom, ...rest].join(",");
+        setFormData(prev => ({ ...prev, baseUom: reordered }));
+    };
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
@@ -238,7 +258,7 @@ const WastageStoreForm: React.FC = () => {
                             isMulti
                             category={["length", "mass", "each", "volume"]}
                             allowedCodes={[
-                                "kg", "g", "t", "ton",
+                                "g", "kg", "t", "ton",
                                 "l", "ml", "ltr",
                                 "m", "cm", "mtr",
                                 "dz", "ea"
@@ -257,6 +277,7 @@ const WastageStoreForm: React.FC = () => {
                             name="onHandQty"
                             value={formData.onHandQty}
                             baseUoms={formData.baseUom}
+                            onUomChange={handleUomSelectInQuantity}
                             onChange={handleChange}
                             error={errors.onHandQty}
                             required

@@ -18,6 +18,11 @@ export class DailyPlanRepository {
         },
         machine: true,
         shift: true,
+        hourlyProductions: {
+          select: { qtyProduced: true, hourIndex: true }
+        },
+        carryForwardFrom: { select: { dailyPlanId: true } },
+        carryForwardTo: { select: { dailyPlanId: true, productionDate: true, shiftId: true, status: true } },
       },
     });
   }

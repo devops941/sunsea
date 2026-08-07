@@ -37,7 +37,7 @@ const SelectInput: React.FC<SelectInputProps> = ({
   icon,
   disabled,
   noMargin = false,
-  searchable = false,
+  searchable = true,
   onChange,
 }) => {
   const [isOpen, setIsOpen] = useState(false);

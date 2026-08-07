@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { FaSave, FaEraser, FaArrowLeft } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -13,6 +13,7 @@ import { fetchGstTaxes, selectActiveGstTaxes } from "../../../features/gst/gstSl
 import { rawMaterialService } from "../../../services/rawMaterialService";
 import { useRawMaterialCategories } from "../../../hooks/useRawMaterialCategories";
 import UOMSelect from "../../../components/form/SelectInput/UOMSelect";
+import { useSocketSync } from "../../../hooks/useSocketSync";
 
 // const CATEGORY_OPTIONS = [
 //     { label: "Yarn", value: "Yarn" },
@@ -233,10 +234,26 @@ const RawMaterialCreate: React.FC = () => {
         })),
     ], [gstTaxes, gstLoading]);
 
-    useEffect(() => {
+    const fetchStoresData = useCallback(() => {
         dispatch(fetchStores({ storeCategory: "RAW_MATERIAL" }));
+    }, [dispatch]);
+
+    const fetchCategoriesData = useCallback(() => {
         loadCategories();
+    }, [loadCategories]);
+
+    const fetchGstData = useCallback(() => {
         dispatch(fetchGstTaxes({ status: "ACTIVE" }));
+    }, [dispatch]);
+
+    useSocketSync("store", undefined, fetchStoresData);
+    useSocketSync("rawMaterialCategory", undefined, fetchCategoriesData);
+    useSocketSync("gstTax", undefined, fetchGstData);
+
+    useEffect(() => {
+        fetchStoresData();
+        fetchCategoriesData();
+        fetchGstData();
         const getNextId = async () => {
             try {
                 const nextId = await rawMaterialService.fetchNextId();
@@ -246,7 +263,15 @@ const RawMaterialCreate: React.FC = () => {
             }
         };
         getNextId();
-    }, [dispatch, loadCategories]);
+    }, [fetchStoresData, fetchCategoriesData, fetchGstData]);
+
+    const handleUomSelectInQuantity = (selectedUom: string) => {
+        if (!formData.baseUom) return;
+        const list = formData.baseUom.split(",").map(u => u.trim()).filter(Boolean);
+        const rest = list.filter(u => u.toLowerCase() !== selectedUom.toLowerCase());
+        const reordered = [selectedUom, ...rest].join(",");
+        setFormData(prev => ({ ...prev, baseUom: reordered }));
+    };
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target as any;
@@ -460,6 +485,7 @@ const RawMaterialCreate: React.FC = () => {
                                 name="onHandQty"
                                 value={formData.onHandQty}
                                 baseUoms={formData.baseUom}
+                                onUomChange={handleUomSelectInQuantity}
                                 required
                                 error={errors.onHandQty}
                                 onChange={handleChange}
@@ -469,6 +495,7 @@ const RawMaterialCreate: React.FC = () => {
                                 name="minimumStock"
                                 value={formData.minimumStock}
                                 baseUoms={formData.baseUom}
+                                onUomChange={handleUomSelectInQuantity}
                                 required
                                 error={errors.minimumStock}
                                 onChange={handleChange}
@@ -478,6 +505,7 @@ const RawMaterialCreate: React.FC = () => {
                                 name="reorderLevel"
                                 value={formData.reorderLevel}
                                 baseUoms={formData.baseUom}
+                                onUomChange={handleUomSelectInQuantity}
                                 required
                                 error={errors.reorderLevel}
                                 onChange={handleChange}

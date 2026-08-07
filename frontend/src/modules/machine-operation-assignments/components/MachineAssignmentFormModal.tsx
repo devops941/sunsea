@@ -104,8 +104,36 @@ export const MachineAssignmentFormModal: React.FC<Props> = ({
 
   useEffect(() => {
     if (!isOpen) return;
-    fetchRefData();
-  }, [isOpen, fetchRefData]);
+
+    const loadRefData = async () => {
+      try {
+        const [mRes, rRes, sRes] = await Promise.all([
+          machineService.getAll().catch(() => []),
+          machineOperationAssignmentService.getRoles().catch(() => ({ data: [] })),
+          shiftService.fetchAll().catch(() => []),
+        ]);
+
+        const machineList = Array.isArray(mRes) ? mRes : mRes.data || [];
+        setMachines(machineList.filter((m: any) => m.isActive !== false));
+
+        const roleList = (rRes.data || []).filter((r: any) => 
+          !r.name?.toLowerCase().includes("super admin") &&
+          !r.name?.toLowerCase().includes("superadmin") &&
+          !r.code?.toLowerCase().includes("super_admin") &&
+          !r.code?.toLowerCase().includes("superadmin") &&
+          r.code?.toLowerCase() !== "role_admin"
+        );
+        setRoles(roleList);
+
+        const shiftList = Array.isArray(sRes) ? sRes : (sRes as any).data || [];
+        setShifts(shiftList.filter((s: any) => s.isActive !== false));
+      } catch (err: any) {
+        console.error("Failed to load reference data:", err);
+      }
+    };
+
+    loadRefData();
+  }, [isOpen]);
 
   // Populate data when editing or initialData opens
   useEffect(() => {

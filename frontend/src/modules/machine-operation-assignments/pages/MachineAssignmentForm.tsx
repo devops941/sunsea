@@ -86,8 +86,14 @@ export const MachineAssignmentForm: React.FC = () => {
       const machineList = Array.isArray(mRes) ? mRes : mRes.data || [];
       setMachines(machineList.filter((m: any) => m.isActive !== false));
 
-      const roleList = rRes.data || [];
-      setRoles(roleList);
+        const roleList = (rRes.data || []).filter((r: any) => 
+          !r.name?.toLowerCase().includes("super admin") &&
+          !r.name?.toLowerCase().includes("superadmin") &&
+          !r.code?.toLowerCase().includes("super_admin") &&
+          !r.code?.toLowerCase().includes("superadmin") &&
+          r.code?.toLowerCase() !== "role_admin"
+        );
+        setRoles(roleList);
 
       const shiftList = Array.isArray(sRes) ? sRes : (sRes as any).data || [];
       setShifts(shiftList.filter((s: any) => s.isActive !== false));

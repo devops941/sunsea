@@ -10,6 +10,7 @@ import {
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
 import { fetchMachines } from "../../../features/machines/machineSlice";
 import { fetchShifts } from "../../../features/shifts/shiftSlice";
+import { useSocketSync } from "../../../hooks/useSocketSync";
 import { createDailyPlan, updateDailyPlan } from "../../../features/daily-plans/dailyPlanSlice";
 import { weeklyProgramService } from "../../../services/weeklyProgramService";
 import { dailyPlanService } from "../../../services/dailyPlanService";
@@ -208,22 +209,26 @@ const DailyPlanCreate: React.FC = () => {
     const hoursMap: Record<string, number> = {};
     if (!productionDate || !machineId || !shifts || shifts.length === 0) return hoursMap;
 
+    const TERMINAL_STATUSES = ["COMPLETED", "STOPPED", "SHORT_CLOSED", "POST_PRODUCTION", "PARTIAL_COMPLETED", "COMPLETED_WITH_SHORTFALL"];
+
     shifts.forEach((s: any) => {
       const shiftHrs = computeShiftHours(s.startTime, s.endTime);
       const safePlans = Array.isArray(plansForDateAndMachine) ? plansForDateAndMachine : [];
       const existingPlans = safePlans.filter(
         (p: any) => p.shiftId === s.shiftCode && p.status !== "CANCELLED" && p.dailyPlanId !== editId
       );
-      const plannedHrsSum = existingPlans.reduce((sum: number, p: any) => {
-        const loggedHours = Array.isArray(p.hourlyProductions) ? p.hourlyProductions.length : 0;
-        if (p.status === "COMPLETED" || p.status === "STOPPED") {
-          return sum + loggedHours;
-        } else {
-          return sum + Math.max(Number(p.plannedHours || 0), loggedHours);
-        }
-      }, 0);
 
-      hoursMap[s.shiftCode] = Math.max(0, shiftHrs - plannedHrsSum);
+      // Only hours physically consumed by terminal plans count toward disabling a shift.
+      // Active/planned plans reserve hours but don't lock the shift entirely — the user
+      // can still schedule in the remaining physical hours after stopped/completed work.
+      const terminalConsumed = existingPlans
+        .filter((p: any) => TERMINAL_STATUSES.includes(p.status))
+        .reduce((sum: number, p: any) => {
+          const loggedHours = Array.isArray(p.hourlyProductions) ? p.hourlyProductions.length : 0;
+          return sum + loggedHours;
+        }, 0);
+
+      hoursMap[s.shiftCode] = Math.max(0, shiftHrs - terminalConsumed);
     });
 
     return hoursMap;
@@ -234,6 +239,42 @@ const DailyPlanCreate: React.FC = () => {
     dispatch(fetchMachines());
     dispatch(fetchShifts());
   }, [dispatch]);
+
+  // ── Real-time socket callbacks ────────────────────────────────────────────
+
+  // Re-fetch daily plans for the current date+machine (affects remaining shift hours)
+  const refreshDailyPlans = useCallback(() => {
+    if (!productionDate || !machineId) return;
+    dailyPlanService.getAll({ productionDate, machineId }).then((res) => {
+      let data: any[] = [];
+      if (Array.isArray(res)) data = res;
+      else if (res && Array.isArray((res as any).data)) data = (res as any).data;
+      else if (res && (res as any).data && Array.isArray((res as any).data.dailyPlans)) data = (res as any).data.dailyPlans;
+      else if (res && Array.isArray((res as any).dailyPlans)) data = (res as any).dailyPlans;
+      else if (res && Array.isArray((res as any).content)) data = (res as any).content;
+      setPlansForDateAndMachine(data);
+    }).catch(() => {});
+  }, [productionDate, machineId]);
+
+  // Re-resolve machine assignment (operators) when assignments change
+  const refreshAssignment = useCallback(() => {
+    if (!machineId || !shiftId || !productionDate) return;
+    machineOperationAssignmentService.resolveAssignment({ machineId, shiftId, date: productionDate })
+      .then((res: any) => {
+        const assignment = res.data;
+        if (!assignment || !assignment.operators || assignment.operators.length === 0) {
+          setAvailableOperators([]);
+          setAssignmentError("No operator is assigned to the selected machine for this shift in Weekly Machine Assignment.");
+          return;
+        }
+        setAvailableOperators(assignment.operators);
+        setAssignmentError(null);
+      })
+      .catch(() => {
+        setAvailableOperators([]);
+        setAssignmentError("Error resolving machine shift assignment.");
+      });
+  }, [machineId, shiftId, productionDate]);
 
   const loadWeeklyPrograms = useCallback(async () => {
     setLoadingWeekly(true);
@@ -349,6 +390,13 @@ const DailyPlanCreate: React.FC = () => {
   }, [location.state, productionDate]);
 
   useEffect(() => { loadWeeklyPrograms(); }, [loadWeeklyPrograms]);
+
+  // ── Socket sync: keep dropdowns and remaining quantities live ─────────────
+  useSocketSync("machine", undefined, () => dispatch(fetchMachines()));
+  useSocketSync("shift", undefined, () => dispatch(fetchShifts()));
+  useSocketSync("weeklyProgram", undefined, loadWeeklyPrograms);
+  useSocketSync("dailyPlan", undefined, refreshDailyPlans);
+  useSocketSync("machineAssignment", undefined, refreshAssignment);
 
   // If editing, load existing plan
   useEffect(() => {
@@ -935,10 +983,13 @@ const DailyPlanCreate: React.FC = () => {
                     error={formErrors.shiftId}
                     defaultOptionLabel="— Select Shift —"
                     options={shifts.map((s: any) => {
-                      const remainingHrs = remainingShiftsHours[s.shiftCode] ?? computeShiftHours(s.startTime, s.endTime);
+                      const totalHrs = computeShiftHours(s.startTime, s.endTime);
+                      const remainingHrs = remainingShiftsHours[s.shiftCode] ?? totalHrs;
                       return {
                         value: s.shiftCode,
-                        label: `${s.shiftName} (${s.startTime} – ${s.endTime})`,
+                        label: remainingHrs > 0
+                          ? `${s.shiftName} (${s.startTime} – ${s.endTime}) — ${remainingHrs}h available`
+                          : `${s.shiftName} (${s.startTime} – ${s.endTime}) — Full`,
                         disabled: remainingHrs === 0,
                       };
                     })}

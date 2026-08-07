@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { FaPrint, FaIndustry, FaCheckCircle, FaExclamationCircle } from "react-icons/fa";
 
@@ -10,6 +10,7 @@ import BackButton from "../../../components/ui/BackButton/BackButton";
 import { dailyPlanService } from "../../../services/dailyPlanService";
 import { machineService } from "../../../services/machineService";
 import { shiftService } from "../../../services/shiftService";
+import { useSocketSync } from "../../../hooks/useSocketSync";
 import apiClient from "../../../api/apiClient";
 import config from "../../../api/config";
 
@@ -30,38 +31,42 @@ const DailyReportPage: React.FC = () => {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   });
 
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        if (!passedState?.dailyPlans) {
-          const [plans, machs, shfts] = await Promise.all([
-            dailyPlanService.getAll(),
-            machineService.getAll(),
-            shiftService.fetchAll()
-          ]);
-          setDailyPlans(Array.isArray(plans) ? plans : plans?.data || []);
-          setMachines(machs?.data || []);
-          setShifts(Array.isArray(shfts) ? shfts : (shfts as any)?.data || []);
-        }
-
-        // Fetch hourly productions for the selected date
-        const hpRes = await apiClient.get(config.hourlyProduction.base, {
-          params: { productionDate: selectedDate }
-        });
-        if (hpRes.data?.success) {
-          setHourlyProductions(hpRes.data.data || []);
-        } else {
-          setHourlyProductions([]);
-        }
-      } catch (err) {
-        console.error("Failed to load report data", err);
-      } finally {
-        setLoading(false);
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    try {
+      if (!passedState?.dailyPlans) {
+        const [plans, machs, shfts] = await Promise.all([
+          dailyPlanService.getAll(),
+          machineService.getAll(),
+          shiftService.fetchAll()
+        ]);
+        setDailyPlans(Array.isArray(plans) ? plans : plans?.data || []);
+        setMachines(machs?.data || []);
+        setShifts(Array.isArray(shfts) ? shfts : (shfts as any)?.data || []);
       }
-    };
-    fetchData();
+
+      // Fetch hourly productions for the selected date
+      const hpRes = await apiClient.get(config.hourlyProduction.base, {
+        params: { productionDate: selectedDate }
+      });
+      if (hpRes.data?.success) {
+        setHourlyProductions(hpRes.data.data || []);
+      } else {
+        setHourlyProductions([]);
+      }
+    } catch (err) {
+      console.error("Failed to load report data", err);
+    } finally {
+      setLoading(false);
+    }
   }, [selectedDate, passedState?.dailyPlans]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  useSocketSync("dailyPlan", undefined, fetchData);
+  useSocketSync("hourlyProduction", undefined, fetchData);
 
   const reportData = useMemo(() => {
     if (!selectedDate) return {

@@ -189,7 +189,11 @@ const DailyProductionPlanningPage: React.FC = () => {
     created: dailyPlanCreated,
     updated: dailyPlanUpdated,
     deleted: dailyPlanDeleted,
-  });
+  }, loadDailyPlans);
+
+  useSocketSync("hourlyProduction", undefined, loadDailyPlans);
+  useSocketSync("weeklyProgram", undefined, loadDailyPlans);
+  useSocketSync("productionOrder", undefined, loadDailyPlans);
 
   // ──────────────────────────────────────────────────────────────
   // Filtered data
@@ -205,9 +209,9 @@ const DailyProductionPlanningPage: React.FC = () => {
 
   const allPlans = useMemo(() => Array.isArray(dailyPlans) ? dailyPlans : [], [dailyPlans]);
 
-  // Active plans: show all plans, including short-closed/stopped ones
+  // Active plans: show all plans sorted by insertion order (dailyPlanId ascending)
   const filteredPlans = useMemo(() =>
-    allPlans
+    [...allPlans].sort((a: any, b: any) => String(a.dailyPlanId).localeCompare(String(b.dailyPlanId)))
   , [allPlans]);
 
   // Short-closed plans: COMPLETED but produced < planned
@@ -554,8 +558,11 @@ const DailyProductionPlanningPage: React.FC = () => {
       align: "center",
       render: (plan: any) => {
         const plannedQty = Number(plan.plannedQty || 0);
+        // Only count real hourly production (hourIndex > 0) for status evaluation
         const producedQty = Array.isArray(plan.hourlyProductions)
-          ? plan.hourlyProductions.reduce((sum: number, h: any) => sum + Number(h.qtyProduced || 0), 0)
+          ? plan.hourlyProductions
+              .filter((h: any) => Number(h.hourIndex) > 0)
+              .reduce((sum: number, h: any) => sum + Number(h.qtyProduced || 0), 0)
           : 0;
         const customSteps = plan.productionOrder?.productItem?.productionSteps || [];
         let activeStepName = null;
@@ -571,6 +578,7 @@ const DailyProductionPlanningPage: React.FC = () => {
           }
         }
 
+        // Only count real hourly production (hourIndex > 0), not setup/config entries
         const thisPlanProducedQty = Array.isArray(plan.hourlyProductions)
           ? plan.hourlyProductions
               .filter((h: any) => Number(h.hourIndex) > 0)
@@ -580,10 +588,24 @@ const DailyProductionPlanningPage: React.FC = () => {
           ? plan.productionOrder.goodsDispatchItems
               .reduce((sum: number, d: any) => sum + Number(d.dispatchQty || 0), 0)
           : 0;
+
+        // Active plans (not yet done) must NEVER show dispatch-related status
+        const ACTIVE_STATUSES = ["IN_PROGRESS", "PLANNED", "DRAFT"];
+        if (ACTIVE_STATUSES.includes(plan.status)) {
+          return (
+            <div className="flex flex-col items-center gap-1">
+              <StatusBadge status={plan.status} />
+            </div>
+          );
+        }
+
+        // Dispatch status per plan: if total dispatched on PO covers this plan's actual production → Dispatched
         const completedPlanStatus =
           plan.productionOrder?.status === "DISPATCHED"
             ? "DISPATCHED"
-            : plan.productionOrder?.status === "PARTIAL_COMPLETED" && thisPlanProducedQty > 0 && totalDispatchedOnPO >= thisPlanProducedQty
+            : thisPlanProducedQty > 0 && totalDispatchedOnPO >= thisPlanProducedQty
+            ? "DISPATCHED"
+            : totalDispatchedOnPO > 0
             ? "PARTIALLY_DISPATCHED"
             : "READY_FOR_DISPATCH";
         const completedPlanLabel =
@@ -598,25 +620,51 @@ const DailyProductionPlanningPage: React.FC = () => {
             <div className="flex items-center gap-1.5">
               <StatusBadge
                 status={
-                  plan.productionOrder?.status === "COMPLETED_WITH_SHORTFALL" || (plan.remarks?.includes("Permanently Stopped:") && producedQty < plannedQty && ["POST_PRODUCTION", "COMPLETED"].includes(plan.status))
-                    ? "COMPLETED_WITH_SHORTFALL"
-                    : plan.status === "STOPPED" || plan.status === "SHORT_CLOSED" || (plan.remarks?.includes("Short Closed:") && producedQty < plannedQty && ["POST_PRODUCTION", "COMPLETED"].includes(plan.status))
-                    ? "SHORT_CLOSED"
-                    : plan.status === "COMPLETED"
+                  // COMPLETED plans that met target → Ready for Dispatch (post production fully done)
+                  producedQty >= plannedQty && plannedQty > 0 && plan.status === "COMPLETED"
                     ? completedPlanStatus
-                    : plan.status
+                  // POST_PRODUCTION or STOPPED-cascade plans with product steps → still in post production
+                  : producedQty >= plannedQty && plannedQty > 0 && (plan.status === "POST_PRODUCTION" || (plan.status === "STOPPED" && customSteps.length > 0))
+                    ? "POST_PRODUCTION"
+                  // STOPPED plans with no product steps that met target → Ready for Dispatch
+                  : producedQty >= plannedQty && plannedQty > 0 && plan.status === "STOPPED"
+                    ? completedPlanStatus
+                  // "Permanently Stopped" only when THIS plan's own remarks say so (permanent stop action)
+                  : plan.remarks?.includes("Permanently Stopped:") && producedQty < plannedQty
+                    ? "COMPLETED_WITH_SHORTFALL"
+                  // Short closed / temporarily stopped
+                  : (plan.status === "STOPPED" || plan.status === "SHORT_CLOSED" || (plan.remarks?.includes("Short Closed:") && ["POST_PRODUCTION", "COMPLETED"].includes(plan.status))) && producedQty < plannedQty
+                    ? "SHORT_CLOSED"
+                  // COMPLETED with shortfall (no explicit remarks) → Short Closed
+                  : plan.status === "COMPLETED" && producedQty < plannedQty
+                    ? "SHORT_CLOSED"
+                  // COMPLETED meeting target → dispatch status
+                  : plan.status === "COMPLETED" && producedQty >= plannedQty
+                    ? completedPlanStatus
+                  : plan.status
                 }
                 customText={
-                  plan.productionOrder?.status === "COMPLETED_WITH_SHORTFALL" || (plan.remarks?.includes("Permanently Stopped:") && producedQty < plannedQty && ["POST_PRODUCTION", "COMPLETED"].includes(plan.status))
-                    ? "Permanently Stopped"
-                    : plan.status === "STOPPED" || plan.status === "SHORT_CLOSED" || (plan.remarks?.includes("Short Closed:") && producedQty < plannedQty && ["POST_PRODUCTION", "COMPLETED"].includes(plan.status))
-                    ? "Short Closed"
-                    : plan.status === "COMPLETED"
+                  // COMPLETED plans → show dispatch label
+                  producedQty >= plannedQty && plannedQty > 0 && plan.status === "COMPLETED"
                     ? completedPlanLabel
-                    : undefined
+                  // POST_PRODUCTION or STOPPED-cascade with steps → Post Production
+                  : producedQty >= plannedQty && plannedQty > 0 && (plan.status === "POST_PRODUCTION" || (plan.status === "STOPPED" && customSteps.length > 0))
+                    ? "Post Production"
+                  // STOPPED with no steps → dispatch label
+                  : producedQty >= plannedQty && plannedQty > 0 && plan.status === "STOPPED"
+                    ? completedPlanLabel
+                  : plan.remarks?.includes("Permanently Stopped:") && producedQty < plannedQty
+                    ? "Permanently Stopped"
+                  : (plan.status === "STOPPED" || plan.status === "SHORT_CLOSED" || (plan.remarks?.includes("Short Closed:") && ["POST_PRODUCTION", "COMPLETED"].includes(plan.status))) && producedQty < plannedQty
+                    ? "Short Closed"
+                  : plan.status === "COMPLETED" && producedQty < plannedQty
+                    ? "Short Closed"
+                  : plan.status === "COMPLETED"
+                    ? completedPlanLabel
+                  : undefined
                 }
               />
-              {(plan.status === "STOPPED" || plan.status === "SHORT_CLOSED" || plan.status === "CANCELLED" || (plan.status === "COMPLETED" && (plan.remarks?.includes("Short Closed:") || plan.remarks?.includes("Permanently Stopped:")))) && plan.remarks && (
+              {(((plan.status === "STOPPED" || plan.status === "SHORT_CLOSED") && producedQty < plannedQty) || plan.status === "CANCELLED" || (plan.status === "COMPLETED" && (plan.remarks?.includes("Short Closed:") || plan.remarks?.includes("Permanently Stopped:")))) && plan.remarks && (
                 <div className="group relative flex items-center cursor-pointer">
                   <FaInfoCircle className="text-rose-400 text-[13px] hover:text-rose-600 transition-colors" />
                   <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-52 p-2.5 bg-slate-800 text-white text-xs rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-20 shadow-xl text-left">

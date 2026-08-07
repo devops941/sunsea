@@ -22,10 +22,70 @@ import DataTable, { type DataTableColumn } from "../../../components/ui/table/Da
 
 const ITEMS_PER_PAGE = 10;
 
+const formatStockQty = (qty: number | string | null | undefined, uomStr?: string): string => {
+    const num = Number(qty ?? 0);
+    if (isNaN(num)) return `0 kg`;
+    if (!uomStr) return `${num} kg`;
+
+    const firstCode = uomStr.split(',')[0].trim().toLowerCase();
+
+    // Mass conversion to primary unit kg (e.g., 200 g -> 0.2 kg)
+    if (firstCode === 'g' || firstCode === 'gram' || firstCode === 'grams' || firstCode === 'gm') {
+        const kgVal = num / 1000;
+        return `${Number(kgVal.toFixed(3))} kg`;
+    }
+    if (firstCode === 't' || firstCode === 'ton' || firstCode === 'tons') {
+        return `${Number((num * 1000).toFixed(3))} kg`;
+    }
+    if (firstCode === 'kg' || firstCode === 'kilogram' || firstCode === 'kilo' || firstCode === 'kgs') {
+        return `${Number(num.toFixed(3))} kg`;
+    }
+
+    // Volume conversion to L
+    if (firstCode === 'ml') {
+        const lVal = num / 1000;
+        return `${Number(lVal.toFixed(3))} L`;
+    }
+    if (firstCode === 'l' || firstCode === 'ltr' || firstCode === 'litre' || firstCode === 'litres') {
+        return `${Number(num.toFixed(3))} L`;
+    }
+
+    // Count
+    if (firstCode === 'ea' || firstCode === 'each' || firstCode === 'pcs') {
+        return `${num} pcs`;
+    }
+    if (firstCode === 'dz' || firstCode === 'dozen') {
+        return `${num * 12} pcs`;
+    }
+
+    return `${num} ${firstCode}`;
+};
+
+const parseBaseUom = (uomStr?: string) => {
+    if (!uomStr) return { primary: "N/A", secondary: "None", list: [] };
+    const list = uomStr.split(',').map(u => u.trim()).filter(Boolean);
+    if (list.length === 0) return { primary: "N/A", secondary: "None", list: [] };
+    const primary = list[0];
+    const secondaryList = list.slice(1);
+    const secondary = secondaryList.length > 0 ? secondaryList.join(', ') : "None";
+    return { primary, secondary, list };
+};
+
 const formatUOM = (uomStr?: string) => {
     if (!uomStr) return "";
-    const base = uomStr.split(',')[0].trim().toLowerCase();
-    return base === 'ea' ? 'pcs' : base;
+    const firstCode = uomStr.split(',')[0].trim();
+    if (!firstCode) return "";
+    const lower = firstCode.toLowerCase();
+    if (lower === 'ea' || lower === 'each') return 'pcs';
+    if (lower === 'g' || lower === 'gram' || lower === 'grams' || lower === 'gm') return 'kg';
+    if (lower === 'kg' || lower === 'kilogram' || lower === 'kilo' || lower === 'kgs') return 'kg';
+    if (lower === 't' || lower === 'ton' || lower === 'tons') return 'kg';
+    if (lower === 'l' || lower === 'ltr' || lower === 'litre' || lower === 'litres') return 'L';
+    if (lower === 'ml') return 'L';
+    if (lower === 'm' || lower === 'mtr' || lower === 'meter') return 'm';
+    if (lower === 'cm') return 'cm';
+    if (lower === 'dz' || lower === 'dozen') return 'dz';
+    return firstCode;
 };
 
 const WastageStoreList: React.FC = () => {
@@ -58,11 +118,17 @@ const WastageStoreList: React.FC = () => {
         deleted: rawMaterialDeleted,
     });
 
-    useEffect(() => {
+    const fetchWastageStoresData = useCallback(() => {
         if (can("wastage-store.view")) {
             dispatch(fetchStores({ storeCategory: "WASTAGE" }));
         }
-    }, [dispatch, can]);
+    }, [can, dispatch]);
+
+    useSocketSync("store", undefined, fetchWastageStoresData);
+
+    useEffect(() => {
+        fetchWastageStoresData();
+    }, [fetchWastageStoresData]);
 
     useEffect(() => {
         const delayDebounceFn = setTimeout(() => {
@@ -108,8 +174,10 @@ const WastageStoreList: React.FC = () => {
         { header: "NAME", accessor: (item: any) => item.materialName || "-" },
         { header: "ID", accessor: (item: any) => item.rawMaterialId || "-" },
         { header: "CATEGORY", accessor: (item: any) => item.category?.name || item.categoryId || "-" },
+        { header: "PRIMARY UOM", accessor: (item: any) => parseBaseUom(item.baseUom).primary },
+        { header: "SECONDARY UOM(S)", accessor: (item: any) => parseBaseUom(item.baseUom).secondary },
         { header: "STORE", accessor: (item: any) => item.store?.storeName || item.storeId || "-" },
-        { header: "PHYSICAL STOCK", accessor: (item: any) => `${item.onHandQty ?? 0} ${formatUOM(item.baseUom)}` },
+        { header: "PHYSICAL STOCK", accessor: (item: any) => formatStockQty(item.onHandQty, item.baseUom) },
         { header: "REMARKS", accessor: (item: any) => item.remarks || "-" },
         { header: "STATUS", accessor: (item: any) => item.isActive ? "Active" : "Inactive" },
     ];
@@ -175,7 +243,7 @@ const WastageStoreList: React.FC = () => {
             header: "PHYSICAL STOCK",
             render: (item) => (
                 <div>
-                    <div className="font-semibold text-gray-800">{item.onHandQty ?? 0} {formatUOM(item.baseUom)}</div>
+                    <div className="font-semibold text-gray-800">{formatStockQty(item.onHandQty, item.baseUom)}</div>
                 </div>
             ),
         },
@@ -275,9 +343,10 @@ const WastageStoreList: React.FC = () => {
                             { label: "Wastage ID", value: selectedItem.rawMaterialId },
                             { label: "Material Name", value: selectedItem.materialName },
                             { label: "Category", value: selectedItem.category?.name || "N/A" },
-                            { label: "Base UOM", value: formatUOM(selectedItem.baseUom) },
+                            { label: "Primary UOM", value: parseBaseUom(selectedItem.baseUom).primary },
+                            { label: "Secondary UOM(s)", value: parseBaseUom(selectedItem.baseUom).secondary },
                             { label: "Store", value: selectedItem.store?.storeName || selectedItem.storeId || "N/A" },
-                            { label: "Physical Stock", value: `${selectedItem.onHandQty ?? 0} ${formatUOM(selectedItem.baseUom)}` },
+                            { label: "Physical Stock", value: formatStockQty(selectedItem.onHandQty, selectedItem.baseUom) },
                             { label: "Status", value: selectedItem.isActive ? "Active" : "Inactive" },
                             { label: "Remarks", value: selectedItem.remarks || "N/A" },
                             { label: "Created Date", value: selectedItem.createdAt ? new Date(selectedItem.createdAt).toLocaleString() : "-" },

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import {
   FaShieldAlt, FaSlidersH, FaCogs, FaUsersCog,
   FaBoxOpen, FaShoppingCart, FaWarehouse, FaChartBar,
-  FaLayerGroup, FaBox, FaDollarSign, FaCalendarCheck,
+  FaLayerGroup, FaBox, FaDollarSign, FaCalendarCheck, FaTachometerAlt,
 } from "react-icons/fa";
 import { toast } from "react-toastify";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
@@ -38,6 +38,14 @@ const SECTION_STYLE: Record<string, {
   iconClass: string;
   hex: string;
 }> = {
+  dashboard: {
+    activeBg: "bg-slate-700",
+    activeShadow: "shadow-slate-300",
+    badgeActive: "bg-white/20 text-white",
+    badgeInactive: "bg-slate-100 text-slate-700",
+    iconClass: "text-slate-500",
+    hex: "#334155",
+  },
   administration: {
     activeBg: "bg-violet-600",
     activeShadow: "shadow-violet-200",
@@ -132,6 +140,21 @@ const SECTION_STYLE: Record<string, {
 // All pages organized by section
 // ─────────────────────────────────────────────────────────────────────────────
 const MODULE_GROUPS: ModuleGroup[] = [
+  {
+    id: "dashboard",
+    groupName: "Dashboard",
+    icon: <FaTachometerAlt />,
+    colorId: "dashboard",
+    modules: [
+      { key: "dash-overview",     label: "Overview Stats" },
+      { key: "dash-trend",        label: "Sales & Purchase Trend" },
+      { key: "dash-tasks",        label: "Today's Tasks" },
+      { key: "dash-inventory",    label: "Stock / Inventory" },
+      { key: "dash-machines",     label: "Machine Overview" },
+      { key: "dash-top-products", label: "Top Products" },
+      { key: "dash-recent-sales", label: "Recent Sales Orders" },
+    ],
+  },
   {
     id: "administration",
     groupName: "Administration",
@@ -347,7 +370,7 @@ const RolePermissionMapping: React.FC = () => {
   const { socket } = useSocket();
 
   const [selectedRoleId, setSelectedRoleId] = useState<string>("");
-  const [activeGroupId, setActiveGroupId] = useState<string>("administration");
+  const [activeGroupId, setActiveGroupId] = useState<string>("dashboard");
   const [busy, setBusy] = useState(false);
 
   useEffect(() => { loadRoles(); loadPermissions(); }, [loadRoles, loadPermissions]);

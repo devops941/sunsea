@@ -19,6 +19,16 @@ interface StockListProps {
     storeId?: string;
 }
 
+const parseBaseUom = (uomStr?: string) => {
+    if (!uomStr) return { primary: "N/A", secondary: "None", list: [] };
+    const list = uomStr.split(',').map(u => u.trim()).filter(Boolean);
+    if (list.length === 0) return { primary: "N/A", secondary: "None", list: [] };
+    const primary = list[0];
+    const secondaryList = list.slice(1);
+    const secondary = secondaryList.length > 0 ? secondaryList.join(', ') : "None";
+    return { primary, secondary, list };
+};
+
 const StockList: React.FC<StockListProps> = ({ storeId: propStoreId }) => {
     const dispatch = useAppDispatch();
 
@@ -269,7 +279,8 @@ const StockList: React.FC<StockListProps> = ({ storeId: propStoreId }) => {
                             { label: "Material ID", value: selectedItem.rawMaterialId },
                             { label: "Material Name", value: (selectedItem as any).materialName || selectedItem.rawMaterial?.materialName || "N/A" },
                             { label: "Category", value: (selectedItem as any).category?.categoryName || selectedItem.rawMaterial?.category?.name || "N/A" },
-                            { label: "Base UOM", value: ((selectedItem as any).baseUom || selectedItem.rawMaterial?.baseUom || "").toLowerCase() === 'ea' ? 'PCS' : ((selectedItem as any).baseUom || selectedItem.rawMaterial?.baseUom || "N/A") },
+                            { label: "Primary UOM", value: parseBaseUom((selectedItem as any).baseUom || selectedItem.rawMaterial?.baseUom).primary },
+                            { label: "Secondary UOM(s)", value: parseBaseUom((selectedItem as any).baseUom || selectedItem.rawMaterial?.baseUom).secondary },
                             { label: "Reorder Level", value: ((selectedItem as any).reorderLevel || selectedItem.rawMaterial?.reorderLevel) != null ? formatExportQty((selectedItem as any).reorderLevel || selectedItem.rawMaterial?.reorderLevel, (selectedItem as any).baseUom || selectedItem.rawMaterial?.baseUom || "") : "N/A" },
                             { label: "Minimum Stock", value: ((selectedItem as any).minimumStock || selectedItem.rawMaterial?.minimumStock) != null ? formatExportQty((selectedItem as any).minimumStock || selectedItem.rawMaterial?.minimumStock, (selectedItem as any).baseUom || selectedItem.rawMaterial?.baseUom || "") : "N/A" },
                             { label: "Store", value: selectedItem.store?.storeName || selectedItem.storeId || "N/A" },

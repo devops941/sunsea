@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { FaSave, FaEraser, FaTimes, FaPlus } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -18,6 +18,7 @@ import { useSizes } from "../../../hooks/useSizes";
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
 import { fetchGstTaxes, selectActiveGstTaxes } from "../../../features/gst/gstSlice";
 import FlowInput from "../../../components/ui/FlowInput/FlowInput";
+import { useSocketSync } from "../../../hooks/useSocketSync";
 import BackButton from "../../../components/ui/BackButton/BackButton";
 import DatePickerCalendar from "../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 import { employeeService } from "../../../services/employeeService";
@@ -100,12 +101,72 @@ const ProductCreatePage: React.FC = () => {
     const [shifts, setShifts] = useState<any[]>([]);
     const [machines, setMachines] = useState<any[]>([]);
 
+    const fetchCategoriesData = useCallback(() => { loadCategories({ isActive: true }); }, [loadCategories]);
+    const fetchGstData = useCallback(() => { dispatch(fetchGstTaxes({ status: "ACTIVE" })); }, [dispatch]);
+    const fetchColorsData = useCallback(() => { loadColors({ isActive: true }); }, [loadColors]);
+    const fetchSizesData = useCallback(() => { loadSizes({ isActive: true }); }, [loadSizes]);
+    const fetchStoresData = useCallback(() => {
+        storeService.fetchAll({ storeCategory: "FINISHED_GOODS" }).then(res => {
+            const data = Array.isArray(res?.stores) ? res.stores : Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
+            setStores(data);
+        }).catch(() => {});
+    }, []);
+    const fetchRawMaterialsData = useCallback(() => {
+        rawMaterialService.fetchAll({}).then((res: any) => {
+            const data = Array.isArray(res?.rawMaterials) ? res.rawMaterials : Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
+            const rmOnly = data.filter((item: any) => item.itemType !== "WASTAGE");
+            setAllRawMaterials(rmOnly);
+        }).catch(() => {});
+    }, []);
+    const fetchEmployeesData = useCallback(() => {
+        employeeService.fetchAll({ limit: 500 }).then((res: any) => {
+            const data = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : Array.isArray(res?.employees) ? res.employees : [];
+            setEmployees(data);
+        }).catch(() => {});
+    }, []);
+    const fetchDepartmentsData = useCallback(() => {
+        departmentService.fetchAll().then((res: any) => {
+            const depts = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
+            setDepartments(depts);
+        }).catch(() => {});
+    }, []);
+    const fetchShiftsData = useCallback(() => {
+        shiftService.fetchAll().then((res: any) => {
+            const data = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
+            setShifts(data);
+        }).catch(() => {});
+    }, []);
+    const fetchMachinesData = useCallback(() => {
+        machineService.getAll().then((res: any) => {
+            const data = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
+            setMachines(data);
+        }).catch(() => {});
+    }, []);
+
+    useSocketSync("category", undefined, fetchCategoriesData);
+    useSocketSync("gstTax", undefined, fetchGstData);
+    useSocketSync("color", undefined, fetchColorsData);
+    useSocketSync("size", undefined, fetchSizesData);
+    useSocketSync("store", undefined, fetchStoresData);
+    useSocketSync("rawMaterial", undefined, fetchRawMaterialsData);
+    useSocketSync("employee", undefined, fetchEmployeesData);
+    useSocketSync("department", undefined, fetchDepartmentsData);
+    useSocketSync("shift", undefined, fetchShiftsData);
+    useSocketSync("machine", undefined, fetchMachinesData);
+
     // Load initial data
     useEffect(() => {
-        loadCategories({ isActive: true });
-        dispatch(fetchGstTaxes({ status: "ACTIVE" }));
-        loadColors({ isActive: true });
-        loadSizes({ isActive: true });
+        fetchCategoriesData();
+        fetchGstData();
+        fetchColorsData();
+        fetchSizesData();
+        fetchStoresData();
+        fetchRawMaterialsData();
+        fetchEmployeesData();
+        fetchDepartmentsData();
+        fetchShiftsData();
+        fetchMachinesData();
+
         const fetchCode = async () => {
             try {
                 const nextCode = await productService.fetchNextId();
@@ -115,46 +176,7 @@ const ProductCreatePage: React.FC = () => {
             }
         };
         fetchCode();
-
-        storeService.fetchAll({ storeCategory: "FINISHED_GOODS" })
-            .then(res => {
-                const data = Array.isArray(res?.stores) ? res.stores : Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
-                setStores(data);
-            }).catch(() => { });
-
-        rawMaterialService.fetchAll({})
-            .then((res: any) => {
-                const data = Array.isArray(res?.rawMaterials) ? res.rawMaterials : Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
-                setAllRawMaterials(data);
-            }).catch(() => { });
-
-        employeeService.fetchAll({ limit: 500 })
-            .then((res: any) => {
-                const data = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : Array.isArray(res?.employees) ? res.employees : [];
-                setEmployees(data);
-            }).catch(() => { });
-
-        departmentService.fetchAll()
-            .then((res: any) => {
-                const depts = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
-                setDepartments(depts);
-            }).catch((err: any) => {
-                console.error("Failed to fetch departments:", err);
-            });
-
-        shiftService.fetchAll()
-            .then((res: any) => {
-                const data = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
-                setShifts(data);
-            }).catch(() => { });
-
-        machineService.getAll().then((res: any) => {
-            const data = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
-            setMachines(data);
-        }).catch((err: any) => {
-            console.error("Failed to fetch machines:", err);
-        });
-    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [fetchCategoriesData, fetchGstData, fetchColorsData, fetchSizesData, fetchStoresData, fetchRawMaterialsData, fetchEmployeesData, fetchDepartmentsData, fetchShiftsData, fetchMachinesData]);
 
     // Cleanup image previews
     useEffect(() => {
@@ -621,7 +643,7 @@ const ProductCreatePage: React.FC = () => {
         return allRawMaterials
             .filter(rm => {
                 const uom = (rm.baseUom || "").split(',')[0].toLowerCase().trim();
-                return uom === "ea" || uom === "pcs";
+                return uom === "ea" || uom === "pcs" || uom === "each";
             })
             .map(rm => ({
                 value: String(rm.rawMaterialId),
@@ -1094,7 +1116,12 @@ const ProductCreatePage: React.FC = () => {
                     {/* Accessories / Additional Items */}
                     <div className="pt-6">
                         <div className="flex justify-between items-center mb-3">
-                            <h6 className="text-base font-semibold text-gray-800 m-0">Accessories / Additional Items (Optional)</h6>
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <h6 className="text-base font-semibold text-gray-800 m-0">Accessories / Additional Items (Optional)</h6>
+                                <span className="text-xs text-slate-500 font-normal bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                                    (Only items measured in pcs are shown here)
+                                </span>
+                            </div>
                             <CustomButton
                                 text="Add Item"
                                 icon={FaPlus}

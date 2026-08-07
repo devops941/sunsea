@@ -25,6 +25,7 @@ import { billOfMaterialService } from "../../../services/billOfMaterialService";
 import { productCapacityHistoryService } from "../../../services/productCapacityHistoryService";
 import BackButton from "../../../components/ui/BackButton/BackButton";
 import CommonLoader from "../../../components/ui/Loader/CommonLoader";
+import { useSocketSync } from "../../../hooks/useSocketSync";
 
 
 
@@ -641,19 +642,40 @@ const ProductionOrderCreate: React.FC = () => {
     // â”€â”€ Load Dependencies â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const [products, setProducts] = useState<any[]>([]);
 
-    useEffect(() => {
-        const extractArray = (d: any): any[] => {
-            if (Array.isArray(d)) return d;
-            if (Array.isArray(d?.data)) return d.data;
-            if (Array.isArray(d?.data?.data)) return d.data.data;
-            if (Array.isArray(d?.stores)) return d.stores;
-            return [];
-        };
-
-        storeService.fetchAll({ storeCategory: "RAW_MATERIAL" }).then((r) => setStores(extractArray(r))).catch(() => { });
-        productService.fetchAll().then((r) => setProducts(extractArray(r))).catch(() => { });
-        billOfMaterialService.fetchAll().then((r) => setBoms(extractArray(r))).catch(() => { });
+    const extractArray = useCallback((d: any): any[] => {
+        if (Array.isArray(d)) return d;
+        if (Array.isArray(d?.data)) return d.data;
+        if (Array.isArray(d?.data?.data)) return d.data.data;
+        if (Array.isArray(d?.stores)) return d.stores;
+        return [];
     }, []);
+
+    const fetchStoresData = useCallback(() => {
+        storeService.fetchAll({ storeCategory: "RAW_MATERIAL" }).then((r) => setStores(extractArray(r))).catch(() => { });
+    }, [extractArray]);
+
+    const fetchProductsData = useCallback(() => {
+        productService.fetchAll().then((r) => setProducts(extractArray(r))).catch(() => { });
+    }, [extractArray]);
+
+    const fetchBomsData = useCallback(() => {
+        billOfMaterialService.fetchAll().then((r) => setBoms(extractArray(r))).catch(() => { });
+    }, [extractArray]);
+
+    const refreshRmStates = useCallback(() => {
+        setRowRmStates({});
+    }, []);
+
+    useSocketSync("store", undefined, fetchStoresData);
+    useSocketSync("product", undefined, fetchProductsData);
+    useSocketSync("billOfMaterial", undefined, fetchBomsData);
+    useSocketSync("rawMaterial", undefined, refreshRmStates);
+
+    useEffect(() => {
+        fetchStoresData();
+        fetchProductsData();
+        fetchBomsData();
+    }, [fetchStoresData, fetchProductsData, fetchBomsData]);
 
     // â”€â”€ Sales Order watch â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // ————————————————————————————————————————————————————————————————————————————————

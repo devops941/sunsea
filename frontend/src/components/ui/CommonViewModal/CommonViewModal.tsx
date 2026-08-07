@@ -76,11 +76,11 @@ const CommonViewModal: React.FC<CommonViewModalProps> = ({
           {/* Main Info Header */}
           <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-8 bg-primary/5 rounded-xl p-5 border border-primary/10">
             <div className="flex items-center gap-4">
-              {avatarText && (
+              {/* {avatarText && (
                 <div className="w-14 h-14 rounded-full bg-gradient-to-br from-primary to-blue-600 flex items-center justify-center text-white font-bold text-xl shadow-md shrink-0">
                   {avatarText}
                 </div>
-              )}
+              )} */}
               <div>
                 <h4 className="text-xl font-bold text-slate-900 mb-1">{headerTitle}</h4>
                 {headerSubtitle && (
