@@ -147,13 +147,15 @@ const PoInvoicePage: React.FC = () => {
             const pageHeight = pdf.internal.pageSize.getHeight();
 
             const imgWidth = pageWidth - 2 * margin;
-            const imgHeight = (canvas.height * imgWidth) / canvas.width;
             const availableHeight = pageHeight - 2 * margin;
+            const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
-            let heightLeft = imgHeight;
+            const renderHeight = imgHeight < availableHeight ? availableHeight : imgHeight;
+
+            let heightLeft = renderHeight;
             let position = margin;
 
-            pdf.addImage(imgData, "PNG", margin, position, imgWidth, imgHeight);
+            pdf.addImage(imgData, "PNG", margin, position, imgWidth, renderHeight);
             heightLeft -= availableHeight;
 
             while (heightLeft > 0) {
@@ -219,6 +221,10 @@ const PoInvoicePage: React.FC = () => {
                 {/* Print stylesheet */}
                 <style>{`
                     @media print {
+                        @page {
+                            size: A4 portrait;
+                            margin: 8mm;
+                        }
                         body * {
                             visibility: hidden !important;
                         }
@@ -230,6 +236,7 @@ const PoInvoicePage: React.FC = () => {
                             left: 0;
                             top: 0;
                             width: 100%;
+                            min-height: auto !important;
                             background: #fff !important;
                             box-shadow: none !important;
                             margin: 0 !important;
@@ -247,7 +254,7 @@ const PoInvoicePage: React.FC = () => {
                 {/* GST Tax Invoice Card */}
                 <div
                     id="printable-po-invoice-card"
-                    className="font-[Arial,sans-serif] text-black bg-white border-[1.5px] border-black w-full min-h-[265mm] flex flex-col justify-between box-border text-[14px] shadow-lg font-medium"
+                    className="font-[Arial,sans-serif] text-black bg-white border-[1.5px] border-black w-full min-h-[262mm] flex flex-col justify-between box-border text-[14px] shadow-lg font-medium"
                 >
                     {/* Top bar */}
                     <div className="flex justify-between items-center px-3 pt-2 text-[13px] font-semibold">

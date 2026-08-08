@@ -219,13 +219,16 @@ const SalesInvoiceView: React.FC = () => {
             const pageHeight = pdf.internal.pageSize.getHeight();
 
             const imgWidth = pageWidth - 2 * margin;
-            const imgHeight = (canvas.height * imgWidth) / canvas.width;
             const availableHeight = pageHeight - 2 * margin;
+            const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
-            let heightLeft = imgHeight;
+            // Use full available printable height for 1-page document to match print preview height
+            const renderHeight = imgHeight < availableHeight ? availableHeight : imgHeight;
+
+            let heightLeft = renderHeight;
             let position = margin;
 
-            pdf.addImage(imgData, "PNG", margin, position, imgWidth, imgHeight);
+            pdf.addImage(imgData, "PNG", margin, position, imgWidth, renderHeight);
             heightLeft -= availableHeight;
 
             while (heightLeft > 0) {
@@ -326,6 +329,10 @@ const SalesInvoiceView: React.FC = () => {
                         {/* Print stylesheet */}
                         <style>{`
                             @media print {
+                                @page {
+                                    size: A4 portrait;
+                                    margin: 8mm;
+                                }
                                 body * {
                                     visibility: hidden !important;
                                 }
@@ -337,6 +344,7 @@ const SalesInvoiceView: React.FC = () => {
                                     left: 0;
                                     top: 0;
                                     width: 100%;
+                                    min-height: auto !important;
                                     background: #fff !important;
                                     box-shadow: none !important;
                                     margin: 0 !important;
@@ -354,7 +362,7 @@ const SalesInvoiceView: React.FC = () => {
                         {/* GST Tax Invoice Card */}
                         <div
                             id="printable-invoice-card"
-                            className="font-[Arial,sans-serif] text-black bg-white border-[1.5px] border-black w-full min-h-[265mm] flex flex-col justify-between box-border text-[14px] shadow-lg font-medium"
+                            className="font-[Arial,sans-serif] text-black bg-white border-[1.5px] border-black w-full min-h-[262mm] flex flex-col justify-between box-border text-[14px] shadow-lg font-medium"
                         >
                             <div>
                                 {/* Top bar */}
@@ -482,7 +490,7 @@ const SalesInvoiceView: React.FC = () => {
                                         ))}
                                         {/* Clean empty rows filling out A4 sheet */}
                                         {Array.from({ length: Math.max(0, 10 - itemsWithTax.length) }).map((_, idx) => (
-                                            <tr key={`empty-${idx}`} style={{ height: "30px" }}>
+                                            <tr key={`empty-${idx}`} style={{ height: "26px" }}>
                                                 <Td align="center"></Td>
                                                 <Td></Td>
                                                 <Td align="center"></Td>

@@ -15,7 +15,7 @@ export const DocumentPrintLayout: React.FC<DocumentPrintLayoutProps> = ({
     return (
         <div 
             id={id}
-            className="font-sans text-black bg-white border-[1.5px] border-black w-full min-h-[265mm] flex flex-col box-border"
+            className="font-sans text-black bg-white border-[1.5px] border-black w-full min-h-[262mm] flex flex-col box-border"
         >
             <div className="text-center border-b-[1.5px] border-black py-[15px] px-[10px] shrink-0">
                 {subtitle && <div className="text-[12px] uppercase font-bold tracking-[2px] mb-[2px]">{subtitle}</div>}
