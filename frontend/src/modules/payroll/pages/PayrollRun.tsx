@@ -9,6 +9,7 @@ import {
 import { useSocket } from '../../../providers/SocketProvider';
 import { usePermission } from '../../../hooks/usePermission';
 import CommonLoader from '../../../components/ui/Loader/CommonLoader';
+import Button from '../../../components/ui/Button/Button';
 import { payrollService } from '../../../services/payrollService';
 import type { ApiPayrollRun, ApiEmployeePayroll, AttendanceInput, ApiPayrollResult } from '../../../services/payrollService';
 import DataTable, { type DataTableColumn } from '../../../components/ui/table/DataTable';
@@ -162,179 +163,259 @@ const Step1: React.FC<Step1Props> = ({
   const selectedWeek = weekOptions.find(w => w.weekOfMonth === weekOfMonth) ?? weekOptions[0];
 
   return (
-    <div className="max-w-2xl mx-auto space-y-5">
-      <div>
-        <h2 className="text-lg font-bold text-text-primary">Select Payroll Period</h2>
-        <p className="text-sm text-text-secondary mt-0.5">Choose the period type and employee category for this run.</p>
+    <div className="w-full space-y-6">
+      <div className="text-center sm:text-left">
+        <h2 className="text-xl font-extrabold text-slate-900 tracking-tight">Select Payroll Period</h2>
+        <p className="text-sm text-slate-500 mt-1">Choose the period type and target employee category for this payroll run.</p>
       </div>
 
-      {/* Type toggle */}
-      <div className="bg-white rounded-xl border border-border p-5 shadow-sm space-y-4">
-        <p className="text-xs font-semibold text-text-muted uppercase tracking-wider">Payroll Type</p>
-        <div className="flex gap-3">
-          {(['MONTHLY','WEEKLY'] as const).map(t => (
-            <button key={t} onClick={() => setRunType(t)}
-              className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg border-2 font-semibold text-sm transition-all ${
-                runType === t ? 'border-primary bg-red-50 text-primary' : 'border-border bg-white text-text-secondary hover:border-primary/40'
-              }`}>
-              {t === 'MONTHLY'
-                ? <><CalendarRange size={16} /> Monthly Payroll</>
-                : <><CalendarDays  size={16} /> Weekly Payroll</>}
-            </button>
-          ))}
-        </div>
-
-        {runType === 'MONTHLY' ? (
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-text-muted mb-1.5">Month</label>
-              <select value={month} onChange={e => setMonth(Number(e.target.value))}
-                className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary">
-                {MONTHS.map((m, i) => <option key={m} value={i+1}>{m}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-text-muted mb-1.5">Year</label>
-              <select value={year} onChange={e => setYear(Number(e.target.value))}
-                className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary">
-                {[2024,2025,2026,2027].map(y => <option key={y} value={y}>{y}</option>)}
-              </select>
-            </div>
-            <div className="col-span-2 bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3 flex items-center justify-between">
-              <div>
-                <p className="text-xs text-emerald-700 font-semibold">Period</p>
-                <p className="text-sm font-bold text-emerald-800">{MONTHS[month-1]} {year}</p>
+      {/* 2-Column Responsive Grid for Full-Width Layout (Equal Height Cards) */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
+        {/* Card 1: Payroll Type & Period */}
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-md transition-shadow p-6 space-y-5 h-full flex flex-col justify-between">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div className="flex items-center gap-2">
+              <div className="p-2 rounded-xl bg-blue-50 text-primary">
+                <CalendarRange size={18} />
               </div>
               <div>
-                <p className="text-xs text-emerald-700 font-semibold">Calendar Days</p>
-                <p className="text-sm font-bold text-emerald-800 text-right">{calDays} days</p>
+                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Payroll Schedule</h3>
+                <p className="text-sm font-semibold text-slate-800">Frequency & Timeline</p>
               </div>
             </div>
           </div>
-        ) : (
-          <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-text-muted mb-1.5">Month</label>
-                <select value={weekMonth} onChange={e => { setWeekMonth(Number(e.target.value)); setWeekOfMonth(1); }}
-                  className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary">
-                  {MONTHS.map((m, i) => <option key={m} value={i+1}>{m}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-text-muted mb-1.5">Year</label>
-                <select value={year} onChange={e => { setYear(Number(e.target.value)); setWeekOfMonth(1); }}
-                  className="w-full border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary">
-                  {[2024,2025,2026,2027].map(y => <option key={y} value={y}>{y}</option>)}
-                </select>
-              </div>
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-text-muted mb-1.5">Select Week</label>
-              <div className="grid grid-cols-1 gap-2">
-                {weekOptions.map(opt => (
-                  <button
-                    key={opt.weekOfMonth}
-                    onClick={() => setWeekOfMonth(opt.weekOfMonth)}
-                    className={`flex items-center justify-between px-4 py-3 rounded-lg border-2 text-sm font-medium transition-all text-left ${
-                      weekOfMonth === opt.weekOfMonth
-                        ? 'border-primary bg-red-50 text-primary'
-                        : 'border-border bg-white text-text-secondary hover:border-primary/40'
-                    }`}
-                  >
-                    <span className="font-semibold">{opt.label}</span>
-                    <span className={`text-xs ${weekOfMonth === opt.weekOfMonth ? 'text-primary/70' : 'text-text-muted'}`}>
-                      {opt.endDay - opt.startDay + 1} days
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-            {selectedWeek && (
-              <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3 flex items-center justify-between">
+
+          {/* Type toggle buttons */}
+          <div className="grid grid-cols-2 gap-3 p-1.5 bg-slate-100/70 rounded-xl border border-slate-200/50">
+            {(['MONTHLY','WEEKLY'] as const).map(t => {
+              const isActive = runType === t;
+              return (
+                <button
+                  key={t}
+                  onClick={() => setRunType(t)}
+                  className={`flex items-center justify-center gap-2 py-3 px-4 rounded-lg font-bold text-sm transition-all duration-200 cursor-pointer ${
+                    isActive
+                      ? 'bg-primary text-white shadow-sm shadow-primary/30 scale-[1.01]'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+                  }`}
+                >
+                  {t === 'MONTHLY'
+                    ? <><CalendarRange size={16} /> Monthly Payroll</>
+                    : <><CalendarDays  size={16} /> Weekly Payroll</>}
+                </button>
+              );
+            })}
+          </div>
+
+          {runType === 'MONTHLY' ? (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-xs text-emerald-700 font-semibold">Selected Period</p>
-                  <p className="text-sm font-bold text-emerald-800">
-                    {MONTHS_SHORT[weekMonth - 1]} {selectedWeek.startDay}–{selectedWeek.endDay}, {year}
-                  </p>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Select Month</label>
+                  <select
+                    value={month}
+                    onChange={e => setMonth(Number(e.target.value))}
+                    className="w-full bg-slate-50/80 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary focus:bg-white transition-all cursor-pointer"
+                  >
+                    {MONTHS.map((m, i) => <option key={m} value={i+1}>{m}</option>)}
+                  </select>
                 </div>
-                <div className="text-right">
-                  <p className="text-xs text-emerald-700 font-semibold">Days</p>
-                  <p className="text-sm font-bold text-emerald-800">{calDays} days</p>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Select Year</label>
+                  <select
+                    value={year}
+                    onChange={e => setYear(Number(e.target.value))}
+                    className="w-full bg-slate-50/80 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary focus:bg-white transition-all cursor-pointer"
+                  >
+                    {[2024,2025,2026,2027].map(y => <option key={y} value={y}>{y}</option>)}
+                  </select>
                 </div>
               </div>
-            )}
-          </div>
-        )}
-      </div>
 
-      {/* Category */}
-      <div className="bg-white rounded-xl border border-border p-5 shadow-sm space-y-3">
-        <p className="text-xs font-semibold text-text-muted uppercase tracking-wider">Employee Category</p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          {CATEGORIES.filter(c => runType === 'WEEKLY' ? c.value === 'DAILY_WEEKLY' || c.value === 'ALL' : true).map(c => {
-            const count = typeFiltered.filter(e =>
-              c.value === 'ALL' || e.payrollConfig?.salaryType === c.value
-            ).length;
-            return (
-              <button key={c.value} onClick={() => setCategory(c.value)}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border text-sm font-medium transition-all ${
-                  category === c.value ? 'border-primary bg-red-50 text-primary ring-2 ring-offset-1 ring-primary/20' : 'border-border bg-white text-text-secondary hover:border-primary/40'
-                }`}>
-                <span className={`w-2 h-2 rounded-full ${category === c.value ? 'bg-primary' : 'bg-border'}`} />
-                {c.label}
-                <span className="ml-auto text-xs text-text-muted">{count} emp</span>
-              </button>
-            );
-          })}
+              {/* Period status card */}
+              <div className="bg-gradient-to-r from-blue-50/80 via-blue-50/30 to-slate-50 border border-blue-100 rounded-xl p-4 flex items-center justify-between shadow-xs">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-full bg-blue-100 text-primary flex items-center justify-center font-bold">
+                    <CalendarDays size={18} />
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-extrabold text-primary uppercase tracking-widest">Active Period</p>
+                    <p className="text-base font-extrabold text-slate-900">{MONTHS[month-1]} {year}</p>
+                  </div>
+                </div>
+                <div className="text-right border-l border-blue-200/60 pl-5">
+                  <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">Calendar Days</p>
+                  <p className="text-base font-extrabold text-primary font-mono">{calDays} <span className="text-xs font-semibold text-slate-500">days</span></p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Select Month</label>
+                  <select
+                    value={weekMonth}
+                    onChange={e => { setWeekMonth(Number(e.target.value)); setWeekOfMonth(1); }}
+                    className="w-full bg-slate-50/80 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary focus:bg-white transition-all cursor-pointer"
+                  >
+                    {MONTHS.map((m, i) => <option key={m} value={i+1}>{m}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Select Year</label>
+                  <select
+                    value={year}
+                    onChange={e => { setYear(Number(e.target.value)); setWeekOfMonth(1); }}
+                    className="w-full bg-slate-50/80 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary focus:bg-white transition-all cursor-pointer"
+                  >
+                    {[2024,2025,2026,2027].map(y => <option key={y} value={y}>{y}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Select Week</label>
+                <div className="grid grid-cols-1 gap-2.5">
+                  {weekOptions.map(opt => {
+                    const isSelected = weekOfMonth === opt.weekOfMonth;
+                    return (
+                      <button
+                        key={opt.weekOfMonth}
+                        onClick={() => setWeekOfMonth(opt.weekOfMonth)}
+                        className={`flex items-center justify-between px-4 py-3 rounded-xl border transition-all text-left cursor-pointer ${
+                          isSelected
+                            ? 'border-primary bg-blue-50/70 text-slate-900 shadow-xs ring-2 ring-primary/20'
+                            : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50/50'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <span className={`w-2.5 h-2.5 rounded-full ${isSelected ? 'bg-primary' : 'bg-slate-300'}`} />
+                          <span className="font-bold text-sm">{opt.label}</span>
+                        </div>
+                        <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded-md ${isSelected ? 'bg-blue-100 text-blue-700' : 'text-slate-400 bg-slate-100'}`}>
+                          {opt.endDay - opt.startDay + 1} days
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              {selectedWeek && (
+                <div className="bg-gradient-to-r from-blue-50/80 via-blue-50/30 to-slate-50 border border-blue-100 rounded-xl p-4 flex items-center justify-between shadow-xs">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-full bg-blue-100 text-primary flex items-center justify-center font-bold">
+                      <CalendarDays size={18} />
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-extrabold text-primary uppercase tracking-widest">Active Weekly Period</p>
+                      <p className="text-base font-extrabold text-slate-900">
+                        {MONTHS_SHORT[weekMonth - 1]} {selectedWeek.startDay}–{selectedWeek.endDay}, {year}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right border-l border-blue-200/60 pl-5">
+                    <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">Days</p>
+                    <p className="text-base font-extrabold text-primary font-mono">{calDays} <span className="text-xs font-semibold text-slate-500">days</span></p>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
-        {filtered.length > 0 && (
-          <p className="text-xs text-text-secondary pt-1">
-            <span className="font-semibold text-text-primary">{filtered.length}</span> employees will be included in this run.
-          </p>
-        )}
-        {noConfig > 0 && (
-          <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-            <span className="font-semibold">{noConfig}</span> employee{noConfig > 1 ? 's' : ''} skipped — no payroll config set up. Go to <strong>Payroll Settings → Employee Config</strong> to configure them.
-          </p>
-        )}
+
+        {/* Card 2: Employee Category */}
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm hover:shadow-md transition-shadow p-6 space-y-4 h-full flex flex-col justify-between">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div className="flex items-center gap-2">
+              <div className="p-2 rounded-xl bg-slate-100 text-slate-700">
+                <Users size={18} />
+              </div>
+              <div>
+                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Target Selection</h3>
+                <p className="text-sm font-semibold text-slate-800">Employee Category</p>
+              </div>
+            </div>
+            <span className="text-xs font-bold text-primary bg-blue-50 border border-blue-100 px-3 py-1 rounded-full">
+              {filtered.length} Selected
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            {CATEGORIES.filter(c => runType === 'WEEKLY' ? c.value === 'DAILY_WEEKLY' || c.value === 'ALL' : true).map(c => {
+              const count = typeFiltered.filter(e =>
+                c.value === 'ALL' || e.payrollConfig?.salaryType === c.value
+              ).length;
+              const isSelected = category === c.value;
+              return (
+                <button
+                  key={c.value}
+                  onClick={() => setCategory(c.value)}
+                  className={`flex items-center justify-between px-4 py-3 rounded-xl border text-sm font-semibold transition-all cursor-pointer ${
+                    isSelected
+                      ? 'border-primary bg-blue-50/70 text-slate-900 shadow-xs ring-2 ring-primary/20'
+                      : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50/60'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${isSelected ? 'bg-primary' : 'bg-slate-300'}`} />
+                    <span className="text-xs sm:text-sm font-bold text-slate-800">{c.label}</span>
+                  </div>
+                  <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded-full ${isSelected ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500'}`}>
+                    {count} emp
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {noConfig > 0 && (
+            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl p-3.5 flex items-center gap-2">
+              <AlertTriangle size={15} className="shrink-0 text-amber-600" />
+              <span>
+                <span className="font-bold">{noConfig}</span> employee{noConfig > 1 ? 's' : ''} skipped — no payroll config set up. Go to <strong>Payroll Settings → Employee Config</strong> to configure them.
+              </span>
+            </p>
+          )}
+        </div>
       </div>
 
-      {/* Attendance validation error — blocks run if any employee has incomplete entries */}
+      {/* Attendance validation error */}
       {attValidationError && (
-        <div className="rounded-xl border border-red-200 bg-red-50 p-4 space-y-3">
-          <div className="flex items-start gap-2">
-            <AlertTriangle size={16} className="text-red-600 mt-0.5 shrink-0" />
+        <div className="rounded-2xl border border-red-200 bg-red-50/90 p-5 space-y-4 shadow-sm">
+          <div className="flex items-start gap-3">
+            <div className="p-2 rounded-xl bg-red-100 text-red-700 shrink-0">
+              <AlertTriangle size={20} />
+            </div>
             <div>
-              <p className="text-sm font-semibold text-red-700">
-                Attendance incomplete — payroll run blocked
+              <p className="text-sm font-bold text-red-900">
+                Attendance Incomplete — Payroll Run Blocked
               </p>
-              <p className="text-xs text-red-600 mt-0.5">
+              <p className="text-xs text-red-700 mt-1">
                 All {attValidationError.employees[0]?.expected}-day entries must be saved for every employee before running payroll.
                 Go to <strong>Attendance Entry</strong> and fill all days, then try again.
               </p>
             </div>
           </div>
-          <div className="rounded-lg border border-red-200 bg-white overflow-hidden">
+          <div className="rounded-xl border border-red-200 bg-white overflow-hidden shadow-xs">
             <table className="w-full text-xs">
               <thead>
-                <tr className="bg-red-100 text-red-700">
-                  <th className="text-left px-3 py-2 font-semibold">Employee</th>
-                  <th className="text-center px-3 py-2 font-semibold">Days Entered</th>
-                  <th className="text-center px-3 py-2 font-semibold">Required</th>
-                  <th className="text-center px-3 py-2 font-semibold">Missing</th>
+                <tr className="bg-red-100/80 text-red-800 uppercase tracking-wider font-bold">
+                  <th className="text-left px-4 py-2.5">Employee</th>
+                  <th className="text-center px-4 py-2.5">Days Entered</th>
+                  <th className="text-center px-4 py-2.5">Required</th>
+                  <th className="text-center px-4 py-2.5">Missing</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-red-100">
                 {attValidationError.employees.map((e, i) => (
-                  <tr key={i} className="text-slate-700">
-                    <td className="px-3 py-2">
-                      <span className="font-medium">{e.name}</span>
-                      <span className="text-slate-400 ml-1">({e.code})</span>
+                  <tr key={i} className="text-slate-700 hover:bg-red-50/40">
+                    <td className="px-4 py-2.5">
+                      <span className="font-bold text-slate-800">{e.name}</span>
+                      <span className="text-slate-400 font-mono text-[11px] ml-1">({e.code})</span>
                     </td>
-                    <td className="px-3 py-2 text-center font-mono text-red-600 font-semibold">{e.entered}</td>
-                    <td className="px-3 py-2 text-center font-mono">{e.expected}</td>
-                    <td className="px-3 py-2 text-center font-mono text-red-700 font-bold">{e.expected - e.entered}</td>
+                    <td className="px-4 py-2.5 text-center font-mono text-red-600 font-bold">{e.entered}</td>
+                    <td className="px-4 py-2.5 text-center font-mono font-medium">{e.expected}</td>
+                    <td className="px-4 py-2.5 text-center font-mono text-red-700 font-black">{e.expected - e.entered}</td>
                   </tr>
                 ))}
               </tbody>
@@ -343,13 +424,18 @@ const Step1: React.FC<Step1Props> = ({
         </div>
       )}
 
-      <div className="flex justify-end">
-        <button onClick={onNext} disabled={filtered.length === 0 || loading}
-          className="inline-flex items-center gap-2 px-6 py-2.5 bg-primary text-white rounded-lg font-semibold text-sm hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm">
-          {loading
-            ? <><Loader2 size={15} className="animate-spin" /> Checking Attendance…</>
-            : <>Next: Review Attendance <ChevronRight size={16} /></>}
-        </button>
+      {/* Action Footer */}
+      <div className="flex items-center justify-between pt-2">
+        <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
+          <Users size={16} className="text-primary" />
+          <span><strong className="text-slate-900 font-extrabold">{filtered.length}</strong> employees will be processed</span>
+        </div>
+        <Button
+          text={loading ? "Checking Attendance..." : "Next: Review Attendance"}
+          onClick={onNext}
+          disabled={filtered.length === 0 || loading}
+          size="md"
+        />
       </div>
     </div>
   );
@@ -604,15 +690,63 @@ const Step2: React.FC<{
           }}
           density="compact"
         />
-        {/* Total Summary Footer */}
-        <div className="bg-slate-50 border-t border-slate-200 p-4 flex flex-wrap justify-between items-center text-xs font-mono">
-          <span className="font-bold text-slate-800 text-sm">TOTAL ({rows.length} employees)</span>
-          <div className="flex gap-6 flex-wrap justify-end font-semibold">
-            <span className="text-emerald-700">Present: {totals.present}</span>
-            <span className="text-red-600">Absent: {totals.absent}</span>
-            <span className="text-amber-600">Half: {totals.half}</span>
-            <span className="text-blue-600 font-mono">OT: {totals.ot.toFixed(1)}h</span>
-            <span className="text-violet-700 font-mono">Advance: {totals.adv > 0 ? `₹${totals.adv.toLocaleString('en-IN')}` : '—'}</span>
+        {/* Total Summary Footer — Step 3 Styled Footer */}
+        <div className="bg-white border-t border-slate-200">
+          <div className="flex flex-col xl:flex-row items-center justify-between">
+            {/* Left side: Total count */}
+            <div className="px-6 py-4 flex items-center xl:border-r border-slate-200 xl:min-w-[200px] w-full xl:w-auto border-b xl:border-b-0">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-600 font-bold">
+                  <Users size={18} />
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total Employees</p>
+                  <p className="text-sm font-bold text-slate-800">{rows.length}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Middle: Attendance Breakdown Metrics */}
+            <div className="flex-1 flex flex-wrap items-center justify-center gap-x-8 gap-y-4 px-6 py-4 text-sm border-b xl:border-b-0 border-slate-200">
+              <div className="flex flex-col items-center">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Present</span>
+                <span className="font-mono font-bold text-emerald-600">{totals.present} days</span>
+              </div>
+              <div className="h-8 w-px bg-slate-200 hidden sm:block"></div>
+
+              <div className="flex flex-col items-center">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Absent</span>
+                <span className="font-mono font-bold text-rose-600">{totals.absent} days</span>
+              </div>
+              <div className="h-8 w-px bg-slate-200 hidden sm:block"></div>
+
+              <div className="flex flex-col items-center">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Half Days</span>
+                <span className="font-mono font-bold text-amber-600">{totals.half} days</span>
+              </div>
+              <div className="h-8 w-px bg-slate-200 hidden sm:block"></div>
+
+              <div className="flex flex-col items-center">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">OT Hours</span>
+                <span className="font-mono font-bold text-blue-600">{totals.ot.toFixed(1)} hrs</span>
+              </div>
+              <div className="h-8 w-px bg-slate-200 hidden sm:block"></div>
+
+              <div className="flex flex-col items-center">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Salary Advance</span>
+                <span className="font-mono font-bold text-violet-700">
+                  {totals.adv > 0 ? `₹${totals.adv.toLocaleString('en-IN')}` : '—'}
+                </span>
+              </div>
+            </div>
+
+            {/* Right side: Attendance Rate / Total Tracked */}
+            <div className="flex items-stretch xl:border-l border-slate-200 bg-slate-50 w-full xl:w-auto">
+              <div className="px-6 py-4 flex flex-col items-end justify-center flex-1 xl:flex-none">
+                <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest mb-1">Total Tracked</span>
+                <span className="font-mono text-xl font-black text-emerald-700">{totals.present + totals.absent + totals.half} days</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -627,7 +761,7 @@ const Step2: React.FC<{
         <button onClick={onBack} className="inline-flex items-center gap-2 px-4 py-2 border border-border text-text-secondary rounded-lg text-sm font-semibold hover:bg-slate-50 transition-colors">
           <ChevronLeft size={16} /> Back
         </button>
-        <button onClick={onNext} className="inline-flex items-center gap-2 px-6 py-2.5 bg-primary text-white rounded-lg font-semibold text-sm hover:bg-red-700 transition-colors shadow-sm">
+        <button onClick={onNext} className="inline-flex items-center gap-2 px-6 py-2.5 bg-primary text-white rounded-xl font-bold text-sm hover:bg-primary/90 transition-all shadow-md shadow-primary/20 cursor-pointer">
           Calculate Payroll <PlayCircle size={16} />
         </button>
       </div>
@@ -682,7 +816,8 @@ const Step3: React.FC<{
   onBack: () => void;
   onNext: () => void;
 }> = ({ run, onBack, onNext }) => {
-  const { isSuperAdmin } = usePermission();
+  const { can } = usePermission();
+  const canViewCashInHand = can("payroll-extended-comp.view");
   const results   = run.results || [];
   const variances = results.filter(r => r.hasVariance);
 
@@ -696,7 +831,7 @@ const Step3: React.FC<{
       'Daily Rate', 'Earned Salary', 'OT Pay', 'Gross Salary', 'Emp PF', 'Emp ESI',
       'PT', 'Late Ded', 'Perm Ded', 'Advance', 'On-Record Net'
     ];
-    if (isSuperAdmin) {
+    if (canViewCashInHand) {
       headers.push('Additional Comp', 'Combined Net');
     }
 
@@ -719,7 +854,7 @@ const Step3: React.FC<{
         Number(r.salaryAdvance).toFixed(2),
         Number(r.netSalary).toFixed(2),
       ];
-      if (isSuperAdmin) {
+      if (canViewCashInHand) {
         const addl = r.additionalComp ? Number(r.additionalComp.additionalAmount).toFixed(2) : '0.00';
         const comb = r.additionalComp ? Number(r.additionalComp.combinedNet).toFixed(2) : Number(r.netSalary).toFixed(2);
         row.push(addl, comb);
@@ -900,7 +1035,7 @@ const Step3: React.FC<{
         </span>
       ),
     },
-    ...(isSuperAdmin ? [{
+    ...(canViewCashInHand ? [{
       header: "Cash in Hand",
       align: "right" as const,
       render: (r: ApiPayrollResult) => (
@@ -912,7 +1047,7 @@ const Step3: React.FC<{
       ),
     }] : []),
     {
-      header: isSuperAdmin ? "Combined Net" : "Net",
+      header: canViewCashInHand ? "Combined Net" : "Net",
       align: "right",
       render: (r) => (
         <div className="text-right">
@@ -920,9 +1055,9 @@ const Step3: React.FC<{
             className="font-mono font-bold text-xs text-text-primary cursor-help block"
             title={`Net = Gross − All Deductions\n= ${fmtDec(Number(r.grossSalary))} − ${fmtDec(Number(r.totalDeductions))}\n= ${fmtDec(Number(r.netSalary))}`}
           >
-            {fmtRs(isSuperAdmin && r.additionalComp ? r.additionalComp.combinedNet : Number(r.netSalary))}
+            {fmtRs(canViewCashInHand && r.additionalComp ? r.additionalComp.combinedNet : Number(r.netSalary))}
           </span>
-          {isSuperAdmin && r.additionalComp && r.additionalComp.additionalAmount > 0 && (
+          {canViewCashInHand && r.additionalComp && r.additionalComp.additionalAmount > 0 && (
             <span className="text-[10px] font-mono text-indigo-600 block">
               (Net Pay: {fmtRs(Number(r.netSalary))})
             </span>
@@ -952,7 +1087,7 @@ const Step3: React.FC<{
       </div>
 
       {/* Super Admin Confidential Total Compensation Summary Card 
-      {isSuperAdmin && (
+      {canViewCashInHand && (
         <div className="rounded-2xl border border-indigo-200 bg-white shadow-sm overflow-hidden my-2">
           <div className="flex items-center justify-between px-5 py-3 bg-indigo-600 text-white">
             <div className="flex items-center gap-2 font-bold text-xs uppercase tracking-wider">
@@ -1077,7 +1212,7 @@ const Step3: React.FC<{
                 <span className="font-mono text-xl font-black text-emerald-700">{fmtRs(run.totalNetSalary)}</span>
               </div>
               
-              {isSuperAdmin && (
+              {canViewCashInHand && (
                 <div className="px-6 py-4 flex flex-col items-end justify-center bg-indigo-50 flex-1 xl:flex-none">
                   <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest mb-1">Cash in Hand</span>
                   <span className="font-mono text-xl font-black text-indigo-700">{fmtRs(totalAdditionalComp)}</span>
@@ -1109,6 +1244,8 @@ const Step4: React.FC<{
 }> = ({ run, onBack, onApproved }) => {
   const { can } = usePermission();
   const canEditRun = can("payroll-run.edit");
+  const canViewCash = can("payroll-cash-in-hand");
+  const canViewCashInHand = can("payroll-extended-comp.view") || canViewCash;
   const [declared, setDeclared] = useState(false);
   const [loading,  setLoading]  = useState(false);
   const [error,    setError]    = useState('');
@@ -1116,6 +1253,9 @@ const Step4: React.FC<{
   const results   = run.results || [];
   const bankRows  = results.filter(r => r.paymentMode === 'BANK');
   const cashRows  = results.filter(r => r.paymentMode === 'CASH');
+  const totalAdditionalComp = run.totalAdditionalComp || results.reduce((s, r) => s + Number(r.additionalComp?.additionalAmount || 0), 0);
+  const totalCombinedNet = run.totalCombinedNet || (run.totalNetSalary + totalAdditionalComp);
+
   const periodLabel = run.period.startsWith('20') && run.period.length === 7
     ? `${MONTHS[parseInt(run.period.split('-')[1], 10) - 1]} ${run.period.split('-')[0]}`
     : run.period;
@@ -1137,7 +1277,7 @@ const Step4: React.FC<{
   };
 
   return (
-    <div className="max-w-2xl mx-auto space-y-5">
+    <div className="w-full space-y-5">
       <div>
         <h2 className="text-lg font-bold text-text-primary">Approve Payroll Run</h2>
         <p className="text-sm text-text-secondary mt-0.5">Review the summary and approve to proceed to disbursement.</p>
@@ -1147,16 +1287,18 @@ const Step4: React.FC<{
       <div className="bg-white rounded-xl border border-border shadow-sm p-5">
         <h3 className="text-sm font-bold text-text-primary border-b border-border pb-3 mb-4">Run Summary — {periodLabel}</h3>
         <div className="grid grid-cols-2 gap-3">
-          {[
+          {([
             { label: 'Total Employees', value: `${results.length}` },
             { label: 'Net Payroll',     value: fmtRs(run.totalNetSalary), bold: true },
+            canViewCashInHand ? { label: 'Cash In Hand',    value: fmtRs(totalAdditionalComp) } : null,
+            canViewCashInHand ? { label: 'Combined Net',    value: fmtRs(totalCombinedNet), bold: true } : null,
             { label: 'Bank Transfer',   value: fmtRs(bankRows.reduce((s,r)=>s+Number(r.netSalary),0)) },
-            { label: 'Cash Payment',    value: fmtRs(cashRows.reduce((s,r)=>s+Number(r.netSalary),0)) },
+            canViewCash ? { label: 'Cash Payment',    value: fmtRs(cashRows.reduce((s,r)=>s+Number(r.netSalary),0)) } : null,
             { label: 'Employee PF',     value: fmtRs(run.totalPfEmployee) },
             { label: 'Employer PF',     value: fmtRs(run.totalPfEmployer) },
             { label: 'Employee ESI',    value: fmtRs(run.totalEsiEmployee) },
             { label: 'Employer ESI',    value: fmtRs(run.totalEsiEmployer) },
-          ].map(item => (
+          ].filter(Boolean) as { label: string; value: string; bold?: boolean }[]).map(item => (
             <div key={item.label} className="flex items-center justify-between py-1.5 border-b border-slate-100">
               <span className="text-sm text-text-secondary">{item.label}</span>
               <span className={`font-semibold ${item.bold ? 'text-primary text-base' : 'text-text-primary text-sm'}`}>{item.value}</span>
@@ -1171,7 +1313,7 @@ const Step4: React.FC<{
           <p className="text-xs font-bold text-text-muted uppercase tracking-wider">Payment Mode Breakdown</p>
         </div>
         <div className="divide-y divide-border max-h-56 overflow-y-auto">
-          {results.map(r => (
+          {results.filter(r => canViewCash || r.paymentMode !== 'CASH').map(r => (
             <div key={r.id} className="flex items-center justify-between px-5 py-2.5">
               <div>
                 <p className="text-sm font-semibold text-text-primary">{r.employeeName}</p>
@@ -1183,7 +1325,16 @@ const Step4: React.FC<{
                 }`}>
                   {r.paymentMode === 'BANK' ? <Building2 size={10} /> : <Wallet size={10} />} {r.paymentMode}
                 </span>
-                <span className="font-mono font-semibold text-sm text-text-primary">{fmtRs(Number(r.netSalary))}</span>
+                <div className="flex flex-col items-end text-right">
+                  {canViewCashInHand && Number(r.additionalComp?.additionalAmount) > 0 ? (
+                    <>
+                      <div className="text-[10px] text-text-muted font-mono leading-tight">Net: {fmtRs(Number(r.netSalary))} | Addl: {fmtRs(Number(r.additionalComp?.additionalAmount))}</div>
+                      <span className="font-mono font-bold text-sm text-text-primary mt-0.5">Total: {fmtRs(Number(r.additionalComp?.combinedNet))}</span>
+                    </>
+                  ) : (
+                    <span className="font-mono font-semibold text-sm text-text-primary">{fmtRs(Number(r.netSalary))}</span>
+                  )}
+                </div>
               </div>
             </div>
           ))}
@@ -1211,15 +1362,12 @@ const Step4: React.FC<{
           <ChevronLeft size={16} /> Back to Preview
         </button>
         {canEditRun && (
-          <button onClick={handleApprove} disabled={!declared || loading}
-            className={`inline-flex items-center gap-2 px-6 py-2.5 rounded-lg font-semibold text-sm shadow-sm transition-all ${
-              declared && !loading ? 'bg-primary text-white hover:bg-red-700' : 'bg-slate-200 text-slate-400 cursor-not-allowed'
-            }`}>
-            {loading
-              ? <><Loader2 size={15} className="animate-spin" /> Approving…</>
-              : <><CheckCircle2 size={15} /> Approve Payroll</>
-            }
-          </button>
+          <Button 
+            text={loading ? "Approving..." : "Approve Payroll"} 
+            onClick={handleApprove} 
+            disabled={!declared || loading} 
+            size="md"
+          />
         )}
       </div>
     </div>
@@ -1234,6 +1382,8 @@ const Step5: React.FC<{
   const navigate   = useNavigate();
   const { can } = usePermission();
   const canEditRun = can("payroll-run.edit");
+  const canViewCash = can("payroll-cash-in-hand");
+  const canViewCashInHand = can("payroll-extended-comp.view") || canViewCash;
   const [showModal, setShowModal] = useState(false);
   const [loading,   setLoading]   = useState(false);
   const [locked,    setLocked]    = useState(false);
@@ -1245,6 +1395,8 @@ const Step5: React.FC<{
   const cashRows = results.filter(r => r.paymentMode === 'CASH');
   const bankTotal = bankRows.reduce((s,r) => s + Number(r.netSalary), 0);
   const cashTotal = cashRows.reduce((s,r) => s + Number(r.netSalary), 0);
+  const totalAdditionalComp = run.totalAdditionalComp || results.reduce((s, r) => s + Number(r.additionalComp?.additionalAmount || 0), 0);
+  const totalCombinedNet = run.totalCombinedNet || (run.totalNetSalary + totalAdditionalComp);
 
   const bankColumns: DataTableColumn<ApiPayrollResult>[] = [
     {
@@ -1275,9 +1427,16 @@ const Step5: React.FC<{
       header: "AMOUNT",
       align: "right",
       render: (r) => (
-        <span className="font-mono font-semibold text-text-primary text-xs">
-          {fmtRs(Number(r.netSalary))}
-        </span>
+        <div className="flex flex-col items-end text-right">
+          {canViewCashInHand && Number(r.additionalComp?.additionalAmount) > 0 ? (
+            <>
+              <div className="text-[9px] text-text-muted font-mono leading-tight">Net: {fmtRs(Number(r.netSalary))} | Addl: {fmtRs(Number(r.additionalComp?.additionalAmount))}</div>
+              <span className="font-mono font-bold text-xs text-text-primary mt-0.5">{fmtRs(Number(r.additionalComp?.combinedNet))}</span>
+            </>
+          ) : (
+            <span className="font-mono font-semibold text-text-primary text-xs">{fmtRs(Number(r.netSalary))}</span>
+          )}
+        </div>
       ),
     },
   ];
@@ -1306,9 +1465,16 @@ const Step5: React.FC<{
       header: "AMOUNT",
       align: "right",
       render: (r) => (
-        <span className="font-mono font-semibold text-text-primary text-xs">
-          {fmtRs(Number(r.netSalary))}
-        </span>
+        <div className="flex flex-col items-end text-right">
+          {canViewCashInHand && Number(r.additionalComp?.additionalAmount) > 0 ? (
+            <>
+              <div className="text-[9px] text-text-muted font-mono leading-tight">Net: {fmtRs(Number(r.netSalary))} | Addl: {fmtRs(Number(r.additionalComp?.additionalAmount))}</div>
+              <span className="font-mono font-bold text-xs text-text-primary mt-0.5">{fmtRs(Number(r.additionalComp?.combinedNet))}</span>
+            </>
+          ) : (
+            <span className="font-mono font-semibold text-text-primary text-xs">{fmtRs(Number(r.netSalary))}</span>
+          )}
+        </div>
       ),
     },
   ];
@@ -1392,8 +1558,10 @@ const Step5: React.FC<{
         </div>
         <div className="bg-slate-50 rounded-xl border border-border p-5 text-left space-y-2">
           <div className="flex justify-between text-sm"><span className="text-text-secondary">Bank Transfers</span><span className="font-semibold text-text-primary">{fmtRs(bankTotal)}</span></div>
-          <div className="flex justify-between text-sm"><span className="text-text-secondary">Cash Payments</span><span className="font-semibold text-text-primary">{fmtRs(cashTotal)}</span></div>
-          <div className="flex justify-between text-sm font-bold border-t border-border pt-2"><span>Total Disbursed</span><span className="text-primary">{fmtRs(run.totalNetSalary)}</span></div>
+          {canViewCash && <div className="flex justify-between text-sm"><span className="text-text-secondary">Cash Payments</span><span className="font-semibold text-text-primary">{fmtRs(cashTotal)}</span></div>}
+          {canViewCashInHand && <div className="flex justify-between text-sm"><span className="text-text-secondary">Cash In Hand</span><span className="font-semibold text-text-primary">{fmtRs(totalAdditionalComp)}</span></div>}
+          <div className="flex justify-between text-sm font-bold border-t border-border pt-2"><span>Total Disbursed (On-Record)</span><span className="text-primary">{fmtRs(run.totalNetSalary)}</span></div>
+          {canViewCashInHand && <div className="flex justify-between text-sm font-bold border-t border-border pt-2"><span>Total Combined Net</span><span className="text-primary">{fmtRs(totalCombinedNet)}</span></div>}
         </div>
         <div className="flex gap-3 justify-center">
           <button onClick={() => navigate('/payroll/monthly-report')}
@@ -1417,12 +1585,13 @@ const Step5: React.FC<{
       </div>
 
       {/* Disbursal summary */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {[
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+        {([
           { label: 'Total Net Payroll', value: fmtRs(run.totalNetSalary), icon: IndianRupee, cls: 'text-text-primary bg-slate-100' },
           { label: 'Bank Transfer',     value: fmtRs(bankTotal),           icon: Building2,   cls: 'text-blue-700 bg-blue-50'      },
-          { label: 'Cash Payment',      value: fmtRs(cashTotal),           icon: Wallet,      cls: 'text-emerald-700 bg-emerald-50'},
-        ].map(c => (
+          canViewCash ? { label: 'Cash Payment',      value: fmtRs(cashTotal),           icon: Wallet,      cls: 'text-emerald-700 bg-emerald-50'} : null,
+          canViewCashInHand ? { label: 'Cash In Hand', value: fmtRs(totalAdditionalComp), icon: Wallet, cls: 'text-amber-700 bg-amber-50'} : null,
+        ].filter(Boolean) as { label: string; value: string; icon: any; cls: string }[]).map(c => (
           <div key={c.label} className="bg-white rounded-xl border border-border p-5 shadow-sm flex items-center gap-4">
             <div className={`p-3 rounded-xl ${c.cls}`}><c.icon size={20} /></div>
             <div>
@@ -1462,7 +1631,7 @@ const Step5: React.FC<{
       )}
 
       {/* Cash table using reusable DataTable component */}
-      {cashRows.length > 0 && (
+      {canViewCash && cashRows.length > 0 && (
         <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
           <div className="flex items-center justify-between px-5 py-3 border-b border-border bg-emerald-50/60">
             <h3 className="text-xs font-bold text-emerald-700 uppercase tracking-wider flex items-center gap-1.5">

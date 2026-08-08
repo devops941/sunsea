@@ -328,14 +328,14 @@ const EodStockList: React.FC = () => {
             </div>
 
             <div className="flex items-center gap-2">
-              <Button
+              {/* <Button
                 text={syncing ? "Syncing…" : "Sync EOD"}
                 icon={FaSyncAlt}
                 variant="secondary"
                 size="sm"
                 disabled={syncing}
                 onClick={handleSync}
-              />
+              /> */}
               <ExportCSVButton
                 data={data}
                 columns={csvColumns}

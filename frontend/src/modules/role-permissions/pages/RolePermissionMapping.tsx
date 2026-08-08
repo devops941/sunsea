@@ -307,6 +307,7 @@ const MODULE_GROUPS: ModuleGroup[] = [
       { key: "payroll-settings", label: "Payroll Settings" },
       { key: "payroll-attendance", label: "Attendance" },
       { key: "payroll-advance", label: "Salary Advance" },
+      { key: "payroll-extended-comp", label: "Extended Compensation" },
     ],
   },
 ];

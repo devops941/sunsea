@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { ChevronLeft, ChevronRight, Printer, AlertTriangle, FileDown } from 'lucide-react';
+import { Calendar, ChevronLeft, ChevronRight, Printer, AlertTriangle, FileDown, Users } from 'lucide-react';
 import ViewButton from '../../../components/ui/viewbutton/ViewButton';
 import { usePermission } from '../../../hooks/usePermission';
 import IconButton from '../../../components/ui/IconButton/IconButton';
@@ -12,8 +12,41 @@ import { payrollService } from '../../../services/payrollService';
 import type { ApiPayrollRun, ApiPayrollResult } from '../../../services/payrollService';
 import DataTable, { type DataTableColumn } from '../../../components/ui/table/DataTable';
 import PayslipModal from '../components/PayslipModal';
+import FilterPopover from '../../../components/ui/FilterPopover/FilterPopover';
 
-const PAGE_SIZE = 15;
+const ITEMS_PER_PAGE = 10;
+
+const MONTH_OPTIONS = [
+  { value: 'ALL', label: 'All Months' },
+  { value: '01', label: 'January' },
+  { value: '02', label: 'February' },
+  { value: '03', label: 'March' },
+  { value: '04', label: 'April' },
+  { value: '05', label: 'May' },
+  { value: '06', label: 'June' },
+  { value: '07', label: 'July' },
+  { value: '08', label: 'August' },
+  { value: '09', label: 'September' },
+  { value: '10', label: 'October' },
+  { value: '11', label: 'November' },
+  { value: '12', label: 'December' },
+];
+
+const YEAR_OPTIONS = [
+  { value: 'ALL', label: 'All Years' },
+  { value: '2027', label: '2027' },
+  { value: '2026', label: '2026' },
+  { value: '2025', label: '2025' },
+  { value: '2024', label: '2024' },
+];
+
+const WEEK_OPTIONS = [
+  { value: 'ALL', label: 'All Weeks' },
+  ...Array.from({ length: 52 }, (_, i) => {
+    const w = `W${String(i + 1).padStart(2, '0')}`;
+    return { value: w, label: `Week ${i + 1} (${w})` };
+  })
+];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const fmt = (n: number) => n.toLocaleString('en-IN');
@@ -28,14 +61,46 @@ const STATUS_COLOR: Record<string, string> = {
 // ─── Component ────────────────────────────────────────────────────────────────
 const WeeklyPayrollReport: React.FC = () => {
   const { can } = usePermission();
-  const canViewRun = can("payroll-run.view");
+  const canViewRun        = can("payroll-run.view");
+  const canViewCashInHand = can("payroll-extended-comp.view");
   const { socket }              = useSocket();
+  const [selectedYear, setSelectedYear]   = useState<string>('ALL');
+  const [selectedMonth, setSelectedMonth] = useState<string>('ALL');
+  const [selectedWeek, setSelectedWeek]   = useState<string>('ALL');
+  const [draftYear, setDraftYear]         = useState<string>('ALL');
+  const [draftMonth, setDraftMonth]       = useState<string>('ALL');
+  const [draftWeek, setDraftWeek]         = useState<string>('ALL');
+
+  const hasActiveFilters = selectedWeek !== 'ALL' || selectedMonth !== 'ALL' || selectedYear !== 'ALL';
+  const activeFilterCount = (selectedWeek !== 'ALL' ? 1 : 0) + (selectedMonth !== 'ALL' ? 1 : 0) + (selectedYear !== 'ALL' ? 1 : 0);
+
+  const handleOpenFilter = () => {
+    setDraftWeek(selectedWeek);
+    setDraftMonth(selectedMonth);
+    setDraftYear(selectedYear);
+  };
+
+  const handleApplyFilters = () => {
+    setSelectedWeek(draftWeek);
+    setSelectedMonth(draftMonth);
+    setSelectedYear(draftYear);
+  };
+
+  const handleClearFilters = () => {
+    setDraftWeek('ALL');
+    setDraftMonth('ALL');
+    setDraftYear('ALL');
+    setSelectedWeek('ALL');
+    setSelectedMonth('ALL');
+    setSelectedYear('ALL');
+  };
   const [runs, setRuns]         = useState<ApiPayrollRun[]>([]);
   const [runIdx, setRunIdx]     = useState(0);
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState<string | null>(null);
   const [filter, setFilter]     = useState<'ALL' | 'BANK' | 'CASH'>('ALL');
   const [page, setPage]         = useState(1);
+  const [pageSize, setPageSize] = useState(ITEMS_PER_PAGE);
   const [pdfLoadingIds, setPdfLoadingIds] = useState<Set<number>>(new Set());
   const [payslipTarget, setPayslipTarget] = useState<{ runId: number; resultId: number; period: string; type: 'MONTHLY' | 'WEEKLY' } | null>(null);
 
@@ -43,7 +108,13 @@ const WeeklyPayrollReport: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      const res = await payrollService.listRuns({ type: 'WEEKLY', limit: 100 });
+      const res = await payrollService.listRuns({
+        type: 'WEEKLY',
+        year: selectedYear !== 'ALL' ? selectedYear : undefined,
+        month: selectedMonth !== 'ALL' ? selectedMonth : undefined,
+        week: selectedWeek !== 'ALL' ? selectedWeek : undefined,
+        limit: 100,
+      });
       const sorted = [...(res.runs ?? [])].sort(
         (a, b) => new Date(b.period).getTime() - new Date(a.period).getTime()
       );
@@ -54,7 +125,7 @@ const WeeklyPayrollReport: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [selectedYear, selectedMonth, selectedWeek]);
 
   useEffect(() => { fetchRuns(); }, [fetchRuns]);
 
@@ -142,8 +213,8 @@ const WeeklyPayrollReport: React.FC = () => {
     ? allResults
     : allResults.filter((r) => r.paymentMode === filter);
 
-  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
-  const pagedData  = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const pagedData  = filtered.slice((page - 1) * pageSize, page * pageSize);
 
   const totals = filtered.reduce(
     (acc, r) => ({
@@ -158,6 +229,9 @@ const WeeklyPayrollReport: React.FC = () => {
     }),
     { earnedSalary: 0, otPay: 0, salaryAdvance: 0, permissionDeduction: 0, netSalary: 0, presentDays: 0, absentDays: 0, halfDays: 0 }
   );
+
+  const totalAdditionalComp = run?.totalAdditionalComp || allResults.reduce((s, r) => s + Number(r.additionalComp?.additionalAmount || 0), 0);
+  const totalCombinedNet = run?.totalCombinedNet || (totals.netSalary + totalAdditionalComp);
 
   const varianceCount = filtered.filter((r) => r.hasVariance).length;
 
@@ -180,10 +254,72 @@ const WeeklyPayrollReport: React.FC = () => {
   // ── Empty ──
   if (runs.length === 0) {
     return (
-      <div className="min-h-screen  flex items-center justify-center">
-        <div className="text-center space-y-3">
+      <div className="min-h-screen p-6 space-y-5">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 print:hidden">
+          <div>
+            <h1 className="text-2xl font-bold text-text-primary">Weekly Payroll Report</h1>
+            <p className="text-sm text-text-secondary mt-0.5">No payroll runs found for selected filters.</p>
+          </div>
+          <div className="flex items-center gap-3 flex-wrap justify-end">
+            <FilterPopover
+              activeFilterCount={activeFilterCount}
+              hasActiveFilters={hasActiveFilters}
+              onApply={handleApplyFilters}
+              onClear={handleClearFilters}
+              onOpen={handleOpenFilter}
+            >
+              <div className="mb-3">
+                <label className="block mb-1 text-[11px] uppercase tracking-wider text-slate-500 font-semibold">
+                  Week
+                </label>
+                <select
+                  className="w-full border border-slate-200 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary bg-white text-slate-700 font-medium cursor-pointer"
+                  value={draftWeek}
+                  onChange={(e) => setDraftWeek(e.target.value)}
+                >
+                  {WEEK_OPTIONS.map((w) => (
+                    <option key={w.value} value={w.value}>{w.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="mb-3">
+                <label className="block mb-1 text-[11px] uppercase tracking-wider text-slate-500 font-semibold">
+                  Month
+                </label>
+                <select
+                  className="w-full border border-slate-200 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary bg-white text-slate-700 font-medium cursor-pointer"
+                  value={draftMonth}
+                  onChange={(e) => setDraftMonth(e.target.value)}
+                >
+                  {MONTH_OPTIONS.map((m) => (
+                    <option key={m.value} value={m.value}>{m.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="mb-3">
+                <label className="block mb-1 text-[11px] uppercase tracking-wider text-slate-500 font-semibold">
+                  Year
+                </label>
+                <select
+                  className="w-full border border-slate-200 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary bg-white text-slate-700 font-medium cursor-pointer"
+                  value={draftYear}
+                  onChange={(e) => setDraftYear(e.target.value)}
+                >
+                  {YEAR_OPTIONS.map((y) => (
+                    <option key={y.value} value={y.value}>{y.label}</option>
+                  ))}
+                </select>
+              </div>
+            </FilterPopover>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl border border-border p-12 text-center shadow-sm">
           <p className="text-text-primary font-semibold text-lg">No weekly payroll runs found</p>
-          <p className="text-text-secondary text-sm">Run a weekly payroll to see the report here.</p>
+          <p className="text-text-secondary text-sm mt-1">Try selecting a different week, month, or year filter using the Filters button.</p>
         </div>
       </div>
     );
@@ -206,6 +342,10 @@ const WeeklyPayrollReport: React.FC = () => {
     { header: 'Advance (₹)',         accessor: (r: typeof csvData[0]) => r.salaryAdvance },
     { header: 'Perm. Deduction (₹)', accessor: (r: typeof csvData[0]) => r.permissionDeduction },
     { header: 'Net Salary (₹)',      accessor: (r: typeof csvData[0]) => r.netSalary },
+    ...(canViewCashInHand ? [
+      { header: 'Cash in Hand (₹)',  accessor: (r: typeof csvData[0]) => r.additionalComp?.additionalAmount || 0 },
+      { header: 'Combined Net (₹)',  accessor: (r: typeof csvData[0]) => r.additionalComp?.combinedNet || r.netSalary },
+    ] : []),
     { header: 'Payment Mode',        accessor: (r: typeof csvData[0]) => r.paymentMode },
   ];
 
@@ -296,9 +436,22 @@ const WeeklyPayrollReport: React.FC = () => {
       ),
     },
     {
-      header: 'NET SALARY (₹)',
+      header: canViewCashInHand ? 'COMBINED NET (₹)' : 'NET SALARY (₹)',
       align: 'right',
-      render: (r) => <span className="font-mono font-bold text-text-primary">₹{fmt(Number(r.netSalary))}</span>,
+      render: (r) => {
+        const hasAddl = canViewCashInHand && r.additionalComp && r.additionalComp.additionalAmount > 0;
+        const combNet = hasAddl ? r.additionalComp!.combinedNet : r.netSalary;
+        return (
+          <div className="flex flex-col items-end">
+            <span className="font-mono font-bold text-text-primary">₹{fmt(Number(combNet))}</span>
+            {hasAddl && (
+              <span className="text-[10px] text-indigo-700 font-semibold bg-indigo-50 px-1 rounded">
+                Net ₹{fmt(Number(r.netSalary))} + Cash ₹{fmt(Number(r.additionalComp!.additionalAmount))}
+              </span>
+            )}
+          </div>
+        );
+      },
     },
     {
       header: 'MODE',
@@ -347,48 +500,88 @@ const WeeklyPayrollReport: React.FC = () => {
             </span>
           </p>
         </div>
-        <div className="flex items-center gap-2 flex-wrap justify-end">
-          {/* Period navigation */}
-          <button
-            onClick={() => setRunIdx((i) => Math.min(i + 1, runs.length - 1))}
-            disabled={runIdx >= runs.length - 1}
-            className="p-2 border border-border rounded-lg text-text-secondary hover:bg-slate-50 disabled:opacity-40"
-          >
-            <ChevronLeft size={15} />
-          </button>
-          <span className="text-sm font-medium text-text-primary px-1">
-            {runIdx + 1} / {runs.length}
-          </span>
-          <button
-            onClick={() => setRunIdx((i) => Math.max(i - 1, 0))}
-            disabled={runIdx <= 0}
-            className="p-2 border border-border rounded-lg text-text-secondary hover:bg-slate-50 disabled:opacity-40"
-          >
-            <ChevronRight size={15} />
-          </button>
+        <div className="flex items-center gap-3 flex-wrap justify-end">
+          {/* Run Selector if multiple runs exist */}
+          {runs.length > 1 && (
+            <div className="flex items-center gap-1.5 bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold shadow-sm">
+              <span className="text-slate-500">Run:</span>
+              <select
+                value={runIdx}
+                onChange={(e) => setRunIdx(Number(e.target.value))}
+                className="bg-transparent font-semibold text-slate-800 outline-none cursor-pointer"
+              >
+                {runs.map((r, i) => (
+                  <option key={r.id} value={i}>
+                    {r.runCode} ({r.period})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
-          <button
-            onClick={() => window.print()}
-            className="inline-flex items-center gap-1.5 px-3 py-2 border border-border rounded-lg text-sm text-text-secondary hover:bg-slate-50"
+          <FilterPopover
+            activeFilterCount={activeFilterCount}
+            hasActiveFilters={hasActiveFilters}
+            onApply={handleApplyFilters}
+            onClear={handleClearFilters}
+            onOpen={handleOpenFilter}
           >
-            <Printer size={15} /> Print
-          </button>
+            <div className="mb-3">
+              <label className="block mb-1 text-[11px] uppercase tracking-wider text-slate-500 font-semibold">
+                Week
+              </label>
+              <select
+                className="w-full border border-slate-200 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary bg-white text-slate-700 font-medium cursor-pointer"
+                value={draftWeek}
+                onChange={(e) => setDraftWeek(e.target.value)}
+              >
+                {WEEK_OPTIONS.map((w) => (
+                  <option key={w.value} value={w.value}>{w.label}</option>
+                ))}
+              </select>
+            </div>
 
-          <ExportCSVButton
-            data={csvData}
-            columns={csvColsIndexed}
-            filename={`weekly-payroll-${run.period}.csv`}
-            text="Export CSV"
-          />
+            <div className="mb-3">
+              <label className="block mb-1 text-[11px] uppercase tracking-wider text-slate-500 font-semibold">
+                Month
+              </label>
+              <select
+                className="w-full border border-slate-200 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary bg-white text-slate-700 font-medium cursor-pointer"
+                value={draftMonth}
+                onChange={(e) => setDraftMonth(e.target.value)}
+              >
+                {MONTH_OPTIONS.map((m) => (
+                  <option key={m.value} value={m.value}>{m.label}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="mb-3">
+              <label className="block mb-1 text-[11px] uppercase tracking-wider text-slate-500 font-semibold">
+                Year
+              </label>
+              <select
+                className="w-full border border-slate-200 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary bg-white text-slate-700 font-medium cursor-pointer"
+                value={draftYear}
+                onChange={(e) => setDraftYear(e.target.value)}
+              >
+                {YEAR_OPTIONS.map((y) => (
+                  <option key={y.value} value={y.value}>{y.label}</option>
+                ))}
+              </select>
+            </div>
+          </FilterPopover>
+
+          {run && (
+            <ExportCSVButton
+              data={csvData}
+              columns={csvColsIndexed}
+              filename={`weekly-payroll-${run.period}.csv`}
+              text="Export CSV"
+            />
+          )}
         </div>
       </div>
-
-      {/* Locked banner */}
-      {/* {isLocked && (
-        <div className="flex items-center gap-3 p-3 bg-amber-50 border border-amber-300 rounded-lg text-sm text-amber-800 font-medium">
-          <Lock size={16} /> This payroll period is LOCKED. Read-only view.
-        </div>
-      )} */}
 
       {/* Variance alert */}
       {varianceCount > 0 && (
@@ -434,29 +627,85 @@ const WeeklyPayrollReport: React.FC = () => {
           emptyMessage="No employees match the selected filter."
           rowClassName={(r) => (r.hasVariance ? 'bg-amber-50 border-l-4 border-l-amber-400' : '')}
           density="compact"
-          pagination={totalPages > 1 ? { currentPage: page, totalPages, onPageChange: setPage } : undefined}
+          pagination={{ currentPage: page, totalPages, onPageChange: setPage }}
         />
 
-        {/* Total summary row */}
+        {/* Footer Summary Bar matching PayrollRun design */}
         {filtered.length > 0 && (
-          <div className="bg-slate-100 border-t-2 border-slate-300 p-4 flex flex-wrap justify-between items-center text-xs font-mono">
-            <span className="font-bold text-slate-800 text-sm">TOTAL ({filtered.length} Employees)</span>
-            <div className="flex gap-4 flex-wrap justify-end font-semibold">
-              <span className="text-emerald-700">Present: {totals.presentDays}</span>
-              <span className="text-red-600">Absent: {totals.absentDays}</span>
-              <span className="text-amber-600">Half: {totals.halfDays}</span>
-              <span>Earned: ₹{fmt(totals.earnedSalary)}</span>
-              <span className="text-emerald-700">OT: ₹{fmt(totals.otPay)}</span>
-              <span className="text-amber-700">Adv: ₹{fmt(totals.salaryAdvance)}</span>
-              <span className="text-red-600">Perm Ded: ₹{fmt(totals.permissionDeduction)}</span>
-              <span className="font-bold text-primary text-sm">Net: ₹{fmt(totals.netSalary)}</span>
+          <div className="bg-white border-t border-slate-200 overflow-hidden flex flex-col xl:flex-row items-stretch justify-between">
+
+            {/* Left side: TOTAL EMPLOYEES */}
+            <div className="px-6 py-4 flex items-center xl:border-r border-slate-200 xl:min-w-[180px] w-full xl:w-auto border-b xl:border-b-0">
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-slate-500 font-bold">
+                  <Users size={16} />
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">TOTAL EMPLOYEES</p>
+                  <p className="text-sm font-bold text-slate-800">{filtered.length}</p>
+                </div>
+              </div>
             </div>
+
+            {/* Middle: EARNED | OT | GROSS | DEDUCTIONS */}
+            <div className="flex-1 flex flex-wrap items-center justify-center gap-x-6 gap-y-3 px-6 py-4 text-xs border-b xl:border-b-0 border-slate-200">
+              <div className="flex flex-col items-center">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">EARNED</span>
+                <span className="font-mono font-semibold text-slate-700">
+                  ₹{fmt(totals.earnedSalary)}
+                </span>
+              </div>
+              <div className="h-7 w-px bg-slate-200 hidden sm:block"></div>
+
+              <div className="flex flex-col items-center">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">OT</span>
+                <span className="font-mono font-semibold text-emerald-600">
+                  ₹{fmt(totals.otPay)}
+                </span>
+              </div>
+              <div className="h-7 w-px bg-slate-200 hidden sm:block"></div>
+
+              <div className="flex flex-col items-center">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">GROSS</span>
+                <span className="font-mono font-bold text-slate-900">
+                  ₹{fmt(totals.earnedSalary + totals.otPay)}
+                </span>
+              </div>
+              <div className="h-7 w-px bg-slate-200 hidden sm:block"></div>
+
+              <div className="flex flex-col items-center">
+                <span className="text-[10px] font-bold text-rose-400 uppercase tracking-widest mb-0.5">DEDUCTIONS</span>
+                <span className="font-mono font-semibold text-rose-600">
+                  ADV ₹{fmt(totals.salaryAdvance)} · PERM ₹{fmt(totals.permissionDeduction)}
+                </span>
+              </div>
+            </div>
+
+            {/* Right side: NET PAY & CASH IN HAND */}
+            <div className="flex items-stretch xl:border-l border-slate-200 bg-slate-50 w-full xl:w-auto">
+              <div className="px-6 py-4 flex flex-col items-end justify-center border-r border-slate-200 flex-1 xl:flex-none">
+                <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest mb-0.5">NET PAY</span>
+                <span className="font-mono text-lg font-black text-emerald-700">
+                  ₹{fmt(totals.netSalary)}
+                </span>
+              </div>
+
+              {canViewCashInHand && (
+                <div className="px-6 py-4 flex flex-col items-end justify-center bg-indigo-50/70 flex-1 xl:flex-none">
+                  <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest mb-0.5">CASH IN HAND</span>
+                  <span className="font-mono text-lg font-black text-indigo-700">
+                    ₹{fmt(totalAdditionalComp)}
+                  </span>
+                </div>
+              )}
+            </div>
+
           </div>
         )}
       </div>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 print:hidden">
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-4 print:hidden">
         {[
           {
             label: 'Total Gross',
@@ -473,6 +722,13 @@ const WeeklyPayrollReport: React.FC = () => {
             value: `₹${fmt(totals.netSalary)}`,
             color: 'text-primary font-bold',
           },
+          ...(canViewCashInHand && totalAdditionalComp > 0 ? [
+            {
+              label: 'Cash in Hand (Confidential)',
+              value: `₹${fmt(totalAdditionalComp)}`,
+              color: 'text-indigo-700 font-bold',
+            }
+          ] : []),
           {
             label: 'Employees',
             value: String(filtered.length),

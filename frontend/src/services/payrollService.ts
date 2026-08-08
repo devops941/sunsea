@@ -298,7 +298,7 @@ export const payrollService = {
   },
 
   // Payroll Runs
-  listRuns: async (params?: { period?: string; type?: string; status?: string; page?: number; limit?: number }) => {
+  listRuns: async (params?: { period?: string; type?: string; status?: string; year?: string; month?: string; week?: string; page?: number; limit?: number }) => {
     const { data } = await apiClient.get(`${BASE}/runs`, { params });
     return data.data as { runs: ApiPayrollRun[]; total: number; page: number; limit: number };
   },

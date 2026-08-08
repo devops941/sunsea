@@ -126,7 +126,7 @@ const PayslipModal: React.FC<PayslipModalProps> = ({ runId, resultId, onClose })
           <h2 className="text-base font-bold text-slate-800">Payslip Preview</h2>
         </div>
         <div className="flex items-center gap-2.5">
-          <button
+          {/* <button
             type="button"
             onClick={handlePrint}
             disabled={!data}
@@ -134,7 +134,7 @@ const PayslipModal: React.FC<PayslipModalProps> = ({ runId, resultId, onClose })
           >
             <FiPrinter size={15} className="text-slate-500" />
             <span>Print</span>
-          </button>
+          </button> */}
 
           <button
             type="button"

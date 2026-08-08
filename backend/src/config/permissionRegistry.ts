@@ -114,11 +114,12 @@ export const PERMISSION_REGISTRY: ModulePermission[] = [
   { module: "chart-of-accounts", actions: ["view","create","edit","delete"], description: "Chart of Accounts" },
 
   // ── Payroll ──────────────────────────────────────────────────────────────────
-  { module: "payroll",            actions: ["view","create","edit","delete"], description: "Payroll Dashboard" },
-  { module: "payroll-run",        actions: ["view","create","edit","delete"], description: "Payroll Run" },
-  { module: "payroll-settings",   actions: ["view","create","edit","delete"], description: "Payroll Settings" },
-  { module: "payroll-attendance", actions: ["view","create","edit","delete"], description: "Attendance" },
-  { module: "payroll-advance",    actions: ["view","create","edit","delete"], description: "Salary Advance" },
+  { module: "payroll",              actions: ["view","create","edit","delete"], description: "Payroll Dashboard" },
+  { module: "payroll-run",          actions: ["view","create","edit","delete"], description: "Payroll Run" },
+  { module: "payroll-settings",     actions: ["view","create","edit","delete"], description: "Payroll Settings" },
+  { module: "payroll-attendance",   actions: ["view","create","edit","delete"], description: "Attendance" },
+  { module: "payroll-advance",      actions: ["view","create","edit","delete"], description: "Salary Advance" },
+  { module: "payroll-extended-comp", actions: ["view"],                        description: "Extended Compensation" },
 ];
 
 /**

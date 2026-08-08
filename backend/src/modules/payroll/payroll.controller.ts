@@ -18,6 +18,13 @@ function isSuperAdmin(req: Request): boolean {
   );
 }
 
+/** Returns true when user is Super Admin OR holds 'payroll-extended-comp.view' permission. */
+function hasCashInHandAccess(req: Request): boolean {
+  if (isSuperAdmin(req)) return true;
+  const user = (req as any).user;
+  return Array.isArray(user?.permissions) && user.permissions.includes('payroll-extended-comp.view');
+}
+
 class PayrollController {
 
   // ── Payroll Config ───────────────────────────────────────────────────────────
@@ -54,11 +61,8 @@ class PayrollController {
     const empId = BigInt(String(req.params.employeeId));
     const config = await payrollService.upsertEmployeePayrollConfig(empId, req.body);
 
-    // Super Admin integrated path: if offRecordAmount is present in the same request,
-    // process the extended compensation layer in the same call.
-    // offRecordAmount is ignored silently for non-super-admin users (it never reaches here
-    // because payrollService.upsertEmployeePayrollConfig explicitly strips unknown fields).
-    if (isSuperAdmin(req) && req.body.offRecordAmount !== undefined) {
+    // Integrated path: if offRecordAmount is present in the same request and user has access
+    if (hasCashInHandAccess(req) && req.body.offRecordAmount !== undefined) {
       const amount = Number(req.body.offRecordAmount);
       if (amount > 0) {
         try {
@@ -72,7 +76,7 @@ class PayrollController {
     res.json(new ApiResponse('Employee payroll config updated', config));
   });
 
-  // ── Extended Compensation (Super Admin only) ──────────────────────────────
+  // ── Extended Compensation (Super Admin / Cash-in-Hand permission) ────────────
 
   getExtendedConfig = asyncHandler(async (req: Request, res: Response) => {
     const empId = BigInt(String(req.params.employeeId));
@@ -127,21 +131,21 @@ class PayrollController {
   // ── Payroll Run ──────────────────────────────────────────────────────────────
 
   listRuns = asyncHandler(async (req: Request, res: Response) => {
-    const { period, type, status, page = '1', limit = '20' } = req.query as Record<string, string>;
+    const { period, type, status, year, month, week, page = '1', limit = '20' } = req.query as Record<string, string>;
     const result = await payrollService.listRuns({
-      period, type, status,
+      period, type, status, year, month, week,
       page:  parseInt(page,  10),
       limit: parseInt(limit, 10),
     });
-    const isSuper = isSuperAdmin(req);
-    result.runs = result.runs.map((r: any) => payrollService.sanitizeRunForUser(r, isSuper));
+    const canAccess = hasCashInHandAccess(req);
+    result.runs = result.runs.map((r: any) => payrollService.sanitizeRunForUser(r, canAccess));
     res.json(new ApiResponse('Payroll runs fetched', result));
   });
 
   getRun = asyncHandler(async (req: Request, res: Response) => {
     const id  = parseInt(String(req.params.id), 10);
     const run = await payrollService.getRun(id);
-    const sanitized = payrollService.sanitizeRunForUser(run, isSuperAdmin(req));
+    const sanitized = payrollService.sanitizeRunForUser(run, hasCashInHandAccess(req));
     res.json(new ApiResponse('Payroll run fetched', sanitized));
   });
 
@@ -162,7 +166,7 @@ class PayrollController {
       companyId:        company.id,
     });
 
-    const sanitized = payrollService.sanitizeRunForUser(run, isSuperAdmin(req));
+    const sanitized = payrollService.sanitizeRunForUser(run, hasCashInHandAccess(req));
     res.status(201).json(new ApiResponse('Payroll computed successfully', sanitized));
   });
 
@@ -170,7 +174,7 @@ class PayrollController {
     const id     = parseInt(String(req.params.id), 10);
     const userId = (req as any).user?.userId ?? 'unknown';
     const run    = await payrollService.approveRun(id, userId);
-    const sanitized = payrollService.sanitizeRunForUser(run, isSuperAdmin(req));
+    const sanitized = payrollService.sanitizeRunForUser(run, hasCashInHandAccess(req));
     res.json(new ApiResponse('Payroll run approved', sanitized));
   });
 

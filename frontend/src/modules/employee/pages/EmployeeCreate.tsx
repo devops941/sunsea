@@ -284,7 +284,8 @@ const EmployeeCreatePage: React.FC = () => {
   const user       = useSelector((state: any) => state.auth.user);
   const { departments, loadDepartments } = useDepartments();
   const { roles,       loadRoles       } = useRoles();
-  const { isSuperAdmin } = usePermission();
+  const { can } = usePermission();
+  const canViewCashInHand = can("payroll-extended-comp.view");
 
   const [activeTab,    setActiveTab]    = useState(0);
   const [form,         setForm]         = useState<FormState>(INITIAL);
@@ -648,19 +649,13 @@ const EmployeeCreatePage: React.FC = () => {
         if (form.hra)            fd.append("hra", form.hra);
         if (form.otherAllowance) fd.append("otherAllowance", form.otherAllowance);
       }
-      // Statutory (only for Bank Transfer)
-      if (form.paymentMode === "BANK") {
-        fd.append("pfApplicable",    String(form.pfApplicable));
-        if (form.pfApplicable && form.pfNumber)  fd.append("pfNumber",  form.pfNumber);
-        if (form.pfApplicable && form.uanNumber) fd.append("uanNumber", form.uanNumber);
-        fd.append("esiApplicable",   String(form.esiApplicable));
-        if (form.esiApplicable && form.esiNumber) fd.append("esiNumber", form.esiNumber);
-        fd.append("professionalTax", String(form.professionalTax));
-      } else {
-        fd.append("pfApplicable",    "false");
-        fd.append("esiApplicable",   "false");
-        fd.append("professionalTax", "false");
-      }
+      // Statutory
+      fd.append("pfApplicable",    String(form.pfApplicable));
+      if (form.pfNumber)  fd.append("pfNumber",  form.pfNumber);
+      if (form.uanNumber) fd.append("uanNumber", form.uanNumber);
+      fd.append("esiApplicable",   String(form.esiApplicable));
+      if (form.esiNumber) fd.append("esiNumber", form.esiNumber);
+      fd.append("professionalTax", String(form.professionalTax));
 
       // Bank
       fd.append("paymentMode",      form.paymentMode || "CASH");
@@ -688,7 +683,7 @@ const EmployeeCreatePage: React.FC = () => {
       const newId: number | null = createRes?.data?.id ?? createRes?.id ?? null;
 
       // Save extended compensation if super admin filled it in
-      if (isSuperAdmin && newId && extComp.offRecordAmount) {
+      if (canViewCashInHand && newId && extComp.offRecordAmount) {
         const amount = parseFloat(extComp.offRecordAmount);
         if (!isNaN(amount) && amount > 0) {
           try {
@@ -941,7 +936,7 @@ const EmployeeCreatePage: React.FC = () => {
         errors={errors}
         selectedShift={selectedShift}
       />
-      {isSuperAdmin && (
+      {canViewCashInHand && (
         <ExtCompDraft state={extComp} onChange={setExtComp} />
       )}
     </div>

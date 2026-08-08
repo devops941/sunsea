@@ -241,7 +241,8 @@ const EmployeeEdit: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const user = useSelector((state: any) => state.auth.user);
-  const { isSuperAdmin } = usePermission();
+  const { can } = usePermission();
+  const canViewCashInHand = can("payroll-extended-comp.view");
   const { departments, loadDepartments } = useDepartments();
   const { roles, loadRoles } = useRoles();
 
@@ -673,19 +674,13 @@ const EmployeeEdit: React.FC = () => {
         if (form.hra)            fd.append("hra", form.hra);
         if (form.otherAllowance) fd.append("otherAllowance", form.otherAllowance);
       }
-      // Statutory (only for Bank Transfer)
-      if (form.paymentMode === "BANK") {
-        fd.append("pfApplicable",    String(form.pfApplicable));
-        if (form.pfApplicable && form.pfNumber)  fd.append("pfNumber",  form.pfNumber);
-        if (form.pfApplicable && form.uanNumber) fd.append("uanNumber", form.uanNumber);
-        fd.append("esiApplicable",   String(form.esiApplicable));
-        if (form.esiApplicable && form.esiNumber) fd.append("esiNumber", form.esiNumber);
-        fd.append("professionalTax", String(form.professionalTax));
-      } else {
-        fd.append("pfApplicable",    "false");
-        fd.append("esiApplicable",   "false");
-        fd.append("professionalTax", "false");
-      }
+      // Statutory
+      fd.append("pfApplicable",    String(form.pfApplicable));
+      if (form.pfNumber)  fd.append("pfNumber",  form.pfNumber);
+      if (form.uanNumber) fd.append("uanNumber", form.uanNumber);
+      fd.append("esiApplicable",   String(form.esiApplicable));
+      if (form.esiNumber) fd.append("esiNumber", form.esiNumber);
+      fd.append("professionalTax", String(form.professionalTax));
       fd.append("paymentMode", form.paymentMode || "CASH");
       if (form.bankName) fd.append("bankName", form.bankName);
       if (form.bankBranch) fd.append("bankBranch", form.bankBranch);
@@ -943,7 +938,7 @@ const EmployeeEdit: React.FC = () => {
         errors={errors}
         selectedShift={selectedShift}
       />
-      {isSuperAdmin && (
+      {canViewCashInHand && (
         <TotalCompensationSection
           employeeId={id ? Number(id) : null}
         />
