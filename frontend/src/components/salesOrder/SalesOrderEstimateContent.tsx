@@ -169,8 +169,8 @@ export const SalesOrderEstimateContent: React.FC<SalesOrderEstimateContentProps>
                             </tr>
                         ))}
                         {/* Clean empty rows filling out A4 sheet without dummy numbers */}
-                        {Array.from({ length: Math.max(0, 18 - (estimateOrder.items?.length || 0)) }).map((_, idx) => (
-                            <tr key={`empty-${idx}`} style={{ height: "36px" }}>
+                        {Array.from({ length: Math.max(0, 20 - (estimateOrder.items?.length || 0)) }).map((_, idx) => (
+                            <tr key={`empty-${idx}`} style={{ height: "32px" }}>
                                 <td className="border border-black px-2.5 py-2 align-middle text-center"></td>
                                 <td className="border border-black px-2.5 py-2 align-middle"></td>
                                 <td className="border border-black px-2.5 py-2 align-middle"></td>

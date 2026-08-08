@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
-import { FaInfoCircle, FaHistory, FaSyncAlt, FaLock, FaBroadcastTower } from "react-icons/fa";
+import { FaInfoCircle, FaHistory, FaLock, FaBroadcastTower } from "react-icons/fa";
 import DataTable from "../../../components/ui/table/DataTable";
 import SearchInput from "../../../components/ui/SearchInput/SearchInput";
 import ExportCSVButton from "../../../components/ui/ExportCSVButton/ExportCSVButton";
-import Button from "../../../components/ui/Button/Button";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import DatePickerCalendar from "../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 import apiClient from "../../../api/apiClient";
@@ -72,7 +71,6 @@ const EodStockList: React.FC = () => {
 
   const [data,        setData]        = useState<EodStockItem[]>([]);
   const [loading,     setLoading]     = useState(true);
-  const [syncing,     setSyncing]     = useState(false);
   const [totalItems,  setTotalItems]  = useState(0);
   const [asOfDate,    setAsOfDate]    = useState("");
   const [searchTerm,  setSearchTerm]  = useState("");
@@ -147,41 +145,35 @@ const EodStockList: React.FC = () => {
     return () => clearInterval(timer);
   }, [isTodaySelected]);
 
-  // ── Socket: refresh today's view when any stock operation happens ─────────
+  // ── Socket.IO: Real-time update for live current stock quantity ──────────
   useEffect(() => {
     if (!socket) return;
 
-    // After EOD snapshot is locked (cron or manual sync)
-    const onSnapshotCompleted = () => { fetchFnRef.current?.(); };
-    socket.on("inventorySnapshot:completed", onSnapshotCompleted);
-
-    // After any stock movement (hourly production, stock adjustment approval)
-    const onStockUpdated = () => {
-      if (isTodaySelected) fetchFnRef.current?.();
+    const handleStockUpdate = () => {
+      if (isTodaySelected) {
+        fetchFnRef.current?.();
+      }
     };
-    socket.on("inventory:stockUpdated", onStockUpdated);
+
+    const socketEvents = [
+      "inventory:stockUpdated",
+      "inventorySnapshot:completed",
+      "stockAdjustment:created",
+      "stockAdjustment:updated",
+      "grn:created",
+      "grn:updated",
+      "salesInvoice:created",
+      "salesInvoice:updated",
+      "hourlyProduction:created",
+      "hourlyProduction:updated",
+    ];
+
+    socketEvents.forEach((evt) => socket.on(evt, handleStockUpdate));
 
     return () => {
-      socket.off("inventorySnapshot:completed", onSnapshotCompleted);
-      socket.off("inventory:stockUpdated", onStockUpdated);
+      socketEvents.forEach((evt) => socket.off(evt, handleStockUpdate));
     };
   }, [socket, isTodaySelected]);
-
-  // Manual sync / re-run EOD for selected date
-  const handleSync = async () => {
-    setSyncing(true);
-    try {
-      await apiClient.post("/inventory/eod-stock/run-now", null, {
-        params: { date: selectedDate },
-      });
-      toast.success(`EOD snapshot run for ${selectedDate}`);
-      await fetchEodStock();
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || "Sync failed");
-    } finally {
-      setSyncing(false);
-    }
-  };
 
   const getStoreName = (id: string) =>
     stores.find((s) => s.storeId === id)?.storeName || id || "—";
@@ -278,7 +270,6 @@ const EodStockList: React.FC = () => {
           <span>
             No EOD snapshot recorded for{" "}
             <span className="font-semibold">{formatDate(selectedDate)}</span>.
-            {" "}Use <span className="font-semibold">Sync EOD</span> to capture a snapshot for this date.
           </span>
         </div>
       );
@@ -328,14 +319,6 @@ const EodStockList: React.FC = () => {
             </div>
 
             <div className="flex items-center gap-2">
-              {/* <Button
-                text={syncing ? "Syncing…" : "Sync EOD"}
-                icon={FaSyncAlt}
-                variant="secondary"
-                size="sm"
-                disabled={syncing}
-                onClick={handleSync}
-              /> */}
               <ExportCSVButton
                 data={data}
                 columns={csvColumns}
@@ -406,17 +389,6 @@ const EodStockList: React.FC = () => {
               <div className="flex flex-col items-center justify-center py-16 text-center px-4">
                 <FaHistory size={32} className="text-slate-300 mb-3" />
                 <p className="text-slate-500 font-medium text-sm">{emptyMessage}</p>
-                {/* Only show Sync button for past dates with no data (not future) */}
-                {!isTodaySelected && !isFuture && (
-                  <button
-                    onClick={handleSync}
-                    disabled={syncing}
-                    className="mt-3 px-4 py-1.5 text-xs font-semibold text-white bg-blue-500
-                      hover:bg-blue-600 rounded-lg transition-colors disabled:opacity-50"
-                  >
-                    {syncing ? "Syncing…" : "Sync Now"}
-                  </button>
-                )}
               </div>
             }
             rowClassName={(_, i) => (i % 2 === 0 ? "bg-white" : "bg-slate-50/40")}
