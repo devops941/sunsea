@@ -35,10 +35,11 @@ const getCurrentMonth = () => {
 const PayrollDashboard: React.FC = () => {
   const navigate = useNavigate();
   const { can } = usePermission();
-  const canCreateRun = can("payroll-run.create");
-  const canEditRun   = can("payroll-run.edit");
-  const canDeleteRun = can("payroll-run.delete");
-  const canViewRun   = can("payroll-run.view");
+  const canCreateRun      = can("payroll-run.create");
+  const canEditRun        = can("payroll-run.edit");
+  const canDeleteRun      = can("payroll-run.delete");
+  const canViewRun        = can("payroll-run.view");
+  const canViewCashInHand = can("payroll-extended-comp.view");
 
   const [selectedMonth, setSelectedMonth] = useState<string>(getCurrentMonth);
   const [runs,          setRuns]          = useState<ApiPayrollRun[]>([]);
@@ -128,11 +129,32 @@ const PayrollDashboard: React.FC = () => {
     {
       header: 'Net Salary',
       align: 'right' as const,
-      render: (r: ApiPayrollRun) => (
-        <span className="font-mono font-semibold">
-          {Number(r.totalNetSalary) > 0 ? fmtRs(Number(r.totalNetSalary)) : '—'}
-        </span>
-      ),
+      render: (r: ApiPayrollRun) => {
+        const netSal = Number(r.totalNetSalary || 0);
+        const addlComp = Number(r.totalAdditionalComp || 0);
+        const combNet = Number(r.totalCombinedNet || (netSal + addlComp));
+
+        if (canViewCashInHand && addlComp > 0) {
+          return (
+            <div className="flex flex-col items-end">
+              <span className="font-mono font-bold text-slate-900">
+                {fmtRs(combNet)}
+              </span>
+              <span className="text-[10px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded flex items-center gap-1">
+                <span>Net: {fmtRs(netSal)}</span>
+                <span>+</span>
+                <span>Cash: {fmtRs(addlComp)}</span>
+              </span>
+            </div>
+          );
+        }
+
+        return (
+          <span className="font-mono font-semibold">
+            {netSal > 0 ? fmtRs(netSal) : '—'}
+          </span>
+        );
+      },
     },
     {
       header: 'Status',
@@ -155,7 +177,7 @@ const PayrollDashboard: React.FC = () => {
             />
           )}
 
-          {canDeleteRun && r.status !== 'LOCKED' && (
+          {canDeleteRun && r.status === 'DRAFT' && (
             <DeleteButton
               onClick={() => setDeleteRunId(r.id)}
             />

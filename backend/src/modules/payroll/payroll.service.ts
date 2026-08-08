@@ -136,8 +136,32 @@ function lookupSlab(minutes: number, slabs: Array<{ fromMinutes: number; toMinut
   return 0;
 }
 
+function getFirstNonEmptyString(...values: Array<string | null | undefined>): string | null {
+  for (const val of values) {
+    if (typeof val === 'string' && val.trim().length > 0) {
+      return val.trim();
+    }
+  }
+  return null;
+}
+
 export function getEffectivePayrollConfig(emp: any) {
-  if (emp.payrollConfig) return emp.payrollConfig;
+  const pfNumber = getFirstNonEmptyString(emp.payrollConfig?.pfNumber, emp.pfNumber);
+  const esiNumber = getFirstNonEmptyString(emp.payrollConfig?.esiNumber, emp.esiNumber);
+  const bankAccount = getFirstNonEmptyString(emp.payrollConfig?.bankAccount, emp.accountNumber);
+  const bankName = getFirstNonEmptyString(emp.payrollConfig?.bankName, emp.bankName);
+  const ifscCode = getFirstNonEmptyString(emp.payrollConfig?.ifscCode, emp.ifscCode);
+
+  if (emp.payrollConfig) {
+    return {
+      ...emp.payrollConfig,
+      pfNumber,
+      esiNumber,
+      bankAccount,
+      bankName,
+      ifscCode,
+    };
+  }
 
   let salaryType = 'FIXED_MONTHLY';
   if (emp.salaryType === 'daily') {
@@ -168,9 +192,9 @@ export function getEffectivePayrollConfig(emp: any) {
     hra,
     otherAllowance,
     dailySalary,
-    bankAccount: emp.accountNumber || null,
-    pfNumber: emp.pfNumber || null,
-    esiNumber: emp.esiNumber || null,
+    bankAccount,
+    pfNumber,
+    esiNumber,
     pfApplicable: emp.pfApplicable ?? true,
     esiApplicable: emp.esiApplicable ?? true,
     professionalTax: emp.professionalTax ?? true,
@@ -576,6 +600,8 @@ class PayrollService {
     if (data.bankName !== undefined) empUpdate.bankName = data.bankName;
     if (data.ifscCode !== undefined) empUpdate.ifscCode = data.ifscCode;
     if (data.paymentMode !== undefined) empUpdate.paymentMode = data.paymentMode;
+    if (data.pfNumber !== undefined) empUpdate.pfNumber = data.pfNumber || null;
+    if (data.esiNumber !== undefined) empUpdate.esiNumber = data.esiNumber || null;
 
     if (Object.keys(empUpdate).length > 0) {
       await prisma.employee.update({
@@ -672,8 +698,11 @@ class PayrollService {
   }
 
   // ── Payroll Run ──────────────────────────────────────────────────────────────
-  async listRuns(opts: { period?: string; type?: string; status?: string; page: number; limit: number }) {
+  async listRuns(opts: { period?: string; type?: string; status?: string; year?: string; month?: string; week?: string; page: number; limit: number }) {
     const where: Record<string, unknown> = {};
+    if (opts.type)   where.type   = opts.type;
+    if (opts.status) where.status = opts.status;
+
     if (opts.period) {
       if (/^\d{4}-\d{2}$/.test(opts.period)) {
         const [yearStr, monthStr] = opts.period.split('-');
@@ -692,9 +721,34 @@ class PayrollService {
       } else {
         where.period = opts.period;
       }
+    } else {
+      const year = opts.year && opts.year !== 'ALL' ? opts.year : undefined;
+      const month = opts.month && opts.month !== 'ALL' ? opts.month.padStart(2, '0') : undefined;
+      const week = opts.week && opts.week !== 'ALL' ? (opts.week.startsWith('W') ? opts.week : `W${opts.week.padStart(2, '0')}`) : undefined;
+
+      if (year && week) {
+        where.period = `${year}-${week}`;
+      } else if (week) {
+        where.period = { contains: `-${week}` };
+      } else if (year && month) {
+        if (opts.type === 'WEEKLY') {
+          const yNum = parseInt(year, 10);
+          const mNum = parseInt(month, 10);
+          const monthIsoWeeks = getIsoWeeksForMonth(yNum, mNum);
+          where.OR = [
+            { period: `${year}-${month}` },
+            { period: { in: monthIsoWeeks } },
+            { period: { startsWith: `${year}-${month}` } },
+          ];
+        } else {
+          where.period = `${year}-${month}`;
+        }
+      } else if (year) {
+        where.period = { startsWith: `${year}-` };
+      } else if (month) {
+        where.period = { contains: `-${month}` };
+      }
     }
-    if (opts.type)   where.type   = opts.type;
-    if (opts.status) where.status = opts.status;
 
     const [runs, total] = await Promise.all([
       prisma.payrollRun.findMany({
@@ -1083,7 +1137,7 @@ class PayrollService {
   async deleteRun(id: number) {
     const run = await prisma.payrollRun.findUnique({ where: { id } });
     if (!run) throw new ApiError(404, 'Payroll run not found');
-    if (run.status === 'LOCKED') throw new ApiError(400, 'Cannot delete a locked payroll run');
+    if (run.status !== 'DRAFT') throw new ApiError(400, 'Cannot delete an approved or locked payroll run');
     await prisma.payrollRun.delete({ where: { id } });
     getIO().emit('payroll:deleted', { runId: id });
   }
@@ -1179,13 +1233,13 @@ class PayrollService {
         fullName:     emp.fullName,
         designation:  emp.designation  ?? null,
         employeeType: emp.employeeType ?? null,
-        pfNumber:     pc?.pfNumber     ?? emp.pfNumber   ?? null,
-        esiNumber:    pc?.esiNumber    ?? emp.esiNumber  ?? null,
-        uanNumber:    emp.uanNumber    ?? null,
-        panNumber:    emp.panNumber    ?? null,
-        bankName:     pc?.bankName     ?? emp.bankName   ?? null,
-        accountNumber: pc?.bankAccount ?? emp.accountNumber ?? null,
-        ifscCode:     pc?.ifscCode     ?? emp.ifscCode   ?? null,
+        pfNumber:     getFirstNonEmptyString(pc?.pfNumber, emp.pfNumber),
+        esiNumber:    getFirstNonEmptyString(pc?.esiNumber, emp.esiNumber),
+        uanNumber:    getFirstNonEmptyString(emp.uanNumber),
+        panNumber:    getFirstNonEmptyString(emp.panNumber),
+        bankName:     getFirstNonEmptyString(pc?.bankName, emp.bankName),
+        accountNumber: getFirstNonEmptyString(pc?.bankAccount, emp.accountNumber),
+        ifscCode:     getFirstNonEmptyString(pc?.ifscCode, emp.ifscCode),
         department:   emp.department?.name ?? '',
         dateOfJoining: emp.dateOfJoining?.toISOString() ?? null,
         payrollConfig: pc ? {

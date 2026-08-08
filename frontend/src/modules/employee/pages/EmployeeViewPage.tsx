@@ -388,8 +388,9 @@ function TotalCompSummarySection({
 export default function EmployeeViewPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { can, isSuperAdmin } = usePermission();
-  const canEdit = can("employees.edit");
+  const { can } = usePermission();
+  const canEdit           = can("employees.edit");
+  const canViewCashInHand = can("payroll-extended-comp.view");
 
   const [employee, setEmployee] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -411,13 +412,13 @@ export default function EmployeeViewPage() {
       .finally(() => setLoading(false));
   }, [id]);
 
-  // Fetch extended comp — super admin only, silent on error
+  // Fetch extended comp — cash-in-hand permission, silent on error
   useEffect(() => {
-    if (!isSuperAdmin || !id) return;
+    if (!canViewCashInHand || !id) return;
     payrollService.getExtendedConfig(Number(id))
       .then(setExtComp)
       .catch(() => setExtComp(null));
-  }, [isSuperAdmin, id]);
+  }, [canViewCashInHand, id]);
 
   if (loading) {
     return (
@@ -586,8 +587,8 @@ export default function EmployeeViewPage() {
       {/* 9. Payroll */}
       <PayrollSection employee={employee} payrollConfig={payrollConfig} />
 
-      {/* 9b. Total Compensation — Super Admin only */}
-      {isSuperAdmin && extComp && (
+      {/* 9b. Total Compensation — Cash-in-Hand permission required */}
+      {canViewCashInHand && extComp && (
         <TotalCompSummarySection employee={employee} extComp={extComp} />
       )}
 

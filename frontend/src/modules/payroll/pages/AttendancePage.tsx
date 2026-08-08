@@ -124,14 +124,20 @@ const StatusCell: React.FC<{
         disabled={isLocked}
         className={`w-[32px] h-[28px] rounded flex items-center justify-center font-bold text-[9px] transition-all select-none ${
           isLocked
-            ? 'bg-slate-200 text-slate-500 cursor-not-allowed opacity-75 border border-slate-300'
+            ? cell.status
+              ? `${S[cell.status].cell} opacity-90 cursor-not-allowed border border-slate-300/60`
+              : 'bg-slate-200 text-slate-500 cursor-not-allowed opacity-90 border border-slate-300'
             : cell.status
               ? S[cell.status].cell
               : 'bg-slate-100 text-slate-400 hover:bg-slate-200'
         }`}
-        title={isLocked ? 'Locked (Payroll Approved)' : 'Left-click: cycle status | Right-click: edit OT / Late / Perm'}
+        title={
+          isLocked
+            ? `Locked (Payroll Approved) — ${cell.status ? S[cell.status].label : 'Unset'}`
+            : 'Left-click: cycle status | Right-click: edit OT / Late / Perm'
+        }
       >
-        {isLocked ? <Lock size={10} className="text-slate-600" /> : cell.status ? S[cell.status].abbr : '—'}
+        {cell.status ? S[cell.status].abbr : '—'}
       </button>
       {hasExtra && (
         <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-blue-500 pointer-events-none" />
