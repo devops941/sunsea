@@ -361,11 +361,11 @@ function TotalCompSummarySection({
         {/* Summary cards: On-Record, Additional, Total CTC */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-xs flex flex-col gap-1">
-            <span className="text-xs font-medium text-slate-500">On-Record Salary (Monthly)</span>
+            <span className="text-xs font-medium text-slate-500">Net Pay (Monthly)</span>
             <span className="text-lg font-bold text-slate-800 tabular-nums">{formatINR(onRecordGross)}</span>
           </div>
           <div className="p-4 rounded-xl bg-white border border-indigo-200 shadow-xs flex flex-col gap-1">
-            <span className="text-xs font-medium text-indigo-600">Additional Compensation</span>
+            <span className="text-xs font-medium text-indigo-600">Cash in Hand</span>
             <span className="text-lg font-bold text-indigo-700 tabular-nums">{formatINR(additionalComp)}</span>
           </div>
           <div className="p-4 rounded-xl bg-indigo-600 text-white shadow-xs flex flex-col gap-1">
@@ -376,7 +376,7 @@ function TotalCompSummarySection({
 
         {/* Formula note */}
         <p className="text-xs text-slate-400 text-center italic">
-          On-Record ({formatINR(onRecordGross)}) + Additional ({formatINR(additionalComp)}) = {formatINR(totalCTC)}
+          Net Pay ({formatINR(onRecordGross)}) + Cash ({formatINR(additionalComp)}) = {formatINR(totalCTC)}
         </p>
       </div>
     </div>

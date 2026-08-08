@@ -249,7 +249,7 @@ const EmployeeEdit: React.FC = () => {
   const [form, setForm] = useState<FormState>(INITIAL_STATE);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [shifts, setShifts] = useState<{ id: string | number; name: string }[]>([]);
+  const [shifts, setShifts] = useState<any[]>([]);
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({});
   const [showPassword, setShowPassword] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);

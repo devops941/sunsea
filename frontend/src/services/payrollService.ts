@@ -117,6 +117,11 @@ export interface ApiPayrollResult {
   paymentMode: string;
   hasVariance: boolean;
   varianceNote?: string;
+  additionalComp?: {
+    additionalAmount: number;
+    combinedGross: number;
+    combinedNet: number;
+  };
 }
 
 export interface ApiPayrollRun {
@@ -134,6 +139,9 @@ export interface ApiPayrollRun {
   totalPfEmployer: number;
   totalEsiEmployee: number;
   totalEsiEmployer: number;
+  totalAdditionalComp?: number;
+  totalCombinedGross?: number;
+  totalCombinedNet?: number;
   createdById: string;
   approvedById: string | null;
   lockedById: string | null;

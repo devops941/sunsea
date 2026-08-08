@@ -4,7 +4,7 @@ import {
   CalendarRange, CalendarDays, PlayCircle, Eye, CheckCircle2, Lock,
   ChevronRight, ChevronLeft, AlertTriangle,
   IndianRupee, FileText, Download, X, Check,
-  Building2, Wallet, TrendingUp, Info, Loader2, ClipboardList,
+  Building2, Wallet, TrendingUp, Info, Loader2, ClipboardList, Users
 } from 'lucide-react';
 import { useSocket } from '../../../providers/SocketProvider';
 import { usePermission } from '../../../hooks/usePermission';
@@ -682,8 +682,60 @@ const Step3: React.FC<{
   onBack: () => void;
   onNext: () => void;
 }> = ({ run, onBack, onNext }) => {
+  const { isSuperAdmin } = usePermission();
   const results   = run.results || [];
   const variances = results.filter(r => r.hasVariance);
+
+  const totalOnRecordNet = run.totalNetSalary || results.reduce((s, r) => s + Number(r.netSalary || 0), 0);
+  const totalAdditionalComp = run.totalAdditionalComp || results.reduce((s, r) => s + Number(r.additionalComp?.additionalAmount || 0), 0);
+  const totalCombinedNet = run.totalCombinedNet || (totalOnRecordNet + totalAdditionalComp);
+
+  const handleExportCSV = () => {
+    const headers = [
+      'Employee Code', 'Employee Name', 'Department', 'Pres Days', 'LOP Days',
+      'Daily Rate', 'Earned Salary', 'OT Pay', 'Gross Salary', 'Emp PF', 'Emp ESI',
+      'PT', 'Late Ded', 'Perm Ded', 'Advance', 'On-Record Net'
+    ];
+    if (isSuperAdmin) {
+      headers.push('Additional Comp', 'Combined Net');
+    }
+
+    const rows = results.map(r => {
+      const row = [
+        r.employeeCode,
+        `"${r.employeeName.replace(/"/g, '""')}"`,
+        `"${(r.department || '').replace(/"/g, '""')}"`,
+        Number(r.presentDays).toFixed(1),
+        Number(r.lopDays).toFixed(1),
+        Number(r.dailyRate).toFixed(2),
+        Number(r.earnedSalary).toFixed(2),
+        Number(r.otPay).toFixed(2),
+        Number(r.grossSalary).toFixed(2),
+        Number(r.employeePf).toFixed(2),
+        Number(r.employeeEsi).toFixed(2),
+        Number(r.professionalTax).toFixed(2),
+        Number(r.lateEntryDeduction).toFixed(2),
+        Number(r.permissionDeduction).toFixed(2),
+        Number(r.salaryAdvance).toFixed(2),
+        Number(r.netSalary).toFixed(2),
+      ];
+      if (isSuperAdmin) {
+        const addl = r.additionalComp ? Number(r.additionalComp.additionalAmount).toFixed(2) : '0.00';
+        const comb = r.additionalComp ? Number(r.additionalComp.combinedNet).toFixed(2) : Number(r.netSalary).toFixed(2);
+        row.push(addl, comb);
+      }
+      return row.join(',');
+    });
+
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `Payroll_Preview_${run.period}_${run.runCode}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   const columns: DataTableColumn<ApiPayrollResult>[] = [
     {
@@ -848,16 +900,34 @@ const Step3: React.FC<{
         </span>
       ),
     },
+    ...(isSuperAdmin ? [{
+      header: "Cash in Hand",
+      align: "right" as const,
+      render: (r: ApiPayrollResult) => (
+        <span className="font-mono text-xs text-indigo-600 font-semibold">
+          {r.additionalComp && r.additionalComp.additionalAmount > 0
+            ? fmtRs(r.additionalComp.additionalAmount)
+            : '—'}
+        </span>
+      ),
+    }] : []),
     {
-      header: "Net",
+      header: isSuperAdmin ? "Combined Net" : "Net",
       align: "right",
       render: (r) => (
-        <span
-          className="font-mono font-bold text-xs text-text-primary cursor-help"
-          title={`Net = Gross − All Deductions\n= ${fmtDec(Number(r.grossSalary))} − ${fmtDec(Number(r.totalDeductions))}\n= ${fmtDec(Number(r.netSalary))}`}
-        >
-          {fmtRs(Number(r.netSalary))}
-        </span>
+        <div className="text-right">
+          <span
+            className="font-mono font-bold text-xs text-text-primary cursor-help block"
+            title={`Net = Gross − All Deductions\n= ${fmtDec(Number(r.grossSalary))} − ${fmtDec(Number(r.totalDeductions))}\n= ${fmtDec(Number(r.netSalary))}`}
+          >
+            {fmtRs(isSuperAdmin && r.additionalComp ? r.additionalComp.combinedNet : Number(r.netSalary))}
+          </span>
+          {isSuperAdmin && r.additionalComp && r.additionalComp.additionalAmount > 0 && (
+            <span className="text-[10px] font-mono text-indigo-600 block">
+              (Net Pay: {fmtRs(Number(r.netSalary))})
+            </span>
+          )}
+        </div>
       ),
     },
   ];
@@ -871,10 +941,51 @@ const Step3: React.FC<{
             {run.period} · {results.length} employees · Run: <span className="font-mono text-xs text-text-muted">{run.runCode}</span>
           </p>
         </div>
-        <button className="inline-flex items-center gap-2 px-3 py-1.5 border border-border text-text-secondary rounded-lg text-xs font-semibold hover:bg-slate-50 transition-colors">
+        {/* 
+        <button
+          onClick={handleExportCSV}
+          className="inline-flex items-center gap-2 px-3 py-1.5 border border-border text-text-secondary rounded-lg text-xs font-semibold hover:bg-slate-50 transition-colors cursor-pointer"
+        >
           <Download size={13} /> Export CSV
         </button>
+        */}
       </div>
+
+      {/* Super Admin Confidential Total Compensation Summary Card 
+      {isSuperAdmin && (
+        <div className="rounded-2xl border border-indigo-200 bg-white shadow-sm overflow-hidden my-2">
+          <div className="flex items-center justify-between px-5 py-3 bg-indigo-600 text-white">
+            <div className="flex items-center gap-2 font-bold text-xs uppercase tracking-wider">
+              <Wallet size={15} /> Total Compensation Summary
+            </div>
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-700 text-indigo-100 border border-indigo-400">
+              <Lock size={10} /> Super Admin
+            </span>
+          </div>
+
+          <div className="p-5 space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 flex flex-col gap-1">
+                <span className="text-xs font-semibold text-slate-500">Net Pay (Account)</span>
+                <span className="text-xl font-extrabold text-slate-800 font-mono">{fmtRs(totalOnRecordNet)}</span>
+              </div>
+              <div className="p-4 rounded-xl bg-indigo-50/60 border border-indigo-200 flex flex-col gap-1">
+                <span className="text-xs font-semibold text-indigo-600">Cash in Hand</span>
+                <span className="text-xl font-extrabold text-indigo-700 font-mono">{fmtRs(totalAdditionalComp)}</span>
+              </div>
+              <div className="p-4 rounded-xl bg-indigo-600 text-white flex flex-col gap-1 shadow-sm">
+                <span className="text-xs font-bold uppercase tracking-wider text-indigo-100">Total Monthly Net (Combined)</span>
+                <span className="text-2xl font-black text-white font-mono">{fmtRs(totalCombinedNet)}</span>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-400 text-center italic pt-1">
+              Net Pay ({fmtRs(totalOnRecordNet)}) + Cash ({fmtRs(totalAdditionalComp)}) = {fmtRs(totalCombinedNet)}
+            </p>
+          </div>
+        </div>
+      )}
+      */}
 
       {/* Summary cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -919,19 +1030,64 @@ const Step3: React.FC<{
           density="compact"
         />
         {/* Total Summary Footer */}
-        <div className="bg-slate-50 border-t border-slate-200 p-4 flex flex-wrap justify-between items-center text-xs font-mono">
-          <span className="font-bold text-slate-800 text-sm">TOTAL ({results.length} employees)</span>
-          <div className="flex gap-4 flex-wrap justify-end font-semibold">
-            <span>Earned: {fmtRs(results.reduce((s,r)=>s+Number(r.earnedSalary),0))}</span>
-            <span className="text-emerald-600">OT: {fmtRs(results.reduce((s,r)=>s+Number(r.otPay),0))}</span>
-            <span className="font-bold text-slate-900">Gross: {fmtRs(run.totalGross)}</span>
-            <span className="text-rose-600">PF: {fmtRs(results.reduce((s,r)=>s+Number(r.employeePf),0))}</span>
-            <span className="text-rose-600">ESI: {fmtRs(results.reduce((s,r)=>s+Number(r.employeeEsi),0))}</span>
-            <span className="text-rose-600">Adv: {fmtRs(results.reduce((s,r)=>s+Number(r.salaryAdvance),0))}</span>
-            <span className="font-bold text-emerald-700 text-sm">Net: {fmtRs(run.totalNetSalary)}</span>
+        <div className="bg-white border-t border-slate-200">
+          <div className="flex flex-col xl:flex-row items-center justify-between">
+            {/* Left side: Total count */}
+            <div className="px-6 py-4 flex items-center xl:border-r border-slate-200 xl:min-w-[200px] w-full xl:w-auto border-b xl:border-b-0">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-600 font-bold">
+                  <Users size={18} />
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total Employees</p>
+                  <p className="text-sm font-bold text-slate-800">{results.length}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Middle: Breakdowns */}
+            <div className="flex-1 flex flex-wrap items-center justify-center gap-x-8 gap-y-4 px-6 py-4 text-sm border-b xl:border-b-0 border-slate-200">
+              <div className="flex flex-col items-center">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Earned</span>
+                <span className="font-mono font-semibold text-slate-700">{fmtRs(results.reduce((s,r)=>s+Number(r.earnedSalary),0))}</span>
+              </div>
+              <div className="h-8 w-px bg-slate-200 hidden sm:block"></div>
+              <div className="flex flex-col items-center">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">OT</span>
+                <span className="font-mono font-semibold text-emerald-600">{fmtRs(results.reduce((s,r)=>s+Number(r.otPay),0))}</span>
+              </div>
+              <div className="h-8 w-px bg-slate-200 hidden sm:block"></div>
+              <div className="flex flex-col items-center">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Gross</span>
+                <span className="font-mono font-bold text-slate-900">{fmtRs(run.totalGross)}</span>
+              </div>
+              <div className="h-8 w-px bg-slate-200 hidden sm:block"></div>
+              <div className="flex flex-col items-center">
+                <span className="text-[10px] font-bold text-rose-400 uppercase tracking-widest mb-1">Deductions</span>
+                <span className="font-mono font-semibold text-rose-600">
+                  PF {fmtRs(results.reduce((s,r)=>s+Number(r.employeePf),0))} · ESI {fmtRs(results.reduce((s,r)=>s+Number(r.employeeEsi),0))}
+                </span>
+              </div>
+            </div>
+
+            {/* Right side: Final numbers */}
+            <div className="flex items-stretch xl:border-l border-slate-200 bg-slate-50 w-full xl:w-auto">
+              <div className="px-6 py-4 flex flex-col items-end justify-center border-r border-slate-200 flex-1 xl:flex-none">
+                <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest mb-1">Net Pay</span>
+                <span className="font-mono text-xl font-black text-emerald-700">{fmtRs(run.totalNetSalary)}</span>
+              </div>
+              
+              {isSuperAdmin && (
+                <div className="px-6 py-4 flex flex-col items-end justify-center bg-indigo-50 flex-1 xl:flex-none">
+                  <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest mb-1">Cash in Hand</span>
+                  <span className="font-mono text-xl font-black text-indigo-700">{fmtRs(totalAdditionalComp)}</span>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
+
 
       <div className="flex items-center justify-between">
         <button onClick={onBack} className="inline-flex items-center gap-2 px-4 py-2 border border-border text-text-secondary rounded-lg text-sm font-semibold hover:bg-slate-50 transition-colors">

@@ -82,7 +82,7 @@ interface Props {
   ) => void;
   onToggle: (name: string) => (v: boolean) => void;
   errors?: Partial<Record<string, string>>;
-  selectedShift?: { startTime?: string; endTime?: string; breakDuration?: any; shiftCode?: string; shiftName?: string } | null;
+  selectedShift?: { id?: string | number; name?: string; startTime?: string; endTime?: string; breakDuration?: any; shiftCode?: string; shiftName?: string } | null;
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -449,8 +449,8 @@ const SalaryStructureSection: React.FC<Props> = ({ form, onChange, onToggle, err
                 options={[
                   { value: 'MONTHLY', label: 'Monthly' },
                   { value: 'WEEKLY', label: 'Weekly' },
-                  { value: 'DAILY', label: 'Daily Wage' },
-                  { value: 'HOURLY', label: 'Hourly' },
+                  // { value: 'DAILY', label: 'Daily Wage' },
+                  // { value: 'HOURLY', label: 'Hourly' },
                 ]}
               />
 

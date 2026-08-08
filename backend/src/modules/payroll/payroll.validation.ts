@@ -142,8 +142,7 @@ export const listRunsSchema = z.object({
 export const upsertExtendedCompSchema = z.object({
   body: z.object({
     offRecordAmount: z.coerce.number({
-      required_error: 'offRecordAmount is required',
-      invalid_type_error: 'offRecordAmount must be a number',
+      message: 'offRecordAmount must be a positive number',
     }).positive('offRecordAmount must be a positive number'),
   }),
   query:  z.object({}),

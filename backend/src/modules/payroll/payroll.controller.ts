@@ -10,7 +10,12 @@ import { prisma } from '../../config/prisma';
 function isSuperAdmin(req: Request): boolean {
   const user = (req as any).user;
   if (!user) return false;
-  return !!user.isSuperAdmin || (typeof user.userId === 'string' && user.userId.startsWith('admin_'));
+  return (
+    !!user.isSuperAdmin ||
+    (typeof user.userId === 'string' && user.userId.startsWith('admin_')) ||
+    user.role === 'ROLE_ADMIN' ||
+    user.role?.name === 'Super Admin'
+  );
 }
 
 class PayrollController {
@@ -128,13 +133,16 @@ class PayrollController {
       page:  parseInt(page,  10),
       limit: parseInt(limit, 10),
     });
+    const isSuper = isSuperAdmin(req);
+    result.runs = result.runs.map((r: any) => payrollService.sanitizeRunForUser(r, isSuper));
     res.json(new ApiResponse('Payroll runs fetched', result));
   });
 
   getRun = asyncHandler(async (req: Request, res: Response) => {
     const id  = parseInt(String(req.params.id), 10);
     const run = await payrollService.getRun(id);
-    res.json(new ApiResponse('Payroll run fetched', run));
+    const sanitized = payrollService.sanitizeRunForUser(run, isSuperAdmin(req));
+    res.json(new ApiResponse('Payroll run fetched', sanitized));
   });
 
   computeRun = asyncHandler(async (req: Request, res: Response) => {
@@ -154,21 +162,24 @@ class PayrollController {
       companyId:        company.id,
     });
 
-    res.status(201).json(new ApiResponse('Payroll computed successfully', run));
+    const sanitized = payrollService.sanitizeRunForUser(run, isSuperAdmin(req));
+    res.status(201).json(new ApiResponse('Payroll computed successfully', sanitized));
   });
 
   approveRun = asyncHandler(async (req: Request, res: Response) => {
     const id     = parseInt(String(req.params.id), 10);
     const userId = (req as any).user?.userId ?? 'unknown';
     const run    = await payrollService.approveRun(id, userId);
-    res.json(new ApiResponse('Payroll run approved', run));
+    const sanitized = payrollService.sanitizeRunForUser(run, isSuperAdmin(req));
+    res.json(new ApiResponse('Payroll run approved', sanitized));
   });
 
   lockRun = asyncHandler(async (req: Request, res: Response) => {
     const id     = parseInt(String(req.params.id), 10);
     const userId = (req as any).user?.userId ?? 'unknown';
     const run    = await payrollService.lockRun(id, userId);
-    res.json(new ApiResponse('Payroll run locked', run));
+    const sanitized = payrollService.sanitizeRunForUser(run, isSuperAdmin(req));
+    res.json(new ApiResponse('Payroll run locked', sanitized));
   });
 
   deleteRun = asyncHandler(async (req: Request, res: Response) => {

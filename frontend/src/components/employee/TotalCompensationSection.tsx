@@ -114,7 +114,7 @@ const TotalCompensationSection: React.FC<Props> = ({ employeeId }) => {
             {/* Amount input */}
             <div>
               <label className="block text-xs font-bold uppercase tracking-[0.5px] text-slate-500 mb-1">
-                Additional Compensation Amount (₹)
+                Cash in Hand Amount (₹)
               </label>
               <input
                 type="number"

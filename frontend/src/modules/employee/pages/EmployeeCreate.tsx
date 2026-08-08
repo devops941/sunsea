@@ -256,7 +256,7 @@ const ExtCompDraft: React.FC<{
       <div className="p-4 space-y-3">
         <div>
           <label className="block text-xs font-bold uppercase tracking-[0.5px] text-slate-500 mb-1">
-            Additional Compensation Amount (₹)
+            Cash in Hand Amount (₹)
           </label>
           <input
             type="number"
@@ -289,7 +289,7 @@ const EmployeeCreatePage: React.FC = () => {
   const [activeTab,    setActiveTab]    = useState(0);
   const [form,         setForm]         = useState<FormState>(INITIAL);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [shifts,       setShifts]       = useState<{ id: string | number; name: string }[]>([]);
+  const [shifts,       setShifts]       = useState<any[]>([]);
   const [errors,       setErrors]       = useState<Partial<Record<keyof FormState, string>>>({});
   const [showPassword, setShowPassword] = useState(false);
   const [usernameStatus, setUsernameStatus] = useState<"idle" | "checking" | "available" | "taken">("idle");
@@ -908,7 +908,7 @@ const EmployeeCreatePage: React.FC = () => {
     <div>
       <SectionHeader icon={FaCalendarAlt} title="Joining Details" />
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        <DatePickerCalendar label="Date of Joining" name="dateOfJoining" value={form.dateOfJoining}
+        <DatePickerCalendar label="Date of Joining" name="dateOfJoining" required value={form.dateOfJoining}
           onChange={handleChange} placeholder="Select joining date" />
         <DatePickerCalendar label="Relieving Date" name="relievingDate" value={form.relievingDate}
           onChange={handleChange} placeholder="Select relieving date" />
