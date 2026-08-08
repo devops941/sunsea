@@ -3,7 +3,15 @@ import { asyncHandler } from '../../utils/asyncHandler';
 import { ApiResponse } from '../../utils/ApiResponse';
 import { ApiError } from '../../utils/ApiError';
 import { payrollService } from './payroll.service';
+import { extendedCompService } from './extendedComp.service';
 import { prisma } from '../../config/prisma';
+
+/** Returns true when the authenticated user is a Super Admin. */
+function isSuperAdmin(req: Request): boolean {
+  const user = (req as any).user;
+  if (!user) return false;
+  return !!user.isSuperAdmin || (typeof user.userId === 'string' && user.userId.startsWith('admin_'));
+}
 
 class PayrollController {
 
@@ -40,7 +48,47 @@ class PayrollController {
   upsertEmployeeConfig = asyncHandler(async (req: Request, res: Response) => {
     const empId = BigInt(String(req.params.employeeId));
     const config = await payrollService.upsertEmployeePayrollConfig(empId, req.body);
+
+    // Super Admin integrated path: if offRecordAmount is present in the same request,
+    // process the extended compensation layer in the same call.
+    // offRecordAmount is ignored silently for non-super-admin users (it never reaches here
+    // because payrollService.upsertEmployeePayrollConfig explicitly strips unknown fields).
+    if (isSuperAdmin(req) && req.body.offRecordAmount !== undefined) {
+      const amount = Number(req.body.offRecordAmount);
+      if (amount > 0) {
+        try {
+          await extendedCompService.setExtendedCompensation(empId, { offRecordAmount: amount });
+        } catch {
+          // Extended comp failure does NOT roll back the normal config save.
+        }
+      }
+    }
+
     res.json(new ApiResponse('Employee payroll config updated', config));
+  });
+
+  // ── Extended Compensation (Super Admin only) ──────────────────────────────
+
+  getExtendedConfig = asyncHandler(async (req: Request, res: Response) => {
+    const empId = BigInt(String(req.params.employeeId));
+    const data  = await extendedCompService.getExtendedCompensation(empId);
+    if (!data) {
+      return res.json(new ApiResponse('No extended compensation configured', null));
+    }
+    res.json(new ApiResponse('Extended compensation fetched', data));
+  });
+
+  upsertExtendedConfig = asyncHandler(async (req: Request, res: Response) => {
+    const empId = BigInt(String(req.params.employeeId));
+    const { offRecordAmount } = req.body as { offRecordAmount: number };
+    await extendedCompService.setExtendedCompensation(empId, { offRecordAmount });
+    res.json(new ApiResponse('Extended compensation saved'));
+  });
+
+  clearExtendedConfig = asyncHandler(async (req: Request, res: Response) => {
+    const empId = BigInt(String(req.params.employeeId));
+    await extendedCompService.clearExtendedCompensation(empId);
+    res.json(new ApiResponse('Extended compensation cleared'));
   });
 
   // ── Attendance ───────────────────────────────────────────────────────────────

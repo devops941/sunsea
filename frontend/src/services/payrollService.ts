@@ -143,6 +143,10 @@ export interface ApiPayrollRun {
   results: ApiPayrollResult[];
 }
 
+export interface ApiExtendedComp {
+  offRecordAmount: number;
+}
+
 export interface ApiSalaryAdvance {
   id: number;
   employeeId: string;
@@ -340,5 +344,22 @@ export const payrollService = {
   getPayslip: async (runId: number, resultId: number): Promise<ApiPayslipData> => {
     const { data } = await apiClient.get(`${BASE}/runs/${runId}/payslip/${resultId}`);
     return data.data;
+  },
+
+  // Extended Compensation (Super Admin only)
+  getExtendedConfig: async (employeeId: number): Promise<ApiExtendedComp | null> => {
+    const { data } = await apiClient.get(`${BASE}/employees/${employeeId}/config/extended`);
+    return data.data ?? null;
+  },
+
+  upsertExtendedConfig: async (
+    employeeId: number,
+    payload: { offRecordAmount: number }
+  ): Promise<void> => {
+    await apiClient.put(`${BASE}/employees/${employeeId}/config/extended`, payload);
+  },
+
+  clearExtendedConfig: async (employeeId: number): Promise<void> => {
+    await apiClient.delete(`${BASE}/employees/${employeeId}/config/extended`);
   },
 };

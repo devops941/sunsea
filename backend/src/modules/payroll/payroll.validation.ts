@@ -138,6 +138,18 @@ export const listRunsSchema = z.object({
   params: z.object({}),
 });
 
+// ─── Extended Compensation (Super Admin only) ─────────────────────────────────
+export const upsertExtendedCompSchema = z.object({
+  body: z.object({
+    offRecordAmount: z.coerce.number({
+      required_error: 'offRecordAmount is required',
+      invalid_type_error: 'offRecordAmount must be a number',
+    }).positive('offRecordAmount must be a positive number'),
+  }),
+  query:  z.object({}),
+  params: z.object({ employeeId: z.string() }),
+});
+
 // ─── Salary Advance ───────────────────────────────────────────────────────────
 export const createAdvanceSchema = z.object({
   body: z.object({

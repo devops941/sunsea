@@ -26,6 +26,7 @@ import {
   deriveFromHourly,
   getMonthlyWorkingDays,
   getWeeklyWorkingDays,
+  calcShiftWorkingHours,
   formatINR,
   calcMethodLabel,
   type PayrollCalcConfig,
@@ -81,6 +82,7 @@ interface Props {
   ) => void;
   onToggle: (name: string) => (v: boolean) => void;
   errors?: Partial<Record<string, string>>;
+  selectedShift?: { startTime?: string; endTime?: string; breakDuration?: any; shiftCode?: string; shiftName?: string } | null;
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -247,13 +249,21 @@ const PreviewMeta: React.FC<{ label: string; value: string }> = ({ label, value 
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-const SalaryStructureSection: React.FC<Props> = ({ form, onChange, onToggle, errors = {} }) => {
+const SalaryStructureSection: React.FC<Props> = ({ form, onChange, onToggle, errors = {}, selectedShift }) => {
   const { config, loading, configError } = usePayrollConfig();
+
+  const shiftHours = useMemo(() => {
+    if (!selectedShift) return null;
+    return calcShiftWorkingHours(selectedShift, 0);
+  }, [selectedShift]);
+
+  const defaultHours = config.defaultWorkingHoursPerDay || 8;
+  const hoursPerDay = (shiftHours && shiftHours > 0) ? shiftHours : defaultHours;
 
   const calcConfig: PayrollCalcConfig = {
     salaryCalculationMethod: (config.salaryCalculationMethod as any) || 'WORKING_DAYS',
     fixedDays: config.fixedDays || 26,
-    defaultWorkingHoursPerDay: config.defaultWorkingHoursPerDay || 8,
+    defaultWorkingHoursPerDay: hoursPerDay,
     weeklyOffDays: config.weeklyOffDays || [0],
   };
 
@@ -284,9 +294,59 @@ const SalaryStructureSection: React.FC<Props> = ({ form, onChange, onToggle, err
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [primaryAmount, salaryType, config]);
 
-  console.log(derivatives, "jlkj")
+  // ── Auto-calculation logic for breakdown components (Bank Transfer mode)
+  const handleSalaryChange = (
+    e:
+      | React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+      | { target: { name: string; value: any } }
+  ) => {
+    const { name, value } = e.target;
+    onChange(e);
 
+    const isGrossField = ['monthlySalary', 'weeklySalary', 'dailySalary', 'hourlySalary'].includes(name);
 
+    if (isGrossField) {
+      const gross = parseFloat(value) || 0;
+      if (gross > 0) {
+        const basic = Math.round(gross * 0.50);
+        const da = Math.round(gross * 0.10);
+        const hra = Math.round(gross * 0.10);
+        const other = Math.max(0, gross - basic - da - hra);
+
+        onChange({ target: { name: 'basicSalary', value: String(basic) } });
+        onChange({ target: { name: 'da', value: String(da) } });
+        onChange({ target: { name: 'hra', value: String(hra) } });
+        onChange({ target: { name: 'otherAllowance', value: String(other) } });
+      } else {
+        onChange({ target: { name: 'basicSalary', value: '' } });
+        onChange({ target: { name: 'da', value: '' } });
+        onChange({ target: { name: 'hra', value: '' } });
+        onChange({ target: { name: 'otherAllowance', value: '' } });
+      }
+    } else if (['basicSalary', 'hra', 'da'].includes(name)) {
+      const gross = parseFloat(form.monthlySalary || form.weeklySalary || form.dailySalary || form.hourlySalary || '0') || 0;
+      if (gross > 0) {
+        const b = name === 'basicSalary' ? (parseFloat(value) || 0) : (parseFloat(form.basicSalary || '0') || 0);
+        const d = name === 'da' ? (parseFloat(value) || 0) : (parseFloat(form.da || '0') || 0);
+        const h = name === 'hra' ? (parseFloat(value) || 0) : (parseFloat(form.hra || '0') || 0);
+        const other = Math.max(0, gross - b - d - h);
+        onChange({ target: { name: 'otherAllowance', value: String(other) } });
+      }
+    } else if (name === 'paymentMode' && value === 'BANK') {
+      const gross = parseFloat(form.monthlySalary || form.weeklySalary || form.dailySalary || form.hourlySalary || '0') || 0;
+      if (gross > 0 && (!form.basicSalary || parseFloat(form.basicSalary) === 0)) {
+        const basic = Math.round(gross * 0.50);
+        const da = Math.round(gross * 0.10);
+        const hra = Math.round(gross * 0.10);
+        const other = Math.max(0, gross - basic - da - hra);
+
+        onChange({ target: { name: 'basicSalary', value: String(basic) } });
+        onChange({ target: { name: 'da', value: String(da) } });
+        onChange({ target: { name: 'hra', value: String(hra) } });
+        onChange({ target: { name: 'otherAllowance', value: String(other) } });
+      }
+    }
+  };
 
   // ─────────────────────────────────────────────────────────────────────────────
   // RENDER
@@ -317,7 +377,7 @@ const SalaryStructureSection: React.FC<Props> = ({ form, onChange, onToggle, err
                 label="Payment Mode"
                 name="paymentMode"
                 value={form.paymentMode}
-                onChange={onChange}
+                onChange={handleSalaryChange}
                 options={[
                   { value: 'BANK', label: 'Bank Transfer' },
                   { value: 'CASH', label: 'Cash' },
@@ -383,7 +443,7 @@ const SalaryStructureSection: React.FC<Props> = ({ form, onChange, onToggle, err
                 label="Salary Type"
                 name="salaryType"
                 value={form.salaryType}
-                onChange={onChange}
+                onChange={handleSalaryChange}
                 required
                 error={errors.salaryType}
                 options={[
@@ -401,7 +461,7 @@ const SalaryStructureSection: React.FC<Props> = ({ form, onChange, onToggle, err
                   name="monthlySalary"
                   type="number"
                   value={form.monthlySalary}
-                  onChange={onChange}
+                  onChange={handleSalaryChange}
                   required
                   error={errors.monthlySalary}
                   placeholder="Total monthly CTC"
@@ -415,7 +475,7 @@ const SalaryStructureSection: React.FC<Props> = ({ form, onChange, onToggle, err
                   name="weeklySalary"
                   type="number"
                   value={form.weeklySalary}
-                  onChange={onChange}
+                  onChange={handleSalaryChange}
                   required
                   error={errors.weeklySalary}
                   placeholder="Total weekly salary"
@@ -429,7 +489,7 @@ const SalaryStructureSection: React.FC<Props> = ({ form, onChange, onToggle, err
                   name="dailySalary"
                   type="number"
                   value={form.dailySalary}
-                  onChange={onChange}
+                  onChange={handleSalaryChange}
                   required
                   error={errors.dailySalary}
                   placeholder="Per-day rate"
@@ -444,7 +504,7 @@ const SalaryStructureSection: React.FC<Props> = ({ form, onChange, onToggle, err
                     name="hourlySalary"
                     type="number"
                     value={form.hourlySalary}
-                    onChange={onChange}
+                    onChange={handleSalaryChange}
                     required
                     error={errors.hourlySalary}
                     placeholder="Per-hour rate"
@@ -476,7 +536,7 @@ const SalaryStructureSection: React.FC<Props> = ({ form, onChange, onToggle, err
                     name="basicSalary"
                     type="number"
                     value={form.basicSalary}
-                    onChange={onChange}
+                    onChange={handleSalaryChange}
                     error={errors.basicSalary}
                     placeholder="Basic salary"
                   />
@@ -485,7 +545,7 @@ const SalaryStructureSection: React.FC<Props> = ({ form, onChange, onToggle, err
                     name="da"
                     type="number"
                     value={form.da}
-                    onChange={onChange}
+                    onChange={handleSalaryChange}
                     error={errors.da}
                     placeholder="DA amount"
                   />
@@ -494,7 +554,7 @@ const SalaryStructureSection: React.FC<Props> = ({ form, onChange, onToggle, err
                     name="hra"
                     type="number"
                     value={form.hra}
-                    onChange={onChange}
+                    onChange={handleSalaryChange}
                     error={errors.hra}
                     placeholder="HRA amount"
                   />

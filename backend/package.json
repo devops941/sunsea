@@ -4,7 +4,8 @@
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
     "build": "tsc",
     "start": "node server.js",
-    "vercel-build": "tsc"
+    "vercel-build": "tsc",
+    "test": "echo \"No tests configured\""
   },
   "dependencies": {
     "@prisma/client": "^6.16.2",

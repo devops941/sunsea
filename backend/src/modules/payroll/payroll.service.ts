@@ -496,10 +496,23 @@ class PayrollService {
   }
 
   async upsertEmployeePayrollConfig(employeeId: bigint, data: Record<string, unknown>) {
+    // Explicitly pick only the allowed fields.
+    // This prevents any caller from writing encrypted column names (xc_val_*, xr_*)
+    // through this endpoint, whether accidentally or intentionally.
+    const safe: Record<string, unknown> = {};
+    const allowed = [
+      'salaryType', 'monthlySalary', 'basicSalary', 'da', 'hra',
+      'otherAllowance', 'dailySalary', 'bankAccount', 'ifscCode',
+      'bankName', 'pfNumber', 'esiNumber', 'paymentMode',
+    ];
+    for (const key of allowed) {
+      if (data[key] !== undefined) safe[key] = data[key];
+    }
+
     const cfg = await prisma.employeePayrollConfig.upsert({
       where:  { employeeId },
-      update: data,
-      create: { employeeId, salaryType: 'CASH_MONTHLY', monthlySalary: 0, basicSalary: 0, ...data },
+      update: safe,
+      create: { employeeId, salaryType: 'CASH_MONTHLY', monthlySalary: 0, basicSalary: 0, ...safe },
     });
 
     // Keep Employee table in sync
