@@ -636,6 +636,11 @@ ul {
 
 /* Global Print Styles */
 @media print {
+    @page {
+        size: A4 portrait;
+        margin: 8mm;
+    }
+
     .no-print, .print\:hidden {
         display: none !important;
     }

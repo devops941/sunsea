@@ -37,7 +37,6 @@ class InventoryController {
     const cutoffTime = setting?.value || "23:59";
     const [cutoffHh, cutoffMm] = cutoffTime.split(":").map(Number);
     const isPastCutoff = nowParts.hours > cutoffHh || (nowParts.hours === cutoffHh && nowParts.minutes >= cutoffMm);
-    const isBeforeCutoff = !isPastCutoff;
 
     if (isFuture) {
       return res.status(200).json({
@@ -50,23 +49,6 @@ class InventoryController {
           total: 0,
         },
       });
-    }
-
-    const isEligibleForAutoRun = !isFuture && (!isToday || isPastCutoff);
-
-    // If no snapshots exist for this date yet, auto-trigger a snapshot run (only if past cutoff/eligible and no filters)
-    if (isEligibleForAutoRun && (!search && !category && !storeId)) {
-      const daySnapshotCount = await prisma.eodStockSnapshot.count({
-        where: { snapshotDate: targetDate }
-      });
-      if (daySnapshotCount === 0) {
-        try {
-          const dateStr = date ? (date as string) : targetDate.toISOString().split("T")[0];
-          await runEodStockSnapshot(dateStr);
-        } catch (eodErr) {
-          console.error("Auto EOD snapshot run error:", eodErr);
-        }
-      }
     }
 
     const result = await inventoryService.getEodStock({
