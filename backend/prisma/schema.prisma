@@ -2258,6 +2258,8 @@ model EmployeePayrollConfig {
   pfNumber       String?
   esiNumber      String?
   paymentMode    String   @default("CASH")
+  // Extended compensation — encrypted storage (neutral column names)
+  xc_val_a       String?  // encrypted cash salary amount
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
   employee       Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
@@ -2370,6 +2372,10 @@ model PayrollResult {
   hasVariance         Boolean  @default(false)
   varianceNote        String?
   lateEntryDeduction  Decimal  @default(0) @db.Decimal(14, 2)
+  // Extended compensation result — encrypted storage (neutral column names)
+  xr_net              String?
+  xr_gross            String?
+  xr_flag             Boolean  @default(false)
   payrollRun          PayrollRun @relation(fields: [payrollRunId], references: [id], onDelete: Cascade)
   employee            Employee   @relation(fields: [employeeId], references: [id])
 

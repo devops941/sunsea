@@ -1,6 +1,8 @@
 import { prisma } from '../../config/prisma';
 import { ApiError } from '../../utils/ApiError';
 import { getIO } from '../../socket/socket';
+import { encryptField, decryptField } from '../../utils/fieldEncryption';
+import { ENC_FIELDS } from '../../constants/encryptedFields';
 
 /** Convert a period string (YYYY-MM or YYYY-Www) to a date range { start, end } in YYYY-MM-DD */
 function periodToDateRange(period: string): { start: string; end: string } {
@@ -22,6 +24,27 @@ function periodToDateRange(period: string): { start: string; end: string } {
   sun.setDate(mon.getDate() + 6);
   const fmt  = (d: Date) => d.toISOString().split('T')[0];
   return { start: fmt(mon), end: fmt(sun) };
+}
+
+/** Helper to compute ISO week string e.g. "2026-W32" for a date "YYYY-MM-DD" */
+function getIsoWeekPeriod(dateStr: string): string {
+  const d = new Date(dateStr + 'T00:00:00');
+  const dow = d.getDay() || 7;
+  d.setDate(d.getDate() + 4 - dow);
+  const yearStart = new Date(d.getFullYear(), 0, 1);
+  const weekNo = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+  return `${d.getFullYear()}-W${String(weekNo).padStart(2, '0')}`;
+}
+
+/** Helper to compute all ISO week periods that fall within a given month YYYY-MM */
+function getIsoWeeksForMonth(year: number, month: number): string[] {
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const weeks = new Set<string>();
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    weeks.add(getIsoWeekPeriod(dateStr));
+  }
+  return Array.from(weeks);
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -371,7 +394,7 @@ function computeResult(
         if (settings.lateEntrySlabs?.length > 0) {
           lateEntryDeduction += lookupSlab(dayLate, settings.lateEntrySlabs);
         } else {
-          lateEntryDeduction += Math.round(perMinuteRate * (dayLate - graceMins));
+          throw new Error(`Late Entry Deduction Slabs are not configured. Please add them in Payroll Settings before running payroll.`);
         }
       }
     }
@@ -380,7 +403,7 @@ function computeResult(
     if (settings.lateEntrySlabs?.length > 0) {
       lateEntryDeduction = lookupSlab(att.lateMinutes, settings.lateEntrySlabs);
     } else {
-      lateEntryDeduction = Math.round(perMinuteRate * (att.lateMinutes - graceMins));
+      throw new Error(`Late Entry Deduction Slabs are not configured. Please add them in Payroll Settings before running payroll.`);
     }
   }
 
@@ -390,8 +413,7 @@ function computeResult(
     if (settings.permissionSlabs?.length > 0) {
       permissionDeduction = lookupSlab(att.permissionMinutes, settings.permissionSlabs);
     } else {
-      // Fallback: deduct per-minute rate
-      permissionDeduction = Math.round(perMinuteRate * att.permissionMinutes);
+      throw new Error(`Permission Deduction Slabs are not configured. Please add them in Payroll Settings before running payroll.`);
     }
   }
 
@@ -422,6 +444,33 @@ function computeResult(
     if (deviation > 0.2) {
       hasVariance  = true;
       varianceNote = `Net ₹${Math.round(netSalary)} vs expected ₹${Math.round(expectedNet)} (${Math.round(deviation * 100)}% deviation)`;
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // STEP 10 — Extended / Additional Compensation (Super Admin Confidential)
+  // ─────────────────────────────────────────────────────────────────────────────
+  let xr_net: string | null = null;
+  let xr_gross: string | null = null;
+  let xr_flag = false;
+
+  const encCompAmount: string | undefined | null = (pc as any)[ENC_FIELDS.CONFIG_AMOUNT];
+  if (encCompAmount && typeof encCompAmount === 'string') {
+    try {
+      const offRecordMonthly = Number(decryptField(encCompAmount));
+      if (!isNaN(offRecordMonthly) && offRecordMonthly > 0) {
+        // As requested: Additional Compensation should be added directly without LOP deductions
+        let earnedAdditional: number = offRecordMonthly;
+
+        const combinedGross = grossSalary + earnedAdditional;
+        const combinedNet = netSalary + earnedAdditional;
+
+        xr_gross = encryptField(combinedGross.toFixed(2));
+        xr_net   = encryptField(combinedNet.toFixed(2));
+        xr_flag  = true;
+      }
+    } catch {
+      // If decryption fails, keep xr_flag as false
     }
   }
 
@@ -463,8 +512,12 @@ function computeResult(
     paymentMode:        pc.paymentMode,
     hasVariance,
     varianceNote,
+    xr_net,
+    xr_gross,
+    xr_flag,
   };
 }
+
 
 // ─── Service class ────────────────────────────────────────────────────────────
 class PayrollService {
@@ -496,10 +549,23 @@ class PayrollService {
   }
 
   async upsertEmployeePayrollConfig(employeeId: bigint, data: Record<string, unknown>) {
+    // Explicitly pick only the allowed fields.
+    // This prevents any caller from writing encrypted column names (xc_val_*, xr_*)
+    // through this endpoint, whether accidentally or intentionally.
+    const safe: Record<string, unknown> = {};
+    const allowed = [
+      'salaryType', 'monthlySalary', 'basicSalary', 'da', 'hra',
+      'otherAllowance', 'dailySalary', 'bankAccount', 'ifscCode',
+      'bankName', 'pfNumber', 'esiNumber', 'paymentMode',
+    ];
+    for (const key of allowed) {
+      if (data[key] !== undefined) safe[key] = data[key];
+    }
+
     const cfg = await prisma.employeePayrollConfig.upsert({
       where:  { employeeId },
-      update: data,
-      create: { employeeId, salaryType: 'CASH_MONTHLY', monthlySalary: 0, basicSalary: 0, ...data },
+      update: safe,
+      create: { employeeId, salaryType: 'CASH_MONTHLY', monthlySalary: 0, basicSalary: 0, ...safe },
     });
 
     // Keep Employee table in sync
@@ -565,6 +631,36 @@ class PayrollService {
     status: string; otHours: number; lateMinutes: number;
     permissionMinutes: number; salaryAdvance: number;
   }>) {
+    const allPeriodsToCheck = new Set<string>();
+    records.forEach(r => {
+      if (r.period) allPeriodsToCheck.add(r.period);
+      if (r.date) {
+        allPeriodsToCheck.add(r.date.slice(0, 7)); // YYYY-MM
+        allPeriodsToCheck.add(getIsoWeekPeriod(r.date)); // YYYY-Www
+      }
+    });
+
+    const lockedRuns = await prisma.payrollRun.findMany({
+      where: {
+        period: { in: Array.from(allPeriodsToCheck) },
+        status: { in: ['APPROVED', 'LOCKED'] }
+      }
+    });
+
+    if (lockedRuns.length > 0) {
+      const lockedPeriodSet = new Set(lockedRuns.map(r => r.period));
+      const lockedRecords = records.filter(r => {
+        const monthP = r.date ? r.date.slice(0, 7) : '';
+        const weekP  = r.date ? getIsoWeekPeriod(r.date) : '';
+        return lockedPeriodSet.has(r.period) || lockedPeriodSet.has(monthP) || lockedPeriodSet.has(weekP);
+      });
+
+      if (lockedRecords.length > 0) {
+        const periodsStr = Array.from(new Set(lockedRuns.map(r => r.period))).join(', ');
+        throw new Error(`Cannot edit attendance for period(s) ${periodsStr} because payroll has already been approved or locked.`);
+      }
+    }
+
     const ops = records.map(r =>
       prisma.attendanceRecord.upsert({
         where:  { employeeId_date: { employeeId: r.employeeId, date: r.date } },
@@ -585,9 +681,11 @@ class PayrollService {
         const month = parseInt(monthStr, 10);
         const startOfMonth = new Date(year, month - 1, 1);
         const endOfMonth   = new Date(year, month, 1);
+        const monthIsoWeeks = getIsoWeeksForMonth(year, month);
 
         where.OR = [
           { period: opts.period },
+          { period: { in: monthIsoWeeks } },
           { period: { startsWith: opts.period } },
           { createdAt: { gte: startOfMonth, lt: endOfMonth } },
         ];
@@ -879,6 +977,9 @@ class PayrollService {
           paymentMode:        r!.paymentMode,
           hasVariance:        r!.hasVariance,
           varianceNote:       r!.varianceNote ?? null,
+          xr_net:             r!.xr_net,
+          xr_gross:           r!.xr_gross,
+          xr_flag:            r!.xr_flag ?? false,
         })),
       });
 
@@ -1133,6 +1234,63 @@ class PayrollService {
       },
     };
   }
+
+  // ── Sanitization & Super Admin Decryption Helpers ──────────────────────────
+
+  sanitizeResultForUser(res: any, isSuperAdmin: boolean) {
+    if (!res) return res;
+    const resCopy = { ...res };
+    if (isSuperAdmin && resCopy.xr_flag && resCopy.xr_net) {
+      try {
+        const decryptedNet = Number(decryptField(resCopy.xr_net));
+        const decryptedGross = resCopy.xr_gross ? Number(decryptField(resCopy.xr_gross)) : decryptedNet;
+        const netSal = Number(resCopy.netSalary || 0);
+        const additionalAmount = Math.max(0, decryptedNet - netSal);
+
+        resCopy.additionalComp = {
+          additionalAmount,
+          combinedGross: decryptedGross,
+          combinedNet: decryptedNet,
+        };
+      } catch {
+        // Decryption failed or invalid key
+      }
+    }
+    delete resCopy.xr_net;
+    delete resCopy.xr_gross;
+    delete resCopy.xr_flag;
+    return resCopy;
+  }
+
+  sanitizeRunForUser(run: any, isSuperAdmin: boolean) {
+    if (!run) return run;
+    const runCopy = { ...run };
+    if (Array.isArray(runCopy.results)) {
+      runCopy.results = runCopy.results.map((r: any) => this.sanitizeResultForUser(r, isSuperAdmin));
+    }
+
+    if (isSuperAdmin && Array.isArray(runCopy.results)) {
+      const totalAdditionalComp = runCopy.results.reduce(
+        (sum: number, r: any) => sum + (r.additionalComp?.additionalAmount || 0),
+        0
+      );
+      const totalCombinedGross = runCopy.results.reduce(
+        (sum: number, r: any) => sum + (r.additionalComp?.combinedGross || Number(r.grossSalary || 0)),
+        0
+      );
+      const totalCombinedNet = runCopy.results.reduce(
+        (sum: number, r: any) => sum + (r.additionalComp?.combinedNet || Number(r.netSalary || 0)),
+        0
+      );
+
+      runCopy.totalAdditionalComp = totalAdditionalComp;
+      runCopy.totalCombinedGross  = totalCombinedGross;
+      runCopy.totalCombinedNet    = totalCombinedNet;
+    }
+
+    return runCopy;
+  }
 }
 
 export const payrollService = new PayrollService();
+

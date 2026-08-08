@@ -22,6 +22,8 @@ import { useSocketSync } from "../../../hooks/useSocketSync";
 import { employeeService } from "../../../services/employeeService";
 import apiClient from "../../../api/apiClient";
 import SalaryStructureSection from "../../../components/employee/SalaryStructureSection";
+import { usePermission } from "../../../hooks/usePermission";
+import { payrollService } from "../../../services/payrollService";
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -226,6 +228,55 @@ const Toggle: React.FC<{ label: string; value: boolean; onChange: (v: boolean) =
   </div>
 );
 
+// ─── ExtCompDraft — super admin only, shown during employee creation ─────────
+// Holds state until the employee record exists, then TotalCompensationSection takes over.
+
+interface ExtCompDraftState { offRecordAmount: string }
+
+const ExtCompDraft: React.FC<{
+  state: ExtCompDraftState;
+  onChange: React.Dispatch<React.SetStateAction<ExtCompDraftState>>;
+}> = ({ state, onChange }) => {
+  const handle = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    onChange(prev => ({ ...prev, [name]: value }));
+  };
+
+  return (
+    <div className="rounded-xl border border-indigo-100 bg-gradient-to-br from-indigo-50 via-white to-blue-50 shadow-sm overflow-hidden">
+      <div className="flex items-center gap-2 px-4 py-3 bg-indigo-600">
+        <svg className="text-white text-sm w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+          <path fillRule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+        </svg>
+        <span className="text-sm font-bold text-white tracking-wide uppercase">Total Compensation</span>
+        <svg className="text-indigo-200 w-3 h-3 ml-auto" fill="currentColor" viewBox="0 0 20 20">
+          <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+        </svg>
+      </div>
+      <div className="p-4 space-y-3">
+        <div>
+          <label className="block text-xs font-bold uppercase tracking-[0.5px] text-slate-500 mb-1">
+            Cash in Hand Amount (₹)
+          </label>
+          <input
+            type="number"
+            name="offRecordAmount"
+            value={state.offRecordAmount}
+            onChange={handle}
+            min={0}
+            step={0.01}
+            placeholder="e.g. 10000"
+            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400"
+          />
+        </div>
+        <p className="text-xs text-slate-400 italic">
+          This will be saved automatically when the employee record is created.
+        </p>
+      </div>
+    </div>
+  );
+};
+
 // ─── main component ───────────────────────────────────────────────────────────
 
 const EmployeeCreatePage: React.FC = () => {
@@ -233,14 +284,16 @@ const EmployeeCreatePage: React.FC = () => {
   const user       = useSelector((state: any) => state.auth.user);
   const { departments, loadDepartments } = useDepartments();
   const { roles,       loadRoles       } = useRoles();
+  const { isSuperAdmin } = usePermission();
 
   const [activeTab,    setActiveTab]    = useState(0);
   const [form,         setForm]         = useState<FormState>(INITIAL);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [shifts,       setShifts]       = useState<{ id: string | number; name: string }[]>([]);
-  const [errors,       setErrors]       = useState<Partial<Record<keyof FormState, string>>>({}); 
+  const [shifts,       setShifts]       = useState<any[]>([]);
+  const [errors,       setErrors]       = useState<Partial<Record<keyof FormState, string>>>({});
   const [showPassword, setShowPassword] = useState(false);
   const [usernameStatus, setUsernameStatus] = useState<"idle" | "checking" | "available" | "taken">("idle");
+  const [extComp, setExtComp] = useState<{ offRecordAmount: string }>({ offRecordAmount: '' });
   const photoInputRef = useRef<HTMLInputElement>(null);
   const usernameCheckTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -528,37 +581,37 @@ const EmployeeCreatePage: React.FC = () => {
       if (form.photoFile)       fd.append("photo", form.photoFile);
 
       // Contact
-      if (form.personalMobile)        fd.append("personalMobile",        form.personalMobile);
-      if (form.officialMobile)        fd.append("mobile",                form.officialMobile);
-      if (form.personalEmail)         fd.append("personalEmail",         form.personalEmail);
-      if (form.officialEmail)         fd.append("email",                 form.officialEmail);
-      if (form.emergencyContactName)  fd.append("emergencyContactName",  form.emergencyContactName);
-      if (form.emergencyContactNumber) fd.append("emergencyContactNumber", form.emergencyContactNumber);
+      fd.append("personalMobile",        form.personalMobile || "");
+      fd.append("mobile",                form.officialMobile || "");
+      fd.append("personalEmail",         form.personalEmail || "");
+      fd.append("email",                 form.officialEmail || "");
+      fd.append("emergencyContactName",  form.emergencyContactName || "");
+      fd.append("emergencyContactNumber", form.emergencyContactNumber || "");
 
       // Family
-      if (form.fatherName)           fd.append("fatherName",           form.fatherName);
-      if (form.motherName)           fd.append("motherName",           form.motherName);
-      if (form.spouseName)           fd.append("spouseName",           form.spouseName);
-      if (form.guardianName)         fd.append("guardianName",         form.guardianName);
-      if (form.guardianRelationship) fd.append("guardianRelationship", form.guardianRelationship);
+      fd.append("fatherName",           form.fatherName || "");
+      fd.append("motherName",           form.motherName || "");
+      fd.append("spouseName",           form.spouseName || "");
+      fd.append("guardianName",         form.guardianName || "");
+      fd.append("guardianRelationship", form.guardianRelationship || "");
 
       // Identity
-      if (form.aadhaarNumber) fd.append("aadhaarNumber", form.aadhaarNumber);
-      if (form.panNumber)     fd.append("panNumber",     form.panNumber);
-      if (form.drivingLicense)fd.append("drivingLicense",form.drivingLicense);
-      if (form.voterId)       fd.append("voterId",       form.voterId);
+      fd.append("aadhaarNumber", form.aadhaarNumber || "");
+      fd.append("panNumber",     form.panNumber || "");
+      fd.append("drivingLicense",form.drivingLicense || "");
+      fd.append("voterId",       form.voterId || "");
 
       // Address
-      if (form.permAddress1)  fd.append("permanentAddressLine1", form.permAddress1);
-      if (form.permAddress2)  fd.append("permanentAddressLine2", form.permAddress2);
-      if (form.permCity)      fd.append("permanentCity",         form.permCity);
-      if (form.permState)     fd.append("permanentState",        form.permState);
-      if (form.permPincode)   fd.append("permanentPincode",      form.permPincode);
-      if (form.presAddress1)  fd.append("presentAddressLine1",   form.presAddress1);
-      if (form.presAddress2)  fd.append("presentAddressLine2",   form.presAddress2);
-      if (form.presCity)      fd.append("presentCity",           form.presCity);
-      if (form.presState)     fd.append("presentState",          form.presState);
-      if (form.presPincode)   fd.append("presentPincode",        form.presPincode);
+      fd.append("permanentAddressLine1", form.permAddress1 || "");
+      fd.append("permanentAddressLine2", form.permAddress2 || "");
+      fd.append("permanentCity",         form.permCity || "");
+      fd.append("permanentState",        form.permState || "");
+      fd.append("permanentPincode",      form.permPincode || "");
+      fd.append("presentAddressLine1",   form.presAddress1 || "");
+      fd.append("presentAddressLine2",   form.presAddress2 || "");
+      fd.append("presentCity",           form.presCity || "");
+      fd.append("presentState",          form.presState || "");
+      fd.append("presentPincode",        form.presPincode || "");
 
       // Official
       if (form.departmentId)  fd.append("departmentId",  form.departmentId);
@@ -631,7 +684,23 @@ const EmployeeCreatePage: React.FC = () => {
 
       if (user?.userId) fd.append("createdBy", String(user.userId));
 
-      await employeeService.create(fd as any);
+      const createRes: any = await employeeService.create(fd as any);
+      const newId: number | null = createRes?.data?.id ?? createRes?.id ?? null;
+
+      // Save extended compensation if super admin filled it in
+      if (isSuperAdmin && newId && extComp.offRecordAmount) {
+        const amount = parseFloat(extComp.offRecordAmount);
+        if (!isNaN(amount) && amount > 0) {
+          try {
+            await payrollService.upsertExtendedConfig(newId, {
+              offRecordAmount: amount,
+            });
+          } catch {
+            // Non-blocking — employee is already created; super admin can set it from Edit
+          }
+        }
+      }
+
       toast.success("Employee created successfully!");
       navigate("/employees");
     } catch (err: any) {
@@ -839,7 +908,7 @@ const EmployeeCreatePage: React.FC = () => {
     <div>
       <SectionHeader icon={FaCalendarAlt} title="Joining Details" />
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        <DatePickerCalendar label="Date of Joining" name="dateOfJoining" value={form.dateOfJoining}
+        <DatePickerCalendar label="Date of Joining" name="dateOfJoining" required value={form.dateOfJoining}
           onChange={handleChange} placeholder="Select joining date" />
         <DatePickerCalendar label="Relieving Date" name="relievingDate" value={form.relievingDate}
           onChange={handleChange} placeholder="Select relieving date" />
@@ -854,14 +923,28 @@ const EmployeeCreatePage: React.FC = () => {
     </div>
   );
 
+  const selectedShift = useMemo(() => {
+    if (!form.shiftId) return null;
+    return shifts.find((s: any) =>
+      String(s.shiftCode || s.id) === String(form.shiftId) ||
+      String(s.id) === String(form.shiftId)
+    ) || null;
+  }, [form.shiftId, shifts]);
+
   // Tab 5 — Payroll (dynamic salary structure with live preview)
   const renderTab5 = () => (
-    <SalaryStructureSection
-      form={form}
-      onChange={handleChange}
-      onToggle={(name) => handleToggle(name as any)}
-      errors={errors}
-    />
+    <div className="space-y-6">
+      <SalaryStructureSection
+        form={form}
+        onChange={handleChange}
+        onToggle={(name) => handleToggle(name as any)}
+        errors={errors}
+        selectedShift={selectedShift}
+      />
+      {isSuperAdmin && (
+        <ExtCompDraft state={extComp} onChange={setExtComp} />
+      )}
+    </div>
   );
 
   // Tab 6 — Login Account

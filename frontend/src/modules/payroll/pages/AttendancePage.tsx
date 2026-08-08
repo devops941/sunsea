@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Save, Loader2, AlertCircle, RefreshCw,
-  CheckCircle2, Users, Info, PlayCircle, Calendar, CalendarDays,
+  CheckCircle2, Users, Info, PlayCircle, Calendar, CalendarDays, Lock,
 } from 'lucide-react';
 import CommonLoader from '../../../components/ui/Loader/CommonLoader';
 import SelectInput from '../../../components/form/SelectInput/SelectInput';
@@ -111,21 +111,27 @@ function weeksOfMonth(year: number, month: number): WeekOfMonth[] {
 // ─── Status Cell ──────────────────────────────────────────────────────────────
 const StatusCell: React.FC<{
   cell: CellData;
+  isLocked?: boolean;
   onClick: () => void;
   onContextMenu: (e: React.MouseEvent) => void;
-}> = ({ cell, onClick, onContextMenu }) => {
+}> = ({ cell, isLocked, onClick, onContextMenu }) => {
   const hasExtra = cell.otHours > 0 || cell.lateMinutes > 0 || cell.permissionMinutes > 0;
   return (
     <div className="relative inline-flex">
       <button
         onClick={onClick}
         onContextMenu={onContextMenu}
+        disabled={isLocked}
         className={`w-[32px] h-[28px] rounded flex items-center justify-center font-bold text-[9px] transition-all select-none ${
-          cell.status ? S[cell.status].cell : 'bg-slate-100 text-slate-400 hover:bg-slate-200'
+          isLocked
+            ? 'bg-slate-200 text-slate-500 cursor-not-allowed opacity-75 border border-slate-300'
+            : cell.status
+              ? S[cell.status].cell
+              : 'bg-slate-100 text-slate-400 hover:bg-slate-200'
         }`}
-        title="Left-click: cycle status | Right-click: edit OT / Late / Perm"
+        title={isLocked ? 'Locked (Payroll Approved)' : 'Left-click: cycle status | Right-click: edit OT / Late / Perm'}
       >
-        {cell.status ? S[cell.status].abbr : '—'}
+        {isLocked ? <Lock size={10} className="text-slate-600" /> : cell.status ? S[cell.status].abbr : '—'}
       </button>
       {hasExtra && (
         <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-blue-500 pointer-events-none" />
@@ -136,9 +142,9 @@ const StatusCell: React.FC<{
 
 // ─── Cell Edit Panel ──────────────────────────────────────────────────────────
 const CellEditPanel: React.FC<{
-  empName: string; date: string; cell: CellData;
+  empName: string; date: string; cell: CellData; isLocked?: boolean;
   onChange: (c: CellData) => void; onClose: () => void;
-}> = ({ empName, date, cell, onChange, onClose }) => (
+}> = ({ empName, date, cell, isLocked, onChange, onClose }) => (
   <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/30 backdrop-blur-sm" onClick={onClose}>
     <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-5 space-y-4" onClick={e => e.stopPropagation()}>
       <div className="flex items-center justify-between">
@@ -149,22 +155,29 @@ const CellEditPanel: React.FC<{
         <button onClick={onClose} className="w-8 h-8 flex items-center justify-center text-lg text-text-muted hover:text-text-primary">×</button>
       </div>
 
+      {isLocked && (
+        <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 text-amber-800 text-xs px-3 py-2 rounded-xl font-medium">
+          <Lock size={14} className="shrink-0" />
+          <span>This date is locked because payroll has been approved. Editing is disabled.</span>
+        </div>
+      )}
+
       {/* Status grid */}
       <div>
         <p className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-2">Status</p>
         <div className="grid grid-cols-4 gap-1.5">
           {STATUSES.map(st => (
-            <button key={st} onClick={() => onChange({ ...cell, status: cell.status === st ? null : st })}
+            <button key={st} disabled={isLocked} onClick={() => onChange({ ...cell, status: cell.status === st ? null : st })}
               className={`py-1.5 rounded-lg text-[10px] font-bold transition-all border-2 ${
                 cell.status === st ? `${S[st].cell} border-transparent` : 'bg-white text-text-muted border-border hover:border-slate-300'
-              }`}>
+              } ${isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}>
               {S[st].abbr}
             </button>
           ))}
-          <button onClick={() => onChange({ ...cell, status: null })}
+          <button disabled={isLocked} onClick={() => onChange({ ...cell, status: null })}
             className={`py-1.5 rounded-lg text-[10px] font-bold border-2 transition-all ${
               cell.status === null ? 'bg-slate-700 text-white border-transparent' : 'bg-white text-text-muted border-border hover:border-slate-300'
-            }`}>
+            } ${isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}>
             —
           </button>
         </div>
@@ -179,16 +192,16 @@ const CellEditPanel: React.FC<{
         ] as const).map(f => (
           <div key={f.field}>
             <label className="block text-xs font-semibold text-text-muted mb-1">{f.label}</label>
-            <input type="number" min={0} step={f.step}
+            <input type="number" min={0} step={f.step} disabled={isLocked}
               value={cell[f.field]}
               onChange={e => onChange({ ...cell, [f.field]: Number(e.target.value) })}
-              className="w-full border border-border rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary" />
+              className="w-full border border-border rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed" />
           </div>
         ))}
       </div>
 
       <button onClick={onClose} className="w-full py-2.5 bg-primary text-white rounded-xl font-semibold text-sm hover:bg-red-700 transition-colors">
-        Done
+        {isLocked ? 'Close' : 'Done'}
       </button>
     </div>
   </div>
@@ -218,6 +231,7 @@ const AttendancePage: React.FC = () => {
   const [saveOk,       setSaveOk]       = useState(false);
   const [error,        setError]        = useState('');
   const [hasSavedData, setHasSavedData] = useState(false);
+  const [lockedPeriods, setLockedPeriods] = useState<string[]>([]);
 
   // ── Cell panel ────────────────────────────────────────────────────────────
   const [selected, setSelected] = useState<{ empId: number; empName: string; date: string } | null>(null);
@@ -260,6 +274,17 @@ const AttendancePage: React.FC = () => {
 
   const weeklyOffDays: number[] = payrollCfg?.weeklyOffDays ?? [];
 
+  // Helper to check if a date is locked by an approved/locked payroll run
+  const isDateLocked = useCallback((dateStr: string): boolean => {
+    if (lockedPeriods.length === 0) return false;
+    const monthP = dateStr.slice(0, 7);
+    const weekP  = isoPeriod(dateStr);
+    return lockedPeriods.includes(monthP) || lockedPeriods.includes(weekP);
+  }, [lockedPeriods]);
+
+  const allDatesLocked = useMemo(() => dates.length > 0 && dates.every(d => isDateLocked(d)), [dates, isDateLocked]);
+  const someDatesLocked = useMemo(() => dates.some(d => isDateLocked(d)), [dates, isDateLocked]);
+
   // ── Load employees + config ───────────────────────────────────────────────
   useEffect(() => {
     Promise.all([payrollService.listEmployees(), payrollService.getConfig()])
@@ -293,18 +318,15 @@ const AttendancePage: React.FC = () => {
 
   // ── Load saved attendance from API ────────────────────────────────────────
   const loadSaved = useCallback(async () => {
-    setLoadingAtt(true); setSaveOk(false);
+    setLoadingAtt(true); setSaveOk(false); setError('');
     try {
-      // For MONTHLY period → backend queries by date prefix (returns all month records)
-      // For WEEKLY period  → backend queries by exact period field
-      // For full month mode in weekly → also uses YYYY-MM which returns all month records
       const records: any[] = await payrollService.getAttendance(period);
       if (records.length > 0) {
         setGrid(prev => {
           const next = { ...prev };
           records.forEach(r => {
             const k = cellKey(Number(r.employeeId), r.date);
-            if (k in next) { // only load for employees visible in current view
+            if (k in next) {
               next[k] = {
                 status:            r.status as AttStatus,
                 otHours:           Number(r.otHours),
@@ -319,12 +341,24 @@ const AttendancePage: React.FC = () => {
       } else {
         setHasSavedData(false);
       }
+
+      // Check if period or month is locked/approved
+      try {
+        const monthQuery = `${year}-${String(month).padStart(2,'0')}`;
+        const runRes = await payrollService.listRuns({ period: monthQuery });
+        const lockedList = runRes.runs
+          .filter(r => r.status === 'APPROVED' || r.status === 'LOCKED')
+          .map(r => r.period);
+        setLockedPeriods(lockedList);
+      } catch {
+        setLockedPeriods([]);
+      }
     } catch {
       // No saved records is fine
     } finally {
       setLoadingAtt(false);
     }
-  }, [period]);
+  }, [period, year, month]);
 
   useEffect(() => {
     if (!loading) loadSaved();
@@ -335,11 +369,13 @@ const AttendancePage: React.FC = () => {
     grid[cellKey(empId, date)] ?? EMPTY_CELL;
 
   const setCell = (empId: number, date: string, data: CellData) => {
+    if (isDateLocked(date)) return;
     setGrid(prev => ({ ...prev, [cellKey(empId, date)]: data }));
     setSaveOk(false);
   };
 
   const cycleCell = (empId: number, date: string) => {
+    if (isDateLocked(date)) return;
     const cur = getCell(empId, date);
     setCell(empId, date, { ...cur, status: cycleStatus(cur.status) });
   };
@@ -350,9 +386,11 @@ const AttendancePage: React.FC = () => {
       const next = { ...prev };
       filteredEmployees.forEach(emp => {
         dates.forEach(date => {
-          const k = cellKey(Number(emp.id), date);
-          const isOff = weeklyOffDays.includes(dayOfWeek(date));
-          next[k] = { ...(next[k] ?? EMPTY_CELL), status: isOff ? 'WEEKLY_OFF' : 'PRESENT' };
+          if (!isDateLocked(date)) {
+            const k = cellKey(Number(emp.id), date);
+            const isOff = weeklyOffDays.includes(dayOfWeek(date));
+            next[k] = { ...(next[k] ?? EMPTY_CELL), status: isOff ? 'WEEKLY_OFF' : 'PRESENT' };
+          }
         });
       });
       return next;
@@ -365,7 +403,9 @@ const AttendancePage: React.FC = () => {
       const next = { ...prev };
       filteredEmployees.forEach(emp => {
         dates.forEach(date => {
-          next[cellKey(Number(emp.id), date)] = { ...EMPTY_CELL };
+          if (!isDateLocked(date)) {
+            next[cellKey(Number(emp.id), date)] = { ...EMPTY_CELL };
+          }
         });
       });
       return next;
@@ -377,8 +417,10 @@ const AttendancePage: React.FC = () => {
     setGrid(prev => {
       const next = { ...prev };
       dates.forEach(date => {
-        const k = cellKey(empId, date);
-        next[k] = { ...(next[k] ?? EMPTY_CELL), status };
+        if (!isDateLocked(date)) {
+          const k = cellKey(empId, date);
+          next[k] = { ...(next[k] ?? EMPTY_CELL), status };
+        }
       });
       return next;
     });
@@ -389,6 +431,7 @@ const AttendancePage: React.FC = () => {
   const buildRecords = (empList: ApiEmployeePayroll[], dayList: string[], p: string) =>
     empList.flatMap(emp =>
       dayList.map(date => {
+        if (isDateLocked(date)) return null;
         const c = getCell(Number(emp.id), date);
         if (!c.status) return null;
         return {
@@ -407,14 +450,21 @@ const AttendancePage: React.FC = () => {
   const handleSave = async () => {
     setSaving(true); setError(''); setSaveOk(false);
     try {
+      if (allDatesLocked) {
+        setError('Cannot save attendance. Payroll for this period has already been approved or locked.');
+        return;
+      }
+
       if (runType === 'WEEKLY' && fullMonthMode) {
         // ── Full-month save for weekly employees ─────────────────────────
         // Group all dates by their ISO week period, save each group separately
         const weekGroups = new Map<string, string[]>();
         dates.forEach(date => {
-          const wp = isoPeriod(date);
-          if (!weekGroups.has(wp)) weekGroups.set(wp, []);
-          weekGroups.get(wp)!.push(date);
+          if (!isDateLocked(date)) {
+            const wp = isoPeriod(date);
+            if (!weekGroups.has(wp)) weekGroups.set(wp, []);
+            weekGroups.get(wp)!.push(date);
+          }
         });
 
         let totalSaved = 0;
@@ -425,12 +475,13 @@ const AttendancePage: React.FC = () => {
             totalSaved += records.length;
           }
         }
-        if (totalSaved === 0) { setError('No attendance data to save. Mark at least one cell.'); return; }
+        if (totalSaved === 0) { setError('No editable attendance data to save. Mark at least one unlocked cell.'); return; }
         setSaveOk(true); setHasSavedData(true);
       } else {
         // ── Normal single-period save ─────────────────────────────────────
-        const records = buildRecords(filteredEmployees, dates, period);
-        if (records.length === 0) { setError('No attendance data to save. Mark at least one cell.'); return; }
+        const editableDates = dates.filter(d => !isDateLocked(d));
+        const records = buildRecords(filteredEmployees, editableDates, period);
+        if (records.length === 0) { setError('No editable attendance data to save. Mark at least one unlocked cell.'); return; }
         await payrollService.bulkUpsertAttendance(period, records as any);
         setSaveOk(true); setHasSavedData(true);
       }
@@ -504,14 +555,26 @@ const AttendancePage: React.FC = () => {
               <PlayCircle size={14} /> Run Payroll
             </button>
             {canEditAttendance && (
-              <button onClick={handleSave} disabled={saving}
-                className="inline-flex items-center gap-2 px-5 py-2 bg-primary text-white rounded-lg text-sm font-semibold hover:bg-red-700 transition-colors shadow-sm disabled:opacity-60">
+              <button onClick={handleSave} disabled={saving || allDatesLocked}
+                className="inline-flex items-center gap-2 px-5 py-2 bg-primary text-white rounded-lg text-sm font-semibold hover:bg-red-700 transition-colors shadow-sm disabled:opacity-60 disabled:cursor-not-allowed">
                 {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
                 {saving ? 'Saving…' : runType === 'WEEKLY' && fullMonthMode ? 'Save Full Month' : 'Save Attendance'}
               </button>
             )}
           </div>
         </div>
+
+        {allDatesLocked ? (
+          <div className="mt-3 flex items-center gap-2 text-xs text-red-800 bg-red-50 border border-red-200 rounded-lg px-3 py-2 font-medium">
+            <Lock size={14} className="text-red-600 shrink-0" />
+            <span>Attendance for <strong>{period}</strong> is LOCKED because payroll has been approved or locked. Attendance cannot be edited for this period.</span>
+          </div>
+        ) : someDatesLocked ? (
+          <div className="mt-3 flex items-center gap-2 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 font-medium">
+            <Lock size={14} className="text-amber-600 shrink-0" />
+            <span>Some period(s) in this view (<strong>{lockedPeriods.join(', ')}</strong>) are locked (payroll approved). Locked dates cannot be edited, but unlocked dates remain editable.</span>
+          </div>
+        ) : null}
 
         {saveOk && (
           <div className="mt-3 flex items-center gap-2 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
@@ -603,21 +666,8 @@ const AttendancePage: React.FC = () => {
 
         <div className="w-px h-5 bg-border" />
 
-        {/* Bulk actions */}
-        {/* <button onClick={applyCompanySchedule}
-          title={`Marks ${weeklyOffDays.map(d => DAY_FULL[d]).join(', ')} as Weekly Off; all other days as Present`}
-          className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary bg-red-50 border border-primary/30 px-3 py-1.5 rounded-lg hover:bg-red-100 transition-colors">
-          <Calendar size={12} />
-          Apply Company Schedule
-          {weeklyOffDays.length > 0 && (
-            <span className="ml-0.5 text-[10px] text-text-muted">
-              ({weeklyOffDays.map(d => DAY_ABBR[d]).join(', ')} off)
-            </span>
-          )}
-        </button> */}
-
-        <button onClick={clearAll}
-          className="text-xs font-semibold text-slate-600 bg-slate-100 border border-slate-200 px-3 py-1.5 rounded-lg hover:bg-slate-200 transition-colors">
+        <button onClick={clearAll} disabled={allDatesLocked}
+          className="text-xs font-semibold text-slate-600 bg-slate-100 border border-slate-200 px-3 py-1.5 rounded-lg hover:bg-slate-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
           Clear All
         </button>
       </div>
@@ -630,14 +680,6 @@ const AttendancePage: React.FC = () => {
           Changes will overwrite on next save.
         </div>
       )}
-      {/* {weeklyOffDays.length > 0 && (
-        <div className="bg-amber-50 border-b border-amber-200 px-6 py-2 flex items-center gap-2 text-xs text-amber-700">
-          <Info size={13} />
-          Company weekly off days:
-          <strong className="ml-1">{weeklyOffDays.map(d => DAY_FULL[d]).join(', ')}</strong>.
-          Click "Apply Company Schedule" to auto-fill these as WO.
-        </div>
-      )} */}
 
       {/* ── Legend ── */}
       <div className="bg-white border-b border-border px-6 py-2 flex flex-wrap items-center gap-3">
@@ -652,6 +694,12 @@ const AttendancePage: React.FC = () => {
           <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-200 text-slate-500">—</span>
           <span className="text-[10px] text-text-muted">Unset (not counted)</span>
         </div>
+        <div className="flex items-center gap-1 ml-2 border-l border-border pl-3">
+          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-200 text-slate-600 inline-flex items-center gap-0.5">
+            <Lock size={9} /> Lock
+          </span>
+          <span className="text-[10px] text-text-muted">Payroll Approved</span>
+        </div>
         <div className="ml-auto text-[10px] text-text-muted">
           Left-click = cycle · Right-click = OT / Late / Perm
         </div>
@@ -660,13 +708,19 @@ const AttendancePage: React.FC = () => {
       {/* ── Week divider labels in full-month mode ── */}
       {runType === 'WEEKLY' && fullMonthMode && (
         <div className="bg-slate-50 border-b border-border px-6 py-2 flex flex-wrap gap-2">
-          {monthWeeks.map(w => (
-            <span key={w.num}
-              className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-600 bg-white border border-slate-200 rounded-md px-2 py-0.5">
-              <span className="w-3 h-3 rounded-full bg-primary/20 text-primary flex items-center justify-center text-[8px] font-bold">{w.num}</span>
-              {w.label.replace(`Week ${w.num}  `, '')} → <span className="text-primary font-bold">{w.period}</span>
-            </span>
-          ))}
+          {monthWeeks.map(w => {
+            const isWkLocked = lockedPeriods.includes(w.period) || lockedPeriods.includes(`${year}-${String(month).padStart(2,'0')}`);
+            return (
+              <span key={w.num}
+                className={`inline-flex items-center gap-1 text-[10px] font-semibold border rounded-md px-2 py-0.5 ${
+                  isWkLocked ? 'bg-amber-50 text-amber-800 border-amber-300' : 'bg-white text-slate-600 border-slate-200'
+                }`}>
+                <span className="w-3 h-3 rounded-full bg-primary/20 text-primary flex items-center justify-center text-[8px] font-bold">{w.num}</span>
+                {w.label.replace(`Week ${w.num}  `, '')} → <span className="text-primary font-bold">{w.period}</span>
+                {isWkLocked && <Lock size={10} className="text-amber-600 ml-0.5" />}
+              </span>
+            );
+          })}
         </div>
       )}
 
@@ -699,18 +753,21 @@ const AttendancePage: React.FC = () => {
                       const dow  = dayOfWeek(date);
                       const isOff = weeklyOffDays.includes(dow);
                       const isSun = dow === 0;
-                      // In full-month mode: show week divider before day 8, 15, 22, 29
                       const isWeekStart = fullMonthMode && runType === 'WEEKLY' && (day === 8 || day === 15 || day === 22 || day === 29);
+                      const locked = isDateLocked(date);
                       return (
                         <th key={date}
                           className={`px-0 py-2 text-center font-semibold border-b border-r border-border ${
                             isWeekStart ? 'border-l-2 border-l-primary/40' : ''
-                          } ${isOff ? (isSun ? 'bg-red-50' : 'bg-amber-50/50') : 'bg-slate-50'}`}
+                          } ${locked ? 'bg-slate-200/70' : isOff ? (isSun ? 'bg-red-50' : 'bg-amber-50/50') : 'bg-slate-50'}`}
                           style={{ width: 38, minWidth: 38 }}
-                          title={isWeekStart ? `Week ${Math.ceil(day / 7)} starts` : undefined}
+                          title={locked ? 'Payroll Approved/Locked' : isWeekStart ? `Week ${Math.ceil(day / 7)} starts` : undefined}
                         >
-                          <div className={`text-[11px] font-bold ${isOff ? (isSun ? 'text-red-500' : 'text-amber-600') : 'text-text-primary'}`}>{day}</div>
-                          <div className={`text-[9px] ${isOff ? (isSun ? 'text-red-400' : 'text-amber-500') : 'text-text-muted'}`}>{DAY_ABBR[dow]}</div>
+                          <div className={`text-[11px] font-bold flex items-center justify-center gap-0.5 ${locked ? 'text-slate-500' : isOff ? (isSun ? 'text-red-500' : 'text-amber-600') : 'text-text-primary'}`}>
+                            {day}
+                            {locked && <Lock size={8} className="text-slate-500" />}
+                          </div>
+                          <div className={`text-[9px] ${locked ? 'text-slate-400' : isOff ? (isSun ? 'text-red-400' : 'text-amber-500') : 'text-text-muted'}`}>{DAY_ABBR[dow]}</div>
                           {isWeekStart && <div className="text-[8px] text-primary font-bold">W{Math.ceil(day/7)}</div>}
                         </th>
                       );
@@ -742,10 +799,10 @@ const AttendancePage: React.FC = () => {
                               <p className="text-[10px] text-text-muted">{emp.empCode} · {(emp.payrollConfig?.salaryType ?? '—').replace(/_/g,' ')}</p>
                             </div>
                             <div className="flex gap-0.5 shrink-0">
-                              <button onClick={() => markEmployeeRow(empId, 'PRESENT')} title="All Present"
-                                className="w-5 h-5 rounded text-[8px] font-bold bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-colors">P</button>
-                              <button onClick={() => markEmployeeRow(empId, 'ABSENT')} title="All Absent"
-                                className="w-5 h-5 rounded text-[8px] font-bold bg-red-100 text-red-700 hover:bg-red-200 transition-colors">A</button>
+                              <button onClick={() => markEmployeeRow(empId, 'PRESENT')} title="All Present" disabled={allDatesLocked}
+                                className="w-5 h-5 rounded text-[8px] font-bold bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">P</button>
+                              <button onClick={() => markEmployeeRow(empId, 'ABSENT')} title="All Absent" disabled={allDatesLocked}
+                                className="w-5 h-5 rounded text-[8px] font-bold bg-red-100 text-red-700 hover:bg-red-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">A</button>
                             </div>
                           </div>
                         </td>
@@ -756,13 +813,15 @@ const AttendancePage: React.FC = () => {
                           const isCompanyOff = weeklyOffDays.includes(dayOfWeek(date));
                           const day = parseInt(date.split('-')[2], 10);
                           const isWeekStart = fullMonthMode && runType === 'WEEKLY' && (day === 8 || day === 15 || day === 22 || day === 29);
+                          const locked = isDateLocked(date);
                           return (
                             <td key={date}
                               className={`px-0.5 py-0.5 border-b border-r border-border text-center ${
                                 isWeekStart ? 'border-l-2 border-l-primary/30' : ''
-                              } ${isCompanyOff && !cell.status ? 'bg-slate-50/80' : ''}`}>
+                              } ${locked ? 'bg-slate-100/80' : isCompanyOff && !cell.status ? 'bg-slate-50/80' : ''}`}>
                               <StatusCell
                                 cell={cell}
+                                isLocked={locked}
                                 onClick={() => cycleCell(empId, date)}
                                 onContextMenu={e => { e.preventDefault(); setSelected({ empId, empName: emp.fullName, date }); }}
                               />
@@ -793,6 +852,7 @@ const AttendancePage: React.FC = () => {
           empName={selected.empName}
           date={selected.date}
           cell={getCell(selected.empId, selected.date)}
+          isLocked={isDateLocked(selected.date)}
           onChange={c => setCell(selected.empId, selected.date, c)}
           onClose={() => setSelected(null)}
         />

@@ -21,6 +21,8 @@ import { useSocketSync } from "../../../hooks/useSocketSync";
 import { employeeService } from "../../../services/employeeService";
 import apiClient from "../../../api/apiClient";
 import SalaryStructureSection from "../../../components/employee/SalaryStructureSection";
+import TotalCompensationSection from "../../../components/employee/TotalCompensationSection";
+import { usePermission } from "../../../hooks/usePermission";
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -239,6 +241,7 @@ const EmployeeEdit: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const user = useSelector((state: any) => state.auth.user);
+  const { isSuperAdmin } = usePermission();
   const { departments, loadDepartments } = useDepartments();
   const { roles, loadRoles } = useRoles();
 
@@ -246,7 +249,7 @@ const EmployeeEdit: React.FC = () => {
   const [form, setForm] = useState<FormState>(INITIAL_STATE);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [shifts, setShifts] = useState<{ id: string | number; name: string }[]>([]);
+  const [shifts, setShifts] = useState<any[]>([]);
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({});
   const [showPassword, setShowPassword] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
@@ -331,13 +334,37 @@ const EmployeeEdit: React.FC = () => {
         weeklySalary:       emp.salaryType?.toLowerCase() === "weekly"  ? String(emp.grossSalary || "") : "",
         dailySalary:        emp.salaryType?.toLowerCase() === "daily"   ? String(emp.grossSalary || "") : "",
         hourlySalary:       emp.salaryType?.toLowerCase() === "hourly"  ? String(emp.grossSalary || "") : "",
-        basicSalary:        emp.basicSalary !== undefined && emp.basicSalary !== null ? String(emp.basicSalary) : (emp.payrollConfig?.basicSalary ? String(emp.payrollConfig.basicSalary) : ""),
-        da:                 emp.da !== undefined && emp.da !== null ? String(emp.da) : (emp.payrollConfig?.da ? String(emp.payrollConfig.da) : ""),
-        hra:                emp.hra !== undefined && emp.hra !== null ? String(emp.hra) : (emp.payrollConfig?.hra ? String(emp.payrollConfig.hra) : ""),
+        basicSalary:        (() => {
+          const raw = emp.basicSalary !== undefined && emp.basicSalary !== null ? String(emp.basicSalary) : (emp.payrollConfig?.basicSalary ? String(emp.payrollConfig.basicSalary) : "");
+          if (raw && parseFloat(raw) > 0) return raw;
+          const gross = Number(emp.grossSalary || 0);
+          return gross > 0 ? String(Math.round(gross * 0.50)) : "";
+        })(),
+        da:                 (() => {
+          const raw = emp.da !== undefined && emp.da !== null ? String(emp.da) : (emp.payrollConfig?.da ? String(emp.payrollConfig.da) : "");
+          if (raw && parseFloat(raw) > 0) return raw;
+          const gross = Number(emp.grossSalary || 0);
+          return gross > 0 ? String(Math.round(gross * 0.10)) : "";
+        })(),
+        hra:                (() => {
+          const raw = emp.hra !== undefined && emp.hra !== null ? String(emp.hra) : (emp.payrollConfig?.hra ? String(emp.payrollConfig.hra) : "");
+          if (raw && parseFloat(raw) > 0) return raw;
+          const gross = Number(emp.grossSalary || 0);
+          return gross > 0 ? String(Math.round(gross * 0.10)) : "";
+        })(),
         conveyanceAllowance: "",
         medicalAllowance:   "",
         specialAllowance:   "",
-        otherAllowance:     emp.otherAllowance !== undefined && emp.otherAllowance !== null ? String(emp.otherAllowance) : (emp.payrollConfig?.otherAllowance ? String(emp.payrollConfig.otherAllowance) : ""),
+        otherAllowance:     (() => {
+          const raw = emp.otherAllowance !== undefined && emp.otherAllowance !== null ? String(emp.otherAllowance) : (emp.payrollConfig?.otherAllowance ? String(emp.payrollConfig.otherAllowance) : "");
+          if (raw && parseFloat(raw) > 0) return raw;
+          const gross = Number(emp.grossSalary || 0);
+          if (gross <= 0) return "";
+          const b = Math.round(gross * 0.50);
+          const d = Math.round(gross * 0.10);
+          const h = Math.round(gross * 0.10);
+          return String(Math.max(0, gross - b - d - h));
+        })(),
         overtimeEligible:   false,
         minWorkingHours:    "",
         maxWorkingHours:    "",
@@ -582,34 +609,37 @@ const EmployeeEdit: React.FC = () => {
 
       if (form.photoFile) fd.append("photo", form.photoFile);
 
-      if (form.personalMobile) fd.append("personalMobile", form.personalMobile);
-      fd.append("mobile", form.officialMobile);
-      if (form.personalEmail) fd.append("personalEmail", form.personalEmail);
-      fd.append("email", form.officialEmail);
-      if (form.emergencyContactName) fd.append("emergencyContactName", form.emergencyContactName);
-      if (form.emergencyContactNumber) fd.append("emergencyContactNumber", form.emergencyContactNumber);
+      fd.append("personalMobile",        form.personalMobile || "");
+      fd.append("mobile",                form.officialMobile || "");
+      fd.append("personalEmail",         form.personalEmail || "");
+      fd.append("email",                 form.officialEmail || "");
+      fd.append("emergencyContactName",  form.emergencyContactName || "");
+      fd.append("emergencyContactNumber", form.emergencyContactNumber || "");
 
-      if (form.fatherName)           fd.append("fatherName",           form.fatherName);
-      if (form.motherName)           fd.append("motherName",           form.motherName);
-      if (form.spouseName)           fd.append("spouseName",           form.spouseName);
-      if (form.guardianName)         fd.append("guardianName",         form.guardianName);
-      if (form.guardianRelationship) fd.append("guardianRelationship", form.guardianRelationship);
+      // Family
+      fd.append("fatherName",           form.fatherName || "");
+      fd.append("motherName",           form.motherName || "");
+      fd.append("spouseName",           form.spouseName || "");
+      fd.append("guardianName",         form.guardianName || "");
+      fd.append("guardianRelationship", form.guardianRelationship || "");
 
-      if (form.aadhaarNumber) fd.append("aadhaarNumber", form.aadhaarNumber);
-      if (form.panNumber) fd.append("panNumber", form.panNumber);
-      if (form.drivingLicense) fd.append("drivingLicense", form.drivingLicense);
-      if (form.voterId) fd.append("voterId", form.voterId);
+      // Identity
+      fd.append("aadhaarNumber", form.aadhaarNumber || "");
+      fd.append("panNumber",     form.panNumber || "");
+      fd.append("drivingLicense",form.drivingLicense || "");
+      fd.append("voterId",       form.voterId || "");
 
-      if (form.permAddress1) fd.append("permanentAddressLine1", form.permAddress1);
-      if (form.permAddress2) fd.append("permanentAddressLine2", form.permAddress2);
-      if (form.permCity)     fd.append("permanentCity",         form.permCity);
-      if (form.permState)    fd.append("permanentState",        form.permState);
-      if (form.permPincode)  fd.append("permanentPincode",      form.permPincode);
-      if (form.presAddress1) fd.append("presentAddressLine1",   form.presAddress1);
-      if (form.presAddress2) fd.append("presentAddressLine2",   form.presAddress2);
-      if (form.presCity)     fd.append("presentCity",           form.presCity);
-      if (form.presState)    fd.append("presentState",          form.presState);
-      if (form.presPincode)  fd.append("presentPincode",        form.presPincode);
+      // Address
+      fd.append("permanentAddressLine1", form.permAddress1 || "");
+      fd.append("permanentAddressLine2", form.permAddress2 || "");
+      fd.append("permanentCity",         form.permCity || "");
+      fd.append("permanentState",        form.permState || "");
+      fd.append("permanentPincode",      form.permPincode || "");
+      fd.append("presentAddressLine1",   form.presAddress1 || "");
+      fd.append("presentAddressLine2",   form.presAddress2 || "");
+      fd.append("presentCity",           form.presCity || "");
+      fd.append("presentState",          form.presState || "");
+      fd.append("presentPincode",        form.presPincode || "");
 
       if (form.departmentId) fd.append("departmentId", form.departmentId);
       if (form.roleId)       fd.append("roleId",       form.roleId);
@@ -896,13 +926,29 @@ const EmployeeEdit: React.FC = () => {
     </div>
   );
 
+  const selectedShift = React.useMemo(() => {
+    if (!form.shiftId) return null;
+    return shifts.find((s: any) =>
+      String(s.shiftCode || s.id) === String(form.shiftId) ||
+      String(s.id) === String(form.shiftId)
+    ) || null;
+  }, [form.shiftId, shifts]);
+
   const renderTab8 = () => (
-    <SalaryStructureSection
-      form={form}
-      onChange={handleChange}
-      onToggle={(name) => handleToggle(name as any)}
-      errors={errors}
-    />
+    <div className="space-y-6">
+      <SalaryStructureSection
+        form={form}
+        onChange={handleChange}
+        onToggle={(name) => handleToggle(name as any)}
+        errors={errors}
+        selectedShift={selectedShift}
+      />
+      {isSuperAdmin && (
+        <TotalCompensationSection
+          employeeId={id ? Number(id) : null}
+        />
+      )}
+    </div>
   );
 
   const renderTab9 = () => (

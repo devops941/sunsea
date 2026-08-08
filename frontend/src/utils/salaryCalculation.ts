@@ -38,6 +38,46 @@ export function getWeeklyWorkingDays(cfg: PayrollCalcConfig): number {
   return 7 - (cfg.weeklyOffDays?.length ?? 1);
 }
 
+/** Calculate working hours for a given shift object (startTime, endTime, breakDuration) */
+export function calcShiftWorkingHours(
+  shift: { startTime?: string; endTime?: string; breakDuration?: any } | null | undefined,
+  fallback = 8
+): number {
+  if (!shift || !shift.startTime || !shift.endTime) return fallback;
+  try {
+    const parseMins = (t: string) => {
+      const match = String(t).match(/(\d+):(\d+)\s*(AM|PM)?/i);
+      if (!match) return null;
+      let h = parseInt(match[1], 10);
+      const m = parseInt(match[2], 10);
+      const ampm = match[3]?.toUpperCase();
+      if (ampm === "PM" && h < 12) h += 12;
+      if (ampm === "AM" && h === 12) h = 0;
+      return h * 60 + m;
+    };
+
+    const startMinutes = parseMins(shift.startTime);
+    let endMinutes = parseMins(shift.endTime);
+    if (startMinutes === null || endMinutes === null) return fallback;
+
+    if (endMinutes < startMinutes) {
+      endMinutes += 24 * 60; // Overnight shift
+    }
+
+    let diffMinutes = endMinutes - startMinutes;
+    if (shift.breakDuration) {
+      const bMins = parseFloat(String(shift.breakDuration)) || 0;
+      diffMinutes -= bMins;
+    }
+
+    if (diffMinutes <= 0) return fallback;
+    const hrs = diffMinutes / 60;
+    return Math.round(hrs * 100) / 100;
+  } catch {
+    return fallback;
+  }
+}
+
 // ── Derivation functions ──────────────────────────────────────────────────────
 
 /** Monthly → Daily / Hourly / Weekly */
