@@ -166,6 +166,7 @@ const SalesInvoiceForm: React.FC = () => {
   const [previewInvoiceNo, setPreviewInvoiceNo] = useState<string>("");
   const [invoiceSettings, setInvoiceSettings] = useState<any>(null);
   const [allOrders, setAllOrders] = useState<any[]>([]);
+  const [enabled, setEnabled] = useState(true);
 
   const [customerId, setCustomerId] = useState("");
   const [invoiceDate, setInvoiceDate] = useState<string>(new Date().toISOString().split("T")[0]);
@@ -207,7 +208,7 @@ const SalesInvoiceForm: React.FC = () => {
           setNotes(invoice.notes || "");
           setPreviewInvoiceNo(invoice.invoiceNo);
           setSelectedSalesOrderId(invoice.salesOrderId ? String(invoice.salesOrderId) : "");
-          
+
           if (invoice.salesOrder) {
             setEditInvoiceSalesOrder(invoice.salesOrder);
           }
@@ -683,10 +684,26 @@ const SalesInvoiceForm: React.FC = () => {
 
           {/* Main Details */}
           <div>
-            <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 flex items-center gap-2">
+            {/* <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 flex items-center gap-2">
               <FaFileInvoiceDollar className="text-slate-400" />
               Invoice Details
-            </h3>
+            </h3> */}
+            <div className="flex items-center justify-between gap-4 mb-4">
+              <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                <FaFileInvoiceDollar className="text-slate-400" />
+                Invoice Details
+              </h3>
+
+              <label className="flex items-center gap-2 cursor-pointer text-sm text-slate-600">
+                <input
+                  type="checkbox"
+                  checked={enabled}
+                  onChange={(e) => setEnabled(e.target.checked)}
+                  className=" h-4 w-4 rounded border-0 bg-slate-200 checked:bg-slate-700 focus:ring-0 cursor-pointer"
+                />
+
+              </label>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <SelectInput
                 label="Customer"

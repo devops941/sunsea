@@ -176,7 +176,7 @@ const SalesInvoiceList: React.FC = () => {
             setSendingWhatsapp(true);
             const fullItem = await salesInvoiceService.fetchById(item.id);
             setWhatsappInvoice(fullItem);
-            
+
             // Extract best mobile number from customer object
             let rPhone = "";
             if (fullItem.customer?.mobile) {
@@ -187,7 +187,7 @@ const SalesInvoiceList: React.FC = () => {
                 }
             }
             setRecipientPhone(rPhone);
-            
+
             setWhatsappMessage(`Dear ${fullItem.customer?.displayName || fullItem.customer?.firmName || "Customer"},\n\nPlease find the attached invoice for your reference.\n\nBest regards,\n${company?.companyName || "Sunsea"}`);
             setShowWhatsappModal(true);
         } catch (error: any) {
@@ -283,9 +283,9 @@ const SalesInvoiceList: React.FC = () => {
         },
         {
             header: "ACTIONS",
-            width: "160px",
+            width: "250px",   // was 160px — too tight for 5 icons + gaps
             render: (item) => (
-                <div className="flex justify-start gap-2">
+                <div className="flex justify-start items-center gap-1.5 whitespace-nowrap">
                     <EmailButton onClick={() => handleOpenEmailModal(item)} />
                     <WhatsappButton onClick={() => handleOpenWhatsappModal(item)} />
                     <ViewButton onClick={() => handleOpenView(item)} />
@@ -455,7 +455,7 @@ const SalesInvoiceList: React.FC = () => {
 
                                 if (phones.length > 1) {
                                     return (
-                                        <select 
+                                        <select
                                             className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white"
                                             value={recipientPhone}
                                             onChange={(e) => setRecipientPhone(e.target.value)}
