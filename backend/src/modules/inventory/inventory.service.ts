@@ -56,11 +56,18 @@ class InventoryService {
 
     // ── TODAY: always use live in-memory data ─────────────────────────────────
     if (isToday) {
-      // Fetch today's locked snapshots (if EOD job already ran for today)
-      // and yesterday's snapshots for opening-balance (startQty) calculation
-      const [todaySnapshots, yesterdaySnapshots] = await Promise.all([
+      // Fetch today's locked snapshots, yesterday's snapshots, and today's
+      // transactions so we can compute the day-opening balance when no
+      // yesterday snapshot exists (e.g. first day of using the system).
+      const [todaySnapshots, yesterdaySnapshots, todayRmTxns, todayFgTxns] = await Promise.all([
         prisma.eodStockSnapshot.findMany({ where: { snapshotDate: date } }),
         prisma.eodStockSnapshot.findMany({ where: { snapshotDate: yesterday } }),
+        prisma.rawMaterialTransaction.findMany({
+          where: { txnDateTime: { gte: todayISTStart } },
+        }),
+        prisma.finishedGoodsTransaction.findMany({
+          where: { txnDateTime: { gte: todayISTStart } },
+        }),
       ]);
 
       const todayMap = new Map<string, any>();
@@ -72,21 +79,52 @@ class InventoryService {
         yesterdayMap.set(`${s.category}_${s.itemId}_${s.storeId}`, s);
       }
 
+      // ── Compute today's net stock change for Raw Materials ───────────────────
+      // qty is always stored as absolute; txnType tells direction
+      const rmNetMap = new Map<string, number>();
+      for (const t of todayRmTxns) {
+        const typ = t.txnType.toUpperCase();
+        const q = Number(t.qty) || 0;
+        // IN types add stock, OUT types subtract stock
+        const isIn = typ.includes("IN") || typ.includes("RECEIPT") || typ.includes("OPENING") || typ.includes("RETURN");
+        const isOut = typ.includes("OUT") || typ.includes("ISSUE") || typ.includes("CONSUMPTION") || typ.includes("DISPATCH");
+        const delta = isIn ? q : isOut ? -q : 0;
+        rmNetMap.set(t.rawMaterialId, (rmNetMap.get(t.rawMaterialId) || 0) + delta);
+      }
+
+      // ── Compute today's net stock change for Finished Goods ──────────────────
+      const fgNetMap = new Map<string, number>();
+      for (const t of todayFgTxns) {
+        const typ = t.txnType.toUpperCase();
+        const q = Number(t.qty) || 0;
+        const isIn = typ.includes("IN") || typ.includes("RECEIPT") || typ.includes("OPENING") || typ.includes("RETURN");
+        const isOut = typ.includes("OUT") || typ.includes("ISSUE") || typ.includes("DISPATCH");
+        const delta = isIn ? q : isOut ? -q : 0;
+        const key = `${t.productItemId}_${t.storeId}`;
+        fgNetMap.set(key, (fgNetMap.get(key) || 0) + delta);
+      }
+
+      // ── Helper: compute startQty with 3-tier priority ────────────────────────
+      // 1) Today's locked snapshot startQty (if EOD job already ran today)
+      // 2) Yesterday's snapshot eodQty (yesterday's closing = today's opening)
+      // 3) currentQty − netChangeToday (reverse today's transactions to get opening)
+      const calcStartQty = (todaySnap: any, yesterdaySnap: any, currentQty: number, netChangeToday: number): number => {
+        if (todaySnap) return Number(todaySnap.startQty);
+        if (yesterdaySnap) return Number(yesterdaySnap.eodQty);
+        return currentQty - netChangeToday;
+      };
+
       // ── Raw Materials + Wastage ──────────────────────────────────────────────
       const rawMaterials = await prisma.rawMaterial.findMany({ where: { isActive: true } });
       const rmRows = rawMaterials.map((rm) => {
         const storeIdVal = rm.storeId || "DEFAULT";
         const cat = rm.itemType === "WASTAGE" ? "WASTAGE" : "RAW_MATERIAL";
         const todaySnap = todayMap.get(`${cat}_${rm.rawMaterialId}_${storeIdVal}`);
-        const prevSnap  = yesterdayMap.get(`${cat}_${rm.rawMaterialId}_${storeIdVal}`);
+        const yestSnap = yesterdayMap.get(`${cat}_${rm.rawMaterialId}_${storeIdVal}`);
 
         const currentQty = Number(rm.onHandQty) || 0;
-        // startQty: use today's locked startQty → else yesterday's eodQty → else current
-        const startQty = todaySnap
-          ? Number(todaySnap.startQty)
-          : prevSnap
-          ? Number(prevSnap.eodQty)
-          : currentQty;
+        const netChangeToday = rmNetMap.get(rm.rawMaterialId) || 0;
+        const startQty = calcStartQty(todaySnap, yestSnap, currentQty, netChangeToday);
 
         return {
           id: todaySnap ? String(todaySnap.id) : `temp-${cat}-${rm.rawMaterialId}-${storeIdVal}`,
@@ -117,13 +155,10 @@ class InventoryService {
         seenProductIds.add(itemIdStr);
 
         const todaySnap = todayMap.get(`FINISHED_PRODUCT_${itemIdStr}_${row.storeId}`);
-        const prevSnap  = yesterdayMap.get(`FINISHED_PRODUCT_${itemIdStr}_${row.storeId}`);
+        const yestSnap = yesterdayMap.get(`FINISHED_PRODUCT_${itemIdStr}_${row.storeId}`);
         const currentQty = Number(row.onHandQty) || 0;
-        const startQty = todaySnap
-          ? Number(todaySnap.startQty)
-          : prevSnap
-          ? Number(prevSnap.eodQty)
-          : currentQty;
+        const netChangeToday = fgNetMap.get(`${row.productItemId}_${row.storeId}`) || 0;
+        const startQty = calcStartQty(todaySnap, yestSnap, currentQty, netChangeToday);
 
         fgRows.push({
           id: todaySnap ? String(todaySnap.id) : `temp-FINISHED_PRODUCT-${itemIdStr}-${row.storeId}`,
@@ -150,12 +185,9 @@ class InventoryService {
         if (seenProductIds.has(itemIdStr)) continue;
         const storeIdVal = "DEFAULT";
         const todaySnap = todayMap.get(`FINISHED_PRODUCT_${itemIdStr}_${storeIdVal}`);
-        const prevSnap  = yesterdayMap.get(`FINISHED_PRODUCT_${itemIdStr}_${storeIdVal}`);
-        const startQty = todaySnap
-          ? Number(todaySnap.startQty)
-          : prevSnap
-          ? Number(prevSnap.eodQty)
-          : 0;
+        const yestSnap = yesterdayMap.get(`FINISHED_PRODUCT_${itemIdStr}_${storeIdVal}`);
+        const netChangeToday = fgNetMap.get(`${prod.id}_${storeIdVal}`) || 0;
+        const startQty = calcStartQty(todaySnap, yestSnap, 0, netChangeToday);
 
         fgRows.push({
           id: todaySnap ? String(todaySnap.id) : `temp-FINISHED_PRODUCT-${itemIdStr}-${storeIdVal}`,
@@ -176,8 +208,8 @@ class InventoryService {
 
       // Apply filters
       if (catFilter) allRows = allRows.filter((r) => r.category === catFilter);
-      if (storeId)   allRows = allRows.filter((r) => r.storeId === storeId);
-      if (search)    allRows = allRows.filter((r) => matchesSearch(r, search));
+      if (storeId) allRows = allRows.filter((r) => r.storeId === storeId);
+      if (search) allRows = allRows.filter((r) => matchesSearch(r, search));
 
       allRows.sort((a, b) => a.itemName.localeCompare(b.itemName));
 

@@ -54,11 +54,17 @@ const upsertEodSnapshot = async (data: {
 };
 
 /**
- * Executes EOD Stock snapshot for Raw Materials and Finished Products
+ * Executes EOD Stock snapshot for Raw Materials and Finished Products.
+ *
+ * startQty logic (same as the live view):
+ *   1) Yesterday's snapshot eodQty  (yesterday's closing = today's opening)
+ *   2) currentQty − netChangeToday  (reverse today's transactions to derive opening)
+ *
+ * eodQty = currentQty (live on-hand at the moment the job runs)
  */
 export const runEodStockSnapshot = async (targetDateStr?: string) => {
   const now = new Date();
-  
+
   let dateStr: string;
   let today: Date;
   if (targetDateStr) {
@@ -76,6 +82,56 @@ export const runEodStockSnapshot = async (targetDateStr?: string) => {
 
   const yesterday = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() - 1));
 
+  // Today's start in IST (midnight) as a UTC Date for querying transactions
+  const todayISTStart = new Date(`${dateStr}T00:00:00+05:30`);
+
+  // ── Fetch yesterday's snapshots + today's transactions in parallel ────────
+  const [yesterdaySnapshots, todayRmTxns, todayFgTxns] = await Promise.all([
+    prisma.eodStockSnapshot.findMany({ where: { snapshotDate: yesterday } }),
+    prisma.rawMaterialTransaction.findMany({
+      where: { txnDateTime: { gte: todayISTStart } },
+    }),
+    prisma.finishedGoodsTransaction.findMany({
+      where: { txnDateTime: { gte: todayISTStart } },
+    }),
+  ]);
+
+  const yesterdayMap = new Map<string, any>();
+  for (const s of yesterdaySnapshots) {
+    yesterdayMap.set(`${s.category}_${s.itemId}_${s.storeId}`, s);
+  }
+
+  // ── Compute net stock change today for Raw Materials ─────────────────────
+  const rmNetMap = new Map<string, number>();
+  for (const t of todayRmTxns) {
+    const typ = t.txnType.toUpperCase();
+    const q = Number(t.qty) || 0;
+    const isIn = typ.includes("IN") || typ.includes("RECEIPT") || typ.includes("OPENING") || typ.includes("RETURN");
+    const isOut = typ.includes("OUT") || typ.includes("ISSUE") || typ.includes("CONSUMPTION") || typ.includes("DISPATCH");
+    const delta = isIn ? q : isOut ? -q : 0;
+    rmNetMap.set(t.rawMaterialId, (rmNetMap.get(t.rawMaterialId) || 0) + delta);
+  }
+
+  // ── Compute net stock change today for Finished Goods ────────────────────
+  const fgNetMap = new Map<string, number>();
+  for (const t of todayFgTxns) {
+    const typ = t.txnType.toUpperCase();
+    const q = Number(t.qty) || 0;
+    const isIn = typ.includes("IN") || typ.includes("RECEIPT") || typ.includes("OPENING") || typ.includes("RETURN");
+    const isOut = typ.includes("OUT") || typ.includes("ISSUE") || typ.includes("DISPATCH");
+    const delta = isIn ? q : isOut ? -q : 0;
+    const key = `${t.productItemId}_${t.storeId}`;
+    fgNetMap.set(key, (fgNetMap.get(key) || 0) + delta);
+  }
+
+  // ── Helper: compute startQty with 2-tier priority ────────────────────────
+  // 1) Yesterday's eodQty (yesterday's closing = today's opening)
+  // 2) currentQty − netChangeToday (reverse today's transactions to get opening)
+  const calcStartQty = (yestSnap: any, currentQty: number, netChangeToday: number): number => {
+    if (yestSnap) return Number(yestSnap.eodQty);
+    return currentQty - netChangeToday;
+  };
+
   let rmCount = 0;
   let fgCount = 0;
 
@@ -85,17 +141,10 @@ export const runEodStockSnapshot = async (targetDateStr?: string) => {
     const storeId = rm.storeId || "DEFAULT";
     const category = rm.itemType === "WASTAGE" ? "WASTAGE" : "RAW_MATERIAL";
 
-    const prev = await prisma.eodStockSnapshot.findFirst({
-      where: {
-        category: category as any,
-        itemId: rm.rawMaterialId,
-        storeId,
-        snapshotDate: yesterday,
-      },
-    });
-
+    const yestSnap = yesterdayMap.get(`${category}_${rm.rawMaterialId}_${storeId}`);
     const currentQty = Number(rm.onHandQty) || 0;
-    const startQty = prev ? Number(prev.eodQty) : currentQty;
+    const netChangeToday = rmNetMap.get(rm.rawMaterialId) || 0;
+    const startQty = calcStartQty(yestSnap, currentQty, netChangeToday);
 
     await upsertEodSnapshot({
       category: category as any,
@@ -131,17 +180,10 @@ export const runEodStockSnapshot = async (targetDateStr?: string) => {
     const itemIdStr = String(row.productItemId);
     snapshottedProductItemIds.add(itemIdStr);
 
-    const prev = await prisma.eodStockSnapshot.findFirst({
-      where: {
-        category: "FINISHED_PRODUCT",
-        itemId: itemIdStr,
-        storeId: row.storeId,
-        snapshotDate: yesterday,
-      },
-    });
-
+    const yestSnap = yesterdayMap.get(`FINISHED_PRODUCT_${itemIdStr}_${row.storeId}`);
     const currentQty = Number(row.onHandQty) || 0;
-    const startQty = prev ? Number(prev.eodQty) : currentQty;
+    const netChangeToday = fgNetMap.get(`${row.productItemId}_${row.storeId}`) || 0;
+    const startQty = calcStartQty(yestSnap, currentQty, netChangeToday);
 
     await upsertEodSnapshot({
       category: "FINISHED_PRODUCT",
@@ -169,18 +211,10 @@ export const runEodStockSnapshot = async (targetDateStr?: string) => {
     if (snapshottedProductItemIds.has(itemIdStr)) continue;
 
     const storeId = "DEFAULT";
-
-    const prev = await prisma.eodStockSnapshot.findFirst({
-      where: {
-        category: "FINISHED_PRODUCT",
-        itemId: itemIdStr,
-        storeId,
-        snapshotDate: yesterday,
-      },
-    });
-
+    const yestSnap = yesterdayMap.get(`FINISHED_PRODUCT_${itemIdStr}_${storeId}`);
     const currentQty = 0;
-    const startQty = prev ? Number(prev.eodQty) : currentQty;
+    const netChangeToday = fgNetMap.get(`${prod.id}_${storeId}`) || 0;
+    const startQty = calcStartQty(yestSnap, currentQty, netChangeToday);
 
     await upsertEodSnapshot({
       category: "FINISHED_PRODUCT",

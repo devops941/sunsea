@@ -52,9 +52,9 @@ const formatQty = (qty: number | null, uom: string | null): string => {
 // ─── Category badge ────────────────────────────────────────────────────────────
 const CategoryBadge: React.FC<{ category: EodCategory }> = ({ category }) => {
   const map: Record<EodCategory, { label: string; cls: string }> = {
-    RAW_MATERIAL:     { label: "Raw Material",     cls: "bg-emerald-50 text-emerald-700 border-emerald-200" },
-    FINISHED_PRODUCT: { label: "Finished Product", cls: "bg-purple-50  text-purple-700  border-purple-200"  },
-    WASTAGE:          { label: "Wastage",           cls: "bg-red-50     text-red-700     border-red-200"     },
+    RAW_MATERIAL: { label: "Raw Material", cls: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+    FINISHED_PRODUCT: { label: "Finished Product", cls: "bg-purple-50  text-purple-700  border-purple-200" },
+    WASTAGE: { label: "Wastage", cls: "bg-red-50     text-red-700     border-red-200" },
   };
   const { label, cls } = map[category] ?? { label: category, cls: "" };
   return (
@@ -69,20 +69,20 @@ const CategoryBadge: React.FC<{ category: EodCategory }> = ({ category }) => {
 const EodStockList: React.FC = () => {
   const { socket } = useSocket();
 
-  const [data,        setData]        = useState<EodStockItem[]>([]);
-  const [loading,     setLoading]     = useState(true);
-  const [totalItems,  setTotalItems]  = useState(0);
-  const [asOfDate,    setAsOfDate]    = useState("");
-  const [searchTerm,  setSearchTerm]  = useState("");
+  const [data, setData] = useState<EodStockItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [totalItems, setTotalItems] = useState(0);
+  const [asOfDate, setAsOfDate] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [categoryFilter,  setCategoryFilter]  = useState("");
-  const [storeIdFilter,   setStoreIdFilter]   = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
+  const [storeIdFilter, setStoreIdFilter] = useState("");
 
   // Default date = TODAY so users always open to the live view
   const [selectedDate, setSelectedDate] = useState(() => getISTDateString());
 
   const [currentPage, setCurrentPage] = useState(1);
-  const [stores,      setStores]      = useState<any[]>([]);
+  const [stores, setStores] = useState<any[]>([]);
 
   const fetchFnRef = useRef<(() => void) | undefined>(undefined);
 
@@ -93,7 +93,7 @@ const EodStockList: React.FC = () => {
         const all = res?.stores || res || [];
         setStores(all.filter((s: any) => s.isActive));
       })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   // Debounce search
@@ -107,12 +107,12 @@ const EodStockList: React.FC = () => {
     try {
       const res = await apiClient.get("/inventory/eod-stock", {
         params: {
-          date:     selectedDate,
-          category: categoryFilter  || undefined,
-          storeId:  storeIdFilter   || undefined,
-          search:   debouncedSearch || undefined,
-          page:     currentPage,
-          limit:    ITEMS_PER_PAGE,
+          date: selectedDate,
+          category: categoryFilter || undefined,
+          storeId: storeIdFilter || undefined,
+          search: debouncedSearch || undefined,
+          page: currentPage,
+          limit: ITEMS_PER_PAGE,
         },
       });
       if (res.data) {
@@ -181,10 +181,10 @@ const EodStockList: React.FC = () => {
   const totalPages = Math.max(1, Math.ceil(totalItems / ITEMS_PER_PAGE));
 
   // Determine view state
-  const isLive       = data.some((item) => item.recordedAt === null);
-  const isLocked     = data.length > 0 && data.every((item) => item.recordedAt !== null);
+  const isLive = data.some((item) => item.recordedAt === null);
+  const isLocked = data.length > 0 && data.every((item) => item.recordedAt !== null);
   const lastLockedAt = data.find((item) => item.recordedAt !== null)?.recordedAt ?? null;
-  const isFuture     = selectedDate > todayStr;
+  const isFuture = selectedDate > todayStr;
 
   // ── Empty state message ───────────────────────────────────────────────────
   const emptyMessage = useMemo(() => {
@@ -196,7 +196,7 @@ const EodStockList: React.FC = () => {
     };
     const parts: string[] = [];
     if (categoryFilter) parts.push(catLabels[categoryFilter] || categoryFilter);
-    if (storeIdFilter)  parts.push(`in ${getStoreName(storeIdFilter)}`);
+    if (storeIdFilter) parts.push(`in ${getStoreName(storeIdFilter)}`);
 
     if (!isTodaySelected) {
       // Past date with no snapshot data at all
@@ -214,14 +214,18 @@ const EodStockList: React.FC = () => {
   const csvColumns = [
     { header: "Item Code", accessor: (r: EodStockItem) => r.itemCode },
     { header: "Item Name", accessor: (r: EodStockItem) => r.itemName },
-    { header: "Category",  accessor: (r: EodStockItem) =>
+    {
+      header: "Category", accessor: (r: EodStockItem) =>
         r.category === "RAW_MATERIAL" ? "Raw Material" :
-        r.category === "FINISHED_PRODUCT" ? "Finished Product" : "Wastage" },
-    { header: "Store",     accessor: (r: EodStockItem) => getStoreName(r.storeId) },
-    { header: "UOM",       accessor: (r: EodStockItem) => formatUom(r.uom) },
+          r.category === "FINISHED_PRODUCT" ? "Finished Product" : "Wastage"
+    },
+    { header: "Store", accessor: (r: EodStockItem) => getStoreName(r.storeId) },
+    { header: "UOM", accessor: (r: EodStockItem) => formatUom(r.uom) },
     { header: "Start Qty", accessor: (r: EodStockItem) => r.startQty },
-    { header: isTodaySelected && isLive ? "Current Qty (Live)" : "EOD Qty",
-      accessor: (r: EodStockItem) => r.eodQty ?? "" },
+    {
+      header: isTodaySelected && isLive ? "Current Qty (Live)" : "EOD Qty",
+      accessor: (r: EodStockItem) => r.eodQty ?? ""
+    },
   ];
 
   // ── Info banner ───────────────────────────────────────────────────────────
@@ -335,9 +339,9 @@ const EodStockList: React.FC = () => {
                 value={categoryFilter}
                 defaultOptionLabel="All Categories"
                 options={[
-                  { label: "Raw Material",     value: "RAW_MATERIAL"     },
+                  { label: "Raw Material", value: "RAW_MATERIAL" },
                   { label: "Finished Product", value: "FINISHED_PRODUCT" },
-                  { label: "Wastage",          value: "WASTAGE"          },
+                  { label: "Wastage", value: "WASTAGE" },
                 ]}
                 hideLabel
                 noMargin
@@ -430,9 +434,8 @@ const EodStockList: React.FC = () => {
                 header: isTodaySelected && isLive ? "CURRENT QTY" : "EOD QTY",
                 align: "right",
                 render: (item) => (
-                  <span className={`font-bold font-mono text-sm flex items-center justify-end gap-1.5 ${
-                    item.recordedAt === null ? "text-blue-600" : "text-slate-900"
-                  }`}>
+                  <span className={`font-bold font-mono text-sm flex items-center justify-end gap-1.5 ${item.recordedAt === null ? "text-blue-600" : "text-slate-900"
+                    }`}>
                     {formatQty(item.eodQty, item.uom)}
                     {item.recordedAt === null ? (
                       <span className="text-[9px] font-bold text-blue-400 uppercase tracking-wide
