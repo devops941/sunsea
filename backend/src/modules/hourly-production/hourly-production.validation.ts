@@ -93,6 +93,10 @@ export const createHourlyProductionSchema = z.object({
       .max(60, "Runtime cannot exceed 60 minutes per slot")
       .optional()
       .default(60),
+
+    stopPlanEarly: z
+      .boolean()
+      .optional(),
   }),
 });
 
