@@ -473,11 +473,14 @@ export const MachineAssignmentForm: React.FC = () => {
                       disabled={!operator.roleId}
                       options={[
                         { label: "-- Select Operator --", value: "" },
-                        ...(employeesByRole[operator.roleId] || []).map((e: any) => ({
-                          label: `${e.fullName} (${e.empCode})${e.user?.role ? ` - ${e.user.role.name}` : ""}`,
-                          value: String(e.id),
-                          disabled: selectedEmpIds.has(String(e.id)) && operator.employeeId !== String(e.id)
-                        })),
+                        ...(employeesByRole[operator.roleId] || []).map((e: any) => {
+                          const roleName = e.user?.role?.name || e.role?.name;
+                          return {
+                            label: `${e.fullName} (${e.empCode})${roleName ? ` - ${roleName}` : ""}`,
+                            value: String(e.id),
+                            disabled: selectedEmpIds.has(String(e.id)) && operator.employeeId !== String(e.id)
+                          };
+                        }),
                       ]}
                     />
                   </div>

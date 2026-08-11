@@ -84,34 +84,40 @@ const DailyProductionPlanningPage: React.FC = () => {
   const [filterDate, setFilterDate] = useState(formatLocalDateString(new Date()));
   const [filterStatus, setFilterStatus] = useState("");
   const [filterMachine, setFilterMachine] = useState("");
+  const [filterShift, setFilterShift] = useState("");
 
   // Draft filters for popover
   const [draftFilterDate, setDraftFilterDate] = useState(formatLocalDateString(new Date()));
   const [draftFilterStatus, setDraftFilterStatus] = useState("");
   const [draftFilterMachine, setDraftFilterMachine] = useState("");
+  const [draftFilterShift, setDraftFilterShift] = useState("");
 
-  const hasActiveFilters = !!(filterDate || filterStatus || filterMachine);
-  const activeFilterCount = [filterDate, filterStatus, filterMachine].filter(Boolean).length;
+  const hasActiveFilters = !!(filterDate || filterStatus || filterMachine || filterShift);
+  const activeFilterCount = [filterDate, filterStatus, filterMachine, filterShift].filter(Boolean).length;
 
   const handleApplyFilters = () => {
     setFilterDate(draftFilterDate);
     setFilterStatus(draftFilterStatus);
     setFilterMachine(draftFilterMachine);
+    setFilterShift(draftFilterShift);
   };
 
   const handleClearFilters = () => {
     setDraftFilterDate("");
     setDraftFilterStatus("");
     setDraftFilterMachine("");
+    setDraftFilterShift("");
     setFilterDate("");
     setFilterStatus("");
     setFilterMachine("");
+    setFilterShift("");
   };
 
   const handleOpenFilter = () => {
     setDraftFilterDate(filterDate);
     setDraftFilterStatus(filterStatus);
     setDraftFilterMachine(filterMachine);
+    setDraftFilterShift(filterShift);
   };
 
   // View Modal
@@ -147,7 +153,7 @@ const DailyProductionPlanningPage: React.FC = () => {
   const [stopPlan, setStopPlan] = useState<any>(null);
   const [stopReason, setStopReason] = useState("");
   const [isStopping, setIsStopping] = useState(false);
-  const [stopOption, setStopOption] = useState<"carry_forward" | "completed_stop">("completed_stop");
+  const [stopOption, setStopOption] = useState<"carry_forward" | "completed_stop">("carry_forward");
 
   // Material Issue Modal State
   const [showMaterialIssueModal, setShowMaterialIssueModal] = useState(false);
@@ -179,8 +185,9 @@ const DailyProductionPlanningPage: React.FC = () => {
     if (filterDate) params.productionDate = filterDate;
     if (filterStatus) params.status = filterStatus;
     if (filterMachine) params.machineId = filterMachine;
+    if (filterShift) params.shiftId = filterShift;
     dispatch(fetchDailyPlans(Object.keys(params).length ? params : undefined));
-  }, [dispatch, filterDate, filterStatus, filterMachine]);
+  }, [dispatch, filterDate, filterStatus, filterMachine, filterShift]);
 
   useEffect(() => {
     loadDailyPlans();
@@ -226,7 +233,7 @@ const DailyProductionPlanningPage: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-  useEffect(() => { setCurrentPage(1); }, [filterDate, filterStatus, filterMachine]);
+  useEffect(() => { setCurrentPage(1); }, [filterDate, filterStatus, filterMachine, filterShift]);
 
   const paginatedPlans = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
@@ -234,7 +241,7 @@ const DailyProductionPlanningPage: React.FC = () => {
   }, [filteredPlans, currentPage]);
 
 
-  console.log({filteredPlans});
+  // console.log({filteredPlans});
   const totalPages = Math.ceil(filteredPlans.length / itemsPerPage);
 
   // Stats (active plans only)
@@ -840,7 +847,7 @@ const DailyProductionPlanningPage: React.FC = () => {
             {can("daily-machine-planning.view") && (
               <ViewButton onClick={() => handleViewDailyPlan(plan)} />
             )}
-            {canLog && (can("hourly-work-reports.create") || can("daily-machine-planning.edit")) && (
+            {canLog && !allHoursLogged && (can("hourly-work-reports.create") || can("daily-machine-planning.edit")) && (
               <IconButton variant="primary" title="Log Hourly Production" icon={FaClipboardList} onClick={() => handleLogHourly(plan)} />
             )}
             {canAdvance && can("daily-machine-planning.edit") && (
@@ -993,6 +1000,19 @@ const DailyProductionPlanningPage: React.FC = () => {
                   <option value="">All Machines</option>
                   {allowedMachines.map((m: any) => (
                     <option key={m.machineId} value={m.machineId}>{m.machineName}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="mb-3">
+                <label className="block mb-1 text-[11px] uppercase tracking-wider text-gray-500 font-semibold">Shift</label>
+                <select
+                  className="w-full border border-gray-200 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary bg-white"
+                  value={draftFilterShift}
+                  onChange={(e) => setDraftFilterShift(e.target.value)}
+                >
+                  <option value="">All Shifts</option>
+                  {shifts?.map((s: any) => (
+                    <option key={s.shiftCode} value={s.shiftCode}>{s.shiftName}</option>
                   ))}
                 </select>
               </div>

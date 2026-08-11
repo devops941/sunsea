@@ -24,6 +24,7 @@ import BackButton from "../../../components/ui/BackButton/BackButton";
 import DatePickerCalendar from "../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 import { employeeService } from "../../../services/employeeService";
 import { departmentService } from "../../../services/departmentService";
+import { roleService } from "../../../services/roleService";
 import { shiftService } from "../../../services/shiftService";
 import { machineService } from "../../../services/machineService";
 
@@ -120,7 +121,7 @@ const ProductEdit: React.FC = () => {
     type InitialCapacityRow = {
         capDate: string;
         capShiftId: string;
-        capDeptId: string;
+        capRoleId: string;
         capOperatorIds: string[];
         capQty: string;
         capMachine: string;
@@ -129,6 +130,7 @@ const ProductEdit: React.FC = () => {
 
     const [employees, setEmployees] = useState<any[]>([]);
     const [departments, setDepartments] = useState<any[]>([]);
+    const [roles, setRoles] = useState<any[]>([]);
     const [shifts, setShifts] = useState<any[]>([]);
     const [machines, setMachines] = useState<any[]>([]);
 
@@ -161,6 +163,12 @@ const ProductEdit: React.FC = () => {
             setDepartments(depts);
         }).catch(() => {});
     }, []);
+    const fetchRolesData = useCallback(() => {
+        roleService.fetchAll({ limit: 100 }).then((res: any) => {
+            const roleList = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
+            setRoles(roleList);
+        }).catch(() => {});
+    }, []);
     const fetchShiftsData = useCallback(() => {
         shiftService.fetchAll().then((res: any) => {
             const data = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
@@ -182,6 +190,7 @@ const ProductEdit: React.FC = () => {
     useSocketSync("rawMaterial", undefined, fetchRawMaterialsData);
     useSocketSync("employee", undefined, fetchEmployeesData);
     useSocketSync("department", undefined, fetchDepartmentsData);
+    useSocketSync("role", undefined, fetchRolesData);
     useSocketSync("shift", undefined, fetchShiftsData);
     useSocketSync("machine", undefined, fetchMachinesData);
 
@@ -195,9 +204,10 @@ const ProductEdit: React.FC = () => {
         fetchRawMaterialsData();
         fetchEmployeesData();
         fetchDepartmentsData();
+        fetchRolesData();
         fetchShiftsData();
         fetchMachinesData();
-    }, [fetchCategoriesData, fetchGstData, fetchColorsData, fetchSizesData, fetchStoresData, fetchRawMaterialsData, fetchEmployeesData, fetchDepartmentsData, fetchShiftsData, fetchMachinesData]);
+    }, [fetchCategoriesData, fetchGstData, fetchColorsData, fetchSizesData, fetchStoresData, fetchRawMaterialsData, fetchEmployeesData, fetchDepartmentsData, fetchRolesData, fetchShiftsData, fetchMachinesData]);
 
     // Fetch product
     useEffect(() => {
@@ -417,9 +427,12 @@ const ProductEdit: React.FC = () => {
             if (isNaN(exp) || exp <= 0) newErrors.exportPrice = "Must be > 0";
         }
 
-        if (rawMaterials.length > 0) {
+        if (rawMaterials.length === 0) {
+            newErrors.rawMaterials = "At least one raw material is required for BOM composition.";
+            toast.error("At least one raw material is required for BOM composition.");
+        } else {
             const totalPercent = rawMaterials.reduce((acc, rm) => acc + Number(rm.percentage), 0);
-            if (totalPercent !== 100) {
+            if (Math.abs(totalPercent - 100) > 0.01) {
                 newErrors.rawMaterials = "Total percentage must be exactly 100%";
                 toast.error("Total Raw Material percentage must be exactly 100%");
             }
@@ -490,7 +503,7 @@ const ProductEdit: React.FC = () => {
         setInitialCapacities(prev => [...prev, {
             capDate: new Date().toISOString().split("T")[0],
             capShiftId: "",
-            capDeptId: "",
+            capRoleId: "",
             capOperatorIds: [],
             capQty: "",
             capMachine: ""
@@ -505,7 +518,7 @@ const ProductEdit: React.FC = () => {
         setInitialCapacities(prev => {
             const newCap = [...prev];
             newCap[index] = { ...newCap[index], [field]: value };
-            if (field === 'capDeptId') {
+            if (field === 'capRoleId') {
                 newCap[index].capOperatorIds = [];
             }
             return newCap;
@@ -1123,7 +1136,9 @@ const ProductEdit: React.FC = () => {
                     {/* Raw Materials Composition */}
                     <div className="pt-2">
                         <div className="flex justify-between items-center mb-3">
-                            <h6 className="text-base font-semibold text-gray-800 m-0">Raw Materials Composition (BOM)</h6>
+                            <h6 className="text-base font-semibold text-gray-800 m-0">
+                                Raw Materials Composition (BOM) <span className="text-rose-500 ml-1">*</span>
+                            </h6>
                             <CustomButton
                                 text="Add Raw Material"
                                 icon={FaPlus}
@@ -1181,8 +1196,13 @@ const ProductEdit: React.FC = () => {
                                 )}
                             </div>
                         ) : (
-                            <div className="text-sm text-slate-500 italic bg-slate-50 p-4 rounded-xl border border-dashed border-slate-200 text-center">
-                                No raw materials added. Click "Add Raw Material" to specify the composition.
+                            <div>
+                                <div className={`text-sm italic p-4 rounded-xl border border-dashed text-center ${errors.rawMaterials ? 'bg-rose-50/50 border-rose-300 text-rose-600 font-medium' : 'bg-slate-50 border-slate-200 text-slate-500'}`}>
+                                    No raw materials added. Click "Add Raw Material" to specify the composition.
+                                </div>
+                                {errors.rawMaterials && (
+                                    <p className="mt-1.5 text-sm text-rose-500 font-medium">{errors.rawMaterials}</p>
+                                )}
                             </div>
                         )}
                     </div>
@@ -1326,8 +1346,9 @@ const ProductEdit: React.FC = () => {
                         {initialCapacities.length > 0 ? (
                             <div className="space-y-4">
                                 {initialCapacities.map((cap, idx) => (
-                                    <div key={`cap-${idx}`} className="p-4 border border-slate-200 rounded-xl relative bg-slate-50/50">
-                                        <div className="absolute top-2 right-2">
+                                    <div key={`cap-${idx}`} className="p-4 border border-slate-200 rounded-xl bg-slate-50/50">
+                                        <div className="flex justify-between items-center mb-3 pb-2 border-b border-slate-200/80">
+                                            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Capacity Setup #{idx + 1}</span>
                                             <DeleteButton onClick={() => handleRemoveInitialCapacity(idx)} />
                                         </div>
                                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
@@ -1358,7 +1379,12 @@ const ProductEdit: React.FC = () => {
                                                     value={cap.capMachine}
                                                     options={[
                                                         { value: "", label: "-- Machine --" },
-                                                        ...machines.map(m => ({ value: m.machineId, label: `${m.machineId} - ${m.machineName}` }))
+                                                        ...machines
+                                                            .filter(m =>
+                                                                String(m.machineId) === String(cap.capMachine) ||
+                                                                !initialCapacities.some((c, i) => i !== idx && String(c.capMachine) === String(m.machineId))
+                                                            )
+                                                            .map(m => ({ value: String(m.machineId), label: `${m.machineId} - ${m.machineName}` }))
                                                     ]}
                                                     onChange={(e) => handleInitialCapacityChange(idx, "capMachine", e.target.value)}
                                                 />
@@ -1366,13 +1392,13 @@ const ProductEdit: React.FC = () => {
                                             <div>
                                                 <SelectInput
                                                     label="Role"
-                                                    name={`capDeptId-${idx}`}
-                                                    value={cap.capDeptId}
+                                                    name={`capRoleId-${idx}`}
+                                                    value={cap.capRoleId}
                                                     options={[
                                                         { value: "", label: "-- Role --" },
-                                                        ...departments.map(dept => ({ value: String(dept.id), label: dept.name }))
+                                                        ...roles.map(role => ({ value: String(role.id), label: role.name }))
                                                     ]}
-                                                    onChange={(e) => handleInitialCapacityChange(idx, "capDeptId", e.target.value)}
+                                                    onChange={(e) => handleInitialCapacityChange(idx, "capRoleId", e.target.value)}
                                                 />
                                             </div>
                                             <div className="col-span-full xl:col-span-3">
@@ -1380,11 +1406,15 @@ const ProductEdit: React.FC = () => {
                                                     label="Operators"
                                                     name={`capOperatorIds-${idx}`}
                                                     options={employees
-                                                        .filter(emp => !cap.capDeptId || String(emp.departmentId) === cap.capDeptId)
+                                                        .filter(emp => {
+                                                            if (!cap.capRoleId) return true;
+                                                            const empRoleId = emp.roleId ?? emp.role?.id ?? emp.user?.roleId ?? emp.user?.role?.id;
+                                                            return String(empRoleId) === String(cap.capRoleId);
+                                                        })
                                                         .map(emp => ({ value: String(emp.id), label: emp.fullName }))}
                                                     value={cap.capOperatorIds}
                                                     onChange={(_, vals) => handleInitialCapacityChange(idx, "capOperatorIds", vals)}
-                                                    placeholder={cap.capDeptId ? "Select operators" : "Select role first"}
+                                                    placeholder={cap.capRoleId ? "Select operators" : "Select role first"}
                                                 />
                                             </div>
                                             <div>

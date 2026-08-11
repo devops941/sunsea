@@ -33,7 +33,11 @@ export const createSupplier = createAsyncThunk("suppliers/create", async (data: 
   try {
     return await supplierService.create(data);
   } catch (error: any) {
-    return rejectWithValue(error.response?.data?.message || "Failed to create supplier");
+    const data = error.response?.data;
+    return rejectWithValue({
+      message: data?.message || "Failed to create supplier",
+      errors: data?.errors || []
+    });
   }
 });
 
@@ -41,7 +45,11 @@ export const updateSupplier = createAsyncThunk("suppliers/update", async ({ id, 
   try {
     return await supplierService.update(id, data);
   } catch (error: any) {
-    return rejectWithValue(error.response?.data?.message || "Failed to update supplier");
+    const data = error.response?.data;
+    return rejectWithValue({
+      message: data?.message || "Failed to update supplier",
+      errors: data?.errors || []
+    });
   }
 });
 

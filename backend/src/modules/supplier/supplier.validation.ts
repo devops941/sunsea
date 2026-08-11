@@ -40,23 +40,31 @@ export const createSupplierSchema = z.object({
     website: z.string().max(200).optional().nullable(),
     // BUG-SUP-007 fix: GSTIN format validation (15-char pattern)
     gstin: z
-      .string()
-      .regex(
-        /^\d{2}[A-Z]{5}\d{4}[A-Z][A-Z\d]Z[A-Z\d]$/,
-        "Invalid GSTIN format (e.g. 33ABCDE1234F1Z5)"
+      .preprocess(
+        (val) => (typeof val === "string" ? val.trim().toUpperCase() : val),
+        z
+          .string()
+          .refine(
+            (val) => !val || /^\d{2}[A-Z]{5}\d{4}[A-Z][A-Z\d]Z[A-Z\d]$/.test(val),
+            "Invalid GSTIN format (e.g. 33ABCDE1234F1Z5)"
+          )
+          .optional()
+          .nullable()
       )
-      .optional()
-      .nullable()
       .or(z.literal("")),
     // BUG-SUP-008 fix: PAN format validation (10-char pattern)
     pan: z
-      .string()
-      .regex(
-        /^[A-Z]{5}\d{4}[A-Z]$/,
-        "Invalid PAN format (e.g. ABCDE1234F)"
+      .preprocess(
+        (val) => (typeof val === "string" ? val.trim().toUpperCase() : val),
+        z
+          .string()
+          .refine(
+            (val) => !val || /^[A-Z]{5}\d{4}[A-Z]$/.test(val),
+            "Invalid PAN format (e.g. ABCDE1234F)"
+          )
+          .optional()
+          .nullable()
       )
-      .optional()
-      .nullable()
       .or(z.literal("")),
     gstRegType: z.string().max(20).optional().nullable(),
     msmeStatus: z.enum(["Micro", "Small", "Medium", "None"]).optional().nullable(),

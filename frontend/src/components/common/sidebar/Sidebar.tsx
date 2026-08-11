@@ -70,14 +70,16 @@ const Sidebar = () => {
     dispatch(getCurrentUser());
   });
 
-  // Also refetch permissions whenever user returns focus to the window or navigates
+  // Also refetch permissions if user is not loaded
   useEffect(() => {
     const handleFocus = () => {
-      dispatch(getCurrentUser());
+      if (!user) {
+        dispatch(getCurrentUser());
+      }
     };
     window.addEventListener("focus", handleFocus);
     return () => window.removeEventListener("focus", handleFocus);
-  }, [dispatch]);
+  }, [dispatch, user]);
   const handleLogout = () => {
     setShowLogoutModal(true);
   };
@@ -117,6 +119,31 @@ const Sidebar = () => {
       })
       .filter((item): item is (typeof sidebarItems)[0] => item !== null);
   }, [can]);
+  const getInitials = (name?: string) => {
+    if (!name) return "U";
+    const parts = name.trim().split(" ").filter(Boolean);
+    if (parts.length === 0) return "U";
+    if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+    return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
+  };
+
+  const formatRole = (userObj?: any) => {
+    if (!userObj) return "User";
+    if (userObj.isSuperAdmin) return "Super Admin";
+    const roleVal = userObj.role?.name || userObj.roleId || userObj.role;
+    if (!roleVal) return "User";
+    if (typeof roleVal === "string") {
+      return roleVal.replace(/^ROLE_/, "").replace(/_/g, " ");
+    }
+    return "User";
+  };
+
+  const avatarImage =
+    (user as any)?.avatarUrl ||
+    (user as any)?.profilePicture ||
+    (user as any)?.photoUrl ||
+    (user as any)?.profileImage;
+
   return (
     <aside
       className={`h-screen bg-[#ffffff] text-[#2A3547] relative overflow-visible flex flex-col transition-[width] duration-300 ease-in-out z-50 border-r border-black/10  ${activeCollapsed ? "w-[80px]" : "w-[260px]"}`}
@@ -276,25 +303,23 @@ const Sidebar = () => {
       <div className="p-4 mt-auto shrink-0">
         <div className={`flex items-center p-3 rounded-2xl bg-[#eef5fa] hover:bg-[#e4eff8] transition-colors border border-blue-100/50 ${activeCollapsed ? "justify-center" : "justify-between"}`}>
           {!activeCollapsed && (
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 min-w-0">
               <div className="w-10 h-10 rounded-full overflow-hidden shrink-0 bg-white shadow-sm flex items-center justify-center text-primary font-bold text-lg border border-white/50">
-                {(user as any)?.profilePicture ? (
-                  <img src={(user as any).profilePicture} alt="Profile" className="w-full h-full object-cover" />
+                {avatarImage ? (
+                  <img src={avatarImage} alt="Profile" className="w-full h-full object-cover" />
                 ) : (
-                  user?.fullName
-                    ? user.fullName.split(" ").map((n: string) => n[0]).join("").substring(0, 2).toUpperCase()
-                    : "SA"
+                  getInitials(user?.fullName)
                 )}
               </div>
-              <div className="flex flex-col">
-                <span className="text-[15px] font-bold text-slate-800 leading-tight tracking-tight">{user?.fullName || "Super Admin"}</span>
-                <span className="text-[13px] text-slate-500 font-medium">{(user as any)?.designation || "Designer"}</span>
+              <div className="flex flex-col min-w-0">
+                <span className="text-[15px] font-bold text-slate-800 leading-tight tracking-tight truncate">{user?.fullName || "Super Admin"}</span>
+                <span className="text-[13px] text-slate-500 font-medium truncate">{formatRole(user)}</span>
               </div>
             </div>
           )}
           <button
             onClick={handleLogout}
-            className="text-primary hover:text-blue-700 hover:bg-blue-100/50 w-9 h-9 flex items-center justify-center rounded-full transition-colors"
+            className="text-primary hover:text-blue-700 hover:bg-blue-100/50 w-9 h-9 flex items-center justify-center rounded-full transition-colors shrink-0"
             title="Logout"
           >
             <FiLogOut size={20} strokeWidth={2.5} />

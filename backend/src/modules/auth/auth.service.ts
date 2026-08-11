@@ -492,6 +492,7 @@ export class AuthService {
       status: user.status,
       lastLoginAt: user.lastLoginAt,
       mfaEnabled: user.mfaEnabled || false,
+      avatarUrl: user.avatarUrl || user.profilePicture || user.photoUrl || user.employee?.photoUrl || null,
       isSuperAdmin
     };
   }

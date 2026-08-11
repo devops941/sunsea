@@ -76,6 +76,7 @@ export interface UserResponseDto {
   status: UserStatus;
   lastLoginAt: Date | null;
   mfaEnabled: boolean;
+  avatarUrl?: string | null;
   isSuperAdmin?: boolean;
 }
 

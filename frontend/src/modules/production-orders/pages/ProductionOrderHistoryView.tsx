@@ -335,7 +335,7 @@ const ProductionOrderHistoryView: React.FC = () => {
                                         {(() => {
                                             const targetVal = Number(fullOrder?.targetQty || displayOrder?.targetQty || 0);
                                             const producedVal = Number(fullOrder?.producedQty || displayOrder?.producedQty || 0);
-                                            const hasShortfallStop = fullOrder?.productionOrderHistories?.some((h: any) => h.toStatus === "COMPLETED_WITH_SHORTFALL");
+                                            const hasShortfallStop = fullOrder?.status === "COMPLETED_WITH_SHORTFALL";
                                             
                                             return (
                                                 <div className="flex items-center gap-3 flex-wrap text-sm font-semibold text-slate-500 uppercase tracking-wider">

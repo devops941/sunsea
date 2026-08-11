@@ -14,6 +14,7 @@ import { useSelector } from "react-redux";
 import { validateCustomer } from "../validations/customerValidation";
 import MultiSelect from "../../../components/form/multiSelect/MultiSelect";
 import IndiaPhoneInput, { type PhoneEntry } from "../../../components/ui/PhoneInput/PhoneInput";
+import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
 
 const getGstStateCode = (stateName: string): string => {
   const normalized = stateName.toLowerCase().replace(/[^a-z]/g, "");
@@ -478,7 +479,24 @@ const CustomerEditPage: React.FC = () => {
       navigate('/customers');
       setErrors({});
     } catch (error: any) {
-      toast.error(error?.message || "Failed to update customer");
+      const apiErrors = error?.errors || error?.response?.data?.errors;
+      if (Array.isArray(apiErrors) && apiErrors.length > 0) {
+        const fieldErrors: Record<string, string> = {};
+        apiErrors.forEach((item: any) => {
+          let fieldName = (item.path || "").replace(/^body\./, "");
+          if (fieldName === "billingPincode") fieldName = "billingAddressPincode";
+          if (fieldName === "billingCity") fieldName = "billingAddressCity";
+          if (fieldName === "billingState") fieldName = "billingAddressState";
+          if (fieldName) {
+            fieldErrors[fieldName] = item.message;
+          }
+        });
+        setErrors(prev => ({ ...prev, ...fieldErrors }));
+        toast.error(error?.message || "Please fix validation errors on the form.");
+      } else {
+        const msg = typeof error === "string" ? error : error?.message || error?.response?.data?.message || "Failed to update customer";
+        toast.error(msg);
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -698,15 +716,9 @@ const CustomerEditPage: React.FC = () => {
                               <span>Same as billing</span>
                             </label>
                           )}
-
-                          <button
-                            type="button"
-                            onClick={() => removeShippingAddress(index)}
-                            className="text-red-500 hover:text-red-700 p-1.5 bg-red-50 rounded"
-                            title="Remove Address"
-                          >
-                            <span className="font-bold">Remove</span>
-                          </button>
+                          {addresses.length > 1 && (
+                            <DeleteButton onClick={() => removeShippingAddress(index)} />
+                          )}
                         </div>
                       </div>
                       <AddressForm
@@ -768,13 +780,7 @@ const CustomerEditPage: React.FC = () => {
                 <div key={index} className="p-4 border border-slate-200 rounded-xl bg-white relative">
                   {formData.bankAccounts.length > 1 && (
                     <div className="absolute top-4 right-4">
-                      <button
-                        type="button"
-                        onClick={() => removeBankAccount(index)}
-                        className="text-red-500 hover:text-red-700 text-sm font-semibold transition-colors"
-                      >
-                        Remove
-                      </button>
+                      <DeleteButton onClick={() => removeBankAccount(index)} />
                     </div>
                   )}
                   <h6 className="font-bold text-slate-600 mb-2">Bank #{index + 1}</h6>
@@ -816,13 +822,7 @@ const CustomerEditPage: React.FC = () => {
                 <div key={index} className="p-4 border border-slate-200 rounded-xl bg-white relative">
                   {formData.transports.length > 1 && (
                     <div className="absolute top-4 right-4">
-                      <button
-                        type="button"
-                        onClick={() => removeTransport(index)}
-                        className="text-red-500 hover:text-red-700 text-sm font-semibold transition-colors"
-                      >
-                        Remove
-                      </button>
+                      <DeleteButton onClick={() => removeTransport(index)} />
                     </div>
                   )}
                   <h6 className="font-bold text-slate-600 mb-2">Transport #{index + 1}</h6>

@@ -6,6 +6,7 @@ import employeeService from "../employee/employee.service";
 import { prisma } from "../../config/prisma";
 import bcrypt from "bcrypt";
 import { sendEmail } from "../../utils/mailer";
+import { generateWelcomeEmailHtml } from "../../templates/welcomeEmailTemplate";
 export class UserService {
   async getProfile(userId: string): Promise<UserResponse> {
     const user = await userRepository.findUserById(userId);
@@ -129,20 +130,14 @@ export class UserService {
       await sendEmail({
         to: data.email,
         subject: "Welcome to Sunsea — Your User Account Has Been Created",
-        html: `
-          <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-            <h2 style="color: #1a56db;">Welcome to Sunsea!</h2>
-            <p>Dear <strong>${data.fullName}</strong>,</p>
-            <p>Your user login account has been created successfully. Below are your login credentials:</p>
-            <table style="border-collapse: collapse; margin: 15px 0; background: #f9fafb; padding: 12px; border: 1px solid #e5e7eb; border-radius: 6px; width: 100%; max-width: 500px;">
-              <tr><td style="padding: 8px; font-weight: bold; width: 140px; color: #4b5563;">Username:</td><td style="padding: 8px;">${data.username}</td></tr>
-              ${data.password ? `<tr><td style="padding: 8px; font-weight: bold; color: #4b5563;">Password:</td><td style="padding: 8px;">${data.password}</td></tr>` : ''}
-            </table>
-            <p>Please log in to the Sunsea portal and change your password at your earliest convenience.</p>
-            <br/>
-            <p>Regards,<br/><strong>Sunsea Admin Team</strong></p>
-          </div>
-        `,
+        html: generateWelcomeEmailHtml({
+          fullName: data.fullName,
+          username: data.username,
+          password: data.password,
+          title: "Welcome to Sunsea!",
+          subtitle: "Your user login account has been created successfully.",
+          teamName: "Sunsea Admin Team",
+        }),
       });
     } catch (emailErr) {
       console.error("Failed to send welcome email (non-fatal):", emailErr);

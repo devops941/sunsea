@@ -324,7 +324,7 @@ export const ProductionOrderViewModal: React.FC<ProductionOrderViewModalProps> =
                                             {(() => {
                                                 const targetVal = Number(fullOrder?.targetQty || order.targetQty || 0);
                                                 const producedVal = Number(fullOrder?.producedQty || order.producedQty || 0);
-                                                const hasShortfallStop = fullOrder?.productionOrderHistories?.some((h: any) => h.toStatus === "COMPLETED_WITH_SHORTFALL");
+                                                const hasShortfallStop = fullOrder?.status === "COMPLETED_WITH_SHORTFALL";
                                                 
                                                 return (
                                                     <div className="flex items-center gap-2 flex-wrap text-xs font-semibold text-slate-500 uppercase tracking-wider">

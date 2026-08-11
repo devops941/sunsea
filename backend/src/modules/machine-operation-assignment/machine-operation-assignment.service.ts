@@ -29,30 +29,17 @@ export class MachineOperationAssignmentService {
    * Get employees filtered by Role ID (Role-Based Employee Selection)
    */
   static async getEmployeesByRole(roleId?: number) {
-    if (!roleId) {
-      return prisma.employee.findMany({
-        where: { status: "active" },
-        orderBy: { fullName: "asc" },
-        select: {
-          id: true,
-          empCode: true,
-          fullName: true,
-          email: true,
-          mobile: true,
-          user: {
-            select: {
-              roleId: true,
-              role: { select: { id: true, name: true, code: true } },
-            },
-          },
-        },
-      });
-    }
-
     const rawEmployees = await prisma.employee.findMany({
       where: {
         status: "active",
-        ...(roleId ? { user: { roleId: Number(roleId) } } : {}),
+        ...(roleId
+          ? {
+              OR: [
+                { roleId: Number(roleId) },
+                { user: { roleId: Number(roleId) } },
+              ],
+            }
+          : {}),
       },
       orderBy: { fullName: "asc" },
       select: {
@@ -61,6 +48,8 @@ export class MachineOperationAssignmentService {
         fullName: true,
         email: true,
         mobile: true,
+        roleId: true,
+        role: { select: { id: true, name: true, code: true } },
         user: {
           select: {
             roleId: true,

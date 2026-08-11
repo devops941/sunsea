@@ -7,8 +7,12 @@ import CommonConfirmModal from '../ui/CommonConfirmModal/CommonConfirmModal';
 export interface UserProfile {
   fullName: string;
   roleId?: string | null;
-  avatarUrl?: string;
+  avatarUrl?: string | null;
+  profilePicture?: string | null;
+  photoUrl?: string | null;
+  profileImage?: string | null;
   isSuperAdmin?: boolean;
+  role?: any;
 }
 
 export interface NavbarProps {
@@ -43,23 +47,32 @@ const TopNavbar: React.FC<NavbarProps> = ({
     dispatch(logoutUser());
   };
 
-  // Helper to get initials
+  // Helper to get initials (first letter if single word, or 2 initials)
   const getInitials = (name?: string) => {
-    if (!name) return "GU";
-    return name
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .slice(0, 2)
-      .toUpperCase();
+    if (!name) return "U";
+    const parts = name.trim().split(" ").filter(Boolean);
+    if (parts.length === 0) return "U";
+    if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+    return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
   };
 
   // Helper to format role
   const formatRole = (userObj?: UserProfile | null) => {
-    if (userObj?.isSuperAdmin) return "Super Admin";
-    if (!userObj?.roleId) return "User";
-    return userObj.roleId.replace("ROLE_", "").replace("_", " ");
+    if (!userObj) return "Visitor";
+    if (userObj.isSuperAdmin) return "Super Admin";
+    const roleVal = userObj.role?.name || userObj.roleId || userObj.role;
+    if (!roleVal) return "User";
+    if (typeof roleVal === "string") {
+      return roleVal.replace(/^ROLE_/, "").replace(/_/g, " ");
+    }
+    return "User";
   };
+
+  const avatarImage =
+    user?.avatarUrl ||
+    (user as any)?.profilePicture ||
+    (user as any)?.photoUrl ||
+    (user as any)?.profileImage;
 
   return (
     <header className="flex items-center justify-between h-[72px] bg-[#ffffff] border-b border-black/10 px-4 md:px-6 shadow-sm shrink-0">
@@ -88,8 +101,8 @@ const TopNavbar: React.FC<NavbarProps> = ({
           }}
         >
           <div className="w-9 h-9 rounded-full bg-primary text-white flex items-center justify-center font-bold text-sm shrink-0 overflow-hidden">
-            {user?.avatarUrl ? (
-              <img src={user.avatarUrl} alt="avatar" className="w-full h-full object-cover" />
+            {avatarImage ? (
+              <img src={avatarImage} alt="avatar" className="w-full h-full object-cover" />
             ) : (
               getInitials(user?.fullName)
             )}
@@ -99,7 +112,7 @@ const TopNavbar: React.FC<NavbarProps> = ({
               {user ? user.fullName : "Guest"}
             </span>
             <span className="text-xs text-gray-500 leading-tight">
-              {user ? formatRole(user) : "Visitor"}
+              {formatRole(user)}
             </span>
           </div>
         </div>

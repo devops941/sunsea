@@ -210,9 +210,6 @@ const AllProductionOrderList: React.FC = () => {
             header: "STATUS",
             render: (item: any) => {
                 const s = item.status || 'CREATED';
-                if (s === 'PARTIAL_COMPLETED') {
-                    return <StatusBadge status="PARTIALLY_DISPATCHED" customText="Partially Dispatched" />;
-                }
                 if (s === 'DISPATCHED') {
                     return <StatusBadge status="COMPLETED" customText="Completed" />;
                 }

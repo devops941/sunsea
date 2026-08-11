@@ -1,8 +1,8 @@
 import React, { useState } from "react";
-import { FaPlus, FaTimes } from "react-icons/fa";
+import { FaPlus } from "react-icons/fa";
 import { toast } from "react-toastify";
 import TextInput from "../../form/TextInput/TextInput";
-
+import DeleteButton from "../DeleteButton/DeleteButton";
 
 export interface ProductionWorkflowInputProps {
     /** Ordered list of step names. Empty = no workflow. */
@@ -104,15 +104,9 @@ const FlowInput: React.FC<ProductionWorkflowInputProps> = ({
                                 <span className="flex-1 text-sm text-gray-800 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
                                     {step}
                                 </span>
-                                <button
-                                    type="button"
-                                    onClick={() => handleRemoveStep(idx)}
-                                    className="text-red-500 hover:text-red-700 p-2 shrink-0"
-                                    title="Remove step"
-                                >
-                                    <FaTimes size={14} />
-                                </button>
-
+                                <div className="shrink-0 flex items-center">
+                                    <DeleteButton onClick={() => handleRemoveStep(idx)} />
+                                </div>
                             </div>
                         ))}
                     </div>
