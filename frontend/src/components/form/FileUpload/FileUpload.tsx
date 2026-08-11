@@ -4,6 +4,7 @@ import { FaUpload } from "react-icons/fa";
 interface FileUploadProps {
   label: string;
   name: string;
+  id?: string;
   required?: boolean;
   previewUrl?: string;
   onChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
@@ -12,13 +13,15 @@ interface FileUploadProps {
 const FileUpload: React.FC<FileUploadProps> = ({
   label,
   name,
+  id,
   required = false,
   previewUrl,
   onChange,
 }) => {
+  const inputId = id || name;
   return (
     <div className="flex flex-col gap-1 w-full ">
-      <label htmlFor={name} className="flex items-center gap-2 text-xs font-semibold text-slate-500 uppercase">
+      <label htmlFor={inputId} className="flex items-center gap-2 text-xs font-semibold text-slate-500 uppercase">
         <span>{label}</span>
         {required && <span className="text-red-500">*</span>}
       </label>
@@ -26,7 +29,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
       <div className="flex items-center gap-3 w-full">
         <input
           type="file"
-          id={name}
+          id={inputId}
           name={name}
           onChange={onChange}
           className={`block w-full flex-1 text-sm text-slate-500
@@ -44,7 +47,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
         
         {previewUrl && (
           <label 
-            htmlFor={name}
+            htmlFor={inputId}
             className="relative border border-slate-200 rounded-md overflow-hidden bg-slate-50 p-1 h-[60px] min-w-[80px] flex items-center justify-center cursor-pointer hover:bg-slate-100 transition-colors group"
             title="Click to change image"
           >

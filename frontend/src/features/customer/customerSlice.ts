@@ -21,7 +21,11 @@ export const createCustomer = createAsyncThunk("customers/create", async (data: 
   try {
     return await customerService.create(data);
   } catch (error: any) {
-    return rejectWithValue(error.response?.data?.message || "Failed to create customer");
+    const data = error.response?.data;
+    return rejectWithValue({
+      message: data?.message || "Failed to create customer",
+      errors: data?.errors || []
+    });
   }
 });
 
@@ -29,7 +33,11 @@ export const updateCustomer = createAsyncThunk("customers/update", async ({ id, 
   try {
     return await customerService.update(id, data);
   } catch (error: any) {
-    return rejectWithValue(error.response?.data?.message || "Failed to update customer");
+    const data = error.response?.data;
+    return rejectWithValue({
+      message: data?.message || "Failed to update customer",
+      errors: data?.errors || []
+    });
   }
 });
 

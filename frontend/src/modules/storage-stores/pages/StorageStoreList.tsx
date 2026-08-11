@@ -492,7 +492,7 @@ const StorageStoreList: React.FC = () => {
                                 options={[
                                     { label: "Select an incharge", value: "" },
                                     ...(employees || [])
-                                        .filter((emp: any) => !selectedRoleId || String(emp.user?.roleId) === selectedRoleId)
+                                        .filter((emp: any) => !selectedRoleId || String(emp.roleId || emp.user?.roleId) === selectedRoleId)
                                         .map((emp: any) => ({
                                             label: `${emp.fullName} (${emp.empCode})`,
                                             value: emp.id?.toString() || ""

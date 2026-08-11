@@ -279,10 +279,13 @@ const MachineCreate: React.FC = () => {
                                 defaultOptionLabel={!inchargeRoleId ? "Select Role First" : "-- Select Machine Incharge -- "}
                                 required
                                 disabled={!inchargeRoleId}
-                                options={employees.map(emp => ({
-                                    label: `${emp.fullName} (${emp.empCode})${emp.user?.role ? ` - ${emp.user.role.name}` : ""}`,
-                                    value: emp.id
-                                }))}
+                                options={employees.map(emp => {
+                                    const roleName = emp.user?.role?.name || emp.role?.name;
+                                    return {
+                                        label: `${emp.fullName} (${emp.empCode})${roleName ? ` - ${roleName}` : ""}`,
+                                        value: emp.id
+                                    };
+                                })}
                                 error={errors.operatorId}
                                 onChange={handleChange}
                             />

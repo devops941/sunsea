@@ -15,6 +15,9 @@ export interface UserResponseDto {
     isSuperAdmin?: boolean;
     lastLoginAt: string | null;
     mfaEnabled: boolean;
+    avatarUrl?: string | null;
+    profilePicture?: string | null;
+    photoUrl?: string | null;
 }
 
 export interface ProfileResponseDto {

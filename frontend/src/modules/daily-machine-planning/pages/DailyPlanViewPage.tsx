@@ -233,14 +233,14 @@ const DailyPlanViewPage: React.FC = () => {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          {(viewPlan.status === "PLANNED" || viewPlan.status === "IN_PROGRESS") && (
+          {/* {(viewPlan.status === "PLANNED" || viewPlan.status === "IN_PROGRESS") && (
             <CustomButton
               text="Log Hourly Entry"
               icon={FaClipboardList}
               className="!bg-emerald-600 hover:!bg-emerald-700 !text-white shadow-sm"
               onClick={() => handleLogHourly(viewPlan)}
             />
-          )}
+          )} */}
           <BackButton />
         </div>
       </div>

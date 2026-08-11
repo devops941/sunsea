@@ -462,17 +462,25 @@ const HourlyWorkReportCreate: React.FC = () => {
         const filledIndices = existingLogs.map(log => Number(log.hourIndex));
         const maxFilled = filledIndices.length > 0 ? Math.max(...filledIndices) : 0;
         const nextRequiredHour = maxFilled + 1;
+        const limit = activePlan?.plannedHours ? Number(activePlan.plannedHours) : baseOptions.length;
 
         return baseOptions.map(opt => {
             const optNum = Number(opt.value);
             const isEditingThisOne = existingLogs.some(log => String(log.hourIndex) === opt.value && String(log.hourlyProductionId) === String(editingLogId));
 
+            let disabled = true;
+            if (isEditingThisOne) {
+                disabled = false;
+            } else if (optNum === nextRequiredHour && optNum <= limit) {
+                disabled = false;
+            }
+
             return {
                 ...opt,
-                disabled: !isEditingThisOne && optNum !== nextRequiredHour
+                disabled
             };
         });
-    }, [shiftTiming, existingLogs, editingLogId]);
+    }, [shiftTiming, existingLogs, editingLogId, activePlan]);
 
     const isFinalHour = hourOptions.length > 0 && Number(hourIndex) === hourOptions.length;
 
@@ -861,7 +869,7 @@ const HourlyWorkReportCreate: React.FC = () => {
                         <h6 className="font-bold text-lg text-slate-800 mb-6">Hourly Entry Log</h6>
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5">
-                            <div>
+                            <div className="flex flex-col">
                                 <SelectInput
                                     label="Hour index of Shift"
                                     name="hourIndex"
@@ -874,6 +882,21 @@ const HourlyWorkReportCreate: React.FC = () => {
                                         setFormErrors((prev) => ({ ...prev, hourIndex: "" }));
                                     }}
                                 />
+                                {(() => {
+                                    const limit = activePlan?.plannedHours ? Number(activePlan.plannedHours) : 0;
+                                    const filledIndices = existingLogs.map(log => Number(log.hourIndex));
+                                    const maxFilled = filledIndices.length > 0 ? Math.max(...filledIndices) : 0;
+                                    const nextRequiredHour = maxFilled + 1;
+                                    
+                                    if (limit > 0 && nextRequiredHour > limit && limit < hourOptions.length && !editingLogId) {
+                                        return (
+                                            <div className="mt-2 text-xs text-amber-700 bg-amber-50 p-2 rounded border border-amber-200">
+                                                <strong>Plan Completed:</strong> {limit} hours planned and logged. Remaining shift hours can be allocated to a new plan.
+                                            </div>
+                                        );
+                                    }
+                                    return null;
+                                })()}
                             </div>
                             <div>
                                 <SelectInput
@@ -1499,12 +1522,22 @@ const HourlyWorkReportCreate: React.FC = () => {
                         onClick={handleClear}
                         disabled={isSubmitting}
                     />
-                    <CustomButton
-                        text={isSubmitting ? (editingLogId ? "Updating..." : "Saving...") : (editingLogId ? "Update Entry" : "Save Entry")}
-                        icon={isSubmitting ? undefined : FaSave}
-                        type="submit"
-                        disabled={isSubmitting || !activePlan}
-                    />
+                    {(() => {
+                        const limit = activePlan?.plannedHours ? Number(activePlan.plannedHours) : 0;
+                        const filledIndices = existingLogs.map(log => Number(log.hourIndex));
+                        const maxFilled = filledIndices.length > 0 ? Math.max(...filledIndices) : 0;
+                        const nextRequiredHour = maxFilled + 1;
+                        const isNewLogBlocked = limit > 0 && nextRequiredHour > limit && !editingLogId;
+                        
+                        return (
+                            <CustomButton
+                                text={isSubmitting ? (editingLogId ? "Updating..." : "Saving...") : (editingLogId ? "Update Entry" : "Save Entry")}
+                                icon={isSubmitting ? undefined : FaSave}
+                                type="submit"
+                                disabled={isSubmitting || !activePlan || isNewLogBlocked}
+                            />
+                        );
+                    })()}
                 </div>
             </form>
 

@@ -35,21 +35,30 @@ export class AuthRepository {
   async findUserByEmail(email: string): Promise<PrismaUser | null> {
     return prisma.user.findUnique({
       where: { email },
-      include: { role: { select: { code: true, name: true } } }
+      include: {
+        role: { select: { code: true, name: true } },
+        employee: { select: { photoUrl: true } }
+      }
     }) as Promise<PrismaUser | null>;
   }
 
   async findUserByUsername(username: string): Promise<PrismaUser | null> {
     return prisma.user.findUnique({
       where: { username },
-      include: { role: { select: { code: true, name: true } } }
+      include: {
+        role: { select: { code: true, name: true } },
+        employee: { select: { photoUrl: true } }
+      }
     }) as Promise<PrismaUser | null>;
   }
 
   async findUserById(userId: string): Promise<PrismaUser | null> {
     return prisma.user.findUnique({
       where: { userId },
-      include: { role: { select: { code: true, name: true } } }
+      include: {
+        role: { select: { code: true, name: true } },
+        employee: { select: { photoUrl: true } }
+      }
     }) as Promise<PrismaUser | null>;
   }
 

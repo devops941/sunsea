@@ -683,7 +683,11 @@ class HourlyProductionService {
           }
         }
       }
-      const highCheckResult = await this.checkForNewCapacityHigh(tx, data, prodDate, dailyPlan);
+      const isFinalEntry = (dailyPlan?.plannedHours && Number(data.hourIndex) === Number(dailyPlan.plannedHours)) || isLastHour || data.stopPlanEarly;
+      let highCheckResult = { newHighReached: false };
+      if (isFinalEntry) {
+        highCheckResult = await this.checkForNewCapacityHigh(tx, data, prodDate, dailyPlan);
+      }
 
       return {
         ...created,
@@ -938,7 +942,11 @@ class HourlyProductionService {
         ? await tx.dailyProductionPlan.findUnique({ where: { dailyPlanId: merged.dailyPlanId } })
         : null;
 
-      const highCheckResult = await this.checkForNewCapacityHigh(tx, merged, prodDate, dailyPlan);
+      const isFinalEntry = (dailyPlan?.plannedHours && Number(merged.hourIndex) === Number(dailyPlan.plannedHours)) || data.stopPlanEarly;
+      let highCheckResult = { newHighReached: false };
+      if (isFinalEntry) {
+        highCheckResult = await this.checkForNewCapacityHigh(tx, merged, prodDate, dailyPlan);
+      }
 
       return {
         ...updated,

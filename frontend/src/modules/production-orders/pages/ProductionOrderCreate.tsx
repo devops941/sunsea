@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useCallback } from "react";
+import React, { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { FaSave, FaEraser, FaArrowLeft, FaPlus } from "react-icons/fa";
 import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
@@ -142,7 +142,6 @@ const defaultValues: ProductionOrderFormValues = {
     remarks: "",
 };
 
-// â”€â”€â”€ CtrlText helper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 type CtrlTextProps = {
     label?: string;
@@ -180,7 +179,6 @@ const CtrlText: React.FC<CtrlTextProps> = ({
     />
 );
 
-// â”€â”€â”€ RawMaterialRow â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 //
 //  Each row owns its own options/loading/fetchedForStoreId state via the
 //  `rowState` prop (a slice of the parent's `rowRmStates` array).
@@ -221,10 +219,12 @@ const RawMaterialRowInner: React.FC<RawMaterialRowInnerProps> = React.memo(({
 }) => {
     const { options, loading } = rowState;
     const storeId = watch(`products.${productIndex}.rawMaterials.${index}.storeId`);
+    const lastFetchedStoreRef = useRef<string | null>(null);
 
     // Fetch raw materials when storeId changes
     useEffect(() => {
-        if (storeId) {
+        if (storeId && storeId !== lastFetchedStoreRef.current) {
+            lastFetchedStoreRef.current = storeId;
             fetchRawMaterialsForStore(storeId, fieldId);
         }
     }, [storeId, fieldId, fetchRawMaterialsForStore]);
@@ -506,13 +506,13 @@ const ProductRawMaterialsSection: React.FC<ProductRawMaterialsSectionProps> = Re
     );
 });
 
-// â”€â”€â”€ Main Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ————————————————————————————————————————————————————————————————————————————————
 
 const ProductionOrderCreate: React.FC = () => {
     const navigate = useNavigate();
     const location = useLocation();
 
-    // â”€â”€ Generic state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Generic state ─────────────────────────────────────────────────────────────
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isEditMode, setIsEditMode] = useState(false);
     const [orderId, setOrderId] = useState<number | string | null>(null);
@@ -525,9 +525,9 @@ const ProductionOrderCreate: React.FC = () => {
     const [isFetchingSalesOrder, setIsFetchingSalesOrder] = useState(false);
     const [isCalculatingRM, setIsCalculatingRM] = useState(false);
 
-    // â”€â”€ Per-row raw material state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    // Each element corresponds to one rawMaterials field-array row.
+    // ── Per-row raw material state ────────────────────────────────────────────────
     const [rowRmStates, setRowRmStates] = useState<Record<string, RowRawMaterialState>>({});
+    const storeRmCacheRef = useRef<Record<string, { options: any[]; loading: boolean; promise?: Promise<any> }>>({});
 
     // Helper: update a single row's state
     const updateRowState = (
@@ -543,7 +543,7 @@ const ProductionOrderCreate: React.FC = () => {
         }));
     };
 
-    // â”€â”€ React Hook Form â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── React Hook Form ─────────────────────────────────────────────────────────────
     const {
         control,
         handleSubmit,
@@ -565,7 +565,7 @@ const ProductionOrderCreate: React.FC = () => {
     const watchSalesOrderId = useWatch({ control, name: "sourceSalesOrderId" });
     const watchProducts = useWatch({ control, name: "products" });
 
-    // â”€â”€ Store changed for a specific row â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Store changed for a specific row ───────────────────────────────────────────
     const fetchRawMaterialsForStore = useCallback(async (
         storeId: string,
         fieldId: string
@@ -579,42 +579,68 @@ const ProductionOrderCreate: React.FC = () => {
             return;
         }
 
-        // Avoid duplicate fetches for the same storeId
-        let skip = false;
-        setRowRmStates((prev) => {
-            if (prev[fieldId]?.fetchedForStoreId === storeId && !prev[fieldId]?.loading) {
-                skip = true;
-            }
-            return prev;
-        });
-        if (skip) return;
+        const cache = storeRmCacheRef.current[storeId];
 
+        // 1. If options are already cached for this storeId, reuse immediately without API call
+        if (cache && !cache.loading && cache.options.length >= 0 && cache.promise === undefined) {
+            updateRowState(fieldId, {
+                options: cache.options,
+                loading: false,
+                fetchedForStoreId: storeId,
+            });
+            return;
+        }
+
+        // 2. If a request is currently in flight for this storeId, reuse its promise
+        if (cache && cache.promise) {
+            updateRowState(fieldId, { loading: true, options: [], fetchedForStoreId: storeId });
+            try {
+                const opts = await cache.promise;
+                updateRowState(fieldId, { options: opts, loading: false, fetchedForStoreId: storeId });
+            } catch {
+                updateRowState(fieldId, { options: [], loading: false, fetchedForStoreId: storeId });
+            }
+            return;
+        }
+
+        // 3. Otherwise initiate a single API request for storeId
         updateRowState(fieldId, { loading: true, options: [], fetchedForStoreId: storeId });
 
+        const fetchPromise = (async () => {
+            try {
+                const res = await rawMaterialService.fetchAll({ storeId } as any);
+                const all: any[] = Array.isArray(res) ? res : (res as any)?.data ?? [];
+                const filtered = all.filter(
+                    (rm) => String(rm.storeId) === String(storeId)
+                );
+                const opts = filtered.map((rm) => {
+                    const availableVal = (Number(rm.onHandQty) || 0) - (Number(rm.reservedQty) || 0);
+                    const available = Math.round(availableVal * 100) / 100;
+                    return {
+                        label: `${rm.materialName || rm.name || rm.rawMaterialId} (Available: ${available})`,
+                        value: (rm.rawMaterialId ?? rm.id)?.toString() ?? "",
+                        rawUom: rm.baseUom || "KG",
+                    };
+                });
+                storeRmCacheRef.current[storeId] = { options: opts, loading: false };
+                return opts;
+            } catch (err) {
+                storeRmCacheRef.current[storeId] = { options: [], loading: false };
+                throw err;
+            }
+        })();
+
+        storeRmCacheRef.current[storeId] = {
+            options: [],
+            loading: true,
+            promise: fetchPromise,
+        };
+
         try {
-            // Using existing API to fetch raw materials by storeId
-            const res = await rawMaterialService.fetchAll({ storeId } as any);
-
-            const all: any[] = Array.isArray(res) ? res : (res as any)?.data ?? [];
-
-            // Only keep materials belonging to the selected store (redundant but safe)
-            const filtered = all.filter(
-                (rm) => String(rm.storeId) === String(storeId)
-            );
-
-            const opts = filtered.map((rm) => {
-                const availableVal = (Number(rm.onHandQty) || 0) - (Number(rm.reservedQty) || 0);
-                const available = Math.round(availableVal * 100) / 100;
-                return {
-                    label: `${rm.materialName || rm.name || rm.rawMaterialId} (Available: ${available})`,
-                    value: (rm.rawMaterialId ?? rm.id)?.toString() ?? "",
-                    rawUom: rm.baseUom || "KG",
-                };
-            });
-
-            updateRowState(fieldId, { options: opts, loading: false });
+            const opts = await fetchPromise;
+            updateRowState(fieldId, { options: opts, loading: false, fetchedForStoreId: storeId });
         } catch {
-            updateRowState(fieldId, { options: [], loading: false });
+            updateRowState(fieldId, { options: [], loading: false, fetchedForStoreId: storeId });
             toast.error("Failed to load raw materials for store");
         }
     }, []);
@@ -663,6 +689,7 @@ const ProductionOrderCreate: React.FC = () => {
     }, [extractArray]);
 
     const refreshRmStates = useCallback(() => {
+        storeRmCacheRef.current = {};
         setRowRmStates({});
     }, []);
 
@@ -812,15 +839,22 @@ const ProductionOrderCreate: React.FC = () => {
                         const newRms = [...currentRms];
                         expectedRms.forEach((expected: any, idx: number) => {
                             if (newRms[idx]) {
-                                if (newRms[idx].requiredQty !== expected.requiredQty || newRms[idx].remarks !== expected.remarks || newRms[idx].rawMaterialId !== expected.rawMaterialId || newRms[idx].storeId !== expected.storeId) {
+                                // Row already exists — only recalculate required quantity
+                                if (newRms[idx].requiredQty !== expected.requiredQty) {
                                     setValue(`products.${pIdx}.rawMaterials.${idx}.requiredQty`, expected.requiredQty);
-                                    setValue(`products.${pIdx}.rawMaterials.${idx}.remarks`, expected.remarks);
-                                    if (newRms[idx].rawMaterialId !== expected.rawMaterialId) {
-                                        setValue(`products.${pIdx}.rawMaterials.${idx}.rawMaterialId`, expected.rawMaterialId);
-                                    }
-                                    if (newRms[idx].storeId !== expected.storeId) {
-                                        setValue(`products.${pIdx}.rawMaterials.${idx}.storeId`, expected.storeId);
-                                    }
+                                    updated = true;
+                                }
+                                if (!newRms[idx].uom && expected.uom) {
+                                    setValue(`products.${pIdx}.rawMaterials.${idx}.uom`, expected.uom);
+                                    updated = true;
+                                }
+                                // Only populate storeId or rawMaterialId if currently empty
+                                if (!newRms[idx].storeId && expected.storeId) {
+                                    setValue(`products.${pIdx}.rawMaterials.${idx}.storeId`, expected.storeId);
+                                    updated = true;
+                                }
+                                if (!newRms[idx].rawMaterialId && expected.rawMaterialId) {
+                                    setValue(`products.${pIdx}.rawMaterials.${idx}.rawMaterialId`, expected.rawMaterialId);
                                     updated = true;
                                 }
                             } else {
@@ -829,7 +863,7 @@ const ProductionOrderCreate: React.FC = () => {
                                     requiredQty: expected.requiredQty,
                                     uom: expected.uom,
                                     storeId: expected.storeId,
-                                    remarks: expected.remarks
+                                    remarks: expected.remarks || ""
                                 });
                                 updated = true;
                             }

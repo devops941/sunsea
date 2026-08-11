@@ -2,6 +2,7 @@ import { prisma } from "../../config/prisma";
 import { ApiError } from "../../utils/ApiError";
 import { UserStatus } from "../../types/auth.types";
 import { sendEmail } from "../../utils/mailer";
+import { generateWelcomeEmailHtml } from "../../templates/welcomeEmailTemplate";
 import bcrypt from "bcrypt";
 
 class EmployeeService {
@@ -155,21 +156,15 @@ class EmployeeService {
         await sendEmail({
           to: recipientEmail,
           subject: "Welcome to Sunsea — Your Account Has Been Created",
-          html: `
-            <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-              <h2 style="color: #1a56db;">Welcome to Sunsea!</h2>
-              <p>Dear <strong>${createdEmployee.fullName}</strong>,</p>
-              <p>Your employee account and login credentials have been created successfully.</p>
-              <table style="border-collapse: collapse; margin: 15px 0; background: #f9fafb; padding: 12px; border: 1px solid #e5e7eb; border-radius: 6px; width: 100%; max-width: 500px;">
-                <tr><td style="padding: 8px; font-weight: bold; width: 140px; color: #4b5563;">Employee Code:</td><td style="padding: 8px;">${createdEmployee.empCode}</td></tr>
-                <tr><td style="padding: 8px; font-weight: bold; color: #4b5563;">Username:</td><td style="padding: 8px;">${loginAccount.username}</td></tr>
-                ${loginAccount.password ? `<tr><td style="padding: 8px; font-weight: bold; color: #4b5563;">Password:</td><td style="padding: 8px;">${loginAccount.password}</td></tr>` : ''}
-              </table>
-              <p>Please log in to the Sunsea portal and change your password at your earliest convenience.</p>
-              <br/>
-              <p>Regards,<br/><strong>Sunsea HR & IT Team</strong></p>
-            </div>
-          `,
+          html: generateWelcomeEmailHtml({
+            fullName: createdEmployee.fullName,
+            empCode: createdEmployee.empCode,
+            username: loginAccount.username,
+            password: loginAccount.password,
+            title: "Welcome to Sunsea!",
+            subtitle: "Your official employee account and login credentials are ready.",
+            teamName: "Sunsea HR & IT Team",
+          }),
         });
       } catch (emailErr) {
         console.error("Failed to send welcome email (non-fatal):", emailErr);
@@ -437,21 +432,15 @@ class EmployeeService {
         await sendEmail({
           to: recipientEmail,
           subject: "Sunsea — Your Login Account Credentials",
-          html: `
-            <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-              <h2 style="color: #1a56db;">Sunsea Account Credentials</h2>
-              <p>Dear <strong>${updatedEmployee.fullName}</strong>,</p>
-              <p>Your employee login account credentials have been updated:</p>
-              <table style="border-collapse: collapse; margin: 15px 0; background: #f9fafb; padding: 12px; border: 1px solid #e5e7eb; border-radius: 6px; width: 100%; max-width: 500px;">
-                <tr><td style="padding: 8px; font-weight: bold; width: 140px; color: #4b5563;">Employee Code:</td><td style="padding: 8px;">${updatedEmployee.empCode}</td></tr>
-                <tr><td style="padding: 8px; font-weight: bold; color: #4b5563;">Username:</td><td style="padding: 8px;">${loginAccount.username}</td></tr>
-                <tr><td style="padding: 8px; font-weight: bold; color: #4b5563;">Password:</td><td style="padding: 8px;">${loginAccount.password}</td></tr>
-              </table>
-              <p>Please log in and change your password at your earliest convenience.</p>
-              <br/>
-              <p>Regards,<br/><strong>Sunsea HR & IT Team</strong></p>
-            </div>
-          `,
+          html: generateWelcomeEmailHtml({
+            fullName: updatedEmployee.fullName,
+            empCode: updatedEmployee.empCode,
+            username: loginAccount.username,
+            password: loginAccount.password,
+            title: "Account Credentials Updated",
+            subtitle: "Your login credentials for the Sunsea portal have been updated.",
+            teamName: "Sunsea HR & IT Team",
+          }),
         });
       } catch (emailErr) {
         console.error("Failed to send welcome email on update (non-fatal):", emailErr);

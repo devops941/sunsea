@@ -96,6 +96,44 @@ const Employeelist: React.FC = () => {
     { header: "Department", render: (emp) => emp.department?.name || "N/A" },
     { header: "Role", render: (emp) => emp.role?.name || emp.user?.role?.name || "N/A" },
     {
+      header: "Login Account",
+      align: "center",
+      render: (emp) => {
+        if (!emp.user) {
+          return (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-500 border border-slate-200/80">
+              <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+              No Login
+            </span>
+          );
+        }
+        const isActive = emp.user.status === "active";
+        return (
+          <div className="flex flex-col items-center gap-0.5">
+            <span
+              className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
+                isActive
+                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                  : "bg-amber-50 text-amber-700 border-amber-200"
+              }`}
+            >
+              <span
+                className={`w-1.5 h-1.5 rounded-full ${
+                  isActive ? "bg-emerald-500 animate-pulse" : "bg-amber-500"
+                }`}
+              ></span>
+              {isActive ? "Enabled" : emp.user.status?.toUpperCase() || "Disabled"}
+            </span>
+            {emp.user.username && (
+              <span className="text-[11px] font-mono text-slate-500">
+                @{emp.user.username}
+              </span>
+            )}
+          </div>
+        );
+      },
+    },
+    {
       header: "Status", render: (emp) => {
         const statusMap: Record<string, string> = {
           active: "ACTIVE",

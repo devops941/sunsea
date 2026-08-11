@@ -218,17 +218,17 @@ const DailyPlanCreate: React.FC = () => {
         (p: any) => p.shiftId === s.shiftCode && p.status !== "CANCELLED" && p.dailyPlanId !== editId
       );
 
-      // Only hours physically consumed by terminal plans count toward disabling a shift.
-      // Active/planned plans reserve hours but don't lock the shift entirely — the user
-      // can still schedule in the remaining physical hours after stopped/completed work.
-      const terminalConsumed = existingPlans
-        .filter((p: any) => TERMINAL_STATUSES.includes(p.status))
+      const plannedHrsSum = existingPlans
         .reduce((sum: number, p: any) => {
           const loggedHours = Array.isArray(p.hourlyProductions) ? p.hourlyProductions.length : 0;
-          return sum + loggedHours;
+          if (TERMINAL_STATUSES.includes(p.status)) {
+            return sum + loggedHours;
+          } else {
+            return sum + Math.max(Number(p.plannedHours || 0), loggedHours);
+          }
         }, 0);
 
-      hoursMap[s.shiftCode] = Math.max(0, shiftHrs - terminalConsumed);
+      hoursMap[s.shiftCode] = Math.max(0, shiftHrs - plannedHrsSum);
     });
 
     return hoursMap;
@@ -604,7 +604,7 @@ const DailyPlanCreate: React.FC = () => {
       shiftId: z.string().min(1, "Shift is required"),
       plannedQty: z.coerce.number().positive("Planned Quantity must be greater than 0"),
       plannedHours: z.coerce.number()
-        .nonnegative("Planned Hours must be a positive number")
+        .positive("Planned Hours must be greater than 0")
         .max(availableShiftHours, `Planned Hours cannot exceed available shift hours (${availableShiftHours}h)`)
         .optional(),
       selectedOperators: z.array(z.string()).min(1, "Please select at least one operator"),

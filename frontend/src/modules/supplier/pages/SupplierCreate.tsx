@@ -23,6 +23,7 @@ import IndiaPhoneInput, { type PhoneEntry } from "../../../components/ui/PhoneIn
 
 import { validatePhoneNumber } from "../../../components/ui/PhoneInput/PhoneInput";
 import BackButton from "../../../components/ui/BackButton/BackButton";
+import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
 import { useSocketSync } from "../../../hooks/useSocketSync";
 
 
@@ -52,8 +53,18 @@ const supplierFormSchema = z.object({
         }),
     email: z.preprocess((val) => (val === "" ? null : val), z.string().trim().email("Invalid email address").max(120).nullable()).optional(),
     website: z.string().trim().max(200, "Maximum 200 characters allowed").optional().nullable(),
-    gstin: z.preprocess((val) => (val === "" ? null : val), z.string().trim().max(15, "Maximum 15 characters allowed").nullable()).optional(),
-    pan: z.preprocess((val) => (val === "" ? null : val), z.string().trim().max(10, "Maximum 10 characters allowed").nullable()).optional(),
+    gstin: z.preprocess(
+        (val) => (typeof val === "string" ? val.trim().toUpperCase() : val),
+        z.string()
+            .refine(val => !val || /^\d{2}[A-Z]{5}\d{4}[A-Z][A-Z\d]Z[A-Z\d]$/.test(val), "Invalid GSTIN format (e.g. 33ABCDE1234F1Z5)")
+            .nullable()
+    ).optional(),
+    pan: z.preprocess(
+        (val) => (typeof val === "string" ? val.trim().toUpperCase() : val),
+        z.string()
+            .refine(val => !val || /^[A-Z]{5}\d{4}[A-Z]$/.test(val), "Invalid PAN format (e.g. ABCDE1234F)")
+            .nullable()
+    ).optional(),
     gstRegType: z.string().trim().max(20, "Maximum 20 characters allowed").optional().nullable(),
     msmeStatus: z.enum(["Micro", "Small", "Medium", "None"]).optional().nullable(),
     udyamNo: z.string().trim().max(20, "Maximum 20 characters allowed").optional().nullable(),
@@ -280,6 +291,21 @@ const SupplierCreate: React.FC = () => {
         if (type === "checkbox") {
             const checked = (e.target as HTMLInputElement).checked;
             setFormData(prev => ({ ...prev, [name]: checked }));
+        } else if (name === "gstin" || name === "pan") {
+            const uppercaseVal = value.toUpperCase();
+            setFormData(prev => {
+                const updated = { ...prev, [name]: uppercaseVal };
+                if (name === "gstin" && uppercaseVal.length >= 12) {
+                    const extractedPan = uppercaseVal.slice(2, 12);
+                    if (/^[A-Z]{5}\d{4}[A-Z]$/.test(extractedPan)) {
+                        updated.pan = extractedPan;
+                        if (errors.pan) {
+                            setErrors(ePrev => ({ ...ePrev, pan: "" }));
+                        }
+                    }
+                }
+                return updated;
+            });
         } else {
             const parsedValue = (name === "leadTimeDays" || name === "minOrderQty")
                 ? Number(value) || 0
@@ -577,7 +603,24 @@ const SupplierCreate: React.FC = () => {
             toast.success("Supplier created successfully!");
             navigate("/suppliers");
         } catch (err: any) {
-            toast.error(typeof err === "string" ? err : err?.message || "Failed to create supplier");
+            const apiErrors = err?.errors || err?.response?.data?.errors;
+            if (Array.isArray(apiErrors) && apiErrors.length > 0) {
+                const fieldErrors: Record<string, string> = {};
+                apiErrors.forEach((item: any) => {
+                    let fieldName = (item.path || "").replace(/^body\./, "");
+                    if (fieldName === "billingPincode") fieldName = "billingAddressPincode";
+                    if (fieldName === "billingCity") fieldName = "billingAddressCity";
+                    if (fieldName === "billingState") fieldName = "billingAddressState";
+                    if (fieldName) {
+                        fieldErrors[fieldName] = item.message;
+                    }
+                });
+                setErrors(prev => ({ ...prev, ...fieldErrors }));
+                toast.error(err?.message || "Please fix validation errors on the form.");
+            } else {
+                const msg = typeof err === "string" ? err : err?.message || err?.response?.data?.message || "Failed to create supplier";
+                toast.error(msg);
+            }
         } finally {
             setIsSubmitting(false);
         }
@@ -894,14 +937,7 @@ const SupplierCreate: React.FC = () => {
                                                         )}
 
                                                         {addresses.length > 1 && (
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => removeShippingAddress(index)}
-                                                                className="text-red-500 hover:text-red-700 p-1.5 bg-red-50 rounded"
-                                                                title="Remove Address"
-                                                            >
-                                                                <FaTrash />
-                                                            </button>
+                                                            <DeleteButton onClick={() => removeShippingAddress(index)} />
                                                         )}
                                                     </div>
                                                 </div>
@@ -1021,13 +1057,7 @@ const SupplierCreate: React.FC = () => {
                                     <div key={index} className="p-4 border border-slate-200 rounded-xl bg-white relative">
                                         {formData.bankAccounts.length > 1 && (
                                             <div className="absolute top-4 right-4">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => removeBankAccount(index)}
-                                                    className="text-red-500 hover:text-red-700 text-sm font-semibold transition-colors"
-                                                >
-                                                    Remove
-                                                </button>
+                                                <DeleteButton onClick={() => removeBankAccount(index)} />
                                             </div>
                                         )}
                                         <h6 className="font-bold text-slate-600 mb-2">Bank #{index + 1}</h6>
@@ -1088,6 +1118,7 @@ const SupplierCreate: React.FC = () => {
 
                                             />
                                             <FileUpload
+                                                id={`qrImage-${index}`}
                                                 label="Upload QR Image"
                                                 name="qrImage"
                                                 onChange={(e) => handleBankFileChange(index, e)}
