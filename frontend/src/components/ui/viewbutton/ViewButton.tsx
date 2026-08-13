@@ -4,13 +4,15 @@ import { FiEye } from "react-icons/fi";
 interface ViewButtonProps {
   onClick?: () => void;
   disabled?: boolean;
+  onMouseEnter?: () => void;
 }
 
-const ViewButton: React.FC<ViewButtonProps> = ({ onClick, disabled }) => {
+const ViewButton: React.FC<ViewButtonProps> = ({ onClick, disabled, onMouseEnter }) => {
   return (
     <button
       type="button"
       onClick={onClick}
+      onMouseEnter={onMouseEnter}
       disabled={disabled}
       className="
         w-10 h-10
