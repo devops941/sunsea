@@ -35,8 +35,7 @@ const EmployeeViewPage = lazy(() => import("../modules/employee/pages/EmployeeVi
 
 // Suppliers
 
-const SupplierCreatePage = lazy(() => import("../modules/supplier/pages/SupplierCreate"));
-const SupplierEditPage = lazy(() => import("../modules/supplier/pages/SupplierEdit"));
+const SupplierFormPage = lazy(() => import("../modules/supplier/pages/SupplierForm"));
 const SupplierMaterialPricingList = lazy(() => import("../modules/supplier/pages/Suppliermaterialpricinglist"));
 
 // Products
@@ -145,8 +144,7 @@ const PurchaseTabs = lazy(() => import("../modules/purchase/pages/PurchaseTabs")
 
 // Purchase Order Module
 
-const PurchaseOrderCreatePage = lazy(() => import("../modules/purchase/purchase-order/pages/PurchaseOrderCreatePage"));
-const PurchaseOrderEditPage = lazy(() => import("../modules/purchase/purchase-order/pages/PurchaseOrderEditPage"));
+const PurchaseOrderForm = lazy(() => import("../modules/purchase/purchase-order/pages/PurchaseOrderForm"));
 
 const PurchaseOrderViewPage = lazy(() => import("../modules/purchase/purchase-order/purchaseordeappovals/PurchaseOrderapprovalEdit"));
 
@@ -213,13 +211,12 @@ const AppRoutes = () => {
             <Route element={<ProtectedRoute permission="suppliers.view" />}>
               <Route path="/suppliers" element={<PurchaseTabs />} />
             </Route>
-            {/* Suppliers Create Route */}
+            {/* Suppliers Form Route (Create / Edit) */}
             <Route element={<ProtectedRoute permission="suppliers.create" />}>
-              <Route path="/suppliers/create" element={<SupplierCreatePage />} />
+              <Route path="/suppliers/create" element={<SupplierFormPage />} />
             </Route>
-            {/* Suppliers Edit :Id Route */}
             <Route element={<ProtectedRoute permission="suppliers.edit" />}>
-              <Route path="/suppliers/edit/:id" element={<SupplierEditPage />} />
+              <Route path="/suppliers/edit/:id" element={<SupplierFormPage />} />
             </Route>
             <Route element={<ProtectedRoute permission="supplierpricelist.view" />}>
               <Route path="/suppliers/:supplierId/material-prices" element={<SupplierMaterialPricingList />} />
@@ -629,15 +626,13 @@ const AppRoutes = () => {
               <Route path="/purchase-orders/view/:id" element={<PurchaseOrderViewPage />} />
             </Route>
             <Route element={<ProtectedRoute permission="purchaseOrders.create" />}>
-              <Route path="/purchase-orders/create" element={<PurchaseOrderCreatePage />} />
+              <Route path="/purchase-orders/create" element={<PurchaseOrderForm />} />
             </Route>
             <Route element={<ProtectedRoute permission="purchaseOrders.edit" />}>
-              <Route path="/purchase-orders/edit/:id" element={<PurchaseOrderEditPage />} />
+              <Route path="/purchase-orders/edit/:id" element={<PurchaseOrderForm />} />
             </Route>
 
-            <Route element={<ProtectedRoute permission="purchase-order-approvals.view" />}>
-              <Route path="/purchase-order-approvals" element={<PurchaseTabs />} />
-            </Route>
+
 
             <Route element={<ProtectedRoute permission="expenses.view" />}>
               <Route path="/expenses" element={<PurchaseTabs />} />

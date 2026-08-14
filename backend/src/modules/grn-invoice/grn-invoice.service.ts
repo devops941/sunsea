@@ -6,6 +6,29 @@ import fs from "fs";
 import path from "path";
 import crypto from "crypto";
 
+function getUomMultiplier(uom: string = "", baseUom: string = ""): number {
+    const u = (uom || "").trim().toLowerCase();
+    const b = (baseUom || "").trim().toLowerCase();
+    if (!u || u === b) return 1;
+    if (u === "g" || u === "gram" || u === "grams") {
+        if (b.includes("kg") || b === "kilogram" || b === "kilograms" || !b) return 0.001;
+    }
+    if (u === "kg" || u === "kilogram" || u === "kilograms") {
+        if (b === "g" || b === "gram" || b === "grams") return 1000;
+    }
+    if (u === "mg") {
+        if (b.includes("kg")) return 0.000001;
+        if (b.includes("g")) return 0.001;
+    }
+    if (u === "ton" || u === "tonne" || u === "tonnes" || u === "tons") {
+        if (b.includes("kg") || !b) return 1000;
+    }
+    if (u === "ml" && (b.includes("l") || !b)) return 0.001;
+    if (u === "mm" && (b.includes("m") || !b)) return 0.001;
+    if (u === "cm" && (b.includes("m") || !b)) return 0.01;
+    return 1;
+}
+
 class GrnInvoiceService {
 
     // ── Generate next GRN number ───────────────────────────────────────────────
@@ -34,13 +57,19 @@ class GrnInvoiceService {
     }
 
     // ── Calculate totals ────────────────────────────────────────────────────────
-    private calculateTotals(
+    private async calculateTotals(
         items: CreateGrnInvoiceInput["items"],
         isInterState: boolean,
         discountType: "PERCENT" | "FLAT" = "PERCENT",
         discountValue: number = 0,
         roundingAdjust: number = 0
     ) {
+        const productIds = items.map((i) => String(i.productId)).filter(Boolean);
+        const rawMaterials = productIds.length > 0
+            ? await prisma.rawMaterial.findMany({ where: { rawMaterialId: { in: productIds } } })
+            : [];
+        const rmMap = new Map(rawMaterials.map((rm) => [String(rm.rawMaterialId), rm]));
+
         let subtotal = 0;
         let totalTax = 0;
         let totalCgst = 0;
@@ -50,8 +79,10 @@ class GrnInvoiceService {
         const itemsWithTotals = items.map((item) => {
             const qty = Number(item.quantity) || 0;
             const unitPrice = Number(item.unitPrice) || 0;
+            const rm = rmMap.get(String(item.productId));
+            const mult = getUomMultiplier(item.uom, rm?.baseUom);
             const itemDiscountAmount = Number((item as any).discountAmount || 0);
-            const lineSubtotal = (qty * unitPrice) - itemDiscountAmount;
+            const lineSubtotal = (qty * mult * unitPrice) - itemDiscountAmount;
 
             const taxableAmount = lineSubtotal;
             const totalGstRate = Number(item.tax) || 0;
@@ -160,7 +191,7 @@ class GrnInvoiceService {
         const sameAsBilling = (data.sameAsBilling as any) === "true" || data.sameAsBilling === true;
 
         const { itemsWithTotals, subtotal, totalDiscount, totalTax, totalCgst, totalSgst, totalIgst, netAmount } =
-            this.calculateTotals(items, isInterState, discountType, discountValue, roundingAdjust);
+            await this.calculateTotals(items, isInterState, discountType, discountValue, roundingAdjust);
 
         // Upload invoice image to ImageKit if provided
         let invoiceImageUrl: string | null = null;
@@ -307,8 +338,9 @@ class GrnInvoiceService {
                         enumType = "CONSUMABLE";
                     }
 
+                    const mult = getUomMultiplier(item.uom, rawMaterial.baseUom);
                     const currentQtyNum = Number(rawMaterial.onHandQty) || 0;
-                    const receivedQtyNum = Number(item.quantity);
+                    const receivedQtyNum = Number(item.quantity) * mult;
                     const adjustedQtyNum = currentQtyNum + receivedQtyNum;
 
                     adjustmentItems.push({
@@ -381,8 +413,11 @@ class GrnInvoiceService {
 
                 for (const poItem of po.items) {
                     const item = itemsWithTotals.find((i) => i.productId === poItem.productId);
+                    const poRawMaterial = await tx.rawMaterial.findUnique({ where: { rawMaterialId: poItem.productId } });
                     const currentRec = Number(poItem.receivedQty) || 0;
-                    const addedRec = item ? Number(item.quantity) : 0;
+                    const mult = item ? getUomMultiplier(item.uom, poRawMaterial?.baseUom) : 1;
+                    const poMult = getUomMultiplier(poItem.uom, poRawMaterial?.baseUom);
+                    const addedRec = item ? (Number(item.quantity) * mult) / (poMult || 1) : 0;
                     const newRec = currentRec + addedRec;
 
                     if (addedRec > 0) {
@@ -574,7 +609,7 @@ class GrnInvoiceService {
             let itemsToCreate = existing.items;
 
             if (items) {
-                const totals = this.calculateTotals(items, isInterState, discountType, discountValue, roundingAdjust);
+                const totals = await this.calculateTotals(items, isInterState, discountType, discountValue, roundingAdjust);
                 subtotal = totals.subtotal;
                 totalDiscount = totals.totalDiscount;
                 totalTax = totals.totalTax;
@@ -707,8 +742,9 @@ class GrnInvoiceService {
                         enumType = "CONSUMABLE";
                     }
 
+                    const mult = getUomMultiplier(item.uom, rawMaterial.baseUom);
                     const currentQtyNum = Number(rawMaterial.onHandQty) || 0;
-                    const revertQtyNum = Number(item.quantity);
+                    const revertQtyNum = Number(item.quantity) * mult;
                     const adjustedQtyNum = currentQtyNum - revertQtyNum;
 
                     revAdjustmentItems.push({
@@ -802,8 +838,9 @@ class GrnInvoiceService {
                         enumType = "CONSUMABLE";
                     }
 
+                    const mult = getUomMultiplier(item.uom, rawMaterial.baseUom);
                     const currentQtyNum = Number(rawMaterial.onHandQty) || 0;
-                    const newQtyNum = Number(item.quantity);
+                    const newQtyNum = Number(item.quantity) * mult;
                     const adjustedQtyNum = currentQtyNum + newQtyNum;
 
                     newAdjustmentItems.push({
@@ -904,8 +941,9 @@ class GrnInvoiceService {
                             enumType = "CONSUMABLE";
                         }
 
+                        const mult = getUomMultiplier(item.uom, rawMaterial.baseUom);
                         const currentQtyNum = Number(rawMaterial.onHandQty) || 0;
-                        const revertQtyNum = Number(item.quantity);
+                        const revertQtyNum = Number(item.quantity) * mult;
                         const adjustedQtyNum = currentQtyNum - revertQtyNum;
 
                         revAdjustmentItems.push({
@@ -999,8 +1037,9 @@ class GrnInvoiceService {
                             enumType = "CONSUMABLE";
                         }
 
+                        const mult = getUomMultiplier(item.uom, rawMaterial.baseUom);
                         const currentQtyNum = Number(rawMaterial.onHandQty) || 0;
-                        const newQtyNum = Number(item.quantity);
+                        const newQtyNum = Number(item.quantity) * mult;
                         const adjustedQtyNum = currentQtyNum + newQtyNum;
 
                         newAdjustmentItems.push({
@@ -1109,8 +1148,9 @@ class GrnInvoiceService {
                         enumType = "CONSUMABLE";
                     }
 
+                    const mult = getUomMultiplier(item.uom, rawMaterial.baseUom);
                     const currentQtyNum = Number(rawMaterial.onHandQty) || 0;
-                    const revertQtyNum = Number(item.quantity);
+                    const revertQtyNum = Number(item.quantity) * mult;
                     const adjustedQtyNum = currentQtyNum - revertQtyNum;
 
                     revAdjustmentItems.push({

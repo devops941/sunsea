@@ -3,6 +3,29 @@ import { ApiError } from "../../utils/ApiError";
 import { executeDeleteWithValidation } from "../../utils/deleteValidation";
 import { CreatePurchaseOrderInput, UpdatePurchaseOrderInput } from "./purchase-order.validation";
 
+function getUomMultiplier(uom: string = "", baseUom: string = ""): number {
+    const u = (uom || "").trim().toLowerCase();
+    const b = (baseUom || "").trim().toLowerCase();
+    if (!u || u === b) return 1;
+    if (u === "g" || u === "gram" || u === "grams") {
+        if (b.includes("kg") || b === "kilogram" || b === "kilograms" || !b) return 0.001;
+    }
+    if (u === "kg" || u === "kilogram" || u === "kilograms") {
+        if (b === "g" || b === "gram" || b === "grams") return 1000;
+    }
+    if (u === "mg") {
+        if (b.includes("kg")) return 0.000001;
+        if (b.includes("g")) return 0.001;
+    }
+    if (u === "ton" || u === "tonne" || u === "tonnes" || u === "tons") {
+        if (b.includes("kg") || !b) return 1000;
+    }
+    if (u === "ml" && (b.includes("l") || !b)) return 0.001;
+    if (u === "mm" && (b.includes("m") || !b)) return 0.001;
+    if (u === "cm" && (b.includes("m") || !b)) return 0.01;
+    return 1;
+}
+
 class PurchaseOrderService {
 
     // ── Generate next PO number ───────────────────────────────────────────────
@@ -26,13 +49,19 @@ class PurchaseOrderService {
     }
 
     // ── Calculate totals from items ───────────────────────────────────────────
-    private calculateTotals(
+    private async calculateTotals(
         items: CreatePurchaseOrderInput["items"],
         isInterState: boolean,
         poDiscountType: "PERCENT" | "FLAT" = "PERCENT",
         poDiscountValue: number = 0,
         roundingAdjust: number = 0
     ) {
+        const productIds = items.map((i) => String(i.productId)).filter(Boolean);
+        const rawMaterials = productIds.length > 0
+            ? await prisma.rawMaterial.findMany({ where: { rawMaterialId: { in: productIds } } })
+            : [];
+        const rmMap = new Map(rawMaterials.map((rm) => [String(rm.rawMaterialId), rm]));
+
         let subtotal = 0;
         let totalTax = 0;
         let totalCgst = 0;
@@ -42,7 +71,9 @@ class PurchaseOrderService {
         const itemsWithTotals = items.map((item) => {
             const qty = Number(item.quantity) || 0;
             const unitPrice = Number(item.unitPrice) || 0;
-            const lineSubtotal = qty * unitPrice;
+            const rm = rmMap.get(String(item.productId));
+            const mult = getUomMultiplier(item.uom, rm?.baseUom);
+            const lineSubtotal = qty * mult * unitPrice;
 
             // Taxable amount is the line subtotal (no item-level discount)
             const taxableAmount = lineSubtotal;
@@ -148,7 +179,7 @@ class PurchaseOrderService {
         const roundingAdjust = Number(data.roundingAdjust) || 0;
 
         const { itemsWithTotals, subtotal, totalDiscount, totalTax, totalCgst, totalSgst, totalIgst, netAmount } =
-            this.calculateTotals(data.items, isInterState, poDiscountType, poDiscountValue, roundingAdjust);
+            await this.calculateTotals(data.items, isInterState, poDiscountType, poDiscountValue, roundingAdjust);
 
         return prisma.purchaseOrder.create({
             data: {
@@ -333,9 +364,48 @@ class PurchaseOrderService {
             throw new ApiError(404, "Purchase Order not found");
         }
 
+        const productIds = po.items.map((i) => String(i.productId)).filter(Boolean);
+        const numericProductIds = productIds.filter((id) => /^\d+$/.test(id)).map((id) => BigInt(id));
+
+        const [rawMaterials, products] = await Promise.all([
+            productIds.length > 0
+                ? prisma.rawMaterial.findMany({ where: { rawMaterialId: { in: productIds } } })
+                : [],
+            numericProductIds.length > 0
+                ? prisma.product.findMany({ where: { id: { in: numericProductIds } } })
+                : [],
+        ]);
+
+        const rmMap = new Map(rawMaterials.map((rm) => [String(rm.rawMaterialId), rm]));
+        const pMap = new Map(products.map((p) => [String(p.id), p]));
+
+        const itemsWithDetails = po.items.map((item) => {
+            const rm = rmMap.get(String(item.productId));
+            const p = pMap.get(String(item.productId));
+            const description = rm?.materialName || p?.productName || item.productId;
+            const hsnCode = rm?.hsnCode || p?.hsnCode || null;
+            return {
+                ...item,
+                description,
+                hsnCode,
+                rawMaterial: rm || null,
+                product: p ? {
+                    id: p.id,
+                    productName: p.productName,
+                    hsnCode: p.hsnCode,
+                } : (rm ? {
+                    id: rm.rawMaterialId,
+                    productName: rm.materialName,
+                    materialName: rm.materialName,
+                    hsnCode: rm.hsnCode,
+                } : null),
+            };
+        });
+
         const { supplier, ...rest } = po as any;
         return {
             ...rest,
+            items: itemsWithDetails,
             supplier: supplier
                 ? {
                     id: supplier.id,
@@ -363,7 +433,7 @@ class PurchaseOrderService {
         const updateData: any = {
             ...(data.poDate && { poDate: new Date(data.poDate) }),
             ...(data.expectedDeliveryDate && { expectedDeliveryDate: new Date(data.expectedDeliveryDate) }),
-            ...(data.supplierId && { supplierId: data.supplierId }),
+            ...(data.supplierId && { supplierId: Number(data.supplierId) }),
             ...(data.status && { status: data.status }),
             ...(data.remarks !== undefined && { remarks: data.remarks }),
             ...(data.rejectReason !== undefined && { rejectReason: data.rejectReason }),
@@ -383,7 +453,7 @@ class PurchaseOrderService {
 
             ...(data.storeId !== undefined && { storeId: data.storeId }),
             ...(data.discountType !== undefined && { discountType: data.discountType }),
-            ...(data.discountValue !== undefined && { discountValue: data.discountValue }),
+            ...(data.discountValue !== undefined && { discountValue: Number(data.discountValue) }),
         };
 
         if (data.roundingAdjust !== undefined && (!data.items || data.items.length === 0)) {
@@ -412,7 +482,7 @@ class PurchaseOrderService {
             const roundingAdjust = data.roundingAdjust !== undefined ? Number(data.roundingAdjust) : Number(po.roundingAdjust || 0);
 
             const { itemsWithTotals, subtotal, totalDiscount, totalTax, totalCgst, totalSgst, totalIgst, netAmount } =
-                this.calculateTotals(data.items, isInterState, poDiscountType as any, poDiscountValue, roundingAdjust);
+                await this.calculateTotals(data.items, isInterState, poDiscountType as any, poDiscountValue, roundingAdjust);
 
             updateData.subtotal = subtotal;
             updateData.discountType = poDiscountType;

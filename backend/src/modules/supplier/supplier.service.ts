@@ -46,14 +46,11 @@ class SupplierService {
 
     const { addresses, userId, materialPrices, phones, openingBalance, ...supplierData } = data as any;
 
-    const processedBankAccount = await processBankAccounts(supplierData.bankAccount);
     const mobileData = phones || supplierData.mobile || null;
 
     const insertData: Prisma.SupplierCreateInput = {
       ...supplierData,
       mobile: mobileData as any,
-      bankAccount: processedBankAccount as any,
-      minOrderQty: supplierData.minOrderQty !== undefined && supplierData.minOrderQty !== null ? new Prisma.Decimal(supplierData.minOrderQty) : undefined,
       openingBalance: openingBalance !== undefined && openingBalance !== null ? new Prisma.Decimal(openingBalance) : new Prisma.Decimal(0),
       createdBy: userId,
       addresses: addresses && addresses.length > 0
@@ -63,16 +60,6 @@ class SupplierService {
             label: `Address ${index + 1}`,
             state_code: addr.address.state || "",
             is_default: index === 0,
-          })),
-        }
-        : undefined,
-      materialPrices: materialPrices && materialPrices.length > 0
-        ? {
-          create: materialPrices.map((mp: any) => ({
-            rawMaterialId: mp.rawMaterialId,
-            price: new Prisma.Decimal(mp.price),
-            validFrom: new Date(mp.validFrom),
-            validTo: mp.validTo ? new Date(mp.validTo) : null,
           })),
         }
         : undefined,
@@ -300,37 +287,11 @@ class SupplierService {
         }
       }
 
-      if (materialPrices !== undefined) {
-        // Delete only current active material prices for this supplier
-        await tx.supplierMaterialPrice.deleteMany({
-          where: {
-            supplierId: Number(id),
-            validTo: null,
-          },
-        });
-
-        // Insert new material prices
-        if (materialPrices.length > 0) {
-          await tx.supplierMaterialPrice.createMany({
-            data: materialPrices.map((mp: any) => ({
-              supplierId: Number(id),
-              rawMaterialId: mp.rawMaterialId,
-              price: new Prisma.Decimal(mp.price),
-              validFrom: new Date(mp.validFrom),
-              validTo: null, // Always null for active prices being set/updated via edit supplier
-            })),
-          });
-        }
-      }
-
-      const processedBankAccount = await processBankAccounts(supplierData.bankAccount);
       const mobileData = phones !== undefined ? phones : supplierData.mobile;
 
       const updateData: Prisma.SupplierUpdateInput = {
         ...supplierData,
         ...(mobileData !== undefined && { mobile: mobileData as any }),
-        bankAccount: processedBankAccount as any,
-        minOrderQty: supplierData.minOrderQty !== undefined && supplierData.minOrderQty !== null ? new Prisma.Decimal(supplierData.minOrderQty) : undefined,
         updatedBy: updatedByUserId ? updatedByUserId : undefined,
       };
 

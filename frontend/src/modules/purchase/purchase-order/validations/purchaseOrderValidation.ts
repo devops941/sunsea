@@ -9,15 +9,7 @@ export const validatePurchaseOrder = (data: PurchaseOrderFormData): Record<strin
     errors.poDate = "PO Date is required";
   }
 
-  // Expected Delivery Date
-  const todayStr = new Date().toISOString().split("T")[0];
-  if (!data.expectedDeliveryDate) {
-    errors.expectedDeliveryDate = "Expected Delivery Date is required";
-  } else if (data.expectedDeliveryDate < todayStr) {
-    errors.expectedDeliveryDate = "Expected Delivery Date must be today or in the future";
-  } else if (data.poDate && data.expectedDeliveryDate < data.poDate) {
-    errors.expectedDeliveryDate = "Expected Delivery Date must be on or after PO Date";
-  }
+
 
   // Supplier
   if (!data.supplierId) {

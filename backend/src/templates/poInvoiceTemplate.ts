@@ -49,12 +49,16 @@ export const generatePoInvoiceHtml = (po: any, company: any, supplier: any, stor
 
             const totalAmount = amount + cgstAmount + sgstAmount + igstAmount;
 
+            const description = item.description || item.product?.productName || item.product?.materialName || item.rawMaterial?.materialName || item.productId || "N/A";
+            const hsnCode = item.hsnCode || item.product?.hsnCode || item.rawMaterial?.hsnCode || "—";
+
             return {
                 ...item,
+                description,
+                hsnCode,
                 qty,
                 rate,
                 amount,
-                hsnCode: item.product?.hsnCode || "—",
                 unit: item.uom || "Pcs.",
                 cgstRate,
                 sgstRate,
@@ -113,7 +117,7 @@ export const generatePoInvoiceHtml = (po: any, company: any, supplier: any, stor
             itemsHtml += `
             <tr>
                 <td class="border border-black px-2 py-1 align-middle text-center">${idx + 1}.</td>
-                <td class="border border-black px-2 py-1 align-middle text-left">${item.description || item.product?.productName || "N/A"}</td>
+                <td class="border border-black px-2 py-1 align-middle text-left">${item.description}</td>
                 <td class="border border-black px-2 py-1 align-middle text-center">${item.hsnCode}</td>
                 <td class="border border-black px-2 py-1 align-middle text-right">${item.qty}</td>
                 <td class="border border-black px-2 py-1 align-middle text-center">${item.unit}</td>

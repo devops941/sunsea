@@ -17,42 +17,24 @@ export interface Supplier {
   supplierCode: string;
   legalName: string;
   displayName?: string | null;
-  vendorType: string;
-  category: string;
   contactPerson?: string | null;
-  designation?: string | null;
   mobile: any;
   email?: string | null;
-  website?: string | null;
   gstin?: string | null;
   pan?: string | null;
   gstRegType?: string | null;
-  msmeStatus?: string | null;
-  udyamNo?: string | null;
-  tdsSection?: string | null;
   billingAddressLine1: string;
   billingCity: string;
   billingState: string;
   billingPincode: string;
   billingCountry?: string | null;
   stateCode: string;
-  paymentTerms: string;
-  leadTimeDays: number;
-  minOrderQty?: number | null;
-  currency: string;
   openingBalance?: number | string | null;
   openingBalanceType?: string | null;
-  bankIfsc?: string | null;
-  bankHolder?: string | null;
-  upiId?: string | null;
-  onTimePct?: number | null;
   status: string;
   addresses?: SupplierAddress[];
   createdAt: string;
   updatedAt: string;
-  rawMaterialCategories?: string | string[];
-  bankAccount?: any;
-  materialPrices?: any[];
 }
 
 export interface CreateSupplierDto {
@@ -60,39 +42,22 @@ export interface CreateSupplierDto {
   supplierCode: string;
   legalName: string;
   displayName?: string | null;
-  vendorType: string;
-  category: string;
-  rawMaterialCategories?: string;
   contactPerson?: string | null;
-  designation?: string | null;
   mobile: any;
   email?: string | null;
-  website?: string | null;
   gstin?: string | null;
   pan?: string | null;
   gstRegType?: string | null;
-  msmeStatus?: string | null;
-  udyamNo?: string | null;
-  tdsSection?: string | null;
   billingAddressLine1: string;
   billingCity: string;
   billingState: string;
   billingPincode: string;
   billingCountry?: string | null;
   stateCode: string;
-  paymentTerms: string;
-  leadTimeDays: number;
-  minOrderQty?: number | null;
   openingBalance?: number | null;
   openingBalanceType?: string;
-  currency: string;
-  bankIfsc?: string | null;
-  bankAccount?: any;
-  bankHolder?: string | null;
-  upiId?: string | null;
   status?: string;
   addresses?: SupplierAddress[];
-  materialPrices?: any[];
 }
 
 export interface UpdateSupplierDto extends Partial<CreateSupplierDto> { }
