@@ -15,6 +15,8 @@ export interface RawMaterial {
 
   reorderLevel?: number | string | null;
   rate?: number | string | null;
+  unitPrice?: number | string | null;
+  gstTaxRateId?: number | string | null;
 
   storeId?: string | null;
   store?: {
