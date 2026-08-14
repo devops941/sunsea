@@ -160,7 +160,6 @@ const QuotationReport: React.FC = () => {
                         <DetailBox label="Customer" value={order.customer?.displayName || order.customer?.firmName} icon={<FaUser />} />
                         <DetailBox label="Quotation Date" value={formatDate(order.orderDate)} icon={<FaCalendarAlt />} />
                         <DetailBox label="Valid Until" value={formatDate(order.expectedCompletionDate)} icon={<FaCalendarAlt />} />
-                        <DetailBox label="Customer Type" value={order.customerType ? order.customerType.toLowerCase() : ""} icon={<FaUser />} />
                         {order.transportName ? <DetailBox label="Transport" value={order.transportName} icon={<FaTruck />} /> : null}
                         <DetailBox label="Mobile Number" value={order.mobile || "—"} icon={<FaPhone />} />
                     </div>
@@ -215,7 +214,7 @@ const QuotationReport: React.FC = () => {
                                             <div className="text-gray-500 text-xs">{item.product?.productCode}</div>
                                         </td>
                                         <td className="py-3 px-2 text-right text-gray-900">{item.quantity}</td>
-                                        <td className="py-3 px-2 text-right text-gray-900">{formatMoney(getUnitPrice(item, order.customerType))}</td>
+                                        <td className="py-3 px-2 text-right text-gray-900">{formatMoney(getUnitPrice(item))}</td>
                                         {/* <td className="py-3 px-2 text-right text-gray-900">
                                             {formatMoney(item.discountAmount)}
                                             <div className="text-gray-500 text-xs">

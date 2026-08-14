@@ -13,12 +13,7 @@ export const generateQuotationHtml = (quotationOrder: any, company: any): string
         }).format(amount);
     };
 
-    const getUnitPrice = (item: any, customerType: string) => {
-        if (customerType === "WHOLESALE") {
-            return item.product?.wholesalePrice || item.unitPrice;
-        } else if (customerType === "RETAIL") {
-            return item.product?.retailPrice || item.unitPrice;
-        }
+    const getUnitPrice = (item: any) => {
         return item.unitPrice;
     };
 
@@ -40,7 +35,7 @@ export const generateQuotationHtml = (quotationOrder: any, company: any): string
     let itemsHtml = '';
     quotationOrder.items?.forEach((item: any, idx: number) => {
         const uom = item.product?.uom?.uomName || "Pcs.";
-        const unitPrice = getUnitPrice(item, quotationOrder.customerType);
+        const unitPrice = getUnitPrice(item);
         const subtotal = item.lineSubtotal || (item.quantity * item.unitPrice);
 
         let taxHtml = '';

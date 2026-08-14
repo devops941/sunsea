@@ -8,6 +8,8 @@ import rolePermissionRoutes from "../modules/role-permissions/role-permission.ro
 import employeeRoutes from "../modules/employee/employee.routes";
 import departmentRoutes from "../modules/department/department.routes";
 import customerRoutes from "../modules/customer/customer.routes";
+import customerTypeRoutes from "../modules/customer-type/customer-type.routes";
+import customerGradeRoutes from "../modules/customer-grade/customer-grade.routes";
 import supplierRoutes from "../modules/supplier/supplier.routes";
 import categoryRoutes from "../modules/category/category.routes";
 import uomRoutes from "../modules/uom/uom.routes";
@@ -71,6 +73,8 @@ router.use("/shifts", shiftRoutes);
 router.use("/employees", employeeRoutes);
 
 router.use("/customers", customerRoutes);
+router.use("/customer-types", customerTypeRoutes);
+router.use("/customer-grades", customerGradeRoutes);
 router.use("/suppliers", supplierRoutes);
 router.use("/purchase-orders", purchaseOrderRoutes);
 router.use("/supplier-material-prices", supplierMaterialPriceRoutes);

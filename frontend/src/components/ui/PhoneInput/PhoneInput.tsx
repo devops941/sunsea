@@ -107,7 +107,7 @@ const SinglePhoneField: React.FC<SinglePhoneFieldProps> = ({
                         {/* <span className="text-base">🇮🇳</span> */}
                         <span>+91</span>
                     </div>
-                    
+
                     {/* Native Text Input */}
                     <input
                         type="text"
@@ -346,9 +346,9 @@ const IndiaPhoneInput: React.FC<IndiaPhoneInputProps> = (props) => {
         const displayError = error || draftError || (isOpen ? null : requiredError);
 
         return (
-            <div className="mb-[18px] group w-full" ref={wrapperRef}>
+            <div className="group w-full" ref={wrapperRef}>
                 {label && (
-                    <label className="flex items-center gap-[6px] mb-2 text-xs font-bold uppercase tracking-[0.5px] text-slate-500">
+                    <label className={`flex items-center gap-1.5 mb-2 text-xs font-bold uppercase tracking-[0.5px] transition-colors duration-250 ${displayError ? 'text-red-500' : 'text-slate-500'} group-focus-within:text-primary`}>
                         <span>{label}</span>
                         {required && <span className="text-[#e53935] ml-0.5">*</span>}
                     </label>
@@ -360,59 +360,58 @@ const IndiaPhoneInput: React.FC<IndiaPhoneInputProps> = (props) => {
                         type="button"
                         onClick={() => setIsOpen((prev) => !prev)}
                         className={`
-                            w-full min-h-10 px-3 py-1.5
+                            w-full min-h-10 pl-4 pr-3 py-1.5
                             flex items-center justify-between gap-2
-                            border rounded-[10px] bg-white
+                            border rounded-md bg-white
+                            text-[15px] font-medium text-left
                             transition-all duration-250
                             ${displayError
-                                ? "border-red-500"
+                                ? 'border-red-500 focus:border-red-500 focus:ring-4 focus:ring-red-500/15'
                                 : isOpen
-                                    ? "border-primary ring-4 ring-primary/15"
-                                    : "border-slate-300 hover:border-slate-400"
+                                    ? 'border-primary ring-4 ring-primary/15'
+                                    : 'border-slate-300 hover:border-slate-400'
                             }
                         `}
                     >
-                        <div className="flex flex-wrap items-center gap-1.5 flex-1 text-left">
+                        <div className="flex items-center gap-1.5 flex-1 text-left overflow-hidden">
                             {entries.length === 0 && (
-                                <span className="text-[15px] font-medium text-slate-400">
-                                    {placeholder || 'Select mobile numbers'}
+                                <span className="text-[15px] font-medium text-[#9ca3af]">
+                                    {placeholder || 'Add mobile numbers'}
                                 </span>
                             )}
-                            {entries.map((entry, idx) => (
-                                <span
-                                    key={`${entry.number}-${idx}`}
-                                    className="
-                                        flex items-center gap-1
-                                        pl-2.5 pr-1.5 py-1 rounded-full
-                                        bg-primary/10 text-primary
-                                        text-[13px] font-semibold
-                                        whitespace-nowrap
-                                    "
-                                >
-                                    <span className="font-bold">{entry.label}:</span>
-                                    {formatNumber(entry.number)}
-                                    <span
-                                        role="button"
-                                        tabIndex={0}
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleRemove(idx);
-                                        }}
-                                        aria-label={`Remove ${entry.label}`}
-                                        className="
-                                            flex items-center justify-center
-                                            w-4 h-4 rounded-full shrink-0
-                                            hover:bg-primary/20 transition-colors
-                                        "
-                                    >
-                                        <X size={11} />
+                            {entries.length > 0 && (() => {
+                                const entry = entries[0];
+                                const digits = entry.number.replace('+91', '').replace(/\D/g, '');
+                                const shortNum = digits.length === 10 ? `${digits.slice(0, 5)} ${digits.slice(5)}` : digits;
+                                const shortLabel = entry.label
+                                    .replace('Primary Mobile Number', 'Primary')
+                                    .replace('Alternative Number', 'Alt')
+                                    .replace('WhatsApp Number', 'WA');
+                                return (
+                                    <span className="inline-flex items-center gap-1 shrink-0 pl-2.5 pr-1.5 py-1 rounded-full bg-primary/10 text-primary text-[13px] font-semibold">
+                                        <span className="font-bold">{shortLabel}:</span>
+                                        <span>+91 {shortNum}</span>
+                                        <span
+                                            role="button"
+                                            tabIndex={0}
+                                            onClick={(e) => { e.stopPropagation(); handleRemove(0); }}
+                                            aria-label={`Remove ${entry.label}`}
+                                            className="flex items-center justify-center w-4 h-4 rounded-full shrink-0 hover:bg-primary/20 transition-colors"
+                                        >
+                                            <X size={11} />
+                                        </span>
                                     </span>
+                                );
+                            })()}
+                            {entries.length > 1 && (
+                                <span className="inline-flex items-center shrink-0 px-2 py-1 rounded-full bg-slate-100 text-slate-600 text-[12px] font-semibold">
+                                    +{entries.length - 1} more
                                 </span>
-                            ))}
+                            )}
                         </div>
                         <ChevronDown
-                            size={18}
-                            className={`shrink-0 text-slate-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+                            size={14}
+                            className={`shrink-0 text-gray-500 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
                         />
                     </button>
 
@@ -420,9 +419,10 @@ const IndiaPhoneInput: React.FC<IndiaPhoneInputProps> = (props) => {
                     {isOpen && (
                         <div
                             className="
-                                absolute z-20 top-[calc(100%+6px)] left-0 right-0
-                                bg-white border border-slate-200 rounded-[10px]
+                                absolute z-[100000] top-[calc(100%+4px)] left-0 right-0
+                                bg-white border border-gray-100 rounded-lg
                                 shadow-lg overflow-hidden
+                                animate-in fade-in zoom-in-95 duration-100
                             "
                         >
                             {/* add-entry row */}
@@ -432,7 +432,7 @@ const IndiaPhoneInput: React.FC<IndiaPhoneInputProps> = (props) => {
                                         value={draftName}
                                         onChange={(e) => handleNameChange(e.target.value)}
                                         className="
-                                            h-9 px-3 rounded-[8px] border border-slate-200 bg-slate-50
+                                            h-9 px-3 rounded-md border border-slate-200 bg-slate-50
                                             text-[14px] font-medium text-slate-800
                                             outline-none appearance-none
                                             focus:border-primary transition-colors duration-200
@@ -446,11 +446,11 @@ const IndiaPhoneInput: React.FC<IndiaPhoneInputProps> = (props) => {
                                     <div
                                         className={`
                                             flex items-center gap-2
-                                            h-10 px-3 rounded-[8px] border bg-slate-50
+                                            h-10 px-3 rounded-md border bg-slate-50
                                             transition-colors duration-200
                                             ${draftError
-                                                ? "border-red-400"
-                                                : "border-slate-200 focus-within:border-primary"
+                                                ? 'border-red-400'
+                                                : 'border-slate-200 focus-within:border-primary'
                                             }
                                         `}
                                     >
@@ -460,7 +460,7 @@ const IndiaPhoneInput: React.FC<IndiaPhoneInputProps> = (props) => {
                                             inputMode="numeric"
                                             autoComplete="off"
                                             value={draftValue}
-                                            placeholder="Enter mobile number"
+                                            placeholder="Enter number & press Enter"
                                             onChange={(e) => handleDraftChange(e.target.value)}
                                             onKeyDown={handleKeyDown}
                                             className="
@@ -469,16 +469,6 @@ const IndiaPhoneInput: React.FC<IndiaPhoneInputProps> = (props) => {
                                                 placeholder:text-slate-400
                                             "
                                         />
-                                        <button
-                                            type="button"
-                                            onClick={commitDraft}
-                                            className="
-                                                shrink-0 text-xs font-bold uppercase tracking-wide
-                                                text-primary hover:opacity-70 transition-opacity
-                                            "
-                                        >
-                                            Add
-                                        </button>
                                     </div>
 
                                     {draftError && (
@@ -492,7 +482,7 @@ const IndiaPhoneInput: React.FC<IndiaPhoneInputProps> = (props) => {
                             {/* selected entries list */}
                             <div className="max-h-48 overflow-y-auto py-1">
                                 {entries.length === 0 ? (
-                                    <div className="px-3 py-2.5 text-sm text-slate-400">
+                                    <div className="px-4 py-3 text-sm text-gray-400 text-center">
                                         No numbers added yet
                                     </div>
                                 ) : (
@@ -501,16 +491,19 @@ const IndiaPhoneInput: React.FC<IndiaPhoneInputProps> = (props) => {
                                             key={`${entry.number}-${idx}`}
                                             className="
                                                 flex items-center justify-between gap-2
-                                                px-3 py-2 hover:bg-slate-50
+                                                px-4 py-2 hover:bg-gray-50
                                                 transition-colors duration-150
                                             "
                                         >
-                                            <span className="flex items-center gap-2 text-[14px] font-medium text-slate-700 min-w-0">
-                                                <Check size={14} className="text-primary shrink-0" />
-                                                <span className="truncate">
-                                                    <span className="font-bold text-slate-800">{entry.label}</span>
-                                                    <span className="text-slate-400 mx-1">·</span>
-                                                    {formatNumber(entry.number)}
+                                            <span className="flex items-center gap-2 min-w-0">
+                                                <Check size={14} className="text-primary shrink-0 mt-0.5" />
+                                                <span className="flex flex-col min-w-0">
+                                                    <span className="text-[14px] font-semibold text-gray-800 leading-tight">
+                                                        {formatNumber(entry.number)}
+                                                    </span>
+                                                    <span className="text-[11px] font-medium text-gray-400 leading-tight">
+                                                        {entry.label}
+                                                    </span>
                                                 </span>
                                             </span>
                                             <button
@@ -520,7 +513,7 @@ const IndiaPhoneInput: React.FC<IndiaPhoneInputProps> = (props) => {
                                                 className="
                                                     flex items-center justify-center
                                                     w-6 h-6 rounded-full shrink-0
-                                                    text-slate-400 hover:text-red-500 hover:bg-red-50
+                                                    text-gray-400 hover:text-red-500 hover:bg-red-50
                                                     transition-colors duration-150
                                                 "
                                             >
@@ -532,7 +525,7 @@ const IndiaPhoneInput: React.FC<IndiaPhoneInputProps> = (props) => {
                             </div>
 
                             {atMax && (
-                                <div className="px-3 py-2 text-xs font-medium text-slate-400 border-t border-slate-100">
+                                <div className="px-4 py-2 text-xs font-medium text-gray-400 border-t border-gray-100">
                                     Maximum {maxNumbers} numbers added
                                 </div>
                             )}

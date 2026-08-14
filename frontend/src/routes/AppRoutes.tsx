@@ -25,8 +25,7 @@ const ResetPassword = lazy(() => import("../modules/passwordreset/pages/ResetPas
 
 // Customers
 
-const CustomerCreatePage = lazy(() => import("../modules/customers/pages/CustomerCreatePage"));
-const CustomerEditPage = lazy(() => import("../modules/customers/pages/CustomerEditPage"));
+const CustomerFormPage = lazy(() => import("../modules/customers/pages/CustomerFormPage"));
 
 // Employees
 
@@ -204,11 +203,11 @@ const AppRoutes = () => {
             </Route>
             {/* Customers Create Route */}
             <Route element={<ProtectedRoute permission="customers.create" />}>
-              <Route path="/customers/create" element={<CustomerCreatePage />} />
+              <Route path="/customers/create" element={<CustomerFormPage />} />
             </Route>
             {/* Customers Edit :Id Route */}
             <Route element={<ProtectedRoute permission="customers.edit" />}>
-              <Route path="/customers/edit/:id" element={<CustomerEditPage />} />
+              <Route path="/customers/edit/:id" element={<CustomerFormPage />} />
             </Route>
 
             <Route element={<ProtectedRoute permission="suppliers.view" />}>

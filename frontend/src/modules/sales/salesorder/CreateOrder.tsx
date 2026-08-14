@@ -43,9 +43,7 @@ const salesOrderSchema = z
         dispatchType: z.string().min(1, "Dispatch Type is required"),
         referenceText: z.string().optional(),
         salesPersonName: z.string().optional(),
-        transportName: z.string().optional(),
         paymentTermId: z.string().optional(),
-        customerType: z.string().min(1, "Customer type is required"),
         isInterState: z.boolean(),
 
         billingAddressLine1: z.string().min(1, "Billing address is required"),
@@ -146,13 +144,11 @@ const today = new Date().toISOString().split("T")[0];
 const defaultValues: SalesOrderFormValues = {
     id: undefined,
     orderNo: "",
-    customerType: "",
     orderDate: today,
     expectedCompletionDate: "",
     customerId: "",
     mobile: "",
     salesPersonName: "",
-    transportName: "",
     paymentTermId: "",
     billingAddressLine1: "",
     billingCity: "",
@@ -289,10 +285,8 @@ const SalesOrderForm: React.FC = () => {
                 expectedCompletionDate: state.expectedCompletionDate?.split("T")[0] || "",
                 customerId: state.customerId != null ? String(state.customerId) : "",
                 mobile: state.mobile || "",
-                customerType: state.customerType ? String(state.customerType) : "",
                 referenceText: state.referenceText || "",
                 salesPersonName: state.salesPersonName || "",
-                transportName: state.transportName || "",
                 paymentTermId: state.paymentTermId != null ? String(state.paymentTermId) : "",
                 billingAddressLine1: state.billingAddressLine1 || "",
                 billingCity: state.billingCity || "",
@@ -386,18 +380,6 @@ const SalesOrderForm: React.FC = () => {
         }
     }, [mobileOptions, setValue, isEditMode]);
 
-    const transportOptions = useMemo(() => {
-        if (!selectedCustomerId) return [];
-        const customer = customers.find(c => String(c.id) === selectedCustomerId);
-        if (!customer || !Array.isArray(customer.transports)) return [];
-        return customer.transports
-            .filter((t: any) => t && t.transportName)
-            .map((t: any) => ({
-                value: t.transportName,
-                label: t.transportName,
-            }));
-    }, [selectedCustomerId, customers]);
-
     const shippingAddressOptions = useMemo(() => {
         if (!selectedCustomer?.addresses || selectedCustomer.addresses.length === 0) return [];
         return selectedCustomer.addresses.map((addr: any, idx: number) => {
@@ -434,7 +416,6 @@ const SalesOrderForm: React.FC = () => {
     };
 
     const formItems = watch("items");
-    const customerType = watch("customerType");
 
     const proposedTotal = useMemo(() => {
         if (!formItems || !Array.isArray(formItems)) return 0;
@@ -444,16 +425,7 @@ const SalesOrderForm: React.FC = () => {
             const p = products.find((prod) => String(prod.id) === String(item.productCode));
             if (!p) return;
 
-            let unitPrice = 0;
-            if (customerType === "MRP") {
-                unitPrice = p.mrp ?? p.b2b ?? p.b2c ?? p.exportPrice ?? 0;
-            } else if (customerType === "B2C") {
-                unitPrice = p.b2c ?? p.mrp ?? p.b2b ?? p.exportPrice ?? 0;
-            } else if (customerType === "EXPORT") {
-                unitPrice = p.exportPrice ?? p.mrp ?? p.b2b ?? p.b2c ?? 0;
-            } else {
-                unitPrice = p.b2b ?? p.mrp ?? p.b2c ?? p.exportPrice ?? 0;
-            }
+            let unitPrice = p.b2b ?? p.mrp ?? p.b2c ?? p.exportPrice ?? 0;
 
             const qty = Number(item.quantity) || 0;
             const lineSubtotal = unitPrice * qty;
@@ -462,7 +434,7 @@ const SalesOrderForm: React.FC = () => {
             sum += lineSubtotal + lineGst;
         });
         return sum;
-    }, [formItems, customerType, products]);
+    }, [formItems, products]);
     // ─── Auto‑generate order number ──────────────────────────────────
     useEffect(() => {
         const state = location.state as any;
@@ -472,31 +444,6 @@ const SalesOrderForm: React.FC = () => {
             setValue("orderNo", orderNo);
         });
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-    // ─── Customer type options based on selected customer ──────────
-
-    const customerTypeOptions = useMemo(() => {
-        const raw = selectedCustomer?.customerType;
-        if (!raw) return [];
-
-        const allowedTypes = String(raw)
-            .split(",")
-            .map((t: string) => t.trim().toUpperCase())
-            .filter(Boolean);
-
-        return CUSTOMER_TYPE_OPTIONS.filter(opt => allowedTypes.includes(opt.value.toUpperCase()));
-    }, [selectedCustomer]);
-
-    // ─── Auto‑select customer type when only one option ─────────────
-    useEffect(() => {
-        if (isEditMode) return;
-
-        if (customerTypeOptions.length === 1) {
-            setValue("customerType", customerTypeOptions[0].value, { shouldValidate: true });
-        } else {
-            setValue("customerType", "", { shouldValidate: true });
-        }
-    }, [customerTypeOptions, isEditMode, setValue]);
 
     // ─── Populate addresses when customer changes ────────────────────
     useEffect(() => {
@@ -553,12 +500,10 @@ const SalesOrderForm: React.FC = () => {
                 expectedCompletionDate: new Date(data.expectedCompletionDate).toISOString(),
                 customerId: data.customerId,
                 mobile: data.mobile || null,
-                customerType: data.customerType,
                 orderType: data.orderType,
                 dispatchType: data.dispatchType,
                 referenceText: data.referenceText || null,
                 salesPersonName: data.salesPersonName || null,
-                transportName: data.transportName || null,
                 paymentTermId: data.paymentTermId ? Number(data.paymentTermId) : null,
                 billingAddressLine1: data.billingAddressLine1 ?? '',
                 billingCity: data.billingCity ?? '',
@@ -632,14 +577,6 @@ const SalesOrderForm: React.FC = () => {
                             )} />
                             <Err message={errors.mobile?.message} />
                         </div>
-
-                        {customerTypeOptions.length >= 1 && (
-                            <div>
-                                <Controller name="customerType" control={control} render={({ field }) => (
-                                    <SelectInput label="Customer Type" name={field.name} value={field.value} options={customerTypeOptions} required onChange={field.onChange} disabled={customerTypeOptions.length === 1} defaultOptionLabel={!selectedCustomerId ? "Select a customer first" : "Select Customer Type"} />
-                                )} />
-                            </div>
-                        )}
 
                         <div>
                             <Controller name="orderDate" control={control} render={({ field }) => (

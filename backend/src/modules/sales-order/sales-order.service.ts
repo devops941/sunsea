@@ -153,18 +153,9 @@ class SalesOrderService {
     }
 
     private resolveUnitPrice(
-        customerType: string | null | undefined,
         pricing: { b2b: Prisma.Decimal | null; mrp: Prisma.Decimal | null; b2c: Prisma.Decimal | null; exportPrice: Prisma.Decimal | null }
     ): Prisma.Decimal {
-        switch (customerType) {
-            case "B2C":
-                return pricing.b2c ?? pricing.mrp ?? pricing.b2b ?? pricing.exportPrice ?? new Prisma.Decimal(0);
-            case "EXPORT":
-                return pricing.exportPrice ?? pricing.mrp ?? pricing.b2b ?? pricing.b2c ?? new Prisma.Decimal(0);
-            case "B2B":
-            default:
-                return pricing.b2b ?? pricing.mrp ?? pricing.b2c ?? pricing.exportPrice ?? new Prisma.Decimal(0);
-        }
+        return pricing.b2b ?? pricing.mrp ?? pricing.b2c ?? pricing.exportPrice ?? new Prisma.Decimal(0);
     }
 
     // ─── Core line calculator with GST split ─────────────────────────
@@ -173,7 +164,6 @@ class SalesOrderService {
         productId: bigint;
         quantity: Prisma.Decimal;
         pricing: ProductPricingRow;
-        customerType?: string | null;
         discountType?: "PERCENT" | "FLAT";
         discountValue?: Prisma.Decimal;
         customGstTaxRateId?: string | null;
@@ -182,7 +172,7 @@ class SalesOrderService {
     }): LineCalculation {
         const { productId, quantity, pricing, isInterState = false } = params;
 
-        const unitPrice = this.resolveUnitPrice(params.customerType, pricing);
+        const unitPrice = this.resolveUnitPrice(pricing);
         const mrp = pricing.mrp;
         const b2b = pricing.b2b;
         const b2c = pricing.b2c;
@@ -259,7 +249,6 @@ class SalesOrderService {
             gstTaxRateId?: string | null;
             customGstRate?: Prisma.Decimal | null;
         }>,
-        customerType: string | null | undefined,
         isInterState: boolean,
         orderDiscountType: "PERCENT" | "FLAT",
         orderDiscountValue: Prisma.Decimal
@@ -269,7 +258,6 @@ class SalesOrderService {
                 productId: item.productId,
                 quantity: item.quantity,
                 pricing: item.pricing,
-                customerType,
                 customGstTaxRateId: item.gstTaxRateId,
                 customGstRate: item.customGstRate,
                 isInterState,
@@ -294,12 +282,35 @@ class SalesOrderService {
                 productId: baseLine.productId,
                 quantity: baseLine.quantity,
                 pricing: item.pricing,
-                customerType,
                 customGstTaxRateId: item.gstTaxRateId,
                 customGstRate: item.customGstRate,
                 isInterState,
                 discountType: "FLAT",
                 discountValue: itemDiscount,
+            });
+        });
+    }
+
+    private calculateLinesWithoutOrderDiscount(
+        items: Array<{
+            productId: bigint;
+            quantity: Prisma.Decimal;
+            pricing: ProductPricingRow;
+            gstTaxRateId?: string | null;
+            customGstRate?: Prisma.Decimal | null;
+        }>,
+        isInterState: boolean
+    ): LineCalculation[] {
+        return items.map((item) => {
+            return this.calculateLine({
+                productId: item.productId,
+                quantity: item.quantity,
+                pricing: item.pricing,
+                customGstTaxRateId: item.gstTaxRateId,
+                customGstRate: item.customGstRate,
+                isInterState,
+                discountType: "PERCENT",
+                discountValue: new Prisma.Decimal(0),
             });
         });
     }
@@ -348,37 +359,44 @@ class SalesOrderService {
 
         const orderDiscountType = data.orderDiscountType ?? "PERCENT";
         const orderDiscountValue = data.orderDiscountValue !== undefined ? new Prisma.Decimal(data.orderDiscountValue) : new Prisma.Decimal(0);
+        const hasOrderDiscount = orderDiscountValue.gt(0);
 
-        const lineCalcs = this.calculateLinesWithOrderDiscount(
-            data.items.map((item) => {
-                const productId = BigInt(item.productId);
-                const pricing = this.resolvePricing(pricingMap, productId);
-                if (!pricing) {
-                    throw new ApiError(404, `Product with ID ${item.productId} not found`);
+        const pricedItems = data.items.map((item) => {
+            const productId = BigInt(item.productId);
+            const pricing = this.resolvePricing(pricingMap, productId);
+            if (!pricing) {
+                throw new ApiError(404, `Product with ID ${item.productId} not found`);
+            }
+
+            let customGstRate: Prisma.Decimal | null = null;
+            if (item.gstTaxRateId) {
+                const rate = customGstTaxRateMap.get(item.gstTaxRateId);
+                if (rate === undefined) {
+                    throw new ApiError(400, `GST Tax Rate with ID ${item.gstTaxRateId} not found`);
                 }
+                customGstRate = rate;
+            }
 
-                let customGstRate: Prisma.Decimal | null = null;
-                if (item.gstTaxRateId) {
-                    const rate = customGstTaxRateMap.get(item.gstTaxRateId);
-                    if (rate === undefined) {
-                        throw new ApiError(400, `GST Tax Rate with ID ${item.gstTaxRateId} not found`);
-                    }
-                    customGstRate = rate;
-                }
+            return {
+                productId,
+                quantity: new Prisma.Decimal(item.quantity),
+                pricing,
+                gstTaxRateId: item.gstTaxRateId,
+                customGstRate,
+            };
+        });
 
-                return {
-                    productId,
-                    quantity: new Prisma.Decimal(item.quantity),
-                    pricing,
-                    gstTaxRateId: item.gstTaxRateId,
-                    customGstRate,
-                };
-            }),
-            data.customerType,
-            isInterState,
-            orderDiscountType,
-            orderDiscountValue
-        );
+        const lineCalcs = hasOrderDiscount
+            ? this.calculateLinesWithOrderDiscount(
+                pricedItems,
+                isInterState,
+                orderDiscountType,
+                orderDiscountValue
+            )
+            : this.calculateLinesWithoutOrderDiscount(
+                pricedItems,
+                isInterState
+            );
 
         const orderTotals = lineCalcs.reduce(
             (acc, line) => ({
@@ -413,11 +431,8 @@ class SalesOrderService {
                 isInterState,
                 customerId: data.customerId,
                 mobile: data.mobile || null,
-                customerType: data.customerType,
                 // @ts-ignore
                 salesPersonName: data.salesPersonName || null,
-                // @ts-ignore
-                transportName: data.transportName || null,
                 paymentTermId: data.paymentTermId,
                 billingAddressLine1: data.billingAddressLine1,
                 billingCity: data.billingCity,
@@ -602,12 +617,9 @@ class SalesOrderService {
             updateData.customerRejectionReason = null;
         }
 
-        if (data.customerType !== undefined) updateData.customerType = data.customerType;
         if (data.mobile !== undefined) updateData.mobile = data.mobile;
         // @ts-ignore
         if (data.salesPersonName !== undefined) updateData.salesPersonName = data.salesPersonName;
-        // @ts-ignore
-        if (data.transportName !== undefined) updateData.transportName = data.transportName;
         if (data.expectedCompletionDate) updateData.expectedCompletionDate = new Date(data.expectedCompletionDate);
         if (data.paymentTermId !== undefined) updateData.paymentTermId = data.paymentTermId;
         if (data.dispatchType !== undefined) updateData.dispatchType = data.dispatchType;
@@ -730,7 +742,6 @@ class SalesOrderService {
                         customGstRate,
                     };
                 }),
-                data.customerType ?? existing.customerType,
                 isInterState,
                 orderDiscountType,
                 orderDiscountValue
@@ -807,7 +818,6 @@ class SalesOrderService {
                     gstTaxRateId: item.gstTaxRateId,
                     customGstRate: item.igstRate.gt(0) ? item.igstRate : item.cgstRate.add(item.sgstRate),
                 })),
-                data.customerType ?? existing.customerType,
                 isInterState,
                 orderDiscountType,
                 orderDiscountValue
@@ -933,7 +943,7 @@ class SalesOrderService {
             for (const incoming of data.items) {
                 const current = itemMap.get(incoming.itemId.toString())!;
 
-                const unitPrice = this.resolveUnitPrice(existing.customerType, {
+                const unitPrice = this.resolveUnitPrice({
                     b2b: current.b2b,
                     mrp: current.mrp,
                     b2c: current.b2c,

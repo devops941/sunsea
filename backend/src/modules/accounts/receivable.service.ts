@@ -8,10 +8,8 @@ export interface CustomerReceivableSummary {
   customerId: string;
   customerCode: string;
   firmName: string;
-  contactPerson?: string | null;
   gstin?: string | null;
   phone?: string | null;
-  customerType?: string | null;
   openingBalance: number;
   totalBilled: number;
   totalPaid: number;
@@ -31,7 +29,6 @@ export interface CustomerReceivableDetail {
     customerCode: string;
     firmName: string;
     gstin?: string | null;
-    customerType?: string | null;
     openingBalance: number;
   };
   ledger: any;
@@ -231,10 +228,8 @@ class ReceivableService {
           customerId: customer.id,
           customerCode: customer.customerCode,
           firmName: customer.firmName,
-          contactPerson: (customer as any).contactPersonName || (customer as any).primaryContactName || null,
           gstin: customer.gstin,
           phone: (customer as any).phone || (customer as any).mobile || null,
-          customerType: (customer as any).customerType || "CUSTOMER",
           openingBalance,
           totalBilled,
           totalPaid,

@@ -20,15 +20,6 @@ interface PriceableItem {
  * customer's type (B2B / B2C / Export). Falls back to item.unitPrice
  * or product.mrp if the customer type is missing/unrecognized.
  */
-export const getUnitPrice = (item: PriceableItem, customerType: CustomerType): string | number => {
-    switch (customerType) {
-        case "B2B":
-            return item.product?.b2b ?? item.b2b ?? 0;
-        case "B2C":
-            return item.product?.b2c ?? item.b2c ?? 0;
-        case "EXPORT":
-            return item.product?.exportPrice ?? item.exportPrice ?? 0;
-        default:
-            return item.unitPrice ?? item.product?.mrp ?? 0;
-    }
+export const getUnitPrice = (item: PriceableItem): string | number => {
+    return item.product?.b2b ?? item.b2b ?? item.unitPrice ?? item.product?.mrp ?? 0;
 };

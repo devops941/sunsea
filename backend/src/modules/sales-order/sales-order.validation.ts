@@ -24,8 +24,6 @@ export type DispatchType = z.infer<typeof DispatchTypeEnum>;
 export const OrderTypeEnum = z.enum(["telephone", "website", "salesperson", "reference"]);
 export type OrderType = z.infer<typeof OrderTypeEnum>;
 
-export const CustomerTypeEnum = z.enum(["B2B", "B2C", "EXPORT"]);
-export type CustomerType = z.infer<typeof CustomerTypeEnum>;
 
 
 /**
@@ -104,14 +102,12 @@ const salesOrderBodyShape = z.object({
         }, "Expected completion date must be today or a future date"),
     customerId: z.string().uuid("Customer ID must be a valid UUID"),
     mobile: z.string().optional().nullable(),
-    customerType: CustomerTypeEnum,   // ← add this
     isInterState: z.boolean().default(false).optional(),
     paymentTermId: z.number().int().positive("...").optional().nullable(),
     dispatchType: z.string().min(1, "Dispatch Type is required"),
     orderType: z.union([OrderTypeEnum, z.literal("")]).optional().transform(val => val === "" ? undefined : val),
     referenceText: z.string().optional().nullable(),
     salesPersonName: z.string().optional().nullable(),
-    transportName: z.string().optional().nullable(),
     status: SalesOrderStatusEnum.default("DRAFT"),
     billingAddressLine1: z.string().min(1, "Billing Address Line 1 is required"),
     billingCity: z.string().min(1, "Billing City is required"),

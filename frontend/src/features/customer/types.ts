@@ -29,9 +29,6 @@ export interface Customer {
   customerCode: string;
   firmName: string;
   displayName?: string | null;
-  customerType: string;
-  contactPerson?: string | null;
-  designation?: string | null;
   mobile: any;
   email?: string | null;
   gstin?: string | null;
@@ -51,16 +48,13 @@ export interface Customer {
   shippingCountry?: string | null;
   stateCode?: string;
   creditLimit?: number | string | null;
-  creditDays?: number | null;
   openingBalance?: number | string | null;
   openingBalanceType?: string | null;
   priceList?: string | null;
   collectionAgentId?: string | null;
   routeId?: string | null;
-  bankAccount?: any;
   status: string;
   addresses?: CustomerAddress[];
-  transports?: CustomerTransport[];
   createdAt: string;
   updatedAt: string;
   createdUser?: {
@@ -75,9 +69,6 @@ export interface CreateCustomerDto {
   customerCode: string;
   firmName: string;
   displayName?: string;
-  customerType: string[];
-  contactPerson?: string;
-  designation?: string;
   mobile: any;
   email?: string;
   gstin?: string;
@@ -97,25 +88,19 @@ export interface CreateCustomerDto {
   shippingPincode?: string;
   shippingCountry?: string;
   creditLimit?: number;
-  creditDays?: number;
   openingBalance?: number;
   openingBalanceType?: string;
   priceList?: string;
   routeId?: string | null;
   collectionAgentId?: string | null;
-  bankAccount?: any;
   status?: string;
   createdBy?: string;
   addresses?: any[];
-  transports?: CustomerTransport[];
 }
 
 export interface UpdateCustomerDto {
   firmName?: string;
   displayName?: string;
-  customerType?: string[];
-  contactPerson?: string;
-  designation?: string;
   mobile?: any;
   altPhone?: string;
   whatsapp?: string;
@@ -137,15 +122,12 @@ export interface UpdateCustomerDto {
   shippingPincode?: string;
   shippingCountry?: string;
   creditLimit?: number;
-  creditDays?: number;
   openingBalance?: number;
   priceList?: string;
   routeId?: string | null;
   collectionAgentId?: string | null;
-  bankAccount?: any;
   status?: string;
   addresses?: any[];
-  transports?: CustomerTransport[];
 }
 
 export interface CustomerState {

@@ -65,13 +65,13 @@ const TextInput: React.FC<TextInputProps> = ({
   };
 
   return (
-    <div className={`${bottom ? "" : "mb-[18px]"} group`}>
+    <div className={`${bottom ? "mb-[18px]" : ""} group`}>
       {label && (
         <label
           htmlFor={name}
           className={`
             flex items-center gap-[6px] mb-2
-            text-xs font-bold uppercase
+            text-[12px] font-bold uppercase
             tracking-[0.5px]
             transition-colors duration-250
             ${error ? "text-red-500" : "text-slate-500"}
@@ -110,8 +110,8 @@ const TextInput: React.FC<TextInputProps> = ({
             disabled={disabled}
             rows={rows}
             className={`
-              w-full min-h-[35px] px-4 py-[5px] text-[15px] font-medium
-              border rounded-[10px] outline-none
+              w-full min-h-[35px] px-4 py-[5px] text-sm font-medium
+              border rounded-[5px] outline-none
               transition-all duration-250
               placeholder-[#9ca3af]
               text-[#1f2937]
@@ -139,8 +139,9 @@ const TextInput: React.FC<TextInputProps> = ({
             disabled={disabled}
             className={`
               w-full h-10 px-4
-              border rounded-[10px] outline-none
-              text-[15px] font-medium leading-normal
+              border rounded-[5px] outline-none
+              text-sm font-medium leading-normal
+              [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none
               transition-all duration-250
               placeholder-[#9ca3af]
               text-[#1f2937]

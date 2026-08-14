@@ -28,24 +28,6 @@ export const validateCustomer = (
         newErrors.displayName = "Display Name must be at least 2 characters";
     }
 
-    if (
-        !formData.customerType ||
-        (Array.isArray(formData.customerType) && formData.customerType.length === 0) ||
-        (typeof formData.customerType === "string" && !formData.customerType.trim())
-    ) {
-        newErrors.customerType = "Customer Type is required";
-    }
-
-    if (!formData.contactPerson.trim()) {
-        newErrors.contactPerson = "Contact Person is required";
-    } else if (!/^[a-zA-Z.\s]+$/.test(formData.contactPerson)) {
-        newErrors.contactPerson = "Contact Person should only contain letters";
-    }
-
-    if (formData.designation && !/^[a-zA-Z.\s]+$/.test(formData.designation)) {
-        newErrors.designation = "Designation should only contain letters";
-    }
-
     const primaryMobileNumber = Array.isArray(formData.mobile) && formData.mobile.length > 0 ? formData.mobile[0].number : (typeof formData.mobile === "string" ? formData.mobile : "");
     const mobileError = validatePhoneNumber(primaryMobileNumber, true);
     if (mobileError) {
@@ -151,63 +133,8 @@ export const validateCustomer = (
         newErrors.creditLimit = "Credit Limit must be at least ₹25000";
     }
 
-    if (formData.creditDays === "" || isNaN(Number(formData.creditDays))) {
-        newErrors.creditDays = "Credit Days must be a valid number";
-    }
-
     if (!formData.priceList) {
         newErrors.priceList = "Price List is required";
-    }
-
-    // ---- Bank Accounts ----
-    if (formData.bankAccounts && Array.isArray(formData.bankAccounts)) {
-        let hasAtLeastOneBank = false;
-
-        formData.bankAccounts.forEach((bank: any, index: number) => {
-            const hasAnyField = !!(
-                bank.bankHolderName?.trim() ||
-                bank.bankName?.trim() ||
-                bank.ifscCode?.trim() ||
-                bank.accountNumber?.trim() ||
-                bank.branchName?.trim() ||
-                bank.upiMobileNumber?.trim()
-            );
-
-            if (hasAnyField) {
-                hasAtLeastOneBank = true;
-                if (!bank.bankHolderName?.trim()) {
-                    newErrors[`bankAccounts.${index}.bankHolderName`] = "Account Holder Name is required";
-                }
-                if (!bank.bankName?.trim()) {
-                    newErrors[`bankAccounts.${index}.bankName`] = "Bank Name is required";
-                }
-                if (!bank.ifscCode?.trim()) {
-                    newErrors[`bankAccounts.${index}.ifscCode`] = "IFSC Code is required";
-                } else if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(bank.ifscCode)) {
-                    newErrors[`bankAccounts.${index}.ifscCode`] = "Invalid IFSC code";
-                }
-                if (!bank.accountNumber?.trim()) {
-                    newErrors[`bankAccounts.${index}.accountNumber`] = "Account Number is required";
-                } else if (!/^[0-9]{9,18}$/.test(bank.accountNumber)) {
-                    newErrors[`bankAccounts.${index}.accountNumber`] = "Account Number must be 9-18 digits";
-                }
-                if (!bank.branchName?.trim()) {
-                    newErrors[`bankAccounts.${index}.branchName`] = "Branch is required";
-                }
-                const upiMobileNumberError = validatePhoneNumber(bank.upiMobileNumber, false);
-                if (upiMobileNumberError) {
-                    newErrors[`bankAccounts.${index}.upiMobileNumber`] = upiMobileNumberError;
-                }
-            }
-        });
-
-        if (!hasAtLeastOneBank && formData.bankAccounts.length > 0) {
-            newErrors[`bankAccounts.0.bankHolderName`] = "Account Holder Name is required";
-            newErrors[`bankAccounts.0.bankName`] = "Bank Name is required";
-            newErrors[`bankAccounts.0.accountNumber`] = "Account Number is required";
-            newErrors[`bankAccounts.0.ifscCode`] = "IFSC Code is required";
-            newErrors[`bankAccounts.0.branchName`] = "Branch is required";
-        }
     }
 
     return newErrors;
