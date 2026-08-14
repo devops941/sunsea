@@ -3,13 +3,17 @@ import type { PayloadAction } from "@reduxjs/toolkit";
 import { productService } from "../../services/productService";
 import type { Product, ProductState, CreateProductDto, UpdateProductDto } from "./types";
 
-export const fetchProducts = createAsyncThunk("products/fetchAll", async (search: string | undefined, { rejectWithValue }) => {
-  try {
-    return await productService.fetchAll(search);
-  } catch (error: any) {
-    return rejectWithValue(error.response?.data?.message || "Failed to fetch products");
+export const fetchProducts = createAsyncThunk(
+  "products/fetchAll",
+  async (arg: string | { search?: string; categoryId?: string } | undefined, { rejectWithValue }) => {
+    const params = typeof arg === "string" || arg === undefined ? { search: arg } : arg;
+    try {
+      return await productService.fetchAll(params);
+    } catch (error: any) {
+      return rejectWithValue(error.response?.data?.message || "Failed to fetch products");
+    }
   }
-});
+);
 
 export const createProduct = createAsyncThunk("products/create", async (data: CreateProductDto, { rejectWithValue }) => {
   try {

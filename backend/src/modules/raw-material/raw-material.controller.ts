@@ -18,7 +18,12 @@ class RawMaterialController {
 
   findAll = asyncHandler(async (req: Request, res: Response) => {
     const search = req.query.search as string | undefined;
-    const rawMaterials = await rawMaterialService.findAll(search);
+    const storeId = req.query.storeId as string | undefined;
+    const isActive =
+      req.query.isActive === "true" ? true :
+        req.query.isActive === "false" ? false :
+          undefined;
+    const rawMaterials = await rawMaterialService.findAll({ search, storeId, isActive });
 
     return res.status(200).json(
       new ApiResponse("Raw Materials fetched successfully", rawMaterials)

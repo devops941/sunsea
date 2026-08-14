@@ -1,0 +1,183 @@
+import React, { useState, useEffect, useCallback } from "react";
+import { FaPlus } from "react-icons/fa";
+import { useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
+
+import { salesProductService } from "../../../services/salesProductService";
+import { usePermission } from "../../../hooks/usePermission";
+
+import EditButton from "../../../components/ui/EditButton/EditButton";
+import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
+import CustomButton from "../../../components/ui/Button/Button";
+import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
+import DataTable, { type DataTableColumn } from "../../../components/ui/table/DataTable";
+import SearchInput from "../../../components/ui/SearchInput/SearchInput";
+import StatusBadge from "../../../components/ui/StatusBadge/Badge";
+
+const ITEMS_PER_PAGE = 10;
+
+const SalesProductList: React.FC = () => {
+    const navigate = useNavigate();
+    const { can } = usePermission();
+
+    const [salesProducts, setSalesProducts] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [searchTerm, setSearchTerm] = useState("");
+    const [currentPage, setCurrentPage] = useState(1);
+
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [itemToDelete, setItemToDelete] = useState<number | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
+
+    const loadData = useCallback((search: string = "") => {
+        setLoading(true);
+        salesProductService.fetchAll(search)
+            .then((data: any) => setSalesProducts(Array.isArray(data) ? data : []))
+            .catch(() => toast.error("Failed to load sales products"))
+            .finally(() => setLoading(false));
+    }, []);
+
+    useEffect(() => {
+        const delayDebounceFn = setTimeout(() => {
+            if (can("sales_products.view")) loadData(searchTerm);
+        }, 500);
+        return () => clearTimeout(delayDebounceFn);
+    }, [searchTerm, loadData, can]);
+
+    const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setSearchTerm(e.target.value);
+        setCurrentPage(1);
+    };
+
+    const totalPages = Math.ceil(salesProducts.length / ITEMS_PER_PAGE);
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    const paginatedData = salesProducts.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
+    const handleOpenAdd = () => navigate("/sales-products/create");
+    const handleOpenEdit = useCallback((item: any) => {
+        navigate(`/sales-products/edit/${item.id}`, { state: item });
+    }, [navigate]);
+
+    const triggerDelete = useCallback((id: number) => {
+        setItemToDelete(id);
+        setShowDeleteModal(true);
+    }, []);
+
+    const handleDeleteConfirm = async () => {
+        if (itemToDelete === null) return;
+        setIsDeleting(true);
+        try {
+            await salesProductService.delete(itemToDelete);
+            toast.success("Sales Product deleted successfully!");
+            loadData(searchTerm);
+        } catch (err: any) {
+            toast.error(err?.response?.data?.message || "Failed to delete Sales Product");
+        } finally {
+            setIsDeleting(false);
+            setShowDeleteModal(false);
+            setItemToDelete(null);
+        }
+    };
+
+    const columns: DataTableColumn<any>[] = [
+        {
+            header: "#",
+            width: "60px",
+            align: "center",
+            render: (_, index) => startIndex + index + 1,
+        },
+        {
+            header: "SALES PRODUCT",
+            render: (item) => (
+                <div>
+                    <div className="font-semibold text-gray-800">{item.salesProductName}</div>
+                    <span className="text-xs text-gray-400">Code: {item.salesProductCode}</span>
+                </div>
+            ),
+        },
+        {
+            header: "COMPONENTS",
+            render: (item) =>
+                (item.components || [])
+                    .map((c: any) => {
+                        const name = c.componentProduct?.productName;
+                        if (!name) return null;
+                        return `${name} (${c.quantity ?? 1})`;
+                    })
+                    .filter(Boolean)
+                    .join(", ") || "-",
+        },
+        {
+            header: "RATE (₹)",
+            align: "right",
+            render: (item) => item.rate != null ? Number(item.rate).toFixed(2) : "-",
+        },
+        {
+            header: "STATUS",
+            align: "center",
+            render: (item) => <StatusBadge status={item.isActive ? "ACTIVE" : "INACTIVE"} />,
+        },
+        {
+            header: "ACTIONS",
+            align: "left",
+            render: (item) => (
+                <div className="flex items-center gap-2">
+                    {can("sales_products.edit") && <EditButton onClick={() => handleOpenEdit(item)} />}
+                    {can("sales_products.delete") && <DeleteButton onClick={() => triggerDelete(item.id)} />}
+                </div>
+            ),
+        },
+    ];
+
+    return (
+        <div>
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-6 border-b border-slate-200">
+                    <div>
+                        <h2 className="text-2xl font-bold text-slate-800">Sales Product</h2>
+                        <p className="text-sm text-slate-500 mt-1">A sellable item assembled from Production Products — e.g. "3L Container" = "Container" + "Lid".</p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+                        <div className="w-full md:w-64">
+                            <SearchInput
+                                value={searchTerm}
+                                onChange={handleSearch}
+                                placeholder="Search by sales product..."
+                            />
+                        </div>
+                        {can("sales_products.create") && (
+                            <CustomButton text="Add Sales Product" icon={FaPlus} onClick={handleOpenAdd} />
+                        )}
+                    </div>
+                </div>
+
+                <DataTable
+                    columns={columns}
+                    data={paginatedData}
+                    rowKey={(row) => row.id}
+                    loading={loading}
+                    emptyMessage="No sales products found."
+                    pagination={totalPages > 1 ? {
+                        currentPage,
+                        totalPages,
+                        onPageChange: setCurrentPage,
+                    } : undefined}
+                />
+            </div>
+
+            <CommonConfirmModal
+                isOpen={showDeleteModal}
+                onClose={() => setShowDeleteModal(false)}
+                onConfirm={handleDeleteConfirm}
+                title="Confirm Delete"
+                message="Are you sure you want to delete this sales product?"
+                confirmText={isDeleting ? "Deleting..." : "Delete"}
+                cancelText="Cancel"
+                isDangerous={true}
+                isLoading={isDeleting}
+            />
+        </div>
+    );
+};
+
+export default SalesProductList;

@@ -192,7 +192,7 @@ export const sidebarItems: SidebarItem[] = [
       { permission: "goods-dispatch.view", path: "/production/goods-dispatch" },
       { permission: "shift-execution.view", path: "/shift-execution" },
       { permission: "oee-dashboard.view", path: "/oee-dashboard" },
-      { permission: "bill_of_materials.view", path: "/bill-of-materials" },
+      { permission: "sales_products.view", path: "/sales-products" },
     ],
     activePaths: [
       "/approved-sales-orders",
@@ -205,7 +205,7 @@ export const sidebarItems: SidebarItem[] = [
       "/oee-dashboard",
       "/shift-execution",
       "/production-dashboard",
-      "/bill-of-materials",
+      "/sales-products",
       "/production/goods-dispatch",
     ],
     permissionAny: [
@@ -217,7 +217,7 @@ export const sidebarItems: SidebarItem[] = [
       "goods-dispatch.view",
       "shift-execution.view",
       "oee-dashboard.view",
-      "bill_of_materials.view",
+      "sales_products.view",
     ],
   },
   // 8. Inventory

@@ -215,7 +215,7 @@ const FinishedStockList: React.FC<FinishedStockListProps> = ({ storeId: propStor
                                 { label: "Physical Stock (On Hand)", value: `${selectedItem.onHandQty} ${formatUom(selectedItem.product?.uom?.uomCode)}` },
                                 { label: "Minimum Quantity limit", value: `${(selectedItem.product as any)?.minimumQty || "0"} ${formatUom(selectedItem.product?.uom?.uomCode)}` },
                                 { label: "Maximum Quantity limit", value: `${(selectedItem.product as any)?.maximumQty || "0"} ${formatUom(selectedItem.product?.uom?.uomCode)}` },
-                                { label: "Weight Per Piece", value: selectedItem.product?.weightPerPiece != null ? `${selectedItem.product.weightPerPiece} kg` : "N/A" },
+                                { label: "Weight Per Piece", value: selectedItem.product?.weightPerPiece != null ? `${selectedItem.product.weightPerPiece} ${(selectedItem.product as any)?.weightUom || "kg"}` : "N/A" },
                                 { label: "Dimensions (L×B×H)", value: selectedItem.product?.dimensions || "N/A" },
                                 { label: "Last Updated", value: formatDate(selectedItem.updatedAt) },
                             ]

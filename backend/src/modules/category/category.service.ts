@@ -1,96 +1,55 @@
 import { prisma } from "../../config/prisma";
-
 import { ApiError } from "../../utils/ApiError";
-
-import {
-  CreateCategoryInput,
-  UpdateCategoryInput,
-} from "./category.validation";
+import { CreateCategoryInput, UpdateCategoryInput } from "./category.validation";
 
 class CategoryService {
-  async create(
-    data: CreateCategoryInput
-  ) {
-    const existing =
-      await prisma.category.findFirst({
-        where: {
-          OR: [
-            {
-              categoryCode:
-                data.categoryCode,
-            },
-            {
-              categoryName:
-                data.categoryName,
-            },
-          ],
-        },
-      });
+  async create(data: CreateCategoryInput) {
+    const existing = await prisma.category.findFirst({
+      where: {
+        OR: [
+          { categoryCode: data.categoryCode },
+          { categoryName: data.categoryName },
+        ],
+      },
+    });
 
     if (existing) {
-      throw new ApiError(
-        409,
-        "Category already exists"
-      );
+      throw new ApiError(409, "Category already exists");
     }
 
-    return prisma.category.create({
-      data,
-    });
+    return prisma.category.create({ data });
   }
 
   async findAll(search?: string, isActive?: boolean) {
     return prisma.category.findMany({
-      orderBy: {
-        id: "desc",
-      },
+      orderBy: { id: "desc" },
       where: {
         ...(isActive !== undefined ? { isActive } : {}),
         ...(search
           ? {
-            OR: [
-              {
-                categoryCode: {
-                  contains: search,
-                  mode: "insensitive",
-                },
-              },
-              {
-                categoryName: {
-                  contains: search,
-                  mode: "insensitive",
-                },
-              },
-            ],
-          }
+              OR: [
+                { categoryCode: { contains: search, mode: "insensitive" } },
+                { categoryName: { contains: search, mode: "insensitive" } },
+              ],
+            }
           : {}),
       },
     });
   }
 
   async findById(id: number) {
-    const category =
-      await prisma.category.findUnique({
-        where: { id },
-      });
+    const category = await prisma.category.findUnique({ where: { id } });
 
     if (!category) {
-      throw new ApiError(
-        404,
-        "Category not found"
-      );
+      throw new ApiError(404, "Category not found");
     }
 
     return category;
   }
 
-  async update(
-    id: number,
-    data: UpdateCategoryInput
-  ) {
+  async update(id: number, data: UpdateCategoryInput) {
     await this.findById(id);
 
-    // CAT-008 fix: only check fields that are actually being updated (not undefined)
     const orConditions: any[] = [];
     if (data.categoryCode !== undefined) {
       orConditions.push({ categoryCode: data.categoryCode });
@@ -131,9 +90,7 @@ class CategoryService {
       );
     }
 
-    return prisma.category.delete({
-      where: { id },
-    });
+    return prisma.category.delete({ where: { id } });
   }
 
   async getNextCategoryId() {
@@ -146,7 +103,6 @@ class CategoryService {
     }
 
     const lastId = lastItem.categoryCode;
-    // CAT-005 fix: use last (trailing) number group
     const match = lastId.match(/\d+(?!.*\d)/);
     if (!match) {
       return lastId + "001";

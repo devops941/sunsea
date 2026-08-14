@@ -31,6 +31,7 @@ const CategoryList: React.FC = () => {
     const [errors, setErrors] = useState({ code: "", name: "" });
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [itemToDelete, setItemToDelete] = useState<number | null>(null);
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     const [formData, setFormData] = useState({
         id: "",
@@ -149,8 +150,9 @@ const CategoryList: React.FC = () => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!validateForm()) return;
+        if (!validateForm() || isSubmitting) return;
 
+        setIsSubmitting(true);
         try {
             const payload = {
                 code: formData.code,
@@ -169,6 +171,8 @@ const CategoryList: React.FC = () => {
             setShowFormModal(false);
         } catch (err: any) {
             toast.error(err || "Operation failed");
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -255,7 +259,7 @@ const CategoryList: React.FC = () => {
                                 text={editMode ? "Update" : "Save"}
                                 icon={FaSave}
                                 onClick={handleSubmit}
-                                disabled={loading}
+                                disabled={loading || isSubmitting}
                             />
                         </div>
                     }

@@ -2,7 +2,6 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../../config/prisma";
 import { ApiError } from "../../utils/ApiError";
 import { executeDeleteWithValidation } from "../../utils/deleteValidation";
-import { standardConverter } from "../../utils/convert.util";
 import { uploadToImageKit } from "../../utils/Imagekit";
 import fs from "fs";
 import path from "path";
@@ -36,37 +35,18 @@ function toIdArray(value: any): number[] {
 }
 
 class ProductService {
-  private async resolveUomId(uomInput: any): Promise<number | null> {
-
-    if (!uomInput) return null;
-
-    // If it's already a valid number ID
-    const numId = Number(uomInput);
-    if (!isNaN(numId) && numId > 0) {
-      return numId;
-    }
-
-    // Otherwise, it's a string code (e.g., "kg")
-    const uomCode = String(uomInput).trim();
+  // Every Production Product's stock (FinishedGoodsStock.onHandQty) is a
+  // plain piece count, never a weight — so the product's stock-counting UOM
+  // is always "pcs", regardless of weightPerPiece (which is separate,
+  // descriptive-only data). This keeps "Physical Stock" showing e.g.
+  // "3000 PCS" instead of echoing whatever weight unit weightPerPiece used.
+  private async resolvePcsUomId(): Promise<number> {
+    const uomCode = "pcs";
     let existingUom = await prisma.unitOfMeasure.findUnique({ where: { uomCode } });
 
     if (!existingUom) {
-      // Auto-create it if missing using convert-units for the name
-      let uomName = uomCode.toUpperCase();
-      try {
-        const desc = standardConverter().describe(uomCode as any);
-        if (desc) {
-          uomName = desc.plural || desc.singular || uomCode;
-        }
-      } catch (e) {
-        // Ignored if convert-units doesn't recognize it
-      }
-
       existingUom = await prisma.unitOfMeasure.create({
-        data: {
-          uomCode,
-          uomName,
-        },
+        data: { uomCode, uomName: "Pieces" },
       });
     }
 
@@ -74,8 +54,6 @@ class ProductService {
   }
 
   async create(data: any, files?: Express.Multer.File[]) {
-    const colorIds = toIdArray(data.colorIds);
-
     const uploadedImages: any[] = [];
     if (files && files.length > 0) {
       for (let index = 0; index < files.length; index++) {
@@ -107,33 +85,21 @@ class ProductService {
     const payload: Prisma.ProductUncheckedCreateInput = {
       productCode: cleanRequiredString(data.productCode, 20),
       productName: cleanRequiredString(data.productName, 160),
-      displayName: cleanString(data.displayName, 80),
-      itemCode: cleanString(data.itemCode, 50),
       description: cleanString(data.description, 255),
-      typeCode: cleanString(data.typeCode, 20),
-      dimensions: cleanString(data.dimensions, 255),
-      gstTaxRateId: data.gstTaxRateId || null,
-      mouldReference: cleanString(data.mouldReference, 80),
-      tags: cleanString(data.tags, 255),
+      productType: data.productType === "SALES_PRODUCTION" ? "SALES_PRODUCTION" : "PRODUCTION",
 
       categoryId: Number(data.categoryId),
-      subCategoryId: Number(data.subCategoryId),
-      uomId: await this.resolveUomId(data.uomId),
+      uomId: await this.resolvePcsUomId(),
 
       capacityLitres: toNumberOrNull(data.capacityLitres),
       weightPerPiece: toNumberOrNull(data.weightPerPiece),
-      bundleQty: toNumberOrNull(data.bundleQty),
+      weightUom: cleanString(data.weightUom, 10) || "kg",
       isActive: toBoolean(data.isActive, true),
 
       hsnCode: cleanString(data.hsnCode, 20),
-      gstRate: toNumberOrNull(data.gstRate),
-      cess: toNumberOrNull(data.cess),
       minimumQty: data.minimumQty || "0",
       maximumQty: data.maximumQty || "0",
-      mrp: toNumberOrNull(data.mrp),
-      b2b: toNumberOrNull(data.b2b),
-      b2c: toNumberOrNull(data.b2c),
-      exportPrice: toNumberOrNull(data.exportPrice),
+      rate: toNumberOrNull(data.rate),
 
       ...(uploadedImages.length
         ? {
@@ -143,17 +109,6 @@ class ProductService {
         }
         : {}),
     };
-
-    let colorTypePricingList: any[] = [];
-    if (data.colorTypePricing) {
-      try {
-        colorTypePricingList = typeof data.colorTypePricing === "string"
-          ? JSON.parse(data.colorTypePricing)
-          : data.colorTypePricing;
-      } catch (e) {
-        console.error("Failed to parse colorTypePricing in create:", e);
-      }
-    }
 
     let rawMaterialsList: any[] = [];
     if (data.rawMaterials) {
@@ -167,7 +122,7 @@ class ProductService {
         if (percentageItems.length > 0 && totalPercent !== 100) {
           throw new ApiError(400, "Total Raw Material percentage must be exactly 100%");
         }
-        
+
         const rmIds = rawMaterialsList.map(rm => String(rm.rawMaterialId));
         if (new Set(rmIds).size !== rmIds.length) {
           throw new ApiError(400, "Duplicate raw materials are not allowed");
@@ -175,17 +130,6 @@ class ProductService {
       } catch (e: any) {
         if (e instanceof ApiError) throw e;
         console.error("Failed to parse rawMaterials in create:", e);
-      }
-    }
-
-    let productionStepsList: any[] = [];
-    if (data.productionSteps) {
-      try {
-        productionStepsList = typeof data.productionSteps === "string"
-          ? JSON.parse(data.productionSteps)
-          : data.productionSteps;
-      } catch (e: any) {
-        console.error("Failed to parse productionSteps in create:", e);
       }
     }
 
@@ -236,14 +180,6 @@ class ProductService {
               })),
             },
           }),
-          ...(productionStepsList.length > 0 && {
-            productionSteps: {
-              create: productionStepsList.map((ps: any) => ({
-                stepKey: String(ps.stepKey || "").slice(0, 255),
-                stepOrder: Number(ps.stepOrder),
-              })),
-            },
-          }),
           ...(capacityHistoryList.length > 0 && {
             capacityHistories: {
               create: capacityHistoryList.map((entry: any) => ({
@@ -264,11 +200,10 @@ class ProductService {
 
         include: {
           category: true,
-          subCategory: true,
           uom: true,
           images: true,
+          finishedGoodsStocks: { include: { store: true } },
           billOfMaterials: { include: { rawMaterial: true } },
-          productionSteps: { orderBy: { stepOrder: "asc" } },
         },
       });
     } catch (err: any) {
@@ -281,28 +216,29 @@ class ProductService {
     }
   }
 
-  async findAll(search?: string) {
-    const whereClause = search
-      ? {
-        OR: [
-          { productCode: { contains: search, mode: "insensitive" as const } },
-          { productName: { contains: search, mode: "insensitive" as const } },
-          { itemCode: { contains: search, mode: "insensitive" as const } },
-          { tags: { contains: search, mode: "insensitive" as const } },
-        ],
-      }
-      : {};
+  async findAll(params: { search?: string; categoryId?: string } = {}) {
+    const { search, categoryId } = params;
+    const whereClause: Prisma.ProductWhereInput = {};
+
+    if (search) {
+      whereClause.OR = [
+        { productCode: { contains: search, mode: "insensitive" as const } },
+        { productName: { contains: search, mode: "insensitive" as const } },
+      ];
+    }
+
+    if (categoryId) {
+      whereClause.categoryId = Number(categoryId);
+    }
 
     return prisma.product.findMany({
       where: whereClause,
       include: {
         category: true,
-        subCategory: true,
         uom: true,
         images: true,
-        finishedGoodsStocks: true,
+        finishedGoodsStocks: { include: { store: true } },
         billOfMaterials: { include: { rawMaterial: true } },
-        productionSteps: { orderBy: { stepOrder: "asc" } },
         capacityHistories: { orderBy: { createdAt: "desc" } },
       },
       orderBy: {
@@ -316,12 +252,10 @@ class ProductService {
       where: { id },
       include: {
         category: true,
-        subCategory: true,
         uom: true,
         images: true,
-        finishedGoodsStocks: true,
+        finishedGoodsStocks: { include: { store: true } },
         billOfMaterials: { include: { rawMaterial: true } },
-        productionSteps: { orderBy: { stepOrder: "asc" } },
         capacityHistories: { orderBy: { createdAt: "desc" } },
       },
     });
@@ -361,21 +295,6 @@ class ProductService {
         ? Number(data.primaryImageId)
         : undefined;
 
-    // null means "not sent" — leave colors alone
-    // [] means "sent but empty" — clear all colors
-    const colorIds = data.colorIds !== undefined ? toIdArray(data.colorIds) : null;
-
-    let colorTypePricingList: any[] | null = null;
-    if (data.colorTypePricing !== undefined) {
-      try {
-        colorTypePricingList = typeof data.colorTypePricing === "string"
-          ? JSON.parse(data.colorTypePricing)
-          : data.colorTypePricing;
-      } catch (e) {
-        console.error("Failed to parse colorTypePricing in update:", e);
-      }
-    }
-
     let rawMaterialsList: any[] | null = null;
     if (data.rawMaterials !== undefined) {
       try {
@@ -401,17 +320,6 @@ class ProductService {
       }
     }
 
-    let productionStepsList: any[] | null = null;
-    if (data.productionSteps !== undefined) {
-      try {
-        productionStepsList = typeof data.productionSteps === "string"
-          ? JSON.parse(data.productionSteps)
-          : data.productionSteps;
-      } catch (e: any) {
-        console.error("Failed to parse productionSteps in update:", e);
-      }
-    }
-
     let capacityHistoryList: any[] | null = null;
     if (data.capacityHistory !== undefined) {
       try {
@@ -422,7 +330,6 @@ class ProductService {
         console.error("Failed to parse capacityHistory in update:", e);
       }
     }
-
 
     const uploadedImages: any[] = [];
     if (files && files.length > 0) {
@@ -510,23 +417,10 @@ class ProductService {
         }
       }
 
-      if (productionStepsList !== null) {
-        await tx.productionStep.deleteMany({ where: { productId: id } });
-        if (productionStepsList.length > 0) {
-          await tx.productionStep.createMany({
-            data: productionStepsList.map((ps: any) => ({
-              productId: id,
-              stepKey: ps.stepKey,
-              stepOrder: Number(ps.stepOrder),
-            })),
-          });
-        }
-      }
-
       if (capacityHistoryList !== null && capacityHistoryList.length > 0) {
         for (const entry of capacityHistoryList) {
           const machineId = cleanRequiredString(entry.machineId || "INITIAL", 20);
-          
+
           await tx.productCapacityHistory.create({
             data: {
               productId: id,
@@ -548,7 +442,7 @@ class ProductService {
             orderBy: { createdAt: "desc" },
             select: { id: true }
           });
-          
+
           if (existing.length > 2) {
             const idsToDelete = existing.slice(2).map(r => r.id);
             await tx.productCapacityHistory.deleteMany({
@@ -562,33 +456,20 @@ class ProductService {
     const payload: Prisma.ProductUncheckedUpdateInput = {
       productCode: data.productCode !== undefined ? cleanRequiredString(data.productCode, 20) : undefined,
       productName: data.productName !== undefined ? cleanRequiredString(data.productName, 160) : undefined,
-      displayName: data.displayName !== undefined ? cleanString(data.displayName, 80) : undefined,
-      itemCode: data.itemCode !== undefined ? cleanString(data.itemCode, 50) : undefined,
       description: data.description !== undefined ? cleanString(data.description, 255) : undefined,
-      typeCode: data.typeCode !== undefined ? cleanString(data.typeCode, 20) : undefined,
-      dimensions: data.dimensions !== undefined ? cleanString(data.dimensions, 255) : undefined,
-      mouldReference: data.mouldReference !== undefined ? cleanString(data.mouldReference, 80) : undefined,
-      tags: data.tags !== undefined ? cleanString(data.tags, 255) : undefined,
+      productType: data.productType !== undefined ? (data.productType === "SALES_PRODUCTION" ? "SALES_PRODUCTION" : "PRODUCTION") : undefined,
 
       categoryId: data.categoryId ? Number(data.categoryId) : undefined,
-      subCategoryId: undefined,
-      uomId: data.uomId !== undefined ? await this.resolveUomId(data.uomId) : undefined,
 
       capacityLitres: data.capacityLitres !== undefined ? toNumberOrNull(data.capacityLitres) : undefined,
       weightPerPiece: data.weightPerPiece !== undefined ? toNumberOrNull(data.weightPerPiece) : undefined,
-      bundleQty: data.bundleQty !== undefined ? toNumberOrNull(data.bundleQty) : undefined,
+      weightUom: data.weightUom !== undefined ? (cleanString(data.weightUom, 10) || "kg") : undefined,
       minimumQty: data.minimumQty !== undefined ? data.minimumQty : undefined,
       maximumQty: data.maximumQty !== undefined ? data.maximumQty : undefined,
       isActive: data.isActive !== undefined ? toBoolean(data.isActive, true) : undefined,
 
       hsnCode: data.hsnCode !== undefined ? cleanString(data.hsnCode, 20) : undefined,
-      gstTaxRateId: data.gstTaxRateId !== undefined ? data.gstTaxRateId || null : undefined,
-      mrp: data.mrp !== undefined ? toNumberOrNull(data.mrp) : undefined,
-      b2b: data.b2b !== undefined ? toNumberOrNull(data.b2b) : undefined,
-      b2c: data.b2c !== undefined ? toNumberOrNull(data.b2c) : undefined,
-      exportPrice: data.exportPrice !== undefined ? toNumberOrNull(data.exportPrice) : undefined,
-      gstRate: data.gstRate !== undefined ? toNumberOrNull(data.gstRate) : undefined,
-      cess: data.cess !== undefined ? toNumberOrNull(data.cess) : undefined,
+      rate: data.rate !== undefined ? toNumberOrNull(data.rate) : undefined,
 
       ...(data.openingStockQty && data.openingStockStoreId
         ? {
@@ -633,11 +514,10 @@ class ProductService {
       data: payload,
       include: {
         category: true,
-        subCategory: true,
         uom: true,
         images: true,
+        finishedGoodsStocks: { include: { store: true } },
         billOfMaterials: { include: { rawMaterial: true } },
-        productionSteps: { orderBy: { stepOrder: "asc" } },
         capacityHistories: { orderBy: { createdAt: "desc" } },
       },
     });
@@ -645,7 +525,7 @@ class ProductService {
 
   async delete(id: bigint) {
     await this.findById(id);
-    const [salesCount, prodOrderCount, dispatchCount, realTxnCount] = await Promise.all([
+    const [salesCount, prodOrderCount, dispatchCount, realTxnCount, usedAsComponentCount] = await Promise.all([
       prisma.salesOrderItem.count({ where: { productId: id } }),
       prisma.productionOrder.count({ where: { productItemId: id } }),
       prisma.goodsDispatchItem.count({ where: { productItemId: id } }),
@@ -655,10 +535,15 @@ class ProductService {
           txnType: { not: "OPENING_STOCK" },
         },
       }),
+      prisma.salesProductComponent.count({ where: { componentProductId: id } }),
     ]);
 
     if (salesCount > 0 || prodOrderCount > 0 || dispatchCount > 0 || realTxnCount > 0) {
       throw new ApiError(400, "Cannot delete product as it is referenced in sales orders, production orders, dispatch, or stock transactions.");
+    }
+
+    if (usedAsComponentCount > 0) {
+      throw new ApiError(400, "Cannot delete this product because it is used as a component in one or more sales products. Remove it from those sales products first.");
     }
 
     return executeDeleteWithValidation(

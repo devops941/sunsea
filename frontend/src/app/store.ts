@@ -4,9 +4,6 @@ import { baseApi } from "../services/baseApi";
 import roleReducer from "../features/roles/roleSlice";
 import departmentReducer from "../features/departments/departmentSlice";
 import categoryReducer from "../features/categories/categorySlice";
-import subCategoryReducer from "../features/subCategories/subCategorySlice";
-import colorReducer from "../features/colors/colorSlice";
-import sizeReducer from "../features/sizes/sizeSlice";
 import uomReducer from "../features/uoms/uomSlice";
 import userReducer from "../features/user/userSlice";
 import employeeReducer from "../features/employee/employeeSlice";
@@ -46,9 +43,6 @@ export const store = configureStore({
         roles: roleReducer,
         departments: departmentReducer,
         categories: categoryReducer,
-        subCategories: subCategoryReducer,
-        colors: colorReducer,
-        sizes: sizeReducer,
         uoms: uomReducer,
         users: userReducer,
         employees: employeeReducer,

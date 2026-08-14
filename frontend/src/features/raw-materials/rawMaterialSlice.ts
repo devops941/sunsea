@@ -3,13 +3,17 @@ import type { PayloadAction } from "@reduxjs/toolkit";
 import { rawMaterialService, mapRawMaterial } from "../../services/rawMaterialService";
 import type { RawMaterial, RawMaterialState, CreateRawMaterialDto, UpdateRawMaterialDto } from "./types";
 
-export const fetchRawMaterials = createAsyncThunk("rawMaterials/fetchAll", async (search: string | undefined, { rejectWithValue }) => {
-  try {
-    return await rawMaterialService.fetchAll({ search });
-  } catch (error: any) {
-    return rejectWithValue(error.response?.data?.message || "Failed to fetch raw materials");
+export const fetchRawMaterials = createAsyncThunk(
+  "rawMaterials/fetchAll",
+  async (arg: string | { search?: string; isActive?: boolean } | undefined, { rejectWithValue }) => {
+    const params = typeof arg === "string" || arg === undefined ? { search: arg } : arg;
+    try {
+      return await rawMaterialService.fetchAll(params);
+    } catch (error: any) {
+      return rejectWithValue(error.response?.data?.message || "Failed to fetch raw materials");
+    }
   }
-});
+);
 
 export const createRawMaterial = createAsyncThunk("rawMaterials/create", async (data: CreateRawMaterialDto, { rejectWithValue }) => {
   try {

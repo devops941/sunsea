@@ -83,6 +83,7 @@ export const PERMISSION_REGISTRY: ModulePermission[] = [
   { module: "shift-execution",        actions: ["view","edit"],                   description: "Shift Execution Board" },
   { module: "oee-dashboard",          actions: ["view"],                          description: "OEE Dashboard" },
   { module: "bill_of_materials",      actions: ["view","create","edit","delete"], description: "Bill of Materials" },
+  { module: "sales_products",         actions: ["view","create","edit","delete"], description: "Sales Products" },
 
   // ── Inventory ───────────────────────────────────────────────────────────────
   { module: "raw_material_stocks",        actions: ["view","create","edit","delete"], description: "Raw Material Stock" },

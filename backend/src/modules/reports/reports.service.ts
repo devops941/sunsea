@@ -293,7 +293,7 @@ class ReportsService {
           items: {
             include: {
               product: {
-                select: { productName: true, itemCode: true }
+                select: { productName: true, productCode: true }
               }
             }
           },

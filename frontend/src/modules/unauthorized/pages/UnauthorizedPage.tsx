@@ -1,12 +1,11 @@
-import { useNavigate } from "react-router-dom";
-import { FiLock, FiArrowLeft } from "react-icons/fi";
+import React from "react";
+import { FiLock } from "react-icons/fi";
+import BackButton from "../../../components/ui/BackButton/BackButton";
 
-const UnauthorizedPage = () => {
-  const navigate = useNavigate();
-
+const UnauthorizedPage: React.FC = () => {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <div className="text-center max-w-md w-full">
+      <div className="text-center max-w-md w-full flex flex-col items-center">
         {/* Icon */}
         <div className="flex items-center justify-center w-24 h-24 mx-auto mb-6 bg-red-100 rounded-full">
           <FiLock className="text-red-500" style={{ fontSize: "2.5rem" }} />
@@ -26,13 +25,7 @@ const UnauthorizedPage = () => {
         </p>
 
         {/* Action */}
-        <button
-          onClick={() => navigate("/dashboard")}
-          className="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 transition-colors shadow-sm"
-        >
-          <FiArrowLeft size={18} />
-          Go to Dashboard
-        </button>
+        <BackButton to="/dashboard" text="Go to Dashboard" />
       </div>
     </div>
   );

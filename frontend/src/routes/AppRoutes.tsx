@@ -18,7 +18,6 @@ const AccountsTabs = lazy(() => import("../modules/accounts/pages/AccountsTabs")
 
 const OrganizationTabs = lazy(() => import("../modules/company/pages/OrganizationTabs"));
 const InventoryTabs = lazy(() => import("../modules/stock/pages/InventoryTabs"));
-const Sample = lazy(() => import("../modules/sample"));
 const NotFoundPage = lazy(() => import("../modules/not-found/pages/NotFoundPage"));
 const UnauthorizedPage = lazy(() => import("../modules/unauthorized/pages/UnauthorizedPage"));
 const LoginPage = lazy(() => import("../modules/login/pages/LoginPage"));
@@ -43,12 +42,7 @@ const SupplierMaterialPricingList = lazy(() => import("../modules/supplier/pages
 
 // Products
 
-const ProductEdit = lazy(() => import("../modules/product/pages/ProductEdit"));
-const ProductCreatePage = lazy(() => import("../modules/product/pages/ProductCreate"));
-
-// Categories & Sub Categories (Product Master)
-
-const SubcategoryList = lazy(() => import("../modules/product/pages/SubCategoryList"));
+const ProductForm = lazy(() => import("../modules/product/pages/ProductForm"));
 
 const StoreLocationTabs = lazy(() => import("../modules/storage-stores/pages/StoreLocationTabs"));
 const HROrganizationTabs = lazy(() => import("../modules/employee/pages/HROrganizationTabs"));
@@ -67,10 +61,6 @@ const PermissionList = lazy(() => import("../modules/permissions/pages/Permissio
 
 
 
-// Product Management
-const ProductPricing = lazy(() => import("../modules/product-pricing/pages/ProductPricing"));
-const ProductImageUpload = lazy(() => import("../modules/product-images/pages/ProductImageUpload"));
-
 // New modules
 const MachineCreate = lazy(() => import("../modules/machines/pages/MachineCreate"));
 const MachineEdit = lazy(() => import("../modules/machines/pages/MachineEdit"));
@@ -84,9 +74,10 @@ const ShiftCreate = lazy(() => import("../modules/shifts/pages/ShiftCreate"));
 const ShiftEdit = lazy(() => import("../modules/shifts/pages/ShiftEdit"));
 
 
-const RawMaterialCreate = lazy(() => import("../modules/raw-materials/pages/RawMaterialCreate"));
+const RawMaterialForm = lazy(() => import("../modules/raw-materials/pages/RawMaterialForm"));
 const RawMaterialCategoryList = lazy(() => import("../modules/raw-material-categories/pages/RawMaterialCategoryList"));
-const RawMaterialEdit = lazy(() => import("../modules/raw-materials/pages/RawMaterialEdit"));
+
+const SalesProductForm = lazy(() => import("../modules/sales-product/pages/SalesProductForm"));
 
 const WastageStoreList = lazy(() => import("../modules/wastage-store/pages/WastageStoreList"));
 const WastageStoreForm = lazy(() => import("../modules/wastage-store/pages/WastageStoreForm"));
@@ -137,11 +128,6 @@ const GoodsDispatchView = lazy(() => import("../modules/goods-dispatch/pages/Goo
 const GoodsDispatchDetail = lazy(() => import("../modules/goods-dispatch/pages/GoodsDispatchDetail"));
 const GoodsDispatchGateApproval = lazy(() => import("../modules/goods-dispatch/pages/GoodsDispatchGateApproval"));
 const GoodsDispatchStoreApproval = lazy(() => import("../modules/goods-dispatch/pages/GoodsDispatchStoreApproval"));
-
-// OEE Dashboard
-const BillOfMaterialList = lazy(() => import("../modules/bill-of-material/pages/BillOfMaterialList"));
-const BillOfMaterialCreate = lazy(() => import("../modules/bill-of-material/pages/BillOfMaterialCreate"));
-const BillOfMaterialEdit = lazy(() => import("../modules/bill-of-material/pages/BillOfMaterialEdit"));
 
 const SalesOrderCreate = lazy(() => import("../modules/sales/salesorder/CreateOrder"));
 const SalesInvoiceView = lazy(() => import("../modules/sales-order-invoice/SalesInvoiceView"));
@@ -207,8 +193,6 @@ const AppRoutes = () => {
             <Route path="/whatsapp" element={<OrganizationTabs />} />
             <Route path="/email-config" element={<OrganizationTabs />} />
             <Route path="/settings/invoice" element={<OrganizationTabs />} />
-            {/* Sample Route */}
-            <Route path="/sample" element={<Sample />} />
 
             {/* ========================================================================= */}
             {/* MASTER DATA MANAGEMENT                                                    */}
@@ -265,25 +249,29 @@ const AppRoutes = () => {
             </Route>
 
             {/* Products Management (RBAC guarded) */}
-            <Route element={<ProtectedRoute permissionAny={["products.view", "categories.view", "raw_material_categories.view", "raw_materials.view", "uoms.view", "wastage-store.view"]} />}>
+            <Route element={<ProtectedRoute permissionAny={["products.view", "categories.view", "raw_material_categories.view", "raw_materials.view", "uoms.view", "wastage-store.view", "sales_products.view"]} />}>
               <Route path="/products" element={<ProductMasterTabs />} />
+              <Route path="/categories" element={<ProductMasterTabs />} />
+              <Route path="/uoms" element={<ProductMasterTabs />} />
+              <Route path="/raw-materials" element={<ProductMasterTabs />} />
+              <Route path="/raw-material-categories" element={<ProductMasterTabs />} />
+              <Route path="/wastage-store" element={<ProductMasterTabs />} />
+              <Route path="/sales-products" element={<ProductMasterTabs />} />
             </Route>
             {/* Products Create Route */}
             <Route element={<ProtectedRoute permission="products.create" />}>
-              <Route path="/products/create" element={<ProductCreatePage />} />
+              <Route path="/products/create" element={<ProductForm />} />
             </Route>
             {/* Products Edit :Id Route */}
             <Route element={<ProtectedRoute permission="products.edit" />}>
-              <Route path="/products/edit/:id" element={<ProductEdit />} />
+              <Route path="/products/edit/:id" element={<ProductForm />} />
             </Route>
-
-            {/* Categories & Subcategories */}
-            <Route element={<ProtectedRoute permissionAny={["products.view", "categories.view", "raw_material_categories.view", "raw_materials.view", "uoms.view", "wastage-store.view"]} />}>
-              <Route path="/categories" element={<ProductMasterTabs />} />
+            {/* Sales Product Routes */}
+            <Route element={<ProtectedRoute permission="sales_products.create" />}>
+              <Route path="/sales-products/create" element={<SalesProductForm />} />
             </Route>
-            {/* Sub Categories Route */}
-            <Route element={<ProtectedRoute permission="sub-categories.view" />}>
-              <Route path="/sub-categories" element={<SubcategoryList />} />
+            <Route element={<ProtectedRoute permission="sales_products.edit" />}>
+              <Route path="/sales-products/edit/:id" element={<SalesProductForm />} />
             </Route>
 
             {/* Administration (RBAC guarded) */}
@@ -306,26 +294,9 @@ const AppRoutes = () => {
             <Route element={<ProtectedRoute permission="departments.view" />}>
               <Route path="/departments" element={<OrganizationTabs />} />
             </Route>
-            {/* Product Master Attributes */}
-            <Route element={<ProtectedRoute permission="colors.view" />}>
-              <Route path="/colours" element={<ProductMasterTabs />} />
-            </Route>
-            {/* Sizes Route */}
-            <Route element={<ProtectedRoute permission="sizes.view" />}>
-              <Route path="/sizes" element={<ProductMasterTabs />} />
-            </Route>
             {/* Uoms Route */}
             <Route element={<ProtectedRoute permissionAny={["products.view", "categories.view", "raw_material_categories.view", "raw_materials.view", "uoms.view", "wastage-store.view"]} />}>
               <Route path="/uoms" element={<ProductMasterTabs />} />
-            </Route>
-
-            {/* Product Management Extras */}
-            <Route element={<ProtectedRoute permission="product-pricing.view" />}>
-              <Route path="/product-pricing" element={<ProductPricing />} />
-            </Route>
-            {/* Product Images Route */}
-            <Route element={<ProtectedRoute permission="product-images.view" />}>
-              <Route path="/product-images" element={<ProductImageUpload />} />
             </Route>
 
             {/* ========================================================================= */}
@@ -392,11 +363,22 @@ const AppRoutes = () => {
             </Route>
             {/* Raw Materials Create Route */}
             <Route element={<ProtectedRoute permission="raw_materials.create" />}>
-              <Route path="/raw-materials/create" element={<RawMaterialCreate />} />
+              <Route path="/raw-materials/create" element={<RawMaterialForm />} />
             </Route>
             {/* Raw Materials Edit :Id Route */}
             <Route element={<ProtectedRoute permission="raw_materials.edit" />}>
-              <Route path="/raw-materials/edit/:id" element={<RawMaterialEdit />} />
+              <Route path="/raw-materials/edit/:id" element={<RawMaterialForm />} />
+            </Route>
+
+            {/* Sales Product */}
+            <Route element={<ProtectedRoute permissionAny={["products.view", "categories.view", "raw_material_categories.view", "raw_materials.view", "uoms.view", "wastage-store.view", "sales_products.view"]} />}>
+              <Route path="/sales-products" element={<ProductMasterTabs />} />
+            </Route>
+            <Route element={<ProtectedRoute permission="sales_products.create" />}>
+              <Route path="/sales-products/create" element={<SalesProductForm />} />
+            </Route>
+            <Route element={<ProtectedRoute permission="sales_products.edit" />}>
+              <Route path="/sales-products/edit/:id" element={<SalesProductForm />} />
             </Route>
 
             {/* Wastage Store */}
@@ -561,19 +543,6 @@ const AppRoutes = () => {
             </Route>
             <Route element={<ProtectedRoute permission="goods-dispatch.create" />}>
               <Route path="/production/goods-dispatch/create" element={<GoodsDispatchCreate />} />
-            </Route>
-
-            {/* Bill Of Material */}
-            <Route element={<ProtectedRoute permission="bill_of_materials.view" />}>
-              <Route path="/bill-of-materials" element={<BillOfMaterialList />} />
-            </Route>
-            {/* Bill Of Materials Create Route */}
-            <Route element={<ProtectedRoute permission="bill_of_materials.create" />}>
-              <Route path="/bill-of-materials/create" element={<BillOfMaterialCreate />} />
-            </Route>
-            {/* Bill Of Materials Edit :Id Route */}
-            <Route element={<ProtectedRoute permission="bill_of_materials.edit" />}>
-              <Route path="/bill-of-materials/edit/:id" element={<BillOfMaterialEdit />} />
             </Route>
 
             {/* ========================================================================= */}

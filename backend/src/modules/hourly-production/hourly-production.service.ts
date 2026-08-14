@@ -626,7 +626,7 @@ class HourlyProductionService {
                 currentQty,
                 adjustedQty: newOnHand,
                 difference: convertedQty,
-                unitCost: Number(targetProduct.avgCost ?? 0),
+                unitCost: Number((targetProduct as any).rate ?? 0),
                 remarks: `Wastage entry #${wastageNo}`,
               }
             });
@@ -676,7 +676,7 @@ class HourlyProductionService {
                 currentQty,
                 adjustedQty: newOnHand,
                 difference: convertedQty,
-                unitCost: Number(targetProduct.avgCost ?? 0),
+                unitCost: Number((targetProduct as any).rate ?? 0),
                 remarks: `Returned raw material in Shift Log`,
               }
             });

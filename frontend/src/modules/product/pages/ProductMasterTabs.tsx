@@ -12,6 +12,7 @@ import RawMaterialList from "../../raw-materials/pages/RawMaterialList";
 import RawMaterialCategoryList from "../../raw-material-categories/pages/RawMaterialCategoryList";
 
 import WastageStoreList from "../../wastage-store/pages/WastageStoreList";
+import SalesProductList from "../../sales-product/pages/SalesProductList";
 
 import { usePermission } from "../../../hooks/usePermission";
 
@@ -27,7 +28,8 @@ const ProductMasterTabs: React.FC = () => {
         "/uoms": "uoms",
         "/raw-materials": "raw_materials",
         "/raw-material-categories": "raw_material_categories",
-        "/wastage-store": "wastage_store"
+        "/wastage-store": "wastage_store",
+        "/sales-products": "sales_products"
     };
 
     const keyToPath: Record<string, string> = {
@@ -36,7 +38,8 @@ const ProductMasterTabs: React.FC = () => {
         "uoms": "/uoms",
         "raw_materials": "/raw-materials",
         "raw_material_categories": "/raw-material-categories",
-        "wastage_store": "/wastage-store"
+        "wastage_store": "/wastage-store",
+        "sales_products": "/sales-products"
     };
 
     const allTabs: TabItem[] = [
@@ -45,7 +48,8 @@ const ProductMasterTabs: React.FC = () => {
         { key: "raw_material_categories", label: "RM Categories", icon: <FaLayerGroup />, content: <RawMaterialCategoryList /> },
         { key: "raw_materials", label: "Raw Materials", icon: <FaBoxes />, content: <RawMaterialList /> },
         { key: "wastage_store", label: "Wastage Store", icon: <FaLayerGroup />, content: <WastageStoreList /> },
-        { key: "products", label: "Products", icon: <FaBox />, content: <ProductList /> }
+        { key: "products", label: "Production Product", icon: <FaBox />, content: <ProductList /> },
+        { key: "sales_products", label: "Sales Product", icon: <FaBoxes />, content: <SalesProductList /> }
     ];
 
     const tabs = allTabs.filter(tab => {
@@ -55,6 +59,7 @@ const ProductMasterTabs: React.FC = () => {
         if (tab.key === "raw_materials") return can("raw_materials.view");
         if (tab.key === "wastage_store") return can("wastage-store.view");
         if (tab.key === "products") return can("products.view");
+        if (tab.key === "sales_products") return can("sales_products.view");
         return false;
     });
 

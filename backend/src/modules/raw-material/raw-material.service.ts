@@ -23,10 +23,9 @@ class RawMaterialService {
           ...(data.categoryId ? { category: { connect: { id: data.categoryId } } } : {}),
           hsnCode: data.hsnCode || null,
           minimumStock: data.minimumStock,
-          leadTimeDays: data.leadTimeDays,
           baseUom: data.baseUom,
           reorderLevel: data.reorderLevel,
-          unitPrice: data.unitPrice,
+          rate: data.rate,
           ...(data.storeId ? { store: { connect: { storeId: data.storeId } } } : {}),
           isActive: data.isActive ?? true,
           createdBy: userId,
@@ -34,8 +33,7 @@ class RawMaterialService {
           batchNo: data.batchNo ?? null,
           onHandQty: data.onHandQty ?? 0,
           reservedQty: data.reservedQty ?? 0,
-          avgCost: data.avgCost ?? 0,
-          remarks: data.remarks ?? null,
+          narration: data.narration ?? null,
           lastMovementAt: data.lastMovementAt
             ? new Date(data.lastMovementAt)
             : null,
@@ -50,15 +48,24 @@ class RawMaterialService {
     });
   }
 
-  async findAll(search?: string) {
-    const whereClause: any = search
-      ? {
-        OR: [
-          { materialCode: { contains: search } },
-          { materialName: { contains: search } },
-        ],
-      }
-      : {};
+  async findAll(params: { search?: string; storeId?: string; isActive?: boolean } = {}) {
+    const { search, storeId, isActive } = params;
+    const whereClause: any = {};
+
+    if (search) {
+      whereClause.OR = [
+        { rawMaterialId: { contains: search, mode: "insensitive" } },
+        { materialName: { contains: search, mode: "insensitive" } },
+      ];
+    }
+
+    if (storeId) {
+      whereClause.storeId = storeId;
+    }
+
+    if (isActive !== undefined) {
+      whereClause.isActive = isActive;
+    }
 
     return prisma.rawMaterial.findMany({
       where: whereClause,
@@ -98,7 +105,7 @@ class RawMaterialService {
     await this.findById(rawMaterialId);
 
 
-    const { categoryId, gstTaxRateId, storeId, locationId, ...restData } = data;
+    const { categoryId, storeId, locationId, ...restData } = data;
 
     const updateData: any = {
       ...restData,

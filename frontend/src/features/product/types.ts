@@ -1,6 +1,7 @@
 import type { Category } from "../categories/types";
-import type { SubCategory } from "../subCategories/types";
 import type { UOM } from "../uoms/types";
+
+export type ProductType = "PRODUCTION" | "SALES_PRODUCTION";
 
 export interface Product {
   id: string;
@@ -10,12 +11,13 @@ export interface Product {
   displayName: string | null;
   description: string | null;
   categoryId: number;
-  subCategoryId: number;
   uomId: number | null;
   capacityLitres: number | null;
   typeCode: string | null;
+  productType: ProductType;
   bundleQty: number | null;
   weightPerPiece: number | null;
+  weightUom?: string;
   dimensions: string | null;
   mouldReference: string | null;
   tags: string | null;
@@ -23,10 +25,7 @@ export interface Product {
   createdAt: string;
   updatedAt: string;
   category?: Category;
-  subCategory?: SubCategory;
   uom?: UOM | null;
-  colors?: string;
-  sizes?: string;
   hsnCode?: string | null;
   gstRate?: number | null;
   cess?: number | null;
@@ -43,21 +42,19 @@ export interface CreateProductDto {
   productCode: string;
   productName: string;
   categoryId: string;
-  subCategoryId: string;
   itemCode?: string;
   displayName?: string;
   description?: string;
   uomId?: string;
   capacityLitres?: number;
   typeCode?: string;
+  productType?: ProductType;
   bundleQty?: number;
   weightPerPiece?: number;
   dimensions?: string;
   mouldReference?: string;
   tags?: string;
   isActive?: boolean;
-  colorId: number;
-  sizeId: number;
   minimumQty?: number;
   maximumQty?: number;
 }
@@ -66,13 +63,13 @@ export interface UpdateProductDto {
   productCode?: string;
   productName?: string;
   categoryId?: string;
-  subCategoryId?: string;
   itemCode?: string;
   displayName?: string;
   description?: string;
   uomId?: string;
   capacityLitres?: number;
   typeCode?: string;
+  productType?: ProductType;
   bundleQty?: number;
   weightPerPiece?: number;
   dimensions?: string;
