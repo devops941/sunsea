@@ -7,7 +7,7 @@ import type { TabItem } from "../../../components/ui/tab/Tabs";
 import { usePermission } from "../../../hooks/usePermission";
 
 import PurchaseOrderListPage from "../purchase-order/pages/PurchaseOrderListPage";
-import POMDApproval from "../purchase-order/purchaseordeappovals/PurchaseOrderapprovalList";
+
 import ExpensesList from "../../expenses/ExpensesList";
 import InvoiceList from "../purchase-order/invoice/InvoiceList";
 import SupplierListPage from "../../supplier/pages/SupplierList";
@@ -20,7 +20,7 @@ const PurchaseTabs: React.FC = () => {
 
     const pathToKey: Record<string, string> = {
         "/purchase-orders": "orders",
-        "/purchase-order-approvals": "approvals",
+
         "/suppliers": "suppliers",
         "/expenses": "expense",
         "/invoice": "invoice",
@@ -29,7 +29,7 @@ const PurchaseTabs: React.FC = () => {
 
     const keyToPath: Record<string, string> = {
         "orders": "/purchase-orders",
-        "approvals": "/purchase-order-approvals",
+
         "suppliers": "/suppliers",
         "expense": "/expenses",
         "invoice": "/invoice",
@@ -47,9 +47,7 @@ const PurchaseTabs: React.FC = () => {
             result.push({ key: "orders", label: "Purchase Orders", icon: <FaFileInvoiceDollar />, content: <PurchaseOrderListPage /> });
         }
 
-        if (can("purchase-order-approvals.view")) {
-            result.push({ key: "approvals", label: "MD Approvals", icon: <FaUserCheck />, content: <POMDApproval /> });
-        }
+
 
         if (can("invoice.view")) {
             result.push({ key: "invoice", label: "Bill & Invoice", icon: <FaCalendarAlt />, content: <InvoiceList /> });

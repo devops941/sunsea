@@ -15,99 +15,6 @@ const SupplierViewModal: React.FC<SupplierViewModalProps> = ({
 }) => {
     if (!supplier) return null;
 
-    // Helper to render bank details within custom content
-    const renderBankDetails = () => {
-        if (!supplier.bankAccount) return null;
-
-        let bankAccounts: any[] = [];
-        if (Array.isArray(supplier.bankAccount)) {
-            bankAccounts = supplier.bankAccount;
-        } else if (typeof supplier.bankAccount === "object") {
-            bankAccounts = [supplier.bankAccount];
-        } else if (typeof supplier.bankAccount === "string" && supplier.bankAccount.trim() !== "") {
-            return (
-                <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden mt-6">
-                    <div className="px-5 py-3 bg-slate-50 border-b border-slate-100">
-                        <h6 className="text-sm font-semibold text-slate-700 uppercase tracking-wider">Bank Account Details</h6>
-                    </div>
-                    <div className="p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-y-5 gap-x-8">
-                        <div className="flex flex-col gap-1.5">
-                            <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Account Holder Name</span>
-                            <span className="text-sm font-medium text-slate-800 break-words">{supplier.bankHolder || "N/A"}</span>
-                        </div>
-                        <div className="flex flex-col gap-1.5">
-                            <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Account Number</span>
-                            <span className="text-sm font-medium text-slate-800 break-words">{supplier.bankAccount || "N/A"}</span>
-                        </div>
-                        <div className="flex flex-col gap-1.5">
-                            <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">IFSC Code</span>
-                            <span className="text-sm font-medium text-slate-800 break-words">{supplier.bankIfsc || "N/A"}</span>
-                        </div>
-                        <div className="flex flex-col gap-1.5">
-                            <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">UPI ID</span>
-                            <span className="text-sm font-medium text-slate-800 break-words">{supplier.upiId || "N/A"}</span>
-                        </div>
-                    </div>
-                </div>
-            );
-        } else {
-            return null;
-        }
-
-        if (bankAccounts.length === 0) return null;
-
-        return (
-            <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden mt-6">
-                <div className="px-5 py-3 bg-slate-50 border-b border-slate-100">
-                    <h6 className="text-sm font-semibold text-slate-700 uppercase tracking-wider">Bank Account Details</h6>
-                </div>
-                <div className="p-5 space-y-5">
-                    {bankAccounts.map((bank, idx) => (
-                        <div key={idx} className={idx > 0 ? "pt-5 border-t border-slate-100" : ""}>
-                            {bankAccounts.length > 1 && (
-                                <h6 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Bank Account #{idx + 1}</h6>
-                            )}
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-y-5 gap-x-8">
-                                <div className="flex flex-col gap-1.5">
-                                    <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Account Holder Name</span>
-                                    <span className="text-sm font-medium text-slate-800 break-words">{bank.bankHolderName || "N/A"}</span>
-                                </div>
-                                <div className="flex flex-col gap-1.5">
-                                    <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Bank Name</span>
-                                    <span className="text-sm font-medium text-slate-800 break-words">{bank.bankName || "N/A"}</span>
-                                </div>
-                                <div className="flex flex-col gap-1.5">
-                                    <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Account Number</span>
-                                    <span className="text-sm font-medium text-slate-800 break-words">{bank.accountNumber || "N/A"}</span>
-                                </div>
-                                <div className="flex flex-col gap-1.5">
-                                    <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">IFSC Code</span>
-                                    <span className="text-sm font-medium text-slate-800 break-words">{bank.ifscCode || "N/A"}</span>
-                                </div>
-                                <div className="flex flex-col gap-1.5">
-                                    <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Branch Name</span>
-                                    <span className="text-sm font-medium text-slate-800 break-words">{bank.branchName || "N/A"}</span>
-                                </div>
-                                <div className="flex flex-col gap-1.5">
-                                    <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">GPay / PhonePe Number</span>
-                                    <span className="text-sm font-medium text-slate-800 break-words">{bank.upiMobileNumber || "N/A"}</span>
-                                </div>
-                                {bank.qrImage && (
-                                    <div className="flex flex-col gap-1.5 col-span-1 sm:col-span-2 lg:col-span-3">
-                                        <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">QR Code</span>
-                                        <div className="mt-2">
-                                            <img src={bank.qrImage} alt="QR Code" className="max-h-48 max-w-full object-contain rounded-md border border-slate-200 shadow-sm" />
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            </div>
-        );
-    };
-
     // Helper to render additional plant/delivery addresses
     const renderAdditionalAddresses = () => {
         if (!Array.isArray(supplier.addresses) || supplier.addresses.length === 0) return null;
@@ -205,7 +112,7 @@ const SupplierViewModal: React.FC<SupplierViewModalProps> = ({
             modalTitle="Supplier Details"
             avatarText={supplier.displayName?.charAt(0).toUpperCase() || supplier.legalName?.charAt(0).toUpperCase() || "S"}
             headerTitle={supplier.displayName || supplier.legalName || "N/A"}
-            headerSubtitle={`${supplier.supplierCode || "N/A"} | ${supplier.vendorType || "N/A"}`}
+            headerSubtitle={supplier.supplierCode || "N/A"}
             statusNode={
                 <StatusBadge status={supplier.status === "Active" ? "ACTIVE" : "INACTIVE"} />
             }
@@ -213,9 +120,7 @@ const SupplierViewModal: React.FC<SupplierViewModalProps> = ({
                 {
                     title: "Supplier Information",
                     fields: [
-                        { label: "Supplier Code", value: supplier.supplierCode || "N/A" },
-                        { label: "Raw Material Categories", value: supplier.rawMaterialCategories || "N/A" },
-                        { label: "Raw Materials", value: supplier.category || "N/A" }
+                        { label: "Supplier Code", value: supplier.supplierCode || "N/A" }
                     ]
                 },
                 {
@@ -223,9 +128,7 @@ const SupplierViewModal: React.FC<SupplierViewModalProps> = ({
                     fields: [
                         { label: "Legal Name", value: supplier.legalName || "N/A" },
                         { label: "Display Name", value: supplier.displayName || "N/A" },
-                        { label: "Vendor Type", value: supplier.vendorType || "N/A" },
-                        { label: "Contact Person", value: supplier.contactPerson || "N/A" },
-                        { label: "Designation", value: supplier.designation || "N/A" }
+                        { label: "Contact Person", value: supplier.contactPerson || "N/A" }
                     ]
                 },
                 {
@@ -240,7 +143,7 @@ const SupplierViewModal: React.FC<SupplierViewModalProps> = ({
                     ]
                 },
                 {
-                    title: "GST & MSME Information",
+                    title: "Tax & GST Information",
                     fields: [
                         { label: "GSTIN", value: supplier.gstin || "N/A" },
                         { label: "PAN", value: supplier.pan || "N/A" },
@@ -288,20 +191,8 @@ const SupplierViewModal: React.FC<SupplierViewModalProps> = ({
                             }]
                         )
                     ]
-                },
-                {
-                    title: "Commercial Settings",
-                    fields: [
-                        { label: "Payment Terms", value: supplier.paymentTerms || "N/A" },
-                        { label: "Lead Time (Days)", value: supplier.leadTimeDays !== undefined ? `${supplier.leadTimeDays} Days` : "N/A" },
-                        { label: "Min Order Qty", value: supplier.minOrderQty !== undefined ? supplier.minOrderQty : "N/A" },
-                        { label: "Currency", value: supplier.currency || "INR" }
-                    ]
                 }
             ]}
-            customContent={
-                renderBankDetails()
-            }
         />
     );
 };

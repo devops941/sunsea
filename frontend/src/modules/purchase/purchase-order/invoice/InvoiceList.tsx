@@ -159,34 +159,13 @@ const InvoiceList: React.FC = () => {
                             ),
                         },
                         {
-                            header: "PENDING PAYMENT",
-                            render: (item) => {
-                                const pending = calculatePendingAmount(item);
-                                return (
-                                    <span className={`font-semibold ${pending > 0 ? "text-amber-600" : "text-slate-400"}`}>
-                                        {formatMoney(pending)}
-                                    </span>
-                                );
-                            },
-                        },
-                        {
-                            header: "STATUS",
-                            render: (item) => {
-                                const displayStatus = (item.paymentStatus === "Paid" || item.paymentStatus === "Closed" || item.paymentStatus === "CLOSED") ? "Closed" : item.paymentStatus;
-                                return <StatusBadge status={displayStatus || "Unpaid"} />;
-                            }
-                        },
-                        {
                             header: "ACTIONS",
                             width: "160px",
                             render: (item) => {
-                                const isClosed = ["CLOSED", "PAID"].includes((item.paymentStatus || "").toUpperCase());
                                 return (
                                     <div className="flex items-center gap-2">
                                         <ViewButton onClick={() => navigate(`/invoice/details/${item.id}`)} />
-                                        {!isClosed && (
-                                            <EditButton onClick={() => navigate(`/invoice/edit/${item.id}`)} />
-                                        )}
+                                        <EditButton onClick={() => navigate(`/invoice/edit/${item.id}`)} />
                                         <DeleteButton onClick={() => handleDeleteClick(item.id)} />
                                     </div>
                                 );

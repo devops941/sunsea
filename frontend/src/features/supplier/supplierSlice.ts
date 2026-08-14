@@ -12,9 +12,9 @@ export const fetchSuppliers = createAsyncThunk(
       if (res.suppliers) {
         return {
           suppliers: res.suppliers,
-          total: res.pagination?.totalItems || res.suppliers.length,
-          page: res.pagination?.currentPage || 1,
-          totalPages: res.pagination?.totalPages || 1
+          total: res.pagination?.total ?? res.pagination?.totalItems ?? res.suppliers.length,
+          page: res.pagination?.page ?? res.pagination?.currentPage ?? 1,
+          totalPages: res.pagination?.totalPages ?? (res.pagination?.total ? Math.ceil(res.pagination.total / (res.pagination.limit || 10)) : 1)
         };
       }
       return {

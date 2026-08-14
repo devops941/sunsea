@@ -7,6 +7,8 @@ import CommonViewModal from "../../../../components/ui/CommonViewModal/CommonVie
 import StatusBadge from "../../../../components/ui/StatusBadge/Badge";
 import { useUsers } from "../../../../hooks/useUsers";
 
+import { getUomMultiplier } from "../pages/PurchaseOrderForm";
+
 interface PurchaseOrderViewModalProps {
   show: boolean;
   onHide: () => void;

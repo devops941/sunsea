@@ -41,7 +41,7 @@ const UpcomingOrderList: React.FC = () => {
                 page: currentPage,
                 pageSize: ITEMS_PER_PAGE,
                 search: searchTerm || undefined,
-                status: "OPEN,PARTIALLY_RECEIVED" as any,
+                status: "APPROVED,OPEN,PARTIALLY_RECEIVED" as any,
             });
 
             setData(response.data || []);

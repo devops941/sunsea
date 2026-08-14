@@ -19,8 +19,8 @@ import { useSocketSync } from "../../../hooks/useSocketSync";
 const ITEMS_PER_PAGE = 10;
 const SupplierList: React.FC = () => {
     const navigate = useNavigate();
-    const { suppliers, loading, error, total, loadSuppliers, removeSupplier } = useSuppliers();
-
+    const { suppliers, loading, error, totalPages, loadSuppliers, removeSupplier } = useSuppliers();
+    
     const { can } = usePermission();
     const canEditSupplier = can("suppliers.edit");
     const canDeleteSupplier = can("suppliers.delete");
@@ -145,10 +145,10 @@ const SupplierList: React.FC = () => {
                             loading={loading}
                             emptyMessage="No suppliers found."
                             pagination={
-                                total > 1
+                                totalPages > 1
                                     ? {
                                         currentPage,
-                                        totalPages: total,
+                                        totalPages,
                                         onPageChange: setCurrentPage,
                                     }
                                     : undefined
@@ -158,8 +158,7 @@ const SupplierList: React.FC = () => {
                                 { header: "CODE", accessor: "supplierCode" },
                                 { header: "NAME", accessor: "legalName" },
                                 { header: "MOBILE", render: (supplier) => Array.isArray(supplier.mobile) && supplier.mobile.length > 0 ? supplier.mobile[0].number : (typeof supplier.mobile === "string" ? supplier.mobile : "N/A") },
-                                { header: "PAYMENT", accessor: "paymentTerms" },
-                                { header: "LEAD TIME", render: (supplier) => supplier.leadTimeDays !== null ? `${supplier.leadTimeDays} days` : "N/A" },
+
                                 // { header: "ON TIME", render: (supplier) => supplier.onTimePct !== null ? `${supplier.onTimePct} %` : "N/A" },
                                 {
                                     header: "STATUS", render: (supplier) => (
