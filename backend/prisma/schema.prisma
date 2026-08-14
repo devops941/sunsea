@@ -91,7 +91,7 @@ model Employee {
   ifscCode          String?
   accountHolderName String?
 
-  collectionAgentCustomers   Customer[]                   @relation("EmployeeCollectionAgent")
+
   createdByUser              User?                        @relation("EmployeeCreatedBy", fields: [createdBy], references: [userId])
   department                 Department?                  @relation(fields: [departmentId], references: [id])
   updatedByUser              User?                        @relation("EmployeeUpdatedBy", fields: [updatedBy], references: [userId])
@@ -303,59 +303,59 @@ model Department {
   @@map("departments")
 }
 
+model CustomerType {
+  id          Int        @id @default(autoincrement())
+  name        String     @unique @db.VarChar(100)
+  createdAt   DateTime   @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime   @updatedAt @db.Timestamptz(6)
+  customers   Customer[]
+
+  @@map("customer_types")
+}
+
+model CustomerGrade {
+  id          Int        @id @default(autoincrement())
+  name        String     @unique @db.VarChar(100)
+  createdAt   DateTime   @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime   @updatedAt @db.Timestamptz(6)
+  customers   Customer[]
+
+  @@map("customer_grades")
+}
+
 model Customer {
-  contactPerson        String?                  @db.VarChar(80)
-  whatsapp             String?                  @db.VarChar(15)
+
   email                String?                  @db.VarChar(120)
   gstin                String?                  @db.VarChar(15)
   creditLimit          Decimal                  @default(0) @db.Decimal(14, 2)
-  reservedCredit       Decimal                  @default(0) @db.Decimal(14, 2)
+
   outstandingAmount    Decimal                  @default(0) @db.Decimal(14, 2)
   createdBy            String
   createdAt            DateTime                 @default(now()) @db.Timestamptz(6)
   updatedAt            DateTime                 @updatedAt @db.Timestamptz(6)
-  aiRiskBand           String?                  @db.VarChar(10)
-  aiRiskScore          Int?
-  altPhone             String?                  @db.VarChar(15)
-  bankAccount          Json?
-  billingAddressLine1  String                   @db.VarChar(255)
-  billingCity          String                   @db.VarChar(100)
-  billingState         String                   @db.VarChar(100)
-  billingPincode       String                   @db.VarChar(20)
-  billingCountry       String?                  @default("India") @db.VarChar(100)
-  collectionAgentId    BigInt?
+
   companyId            String                   @db.Uuid
-  creditDays           Int                      @default(0)
   customerCode         String                   @db.VarChar(20)
-  customerType         String                   @db.VarChar(100)
   deletedAt            DateTime?                @db.Timestamptz(6)
-  designation          String?                  @db.VarChar(60)
   displayName          String?                  @db.VarChar(80)
   firmName             String                   @db.VarChar(160)
-  gstRegType           String?                  @db.VarChar(20)
+
   mobile               Json?                    @map("mobile")
-  pan                  String?                  @db.VarChar(10)
-  priceList            String?                  @default("Standard") @db.VarChar(20)
-  routeId              String?                  @db.Uuid
+
   searchTsv            Unsupported("tsvector")?
-  shippingAddressLine1 String?                  @db.VarChar(255)
-  shippingCity         String?                  @db.VarChar(100)
-  shippingState        String?                  @db.VarChar(100)
-  shippingPincode      String?                  @db.VarChar(20)
-  shippingCountry      String?                  @default("India") @db.VarChar(100)
-  stateCode            String                   @db.VarChar(2)
+
   status               String                   @default("Active") @db.VarChar(20)
-  tcsRate              Decimal                  @default(0) @db.Decimal(5, 2)
-  tdsSection           String?                  @db.VarChar(10)
+
   updatedBy            String?
   id                   String                   @id @default(uuid()) @db.Uuid
-  transports           Json?
   openingBalance       Decimal                  @default(0) @db.Decimal(14, 2)
   openingBalanceType   String                   @default("DEBIT") @db.VarChar(10)
+  customerTypeId       Int?
+  customerGradeId      Int?
+  customerType         CustomerType?            @relation(fields: [customerTypeId], references: [id])
+  customerGrade        CustomerGrade?           @relation(fields: [customerGradeId], references: [id])
   addresses            CustomerAddress[]
-  collectionAgent      Employee?                @relation("EmployeeCollectionAgent", fields: [collectionAgentId], references: [id])
   company              Company                  @relation(fields: [companyId], references: [id])
-  route                Route?                   @relation(fields: [routeId], references: [id])
   salesInvoices        SalesInvoice[]
   salesOrders          SalesOrder[]             @relation("CustomerSalesOrders")
   accountLedger        AccountLedger?
@@ -363,7 +363,7 @@ model Customer {
 
   @@unique([companyId, customerCode])
   @@index([companyId, status], map: "idx_cust_company_status")
-  @@index([routeId, collectionAgentId], map: "idx_cust_route_agent")
+
   @@map("customers")
 }
 
@@ -471,7 +471,7 @@ model Route {
   routeName String
   createdAt DateTime   @default(now()) @db.Timestamptz(6)
   updatedAt DateTime   @updatedAt @db.Timestamptz(6)
-  customers Customer[]
+
 
   @@map("routes")
 }
@@ -1256,7 +1256,6 @@ model SalesOrder {
   isInterState            Boolean          @default(false)
   customerId              String           @db.Uuid
   mobile                  String?          @db.VarChar(20)
-  customerType            String?          @db.VarChar(20)
   referenceText           String?          @db.VarChar(255)
   paymentTermId           Int?
   billingAddressLine1     String           @db.VarChar(255)
@@ -1299,7 +1298,6 @@ model SalesOrder {
   totalSgst               Decimal          @default(0) @db.Decimal(14, 2)
   totalIgst               Decimal          @default(0) @db.Decimal(14, 2)
   salesPersonName         String?          @db.VarChar(100)
-  transportName           String?          @db.VarChar(100)
   salesInvoices           SalesInvoice[]
   items                   SalesOrderItem[]
   createdByUser           User?            @relation("SalesOrderCreatedBy", fields: [createdBy], references: [userId])

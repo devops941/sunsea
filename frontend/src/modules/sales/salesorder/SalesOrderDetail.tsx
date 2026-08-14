@@ -182,7 +182,6 @@ const SalesOrderDetail: React.FC = () => {
                                 </h3>
                                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                                     <DetailBox label="Name" value={order.customer?.displayName || order.customer?.firmName} />
-                                    <DetailBox label="Type" value={order.customerType ? order.customerType.toLowerCase() : ''} />
                                     <DetailBox label="Mobile Number" value={order.mobile || "—"} />
                                 </div>
                             </div>
@@ -247,7 +246,7 @@ const SalesOrderDetail: React.FC = () => {
                                                     </td>
 
                                                     <td className="py-3 px-2 text-right text-gray-900">{item.quantity}</td>
-                                                    <td className="py-3 px-2 text-right text-gray-900">{formatMoney(getUnitPrice(item, order.customerType))}</td>
+                                                    <td className="py-3 px-2 text-right text-gray-900">{formatMoney(getUnitPrice(item))}</td>
 
                                                     {order.isInterState ? (
                                                         <td className="py-3 px-2 text-right text-gray-900">

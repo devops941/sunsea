@@ -47,7 +47,6 @@ const quotationSchema = z.object({
     quotationDate: z.string().min(1, "Quotation Date is required"),
     validUntil: z.string().min(1, "Valid until date is required"),
     customerId: z.string().min(1, "Customer is required"),
-    customerType: z.string().optional(),
     paymentTermId: z.string().optional(),
     billingAddressLine1: z.string().optional(),
     billingCity: z.string().optional(),
@@ -81,7 +80,6 @@ const defaultValues: QuotationFormValues = {
     quotationDate: today,
     validUntil: validUntilDefault,
     customerId: "",
-    customerType: "",
     paymentTermId: "",
     billingAddressLine1: "",
     billingCity: "",
@@ -186,7 +184,6 @@ const QuotationForm: React.FC = () => {
 
     // ── Watch values ──
     const items = watch("items");
-    const watchedCustomerType = watch("customerType");
     const quotationNo = watch("quotationNo");
     const quotationDate = watch("quotationDate");
     const validUntil = watch("validUntil");
@@ -275,7 +272,6 @@ const QuotationForm: React.FC = () => {
             quotationDate: order.orderDate?.split("T")[0] || today,
             validUntil: order.expectedCompletionDate?.split("T")[0] || validUntilDefault,
             customerId: String(order.customerId || ""),
-            customerType: (order as any).customerType || "",
             paymentTermId: order.paymentTermId?.toString() || "",
             billingAddressLine1: billing?.addressLine1 || "",
             billingCity: billing?.city || "",
@@ -399,18 +395,9 @@ const QuotationForm: React.FC = () => {
 
     // ─── Calculate totals ────────────────────────────────────
     const resolveUnitPrice = (
-        customerType: string | undefined,
-        tiers: { b2b: number; mrp: number; b2c: number; exportPrice: number }
-    ): number => {
-        switch (customerType) {
-            case "B2C":
-                return tiers.b2c || tiers.mrp || tiers.b2b || tiers.exportPrice || 0;
-            case "EXPORT":
-                return tiers.exportPrice || tiers.mrp || tiers.b2b || tiers.b2c || 0;
-            case "B2B":
-            default:
-                return tiers.b2b || tiers.mrp || tiers.b2c || tiers.exportPrice || 0;
-        }
+        pricing: { b2b?: number; mrp?: number; b2c?: number; exportPrice?: number }
+    ) => {
+        return pricing.b2b ?? pricing.mrp ?? pricing.b2c ?? pricing.exportPrice ?? 0;
     };
 
     // Per-item base calc — NO discount applied here anymore. That's the
@@ -457,7 +444,7 @@ const QuotationForm: React.FC = () => {
             }
         }
 
-        const unitPrice = resolveUnitPrice(watchedCustomerType, { b2b, mrp, b2c, exportPrice });
+        const unitPrice = resolveUnitPrice({ b2b, mrp, b2c, exportPrice });
         const subtotal = quantity * unitPrice;
 
         return { subtotal, unitPrice, gstRate, cessRate };
@@ -561,7 +548,6 @@ const QuotationForm: React.FC = () => {
                 orderDate: new Date(data.quotationDate).toISOString(),
                 expectedCompletionDate: new Date(data.validUntil).toISOString(),
                 customerId: data.customerId,
-                customerType: data.customerType || undefined,
                 paymentTermId: data.paymentTermId ? Number(data.paymentTermId) : null,
                 billingAddressLine1: data.billingAddressLine1 ?? "",
                 billingCity: data.billingCity ?? "",
@@ -704,7 +690,6 @@ const QuotationForm: React.FC = () => {
                                     <DetailBox label="Valid Until" value={formatDate(validUntil)} icon={<FaCalendarAlt />} />
                                     <DetailBox label="Dispatch Type" value={dispatchTypeLabel} icon={<FaTruck />} />
                                     <DetailBox label="Order Source Platform" value={orderTypeLabel} icon={<FaGlobe />} />
-                                    <DetailBox label="Customer Type" value={watchedCustomerType} icon={<FaUser />} />
                                     {transportName ? <DetailBox label="Transport" value={transportName} icon={<FaTruck />} /> : null}
                                     {orderType === "salesperson" && (
                                         <DetailBox label="Sales Person" value={salesPersonName} icon={<FaUser />} />

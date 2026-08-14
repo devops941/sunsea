@@ -49,12 +49,8 @@ const CityStateSelect: React.FC<CityStateSelectProps> = ({
     const [states, setStates] = useState<StateCityOption[]>([]);
     const [cities, setCities] = useState<StateCityOption[]>([]);
 
-    // On mount, auto-select India if countryValue is empty, and load India states
+    // On mount, load India states
     useEffect(() => {
-        if ((!countryValue || countryValue === "India") && onCountryChange) {
-            onCountryChange({ id: INDIA_COUNTRY_ID, name: "India" });
-        }
-
         GetState(INDIA_COUNTRY_ID)
             .then((result: StateCityOption[]) => {
                 setStates(result);
@@ -116,11 +112,12 @@ const CityStateSelect: React.FC<CityStateSelectProps> = ({
     if (disabled) {
         return (
             <>
-                <div className="w-full">
-                    <TextInput label={stateLabel} name="stateDisplay" value={stateValue} onChange={() => { }} disabled />
-                </div>
+
                 <div className="w-full">
                     <TextInput label={cityLabel} name="cityDisplay" value={cityValue} onChange={() => { }} disabled />
+                </div>
+                <div className="w-full">
+                    <TextInput label={stateLabel} name="stateDisplay" value={stateValue} onChange={() => { }} disabled />
                 </div>
                 <div className="w-full">
                     <TextInput label={countryLabel} name="countryDisplay" value={countryValue || "India"} onChange={() => { }} disabled />
@@ -131,18 +128,7 @@ const CityStateSelect: React.FC<CityStateSelectProps> = ({
 
     return (
         <>
-            <div className="w-full">
-                <SelectInput
-                    label={stateLabel}
-                    name="state"
-                    value={stateValue}
-                    options={stateOptions}
-                    onChange={handleStateSelect}
-                    required={required}
-                    searchable={true}
-                />
-                {stateError && <div className="text-red-500 text-sm mt-1">{stateError}</div>}
-            </div>
+
 
             <div className="w-full">
                 <SelectInput
@@ -154,8 +140,21 @@ const CityStateSelect: React.FC<CityStateSelectProps> = ({
                     disabled={!stateValue}
                     required={required}
                     searchable={true}
+                    error={cityError}
                 />
-                {cityError && <div className="text-red-500 text-sm mt-1">{cityError}</div>}
+            </div>
+
+            <div className="w-full">
+                <SelectInput
+                    label={stateLabel}
+                    name="state"
+                    value={stateValue}
+                    options={stateOptions}
+                    onChange={handleStateSelect}
+                    required={required}
+                    searchable={true}
+                    error={stateError}
+                />
             </div>
 
             {/* Country field defaulting to India after City */}

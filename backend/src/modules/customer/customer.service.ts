@@ -29,7 +29,6 @@ class CustomerService {
       data: {
         ...restData,
         mobile: mobileData as any,
-        customerType: Array.isArray(restData.customerType) ? restData.customerType.join(",") : restData.customerType,
         companyId: currentUser.companyId,
         createdBy: currentUser.userId,
         // Seed outstanding amount and opening balance (immutable after creation)
@@ -228,9 +227,7 @@ class CustomerService {
       data: {
         ...restData,
         ...(mobileData !== undefined && { mobile: mobileData as any }),
-        ...(restData.customerType && {
-          customerType: Array.isArray(restData.customerType) ? restData.customerType.join(",") : restData.customerType,
-        }),
+
         ...(addresses && {
           addresses: {
             deleteMany: {},

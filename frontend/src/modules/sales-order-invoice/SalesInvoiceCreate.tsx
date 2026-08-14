@@ -374,21 +374,13 @@ const SalesInvoiceForm: React.FC = () => {
           const qty = Number(item.quantity || item.qty || 1);
           const discountAmount = Number(item.discountAmount || 0);
 
-          // Derive unit price based on the Sales Order customerType (B2B, B2C, EXPORT, MRP),
-          // checking stored unit price / rate fields, specific pricing tier, and fallback options.
-          const customerType = (selectedOrder.customerType || selectedOrder.customer?.customerType || "").toUpperCase();
+          // Derive unit price based on stored unit price / rate fields, specific pricing tier, and fallback options.
           let rate = 0;
 
           if (Number(item.unitPrice) > 0) {
             rate = Number(item.unitPrice);
           } else if (Number(item.rate) > 0) {
             rate = Number(item.rate);
-          } else if (customerType === "B2C" && Number(item.b2c) > 0) {
-            rate = Number(item.b2c);
-          } else if (customerType === "EXPORT" && Number(item.exportPrice) > 0) {
-            rate = Number(item.exportPrice);
-          } else if (customerType === "MRP" && Number(item.mrp) > 0) {
-            rate = Number(item.mrp);
           } else if (Number(item.b2b) > 0) {
             rate = Number(item.b2b);
           } else if (Number(item.mrp) > 0) {

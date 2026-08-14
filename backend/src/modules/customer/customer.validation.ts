@@ -10,17 +10,12 @@ export const createCustomerSchema = z.object({
 
   displayName: z.string().optional(),
 
-  customerType: z
-    .array(z.enum(["B2B", "B2C", "Export"]))
-    .min(1, "At least one customer type is required"),
-
-  contactPerson: z.string().optional(),
-  designation: z.string().optional(),
+  customerTypeId: z.number().nullable().optional(),
+  customerGradeId: z.number().nullable().optional(),
 
   mobile: z.any().optional().nullable(),
 
-  altPhone: z.string().optional(),
-  whatsapp: z.string().optional(),
+
   phones: z.any().optional().nullable(),
 
   // accepts "", undefined, or a valid email — only rejects a malformed non-empty string
@@ -32,50 +27,16 @@ export const createCustomerSchema = z.object({
   gstin: z.string().optional(),
   //pan: z.string().optional(),
 
-  gstRegType: z.string().optional(),
 
-  tdsSection: z.string().optional(),
-  tcsRate: z.number().optional(),
 
-  billingAddressLine1: z.string().min(1, "Billing Address is required"),
-  billingCity: z.string().min(1, "City is required"),
-  billingState: z.string().min(1, "State is required"),
-  billingPincode: z.string().min(6, "Pincode is required"),
-  billingCountry: z.string().optional().nullable(),
-
-  shippingAddressLine1: z.string().optional().nullable(),
-  shippingCity: z.string().optional().nullable(),
-  shippingState: z.string().optional().nullable(),
-  shippingPincode: z.string().optional().nullable(),
-  shippingCountry: z.string().optional().nullable(),
-
-  // BUG-CUST-005 fix: added user-friendly error message to stateCode length validation
-  stateCode: z.string().length(2, "State code must be exactly 2 digits (e.g. 33 for Tamil Nadu)"),
 
   creditLimit: z.number().optional(),
-  creditDays: z.number().optional(),
-  priceList: z.string().optional(),
 
   // Opening balance — set once at creation, never editable
   openingBalance: z.number().min(0, "Opening balance cannot be negative").optional().default(0),
   openingBalanceType: z.enum(["DEBIT", "CREDIT"]).optional().default("DEBIT"),
 
-  collectionAgentId: z.coerce.bigint().nullable().optional(),
 
-  routeId: z.string().uuid().nullable().optional(),
-
-  bankAccount: z
-    .array(
-      z.object({
-        bankHolderName: z.string().min(1, "Account Holder Name is required"),
-        bankName: z.string().min(1, "Bank Name is required"),
-        accountNumber: z.string().min(9).max(18),
-        ifscCode: z.string().min(11).max(11),
-        branchName: z.string().min(1, "Branch Name is required"),
-        upiMobileNumber: z.string().optional(),
-      })
-    )
-    .optional(),
 
   addresses: z
     .array(
@@ -89,27 +50,11 @@ export const createCustomerSchema = z.object({
     )
     .optional(),
 
-  transports: z
-    .array(
-      z.object({
-        transportName: z.string().min(1, "Transport Name is required"),
-        phone: z.string().min(1, "Phone is required"),
-        addressLine1: z.string().min(1, "Address Line 1 is required"),
-        country: z.string().optional(),
-        state: z.string().min(1, "State is required"),
-        city: z.string().min(1, "City is required"),
-        pincode: z.string().min(1, "Pincode is required"),
-      })
-    )
-    .optional(),
-
-
   status: z
     .enum(["Active", "OnHold", "Blocked", "Lead", "Inactive"])
     .optional(),
 
-  aiRiskScore: z.number().optional(),
-  aiRiskBand: z.string().optional(),
+
 });
 
 // openingBalance is intentionally excluded from updates — it is immutable after creation

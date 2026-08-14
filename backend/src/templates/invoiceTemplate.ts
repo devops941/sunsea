@@ -244,8 +244,8 @@ export const generateInvoiceHtml = (invoice: any, company: any): string => {
                     <div class="font-bold mb-1">Billed to :</div>
                     <div class="font-semibold">${invoice.customer?.displayName || invoice.customer?.firmName || "N/A"}</div>
                     <div class="font-semibold">
-                        ${invoice.customer?.billingAddressLine1 || ''}<br />
-                        ${invoice.customer?.billingCity || ''}, ${invoice.customer?.billingState || ''} - ${invoice.customer?.billingPincode || ''}
+                        ${invoice.customer?.addresses?.[0]?.address?.addressLine1 || ''}<br />
+                        ${invoice.customer?.addresses?.[0]?.address?.city || ''}, ${invoice.customer?.addresses?.[0]?.address?.state || ''} - ${invoice.customer?.addresses?.[0]?.address?.pincode || ''}
                     </div>
                     ${invoice.customer?.gstin ? `<div class="mt-1">GSTIN / UIN : ${invoice.customer.gstin}</div>` : ''}
                 </div>
@@ -253,8 +253,8 @@ export const generateInvoiceHtml = (invoice: any, company: any): string => {
                     <div class="font-bold mb-1">Shipped to :</div>
                     <div class="font-semibold">${invoice.customer?.displayName || invoice.customer?.firmName || "N/A"}</div>
                     <div class="font-semibold">
-                        ${invoice.salesOrder?.shippingAddressLine1 || invoice.customer?.shippingAddressLine1 || invoice.customer?.billingAddressLine1 || ''}<br />
-                        ${invoice.salesOrder?.shippingCity || invoice.customer?.shippingCity || invoice.customer?.billingCity || ''}, ${invoice.salesOrder?.shippingState || invoice.customer?.shippingState || invoice.customer?.billingState || ''} - ${invoice.salesOrder?.shippingPincode || invoice.customer?.shippingPincode || invoice.customer?.billingPincode || ''}
+                        ${invoice.salesOrder?.shippingAddressLine1 || invoice.customer?.addresses?.[0]?.address?.addressLine1 || ''}<br />
+                        ${invoice.salesOrder?.shippingCity || invoice.customer?.addresses?.[0]?.address?.city || ''}, ${invoice.salesOrder?.shippingState || invoice.customer?.addresses?.[0]?.address?.state || ''} - ${invoice.salesOrder?.shippingPincode || invoice.customer?.addresses?.[0]?.address?.pincode || ''}
                     </div>
                 </div>
             </div>

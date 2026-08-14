@@ -315,7 +315,6 @@ class ReportsService {
         mdApprovalStatus: so.mdApprovalStatus,
         customerApprovalStatus: so.customerApprovalStatus,
         totalQty: so.items.reduce((sum, item) => sum + Number(item.quantity), 0),
-        customerType: so.customerType,
         billingAddress: `${so.billingAddressLine1 || ''} ${so.billingCity || ''} ${so.billingState || ''} ${so.billingPincode || ''}`.trim(),
         shippingAddress: `${so.shippingAddressLine1 || ''} ${so.shippingCity || ''} ${so.shippingState || ''} ${so.shippingPincode || ''}`.trim(),
         totalDiscount: Number(so.totalDiscount || 0),
