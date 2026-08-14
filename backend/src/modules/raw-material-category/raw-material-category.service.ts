@@ -171,12 +171,12 @@ class RawMaterialCategoryService {
       },
     });
 
-    if (!lastCategory) {
+    if (!lastCategory || !lastCategory.categoryCode) {
       return "RMC001";
     }
 
     const lastCode = lastCategory.categoryCode;
-    const match = lastCode.match(/\d+/);
+    const match = lastCode.match(/\d+(?!.*\d)/);
     if (!match) {
       return lastCode + "001";
     }
@@ -184,8 +184,9 @@ class RawMaterialCategoryService {
     const numberStr = match[0];
     const nextNumber = parseInt(numberStr, 10) + 1;
     const paddedNumber = String(nextNumber).padStart(numberStr.length, "0");
-    const prefix = lastCode.substring(0, lastCode.indexOf(numberStr));
-    const suffix = lastCode.substring(lastCode.indexOf(numberStr) + numberStr.length);
+    const lastIndex = lastCode.lastIndexOf(numberStr);
+    const prefix = lastCode.substring(0, lastIndex);
+    const suffix = lastCode.substring(lastIndex + numberStr.length);
     return `${prefix}${paddedNumber}${suffix}`;
   }
 }

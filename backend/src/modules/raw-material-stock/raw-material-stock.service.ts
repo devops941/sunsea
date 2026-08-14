@@ -33,9 +33,8 @@ class RawMaterialStockService {
         reservedQty: {
           increment: data.reservedQty ?? 0,
         },
-        avgCost: data.avgCost ?? rawMaterial.avgCost,
         status: data.status ?? rawMaterial.status,
-        remarks: data.remarks ?? rawMaterial.remarks,
+        narration: data.remarks ?? rawMaterial.narration,
         lastMovementAt: new Date(),
       },
       include: {
@@ -103,11 +102,10 @@ class RawMaterialStockService {
       data: {
         onHandQty: data.onHandQty ?? existing.onHandQty,
         reservedQty: data.reservedQty ?? existing.reservedQty,
-        avgCost: data.avgCost ?? existing.avgCost,
         locationId: data.locationId ?? existing.locationId,
         batchNo: data.batchNo ?? existing.batchNo,
         status: data.status ?? existing.status,
-        remarks: data.remarks ?? existing.remarks,
+        narration: data.remarks ?? (existing as any).narration,
         lastMovementAt: new Date(),
       },
       include: {
@@ -125,7 +123,6 @@ class RawMaterialStockService {
       data: {
         onHandQty: 0,
         reservedQty: 0,
-        avgCost: 0,
         lastMovementAt: new Date()
       }
     });

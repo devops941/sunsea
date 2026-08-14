@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
-import { FaSearch, FaPlus } from "react-icons/fa";
+import { FaPlus } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 
@@ -16,77 +16,13 @@ import ViewButton from "../../../components/ui/viewbutton/ViewButton";
 import CustomButton from "../../../components/ui/Button/Button";
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import CommonViewModal from "../../../components/ui/CommonViewModal/CommonViewModal";
-import ExportCSVButton from "../../../components/ui/ExportCSVButton/ExportCSVButton";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import DataTable, { type DataTableColumn } from "../../../components/ui/table/DataTable";
+import SelectInput from "../../../components/form/SelectInput/SelectInput";
+import SearchInput from "../../../components/ui/SearchInput/SearchInput";
+import { formatStockQty, parseBaseUom } from "../../../utils/uomConversion";
 
 const ITEMS_PER_PAGE = 10;
-
-const formatStockQty = (qty: number | string | null | undefined, uomStr?: string): string => {
-    const num = Number(qty ?? 0);
-    if (isNaN(num)) return `0 kg`;
-    if (!uomStr) return `${num} kg`;
-
-    const firstCode = uomStr.split(',')[0].trim().toLowerCase();
-
-    // Mass conversion to primary unit kg (e.g., 200 g -> 0.2 kg)
-    if (firstCode === 'g' || firstCode === 'gram' || firstCode === 'grams' || firstCode === 'gm') {
-        const kgVal = num / 1000;
-        return `${Number(kgVal.toFixed(3))} kg`;
-    }
-    if (firstCode === 't' || firstCode === 'ton' || firstCode === 'tons') {
-        return `${Number((num * 1000).toFixed(3))} kg`;
-    }
-    if (firstCode === 'kg' || firstCode === 'kilogram' || firstCode === 'kilo' || firstCode === 'kgs') {
-        return `${Number(num.toFixed(3))} kg`;
-    }
-
-    // Volume conversion to L
-    if (firstCode === 'ml') {
-        const lVal = num / 1000;
-        return `${Number(lVal.toFixed(3))} L`;
-    }
-    if (firstCode === 'l' || firstCode === 'ltr' || firstCode === 'litre' || firstCode === 'litres') {
-        return `${Number(num.toFixed(3))} L`;
-    }
-
-    // Count
-    if (firstCode === 'ea' || firstCode === 'each' || firstCode === 'pcs') {
-        return `${num} pcs`;
-    }
-    if (firstCode === 'dz' || firstCode === 'dozen') {
-        return `${num * 12} pcs`;
-    }
-
-    return `${num} ${firstCode}`;
-};
-
-const parseBaseUom = (uomStr?: string) => {
-    if (!uomStr) return { primary: "N/A", secondary: "None", list: [] };
-    const list = uomStr.split(',').map(u => u.trim()).filter(Boolean);
-    if (list.length === 0) return { primary: "N/A", secondary: "None", list: [] };
-    const primary = list[0];
-    const secondaryList = list.slice(1);
-    const secondary = secondaryList.length > 0 ? secondaryList.join(', ') : "None";
-    return { primary, secondary, list };
-};
-
-const formatUOM = (uomStr?: string) => {
-    if (!uomStr) return "";
-    const firstCode = uomStr.split(',')[0].trim();
-    if (!firstCode) return "";
-    const lower = firstCode.toLowerCase();
-    if (lower === 'ea' || lower === 'each') return 'pcs';
-    if (lower === 'g' || lower === 'gram' || lower === 'grams' || lower === 'gm') return 'kg';
-    if (lower === 'kg' || lower === 'kilogram' || lower === 'kilo' || lower === 'kgs') return 'kg';
-    if (lower === 't' || lower === 'ton' || lower === 'tons') return 'kg';
-    if (lower === 'l' || lower === 'ltr' || lower === 'litre' || lower === 'litres') return 'L';
-    if (lower === 'ml') return 'L';
-    if (lower === 'm' || lower === 'mtr' || lower === 'meter') return 'm';
-    if (lower === 'cm') return 'cm';
-    if (lower === 'dz' || lower === 'dozen') return 'dz';
-    return firstCode;
-};
 
 const WastageStoreList: React.FC = () => {
     const navigate = useNavigate();
@@ -170,17 +106,7 @@ const WastageStoreList: React.FC = () => {
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
     const paginatedData = filteredData.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
-    const exportColumns = [
-        { header: "NAME", accessor: (item: any) => item.materialName || "-" },
-        { header: "ID", accessor: (item: any) => item.rawMaterialId || "-" },
-        { header: "CATEGORY", accessor: (item: any) => item.category?.name || item.categoryId || "-" },
-        { header: "PRIMARY UOM", accessor: (item: any) => parseBaseUom(item.baseUom).primary },
-        { header: "SECONDARY UOM(S)", accessor: (item: any) => parseBaseUom(item.baseUom).secondary },
-        { header: "STORE", accessor: (item: any) => item.store?.storeName || item.storeId || "-" },
-        { header: "PHYSICAL STOCK", accessor: (item: any) => formatStockQty(item.onHandQty, item.baseUom) },
-        { header: "REMARKS", accessor: (item: any) => item.remarks || "-" },
-        { header: "STATUS", accessor: (item: any) => item.isActive ? "Active" : "Inactive" },
-    ];
+ 
 
     const handleOpenAdd = () => {
         navigate("/wastage-store/create");
@@ -276,39 +202,32 @@ const WastageStoreList: React.FC = () => {
                         <h2 className="text-2xl font-bold text-slate-800">Wastage Products Management</h2>
                     </div>
                     <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-                        <div className="page-filter-wrap">
-                            <select
+                        <div className="w-48">
+                            <SelectInput
+                                name="storeFilter"
                                 value={storeFilter}
                                 onChange={handleStoreFilterChange}
-                                className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-                                style={{ minWidth: "120px" }}
-                            >
-                                <option value="">All Stores</option>
-                                {stores?.map((store: any) => (
-                                    <option key={store.storeId} value={store.storeId}>
-                                        {store.storeName}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-                        <div className="relative w-full md:w-64">
-                            <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                            <input
-                                type="text"
-                                className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-                                placeholder="Search products..."
-                                value={searchTerm}
-                                onChange={handleSearch}
+                                defaultOptionLabel="All Stores"
+                                hideLabel
+                                noMargin
+                                options={stores?.map((store: any) => ({
+                                    label: store.storeName,
+                                    value: String(store.storeId),
+                                })) || []}
                             />
                         </div>
-                        <ExportCSVButton
-                            data={filteredData || []}
-                            columns={exportColumns}
-                            filename="wastage_products_list.csv"
-                        />
+                        <div className="w-full md:w-64">
+                            <SearchInput
+                                value={searchTerm}
+                                onChange={handleSearch}
+                                placeholder="Search products..."
+                            />
+                        </div>
+                       
+                       
                         {(can("wastage-store.create") || can("production-wastages.create")) && (
                             <CustomButton
-                                text="Add Product"
+                                text="Add Wastage  Product"
                                 icon={FaPlus}
                                 onClick={handleOpenAdd}
                             />

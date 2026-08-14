@@ -113,20 +113,12 @@ class SalesOrderService {
             where: { id: { in: uniqueProductIds } },
             select: {
                 id: true,
-                gstRate: true,
-                gstTaxRateId: true,
-                b2b: true,
-                mrp: true,
-                b2c: true,
-                exportPrice: true,
+                rate: true,
             },
         });
 
         // Resolve GST tax rates
         const allGstTaxRateIds = new Set<string>();
-        for (const p of products) {
-            if (p.gstTaxRateId) allGstTaxRateIds.add(p.gstTaxRateId);
-        }
         for (const item of items) {
             if (item.gstTaxRateId) allGstTaxRateIds.add(item.gstTaxRateId);
         }
@@ -139,19 +131,14 @@ class SalesOrderService {
         const map = new Map<string, ProductPricingRow>();
 
         for (const p of products) {
-            const defaultTaxRate = p.gstTaxRateId ? gstTaxRateMap.get(p.gstTaxRateId) : null;
-            const resolvedGstRate = defaultTaxRate !== undefined && defaultTaxRate !== null
-                ? defaultTaxRate
-                : (p.gstRate ? new Prisma.Decimal(p.gstRate) : null);
-
             const baseRow: ProductPricingRow = {
                 id: p.id,
-                gstTaxRateId: p.gstTaxRateId,
-                gstRate: resolvedGstRate,
-                b2b: p.b2b,
-                mrp: p.mrp,
-                b2c: p.b2c,
-                exportPrice: p.exportPrice,
+                gstTaxRateId: null,
+                gstRate: null,
+                b2b: p.rate,
+                mrp: p.rate,
+                b2c: p.rate,
+                exportPrice: p.rate,
             };
             map.set(`${p.id.toString()}`, baseRow);
         }

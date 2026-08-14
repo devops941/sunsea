@@ -21,7 +21,6 @@ export const mapRawMaterial = (item: any): RawMaterial => ({
 
   hsnCode: item.hsnCode,
   minimumStock: item.minimumStock,
-  leadTimeDays: item.leadTimeDays,
 
   storeId: item.storeId,
   store: item.store
@@ -44,15 +43,13 @@ export const mapRawMaterial = (item: any): RawMaterial => ({
 
   baseUom: item.baseUom,
   reorderLevel: item.reorderLevel,
-  unitPrice: item.unitPrice,
+  rate: item.rate ?? item.unitPrice,
 
   onHandQty: item.onHandQty,
   reservedQty: item.reservedQty,
-  avgCost: item.avgCost,
 
-  remarks: item.remarks,
+  narration: item.narration ?? item.remarks,
   lastMovementAt: item.lastMovementAt,
-  gstTaxRateId: item.gstTaxRateId,
 
   status: item.status,
   isActive: item.isActive,
@@ -65,7 +62,7 @@ export const mapRawMaterial = (item: any): RawMaterial => ({
 });
 
 export const rawMaterialService = {
-  fetchAll: async (params?: { search?: string; storeId?: string }): Promise<RawMaterial[]> => {
+  fetchAll: async (params?: { search?: string; storeId?: string; isActive?: boolean }): Promise<RawMaterial[]> => {
     const response = await apiClient.get(config.rawMaterial.base, { params });
     const list = response.data?.data || response.data;
     return Array.isArray(list) ? list.map(mapRawMaterial) : [];

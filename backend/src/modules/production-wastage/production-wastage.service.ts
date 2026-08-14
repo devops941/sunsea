@@ -99,8 +99,8 @@ class ProductionWastageService {
         const rm = await prisma.rawMaterial.findUnique({
           where: { rawMaterialId: data.rawMaterialId }
         });
-        if (rm?.unitPrice) {
-          finalEstimatedValue = Number(rm.unitPrice) * data.quantity;
+        if (rm?.rate) {
+          finalEstimatedValue = Number(rm.rate) * data.quantity;
         }
       } else {
         if ((product as any)?.unitPrice) {

@@ -10,29 +10,20 @@ export const createProductSchema = z.object({
     productName: z.string().trim().min(1).max(160),
 
     categoryId: z.string(),
-    // subCategoryId: z.string(),
 
-    itemCode: z.string().trim().max(50).optional(),
-    displayName: z.string().trim().max(80).optional(),
     description: z.string().trim().max(255).optional(),
 
     uomId: z.string().optional(),
-    colorId: z.string().optional(),
-    sizeId: z.string().optional(),
 
     capacityLitres: z.coerce.number().optional(),
 
-    typeCode: z.string().trim().max(20).optional(),
-
-    bundleQty: z.coerce.number().optional(),
+    productType: z.enum(["PRODUCTION", "SALES_PRODUCTION"]).optional(),
 
     weightPerPiece: z.coerce.number().optional(),
+    weightUom: z.string().trim().max(10).optional(),
 
-    dimensions: z.string().trim().max(255).optional(),
-
-    mouldReference: z.string().trim().max(80).optional(),
-
-    tags: z.string().trim().max(255).optional(),
+    hsnCode: z.string().trim().max(20).optional(),
+    rate: z.coerce.number().optional(),
 
     minimumQty: z.string().max(20).optional(),
     maximumQty: z.string().max(20).optional(),

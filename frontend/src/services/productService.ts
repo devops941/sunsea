@@ -14,16 +14,6 @@ const mapProduct = (p: any): Product => {
       createdAt: p.category.createdAt,
       updatedAt: p.category.updatedAt
     } : undefined,
-    subCategory: p.subCategory ? {
-      id: p.subCategory.id,
-      code: p.subCategory.subCategoryCode,
-      name: p.subCategory.subCategoryName,
-      parentCategoryId: p.subCategory.categoryId,
-      description: p.subCategory.description || "",
-      status: p.subCategory.isActive ? "ACTIVE" : "INACTIVE",
-      createdAt: p.subCategory.createdAt,
-      updatedAt: p.subCategory.updatedAt
-    } : undefined,
     uom: p.uom ? {
       id: p.uom.id,
       code: p.uom.uomCode,
@@ -37,9 +27,9 @@ const mapProduct = (p: any): Product => {
 };
 
 export const productService = {
-  fetchAll: async (search?: string): Promise<Product[]> => {
+  fetchAll: async (params?: { search?: string; categoryId?: string }): Promise<Product[]> => {
     const response = await apiClient.get(config.product.base, {
-      params: { search }
+      params
     });
     const list = response.data?.data || response.data;
     return Array.isArray(list) ? list.map(mapProduct) : [];

@@ -17,6 +17,7 @@ import { fetchStores } from "../../../features/stores/storeSlice";
 import { rawMaterialService } from "../../../services/rawMaterialService";
 import { useRawMaterialCategories } from "../../../hooks/useRawMaterialCategories";
 import { useSocketSync } from "../../../hooks/useSocketSync";
+import { convertToPrimaryUom } from "../../../utils/uomConversion";
 
 const initialFormState = {
     rawMaterialId: "",
@@ -25,7 +26,7 @@ const initialFormState = {
     storeId: "",
     baseUom: "",
     onHandQty: "",
-    remarks: "",
+    narration: "",
     status: "Active",
 };
 
@@ -59,61 +60,18 @@ const wastageSchema = z.object({
             value => !isNaN(Number(value)) && Number(value) >= 0,
             { message: "Opening Stock must be greater than or equal to 0" }
         ),
-    remarks: z
+    narration: z
         .string()
         .trim()
-        .max(255, "Remarks cannot exceed 255 characters")
+        .max(255, "Narration cannot exceed 255 characters")
         .optional(),
 });
-
-const normalizeUom = (uom: string): string => {
-    const u = uom.trim().toLowerCase();
-    if (u === "kilogram" || u === "kilograms") return "kg";
-    if (u === "gram" || u === "grams") return "g";
-    if (u === "ton" || u === "tonne" || u === "tonnes" || u === "tons") return "t";
-    if (u === "liter" || u === "litre" || u === "liters" || u === "litres" || u === "ltr") return "l";
-    if (u === "milliliter" || u === "millilitre" || u === "milliliters" || u === "millilitres" || u === "ml") return "ml";
-    if (u === "meter" || u === "meters" || u === "metre" || u === "metres" || u === "mtr") return "m";
-    if (u === "centimeter" || u === "centimeters" || u === "centimetre" || u === "centimetres") return "cm";
-    if (u === "millimeter" || u === "millimeters" || u === "millimetre" || u === "millimetres") return "mm";
-    if (u === "pcs" || u === "piece" || u === "pieces" || u === "ea" || u === "each") return "pcs";
-    if (u === "box" || u === "boxes") return "box";
-    if (u === "dozen" || u === "dz") return "dz";
-    return u;
-};
-
-const convertToPrimaryUom = (qty: number, selectedUom: string, baseUomStr: string): number => {
-    if (!baseUomStr || !selectedUom) return qty;
-    const uoms = baseUomStr.split(",").map(u => normalizeUom(u.trim()));
-    const primary = uoms[0];
-    const selected = normalizeUom(selectedUom);
-    if (primary === selected) return qty;
-    if (primary === "kg" && selected === "g") return qty / 1000;
-    if (primary === "kg" && selected === "t") return qty * 1000;
-    if (primary === "g" && selected === "kg") return qty * 1000;
-    if (primary === "g" && selected === "t") return qty * 1_000_000;
-    if (primary === "t" && selected === "kg") return qty / 1000;
-    if (primary === "t" && selected === "g") return qty / 1_000_000;
-    if (primary === "l" && selected === "ml") return qty / 1000;
-    if (primary === "ml" && selected === "l") return qty * 1000;
-    if (primary === "m" && selected === "cm") return qty / 100;
-    if (primary === "m" && selected === "mm") return qty / 1000;
-    if (primary === "cm" && selected === "m") return qty * 100;
-    if (primary === "cm" && selected === "mm") return qty / 10;
-    if (primary === "mm" && selected === "m") return qty * 1000;
-    if (primary === "mm" && selected === "cm") return qty * 10;
-    if (primary === "dz" && selected === "pcs") return qty / 12;
-    if (primary === "pcs" && selected === "dz") return qty * 12;
-    if (primary === "box" && selected === "pcs") return qty / 12;
-    if (primary === "pcs" && selected === "box") return qty * 12;
-    return qty;
-};
 
 const WastageStoreForm: React.FC = () => {
     const navigate = useNavigate();
     const locationState = useLocation();
     const { id } = useParams<{ id: string }>();
-    const isEdit = Boolean(id);
+    const isEditMode = Boolean(id);
     const dispatch = useAppDispatch();
 
     const [formData, setFormData] = useState(initialFormState);
@@ -135,7 +93,6 @@ const WastageStoreForm: React.FC = () => {
     useSocketSync("store", undefined, fetchStoresData);
     useSocketSync("rawMaterialCategory", undefined, fetchCategoriesData);
 
-    // Reset opening stock UOM selection when baseUom changes
     useEffect(() => {
         setOpeningStockUom("");
     }, [formData.baseUom]);
@@ -144,21 +101,20 @@ const WastageStoreForm: React.FC = () => {
         fetchStoresData();
         fetchCategoriesData();
 
-        if (isEdit && locationState.state) {
+        if (isEditMode && locationState.state) {
             setFormData({
                 rawMaterialId: locationState.state.rawMaterialId,
                 materialName: locationState.state.materialName,
-                categoryId: locationState.state.categoryId ? String(locationState.state.categoryId) : "",
-                storeId: locationState.state.storeId || "",
+                categoryId: locationState.state.categoryId ? String(locationState.state.categoryId) : locationState.state.category?.id ? String(locationState.state.category.id) : "",
+                storeId: locationState.state.storeId || locationState.state.store?.storeId || "",
                 baseUom: locationState.state.baseUom || "",
                 onHandQty: locationState.state.onHandQty !== null && locationState.state.onHandQty !== undefined ? String(locationState.state.onHandQty) : "",
-                remarks: locationState.state.remarks || "",
+                narration: locationState.state.narration || locationState.state.remarks || "",
                 status: locationState.state.isActive ? "Active" : "Inactive",
             });
-        } else if (!isEdit) {
+        } else if (!isEditMode) {
             const getNextId = async () => {
                 try {
-                    // Using the same sequence as raw materials for ID generation
                     const nextId = await rawMaterialService.fetchNextId();
                     setFormData(prev => ({ ...prev, rawMaterialId: nextId }));
                 } catch (err) {
@@ -167,7 +123,7 @@ const WastageStoreForm: React.FC = () => {
             };
             getNextId();
         }
-    }, [dispatch, loadCategories, isEdit, locationState.state]);
+    }, [dispatch, loadCategories, isEditMode, locationState.state, fetchStoresData, fetchCategoriesData]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
@@ -178,15 +134,15 @@ const WastageStoreForm: React.FC = () => {
     };
 
     const handleClear = () => {
-        if (isEdit && locationState.state) {
+        if (isEditMode && locationState.state) {
             setFormData({
                 rawMaterialId: locationState.state.rawMaterialId,
                 materialName: locationState.state.materialName,
-                categoryId: locationState.state.categoryId ? String(locationState.state.categoryId) : "",
-                storeId: locationState.state.storeId || "",
+                categoryId: locationState.state.categoryId ? String(locationState.state.categoryId) : locationState.state.category?.id ? String(locationState.state.category.id) : "",
+                storeId: locationState.state.storeId || locationState.state.store?.storeId || "",
                 baseUom: locationState.state.baseUom || "",
                 onHandQty: locationState.state.onHandQty !== null && locationState.state.onHandQty !== undefined ? String(locationState.state.onHandQty) : "",
-                remarks: locationState.state.remarks || "",
+                narration: locationState.state.narration || locationState.state.remarks || "",
                 status: locationState.state.isActive ? "Active" : "Inactive",
             });
         } else {
@@ -217,6 +173,7 @@ const WastageStoreForm: React.FC = () => {
             }
         }
 
+        if (isSubmitting) return;
         setIsSubmitting(true);
         try {
             const primaryUom = formData.baseUom.split(",")[0]?.trim() || "";
@@ -226,15 +183,20 @@ const WastageStoreForm: React.FC = () => {
                 formData.baseUom
             );
 
-            const payload = {
-                ...formData,
-                categoryId: formData.categoryId ? Number(formData.categoryId) : undefined,
+            const payload: any = {
+                rawMaterialId: formData.rawMaterialId,
+                materialName: formData.materialName,
+                categoryId: formData.categoryId ? Number(formData.categoryId) : null,
+                storeId: formData.storeId || null,
+                baseUom: formData.baseUom,
                 onHandQty: convertedOnHandQty,
+                narration: formData.narration || null,
+                status: formData.status,
                 isActive: formData.status === "Active",
                 itemType: "WASTAGE"
-            } as any;
+            };
 
-            if (isEdit) {
+            if (isEditMode) {
                 await dispatch(updateRawMaterial({ id: id as string, data: payload })).unwrap();
                 toast.success("Wastage product updated successfully!");
             } else {
@@ -244,130 +206,132 @@ const WastageStoreForm: React.FC = () => {
 
             navigate("/wastage-store");
         } catch (err: any) {
-            toast.error(err || `Failed to ${isEdit ? "update" : "create"} wastage product`);
-        } finally {
+            toast.error(typeof err === 'string' ? err : err?.message || (isEditMode ? "Failed to update wastage product" : "Failed to create wastage product"));
             setIsSubmitting(false);
         }
     };
 
     return (
-        <div className="inner-containe">
-            <div className="p-6 bg-white shadow-sm border border-slate-200">
-                <div className="flex items-center justify-between gap-4 mb-6 pb-6 border-b border-slate-200">
-                    <div>
-                        <h2 className="text-2xl font-bold text-slate-800">{isEdit ? "Edit" : "Create"} Wastage Product</h2>
-                        <p className="text-sm text-slate-500 mt-1">{isEdit ? "Update details for the selected wastage product" : "Add a new wastage product to the store"}</p>
-                    </div>
-                    <BackButton />
+        <div className="w-full mx-auto h-full flex flex-col">
+            <div className="bg-white shadow-sm border border-gray-200 flex flex-col flex-1 h-full">
+                <div className="px-6 py-4 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <h2 className="text-xl font-bold text-gray-800">
+                        {isEditMode ? "Edit Wastage Product" : "Create Wastage Product"}
+                    </h2>
+                    <BackButton text="Back to List" to="/wastage-store" />
                 </div>
 
-                <form onSubmit={handleSubmit} className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
-                        <TextInput
-                            label="Wastage ID"
-                            name="rawMaterialId"
-                            value={formData.rawMaterialId}
-                            readOnly
-                        />
-                        <TextInput
-                            label="Material Name"
-                            name="materialName"
-                            value={formData.materialName}
-                            onChange={handleChange}
-                            error={errors.materialName}
-                            required
-                        />
-                        <SelectInput
-                            label="Store"
-                            name="storeId"
-                            value={formData.storeId}
-                            onChange={handleChange}
-                            options={(stores || []).map(s => ({ value: s.storeId, label: s.storeName }))}
-                            defaultOptionLabel="Select Store"
-                            error={errors.storeId}
-                            required
-                            disabled={isEdit}
-                        />
-                        <SelectInput
-                            label="Raw Material Category"
-                            name="categoryId"
-                            value={formData.categoryId}
-                            onChange={handleChange}
-                            options={rawMaterialCategories.map(c => ({ value: String(c.id), label: c.name }))}
-                            defaultOptionLabel="Select Category"
-                            error={errors.categoryId}
-                            required
-                            disabled={isEdit}
-                        />
-                        <UOMSelect
-                            name="baseUom"
-                            label="Base UOM"
-                            value={formData.baseUom}
-                            required
-                            isMulti
-                            category={["length", "mass", "each", "volume"]}
-                            allowedCodes={[
-                                "g", "kg", "t", "ton",
-                                "l", "ml", "ltr",
-                                "m", "cm", "mtr",
-                                "dz", "ea"
-                            ]}
-                            onChange={(value) => {
-                                setFormData(prev => ({ ...prev, baseUom: value }));
-                                if (errors.baseUom) {
-                                    setErrors(prev => ({ ...prev, baseUom: "" }));
-                                }
-                            }}
-                            error={errors.baseUom}
-                            disabled={isEdit}
-                        />
-                        <QuantityInput
-                            label="Opening Stock"
-                            name="onHandQty"
-                            value={formData.onHandQty}
-                            baseUoms={formData.baseUom}
-                            uom={openingStockUom || undefined}
-                            onUomChange={setOpeningStockUom}
-                            onChange={handleChange}
-                            error={errors.onHandQty}
-                            required
-                            disabled={isEdit}
-                        />
-                        <SelectInput
-                            label="Status"
-                            name="status"
-                            value={formData.status}
-                            onChange={handleChange}
-                            options={[
-                                { value: "Active", label: "Active" },
-                                { value: "Inactive", label: "Inactive" },
-                            ]}
-                        />
-                        <div className="md:col-span-2">
-                            <TextInput
-                                label="Remarks"
-                                name="remarks"
-                                value={formData.remarks}
-                                onChange={handleChange}
-                                error={errors.remarks}
-                            />
+                <form onSubmit={handleSubmit} className="flex flex-col flex-1" noValidate>
+                    <div className="px-6 py-4 flex-1 overflow-y-auto space-y-8">
+                        <div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                                <TextInput
+                                    label="Wastage ID"
+                                    name="rawMaterialId"
+                                    value={formData.rawMaterialId}
+                                    readOnly
+                                    disabled
+                                />
+                                <TextInput
+                                    label="Material Name"
+                                    name="materialName"
+                                    value={formData.materialName}
+                                    onChange={handleChange}
+                                    error={errors.materialName}
+                                    required
+                                />
+                                <SelectInput
+                                    label="Raw Material Category"
+                                    name="categoryId"
+                                    value={formData.categoryId}
+                                    onChange={handleChange}
+                                    options={rawMaterialCategories.map(c => ({ value: String(c.id), label: c.name }))}
+                                    defaultOptionLabel="Select Category"
+                                    error={errors.categoryId}
+                                    required
+                                    disabled={isEditMode}
+                                />
+                                <SelectInput
+                                    label="Store"
+                                    name="storeId"
+                                    value={formData.storeId}
+                                    onChange={handleChange}
+                                    options={(stores || []).map((s: any) => ({ value: String(s.storeId), label: s.storeName }))}
+                                    defaultOptionLabel="Select Store"
+                                    error={errors.storeId}
+                                    required
+                                    disabled={isEditMode}
+                                />
+                                <UOMSelect
+                                    name="baseUom"
+                                    label="Base UOM"
+                                    value={formData.baseUom}
+                                    required
+                                    isMulti
+                                    category={["length", "mass", "each", "volume"]}
+                                    allowedCodes={[
+                                        "g", "kg", "t", "ton",
+                                        "l", "ml", "ltr",
+                                        "m", "cm", "mtr",
+                                        "dz", "ea"
+                                    ]}
+                                    onChange={(value) => {
+                                        setFormData(prev => ({ ...prev, baseUom: value }));
+                                        if (errors.baseUom) {
+                                            setErrors(prev => ({ ...prev, baseUom: "" }));
+                                        }
+                                    }}
+                                    error={errors.baseUom}
+                                    disabled={isEditMode}
+                                />
+                               
+                                <QuantityInput
+                                    label="Opening Stock"
+                                    name="onHandQty"
+                                    value={formData.onHandQty}
+                                    baseUoms={formData.baseUom}
+                                    uom={openingStockUom || undefined}
+                                    onUomChange={setOpeningStockUom}
+                                    onChange={handleChange}
+                                    error={errors.onHandQty}
+                                    required
+                                    disabled={isEditMode}
+                                />
+                                 <SelectInput
+                                    label="Status"
+                                    name="status"
+                                    value={formData.status}
+                                    onChange={handleChange}
+                                    options={[
+                                        { value: "Active", label: "Active" },
+                                        { value: "Inactive", label: "Inactive" },
+                                    ]}
+                                />
+                                <TextInput
+                                    label="Narration"
+                                    name="narration"
+                                    value={formData.narration}
+                                    onChange={handleChange}
+                                    error={errors.narration}
+                                />
+                            </div>
                         </div>
                     </div>
 
-                    <div className="flex justify-end gap-3 pt-6 border-t border-slate-200 mt-8">
-                        <CustomButton
-                            type="button"
-                            text="Clear"
-                            icon={FaEraser}
-                            onClick={handleClear}
-                            variant="secondary"
-                            disabled={isSubmitting}
-                        />
+                    <div className="px-6 py-4 flex justify-end gap-3 border-t border-gray-100 bg-gray-50">
+                        {!isEditMode && (
+                            <CustomButton
+                                type="button"
+                                text="Clear"
+                                icon={FaEraser}
+                                onClick={handleClear}
+                                disabled={isSubmitting}
+                            />
+                        )}
                         <CustomButton
                             type="submit"
-                            text={isSubmitting ? "Saving..." : "Save Product"}
+                            text={isSubmitting ? (isEditMode ? "Updating..." : "Saving...") : (isEditMode ? "Update Product" : "Save Product")}
                             icon={FaSave}
-                            variant="primary"
                             disabled={isSubmitting}
                         />
                     </div>

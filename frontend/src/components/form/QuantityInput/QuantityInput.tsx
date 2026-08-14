@@ -93,11 +93,22 @@ const QuantityInput: React.FC<QuantityInputProps> = ({
   const primaryUom = uomList.length > 0 ? uomList[0] : "";
 
   return (
-    <div className={`w-full ${!hideLabel ? "mb-4" : ""}`}>
+    <div className={`w-full ${!hideLabel ? "mb-4" : ""} group`}>
       {!hideLabel && (
-        <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-          {label}
-          {required && <span className="text-rose-500 ml-1">*</span>}
+        <label
+          className={`
+            flex items-center gap-[6px] mb-2
+            text-xs font-bold uppercase
+            tracking-[0.5px]
+            transition-colors duration-250
+            ${error ? "text-red-500" : "text-slate-500"}
+            group-focus-within:text-primary
+          `}
+        >
+          <span>{label}</span>
+          {required && (
+            <span className="text-[#e53935] ml-0.5">*</span>
+          )}
         </label>
       )}
 

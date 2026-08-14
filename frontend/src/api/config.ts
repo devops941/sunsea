@@ -44,12 +44,6 @@ const config = {
         productNextId: "/products/next-id",
         category: "/product/categories",
         categoryNextId: "/product/categories/next-id",
-        subCategory: "/product/sub-categories",
-        subCategoryNextId: "/product/sub-categories/next-id",
-        color: "/product/colors",
-        colorNextId: "/product/colors/next-id",
-        size: "/product/sizes",
-        sizeNextId: "/product/sizes/next-id",
         uom: "/product/uoms",
         uomNextId: "/product/uoms/next-id",
         getActiveUom: "/product/uoms/active",
@@ -115,6 +109,10 @@ const config = {
     },
     billOfMaterial: {
         base: "/bill-of-materials",
+    },
+    salesProduct: {
+        base: "/sales-products",
+        nextId: "/sales-products/next-id",
     },
     purchaseOrder: {
         base: "/purchase-orders",

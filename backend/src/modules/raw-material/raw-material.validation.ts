@@ -34,13 +34,6 @@ export const createRawMaterialSchema = z.object({
       .optional()
       .nullable(),
 
-    leadTimeDays: z
-      .number()
-      .int()
-      .nonnegative()
-      .optional()
-      .nullable(),
-
     baseUom: z
       .string()
       .min(1, "Base UOM is required")
@@ -52,7 +45,7 @@ export const createRawMaterialSchema = z.object({
       .optional()
       .nullable(),
 
-    unitPrice: z
+    rate: z
       .number()
       .nonnegative()
       .optional()
@@ -90,27 +83,15 @@ export const createRawMaterialSchema = z.object({
       .default(0)
       .optional(),
 
-    avgCost: z
-      .number()
-      .nonnegative("Average Cost cannot be negative")
-      .default(0)
-      .optional(),
-
-    remarks: z
+    narration: z
       .string()
-      .max(255, "Remarks cannot exceed 255 characters")
+      .max(255, "Narration cannot exceed 255 characters")
       .optional()
       .nullable(),
 
     lastMovementAt: z
       .string()
       .datetime()
-      .optional()
-      .nullable(),
-
-    gstTaxRateId: z
-      .string()
-      .uuid("GST Tax Rate ID must be a valid UUID")
       .optional()
       .nullable(),
 

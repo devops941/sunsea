@@ -14,8 +14,8 @@ export const useProducts = () => {
     deleted: productDeleted,
   });
 
-  const loadProducts = useCallback((search?: string) => {
-    dispatch(fetchProducts(search));
+  const loadProducts = useCallback((args?: string | { search?: string; categoryId?: string }) => {
+    dispatch(fetchProducts(args));
   }, [dispatch]);
 
   const addProduct = useCallback(

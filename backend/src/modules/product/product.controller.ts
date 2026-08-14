@@ -31,8 +31,9 @@ class ProductController {
       res: Response
     ) => {
       const search = req.query.search ? String(req.query.search) : undefined;
+      const categoryId = req.query.categoryId ? String(req.query.categoryId) : undefined;
       const products =
-        await productService.findAll(search);
+        await productService.findAll({ search, categoryId });
 
       return res.status(200).json(
         new ApiResponse(

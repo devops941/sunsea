@@ -10,12 +10,11 @@ export interface RawMaterial {
   hsnCode?: string | null;
 
   minimumStock?: number | string | null;
-  leadTimeDays?: number | string | null;
 
   baseUom: string;
 
   reorderLevel?: number | string | null;
-  unitPrice?: number | string | null;
+  rate?: number | string | null;
 
   storeId?: string | null;
   store?: {
@@ -28,15 +27,14 @@ export interface RawMaterial {
 
   onHandQty?: number | string;
   reservedQty?: number | string;
-  avgCost?: number | string;
 
-  remarks?: string | null;
+  narration?: string | null;
   lastMovementAt?: string | null;
-  gstTaxRateId?: string | null;
 
   status?: string;
   isActive: boolean;
   itemType?: string | null;
+  remarks?: string | null;
 
   createdAt?: string;
   updatedAt?: string;
@@ -58,20 +56,17 @@ export interface CreateRawMaterialDto {
   hsnCode?: string | null;
 
   minimumStock?: number | null;
-  leadTimeDays?: number | null;
   storeId?: string | null;
 
   baseUom: string;
   reorderLevel?: number | null;
-  unitPrice?: number | null;
+  rate?: number | null;
 
   onHandQty?: number | null;
   reservedQty?: number | null;
-  avgCost?: number | null;
   batchNo?: string | null;
-  remarks?: string | null;
+  narration?: string | null;
   lastMovementAt?: string | null;
-  gstTaxRateId?: string | null;
 
   isActive?: boolean;
 }
@@ -81,23 +76,20 @@ export interface UpdateRawMaterialDto {
   hsnCode?: string | null;
 
   minimumStock?: number | null;
-  leadTimeDays?: number | null;
 
   storeId?: string | null;
   baseUom?: string;
 
   reorderLevel?: number | null;
-  unitPrice?: number | null;
+  rate?: number | null;
 
   batchNo?: string | null;
 
   onHandQty?: number | null;
   reservedQty?: number | null;
-  avgCost?: number | null;
 
-  remarks?: string | null;
+  narration?: string | null;
   lastMovementAt?: string | null;
-  gstTaxRateId?: string | null;
 
   status?: string;
   isActive?: boolean;

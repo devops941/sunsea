@@ -17,6 +17,7 @@ import MultiSelect from "../../../components/form/multiSelect/MultiSelect";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import TextInput from "../../../components/form/TextInput/TextInput";
 import { useProducts } from "../../../hooks/useProducts";
+import { useCategories } from "../../../hooks/useCategories";
 import { productCapacityHistoryService } from "../../../services/productCapacityHistoryService";
 import { employeeService } from "../../../services/employeeService";
 import { departmentService } from "../../../services/departmentService";
@@ -24,12 +25,14 @@ import { shiftService } from "../../../services/shiftService";
 import { machineService } from "../../../services/machineService";
 import { useSocketSync } from "../../../hooks/useSocketSync";
 import { usePermission } from "../../../hooks/usePermission";
+import { getImageUrl } from "../../../utils/ImageUrls";
 
 const ITEMS_PER_PAGE = 10;
 
 const ProductList: React.FC = () => {
     const navigate = useNavigate();
     const { products, loading, error, loadProducts, removeProduct } = useProducts();
+    const { categories, loadCategories } = useCategories();
     const { can } = usePermission();
 
     const [showViewModal, setShowViewModal] = useState(false);
@@ -42,6 +45,7 @@ const ProductList: React.FC = () => {
     const initialSearch = searchParams.get("search") || "";
 
     const [searchTerm, setSearchTerm] = useState(initialSearch);
+    const [categoryFilter, setCategoryFilter] = useState("");
 
     // Custom confirm delete state
     const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -64,6 +68,12 @@ const ProductList: React.FC = () => {
     const [departments, setDepartments] = useState<any[]>([]);
     const [shifts, setShifts] = useState<any[]>([]);
     const [machines, setMachines] = useState<any[]>([]);
+
+    useEffect(() => {
+        if (can("products.view")) {
+            loadCategories({ isActive: true });
+        }
+    }, [can, loadCategories]);
 
     useEffect(() => {
         if (can("products.view")) {
@@ -91,11 +101,11 @@ const ProductList: React.FC = () => {
     useEffect(() => {
         const timer = setTimeout(() => {
             if (can("products.view")) {
-                loadProducts(searchTerm);
+                loadProducts({ search: searchTerm, categoryId: categoryFilter || undefined });
             }
         }, 500);
         return () => clearTimeout(timer);
-    }, [searchTerm, loadProducts, can]);
+    }, [searchTerm, categoryFilter, loadProducts, can]);
 
     useEffect(() => {
         if (error) {
@@ -118,6 +128,11 @@ const ProductList: React.FC = () => {
 
     const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
         setSearchTerm(e.target.value);
+        setCurrentPage(1);
+    };
+
+    const handleCategoryFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        setCategoryFilter(e.target.value);
         setCurrentPage(1);
     };
 
@@ -232,21 +247,36 @@ const ProductList: React.FC = () => {
 
     const filteredProducts = products || [];
 
-    const totalPages = Math.ceil(filteredProducts.length / ITEMS_PER_PAGE);
-    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    const totalPages = Math.max(1, Math.ceil(filteredProducts.length / ITEMS_PER_PAGE));
+    const safeCurrentPage = Math.min(currentPage, totalPages);
+    const startIndex = (safeCurrentPage - 1) * ITEMS_PER_PAGE;
     const paginatedProducts = filteredProducts.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
+    useEffect(() => {
+        if (currentPage > totalPages) {
+            setCurrentPage(totalPages);
+        }
+    }, [currentPage, totalPages]);
 
     const columns: DataTableColumn<any>[] = [
         { header: "#", render: (_, index) => startIndex + index + 1, width: "60px", align: "center" },
         { header: "Product Name", accessor: "productName" },
         { header: "Category", render: (product) => product.category?.name || product.category?.categoryName || "N/A" },
         {
-            header: "Price",
+            header: "Product Type",
             render: (product) => (
-                <div className="flex flex-col">
-                    <span className="text-sm text-slate-800">MRP: {product.mrp ? `₹${product.mrp}` : '-'}</span>
-                    <span className="text-xs text-slate-500">B2B: {product.b2b ? `₹${product.b2b}` : '-'}</span>
-                </div>
+                <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${product.productType === "SALES_PRODUCTION" ? "bg-purple-100 text-purple-800" : "bg-blue-100 text-blue-800"}`}>
+                    {product.productType === "SALES_PRODUCTION" ? "Sales Production" : "Production"}
+                </span>
+            ),
+            align: "center"
+        },
+        {
+            header: "Rate (₹)",
+            render: (product) => (
+                <span className="font-semibold text-slate-800">
+                    {product.rate != null ? `₹${product.rate}` : (product.mrp != null ? `₹${product.mrp}` : "-")}
+                </span>
             )
         },
         {
@@ -286,9 +316,21 @@ const ProductList: React.FC = () => {
                     {/* Page Header */}
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-6 border-b border-slate-200">
                         <div>
-                            <h2 className="text-2xl font-bold text-slate-800">Product Catalog</h2>
+                            <h2 className="text-2xl font-bold text-slate-800">Production Product</h2>
                         </div>
                         <div className="flex items-center gap-3 w-full md:w-auto">
+                            <div className="w-full md:w-48">
+                                <SelectInput
+                                    hideLabel
+                                    name="categoryFilter"
+                                    value={categoryFilter}
+                                    onChange={handleCategoryFilterChange}
+                                    options={[
+                                        { value: "", label: "All Categories" },
+                                        ...(categories || []).map((c: any) => ({ value: String(c.id), label: c.name })),
+                                    ]}
+                                />
+                            </div>
                             <div className="relative w-full md:w-64">
                                 <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                                 <input
@@ -312,7 +354,7 @@ const ProductList: React.FC = () => {
                             loading={loading}
                             emptyMessage="No products found."
                             pagination={totalPages > 1 ? {
-                                currentPage,
+                                currentPage: safeCurrentPage,
                                 totalPages,
                                 onPageChange: setCurrentPage
                             } : undefined}
@@ -332,24 +374,73 @@ const ProductList: React.FC = () => {
                             fields: [
                                 { label: "Product Name", value: selectedProduct.productName },
                                 { label: "Product Code", value: selectedProduct.productCode },
+                                { label: "Category", value: selectedProduct.category?.name || selectedProduct.category?.categoryName || "N/A" },
+                                { label: "Product Type", value: selectedProduct.productType === "SALES_PRODUCTION" ? "Sales Production" : "Production" },
                                 {
-                                    label: "UOM", value: (() => {
-                                        const code = selectedProduct.uom?.code || selectedProduct.uom?.uomCode;
-                                        return code?.toLowerCase() === 'ea' ? 'pcs' : (code || "N/A");
+                                    label: "Weight per Piece", value: (() => {
+                                        const weightUom = selectedProduct.weightUom || "kg";
+                                        const weight = selectedProduct.weightPerPiece != null ? selectedProduct.weightPerPiece : "";
+                                        return weight !== "" ? `${weight} ${weightUom}` : "N/A";
                                     })()
                                 },
-                                { label: "Category", value: selectedProduct.category?.name || selectedProduct.category?.categoryName || "N/A" },
-                                { label: "MRP", value: selectedProduct.mrp != null ? `₹${selectedProduct.mrp}` : "N/A" },
-                                { label: "B2B", value: selectedProduct.b2b != null ? `₹${selectedProduct.b2b}` : "N/A" },
-                                { label: "B2C", value: selectedProduct.b2c != null ? `₹${selectedProduct.b2c}` : "N/A" },
-                                { label: "Export Price", value: selectedProduct.exportPrice != null ? `₹${selectedProduct.exportPrice}` : "N/A" },
-                                { label: "Weight", value: selectedProduct.weightPerPiece != null ? (Number(selectedProduct.weightPerPiece) < 1 ? `${Number(selectedProduct.weightPerPiece) * 1000} g` : `${selectedProduct.weightPerPiece} kg`) : "N/A" },
+                                { label: "HSN Code", value: selectedProduct.hsnCode || "N/A" },
+                                { label: "Rate (₹)", value: selectedProduct.rate != null ? `₹${selectedProduct.rate}` : (selectedProduct.mrp != null ? `₹${selectedProduct.mrp}` : "N/A") },
+                                {
+                                    label: "Opening Stock Qty", value: (() => {
+                                        const lastStock = selectedProduct.finishedGoodsStocks?.[selectedProduct.finishedGoodsStocks.length - 1];
+                                        return lastStock?.onHandQty != null ? `${lastStock.onHandQty} PCS` : "N/A";
+                                    })()
+                                },
+                                {
+                                    label: "Opening Stock Store", value: (() => {
+                                        const lastStock = selectedProduct.finishedGoodsStocks?.[selectedProduct.finishedGoodsStocks.length - 1];
+                                        return lastStock?.store?.storeName || "N/A";
+                                    })()
+                                },
+                                { label: "Minimum Stock Qty", value: selectedProduct.minimumQty != null ? `${selectedProduct.minimumQty} PCS` : "N/A" },
                                 { label: "Status", value: selectedProduct.isActive ? "Active" : "Inactive" },
+                                { label: "Description", value: selectedProduct.description || "N/A", xs: 12 },
                             ]
                         }
                     ] : []}
                     customContent={
                         <div className="mt-6 flex flex-col gap-6">
+                            {/* Premium Product Images Gallery */}
+                            {((selectedProduct?.images && selectedProduct.images.length > 0) || selectedProduct?.imageUrl) && (
+                                <div className="bg-slate-50/70 p-4 rounded-xl border border-slate-200/80 shadow-sm">
+                                    <div className="flex items-center justify-between mb-3">
+                                        <h6 className="text-xs font-bold text-slate-700 tracking-wider uppercase flex items-center gap-2">
+                                            <span>Product Images</span>
+                                            <span className="text-[11px] font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100">
+                                                {selectedProduct.images?.length || 1} Image{(selectedProduct.images?.length || 1) > 1 ? 's' : ''}
+                                            </span>
+                                        </h6>
+                                    </div>
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                                        {(selectedProduct.images && selectedProduct.images.length > 0
+                                            ? selectedProduct.images
+                                            : [{ imageUrl: selectedProduct.imageUrl }]
+                                        ).map((img: any, idx: number) => (
+                                            <div 
+                                                key={idx} 
+                                                className="relative group aspect-square rounded-xl border border-slate-200 bg-white overflow-hidden shadow-sm hover:shadow-md transition-all duration-200"
+                                            >
+                                                <img
+                                                    src={getImageUrl(img.imageUrl)}
+                                                    alt={`Product Image ${idx + 1}`}
+                                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                                />
+                                                {img.isPrimary && (
+                                                    <div className="absolute top-2 left-2 bg-indigo-600/90 backdrop-blur-sm text-white text-[10px] font-bold px-2 py-0.5 rounded-md shadow-sm tracking-wider">
+                                                        PRIMARY
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
                             {selectedProduct?.billOfMaterials && selectedProduct.billOfMaterials.length > 0 && (
                                 <>
                                     {/* BOM Section */}
@@ -371,33 +462,6 @@ const ProductList: React.FC = () => {
                                                                 <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
                                                                     <td className="px-4 py-2">{rm.rawMaterial?.materialName || rm.rawMaterialId}</td>
                                                                     <td className="px-4 py-2 text-right">{rm.percentage} %</td>
-                                                                </tr>
-                                                            ))}
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* Accessories Section */}
-                                    {selectedProduct.billOfMaterials.some((rm: any) => Number(rm.requiredQuantity) > 0) && (
-                                        <div>
-                                            <h6 className="text-sm font-semibold text-slate-800 mb-2">Accessories / Additional Items</h6>
-                                            <div className="border border-slate-200 rounded-lg overflow-hidden">
-                                                <table className="w-full text-left text-sm whitespace-nowrap">
-                                                    <thead className="bg-slate-50 text-slate-600">
-                                                        <tr>
-                                                            <th className="px-4 py-2 font-semibold border-b border-slate-200">Item</th>
-                                                            <th className="px-4 py-2 font-semibold border-b border-slate-200 text-right">Quantity</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody className="divide-y divide-slate-100 bg-white">
-                                                        {selectedProduct.billOfMaterials
-                                                            .filter((rm: any) => Number(rm.requiredQuantity) > 0)
-                                                            .map((rm: any, idx: number) => (
-                                                                <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
-                                                                    <td className="px-4 py-2">{rm.rawMaterial?.materialName || rm.rawMaterialId}</td>
-                                                                    <td className="px-4 py-2 text-right">{rm.requiredQuantity}</td>
                                                                 </tr>
                                                             ))}
                                                     </tbody>
