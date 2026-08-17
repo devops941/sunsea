@@ -3,7 +3,8 @@ import { FaUndo, FaPlus, FaTimes, FaTrash, FaEraser, FaSave } from "react-icons/
 import { toast } from "react-toastify";
 import { returnService, type SalesReturn } from "../../../../services/returnService";
 import { customerService } from "../../../../services/customerService";
-import { salesInvoiceService } from "../../../../services/salesInvoiceService";
+
+import { productService } from "../../../../services/productService";
 import { useAppSelector } from "../../../../hooks/reduxHooks";
 
 import DataTable from "../../../../components/ui/table/DataTable";
@@ -20,6 +21,7 @@ interface FormReturnRow {
   salesInvoiceItemId?: string;
   description: string;
   quantity: number;
+  weight: number;
   maxReturnable: number;
   unitPrice: number;
   taxRate: number;
@@ -43,12 +45,8 @@ export const SalesReturnPage: React.FC = () => {
 
   // Form states
   const [customerId, setCustomerId] = useState<string>("");
-  const [customerInvoices, setCustomerInvoices] = useState<any[]>([]);
-  const [selectedInvoiceId, setSelectedInvoiceId] = useState<string>("");
-  const [invoiceDetails, setInvoiceDetails] = useState<any>(null);
-  const [fetchingInvoice, setFetchingInvoice] = useState<boolean>(false);
+  const [allProducts, setAllProducts] = useState<any[]>([]);
 
-  const [refundMode, setRefundMode] = useState<"CREDIT_NOTE" | "CASH" | "BANK">("CREDIT_NOTE");
   const [reason, setReason] = useState<string>("");
   const [narration, setNarration] = useState<string>("");
   const [returnRows, setReturnRows] = useState<FormReturnRow[]>([]);
@@ -56,13 +54,15 @@ export const SalesReturnPage: React.FC = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [rData, cRes] = await Promise.all([
+      const [rData, cRes, pList] = await Promise.all([
         returnService.fetchSalesReturns(),
-        customerService.fetchAll({ page: 1, limit: 10 }),
+        customerService.fetchAll({ page: 1, limit: 500 }),
+        productService.fetchAll(),
       ]);
       setReturns(rData || []);
       const cList = Array.isArray(cRes) ? cRes : cRes?.customers || [];
       setCustomers(cList);
+      setAllProducts(pList || []);
     } catch (err: any) {
       toast.error(err?.message || "Failed to load sales returns");
     } finally {
@@ -78,76 +78,31 @@ export const SalesReturnPage: React.FC = () => {
   useSocketSync("salesInvoice", undefined, loadData);
   useSocketSync("customer", undefined, loadData);
 
-  // When Customer changes, fetch their Invoices
+  // When Customer changes, load all products as return rows
   useEffect(() => {
     if (!customerId) {
-      setCustomerInvoices([]);
-      setSelectedInvoiceId("");
-      setInvoiceDetails(null);
       setReturnRows([]);
       return;
     }
+    // Pre-fill rows from all active products
+    const rows: FormReturnRow[] = allProducts
+      .filter((p: any) => p.isActive !== false)
+      .map((p: any) => ({
+        productId: Number(p.id),
+        description: p.productName || p.displayName || `Product #${p.id}`,
+        quantity: 0,
+        weight: Number(p.weightPerPiece || 0),
+        maxReturnable: 999999,
+        unitPrice: Number(p.rate || 0),
+        taxRate: Number(p.gstRate || 0),
+      }));
+    setReturnRows(rows);
+  }, [customerId, allProducts]);
 
-    const fetchInvoices = async () => {
-      try {
-        const res = await salesInvoiceService.fetchAll({ customerId, limit: 100 });
-        const list = Array.isArray(res) ? res : res?.invoices || res?.data || [];
-        setCustomerInvoices(list);
-      } catch (err) {
-        console.error("Failed to fetch customer invoices", err);
-      }
-    };
-
-    fetchInvoices();
-  }, [customerId]);
-
-  // When Sales Invoice changes, fetch line items and prepare return rows
-  useEffect(() => {
-    if (!selectedInvoiceId) {
-      setInvoiceDetails(null);
-      setReturnRows([]);
-      return;
-    }
-
-    const fetchDetails = async () => {
-      setFetchingInvoice(true);
-      try {
-        const inv = await salesInvoiceService.fetchById(selectedInvoiceId);
-        setInvoiceDetails(inv);
-
-        // Pre-fill rows from invoice line items
-        if (inv && Array.isArray(inv.items)) {
-          const initialRows: FormReturnRow[] = inv.items.map((item: any) => {
-            const tax = Number(item.tax || item.cgstRate + item.sgstRate + item.igstRate || 0);
-            return {
-              productId: Number(item.productId),
-              salesInvoiceItemId: item.id,
-              description: item.description || item.product?.productName || `Product #${item.productId}`,
-              quantity: 0, // default 0 to let user choose
-              maxReturnable: Number(item.quantity),
-              unitPrice: Number(item.unitPrice),
-              taxRate: tax,
-              reason: "",
-            };
-          });
-          setReturnRows(initialRows);
-        }
-      } catch (err: any) {
-        toast.error(err?.message || "Failed to load invoice line items");
-      } finally {
-        setFetchingInvoice(false);
-      }
-    };
-
-    fetchDetails();
-  }, [selectedInvoiceId]);
-
-  const handleRowQuantityChange = (index: number, qtyVal: number) => {
+  const handleRowFieldChange = (index: number, field: 'quantity' | 'weight' | 'unitPrice', value: number) => {
     setReturnRows((prev) => {
       const updated = [...prev];
-      const max = updated[index].maxReturnable;
-      const validQty = Math.max(0, Math.min(qtyVal, max));
-      updated[index].quantity = validQty;
+      updated[index] = { ...updated[index], [field]: Math.max(0, value) };
       return updated;
     });
   };
@@ -183,14 +138,12 @@ export const SalesReturnPage: React.FC = () => {
     try {
       await returnService.createSalesReturn({
         customerId,
-        salesInvoiceId: selectedInvoiceId || undefined,
-        refundMode,
+        refundMode: "CREDIT_NOTE",
         reason: reason.trim(),
         narration,
         companyId: company.id,
         items: activeReturnItems.map((r) => ({
           productId: r.productId,
-          salesInvoiceItemId: r.salesInvoiceItemId,
           quantity: r.quantity,
           unitPrice: r.unitPrice,
           taxRate: r.taxRate,
@@ -211,11 +164,7 @@ export const SalesReturnPage: React.FC = () => {
 
   const resetForm = () => {
     setCustomerId("");
-    setSelectedInvoiceId("");
-    setCustomerInvoices([]);
-    setInvoiceDetails(null);
     setReturnRows([]);
-    setRefundMode("CREDIT_NOTE");
     setReason("");
     setNarration("");
   };
@@ -378,40 +327,14 @@ export const SalesReturnPage: React.FC = () => {
               required
               defaultOptionLabel="Select Customer"
               searchable
-              options={customers.map((c) => ({
-                label: `${c.customerCode ? `${c.customerCode} - ` : ""}${c.firmName}`,
-                value: String(c.id),
-              }))}
+              options={customers.map((c: any) => {
+                const name = c.displayName || c.firmName;
+                const grade = c.customerGrade?.name;
+                const type = c.customerType?.name;
+                const parts = [name, grade, type].filter(Boolean);
+                return { label: parts.join(' - '), value: String(c.id) };
+              })}
               onChange={(e) => setCustomerId(e.target.value)}
-            />
-
-            <SelectInput
-              label="ORIGINAL SALES INVOICE"
-              name="selectedInvoiceId"
-              value={selectedInvoiceId}
-              disabled={!customerId}
-              defaultOptionLabel="-- Direct Return (No Invoice Link) --"
-              searchable
-              options={customerInvoices.map((inv) => ({
-                label: `${inv.invoiceNo} (₹${Number(inv.grandTotal).toFixed(2)}) - ${new Date(inv.invoiceDate || inv.createdAt).toLocaleDateString("en-IN")}`,
-                value: String(inv.id),
-              }))}
-              onChange={(e) => setSelectedInvoiceId(e.target.value)}
-            />
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <SelectInput
-              label="REFUND / SETTLEMENT MODE"
-              name="refundMode"
-              value={refundMode}
-              required
-              options={[
-                { label: "Credit Note (Adjust against ledger)", value: "CREDIT_NOTE" },
-                { label: "Cash Refund (Pay Cash-in-Hand)", value: "CASH" },
-                { label: "Bank Refund (Pay Bank Account)", value: "BANK" },
-              ]}
-              onChange={(e) => setRefundMode(e.target.value as any)}
             />
 
             <TextInput
@@ -428,51 +351,63 @@ export const SalesReturnPage: React.FC = () => {
           <div className="pt-2">
             <div className="flex items-center justify-between mb-2">
               <label className="block text-xs font-semibold text-slate-700 uppercase">Return Line Items</label>
-              {fetchingInvoice && <span className="text-xs text-blue-600 animate-pulse font-medium">Fetching invoice items...</span>}
             </div>
 
             {returnRows.length === 0 ? (
               <div className="p-4 border border-dashed border-slate-200 rounded-lg text-center text-xs text-slate-400">
-                Select a Customer and Sales Invoice to load line items.
+                Select a Customer to load products.
               </div>
             ) : (
-              <div className="border border-slate-200 rounded-lg overflow-hidden">
+              <div className="border border-slate-200 rounded-lg overflow-hidden max-h-72 overflow-y-auto">
                 <table className="w-full text-left text-xs text-slate-700">
-                  <thead className="bg-slate-50 uppercase font-semibold text-slate-600 border-b border-slate-200">
+                  <thead className="bg-slate-50 uppercase font-semibold text-slate-600 border-b border-slate-200 sticky top-0">
                     <tr>
-                      <th className="px-3 py-2">Item Description</th>
-                      <th className="px-3 py-2 w-24 text-right">Invoiced Qty</th>
-                      <th className="px-3 py-2 w-28 text-center">Return Qty</th>
-                      <th className="px-3 py-2 w-28 text-right">Price (₹)</th>
-                      <th className="px-3 py-2 w-20 text-right">Tax %</th>
+                      <th className="px-3 py-2">Product</th>
+                      <th className="px-3 py-2 w-24 text-center">Qty</th>
+                      <th className="px-3 py-2 w-24 text-center">Weight (kg)</th>
+                      <th className="px-3 py-2 w-28 text-center">Unit Price (₹)</th>
                       <th className="px-3 py-2 w-28 text-right">Total (₹)</th>
                       <th className="px-3 py-2 w-10 text-center"></th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200 bg-white">
                     {returnRows.map((row, idx) => {
-                      const lineSub = row.quantity * row.unitPrice;
-                      const lineTax = (lineSub * row.taxRate) / 100;
-                      const lineTot = lineSub + lineTax;
+                      const lineTot = row.quantity * row.unitPrice;
                       return (
-                        <tr key={idx} className="hover:bg-slate-50">
+                        <tr key={idx} className={`hover:bg-slate-50 ${row.quantity > 0 ? 'bg-blue-50/40' : ''}`}>
                           <td className="px-3 py-2 font-medium">{row.description}</td>
-                          <td className="px-3 py-2 text-right font-mono text-slate-500">{row.maxReturnable}</td>
                           <td className="px-3 py-2 text-center">
                             <input
                               type="number"
                               min="0"
-                              max={row.maxReturnable}
-                              step="0.01"
+                              step="1"
                               value={row.quantity || ""}
-                              onChange={(e) => handleRowQuantityChange(idx, parseFloat(e.target.value) || 0)}
+                              onChange={(e) => handleRowFieldChange(idx, 'quantity', parseFloat(e.target.value) || 0)}
                               className="w-20 px-2 py-1 border border-slate-200 rounded text-center font-bold text-blue-600 focus:outline-none focus:border-blue-500"
                             />
                           </td>
-                          <td className="px-3 py-2 text-right font-mono">₹{row.unitPrice.toFixed(2)}</td>
-                          <td className="px-3 py-2 text-right font-mono text-slate-500">{row.taxRate}%</td>
+                          <td className="px-3 py-2 text-center">
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={row.weight || ""}
+                              onChange={(e) => handleRowFieldChange(idx, 'weight', parseFloat(e.target.value) || 0)}
+                              className="w-20 px-2 py-1 border border-slate-200 rounded text-center text-slate-700 focus:outline-none focus:border-blue-500"
+                            />
+                          </td>
+                          <td className="px-3 py-2 text-center">
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={row.unitPrice || ""}
+                              onChange={(e) => handleRowFieldChange(idx, 'unitPrice', parseFloat(e.target.value) || 0)}
+                              className="w-24 px-2 py-1 border border-slate-200 rounded text-center text-slate-700 focus:outline-none focus:border-blue-500"
+                            />
+                          </td>
                           <td className="px-3 py-2 text-right font-mono font-semibold text-slate-900">
-                            ₹{lineTot.toFixed(2)}
+                            {lineTot > 0 ? `₹${lineTot.toFixed(2)}` : '—'}
                           </td>
                           <td className="px-3 py-2 text-center">
                             <button
@@ -494,18 +429,10 @@ export const SalesReturnPage: React.FC = () => {
           </div>
 
           {/* Totals Summary */}
-          {returnRows.length > 0 && (
+          {returnRows.some(r => r.quantity > 0) && (
             <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 flex flex-col items-end space-y-1 text-xs">
-              <div className="flex justify-between w-48 text-slate-600">
-                <span>Subtotal:</span>
-                <span className="font-mono">₹{subTotal.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between w-48 text-slate-600">
-                <span>Tax Total:</span>
-                <span className="font-mono">₹{taxTotal.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between w-48 font-bold text-slate-900 text-sm pt-1 border-t border-slate-300">
-                <span>Grand Total:</span>
+              <div className="flex justify-between w-48 font-bold text-slate-900 text-sm">
+                <span>Total:</span>
                 <span className="font-mono text-blue-600">₹{grandTotal.toFixed(2)}</span>
               </div>
             </div>

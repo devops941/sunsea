@@ -87,7 +87,7 @@ class CustomerService {
         orderBy: { createdAt: "desc" },
         skip: (page - 1) * limit,
         take: limit,
-        include: { addresses: true }
+        include: { addresses: true, customerGrade: { select: { name: true } }, customerType: { select: { name: true } } }
       }),
       prisma.customer.count({ where: whereClause }),
     ]);
@@ -154,6 +154,8 @@ class CustomerService {
       where: { id },
       include: {
         addresses: true,
+        customerGrade: { select: { name: true } },
+        customerType: { select: { name: true } },
       }
     });
 

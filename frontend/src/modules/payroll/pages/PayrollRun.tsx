@@ -16,18 +16,18 @@ import DataTable, { type DataTableColumn } from '../../../components/ui/table/Da
 
 // ─── Steps ───────────────────────────────────────────────────────────────────
 const STEPS = [
-  { id: 1, label: 'Select Period',        icon: CalendarRange  },
-  { id: 2, label: 'Review Attendance',    icon: ClipboardList  },
-  { id: 3, label: 'Calculate & Preview',  icon: Eye            },
-  { id: 4, label: 'Approve',              icon: CheckCircle2   },
-  { id: 5, label: 'Lock & Disburse',      icon: Lock           },
+  { id: 1, label: 'Select Period', icon: CalendarRange },
+  { id: 2, label: 'Review Attendance', icon: ClipboardList },
+  { id: 3, label: 'Calculate & Preview', icon: Eye },
+  { id: 4, label: 'Approve', icon: CheckCircle2 },
+  { id: 5, label: 'Lock & Disburse', icon: Lock },
 ];
 
-const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-const fmt    = (n: number) => n.toLocaleString('en-IN');
-const fmtRs  = (n: number) => `₹${fmt(Math.round(Number(n)))}`;
+const fmt = (n: number) => n.toLocaleString('en-IN');
+const fmtRs = (n: number) => `₹${fmt(Math.round(Number(n)))}`;
 const fmtDec = (n: number) => `₹${Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 // ─── Date Helpers ─────────────────────────────────────────────────────────────
@@ -56,39 +56,52 @@ interface WeekOption {
 }
 
 function getWeeksOfMonth(year: number, month: number): WeekOption[] {
-  const total = daysInMonth(year, month);
-  const mm = String(month).padStart(2, '0');
+  const firstDayOfMonth = new Date(year, month - 1, 1);
+  const lastDayOfMonth = new Date(year, month, 0);
+
+  const firstDow = firstDayOfMonth.getDay() || 7; // Mon=1 ... Sun=7
+  const firstMonday = new Date(firstDayOfMonth);
+  firstMonday.setDate(firstDayOfMonth.getDate() - (firstDow - 1));
+
   const opts: WeekOption[] = [];
+  let currentMonday = new Date(firstMonday);
   let weekOfMonth = 1;
-  for (let startDay = 1; startDay <= total; startDay += 7) {
-    const endDay = Math.min(startDay + 6, total);
-    const startDate = `${year}-${mm}-${String(startDay).padStart(2, '0')}`;
-    const endDate   = `${year}-${mm}-${String(endDay).padStart(2, '0')}`;
-    const { week: isoWeek, year: isoYear } = getISOWeekInfo(new Date(year, month - 1, startDay));
+
+  while (currentMonday <= lastDayOfMonth) {
+    const sun = new Date(currentMonday);
+    sun.setDate(currentMonday.getDate() + 6);
+
+    const { week: isoWeek, year: isoYear } = getISOWeekInfo(currentMonday);
+    const startFmt = `${MONTHS_SHORT[currentMonday.getMonth()]} ${currentMonday.getDate()}`;
+    const endFmt = `${MONTHS_SHORT[sun.getMonth()]} ${sun.getDate()}`;
+
     opts.push({
       weekOfMonth,
-      startDay,
-      endDay,
-      startDate,
-      endDate,
+      startDay: currentMonday.getDate(),
+      endDay: sun.getDate(),
+      startDate: currentMonday.toISOString().split('T')[0],
+      endDate: sun.toISOString().split('T')[0],
       isoWeek,
       isoYear,
-      label: `Week ${weekOfMonth}  (${MONTHS_SHORT[month - 1]} ${startDay}–${endDay})`,
+      label: `Week ${weekOfMonth} (${startFmt} – ${endFmt})`,
     });
+
+    currentMonday.setDate(currentMonday.getDate() + 7);
     weekOfMonth++;
   }
+
   return opts;
 }
 
 type SalaryCategory = 'ALL' | 'FIXED_MONTHLY' | 'PF_MONTHLY' | 'CASH_MONTHLY' | 'DAILY_WEEKLY' | 'WEEKLY';
 
 const CATEGORIES: { value: SalaryCategory; label: string }[] = [
-  { value: 'ALL',           label: 'All Employees'          },
-  { value: 'FIXED_MONTHLY', label: 'Fixed Monthly (Admin)'  },
-  { value: 'PF_MONTHLY',    label: 'PF Workers (Monthly)'   },
-  { value: 'CASH_MONTHLY',  label: 'Cash Monthly'           },
-  { value: 'DAILY_WEEKLY',  label: 'Daily Wage (Weekly)'    },
-  { value: 'WEEKLY',        label: 'Weekly Salary'          },
+  { value: 'ALL', label: 'All Employees' },
+  { value: 'FIXED_MONTHLY', label: 'Fixed Monthly (Admin)' },
+  { value: 'PF_MONTHLY', label: 'PF Workers (Monthly)' },
+  { value: 'CASH_MONTHLY', label: 'Cash Monthly' },
+  { value: 'DAILY_WEEKLY', label: 'Daily Wage (Weekly)' },
+  { value: 'WEEKLY', label: 'Weekly Salary' },
 ];
 
 // ─── Stepper ──────────────────────────────────────────────────────────────────
@@ -96,21 +109,19 @@ const StepHeader: React.FC<{ current: number }> = ({ current }) => (
   <div className="bg-white border-b border-border px-6 py-4">
     <div className="flex items-center max-w-4xl mx-auto">
       {STEPS.map((step, idx) => {
-        const done   = current > step.id;
+        const done = current > step.id;
         const active = current === step.id;
         return (
           <React.Fragment key={step.id}>
             <div className="flex flex-col items-center min-w-0">
-              <div className={`w-9 h-9 rounded-full flex items-center justify-center border-2 font-bold text-sm transition-all ${
-                done   ? 'bg-emerald-500 border-emerald-500 text-white' :
+              <div className={`w-9 h-9 rounded-full flex items-center justify-center border-2 font-bold text-sm transition-all ${done ? 'bg-emerald-500 border-emerald-500 text-white' :
                 active ? 'bg-primary border-primary text-white shadow-md' :
-                         'bg-white border-border text-text-muted'
-              }`}>
+                  'bg-white border-border text-text-muted'
+                }`}>
                 {done ? <Check size={16} /> : <step.icon size={14} />}
               </div>
-              <span className={`mt-1.5 text-[10px] font-semibold text-center leading-tight whitespace-nowrap ${
-                active ? 'text-primary' : done ? 'text-emerald-600' : 'text-text-muted'
-              }`}>{step.label}</span>
+              <span className={`mt-1.5 text-[10px] font-semibold text-center leading-tight whitespace-nowrap ${active ? 'text-primary' : done ? 'text-emerald-600' : 'text-text-muted'
+                }`}>{step.label}</span>
             </div>
             {idx < STEPS.length - 1 && (
               <div className={`flex-1 h-0.5 mx-1 mb-5 transition-colors ${done ? 'bg-emerald-400' : 'bg-border'}`} />
@@ -126,9 +137,9 @@ const StepHeader: React.FC<{ current: number }> = ({ current }) => (
 interface Step1Props {
   runType: 'WEEKLY' | 'MONTHLY'; setRunType: (t: 'WEEKLY' | 'MONTHLY') => void;
   month: number; setMonth: (m: number) => void;
-  year: number;  setYear:  (y: number) => void;
-  weekMonth: number;    setWeekMonth:    (m: number) => void;
-  weekOfMonth: number;  setWeekOfMonth:  (w: number) => void;
+  year: number; setYear: (y: number) => void;
+  weekMonth: number; setWeekMonth: (m: number) => void;
+  weekOfMonth: number; setWeekOfMonth: (w: number) => void;
   category: SalaryCategory; setCategory: (c: SalaryCategory) => void;
   calDays: number;
   employees: ApiEmployeePayroll[];
@@ -187,21 +198,20 @@ const Step1: React.FC<Step1Props> = ({
 
           {/* Type toggle buttons */}
           <div className="grid grid-cols-2 gap-3 p-1.5 bg-slate-100/70 rounded-xl border border-slate-200/50">
-            {(['MONTHLY','WEEKLY'] as const).map(t => {
+            {(['MONTHLY', 'WEEKLY'] as const).map(t => {
               const isActive = runType === t;
               return (
                 <button
                   key={t}
                   onClick={() => setRunType(t)}
-                  className={`flex items-center justify-center gap-2 py-3 px-4 rounded-lg font-bold text-sm transition-all duration-200 cursor-pointer ${
-                    isActive
-                      ? 'bg-primary text-white shadow-sm shadow-primary/30 scale-[1.01]'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
-                  }`}
+                  className={`flex items-center justify-center gap-2 py-3 px-4 rounded-lg font-bold text-sm transition-all duration-200 cursor-pointer ${isActive
+                    ? 'bg-primary text-white shadow-sm shadow-primary/30 scale-[1.01]'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+                    }`}
                 >
                   {t === 'MONTHLY'
                     ? <><CalendarRange size={16} /> Monthly Payroll</>
-                    : <><CalendarDays  size={16} /> Weekly Payroll</>}
+                    : <><CalendarDays size={16} /> Weekly Payroll</>}
                 </button>
               );
             })}
@@ -217,7 +227,7 @@ const Step1: React.FC<Step1Props> = ({
                     onChange={e => setMonth(Number(e.target.value))}
                     className="w-full bg-slate-50/80 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary focus:bg-white transition-all cursor-pointer"
                   >
-                    {MONTHS.map((m, i) => <option key={m} value={i+1}>{m}</option>)}
+                    {MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
                   </select>
                 </div>
                 <div>
@@ -227,7 +237,7 @@ const Step1: React.FC<Step1Props> = ({
                     onChange={e => setYear(Number(e.target.value))}
                     className="w-full bg-slate-50/80 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary focus:bg-white transition-all cursor-pointer"
                   >
-                    {[2024,2025,2026,2027].map(y => <option key={y} value={y}>{y}</option>)}
+                    {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
                   </select>
                 </div>
               </div>
@@ -240,7 +250,7 @@ const Step1: React.FC<Step1Props> = ({
                   </div>
                   <div>
                     <p className="text-[10px] font-extrabold text-primary uppercase tracking-widest">Active Period</p>
-                    <p className="text-base font-extrabold text-slate-900">{MONTHS[month-1]} {year}</p>
+                    <p className="text-base font-extrabold text-slate-900">{MONTHS[month - 1]} {year}</p>
                   </div>
                 </div>
                 <div className="text-right border-l border-blue-200/60 pl-5">
@@ -259,7 +269,7 @@ const Step1: React.FC<Step1Props> = ({
                     onChange={e => { setWeekMonth(Number(e.target.value)); setWeekOfMonth(1); }}
                     className="w-full bg-slate-50/80 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary focus:bg-white transition-all cursor-pointer"
                   >
-                    {MONTHS.map((m, i) => <option key={m} value={i+1}>{m}</option>)}
+                    {MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
                   </select>
                 </div>
                 <div>
@@ -269,7 +279,7 @@ const Step1: React.FC<Step1Props> = ({
                     onChange={e => { setYear(Number(e.target.value)); setWeekOfMonth(1); }}
                     className="w-full bg-slate-50/80 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary focus:bg-white transition-all cursor-pointer"
                   >
-                    {[2024,2025,2026,2027].map(y => <option key={y} value={y}>{y}</option>)}
+                    {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
                   </select>
                 </div>
               </div>
@@ -282,18 +292,17 @@ const Step1: React.FC<Step1Props> = ({
                       <button
                         key={opt.weekOfMonth}
                         onClick={() => setWeekOfMonth(opt.weekOfMonth)}
-                        className={`flex items-center justify-between px-4 py-3 rounded-xl border transition-all text-left cursor-pointer ${
-                          isSelected
-                            ? 'border-primary bg-blue-50/70 text-slate-900 shadow-xs ring-2 ring-primary/20'
-                            : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50/50'
-                        }`}
+                        className={`flex items-center justify-between px-4 py-3 rounded-xl border transition-all text-left cursor-pointer ${isSelected
+                          ? 'border-primary bg-blue-50/70 text-slate-900 shadow-xs ring-2 ring-primary/20'
+                          : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50/50'
+                          }`}
                       >
                         <div className="flex items-center gap-2.5">
                           <span className={`w-2.5 h-2.5 rounded-full ${isSelected ? 'bg-primary' : 'bg-slate-300'}`} />
                           <span className="font-bold text-sm">{opt.label}</span>
                         </div>
                         <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded-md ${isSelected ? 'bg-blue-100 text-blue-700' : 'text-slate-400 bg-slate-100'}`}>
-                          {opt.endDay - opt.startDay + 1} days
+                          7 days
                         </span>
                       </button>
                     );
@@ -309,7 +318,7 @@ const Step1: React.FC<Step1Props> = ({
                     <div>
                       <p className="text-[10px] font-extrabold text-primary uppercase tracking-widest">Active Weekly Period</p>
                       <p className="text-base font-extrabold text-slate-900">
-                        {MONTHS_SHORT[weekMonth - 1]} {selectedWeek.startDay}–{selectedWeek.endDay}, {year}
+                        {selectedWeek.label.replace(/^Week \d+\s*/, '')}
                       </p>
                     </div>
                   </div>
@@ -350,11 +359,10 @@ const Step1: React.FC<Step1Props> = ({
                 <button
                   key={c.value}
                   onClick={() => setCategory(c.value)}
-                  className={`flex items-center justify-between px-4 py-3 rounded-xl border text-sm font-semibold transition-all cursor-pointer ${
-                    isSelected
-                      ? 'border-primary bg-blue-50/70 text-slate-900 shadow-xs ring-2 ring-primary/20'
-                      : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50/60'
-                  }`}
+                  className={`flex items-center justify-between px-4 py-3 rounded-xl border text-sm font-semibold transition-all cursor-pointer ${isSelected
+                    ? 'border-primary bg-blue-50/70 text-slate-900 shadow-xs ring-2 ring-primary/20'
+                    : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50/60'
+                    }`}
                 >
                   <div className="flex items-center gap-2.5">
                     <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${isSelected ? 'bg-primary' : 'bg-slate-300'}`} />
@@ -444,28 +452,145 @@ const Step1: React.FC<Step1Props> = ({
 // ─── Step 2: Attendance Review (read-only from AttendancePage data) ───────────
 interface AttRow extends AttendanceInput { name: string; code: string; salaryType: string; }
 
+// ─── OT Calculation Tooltip ──────────────────────────────────────────────────
+const OtTooltip: React.FC<{
+  otHours: number;
+  otPay: number;
+  dailyRate: number;
+}> = ({ otHours, otPay, dailyRate }) => {
+  const [show, setShow] = React.useState(false);
+
+  if (otHours <= 0 && otPay <= 0) {
+    return <span className="font-mono text-xs text-text-muted">—</span>;
+  }
+
+  const effectiveHourlyRate = otHours > 0 ? otPay / otHours : 0;
+  const estimatedBaseHourly = dailyRate > 0 ? dailyRate / 8 : 0;
+  const estimatedMultiplier = estimatedBaseHourly > 0 && effectiveHourlyRate > 0
+    ? (effectiveHourlyRate / estimatedBaseHourly).toFixed(2)
+    : '—';
+
+  return (
+    <div
+      className="relative inline-flex items-center cursor-help"
+      onMouseEnter={() => setShow(true)}
+      onMouseLeave={() => setShow(false)}
+    >
+      <span className="font-mono text-xs text-emerald-600 font-semibold underline decoration-dotted underline-offset-2">
+        {`₹${Math.round(otPay).toLocaleString('en-IN')}`}
+      </span>
+      {show && (
+        <div className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 pointer-events-none">
+          <div className="bg-slate-900 text-white rounded-xl shadow-2xl p-3 text-xs space-y-1.5">
+            <p className="font-bold text-emerald-400 text-[11px] uppercase tracking-wider mb-2">OT Calculation</p>
+            {otHours > 0 && (
+              <div className="flex justify-between">
+                <span className="text-slate-400">OT Hours</span>
+                <span className="font-semibold">{otHours} hrs</span>
+              </div>
+            )}
+            <div className="flex justify-between">
+              <span className="text-slate-400">Daily Rate</span>
+              <span className="font-semibold">₹{dailyRate.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span>
+            </div>
+            {effectiveHourlyRate > 0 && (
+              <div className="flex justify-between">
+                <span className="text-slate-400">Effective Rate</span>
+                <span className="font-semibold text-yellow-300">₹{effectiveHourlyRate.toFixed(2)}/hr</span>
+              </div>
+            )}
+            {estimatedMultiplier !== '—' && (
+              <div className="flex justify-between">
+                <span className="text-slate-400">Multiplier (est.)</span>
+                <span className="font-semibold">{estimatedMultiplier}×</span>
+              </div>
+            )}
+            <div className="border-t border-slate-700 pt-1.5 flex justify-between">
+              <span className="text-slate-400">OT Pay</span>
+              <span className="font-bold text-emerald-400">₹{Math.round(otPay).toLocaleString('en-IN')}</span>
+            </div>
+          </div>
+          {/* Arrow */}
+          <div className="flex justify-center">
+            <div className="w-2.5 h-2.5 bg-slate-900 rotate-45 -mt-1.5" />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const EditableAdvanceInput: React.FC<{
+  initialValue: number;
+  employeeId: number;
+  textColorClass?: string;
+  onSave: (empId: number, val: number) => void;
+}> = ({ initialValue, employeeId, textColorClass = 'text-violet-700', onSave }) => {
+  const [val, setVal] = useState<string>(String(initialValue ?? 0));
+
+  useEffect(() => {
+    setVal(String(initialValue ?? 0));
+  }, [initialValue]);
+
+  const commitChange = (raw: string) => {
+    const num = Math.max(0, Number(raw) || 0);
+    setVal(String(num));
+    onSave(employeeId, num);
+  };
+
+  return (
+    <div className="flex justify-end">
+      <input
+        type="number"
+        min="0"
+        value={val}
+        onChange={(e) => {
+          const raw = e.target.value;
+          setVal(raw);
+          const num = Math.max(0, Number(raw) || 0);
+          onSave(employeeId, num);
+        }}
+        onBlur={(e) => commitChange(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            commitChange((e.target as HTMLInputElement).value);
+            (e.target as HTMLInputElement).blur();
+          }
+        }}
+        placeholder="0"
+        className={`w-24 px-2.5 py-1 text-right font-mono text-xs font-bold ${textColorClass} bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-all shadow-2xs`}
+      />
+    </div>
+  );
+};
 
 const Step2: React.FC<{
   rows: AttRow[];
   hasData: boolean;
   period: string;
   calDays: number;
+  runType: 'WEEKLY' | 'MONTHLY';
   onBack: () => void;
   onNext: () => void;
-}> = ({ rows, hasData, period, calDays, onBack, onNext }) => {
+  onAdvanceChange?: (empId: number, amount: number) => void;
+}> = ({ rows, hasData, period, calDays, runType, onBack, onNext, onAdvanceChange }) => {
   const navigate = useNavigate();
 
   // Summary totals
-  const totals = rows.reduce(
+  const totalsRaw = rows.reduce(
     (acc, r) => ({
       present: acc.present + Number(r.presentDays || 0),
-      absent:  acc.absent  + Number(r.absentDays || 0),
-      half:    acc.half    + Number(r.halfDays || 0),
-      ot:      acc.ot      + Number(r.otHours || 0),
-      adv:     acc.adv     + Number(r.advance || 0),
+      absent: acc.absent + Number(r.absentDays || 0),
+      half: acc.half + Number(r.halfDays || 0),
+      ot: acc.ot + Number(r.otHours || 0),
+      adv: acc.adv + Number(r.advance || 0),
     }),
     { present: 0, absent: 0, half: 0, ot: 0, adv: 0 }
   );
+  const totals = {
+    ...totalsRaw,
+    present: runType === 'MONTHLY' ? totalsRaw.present + totalsRaw.half * 0.5 : totalsRaw.present,
+  };
 
   if (!hasData) {
     return (
@@ -520,20 +645,22 @@ const Step2: React.FC<{
         </span>
       ),
       align: "center",
-      render: (row) => (
-        <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-emerald-100 text-emerald-700 font-bold text-sm">
-          {row.presentDays}
-        </span>
-      ),
+      render: (row) => {
+        const displayPresent = runType === 'MONTHLY' ? row.presentDays + row.halfDays * 0.5 : row.presentDays;
+        return (
+          <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-emerald-100 text-emerald-700 font-bold text-sm">
+            {displayPresent % 1 === 0 ? displayPresent : displayPresent.toFixed(1)}
+          </span>
+        );
+      },
     },
     {
       header: "ABSENT",
       align: "center",
       render: (row) => (
         <span
-          className={`inline-flex items-center justify-center w-8 h-8 rounded-full font-bold text-sm ${
-            row.absentDays > 0 ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-400'
-          }`}
+          className={`inline-flex items-center justify-center w-8 h-8 rounded-full font-bold text-sm ${row.absentDays > 0 ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-400'
+            }`}
         >
           {row.absentDays > 0 ? row.absentDays : '—'}
         </span>
@@ -550,9 +677,8 @@ const Step2: React.FC<{
       align: "center",
       render: (row) => (
         <span
-          className={`inline-flex items-center justify-center w-8 h-8 rounded-full font-bold text-sm ${
-            row.halfDays > 0 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-400'
-          }`}
+          className={`inline-flex items-center justify-center w-8 h-8 rounded-full font-bold text-sm ${row.halfDays > 0 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-400'
+            }`}
         >
           {row.halfDays > 0 ? row.halfDays : '—'}
         </span>
@@ -607,9 +733,12 @@ const Step2: React.FC<{
       header: "ADVANCE ₹",
       align: "right",
       render: (row) => (
-        <span className={`font-mono text-sm ${row.advance > 0 ? 'text-violet-700 font-semibold' : 'text-text-muted'}`}>
-          {row.advance > 0 ? `₹${row.advance.toLocaleString('en-IN')}` : '—'}
-        </span>
+        <EditableAdvanceInput
+          initialValue={row.advance}
+          employeeId={row.employeeId}
+          textColorClass="text-violet-700"
+          onSave={(empId, amount) => onAdvanceChange?.(empId, amount)}
+        />
       ),
     },
     {
@@ -660,11 +789,11 @@ const Step2: React.FC<{
       {/* Summary cards */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         {[
-          { label: 'Total Present',   value: totals.present, cls: 'text-emerald-700 bg-emerald-50 border-emerald-200' },
-          { label: 'Total Absent',    value: totals.absent,  cls: 'text-red-600 bg-red-50 border-red-200'             },
-          { label: 'Total Half Days', value: totals.half,    cls: 'text-amber-600 bg-amber-50 border-amber-200'       },
-          { label: 'Total OT Hours',  value: totals.ot.toFixed(1), cls: 'text-blue-600 bg-blue-50 border-blue-200'   },
-          { label: 'Total Advance',   value: `₹${totals.adv.toLocaleString('en-IN')}`, cls: 'text-violet-600 bg-violet-50 border-violet-200' },
+          { label: 'Total Present', value: totals.present, cls: 'text-emerald-700 bg-emerald-50 border-emerald-200' },
+          { label: 'Total Absent', value: totals.absent, cls: 'text-red-600 bg-red-50 border-red-200' },
+          { label: 'Total Half Days', value: totals.half, cls: 'text-amber-600 bg-amber-50 border-amber-200' },
+          { label: 'Total OT Hours', value: totals.ot.toFixed(1), cls: 'text-blue-600 bg-blue-50 border-blue-200' },
+          { label: 'Total Advance', value: `₹${totals.adv.toLocaleString('en-IN')}`, cls: 'text-violet-600 bg-violet-50 border-violet-200' },
         ].map(c => (
           <div key={c.label} className={`rounded-xl border p-3.5 ${c.cls}`}>
             <p className="text-[10px] font-semibold uppercase tracking-wider opacity-70">{c.label}</p>
@@ -686,7 +815,7 @@ const Step2: React.FC<{
             const overCap = totalTracked > calDays;
             return totalTracked === 0 ? 'bg-red-50/40' :
               overCap ? 'bg-red-50' :
-              missingDays > 5 ? 'bg-amber-50/50' : '';
+                missingDays > 5 ? 'bg-amber-50/50' : '';
           }}
           density="compact"
         />
@@ -815,10 +944,11 @@ const Step3: React.FC<{
   run: ApiPayrollRun;
   onBack: () => void;
   onNext: () => void;
-}> = ({ run, onBack, onNext }) => {
+  onAdvanceChange?: (empId: number, amount: number) => void;
+}> = ({ run, onBack, onNext, onAdvanceChange }) => {
   const { can } = usePermission();
   const canViewCashInHand = can("payroll-extended-comp.view");
-  const results   = run.results || [];
+  const results = run.results || [];
   const variances = results.filter(r => r.hasVariance);
 
   const totalOnRecordNet = run.totalNetSalary || results.reduce((s, r) => s + Number(r.netSalary || 0), 0);
@@ -929,14 +1059,11 @@ const Step3: React.FC<{
       header: "OT Pay",
       align: "right",
       render: (r) => (
-        <span
-          className="font-mono text-xs text-emerald-600 cursor-help"
-          title={Number(r.otHours) > 0
-            ? `OT = ${r.otHours}h × ₹${Number(r.otHours) > 0 ? (Number(r.otPay) / Number(r.otHours)).toFixed(2) : 0}/h\n= ${fmtDec(Number(r.otPay))}`
-            : 'No overtime'}
-        >
-          {Number(r.otPay) > 0 ? fmtRs(Number(r.otPay)) : '—'}
-        </span>
+        <OtTooltip
+          otHours={Number(r.otHours)}
+          otPay={Number(r.otPay)}
+          dailyRate={Number(r.dailyRate)}
+        />
       ),
     },
     {
@@ -1025,14 +1152,12 @@ const Step3: React.FC<{
       header: "Advance",
       align: "right",
       render: (r) => (
-        <span
-          className="font-mono text-xs text-red-500 cursor-help"
-          title={Number(r.salaryAdvance) > 0
-            ? `Salary Advance Recovery\n= ${fmtRs(Number(r.salaryAdvance))}`
-            : 'No advance deduction'}
-        >
-          {Number(r.salaryAdvance) > 0 ? fmtRs(Number(r.salaryAdvance)) : '—'}
-        </span>
+        <EditableAdvanceInput
+          initialValue={Number(r.salaryAdvance)}
+          employeeId={Number(r.employeeId)}
+          textColorClass="text-red-600"
+          onSave={(empId, amount) => onAdvanceChange?.(empId, amount)}
+        />
       ),
     },
     ...(canViewCashInHand ? [{
@@ -1125,10 +1250,10 @@ const Step3: React.FC<{
       {/* Summary cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: 'Gross Payroll',  value: fmtRs(Number(run.totalGross || 0)),       icon: TrendingUp,   cls: 'text-blue-600 bg-blue-50'     },
-          { label: 'Net Payroll',    value: fmtRs(Number(run.totalNetSalary || 0)),    icon: IndianRupee,  cls: 'text-emerald-600 bg-emerald-50'},
-          { label: 'PF Liability',   value: fmtRs(Number(run.totalPfEmployee || 0) + Number(run.totalPfEmployer || 0)), icon: Building2, cls: 'text-violet-600 bg-violet-50' },
-          { label: 'ESI Liability',  value: fmtRs(Number(run.totalEsiEmployee || 0) + Number(run.totalEsiEmployer || 0)), icon: FileText, cls: 'text-amber-600 bg-amber-50'  },
+          { label: 'Gross Payroll', value: fmtRs(Number(run.totalGross || 0)), icon: TrendingUp, cls: 'text-blue-600 bg-blue-50' },
+          { label: 'Net Payroll', value: fmtRs(Number(run.totalNetSalary || 0)), icon: IndianRupee, cls: 'text-emerald-600 bg-emerald-50' },
+          { label: 'PF Liability', value: fmtRs(Number(run.totalPfEmployee || 0) + Number(run.totalPfEmployer || 0)), icon: Building2, cls: 'text-violet-600 bg-violet-50' },
+          { label: 'ESI Liability', value: fmtRs(Number(run.totalEsiEmployee || 0) + Number(run.totalEsiEmployer || 0)), icon: FileText, cls: 'text-amber-600 bg-amber-50' },
         ].map(c => (
           <div key={c.label} className="bg-white rounded-xl border border-border p-4 shadow-sm">
             <div className="flex items-center justify-between mb-2">
@@ -1184,12 +1309,12 @@ const Step3: React.FC<{
             <div className="flex-1 flex flex-wrap items-center justify-center gap-x-8 gap-y-4 px-6 py-4 text-sm border-b xl:border-b-0 border-slate-200">
               <div className="flex flex-col items-center">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Earned</span>
-                <span className="font-mono font-semibold text-slate-700">{fmtRs(results.reduce((s,r)=>s+Number(r.earnedSalary),0))}</span>
+                <span className="font-mono font-semibold text-slate-700">{fmtRs(results.reduce((s, r) => s + Number(r.earnedSalary), 0))}</span>
               </div>
               <div className="h-8 w-px bg-slate-200 hidden sm:block"></div>
               <div className="flex flex-col items-center">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">OT</span>
-                <span className="font-mono font-semibold text-emerald-600">{fmtRs(results.reduce((s,r)=>s+Number(r.otPay),0))}</span>
+                <span className="font-mono font-semibold text-emerald-600">{fmtRs(results.reduce((s, r) => s + Number(r.otPay), 0))}</span>
               </div>
               <div className="h-8 w-px bg-slate-200 hidden sm:block"></div>
               <div className="flex flex-col items-center">
@@ -1200,7 +1325,7 @@ const Step3: React.FC<{
               <div className="flex flex-col items-center">
                 <span className="text-[10px] font-bold text-rose-400 uppercase tracking-widest mb-1">Deductions</span>
                 <span className="font-mono font-semibold text-rose-600">
-                  PF {fmtRs(results.reduce((s,r)=>s+Number(r.employeePf),0))} · ESI {fmtRs(results.reduce((s,r)=>s+Number(r.employeeEsi),0))}
+                  PF {fmtRs(results.reduce((s, r) => s + Number(r.employeePf), 0))} · ESI {fmtRs(results.reduce((s, r) => s + Number(r.employeeEsi), 0))}
                 </span>
               </div>
             </div>
@@ -1211,7 +1336,7 @@ const Step3: React.FC<{
                 <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest mb-1">Net Pay</span>
                 <span className="font-mono text-xl font-black text-emerald-700">{fmtRs(run.totalNetSalary)}</span>
               </div>
-              
+
               {canViewCashInHand && (
                 <div className="px-6 py-4 flex flex-col items-end justify-center bg-indigo-50 flex-1 xl:flex-none">
                   <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest mb-1">Cash in Hand</span>
@@ -1247,12 +1372,12 @@ const Step4: React.FC<{
   const canViewCash = can("payroll-cash-in-hand");
   const canViewCashInHand = can("payroll-extended-comp.view") || canViewCash;
   const [declared, setDeclared] = useState(false);
-  const [loading,  setLoading]  = useState(false);
-  const [error,    setError]    = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const results   = run.results || [];
-  const bankRows  = results.filter(r => r.paymentMode === 'BANK');
-  const cashRows  = results.filter(r => r.paymentMode === 'CASH');
+  const results = run.results || [];
+  const bankRows = results.filter(r => r.paymentMode === 'BANK');
+  const cashRows = results.filter(r => r.paymentMode === 'CASH');
   const totalAdditionalComp = run.totalAdditionalComp || results.reduce((s, r) => s + Number(r.additionalComp?.additionalAmount || 0), 0);
   const totalCombinedNet = run.totalCombinedNet || (run.totalNetSalary + totalAdditionalComp);
 
@@ -1289,15 +1414,15 @@ const Step4: React.FC<{
         <div className="grid grid-cols-2 gap-3">
           {([
             { label: 'Total Employees', value: `${results.length}` },
-            { label: 'Net Payroll',     value: fmtRs(run.totalNetSalary), bold: true },
-            canViewCashInHand ? { label: 'Cash In Hand',    value: fmtRs(totalAdditionalComp) } : null,
-            canViewCashInHand ? { label: 'Combined Net',    value: fmtRs(totalCombinedNet), bold: true } : null,
-            { label: 'Bank Transfer',   value: fmtRs(bankRows.reduce((s,r)=>s+Number(r.netSalary),0)) },
-            canViewCash ? { label: 'Cash Payment',    value: fmtRs(cashRows.reduce((s,r)=>s+Number(r.netSalary),0)) } : null,
-            { label: 'Employee PF',     value: fmtRs(run.totalPfEmployee) },
-            { label: 'Employer PF',     value: fmtRs(run.totalPfEmployer) },
-            { label: 'Employee ESI',    value: fmtRs(run.totalEsiEmployee) },
-            { label: 'Employer ESI',    value: fmtRs(run.totalEsiEmployer) },
+            { label: 'Net Payroll', value: fmtRs(run.totalNetSalary), bold: true },
+            canViewCashInHand ? { label: 'Cash In Hand', value: fmtRs(totalAdditionalComp) } : null,
+            canViewCashInHand ? { label: 'Combined Net', value: fmtRs(totalCombinedNet), bold: true } : null,
+            { label: 'Bank Transfer', value: fmtRs(bankRows.reduce((s, r) => s + Number(r.netSalary), 0)) },
+            canViewCash ? { label: 'Cash Payment', value: fmtRs(cashRows.reduce((s, r) => s + Number(r.netSalary), 0)) } : null,
+            { label: 'Employee PF', value: fmtRs(run.totalPfEmployee) },
+            { label: 'Employer PF', value: fmtRs(run.totalPfEmployer) },
+            { label: 'Employee ESI', value: fmtRs(run.totalEsiEmployee) },
+            { label: 'Employer ESI', value: fmtRs(run.totalEsiEmployer) },
           ].filter(Boolean) as { label: string; value: string; bold?: boolean }[]).map(item => (
             <div key={item.label} className="flex items-center justify-between py-1.5 border-b border-slate-100">
               <span className="text-sm text-text-secondary">{item.label}</span>
@@ -1320,9 +1445,8 @@ const Step4: React.FC<{
                 <p className="text-xs text-text-muted">{r.employeeCode}</p>
               </div>
               <div className="flex items-center gap-3">
-                <span className={`text-xs px-2 py-0.5 rounded-full font-semibold inline-flex items-center gap-1 ${
-                  r.paymentMode === 'BANK' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'
-                }`}>
+                <span className={`text-xs px-2 py-0.5 rounded-full font-semibold inline-flex items-center gap-1 ${r.paymentMode === 'BANK' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'
+                  }`}>
                   {r.paymentMode === 'BANK' ? <Building2 size={10} /> : <Wallet size={10} />} {r.paymentMode}
                 </span>
                 <div className="flex flex-col items-end text-right">
@@ -1362,10 +1486,10 @@ const Step4: React.FC<{
           <ChevronLeft size={16} /> Back to Preview
         </button>
         {canEditRun && (
-          <Button 
-            text={loading ? "Approving..." : "Approve Payroll"} 
-            onClick={handleApprove} 
-            disabled={!declared || loading} 
+          <Button
+            text={loading ? "Approving..." : "Approve Payroll"}
+            onClick={handleApprove}
+            disabled={!declared || loading}
             size="md"
           />
         )}
@@ -1379,22 +1503,22 @@ const Step5: React.FC<{
   run: ApiPayrollRun;
   onBack: () => void;
 }> = ({ run, onBack }) => {
-  const navigate   = useNavigate();
+  const navigate = useNavigate();
   const { can } = usePermission();
   const canEditRun = can("payroll-run.edit");
   const canViewCash = can("payroll-cash-in-hand");
   const canViewCashInHand = can("payroll-extended-comp.view") || canViewCash;
   const [showModal, setShowModal] = useState(false);
-  const [loading,   setLoading]   = useState(false);
-  const [locked,    setLocked]    = useState(false);
-  const [error,     setError]     = useState('');
-  const { socket }  = useSocket();
+  const [loading, setLoading] = useState(false);
+  const [locked, setLocked] = useState(false);
+  const [error, setError] = useState('');
+  const { socket } = useSocket();
 
-  const results  = run.results || [];
+  const results = run.results || [];
   const bankRows = results.filter(r => r.paymentMode === 'BANK');
   const cashRows = results.filter(r => r.paymentMode === 'CASH');
-  const bankTotal = bankRows.reduce((s,r) => s + Number(r.netSalary), 0);
-  const cashTotal = cashRows.reduce((s,r) => s + Number(r.netSalary), 0);
+  const bankTotal = bankRows.reduce((s, r) => s + Number(r.netSalary), 0);
+  const cashTotal = cashRows.reduce((s, r) => s + Number(r.netSalary), 0);
   const totalAdditionalComp = run.totalAdditionalComp || results.reduce((s, r) => s + Number(r.additionalComp?.additionalAmount || 0), 0);
   const totalCombinedNet = run.totalCombinedNet || (run.totalNetSalary + totalAdditionalComp);
 
@@ -1588,9 +1712,9 @@ const Step5: React.FC<{
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         {([
           { label: 'Total Net Payroll', value: fmtRs(run.totalNetSalary), icon: IndianRupee, cls: 'text-text-primary bg-slate-100' },
-          { label: 'Bank Transfer',     value: fmtRs(bankTotal),           icon: Building2,   cls: 'text-blue-700 bg-blue-50'      },
-          canViewCash ? { label: 'Cash Payment',      value: fmtRs(cashTotal),           icon: Wallet,      cls: 'text-emerald-700 bg-emerald-50'} : null,
-          canViewCashInHand ? { label: 'Cash In Hand', value: fmtRs(totalAdditionalComp), icon: Wallet, cls: 'text-amber-700 bg-amber-50'} : null,
+          { label: 'Bank Transfer', value: fmtRs(bankTotal), icon: Building2, cls: 'text-blue-700 bg-blue-50' },
+          canViewCash ? { label: 'Cash Payment', value: fmtRs(cashTotal), icon: Wallet, cls: 'text-emerald-700 bg-emerald-50' } : null,
+          canViewCashInHand ? { label: 'Cash In Hand', value: fmtRs(totalAdditionalComp), icon: Wallet, cls: 'text-amber-700 bg-amber-50' } : null,
         ].filter(Boolean) as { label: string; value: string; icon: any; cls: string }[]).map(c => (
           <div key={c.label} className="bg-white rounded-xl border border-border p-5 shadow-sm flex items-center gap-4">
             <div className={`p-3 rounded-xl ${c.cls}`}><c.icon size={20} /></div>
@@ -1607,9 +1731,9 @@ const Step5: React.FC<{
         <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
           <div className="flex items-center justify-between px-5 py-3 border-b border-border bg-blue-50/60">
             <h3 className="text-xs font-bold text-blue-700 uppercase tracking-wider flex items-center gap-1.5">
-               Bank Transfers ({bankRows.length})
+              Bank Transfers ({bankRows.length})
             </h3>
-            <button 
+            <button
               onClick={handleDownloadNEFT}
               className="text-xs text-blue-600 font-semibold hover:underline flex items-center gap-1"
             >
@@ -1637,7 +1761,7 @@ const Step5: React.FC<{
             <h3 className="text-xs font-bold text-emerald-700 uppercase tracking-wider flex items-center gap-1.5">
               <Wallet size={12} /> Cash Payments ({cashRows.length})
             </h3>
-            <button 
+            <button
               onClick={handleDownloadCash}
               className="text-xs text-emerald-600 font-semibold hover:underline flex items-center gap-1"
             >
@@ -1722,44 +1846,42 @@ const Step5: React.FC<{
 
 // ─── Main PayrollRun ──────────────────────────────────────────────────────────
 const PayrollRun: React.FC = () => {
-  const [searchParams]  = useSearchParams();
-  const initType        = searchParams.get('type') === 'weekly' ? 'WEEKLY' : 'MONTHLY';
-  const { socket }      = useSocket();
+  const [searchParams] = useSearchParams();
+  const initType = searchParams.get('type') === 'weekly' ? 'WEEKLY' : 'MONTHLY';
+  const { socket } = useSocket();
 
   const [step, setStep] = useState(1);
 
   // Step 1 state
-  const [runType,      setRunType]      = useState<'WEEKLY' | 'MONTHLY'>(initType);
-  const [month,        setMonth]        = useState(new Date().getMonth() + 1);
-  const [year,         setYear]         = useState(new Date().getFullYear());
-  const [weekMonth,    setWeekMonth]    = useState(new Date().getMonth() + 1);
-  const [weekOfMonth,  setWeekOfMonth]  = useState(Math.ceil(new Date().getDate() / 7));
-  const [category,     setCategory]     = useState<SalaryCategory>('ALL');
+  const [runType, setRunType] = useState<'WEEKLY' | 'MONTHLY'>(initType);
+  const [month, setMonth] = useState(new Date().getMonth() + 1);
+  const [year, setYear] = useState(new Date().getFullYear());
+  const [weekMonth, setWeekMonth] = useState(new Date().getMonth() + 1);
+  const [weekOfMonth, setWeekOfMonth] = useState(Math.ceil(new Date().getDate() / 7));
+  const [category, setCategory] = useState<SalaryCategory>('ALL');
 
   // Auto-calculate calDays
   const calDays = useMemo(() => {
     if (runType === 'WEEKLY') {
-      const opts = getWeeksOfMonth(year, weekMonth);
-      const opt  = opts.find(o => o.weekOfMonth === weekOfMonth) ?? opts[0];
-      return opt ? opt.endDay - opt.startDay + 1 : 7;
+      return 7;
     }
     return daysInMonth(year, month);
-  }, [runType, year, month, weekMonth, weekOfMonth]);
+  }, [runType, year, month]);
 
   // Data from API
-  const [employees,  setEmployees]  = useState<ApiEmployeePayroll[]>([]);
+  const [employees, setEmployees] = useState<ApiEmployeePayroll[]>([]);
   const [loadingEmp, setLoadingEmp] = useState(true);
 
   // Step 2 state
   const [attRows, setAttRows] = useState<AttRow[]>([]);
 
   // Step 3 computing state
-  const [computing,      setComputing]      = useState(false);
-  const [progress,       setProgress]       = useState<ProgressState>({ current: 0, total: 0, currentEmployee: '', runCode: '' });
-  const [currentRun,     setCurrentRun]     = useState<ApiPayrollRun | null>(null);
-  const [computeErr,     setComputeErr]     = useState('');
-  const [loadingStep2,      setLoadingStep2]      = useState(false);
-  const [attFromSaved,      setAttFromSaved]      = useState(false);
+  const [computing, setComputing] = useState(false);
+  const [progress, setProgress] = useState<ProgressState>({ current: 0, total: 0, currentEmployee: '', runCode: '' });
+  const [currentRun, setCurrentRun] = useState<ApiPayrollRun | null>(null);
+  const [computeErr, setComputeErr] = useState('');
+  const [loadingStep2, setLoadingStep2] = useState(false);
+  const [attFromSaved, setAttFromSaved] = useState(false);
   const [attValidationError, setAttValidationError] = useState<{ employees: { name: string; code: string; entered: number; expected: number }[] } | null>(null);
 
   // Load employees on mount
@@ -1778,11 +1900,11 @@ const PayrollRun: React.FC = () => {
         setLoadingStep2(true);
         const run = await payrollService.getRun(Number(runId));
         setCurrentRun(run);
-        
+
         // Parse and set period states
         setRunType(run.type);
         setCategory(run.employeeCategory as SalaryCategory);
-        
+
         if (run.type === 'MONTHLY') {
           const [y, m] = run.period.split('-');
           setYear(Number(y));
@@ -1793,7 +1915,7 @@ const PayrollRun: React.FC = () => {
           const isoYear = Number(y);
           const isoWeek = Number(wStr);
           setYear(isoYear);
-          
+
           let wMonth = new Date().getMonth() + 1;
           let wOfM = 1;
           for (let m = 1; m <= 12; m++) {
@@ -1809,43 +1931,8 @@ const PayrollRun: React.FC = () => {
           setWeekOfMonth(wOfM);
         }
 
-        // Fetch attendance for the period to populate Step 2 attRows in case they go back
-        let lookupPeriod: string;
-        let weekStartDay = 1;
-        let weekEndDay   = run.calendarDays;
-
-        if (run.type === 'WEEKLY') {
-          const [y, wStr] = run.period.split('-W');
-          const isoYear = Number(y);
-          const isoWeek = Number(wStr);
-          
-          let wMonth = new Date().getMonth() + 1;
-          let wOfM = 1;
-          for (let m = 1; m <= 12; m++) {
-            const opts = getWeeksOfMonth(isoYear, m);
-            const match = opts.find(o => o.isoWeek === isoWeek && o.isoYear === isoYear);
-            if (match) {
-              wMonth = m;
-              wOfM = match.weekOfMonth;
-              break;
-            }
-          }
-          lookupPeriod = `${isoYear}-${String(wMonth).padStart(2, '0')}`;
-          const opts = getWeeksOfMonth(isoYear, wMonth);
-          const opt  = opts.find(o => o.weekOfMonth === wOfM) ?? opts[0];
-          if (opt) { weekStartDay = opt.startDay; weekEndDay = opt.endDay; }
-        } else {
-          lookupPeriod = run.period;
-        }
-
-        const allRecords = await payrollService.getAttendance(lookupPeriod);
+        const allRecords = await payrollService.getAttendance(run.period);
         let filteredRecords = allRecords;
-        if (run.type === 'WEEKLY') {
-          filteredRecords = allRecords.filter((r: any) => {
-            const day = parseInt(r.date.split('-')[2], 10);
-            return day >= weekStartDay && day <= weekEndDay;
-          });
-        }
 
         const typeFiltered = employees.filter(e =>
           run.type === 'WEEKLY' ? isWeeklyEmployee(e) : !isWeeklyEmployee(e)
@@ -1855,49 +1942,56 @@ const PayrollRun: React.FC = () => {
           : typeFiltered.filter(e => e.payrollConfig?.salaryType === run.employeeCategory);
 
         const defaultRows: AttRow[] = filtered.map(e => ({
-          employeeId:        Number(e.id),
-          name:              e.fullName,
-          code:              e.empCode,
-          salaryType:        e.payrollConfig?.salaryType ?? 'FIXED_MONTHLY',
-          presentDays:       0,
-          absentDays:        0,
-          halfDays:          0,
-          otHours:           0,
-          lateMinutes:       0,
-          dailyLateMinutes:  [],
+          employeeId: Number(e.id),
+          name: e.fullName,
+          code: e.empCode,
+          salaryType: e.payrollConfig?.salaryType ?? 'FIXED_MONTHLY',
+          presentDays: 0,
+          absentDays: 0,
+          halfDays: 0,
+          otHours: 0,
+          lateMinutes: 0,
+          dailyLateMinutes: [],
           permissionMinutes: 0,
-          advance:           0,
+          advance: 0,
         }));
 
         let rows = defaultRows;
         if (filteredRecords.length > 0) {
+          const uniqueMap = new Map<string, any>();
+          filteredRecords.forEach((r: any) => {
+            uniqueMap.set(`${r.employeeId}-${r.date}`, r);
+          });
+          const uniqueRecs = Array.from(uniqueMap.values());
+
           type Agg = { present: number; absent: number; half: number; ot: number; late: number; dailyLate: number[]; perm: number; adv: number };
           const agg: Record<number, Agg> = {};
-          filteredRecords.forEach((r: any) => {
+          uniqueRecs.forEach((r: any) => {
             const empId = Number(r.employeeId);
             if (!agg[empId]) agg[empId] = { present: 0, absent: 0, half: 0, ot: 0, late: 0, dailyLate: [], perm: 0, adv: 0 };
-            if (r.status === 'PRESENT')   agg[empId].present++;
-            if (r.status === 'ABSENT')    agg[empId].absent++;
-            if (r.status === 'HALF_DAY')  agg[empId].half++;
-            agg[empId].ot   += Number(r.otHours);
+            if (r.status === 'PRESENT') agg[empId].present++;
+            if (runType === 'MONTHLY' && (r.status === 'WEEKLY_OFF' || r.status === 'HOLIDAY' || r.status === 'LEAVE_PAID')) agg[empId].present++;
+            if (r.status === 'ABSENT' || r.status === 'LEAVE_UNPAID') agg[empId].absent++;
+            if (r.status === 'HALF_DAY') agg[empId].half++;
+            agg[empId].ot += Number(r.otHours);
             agg[empId].late += Number(r.lateMinutes);
             agg[empId].dailyLate.push(Number(r.lateMinutes));
             agg[empId].perm += Number(r.permissionMinutes);
-            agg[empId].adv  += Number(r.salaryAdvance);
+            agg[empId].adv += Number(r.salaryAdvance);
           });
           rows = defaultRows.map(row => {
             const a = agg[row.employeeId];
             if (!a) return row;
             return {
               ...row,
-              presentDays:       a.present,
-              absentDays:        a.absent,
-              halfDays:          a.half,
-              otHours:           a.ot,
-              lateMinutes:       a.late,
-              dailyLateMinutes:  a.dailyLate,
+              presentDays: a.present,
+              absentDays: a.absent,
+              halfDays: a.half,
+              otHours: a.ot,
+              lateMinutes: a.late,
+              dailyLateMinutes: a.dailyLate,
               permissionMinutes: a.perm,
-              advance:           a.adv,
+              advance: a.adv,
             };
           });
           setAttFromSaved(true);
@@ -1929,10 +2023,10 @@ const PayrollRun: React.FC = () => {
 
     socket.on('payroll:progress', (data: { current: number; total: number; employee: { name: string }; runCode: string }) => {
       setProgress({
-        current:         data.current,
-        total:           data.total,
+        current: data.current,
+        total: data.total,
         currentEmployee: data.employee.name,
-        runCode:         data.runCode,
+        runCode: data.runCode,
       });
     });
 
@@ -1951,19 +2045,19 @@ const PayrollRun: React.FC = () => {
   const period = useMemo(() => {
     if (runType === 'WEEKLY') {
       const opts = getWeeksOfMonth(year, weekMonth);
-      const opt  = opts.find(o => o.weekOfMonth === weekOfMonth) ?? opts[0];
+      const opt = opts.find(o => o.weekOfMonth === weekOfMonth) ?? opts[0];
       if (!opt) return `${year}-W01`;
       return `${opt.isoYear}-W${String(opt.isoWeek).padStart(2, '0')}`;
     }
-    return `${year}-${String(month).padStart(2,'0')}`;
+    return `${year}-${String(month).padStart(2, '0')}`;
   }, [runType, year, month, weekMonth, weekOfMonth]);
 
   const periodLabel = useMemo(() => {
     if (runType === 'WEEKLY') {
       const opts = getWeeksOfMonth(year, weekMonth);
-      const opt  = opts.find(o => o.weekOfMonth === weekOfMonth) ?? opts[0];
+      const opt = opts.find(o => o.weekOfMonth === weekOfMonth) ?? opts[0];
       if (!opt) return `Week 1, ${year}`;
-      return `${MONTHS_SHORT[weekMonth - 1]} ${opt.startDay}–${opt.endDay}, ${year}`;
+      return opt.label.replace(/^Week \d+\s*\(/, '').replace(/\)$/, '');
     }
     return `${MONTHS[month - 1]} ${year}`;
   }, [runType, year, month, weekMonth, weekOfMonth]);
@@ -1980,18 +2074,18 @@ const PayrollRun: React.FC = () => {
     );
     const filtered = c === 'ALL' ? typeFiltered : typeFiltered.filter(e => e.payrollConfig?.salaryType === c);
     setAttRows(filtered.map(e => ({
-      employeeId:        Number(e.id),
-      name:              e.fullName,
-      code:              e.empCode,
-      salaryType:        e.payrollConfig?.salaryType ?? 'FIXED_MONTHLY',
-      presentDays:       0,
-      absentDays:        0,
-      halfDays:          0,
-      otHours:           0,
-      lateMinutes:       0,
-      dailyLateMinutes:  [],
+      employeeId: Number(e.id),
+      name: e.fullName,
+      code: e.empCode,
+      salaryType: e.payrollConfig?.salaryType ?? 'FIXED_MONTHLY',
+      presentDays: 0,
+      absentDays: 0,
+      halfDays: 0,
+      otHours: 0,
+      lateMinutes: 0,
+      dailyLateMinutes: [],
       permissionMinutes: 0,
-      advance:           0,
+      advance: 0,
     })));
   };
 
@@ -2008,55 +2102,42 @@ const PayrollRun: React.FC = () => {
       : typeFiltered.filter(e => e.payrollConfig?.salaryType === category);
 
     const defaultRows: AttRow[] = filtered.map(e => ({
-      employeeId:        Number(e.id),
-      name:              e.fullName,
-      code:              e.empCode,
-      salaryType:        e.payrollConfig?.salaryType ?? 'FIXED_MONTHLY',
-      presentDays:       0,
-      absentDays:        0,
-      halfDays:          0,
-      otHours:           0,
-      lateMinutes:       0,
-      dailyLateMinutes:  [],
+      employeeId: Number(e.id),
+      name: e.fullName,
+      code: e.empCode,
+      salaryType: e.payrollConfig?.salaryType ?? 'FIXED_MONTHLY',
+      presentDays: 0,
+      absentDays: 0,
+      halfDays: 0,
+      otHours: 0,
+      lateMinutes: 0,
+      dailyLateMinutes: [],
       permissionMinutes: 0,
-      advance:           0,
+      advance: 0,
     }));
 
     // Load saved attendance records
     let allRecords: any[] = [];
-    let lookupPeriod = period;
-    let weekStartDay = 1;
-    let weekEndDay   = calDays;
 
     try {
-      if (runType === 'WEEKLY') {
-        lookupPeriod = `${year}-${String(weekMonth).padStart(2, '0')}`;
-        const opts = getWeeksOfMonth(year, weekMonth);
-        const opt  = opts.find(o => o.weekOfMonth === weekOfMonth) ?? opts[0];
-        if (opt) { weekStartDay = opt.startDay; weekEndDay = opt.endDay; }
-      }
-
-      let fetched: any[] = await payrollService.getAttendance(lookupPeriod);
-
-      if (runType === 'WEEKLY') {
-        fetched = fetched.filter((r: any) => {
-          const day = parseInt(r.date.split('-')[2], 10);
-          return day >= weekStartDay && day <= weekEndDay;
-        });
-      }
-      allRecords = fetched;
+      allRecords = await payrollService.getAttendance(period);
     } catch {
       // attendance fetch failed — allRecords stays empty
     }
 
     // ── Validate: every employee must have all days of the period entered ──────
-    const expectedDays = runType === 'WEEKLY'
-      ? (weekEndDay - weekStartDay + 1)
-      : calDays;
+    const expectedDays = runType === 'WEEKLY' ? 7 : calDays;
+
+    // Deduplicate records by employeeId and date to avoid duplicate counts
+    const uniqueMap = new Map<string, any>();
+    allRecords.forEach((r: any) => {
+      uniqueMap.set(`${r.employeeId}-${r.date}`, r);
+    });
+    const uniqueRecords = Array.from(uniqueMap.values());
 
     // Count how many dates each employee has recorded
     const empDateCount: Record<number, number> = {};
-    allRecords.forEach((r: any) => {
+    uniqueRecords.forEach((r: any) => {
       const empId = Number(r.employeeId);
       empDateCount[empId] = (empDateCount[empId] ?? 0) + 1;
     });
@@ -2066,9 +2147,9 @@ const PayrollRun: React.FC = () => {
     if (incomplete.length > 0) {
       setAttValidationError({
         employees: incomplete.map(e => ({
-          name:     e.fullName,
-          code:     e.empCode,
-          entered:  empDateCount[Number(e.id)] ?? 0,
+          name: e.fullName,
+          code: e.empCode,
+          entered: empDateCount[Number(e.id)] ?? 0,
           expected: expectedDays,
         })),
       });
@@ -2079,44 +2160,40 @@ const PayrollRun: React.FC = () => {
     // ── All employees complete — aggregate attendance ──────────────────────────
     type Agg = { present: number; absent: number; half: number; ot: number; late: number; dailyLate: number[]; perm: number; adv: number };
     const agg: Record<number, Agg> = {};
-    allRecords.forEach((r: any) => {
+    uniqueRecords.forEach((r: any) => {
       const empId = Number(r.employeeId);
       if (!agg[empId]) agg[empId] = { present: 0, absent: 0, half: 0, ot: 0, late: 0, dailyLate: [], perm: 0, adv: 0 };
-      if (r.status === 'PRESENT')  agg[empId].present++;
-      if (r.status === 'ABSENT')   agg[empId].absent++;
+      if (r.status === 'PRESENT') agg[empId].present++;
+      if (runType === 'MONTHLY' && (r.status === 'WEEKLY_OFF' || r.status === 'HOLIDAY' || r.status === 'LEAVE_PAID')) agg[empId].present++;
+      if (r.status === 'ABSENT' || r.status === 'LEAVE_UNPAID') agg[empId].absent++;
       if (r.status === 'HALF_DAY') agg[empId].half++;
-      agg[empId].ot   += Number(r.otHours);
+      agg[empId].ot += Number(r.otHours);
       agg[empId].late += Number(r.lateMinutes);
       agg[empId].dailyLate.push(Number(r.lateMinutes));
       agg[empId].perm += Number(r.permissionMinutes);
     });
 
     // ── Load salary advances disbursed within this period ─────────────────────
-    // Date range: for weekly, use the actual start/end dates of the selected week
-    const mm = String(weekMonth).padStart(2, '0');
-    const dateFrom = runType === 'WEEKLY'
-      ? `${year}-${mm}-${String(weekStartDay).padStart(2, '0')}`
+    const selectedWeekOpt = getWeeksOfMonth(year, weekMonth).find(o => o.weekOfMonth === weekOfMonth);
+    const dateFrom = runType === 'WEEKLY' && selectedWeekOpt
+      ? selectedWeekOpt.startDate
       : `${year}-${String(month).padStart(2, '0')}-01`;
-    const lastDay  = runType === 'WEEKLY'
-      ? weekEndDay
-      : new Date(year, month, 0).getDate();
-    const dateTo   = runType === 'WEEKLY'
-      ? `${year}-${mm}-${String(weekEndDay).padStart(2, '0')}`
-      : `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+    const dateTo = runType === 'WEEKLY' && selectedWeekOpt
+      ? selectedWeekOpt.endDate
+      : `${year}-${String(month).padStart(2, '0')}-${String(new Date(year, month, 0).getDate()).padStart(2, '0')}`;
 
     const advanceMap: Record<number, number> = {};
     try {
-      const advances = await payrollService.listAdvances({ status: 'PENDING', dateFrom, dateTo });
-      advances.forEach(adv => {
+      const pendingAdvances = await payrollService.listAdvances({ status: 'PENDING', dateTo });
+      pendingAdvances.forEach(adv => {
         const empId = Number(adv.employeeId);
         const outstanding = Number(adv.amount) - Number(adv.recoveredAmount);
         if (outstanding > 0) {
           advanceMap[empId] = (advanceMap[empId] ?? 0) + outstanding;
         }
       });
-      // Also include PARTIAL advances disbursed in this period
-      const partials = await payrollService.listAdvances({ status: 'PARTIAL', dateFrom, dateTo });
-      partials.forEach(adv => {
+      const partialAdvances = await payrollService.listAdvances({ status: 'PARTIAL', dateTo });
+      partialAdvances.forEach(adv => {
         const empId = Number(adv.employeeId);
         const outstanding = Number(adv.amount) - Number(adv.recoveredAmount);
         if (outstanding > 0) {
@@ -2134,14 +2211,14 @@ const PayrollRun: React.FC = () => {
         const a = agg[row.employeeId];
         return {
           ...row,
-          presentDays:       a?.present   ?? 0,
-          absentDays:        a?.absent    ?? 0,
-          halfDays:          a?.half      ?? 0,
-          otHours:           a?.ot        ?? 0,
-          lateMinutes:       a?.late      ?? 0,
-          dailyLateMinutes:  a?.dailyLate ?? [],
-          permissionMinutes: a?.perm      ?? 0,
-          advance:           advanceMap[row.employeeId] ?? 0,
+          presentDays: a?.present ?? 0,
+          absentDays: a?.absent ?? 0,
+          halfDays: a?.half ?? 0,
+          otHours: a?.ot ?? 0,
+          lateMinutes: a?.late ?? 0,
+          dailyLateMinutes: a?.dailyLate ?? [],
+          permissionMinutes: a?.perm ?? 0,
+          advance: advanceMap[row.employeeId] ?? 0,
         };
       });
       setAttFromSaved(true);
@@ -2153,18 +2230,43 @@ const PayrollRun: React.FC = () => {
     setStep(2);
   };
 
+  const handleAdvanceChange = async (empId: number, amount: number) => {
+    const updatedRows = attRows.map(r => Number(r.employeeId) === Number(empId) ? { ...r, advance: amount } : r);
+    setAttRows(updatedRows);
+
+    if (currentRun) {
+      const attendance: AttendanceInput[] = updatedRows.map(r => ({
+        employeeId: Number(r.employeeId),
+        presentDays: r.presentDays,
+        absentDays: r.absentDays,
+        halfDays: r.halfDays,
+        otHours: r.otHours,
+        lateMinutes: r.lateMinutes,
+        dailyLateMinutes: r.dailyLateMinutes ?? [],
+        permissionMinutes: r.permissionMinutes,
+        advance: Number(r.employeeId) === Number(empId) ? amount : r.advance,
+      }));
+      try {
+        const run = await payrollService.computeRun({ period, type: runType, employeeCategory: category, calendarDays: calDays, attendance });
+        setCurrentRun(run);
+      } catch (e: any) {
+        console.error('Failed to recalculate advance:', e);
+      }
+    }
+  };
+
   const handleCalculate = async () => {
     setComputeErr('');
     const attendance: AttendanceInput[] = attRows.map(r => ({
-      employeeId:        r.employeeId,
-      presentDays:       r.presentDays,
-      absentDays:        r.absentDays,
-      halfDays:          r.halfDays,
-      otHours:           r.otHours,
-      lateMinutes:       r.lateMinutes,
-      dailyLateMinutes:  r.dailyLateMinutes ?? [],
+      employeeId: r.employeeId,
+      presentDays: r.presentDays,
+      absentDays: r.absentDays,
+      halfDays: r.halfDays,
+      otHours: r.otHours,
+      lateMinutes: r.lateMinutes,
+      dailyLateMinutes: r.dailyLateMinutes ?? [],
       permissionMinutes: r.permissionMinutes,
-      advance:           r.advance,
+      advance: r.advance,
     }));
     try {
       if (currentRun) {
@@ -2195,11 +2297,10 @@ const PayrollRun: React.FC = () => {
               <span className="text-text-muted">Run: </span>
               <span className="font-mono text-xs text-text-primary">{currentRun.runCode}</span>
               <span className="mx-2 text-border">·</span>
-              <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                currentRun.status === 'LOCKED'   ? 'bg-emerald-100 text-emerald-700' :
+              <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${currentRun.status === 'LOCKED' ? 'bg-emerald-100 text-emerald-700' :
                 currentRun.status === 'APPROVED' ? 'bg-blue-100 text-blue-700' :
-                'bg-amber-100 text-amber-700'
-              }`}>{currentRun.status}</span>
+                  'bg-amber-100 text-amber-700'
+                }`}>{currentRun.status}</span>
             </div>
           )}
         </div>
@@ -2214,18 +2315,18 @@ const PayrollRun: React.FC = () => {
           loadingEmp
             ? <CommonLoader text="Loading employees…" fullScreen={false} />
             : <Step1
-                runType={runType}       setRunType={setRunType}
-                month={month}           setMonth={setMonth}
-                year={year}             setYear={setYear}
-                weekMonth={weekMonth}   setWeekMonth={setWeekMonth}
-                weekOfMonth={weekOfMonth} setWeekOfMonth={setWeekOfMonth}
-                category={category}     setCategory={handleCategoryChange}
-                calDays={calDays}
-                employees={employees}
-                loading={loadingStep2}
-                onNext={handlePeriodNext}
-                attValidationError={attValidationError}
-              />
+              runType={runType} setRunType={setRunType}
+              month={month} setMonth={setMonth}
+              year={year} setYear={setYear}
+              weekMonth={weekMonth} setWeekMonth={setWeekMonth}
+              weekOfMonth={weekOfMonth} setWeekOfMonth={setWeekOfMonth}
+              category={category} setCategory={handleCategoryChange}
+              calDays={calDays}
+              employees={employees}
+              loading={loadingStep2}
+              onNext={handlePeriodNext}
+              attValidationError={attValidationError}
+            />
         )}
 
         {step === 2 && (
@@ -2234,8 +2335,10 @@ const PayrollRun: React.FC = () => {
             hasData={attFromSaved}
             period={period}
             calDays={calDays}
+            runType={runType}
             onBack={() => setStep(1)}
             onNext={handleCalculate}
+            onAdvanceChange={handleAdvanceChange}
           />
         )}
 
@@ -2246,7 +2349,7 @@ const PayrollRun: React.FC = () => {
         )}
 
         {step === 3 && currentRun && (
-          <Step3 run={currentRun} onBack={() => setStep(2)} onNext={() => setStep(currentRun.status === 'APPROVED' ? 5 : 4)} />
+          <Step3 run={currentRun} onBack={() => setStep(2)} onNext={() => setStep(currentRun.status === 'APPROVED' ? 5 : 4)} onAdvanceChange={handleAdvanceChange} />
         )}
 
         {step === 4 && currentRun && (

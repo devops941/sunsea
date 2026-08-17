@@ -562,6 +562,7 @@ model Shift {
   WeeklyMachineProgram WeeklyMachineProgram[]
   shiftRecords         ProductShiftRecord[]
   employees            Employee[]
+  attendanceRecords    AttendanceRecord[]
 
   @@map("shifts")
 }
@@ -2256,12 +2257,15 @@ model AttendanceRecord {
   date              String
   period            String
   status            String
+  shiftId           Int?
   otHours           Decimal  @default(0) @db.Decimal(10, 2)
   lateMinutes       Int      @default(0)
   permissionMinutes Int      @default(0)
   salaryAdvance     Decimal  @default(0) @db.Decimal(14, 2)
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
+
+  shift             Shift?   @relation(fields: [shiftId], references: [id])
 
   @@unique([employeeId, date])
   @@map("attendance_records")
@@ -2312,7 +2316,7 @@ model PayrollConfig {
   pfEnabled                 Boolean  @default(true)
   pfWageFormula             String   @default("BASIC")
   employeePfPercent         Decimal  @default(12) @db.Decimal(5, 2)
-  employerPfPercent         Decimal  @default(13) @db.Decimal(5, 2)
+  employerPfPercent         Decimal  @default(12) @db.Decimal(5, 2)
   maxPfWage                 Decimal  @default(15000) @db.Decimal(10, 2)
   pfRoundingRule            String   @default("ROUND")
   esiEnabled                Boolean  @default(true)

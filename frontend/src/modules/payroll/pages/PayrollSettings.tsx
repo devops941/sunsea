@@ -23,6 +23,8 @@ interface SlabEntry {
   fromMinutes: number;
   toMinutes: number;
   amount: number;
+  action?: 'DEDUCT_AMOUNT' | 'HALF_DAY' | 'HALF_DAY_PLUS_OT';
+  otHours?: number;
 }
 
 interface SalaryComponent {
@@ -87,6 +89,8 @@ const SlabConfigurator: React.FC<{
       fromMinutes: Number(draft.fromMinutes) || 0,
       toMinutes:   Number(draft.toMinutes)   || 0,
       amount:      Number(draft.amount)      || 0,
+      action:      (draft.action as SlabEntry['action']) ?? 'DEDUCT_AMOUNT',
+      otHours:     Number(draft.otHours)     || 0,
     }]);
     setAdding(false); setDraft({});
   };
@@ -97,58 +101,93 @@ const SlabConfigurator: React.FC<{
 
   // Shared form fields — 3 reusable TextInput components
   // Shared form fields — 3 reusable TextInput components
-  const renderSlabForm = (onSave: () => void, onCancel: () => void) => (
-    <div className="border border-primary/30 rounded-xl p-4 bg-primary/[0.03] space-y-3">
-      <TextInput
-        label="Label"
-        name="slab-label"
-        placeholder="e.g. 1–10 min"
-        value={String(draft.label ?? '')}
-        onChange={e => setDraft(d => ({ ...d, label: e.target.value }))}
-        bottom
-      />
-      <div className="grid grid-cols-3 gap-3">
+  const renderSlabForm = (onSave: () => void, onCancel: () => void) => {
+    const actionVal = (draft.action ?? 'DEDUCT_AMOUNT') as string;
+    return (
+      <div className="border border-primary/30 rounded-xl p-4 bg-primary/[0.03] space-y-3">
         <TextInput
-          label="From (min)"
-          name="slab-from"
-          type="number"
-          value={draft.fromMinutes !== undefined && draft.fromMinutes !== null ? String(draft.fromMinutes) : ''}
-          onChange={e => setDraft(d => ({ ...d, fromMinutes: e.target.value ? Number(e.target.value) : '' as any }))}
+          label="Label"
+          name="slab-label"
+          placeholder="e.g. 1–10 min"
+          value={String(draft.label ?? '')}
+          onChange={e => setDraft(d => ({ ...d, label: e.target.value }))}
           bottom
         />
-        <TextInput
-          label="To (min) — 0 = & above"
-          name="slab-to"
-          type="number"
-          value={draft.toMinutes !== undefined && draft.toMinutes !== null ? String(draft.toMinutes) : ''}
-          onChange={e => setDraft(d => ({ ...d, toMinutes: e.target.value ? Number(e.target.value) : '' as any }))}
-          bottom
-        />
-        <TextInput
-          label="Amount (₹)"
-          name="slab-amount"
-          type="number"
-          value={draft.amount !== undefined && draft.amount !== null ? String(draft.amount) : ''}
-          onChange={e => setDraft(d => ({ ...d, amount: e.target.value ? Number(e.target.value) : '' as any }))}
-          bottom
-        />
+        <div className="grid grid-cols-3 gap-3">
+          <TextInput
+            label="From (min)"
+            name="slab-from"
+            type="number"
+            value={draft.fromMinutes !== undefined && draft.fromMinutes !== null ? String(draft.fromMinutes) : ''}
+            onChange={e => setDraft(d => ({ ...d, fromMinutes: e.target.value ? Number(e.target.value) : '' as any }))}
+            bottom
+          />
+          <TextInput
+            label="To (min) — 0 = & above"
+            name="slab-to"
+            type="number"
+            value={draft.toMinutes !== undefined && draft.toMinutes !== null ? String(draft.toMinutes) : ''}
+            onChange={e => setDraft(d => ({ ...d, toMinutes: e.target.value ? Number(e.target.value) : '' as any }))}
+            bottom
+          />
+          {/* Action dropdown — only shown when this is used as Permission Slab */}
+          <div>
+            <label className="block text-xs font-semibold text-text-muted mb-1.5">Action</label>
+            <select
+              value={actionVal}
+              onChange={e => setDraft(d => ({ ...d, action: e.target.value as SlabEntry['action'], amount: 0, otHours: 0 }))}
+              className="w-full border border-border rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary bg-white"
+            >
+              <option value="DEDUCT_AMOUNT">₹ Deduct Amount</option>
+              <option value="HALF_DAY">Half Day (LOP)</option>
+              <option value="HALF_DAY_PLUS_OT">Half Day + OT</option>
+            </select>
+          </div>
+        </div>
+        {/* Conditional fields */}
+        {actionVal === 'DEDUCT_AMOUNT' && (
+          <TextInput
+            label="Amount (₹)"
+            name="slab-amount"
+            type="number"
+            value={draft.amount !== undefined && draft.amount !== null ? String(draft.amount) : ''}
+            onChange={e => setDraft(d => ({ ...d, amount: e.target.value ? Number(e.target.value) : '' as any }))}
+            bottom
+          />
+        )}
+        {actionVal === 'HALF_DAY_PLUS_OT' && (
+          <TextInput
+            label="Auto-add OT Hours"
+            name="slab-ot-hours"
+            type="number"
+            placeholder="e.g. 3"
+            value={draft.otHours !== undefined && draft.otHours !== null ? String(draft.otHours) : ''}
+            onChange={e => setDraft(d => ({ ...d, otHours: e.target.value ? Number(e.target.value) : '' as any }))}
+            bottom
+          />
+        )}
+        {actionVal === 'HALF_DAY' && (
+          <p className="text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
+            This slab will automatically convert the day to <strong>Half Day (0.5 LOP)</strong> with no ₹ deduction.
+          </p>
+        )}
+        <div className="flex gap-2 pt-1">
+          <button
+            onClick={onSave}
+            className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-primary rounded-lg hover:bg-primary/90 transition-colors"
+          >
+            <Check size={13} /> Save Slab
+          </button>
+          <button
+            onClick={onCancel}
+            className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-text-secondary border border-border rounded-lg hover:bg-slate-50 transition-colors"
+          >
+            <X size={13} /> Cancel
+          </button>
+        </div>
       </div>
-      <div className="flex gap-2 pt-1">
-        <button
-          onClick={onSave}
-          className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-primary rounded-lg hover:bg-primary/90 transition-colors"
-        >
-          <Check size={13} /> Save Slab
-        </button>
-        <button
-          onClick={onCancel}
-          className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-text-secondary border border-border rounded-lg hover:bg-slate-50 transition-colors"
-        >
-          <X size={13} /> Cancel
-        </button>
-      </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div className="space-y-3">
@@ -190,9 +229,28 @@ const SlabConfigurator: React.FC<{
                   {s.fromMinutes}{s.toMinutes === 0 ? '+ min' : ` – ${s.toMinutes} min`}
                 </span>
                 <span className="text-text-muted text-xs">→</span>
-                <span className="px-2.5 py-1 text-xs font-semibold bg-emerald-50 text-emerald-700 rounded-md font-mono">
-                  ₹{s.amount}
-                </span>
+                {/* Action badge */}
+                {(!s.action || s.action === 'DEDUCT_AMOUNT') && (
+                  <span className="px-2.5 py-1 text-xs font-semibold bg-emerald-50 text-emerald-700 rounded-md font-mono">
+                    ₹{s.amount}
+                  </span>
+                )}
+                {s.action === 'HALF_DAY' && (
+                  <span className="px-2.5 py-1 text-xs font-semibold bg-amber-50 text-amber-700 rounded-md">
+                    ½ Day LOP
+                  </span>
+                )}
+                {s.action === 'HALF_DAY_PLUS_OT' && (
+                  <>
+                    <span className="px-2.5 py-1 text-xs font-semibold bg-amber-50 text-amber-700 rounded-md">
+                      ½ Day LOP
+                    </span>
+                    <span className="text-text-muted text-xs">+</span>
+                    <span className="px-2.5 py-1 text-xs font-semibold bg-blue-50 text-blue-700 rounded-md">
+                      {s.otHours ?? 0} hrs OT
+                    </span>
+                  </>
+                )}
               </div>
               {/* Actions */}
               {canEdit && (
@@ -757,7 +815,7 @@ const PayrollSettings: React.FC = () => {
                 onChange={e => set({ employeePfPercent: Number(e.target.value) })}
               />
               <TextInput label="Employer PF %" name="employerPfPercent" type="number"
-                value={String(config.employerPfPercent ?? 13)}
+                value={String(config.employerPfPercent ?? 12)}
                 onChange={e => set({ employerPfPercent: Number(e.target.value) })}
               />
               <SelectInput label="PF Rounding Rule" name="pfRoundingRule"
@@ -846,10 +904,20 @@ const PayrollSettings: React.FC = () => {
             canEdit={canEditSettings}
             warningNote={
               slabs.perm.length === 0
-                ? 'No slabs configured — per-minute fallback will be used. Add slabs to apply fixed deduction amounts.'
+                ? 'No slabs configured — add slabs to apply deduction rules when employees take permission.'
                 : undefined
             }
           />
+          <div className="flex items-start gap-2 bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-800 mt-1">
+            <Info size={14} className="mt-0.5 shrink-0" />
+            <div>
+              <p className="font-semibold mb-1">Permission Slab Actions</p>
+              <p><strong>₹ Deduct Amount</strong> — Deduct a fixed rupee amount from net salary.</p>
+              <p className="mt-1"><strong>Half Day (LOP)</strong> — Convert the day to half day (0.5 LOP). No ₹ deduction.</p>
+              <p className="mt-1"><strong>Half Day + OT</strong> — Mark half day LOP <em>and</em> automatically add the configured OT hours to that employee's OT pay.</p>
+              <p className="mt-1 text-blue-600">Example: 09:00–21:00 shift. Employee arrives at 12:00 (180 min permission). Slab: <em>180+ min → Half Day + OT (3 hrs)</em>. Engine deducts 0.5 day salary and adds 3 hrs OT pay automatically.</p>
+            </div>
+          </div>
         </Section>
       ),
     },

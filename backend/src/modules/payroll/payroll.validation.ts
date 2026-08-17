@@ -82,7 +82,12 @@ export const bulkUpsertAttendanceSchema = z.object({
       lateMinutes:       z.number().int().min(0).default(0),
       permissionMinutes: z.number().int().min(0).default(0),
       salaryAdvance:     z.number().min(0).default(0),
-    })),
+      shiftId:           z.number().int().positive().nullable().optional(),
+    })).default([]),
+    clearedDates: z.array(z.object({
+      employeeId:        z.number().int().positive(),
+      date:              z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    })).optional(),
   }),
   query: z.object({}),
   params: z.object({}),

@@ -23,10 +23,10 @@ export function applyRounding(
 ): number {
   const factor = Math.pow(10, precision);
   switch (rule) {
-    case 'FLOOR':   return Math.floor(value * factor) / factor;
+    case 'FLOOR': return Math.floor(value * factor) / factor;
     case 'CEILING': return Math.ceil(value * factor) / factor;
     case 'ROUND':
-    default:        return Math.round(value * factor) / factor;
+    default: return Math.round(value * factor) / factor;
   }
 }
 
@@ -89,10 +89,8 @@ export function computeDailyRate(
     }
   } else if (st === 'WEEKLY') {
     // If the salary is weekly, the monthlySalary field actually holds the weekly gross salary
-    // The UI calculates daily wage as weekly gross ÷ 7 days/week by default, or working days.
-    // We match the Salary Preview (which divides by 7 or uses settings).
-    // Let's use 7 days as the formula divisor for WEEKLY to match the UI's ₹714.29 (5000/7)
-    formulaDivisor = 7;
+    // The weekly salary is divided by 6 working days (Sunday is weekly off).
+    formulaDivisor = 6;
     dailyRate = monthlySalary / formulaDivisor;
   } else {
     // MONTHLY
@@ -130,20 +128,20 @@ export function computeOtPay(
   const multiplier = isHoliday
     ? settings.holidayOtMultiplier
     : isWeeklyOff
-    ? settings.weeklyOffOtMultiplier
-    : settings.weekdayOtMultiplier;
+      ? settings.weeklyOffOtMultiplier
+      : settings.weekdayOtMultiplier;
 
   switch (settings.otMethod) {
     case 'HOURLY_RATE':
-      return clampedHours * settings.otRatePerHour * multiplier;
+      return clampedHours * settings.otRatePerHour;
     case 'FIXED_AMOUNT':
-      return settings.otRatePerHour * multiplier;
+      return settings.otRatePerHour;
     case 'PERCENTAGE_DAILY': {
       const hoursInDay = settings.defaultWorkingHoursPerDay || 8;
       return dailyRate * (clampedHours / hoursInDay) * multiplier;
     }
     case 'SLAB':
-      return lookupSlab(clampedHours * 60, settings.otSlabs) * multiplier;
+      return lookupSlab(clampedHours * 60, settings.otSlabs);
     default:
       return 0;
   }
@@ -251,16 +249,16 @@ export function computeEmployeePayroll(
   const { days } = attendance;
 
   // 1. Attendance counts
-  const weeklyOffCount  = countDays(days, 'WEEKLY_OFF');
-  const holidayCount    = countDays(days, 'HOLIDAY');
-  const presentDays     = countDays(days, 'PRESENT');
-  const absentDays      = countDays(days, 'ABSENT');
-  const halfDays        = countDays(days, 'HALF_DAY');
-  const paidLeaveDays   = countDays(days, 'LEAVE_PAID');
+  const weeklyOffCount = countDays(days, 'WEEKLY_OFF');
+  const holidayCount = countDays(days, 'HOLIDAY');
+  const presentDays = countDays(days, 'PRESENT');
+  const absentDays = countDays(days, 'ABSENT');
+  const halfDays = countDays(days, 'HALF_DAY');
+  const paidLeaveDays = countDays(days, 'LEAVE_PAID');
   const unpaidLeaveDays = countDays(days, 'LEAVE_UNPAID');
-  const lopDays         = absentDays + unpaidLeaveDays;
-  const paidDays        = presentDays + halfDays * 0.5 + paidLeaveDays + weeklyOffCount + holidayCount;
-  const totalDays       = days.length || calendarDays;
+  const lopDays = absentDays + unpaidLeaveDays;
+  const paidDays = presentDays + halfDays * 0.5 + paidLeaveDays + weeklyOffCount + holidayCount;
+  const totalDays = days.length || calendarDays;
 
   // 2. Daily rate
   const workingDays = calendarDays - weeklyOffCount - holidayCount;
@@ -296,17 +294,17 @@ export function computeEmployeePayroll(
   }
 
   // 5. OT + permission + late entry
-  let totalOtHours       = 0;
-  let totalOtPay         = 0;
-  let totalPermMin       = 0;
-  let totalLateMin       = 0;
+  let totalOtHours = 0;
+  let totalOtPay = 0;
+  let totalPermMin = 0;
+  let totalLateMin = 0;
   let totalLateDeduction = 0;
 
   for (const day of days) {
-    const isHoliday   = day.status === 'HOLIDAY';
+    const isHoliday = day.status === 'HOLIDAY';
     const isWeeklyOff = day.status === 'WEEKLY_OFF';
     totalOtHours += Math.min(day.otHours, settings.maxOtHoursPerDay);
-    totalOtPay   += computeOtPay(day.otHours, dailyRate, settings, isHoliday, isWeeklyOff);
+    totalOtPay += computeOtPay(day.otHours, dailyRate, settings, isHoliday, isWeeklyOff);
     totalPermMin += day.permissionMinutes;
     totalLateMin += day.lateMinutes;
     // Late deduction: calculated per day so each day's minutes are checked against slabs independently
@@ -314,7 +312,7 @@ export function computeEmployeePayroll(
   }
 
   totalOtHours = Math.min(totalOtHours, settings.maxOtHoursPerWeek);
-  totalOtPay   = applyRounding(totalOtPay, settings.roundingRule, settings.decimalPrecision);
+  totalOtPay = applyRounding(totalOtPay, settings.roundingRule, settings.decimalPrecision);
   const lateEntryDeduction = applyRounding(
     totalLateDeduction,
     settings.roundingRule,
@@ -328,7 +326,7 @@ export function computeEmployeePayroll(
 
   // 6. PF — only for PF-eligible salary types
   const pfEligible = employee.salaryType === 'PF_MONTHLY' || employee.salaryType === 'FIXED_MONTHLY';
-  const pfWageRaw  = settings.pfWageFormula === 'BASIC'
+  const pfWageRaw = settings.pfWageFormula === 'BASIC'
     ? (employee.basicSalary * paidDays) / (totalDays || 1)
     : earnedSalary;
   const pfWage = applyRounding(pfWageRaw, settings.pfRoundingRule);
@@ -381,8 +379,8 @@ export function computeEmployeePayroll(
     holidayDays: holidayCount,
     dailyRate,
     basicSalary: applyRounding((employee.basicSalary * paidDays) / (totalDays || 1), settings.roundingRule, settings.decimalPrecision),
-    da:           applyRounding((employee.da * paidDays) / (totalDays || 1), settings.roundingRule, settings.decimalPrecision),
-    hra:          applyRounding((employee.hra * paidDays) / (totalDays || 1), settings.roundingRule, settings.decimalPrecision),
+    da: applyRounding((employee.da * paidDays) / (totalDays || 1), settings.roundingRule, settings.decimalPrecision),
+    hra: applyRounding((employee.hra * paidDays) / (totalDays || 1), settings.roundingRule, settings.decimalPrecision),
     otherAllowance: applyRounding((employee.otherAllowance * paidDays) / (totalDays || 1), settings.roundingRule, settings.decimalPrecision),
     grossSalary,
     earnedSalary,

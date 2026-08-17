@@ -8,6 +8,8 @@ import CommonLoader from '../../../components/ui/Loader/CommonLoader';
 import SelectInput from '../../../components/form/SelectInput/SelectInput';
 import { payrollService } from '../../../services/payrollService';
 import type { ApiEmployeePayroll, ApiPayrollConfig } from '../../../services/payrollService';
+import { shiftService } from '../../../services/shiftService';
+import type { Shift } from '../../../features/shifts/types';
 import { usePermission } from '../../../hooks/usePermission';
 
 // ─── Status Config ────────────────────────────────────────────────────────────
@@ -32,10 +34,11 @@ type CellData = {
   otHours: number;
   lateMinutes: number;
   permissionMinutes: number;
+  shiftId: number | null;
 };
 type GridState = Record<string, CellData>;
 
-const EMPTY_CELL: CellData = { status: null, otHours: 0, lateMinutes: 0, permissionMinutes: 0 };
+const EMPTY_CELL: CellData = { status: null, otHours: 0, lateMinutes: 0, permissionMinutes: 0, shiftId: null };
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -55,6 +58,7 @@ function dayOfWeek(dateStr: string): number {
 }
 
 function cycleStatus(cur: AttStatus | null): AttStatus | null {
+  if (cur === 'WEEKLY_OFF') return 'PRESENT';
   const i = CYCLE.indexOf(cur);
   return CYCLE[(i + 1) % CYCLE.length];
 }
@@ -87,24 +91,46 @@ function isoPeriod(dateStr: string): string {
 type WeekOfMonth = { num: number; dates: string[]; label: string; period: string };
 
 function weeksOfMonth(year: number, month: number): WeekOfMonth[] {
-  const daysInMonth = new Date(year, month, 0).getDate();
+  const firstDayOfMonth = new Date(year, month - 1, 1);
+  const lastDayOfMonth = new Date(year, month, 0);
+
+  const firstDow = firstDayOfMonth.getDay() || 7; // Mon=1 ... Sun=7
+  const firstMonday = new Date(firstDayOfMonth);
+  firstMonday.setDate(firstDayOfMonth.getDate() - (firstDow - 1));
+
   const result: WeekOfMonth[] = [];
-  for (let w = 1; w <= 5; w++) {
-    const startDay = (w - 1) * 7 + 1;
-    if (startDay > daysInMonth) break;
-    const endDay = Math.min(w * 7, daysInMonth);
+  let currentMonday = new Date(firstMonday);
+  let w = 1;
+
+  while (currentMonday <= lastDayOfMonth) {
     const dates: string[] = [];
-    for (let d = startDay; d <= endDay; d++) {
-      dates.push(`${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`);
+    const sun = new Date(currentMonday);
+    sun.setDate(currentMonday.getDate() + 6);
+
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(currentMonday);
+      d.setDate(currentMonday.getDate() + i);
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      dates.push(`${yyyy}-${mm}-${dd}`);
     }
+
     const period = isoPeriod(dates[0]);
+    const startFmt = `${MONTHS[currentMonday.getMonth()].slice(0, 3)} ${currentMonday.getDate()}`;
+    const endFmt = `${MONTHS[sun.getMonth()].slice(0, 3)} ${sun.getDate()}`;
+
     result.push({
       num: w,
       dates,
       period,
-      label: `Week ${w}  (${MONTHS[month - 1].slice(0, 3)} ${startDay}–${endDay})`,
+      label: `Week ${w} (${startFmt} – ${endFmt})`,
     });
+
+    currentMonday.setDate(currentMonday.getDate() + 7);
+    w++;
   }
+
   return result;
 }
 
@@ -134,7 +160,7 @@ const StatusCell: React.FC<{
         title={
           isLocked
             ? `Locked (Payroll Approved) — ${cell.status ? S[cell.status].label : 'Unset'}`
-            : 'Left-click: cycle status | Right-click: edit OT / Late / Perm'
+            : 'Left-click: cycle status | Right-click: edit OT / Late / Perm / Shift'
         }
       >
         {cell.status ? S[cell.status].abbr : '—'}
@@ -149,8 +175,11 @@ const StatusCell: React.FC<{
 // ─── Cell Edit Panel ──────────────────────────────────────────────────────────
 const CellEditPanel: React.FC<{
   empName: string; date: string; cell: CellData; isLocked?: boolean;
+  shifts: Shift[];
   onChange: (c: CellData) => void; onClose: () => void;
-}> = ({ empName, date, cell, isLocked, onChange, onClose }) => (
+}> = ({ empName, date, cell, isLocked, shifts, onChange, onClose }) => {
+  const showExtras = cell.status === 'PRESENT' || cell.status === 'HALF_DAY';
+  return (
   <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/30 backdrop-blur-sm" onClick={onClose}>
     <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-5 space-y-4" onClick={e => e.stopPropagation()}>
       <div className="flex items-center justify-between">
@@ -189,29 +218,50 @@ const CellEditPanel: React.FC<{
         </div>
       </div>
 
-      {/* Extra numeric fields */}
-      <div className="grid grid-cols-3 gap-3">
-        {([
-          { label: 'OT Hours',   field: 'otHours',           step: 0.5 },
-          { label: 'Late (min)', field: 'lateMinutes',       step: 1   },
-          { label: 'Perm (min)', field: 'permissionMinutes', step: 1   },
-        ] as const).map(f => (
-          <div key={f.field}>
-            <label className="block text-xs font-semibold text-text-muted mb-1">{f.label}</label>
-            <input type="number" min={0} step={f.step} disabled={isLocked}
-              value={cell[f.field]}
-              onChange={e => onChange({ ...cell, [f.field]: Number(e.target.value) })}
-              className="w-full border border-border rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed" />
-          </div>
-        ))}
-      </div>
+      {/* Shift selector — only for Present or Half Day */}
+      {showExtras && shifts.length > 0 && (
+        <SelectInput
+          label="Shift"
+          name="shiftId"
+          value={cell.shiftId ?? ''}
+          defaultOptionLabel="— No Shift —"
+          disabled={isLocked}
+          noMargin
+          searchable={false}
+          options={shifts.map(sh => ({
+            value: sh.id,
+            label: `${sh.shiftName} (${sh.startTime} – ${sh.endTime})`,
+          }))}
+          onChange={e => onChange({ ...cell, shiftId: e.target.value ? Number(e.target.value) : null })}
+        />
+      )}
+
+      {/* OT / Late / Permission — only for Present or Half Day */}
+      {showExtras && (
+        <div className="grid grid-cols-3 gap-3">
+          {([
+            { label: 'OT Hours',   field: 'otHours',           step: 0.5 },
+            { label: 'Late (min)', field: 'lateMinutes',       step: 1   },
+            { label: 'Perm (min)', field: 'permissionMinutes', step: 1   },
+          ] as const).map(f => (
+            <div key={f.field}>
+              <label className="block text-xs font-semibold text-text-muted mb-1">{f.label}</label>
+              <input type="number" min={0} step={f.step} disabled={isLocked}
+                value={cell[f.field]}
+                onChange={e => onChange({ ...cell, [f.field]: Number(e.target.value) })}
+                className="w-full border border-border rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed" />
+            </div>
+          ))}
+        </div>
+      )}
 
       <button onClick={onClose} className="w-full py-2.5 bg-primary text-white rounded-xl font-semibold text-sm hover:bg-red-700 transition-colors">
         {isLocked ? 'Close' : 'Done'}
       </button>
     </div>
   </div>
-);
+  );
+};
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 const AttendancePage: React.FC = () => {
@@ -238,6 +288,7 @@ const AttendancePage: React.FC = () => {
   const [error,        setError]        = useState('');
   const [hasSavedData, setHasSavedData] = useState(false);
   const [lockedPeriods, setLockedPeriods] = useState<string[]>([]);
+  const [shifts,        setShifts]       = useState<Shift[]>([]);
 
   // ── Cell panel ────────────────────────────────────────────────────────────
   const [selected, setSelected] = useState<{ empId: number; empName: string; date: string } | null>(null);
@@ -281,22 +332,27 @@ const AttendancePage: React.FC = () => {
   const weeklyOffDays: number[] = payrollCfg?.weeklyOffDays ?? [];
 
   // Helper to check if a date is locked by an approved/locked payroll run
+  // Only check locks matching the current run type so a weekly lock doesn't block monthly editing and vice-versa
   const isDateLocked = useCallback((dateStr: string): boolean => {
     if (lockedPeriods.length === 0) return false;
-    const monthP = dateStr.slice(0, 7);
-    const weekP  = isoPeriod(dateStr);
-    return lockedPeriods.includes(monthP) || lockedPeriods.includes(weekP);
-  }, [lockedPeriods]);
+    if (runType === 'MONTHLY') {
+      const monthP = dateStr.slice(0, 7);
+      return lockedPeriods.includes(monthP);
+    }
+    const weekP = isoPeriod(dateStr);
+    return lockedPeriods.includes(weekP);
+  }, [lockedPeriods, runType]);
 
   const allDatesLocked = useMemo(() => dates.length > 0 && dates.every(d => isDateLocked(d)), [dates, isDateLocked]);
   const someDatesLocked = useMemo(() => dates.some(d => isDateLocked(d)), [dates, isDateLocked]);
 
-  // ── Load employees + config ───────────────────────────────────────────────
+  // ── Load employees + config + shifts ───────────────────────────────────────
   useEffect(() => {
-    Promise.all([payrollService.listEmployees(), payrollService.getConfig()])
-      .then(([emps, cfg]) => {
+    Promise.all([payrollService.listEmployees(), payrollService.getConfig(), shiftService.fetchAll()])
+      .then(([emps, cfg, allShifts]) => {
         setEmployees(emps);
         setPayrollCfg(cfg);
+        setShifts(allShifts.filter(s => s.isActive));
       })
       .catch(() => setError('Failed to load data'))
       .finally(() => setLoading(false));
@@ -310,14 +366,19 @@ const AttendancePage: React.FC = () => {
       filteredEmployees.forEach(emp => {
         dates.forEach(date => {
           const k = cellKey(Number(emp.id), date);
-          next[k] = prev[k] ?? { ...EMPTY_CELL };
+          const isSun = dayOfWeek(date) === 0 || weeklyOffDays.includes(dayOfWeek(date));
+          if (prev[k]) {
+            next[k] = prev[k];
+          } else {
+            next[k] = { ...EMPTY_CELL, status: isSun ? 'WEEKLY_OFF' : null };
+          }
         });
       });
       return next;
     });
     setHasSavedData(false);
     setSaveOk(false);
-  }, [dates, filteredEmployees]);
+  }, [dates, filteredEmployees, weeklyOffDays]);
 
   // ── Reset weekOfMonth to 1 when month/year changes ───────────────────────
   useEffect(() => { setWeekOfMonth(1); }, [month, year]);
@@ -338,6 +399,7 @@ const AttendancePage: React.FC = () => {
                 otHours:           Number(r.otHours),
                 lateMinutes:       Number(r.lateMinutes),
                 permissionMinutes: Number(r.permissionMinutes),
+                shiftId:           r.shiftId ?? null,
               };
             }
           });
@@ -394,7 +456,7 @@ const AttendancePage: React.FC = () => {
         dates.forEach(date => {
           if (!isDateLocked(date)) {
             const k = cellKey(Number(emp.id), date);
-            const isOff = weeklyOffDays.includes(dayOfWeek(date));
+            const isOff = dayOfWeek(date) === 0 || weeklyOffDays.includes(dayOfWeek(date));
             next[k] = { ...(next[k] ?? EMPTY_CELL), status: isOff ? 'WEEKLY_OFF' : 'PRESENT' };
           }
         });
@@ -410,7 +472,9 @@ const AttendancePage: React.FC = () => {
       filteredEmployees.forEach(emp => {
         dates.forEach(date => {
           if (!isDateLocked(date)) {
-            next[cellKey(Number(emp.id), date)] = { ...EMPTY_CELL };
+            const k = cellKey(Number(emp.id), date);
+            const isOff = dayOfWeek(date) === 0 || weeklyOffDays.includes(dayOfWeek(date));
+            next[k] = { ...EMPTY_CELL, status: isOff ? 'WEEKLY_OFF' : null };
           }
         });
       });
@@ -425,7 +489,12 @@ const AttendancePage: React.FC = () => {
       dates.forEach(date => {
         if (!isDateLocked(date)) {
           const k = cellKey(empId, date);
-          next[k] = { ...(next[k] ?? EMPTY_CELL), status };
+          const isOff = dayOfWeek(date) === 0 || weeklyOffDays.includes(dayOfWeek(date));
+          if (status === 'PRESENT' && isOff) {
+            next[k] = { ...(next[k] ?? EMPTY_CELL), status: 'WEEKLY_OFF' };
+          } else {
+            next[k] = { ...(next[k] ?? EMPTY_CELL), status };
+          }
         }
       });
       return next;
@@ -448,9 +517,17 @@ const AttendancePage: React.FC = () => {
           lateMinutes:       c.lateMinutes,
           permissionMinutes: c.permissionMinutes,
           salaryAdvance:     0,
+          shiftId:           c.shiftId,
         };
       }).filter((x): x is NonNullable<typeof x> => x !== null)
     ).map(r => ({ ...r, _period: p })); // carry period for multi-save
+
+  // ── Build list of cleared (null status) cells to delete from DB ─────────
+  const buildClearedDates = (empList: ApiEmployeePayroll[], dayList: string[]) =>
+    empList.flatMap(emp =>
+      dayList.filter(date => !isDateLocked(date) && !getCell(Number(emp.id), date).status)
+        .map(date => ({ employeeId: Number(emp.id), date }))
+    );
 
   // ── Save ──────────────────────────────────────────────────────────────────
   const handleSave = async () => {
@@ -461,9 +538,11 @@ const AttendancePage: React.FC = () => {
         return;
       }
 
+      // Collect cleared cells to delete from DB
+      const clearedDates = buildClearedDates(filteredEmployees, dates.filter(d => !isDateLocked(d)));
+
       if (runType === 'WEEKLY' && fullMonthMode) {
         // ── Full-month save for weekly employees ─────────────────────────
-        // Group all dates by their ISO week period, save each group separately
         const weekGroups = new Map<string, string[]>();
         dates.forEach(date => {
           if (!isDateLocked(date)) {
@@ -477,18 +556,22 @@ const AttendancePage: React.FC = () => {
         for (const [wp, wDates] of weekGroups) {
           const records = buildRecords(filteredEmployees, wDates, wp);
           if (records.length > 0) {
-            await payrollService.bulkUpsertAttendance(wp, records as any);
+            await payrollService.bulkUpsertAttendance(wp, records as any, clearedDates);
             totalSaved += records.length;
           }
         }
-        if (totalSaved === 0) { setError('No editable attendance data to save. Mark at least one unlocked cell.'); return; }
+        if (totalSaved === 0 && clearedDates.length === 0) { setError('No editable attendance data to save. Mark at least one unlocked cell.'); return; }
+        if (totalSaved === 0 && clearedDates.length > 0) {
+          // Only clearing — still need to send the delete request
+          await payrollService.bulkUpsertAttendance(period, [], clearedDates);
+        }
         setSaveOk(true); setHasSavedData(true);
       } else {
         // ── Normal single-period save ─────────────────────────────────────
         const editableDates = dates.filter(d => !isDateLocked(d));
         const records = buildRecords(filteredEmployees, editableDates, period);
-        if (records.length === 0) { setError('No editable attendance data to save. Mark at least one unlocked cell.'); return; }
-        await payrollService.bulkUpsertAttendance(period, records as any);
+        if (records.length === 0 && clearedDates.length === 0) { setError('No editable attendance data to save. Mark at least one unlocked cell.'); return; }
+        await payrollService.bulkUpsertAttendance(period, records as any, clearedDates);
         setSaveOk(true); setHasSavedData(true);
       }
     } catch (e: any) {
@@ -672,6 +755,11 @@ const AttendancePage: React.FC = () => {
 
         <div className="w-px h-5 bg-border" />
 
+        <button onClick={applyCompanySchedule} disabled={allDatesLocked}
+          className="text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-lg hover:bg-emerald-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+          Auto-Fill Schedule
+        </button>
+
         <button onClick={clearAll} disabled={allDatesLocked}
           className="text-xs font-semibold text-slate-600 bg-slate-100 border border-slate-200 px-3 py-1.5 rounded-lg hover:bg-slate-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
           Clear All
@@ -828,7 +916,7 @@ const AttendancePage: React.FC = () => {
                               <StatusCell
                                 cell={cell}
                                 isLocked={locked}
-                                onClick={() => cycleCell(empId, date)}
+                                onClick={() => setSelected({ empId, empName: emp.fullName, date })}
                                 onContextMenu={e => { e.preventDefault(); setSelected({ empId, empName: emp.fullName, date }); }}
                               />
                             </td>
@@ -859,6 +947,7 @@ const AttendancePage: React.FC = () => {
           date={selected.date}
           cell={getCell(selected.empId, selected.date)}
           isLocked={isDateLocked(selected.date)}
+          shifts={shifts}
           onChange={c => setCell(selected.empId, selected.date, c)}
           onClose={() => setSelected(null)}
         />
