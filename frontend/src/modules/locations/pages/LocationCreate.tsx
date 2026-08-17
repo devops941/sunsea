@@ -144,11 +144,11 @@ const LocationCreate: React.FC = () => {
     };
 
     return (
-        <div className="p-4 md:p-6 min-h-screen bg-white">
+        <div className="p-4 md:p-6 min-h-screen bg-card">
             <div className=" space-y-3">
-                <div className="bg-white rounded-2xl shadow-sm border border-slate-200">
-                    <div className="p-6 border-b border-slate-200 flex items-center justify-between">
-                        <h2 className="text-2xl font-bold text-slate-800">Create Location</h2>
+                <div className="bg-card rounded-2xl shadow-sm border border-line">
+                    <div className="p-6 border-b border-line flex items-center justify-between">
+                        <h2 className="text-2xl font-bold text-ink">Create Location</h2>
                         <BackButton text="Back to List" to="/locations" />
                     </div>
 
@@ -233,7 +233,7 @@ const LocationCreate: React.FC = () => {
                             />
                         </div>
 
-                        <div className="flex justify-end gap-3 pt-6 mt-6 border-t border-slate-200">
+                        <div className="flex justify-end gap-3 pt-6 mt-6 border-t border-line">
                             <CustomButton
                                 text="Clear"
                                 icon={FaEraser}

@@ -75,7 +75,7 @@ const FilterPopover: React.FC<FilterPopoverProps> = ({
       {show && (
         <div
           ref={popoverRef}
-          className="absolute top-full right-0 mt-2 w-[300px] bg-white border border-gray-200 rounded-lg shadow-lg p-4 z-50"
+          className="absolute top-full right-0 mt-2 w-[300px] bg-card border border-line rounded-lg shadow-lg p-4 z-50"
         >
           <div className="flex items-center justify-between mb-4">
             <span className="font-bold text-primary text-sm">Filter</span>
@@ -85,7 +85,7 @@ const FilterPopover: React.FC<FilterPopoverProps> = ({
                 setShow(false);
                 if (onClose) onClose();
               }}
-              className="text-gray-400 hover:text-gray-600 bg-transparent border-none cursor-pointer"
+              className="text-ink-subtle hover:text-ink-muted bg-transparent border-none cursor-pointer"
             >
               <FaTimes />
             </button>
@@ -93,12 +93,12 @@ const FilterPopover: React.FC<FilterPopoverProps> = ({
 
           <div className="mb-4">{children}</div>
 
-          <div className="flex gap-2 pt-3 border-t border-gray-100">
+          <div className="flex gap-2 pt-3 border-t border-line-soft">
             <div className="flex-1">
               <CustomButton
                 text="Clear"
                 onClick={handleClear}
-                className="w-full flex justify-center !bg-gray-100 !text-gray-700 hover:!bg-gray-200 !border-transparent"
+                className="w-full flex justify-center !bg-card-2 !text-ink-muted hover:!bg-line !border-transparent"
               />
             </div>
             <div className="flex-1">

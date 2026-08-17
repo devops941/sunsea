@@ -240,15 +240,15 @@ export const AmountPayablePage: React.FC = () => {
     {
       id: "code",
       header: "CODE",
-      render: (item: any) => <span className="font-mono font-medium text-slate-700">{item.supplierCode}</span>,
+      render: (item: any) => <span className="font-mono font-medium text-ink-muted">{item.supplierCode}</span>,
     },
     {
       id: "supplier",
       header: "SUPPLIER",
       render: (item: any) => (
         <div>
-          <div className="font-bold text-slate-900">{item.legalName}</div>
-          {item.gstin && <div className="text-[10px] text-slate-400 font-mono">GST: {item.gstin}</div>}
+          <div className="font-bold text-ink">{item.legalName}</div>
+          {item.gstin && <div className="text-[10px] text-ink-subtle font-mono">GST: {item.gstin}</div>}
         </div>
       ),
     },
@@ -256,7 +256,7 @@ export const AmountPayablePage: React.FC = () => {
       id: "invoiced",
       header: "INVOICED",
       render: (item: any) => (
-        <div className="text-right font-mono text-slate-700">
+        <div className="text-right font-mono text-ink-muted">
           ₹{(item.totalBilled || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </div>
       ),
@@ -265,7 +265,7 @@ export const AmountPayablePage: React.FC = () => {
       id: "paid",
       header: "PAID",
       render: (item: any) => (
-        <div className="text-right font-mono text-slate-700">
+        <div className="text-right font-mono text-ink-muted">
           ₹{(item.totalPaid || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </div>
       ),
@@ -274,7 +274,7 @@ export const AmountPayablePage: React.FC = () => {
       id: "debit",
       header: "DEBIT",
       render: (item: any) => (
-        <div className="text-right font-mono text-slate-700">
+        <div className="text-right font-mono text-ink-muted">
           ₹{(item.debit || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </div>
       ),
@@ -292,7 +292,7 @@ export const AmountPayablePage: React.FC = () => {
       id: "netBalance",
       header: "NET BALANCE",
       render: (item: any) => (
-        <div className="text-right font-mono font-bold text-slate-900">
+        <div className="text-right font-mono font-bold text-ink">
           ₹{item.balanceAsOnDate > 0
             ? item.balanceAsOnDate.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
             : "0.00"}
@@ -303,7 +303,7 @@ export const AmountPayablePage: React.FC = () => {
       id: "dueDays",
       header: "DUE DAYS",
       render: (item: any) => (
-        <div className="text-center font-mono text-xs text-slate-600">
+        <div className="text-center font-mono text-xs text-ink-muted">
           {item.dueDays !== null && item.dueDays !== undefined ? `${item.dueDays} d` : "—"}
         </div>
       ),
@@ -338,20 +338,20 @@ export const AmountPayablePage: React.FC = () => {
   }, [filteredSuppliers, currentPage]);
 
   return (
-    <div className="w-full p-4 md:p-6 bg-slate-50 min-h-screen font-sans text-slate-800">
+    <div className="w-full p-4 md:p-6 bg-card-2 font-sans text-ink">
       {/* HEADER SECTION MATCHING REPORTS CENTER */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 mb-6">
-        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-slate-200">
+      <div className="bg-card rounded-2xl shadow-sm border border-line mb-6">
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-line">
           <div>
             <div className="flex items-center gap-3">
               <span className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-semibold uppercase tracking-wider border border-blue-200">
                 Accounts Payable
               </span>
             </div>
-            <h2 className="text-2xl font-bold text-slate-800 mt-1 flex items-center gap-2">
+            <h2 className="text-2xl font-bold text-ink mt-1 flex items-center gap-2">
               <FaBuilding className="text-blue-600 text-xl" /> Amount Payable Report
             </h2>
-            <p className="text-xs text-slate-500 mt-1">
+            <p className="text-xs text-ink-subtle mt-1">
               Outstanding Supplier Ledger Statements & Accounts Payable Breakdown
             </p>
           </div>
@@ -359,7 +359,7 @@ export const AmountPayablePage: React.FC = () => {
           <div className="flex flex-wrap items-center gap-3 relative w-full lg:w-auto">
             <button
               onClick={loadData}
-              className="flex items-center gap-2 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-sm font-semibold transition-all border border-slate-300"
+              className="flex items-center gap-2 px-3.5 py-2 bg-card-2 hover:bg-line text-ink-muted rounded-lg text-sm font-semibold transition-all border border-line"
               title="Refresh Data"
             >
               <FaSync className={loading ? "animate-spin text-blue-600" : ""} /> Refresh
@@ -374,37 +374,37 @@ export const AmountPayablePage: React.FC = () => {
         </div>
 
         {/* DASHBOARD CARDS */}
-        <div className="p-6 border-b border-slate-200 bg-slate-50/50">
+        <div className="p-6 border-b border-line bg-card-2/50">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
+            <div className="bg-card border border-line rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Amount Payable</span>
+                <span className="text-xs font-bold text-ink-subtle uppercase tracking-wider">Total Amount Payable</span>
                 <div className="w-9 h-9 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
                   <FaMoneyBillWave size={18} />
                 </div>
               </div>
-              <div className="text-2xl font-black text-slate-900 mt-2">
+              <div className="text-2xl font-black text-ink mt-2">
                 ₹ {totals.totalNetBalance.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </div>
-              <div className="text-xs text-slate-500 mt-1">
-                Across <strong className="text-slate-700">{filteredSuppliers.length}</strong> active suppliers
+              <div className="text-xs text-ink-subtle mt-1">
+                Across <strong className="text-ink-muted">{filteredSuppliers.length}</strong> active suppliers
               </div>
             </div>
 
-            <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
+            <div className="bg-card border border-line rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Suppliers</span>
+                <span className="text-xs font-bold text-ink-subtle uppercase tracking-wider">Total Suppliers</span>
                 <div className="w-9 h-9 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600">
                   <FaBuilding size={18} />
                 </div>
               </div>
-              <div className="text-2xl font-black text-slate-900 mt-2">{payables.length}</div>
-              <div className="text-xs text-slate-500 mt-1">Registered Vendor Accounts</div>
+              <div className="text-2xl font-black text-ink mt-2">{payables.length}</div>
+              <div className="text-xs text-ink-subtle mt-1">Registered Vendor Accounts</div>
             </div>
 
-            <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
+            <div className="bg-card border border-line rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Overdue Accounts</span>
+                <span className="text-xs font-bold text-ink-subtle uppercase tracking-wider">Overdue Accounts</span>
                 <div className="w-9 h-9 rounded-full bg-amber-50 flex items-center justify-center text-amber-600">
                   <FaExclamationTriangle size={18} />
                 </div>
@@ -413,26 +413,26 @@ export const AmountPayablePage: React.FC = () => {
               <div className="text-xs text-amber-700/80 mt-1 font-medium">Exceeding payment terms</div>
             </div>
 
-            <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
+            <div className="bg-card border border-line rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Credit</span>
+                <span className="text-xs font-bold text-ink-subtle uppercase tracking-wider">Total Credit</span>
                 <div className="w-9 h-9 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600">
                   <FaCheckCircle size={18} />
                 </div>
               </div>
-              <div className="text-2xl font-black text-slate-900 mt-2">
+              <div className="text-2xl font-black text-ink mt-2">
                 ₹ {totals.totalCredit.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </div>
-              <div className="text-xs text-slate-500 mt-1">Cumulative Purchases</div>
+              <div className="text-xs text-ink-subtle mt-1">Cumulative Purchases</div>
             </div>
           </div>
         </div>
 
         {/* REPORT FILTERS CONTROL PANEL */}
-        <div className="p-6 border-b border-slate-200 bg-slate-50">
+        <div className="p-6 border-b border-line bg-card-2">
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
             <div>
-              <label className="block mb-1 text-[11px] uppercase tracking-wider text-slate-500 font-bold">As On Date</label>
+              <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-bold">As On Date</label>
               <DatePickerCalendar
                 name="draftAsOnDate"
                 value={draftAsOnDate}
@@ -441,7 +441,7 @@ export const AmountPayablePage: React.FC = () => {
             </div>
 
             <div>
-              <label className="block mb-1 text-[11px] uppercase tracking-wider text-slate-500 font-bold">Date Range</label>
+              <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-bold">Date Range</label>
               <SelectInput
                 name="dateRangePreset"
                 value={dateRangePreset}
@@ -452,7 +452,7 @@ export const AmountPayablePage: React.FC = () => {
             </div>
 
             <div>
-              <label className="block mb-1 text-[11px] uppercase tracking-wider text-slate-500 font-bold">Start Date</label>
+              <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-bold">Start Date</label>
               <DatePickerCalendar
                 name="draftStartDate"
                 value={draftStartDate}
@@ -461,7 +461,7 @@ export const AmountPayablePage: React.FC = () => {
             </div>
 
             <div>
-              <label className="block mb-1 text-[11px] uppercase tracking-wider text-slate-500 font-bold">End Date</label>
+              <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-bold">End Date</label>
               <DatePickerCalendar
                 name="draftEndDate"
                 value={draftEndDate}
@@ -470,10 +470,10 @@ export const AmountPayablePage: React.FC = () => {
             </div>
 
             <div>
-              <label className="block mb-1 text-[11px] uppercase tracking-wider text-slate-500 font-bold">Search</label>
+              <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-bold">Search</label>
               <input
                 type="text"
-                className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 shadow-sm"
+                className="w-full border border-line rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 shadow-sm"
                 value={draftSearch}
                 onChange={(e) => setDraftSearch(e.target.value)}
                 placeholder="Search Code / Name..."
@@ -481,7 +481,7 @@ export const AmountPayablePage: React.FC = () => {
             </div>
 
             <div>
-              <label className="block mb-1 text-[11px] uppercase tracking-wider text-slate-500 font-bold">Supplier</label>
+              <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-bold">Supplier</label>
               <SelectInput
                 name="draftSupplierId"
                 value={draftSupplierId}
@@ -494,7 +494,7 @@ export const AmountPayablePage: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex items-center justify-between mt-6 pt-4 border-t border-slate-200">
+          <div className="flex items-center justify-between mt-6 pt-4 border-t border-line">
             <div>
               <ColumnToggle
                 columns={tableColumns.map(c => ({ ...c, header: c.header }))}
@@ -511,7 +511,7 @@ export const AmountPayablePage: React.FC = () => {
             <div className="flex items-center gap-3">
               <button
                 onClick={handleClearFilters}
-                className="px-4 py-2 text-sm font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-md transition-colors"
+                className="px-4 py-2 text-sm font-semibold text-ink-muted hover:text-ink hover:bg-card-2 rounded-md transition-colors"
               >
                 Clear All
               </button>

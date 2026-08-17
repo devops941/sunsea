@@ -201,7 +201,7 @@ const GoodsDispatchCreate: React.FC = () => {
       header: "PO Number",
       accessor: "productionOrderId",
       render: (item: any) => (
-        <span className="font-bold text-gray-900">{item.productionOrderId}</span>
+        <span className="font-bold text-ink">{item.productionOrderId}</span>
       ),
     },
     {
@@ -209,9 +209,9 @@ const GoodsDispatchCreate: React.FC = () => {
       accessor: "productItem",
       render: (item: any) => (
         <div>
-          <div className="font-medium text-gray-800">{item.productItem?.productName}</div>
+          <div className="font-medium text-ink">{item.productItem?.productName}</div>
           {item.productItem?.productCode && (
-            <div className="text-xs text-gray-400 font-mono">{item.productItem?.productCode}</div>
+            <div className="text-xs text-ink-subtle font-mono">{item.productItem?.productCode}</div>
           )}
         </div>
       ),
@@ -221,7 +221,7 @@ const GoodsDispatchCreate: React.FC = () => {
       header: "Produced Qty",
       accessor: "producedQty",
       render: (item: any) => (
-        <span className="text-gray-700">
+        <span className="text-ink-muted">
           {item.producedQty} {formatUOM(item.uom)}
         </span>
       ),
@@ -232,7 +232,7 @@ const GoodsDispatchCreate: React.FC = () => {
       render: (item: any) => {
         const storeObj = stores.find((s: any) => s.storeId === item.destinationStoreId);
         return (
-          <span className="text-slate-700 font-medium">
+          <span className="text-ink-muted font-medium">
             {storeObj ? storeObj.storeName : (item.destinationStoreId || "Unassigned")}
           </span>
         );
@@ -282,14 +282,14 @@ const GoodsDispatchCreate: React.FC = () => {
 
   return (
     <div className="w-full mx-auto p-4 md:p-6 min-h-screen space-y-6">
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+      <div className="bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
         {/* Page Header */}
-        <div className="px-6 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="px-6 py-4 border-b border-line-soft flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h2 className="text-xl font-bold text-gray-800">
+            <h2 className="text-xl font-bold text-ink">
               Create Goods Dispatch
             </h2>
-            <div className="text-sm text-gray-500 mt-1">
+            <div className="text-sm text-ink-subtle mt-1">
               Select completed production orders to dispatch to the warehouse
             </div>
           </div>
@@ -311,10 +311,10 @@ const GoodsDispatchCreate: React.FC = () => {
           {/* Bottom Section: Split Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Left Half: Selected Items to Dispatch */}
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col justify-between">
+            <div className="bg-card rounded-xl shadow-sm border border-line overflow-hidden flex flex-col justify-between">
               <div>
-                <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-                  <h3 className="text-lg font-bold text-slate-800">
+                <div className="px-6 py-4 border-b border-line-soft flex items-center justify-between bg-card-2/50">
+                  <h3 className="text-lg font-bold text-ink">
                     2. Items to Dispatch
                   </h3>
                   <span className="bg-[#5D87FF]/10 text-[#5D87FF] px-3 py-1 rounded-full text-xs font-semibold">
@@ -324,16 +324,16 @@ const GoodsDispatchCreate: React.FC = () => {
 
                 <div className="p-4 md:p-6">
                   {selectedPOs.length === 0 ? (
-                    <div className="text-center py-12 bg-gray-50 rounded-lg border border-dashed border-gray-300">
-                      <p className="text-gray-500 font-medium">No production orders selected.</p>
-                      <p className="text-sm text-gray-400 mt-1">
+                    <div className="text-center py-12 bg-card-2 rounded-lg border border-dashed border-line">
+                      <p className="text-ink-subtle font-medium">No production orders selected.</p>
+                      <p className="text-sm text-ink-subtle mt-1">
                         Select orders from the table above using the "Add" button.
                       </p>
                     </div>
                   ) : (
-                    <div className="overflow-x-auto rounded-lg border border-gray-200">
-                      <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-slate-50 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                    <div className="overflow-x-auto rounded-lg border border-line">
+                      <table className="min-w-full divide-y divide-line">
+                        <thead className="bg-card-2 text-xs font-semibold text-ink-subtle uppercase tracking-wider">
                           <tr>
                             <th className="px-4 py-4 text-left">PO No</th>
                             <th className="px-4 py-4 text-left">Product</th>
@@ -342,12 +342,12 @@ const GoodsDispatchCreate: React.FC = () => {
                             <th className="px-4 py-4 text-center">Action</th>
                           </tr>
                         </thead>
-                        <tbody className="bg-white divide-y divide-slate-100 text-sm">
+                        <tbody className="bg-card divide-y divide-line text-sm">
                           {selectedPOs.map((po) => (
-                            <tr key={po.productionOrderId} className="hover:bg-slate-50/50 transition-colors">
-                              <td className="px-4 py-4 font-semibold text-slate-900 align-top">{po.productionOrderId}</td>
-                              <td className="px-4 py-4 text-slate-600 align-top">{po.productItem?.productName}</td>
-                              <td className="px-4 py-4 text-center text-slate-600 font-medium align-top">
+                            <tr key={po.productionOrderId} className="hover:bg-card-2/50 transition-colors">
+                              <td className="px-4 py-4 font-semibold text-ink align-top">{po.productionOrderId}</td>
+                              <td className="px-4 py-4 text-ink-muted align-top">{po.productItem?.productName}</td>
+                              <td className="px-4 py-4 text-center text-ink-muted font-medium align-top">
                                 {po.pendingDispatchQty} {formatUOM(po.uom)}
                               </td>
                               <td className="px-4 py-3 align-top">
@@ -366,9 +366,9 @@ const GoodsDispatchCreate: React.FC = () => {
                                           po.pendingDispatchQty
                                         )
                                       }
-                                      className="w-24 px-3 py-1.5 border border-slate-300 rounded-md text-sm font-medium focus:ring-2 focus:ring-[#5D87FF] focus:border-[#5D87FF] outline-none transition-all shadow-sm"
+                                      className="w-24 px-3 py-1.5 border border-line rounded-md text-sm font-medium focus:ring-2 focus:ring-[#5D87FF] focus:border-[#5D87FF] outline-none transition-all shadow-sm"
                                     />
-                                    <span className="text-sm font-medium text-slate-500">{formatUOM(po.uom)}</span>
+                                    <span className="text-sm font-medium text-ink-subtle">{formatUOM(po.uom)}</span>
                                   </div>
                                   <input
                                     type="text"
@@ -377,7 +377,7 @@ const GoodsDispatchCreate: React.FC = () => {
                                     onChange={(e) =>
                                       handleRemarksChange(po.productionOrderId, e.target.value)
                                     }
-                                    className="w-[180px] px-3 py-1.5 text-xs border border-slate-300 rounded-md text-slate-700 placeholder-slate-400 focus:ring-2 focus:ring-[#5D87FF] focus:border-[#5D87FF] outline-none transition-all shadow-sm"
+                                    className="w-[180px] px-3 py-1.5 text-xs border border-line rounded-md text-ink-muted placeholder-slate-400 focus:ring-2 focus:ring-[#5D87FF] focus:border-[#5D87FF] outline-none transition-all shadow-sm"
                                   />
                                 </div>
                               </td>
@@ -398,7 +398,7 @@ const GoodsDispatchCreate: React.FC = () => {
               </div>
 
               {selectedPOs.length > 0 && (
-                <div className="px-6 py-3 bg-gray-50 border-t border-gray-200 flex items-center justify-between text-sm font-semibold text-gray-700">
+                <div className="px-6 py-3 bg-card-2 border-t border-line flex items-center justify-between text-sm font-semibold text-ink-muted">
                   <span>Total Selected: {selectedPOs.length} Items</span>
                   <span>Total Dispatch Qty: {totalDispatchQty} Units</span>
                 </div>
@@ -406,9 +406,9 @@ const GoodsDispatchCreate: React.FC = () => {
             </div>
 
             {/* Right Half: Vehicle & Transport Details */}
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-              <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50">
-                <h3 className="text-lg font-bold text-slate-800">
+            <div className="bg-card rounded-xl shadow-sm border border-line overflow-hidden">
+              <div className="px-6 py-4 border-b border-line-soft bg-card-2/50">
+                <h3 className="text-lg font-bold text-ink">
                   3. Vehicle & Transport Details
                 </h3>
               </div>
@@ -486,13 +486,13 @@ const GoodsDispatchCreate: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Remarks</label>
+                  <label className="block text-sm font-medium text-ink-muted mb-1">Remarks</label>
                   <textarea
                     name="remarks"
                     value={formData.remarks}
                     onChange={handleInputChange}
                     placeholder="Enter dispatch remarks..."
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-primary-500 focus:border-primary-500"
+                    className="w-full px-3 py-2 border border-line rounded-lg text-sm focus:ring-primary-500 focus:border-primary-500"
                     rows={3}
                   />
                 </div>
@@ -502,7 +502,7 @@ const GoodsDispatchCreate: React.FC = () => {
         </div>
 
         {/* Footer Actions */}
-        <div className="flex justify-end items-center gap-3 p-6 border-t border-gray-100 bg-white rounded-b-2xl">
+        <div className="flex justify-end items-center gap-3 p-6 border-t border-line-soft bg-card rounded-b-2xl">
           <CustomButton
             text="Cancel"
             icon={FaArrowLeft}

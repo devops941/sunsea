@@ -101,12 +101,12 @@ const FinishedStockList: React.FC<FinishedStockListProps> = ({ storeId: propStor
     };
 
     return (
-        <div className="p-4 md:p-6 min-h-screen bg-white">
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="p-4 md:p-6 bg-card">
+            <div className="bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
                 {/* Page Header */}
-                <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-slate-200">
+                <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-line">
                     <div>
-                        <h2 className="text-2xl font-bold text-slate-800">Finished Goods Stock</h2>
+                        <h2 className="text-2xl font-bold text-ink">Finished Goods Stock</h2>
                     </div>
 
                     <div className="flex flex-wrap items-center gap-3 relative w-full lg:w-auto">
@@ -137,31 +137,31 @@ const FinishedStockList: React.FC<FinishedStockListProps> = ({ storeId: propStor
                     columns={[
                         {
                             header: "#",
-                            render: (_, index) => <span className="text-slate-500">{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</span>
+                            render: (_, index) => <span className="text-ink-subtle">{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</span>
                         },
                         {
                             header: "PRODUCT CODE",
-                            render: (item) => <span className="font-mono text-slate-600">{item.product?.productCode || "N/A"}</span>
+                            render: (item) => <span className="font-mono text-ink-muted">{item.product?.productCode || "N/A"}</span>
                         },
                         {
                             header: "PRODUCT NAME",
-                            render: (item) => <span className="font-semibold text-slate-800">{item.product?.productName || "N/A"}</span>
+                            render: (item) => <span className="font-semibold text-ink">{item.product?.productName || "N/A"}</span>
                         },
                         {
                             header: "CATEGORY",
-                            render: (item) => <span className="text-slate-600">{item.product?.category?.categoryName || "N/A"}</span>
+                            render: (item) => <span className="text-ink-muted">{item.product?.category?.categoryName || "N/A"}</span>
                         },
                         // {
                         //     header: "COLOR",
-                        //     render: (item) => <span className="text-slate-600">{item.product?.colors?.map((c: any) => c.color?.colorName).join(", ") || "N/A"}</span>
+                        //     render: (item) => <span className="text-ink-muted">{item.product?.colors?.map((c: any) => c.color?.colorName).join(", ") || "N/A"}</span>
                         // },
                         // {
                         //     header: "SIZE",
-                        //     render: (item) => <span className="text-slate-600">{item.product?.size?.sizeName ? `${item.product.size.sizeName} (${item.product.size.sizeCode})` : "N/A"}</span>
+                        //     render: (item) => <span className="text-ink-muted">{item.product?.size?.sizeName ? `${item.product.size.sizeName} (${item.product.size.sizeCode})` : "N/A"}</span>
                         // },
                         {
                             header: "STORE / LOCATION",
-                            render: (item) => <span className="font-medium text-slate-700">{item.store?.storeName || "N/A"}</span>
+                            render: (item) => <span className="font-medium text-ink-muted">{item.store?.storeName || "N/A"}</span>
                         },
                         {
                             header: "PHYSICAL STOCK",
@@ -170,10 +170,10 @@ const FinishedStockList: React.FC<FinishedStockListProps> = ({ storeId: propStor
                                 const minQty = Number((item.product as any)?.minimumQty) || 0;
                                 return (
                                     <div className="flex flex-col">
-                                        <span className={`font-semibold ${onHand <= minQty || onHand <= 0 ? "text-red-600" : "text-slate-800"}`}>
+                                        <span className={`font-semibold ${onHand <= minQty || onHand <= 0 ? "text-red-600" : "text-ink"}`}>
                                             {item.onHandQty} {formatUom(item.product?.uom?.uomCode)}
                                         </span>
-                                        <span className="text-xs text-slate-500 mt-1">Min: {minQty} | Max: {(item.product as any)?.maximumQty || "0"}</span>
+                                        <span className="text-xs text-ink-subtle mt-1">Min: {minQty} | Max: {(item.product as any)?.maximumQty || "0"}</span>
                                     </div>
                                 )
                             }

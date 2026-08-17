@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { useSearchParams } from "react-router-dom";
 import { FaSearch, FaPlus, FaSave, FaEraser } from "react-icons/fa";
 import { toast } from "react-toastify";
 import ViewButton from "../../../components/ui/viewbutton/ViewButton";
@@ -22,6 +23,7 @@ const CategoryList: React.FC = () => {
     const { categories, loading, error, loadCategories, addCategory, editCategory, removeCategory } = useCategories();
     const { can } = usePermission();
 
+    const [searchParams, setSearchParams] = useSearchParams();
     const [searchTerm, setSearchTerm] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
     const [showFormModal, setShowFormModal] = useState(false);
@@ -83,6 +85,18 @@ const CategoryList: React.FC = () => {
         setErrors({ code: "", name: "" });
         setShowFormModal(true);
     };
+
+    // Lets the "Add Category" sidebar link open the create modal directly.
+    // The param is cleared straight away so a refresh or back-nav doesn't
+    // reopen the modal, which also stops this effect from looping.
+    useEffect(() => {
+        if (searchParams.get("action") === "add") {
+            handleOpenAdd();
+            searchParams.delete("action");
+            setSearchParams(searchParams, { replace: true });
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchParams]);
 
     const handleOpenEdit = useCallback((category: any) => {
         setEditMode(true);
@@ -198,18 +212,18 @@ const CategoryList: React.FC = () => {
     return (
         <div>
             <div>
-                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className="bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
                     {/* Page Header */}
-                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-6 border-b border-slate-200">
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-6 border-b border-line">
                         <div>
-                            <h2 className="text-2xl font-bold text-slate-800">Product Category Management</h2>
+                            <h2 className="text-2xl font-bold text-ink">Product Category Management</h2>
                         </div>
                         <div className="flex items-center gap-3 w-full md:w-auto">
                             <div className="relative w-full md:w-64">
-                                <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-subtle" />
                                 <input
                                     type="text"
-                                    className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                                    className="w-full pl-10 pr-4 py-2 bg-card border border-line rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
                                     placeholder="Search categories..."
                                     value={searchTerm}
                                     onChange={handleSearch}

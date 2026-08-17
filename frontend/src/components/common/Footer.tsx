@@ -3,7 +3,7 @@ import React from "react";
 const Footer: React.FC = () => {
   const nowYear = new Date().getFullYear();
   return (
-    <footer className="flex items-center justify-between px-6 py-3 bg-white border-t border-gray-200 text-sm text-gray-500 shrink-0">
+    <footer className="flex items-center justify-between px-6 py-3 bg-card border-t border-line text-sm text-ink-subtle shrink-0">
       <p>
         © {nowYear} SUNSEA ERP. All Rights Reserved.
       </p>

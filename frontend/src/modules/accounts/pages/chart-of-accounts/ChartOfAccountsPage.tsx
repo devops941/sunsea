@@ -123,7 +123,7 @@ export const ChartOfAccountsPage: React.FC = () => {
       case "EQUITY":
         return "bg-purple-100 text-purple-800 border-purple-300";
       default:
-        return "bg-slate-100 text-slate-700 border-slate-300";
+        return "bg-card-2 text-ink-muted border-line";
     }
   };
 
@@ -162,11 +162,11 @@ export const ChartOfAccountsPage: React.FC = () => {
     },
     {
       header: "CODE",
-      render: (item) => <span className="font-mono font-bold text-slate-900">{item.code}</span>,
+      render: (item) => <span className="font-mono font-bold text-ink">{item.code}</span>,
     },
     {
       header: "ACCOUNT NAME",
-      render: (item) => <span className="font-bold text-slate-800">{item.name}</span>,
+      render: (item) => <span className="font-bold text-ink">{item.name}</span>,
     },
     {
       header: "ACCOUNT TYPE",
@@ -179,7 +179,7 @@ export const ChartOfAccountsPage: React.FC = () => {
     {
       header: "GROUP CATEGORY",
       render: (item) => (
-        <span className="flex items-center gap-1.5 text-slate-600">
+        <span className="flex items-center gap-1.5 text-ink-muted">
           <FaFolder className="text-blue-500 text-xs" /> {item.group}
         </span>
       ),
@@ -197,7 +197,7 @@ export const ChartOfAccountsPage: React.FC = () => {
               Supplier: {item.supplier.legalName} ({item.supplier.supplierCode})
             </span>
           ) : (
-            <span className="text-slate-400 italic">General System Ledger</span>
+            <span className="text-ink-subtle italic">General System Ledger</span>
           )}
         </div>
       ),
@@ -211,8 +211,8 @@ export const ChartOfAccountsPage: React.FC = () => {
               <FaCheckCircle className="text-emerald-500" /> Active
             </span>
           ) : (
-            <span className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200">
-              <FaTimesCircle className="text-slate-400" /> Inactive
+            <span className="inline-flex items-center gap-1 text-xs font-semibold text-ink-subtle bg-card-2 px-2 py-0.5 rounded-full border border-line">
+              <FaTimesCircle className="text-ink-subtle" /> Inactive
             </span>
           )}
         </div>
@@ -235,20 +235,20 @@ export const ChartOfAccountsPage: React.FC = () => {
   }, [filteredLedgers, currentPage]);
 
   return (
-    <div className="w-full p-4 md:p-6 bg-slate-50 min-h-screen font-sans text-slate-800">
+    <div className="w-full p-4 md:p-6 bg-card-2 font-sans text-ink">
       {/* HEADER SECTION */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 mb-6">
-        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-slate-200">
+      <div className="bg-card rounded-2xl shadow-sm border border-line mb-6">
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-line">
           <div>
             <div className="flex items-center gap-3">
               <span className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-semibold uppercase tracking-wider border border-blue-200">
                 Chart of Accounts
               </span>
             </div>
-            <h2 className="text-2xl font-bold text-slate-800 mt-1 flex items-center gap-2">
+            <h2 className="text-2xl font-bold text-ink mt-1 flex items-center gap-2">
               <FaSitemap className="text-blue-600 text-xl" /> General Ledger Structure
             </h2>
-            <p className="text-xs text-slate-500 mt-1">
+            <p className="text-xs text-ink-subtle mt-1">
               Double-entry account categories, asset/liability grouping & system ledgers
             </p>
           </div>
@@ -256,7 +256,7 @@ export const ChartOfAccountsPage: React.FC = () => {
           <div className="flex flex-wrap items-center gap-3 relative w-full lg:w-auto">
             <button
               onClick={loadLedgers}
-              className="flex items-center gap-2 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-sm font-semibold transition-all border border-slate-300"
+              className="flex items-center gap-2 px-3.5 py-2 bg-card-2 hover:bg-line text-ink-muted rounded-lg text-sm font-semibold transition-all border border-line"
               title="Refresh Data"
             >
               <FaSync className={loading ? "animate-spin text-blue-600" : ""} /> Refresh
@@ -277,24 +277,24 @@ export const ChartOfAccountsPage: React.FC = () => {
         </div>
 
         {/* REPORT FILTERS CONTROL PANEL */}
-        <div className="p-6 border-b border-slate-200 bg-slate-50">
+        <div className="p-6 border-b border-line bg-card-2">
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
             <div>
-              <label className="block mb-1 text-[11px] uppercase tracking-wider text-slate-500 font-bold">Search Ledger</label>
+              <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-bold">Search Ledger</label>
               <div className="relative">
                 <input
                   type="text"
-                  className="w-full border border-slate-300 rounded-md pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 shadow-sm"
+                  className="w-full border border-line rounded-md pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 shadow-sm"
                   value={draftSearchTerm}
                   onChange={(e) => setDraftSearchTerm(e.target.value)}
                   placeholder="Search code, name, group..."
                 />
-                <FaSearch className="absolute left-3 top-3 text-slate-400 text-xs" />
+                <FaSearch className="absolute left-3 top-3 text-ink-subtle text-xs" />
               </div>
             </div>
 
             <div>
-              <label className="block mb-1 text-[11px] uppercase tracking-wider text-slate-500 font-bold">Account Type</label>
+              <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-bold">Account Type</label>
               <SelectInput
                 name="draftSelectedType"
                 value={draftSelectedType}
@@ -311,10 +311,10 @@ export const ChartOfAccountsPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-slate-200">
+          <div className="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-line">
             <button
               onClick={handleClearFilters}
-              className="px-4 py-2 text-sm font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-md transition-colors"
+              className="px-4 py-2 text-sm font-semibold text-ink-muted hover:text-ink hover:bg-card-2 rounded-md transition-colors"
             >
               Clear All
             </button>
@@ -345,14 +345,14 @@ export const ChartOfAccountsPage: React.FC = () => {
       {/* CREATE LEDGER MODAL */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden border border-slate-200">
+          <div className="bg-card rounded-2xl shadow-2xl max-w-md w-full overflow-hidden border border-line">
             <div className="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
               <h3 className="font-bold text-lg flex items-center gap-2">
                 <FaSitemap className="text-blue-400" /> New Account Ledger
               </h3>
               <button
                 onClick={() => setShowModal(false)}
-                className="text-slate-400 hover:text-white transition-colors"
+                className="text-ink-subtle hover:text-white transition-colors"
               >
                 <FaTimes size={18} />
               </button>
@@ -360,7 +360,7 @@ export const ChartOfAccountsPage: React.FC = () => {
 
             <form onSubmit={handleCreateLedger} className="p-6 space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                <label className="block text-xs font-bold text-ink-muted uppercase tracking-wider mb-1">
                   Ledger Code *
                 </label>
                 <input
@@ -368,13 +368,13 @@ export const ChartOfAccountsPage: React.FC = () => {
                   value={formData.code}
                   onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
                   placeholder="e.g. ACC-1001"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 font-mono"
+                  className="w-full px-3 py-2 border border-line rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 font-mono"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                <label className="block text-xs font-bold text-ink-muted uppercase tracking-wider mb-1">
                   Account Name *
                 </label>
                 <input
@@ -382,13 +382,13 @@ export const ChartOfAccountsPage: React.FC = () => {
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   placeholder="e.g. Office Stationery Expenses"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  className="w-full px-3 py-2 border border-line rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                <label className="block text-xs font-bold text-ink-muted uppercase tracking-wider mb-1">
                   Ledger Type *
                 </label>
                 <select
@@ -396,7 +396,7 @@ export const ChartOfAccountsPage: React.FC = () => {
                   onChange={(e) =>
                     setFormData({ ...formData, type: e.target.value as any })
                   }
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  className="w-full px-3 py-2 border border-line rounded-lg text-sm bg-card focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                 >
                   <option value="ASSET">ASSET</option>
                   <option value="LIABILITY">LIABILITY</option>
@@ -407,7 +407,7 @@ export const ChartOfAccountsPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                <label className="block text-xs font-bold text-ink-muted uppercase tracking-wider mb-1">
                   Group Name *
                 </label>
                 <input
@@ -415,16 +415,16 @@ export const ChartOfAccountsPage: React.FC = () => {
                   value={formData.group}
                   onChange={(e) => setFormData({ ...formData, group: e.target.value })}
                   placeholder="e.g. Administrative Expenses, Bank Accounts"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  className="w-full px-3 py-2 border border-line rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                   required
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200">
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-line">
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                  className="px-4 py-2 text-sm font-semibold text-ink-muted hover:bg-card-2 rounded-lg transition-colors"
                 >
                   Cancel
                 </button>

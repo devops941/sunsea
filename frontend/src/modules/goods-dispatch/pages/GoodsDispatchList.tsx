@@ -159,7 +159,7 @@ const GoodsDispatchList: React.FC = () => {
   ];
 
   return (
-    <div className="p-4 md:p-6 min-h-screen bg-white">
+    <div className="p-4 md:p-6 bg-white">
       <div className="w-full">
         {/* Page Header */}
         <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 mb-6">

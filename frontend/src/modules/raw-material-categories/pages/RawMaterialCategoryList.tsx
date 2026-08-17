@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { useSearchParams } from "react-router-dom";
 import { FaPlus, FaSave, FaEraser } from "react-icons/fa";
 import { toast } from "react-toastify";
 import { z } from "zod";
@@ -71,6 +72,7 @@ const RawMaterialCategoryList: React.FC = () => {
     } = useRawMaterialCategories();
     const { can } = usePermission();
 
+    const [searchParams, setSearchParams] = useSearchParams();
     const [searchTerm, setSearchTerm] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
     
@@ -131,6 +133,18 @@ const RawMaterialCategoryList: React.FC = () => {
         setFormData({ ...initialFormState, code: nextCode });
         setShowFormModal(true);
     };
+
+    // Lets the "Add RM Category" sidebar link open the create modal directly.
+    // The param is cleared straight away so a refresh or back-nav doesn't
+    // reopen the modal, which also stops this effect from looping.
+    useEffect(() => {
+        if (searchParams.get("action") === "add") {
+            handleOpenAdd();
+            searchParams.delete("action");
+            setSearchParams(searchParams, { replace: true });
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchParams]);
 
     const handleOpenEdit = useCallback((category: any) => {
         setEditMode(true);
@@ -229,11 +243,11 @@ const RawMaterialCategoryList: React.FC = () => {
 
     return (
         <div>
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
                 {/* Page Header */}
-                <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-slate-200">
+                <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-line">
                     <div>
-                        <h2 className="text-2xl font-bold text-slate-800">Raw Material Category Management</h2>
+                        <h2 className="text-2xl font-bold text-ink">Raw Material Category Management</h2>
                     </div>
 
                     <div className="flex flex-wrap items-center gap-3 relative w-full lg:w-auto">

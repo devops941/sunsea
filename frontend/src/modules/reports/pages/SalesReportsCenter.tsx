@@ -196,7 +196,7 @@ const SalesReportsCenter: React.FC = () => {
     },
     {
       header: "ORDER NUMBER",
-      render: (item: any) => <span className="font-semibold text-gray-800">{item.orderNo || "-"}</span>
+      render: (item: any) => <span className="font-semibold text-ink">{item.orderNo || "-"}</span>
     },
     {
       header: "ORDER DATE",
@@ -207,7 +207,7 @@ const SalesReportsCenter: React.FC = () => {
       render: (item: any) => (
         <div>
           <div className="font-semibold">{item.customerName || "N/A"}</div>
-          <div className="text-[10px] text-gray-500">{item.customerType || "-"}</div>
+          <div className="text-[10px] text-ink-subtle">{item.customerType || "-"}</div>
         </div>
       )
     },
@@ -249,7 +249,7 @@ const SalesReportsCenter: React.FC = () => {
     {
       header: "TAXES",
       render: (item: any) => (
-        <div className="text-[11px] text-gray-600">
+        <div className="text-[11px] text-ink-muted">
           {item.totalCgst > 0 && <div>CGST: ₹{item.totalCgst}</div>}
           {item.totalSgst > 0 && <div>SGST: ₹{item.totalSgst}</div>}
           {item.totalIgst > 0 && <div>IGST: ₹{item.totalIgst}</div>}
@@ -259,12 +259,12 @@ const SalesReportsCenter: React.FC = () => {
     },
     {
       header: "NET AMOUNT",
-      render: (item: any) => <span className="font-bold text-gray-900">₹{(item.netAmount ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+      render: (item: any) => <span className="font-bold text-ink">₹{(item.netAmount ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
     },
     {
       header: "DISPATCH TYPE",
       render: (item: any) => item.dispatchType ? (
-        <span className="px-2.5 py-1 bg-slate-100 text-slate-700 rounded-md text-xs font-medium border border-slate-200">
+        <span className="px-2.5 py-1 bg-card-2 text-ink-muted rounded-md text-xs font-medium border border-line">
           {item.dispatchType}
         </span>
       ) : "-"
@@ -277,10 +277,10 @@ const SalesReportsCenter: React.FC = () => {
 
   return (
     <div className="w-full">
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-slate-200">
+      <div className="bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-line">
           <div>
-            <h2 className="text-2xl font-bold text-slate-800">Sales Order Report</h2>
+            <h2 className="text-2xl font-bold text-ink">Sales Order Report</h2>
           </div>
 
           <div className="flex flex-wrap items-center gap-3 relative w-full lg:w-auto">
@@ -293,10 +293,10 @@ const SalesReportsCenter: React.FC = () => {
           </div>
         </div>
 
-        <div className="p-6 border-b border-slate-200 bg-slate-50">
+        <div className="p-6 border-b border-line bg-card-2">
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-7 gap-4">
             <div>
-              <label className="block mb-1 text-[11px] uppercase tracking-wider text-slate-500 font-bold">Date Range</label>
+              <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-bold">Date Range</label>
               <SelectInput
                 name="dateRangePreset"
                 value={dateRangePreset}
@@ -306,7 +306,7 @@ const SalesReportsCenter: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block mb-1 text-[11px] uppercase tracking-wider text-slate-500 font-bold">Start Date</label>
+              <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-bold">Start Date</label>
               <DatePickerCalendar
                 name="draftStartDate"
                 value={draftStartDate}
@@ -314,7 +314,7 @@ const SalesReportsCenter: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block mb-1 text-[11px] uppercase tracking-wider text-slate-500 font-bold">End Date</label>
+              <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-bold">End Date</label>
               <DatePickerCalendar
                 name="draftEndDate"
                 value={draftEndDate}
@@ -322,11 +322,11 @@ const SalesReportsCenter: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block mb-1 text-[11px] uppercase tracking-wider text-slate-500 font-bold">Order No</label>
-              <input type="text" className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary shadow-sm" value={draftOrderNo} onChange={(e) => setDraftOrderNo(e.target.value)} placeholder="Search Order No..." />
+              <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-bold">Order No</label>
+              <input type="text" className="w-full border border-line rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary shadow-sm" value={draftOrderNo} onChange={(e) => setDraftOrderNo(e.target.value)} placeholder="Search Order No..." />
             </div>
             <div>
-              <label className="block mb-1 text-[11px] uppercase tracking-wider text-slate-500 font-bold">Customer</label>
+              <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-bold">Customer</label>
               <SelectInput
                 name="draftCustomerId"
                 value={draftCustomerId}
@@ -338,7 +338,7 @@ const SalesReportsCenter: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block mb-1 text-[11px] uppercase tracking-wider text-slate-500 font-bold">Status</label>
+              <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-bold">Status</label>
               <SelectInput
                 name="draftStatus"
                 value={draftStatus}
@@ -357,7 +357,7 @@ const SalesReportsCenter: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block mb-1 text-[11px] uppercase tracking-wider text-slate-500 font-bold">Dispatch Type</label>
+              <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-bold">Dispatch Type</label>
               <SelectInput
                 name="draftDispatchType"
                 value={draftDispatchType}
@@ -369,7 +369,7 @@ const SalesReportsCenter: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex items-center justify-between mt-6 pt-4 border-t border-slate-200">
+          <div className="flex items-center justify-between mt-6 pt-4 border-t border-line">
             <div>
               <ColumnToggle
                 columns={tableColumns}
@@ -380,7 +380,7 @@ const SalesReportsCenter: React.FC = () => {
             <div className="flex items-center gap-3">
               <button
                 onClick={handleClearFilters}
-                className="px-4 py-2 text-sm font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-md transition-colors"
+                className="px-4 py-2 text-sm font-semibold text-ink-muted hover:text-ink hover:bg-card-2 rounded-md transition-colors"
               >
                 Clear All
               </button>

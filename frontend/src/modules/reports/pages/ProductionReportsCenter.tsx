@@ -374,7 +374,7 @@ const ProductionReportsCenter: React.FC = () => {
   const getTableColumns = (): DataTableColumn<any>[] => {
     if (selectedReportType === "daily") {
       return [
-        { header: "DATE", render: (item: any) => <span className="font-semibold text-gray-800">{item.date}</span> },
+        { header: "DATE", render: (item: any) => <span className="font-semibold text-ink">{item.date}</span> },
         { header: "MACHINE", render: (item: any) => item.machineName },
         { header: "PROD. ORDER", render: (item: any) => item.productionOrder },
         { header: "PRODUCT", render: (item: any) => item.productName },
@@ -399,7 +399,7 @@ const ProductionReportsCenter: React.FC = () => {
     }
     if (selectedReportType === "weekly") {
       return [
-        { header: "SCHEDULE ID", render: (item: any) => <span className="font-semibold text-gray-800">{item.weeklyProgramId}</span> },
+        { header: "SCHEDULE ID", render: (item: any) => <span className="font-semibold text-ink">{item.weeklyProgramId}</span> },
         { header: "WEEK STARTING", render: (item: any) => item.weekStartDate?.split("T")[0] },
         { header: "MACHINE", render: (item: any) => item.machineName },
         { header: "PLANNED PRODUCT", render: (item: any) => item.productName || "Various" },
@@ -411,7 +411,7 @@ const ProductionReportsCenter: React.FC = () => {
     }
     if (selectedReportType === "hourly") {
       return [
-        { header: "ORDER ID", render: (item: any) => <span className="font-semibold text-gray-800">{item.productionOrderId}</span> },
+        { header: "ORDER ID", render: (item: any) => <span className="font-semibold text-ink">{item.productionOrderId}</span> },
         { header: "MACHINE", render: (item: any) => item.machine?.machineName || item.machineId },
         { header: "SHIFT", render: (item: any) => <StatusBadge status={item.shiftId} /> },
         {
@@ -438,10 +438,10 @@ const ProductionReportsCenter: React.FC = () => {
 
   return (
     <div className="w-full">
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-slate-200">
+      <div className="bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-line">
           <div>
-            <h2 className="text-2xl font-bold text-slate-800">Production Reports</h2>
+            <h2 className="text-2xl font-bold text-ink">Production Reports</h2>
           </div>
 
           <div className="flex flex-wrap items-center gap-3 relative w-full lg:w-auto">
@@ -454,10 +454,10 @@ const ProductionReportsCenter: React.FC = () => {
           </div>
         </div>
 
-        <div className="p-6 border-b border-slate-200 bg-slate-50">
+        <div className="p-6 border-b border-line bg-card-2">
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-7 gap-4">
             <div>
-              <label className="block mb-1 text-[11px] uppercase tracking-wider text-slate-500 font-bold">Date Range</label>
+              <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-bold">Date Range</label>
               <SelectInput
                 name="dateRangePreset"
                 value={dateRangePreset}
@@ -467,7 +467,7 @@ const ProductionReportsCenter: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block mb-1 text-[11px] uppercase tracking-wider text-slate-500 font-bold">Start Date</label>
+              <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-bold">Start Date</label>
               <DatePickerCalendar
                 name="draftStartDate"
                 value={draftStartDate}
@@ -475,7 +475,7 @@ const ProductionReportsCenter: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block mb-1 text-[11px] uppercase tracking-wider text-slate-500 font-bold">End Date</label>
+              <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-bold">End Date</label>
               <DatePickerCalendar
                 name="draftEndDate"
                 value={draftEndDate}
@@ -483,7 +483,7 @@ const ProductionReportsCenter: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block mb-1 text-[11px] uppercase tracking-wider text-slate-500 font-bold">Machine</label>
+              <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-bold">Machine</label>
               <SelectInput
                 name="draftMachine"
                 value={draftMachine}
@@ -494,7 +494,7 @@ const ProductionReportsCenter: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block mb-1 text-[11px] uppercase tracking-wider text-slate-500 font-bold">Shift</label>
+              <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-bold">Shift</label>
               <SelectInput
                 name="draftShift"
                 value={draftShift}
@@ -506,7 +506,7 @@ const ProductionReportsCenter: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex items-center justify-between mt-6 pt-4 border-t border-slate-200">
+          <div className="flex items-center justify-between mt-6 pt-4 border-t border-line">
             <div>
               <ColumnToggle
                 columns={currentColumns}
@@ -517,7 +517,7 @@ const ProductionReportsCenter: React.FC = () => {
             <div className="flex items-center gap-3">
               <button
                 onClick={handleClearFilters}
-                className="px-4 py-2 text-sm font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-md transition-colors"
+                className="px-4 py-2 text-sm font-semibold text-ink-muted hover:text-ink hover:bg-card-2 rounded-md transition-colors"
               >
                 Clear All
               </button>

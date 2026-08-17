@@ -40,12 +40,12 @@ const CommonConfirmModal: React.FC<CommonConfirmModalProps> = ({
   // Determine colors based on variant
   const iconBgClass = dangerMode ? "bg-red-100" : "bg-primary/10";
   const iconColorClass = dangerMode ? "text-red-500" : "text-primary";
-  const titleColorClass = dangerMode ? "text-red-600" : "text-gray-900";
+  const titleColorClass = dangerMode ? "text-red-600" : "text-ink";
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200">
       <div
-        className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200 relative"
+        className="bg-card rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200 relative"
         role="dialog"
         aria-modal="true"
       >
@@ -58,12 +58,12 @@ const CommonConfirmModal: React.FC<CommonConfirmModalProps> = ({
             {title}
           </h5>
 
-          <p className="text-gray-600 mb-2">
+          <p className="text-ink-muted mb-2">
             {message}
           </p>
 
           {warningText && (
-            <p className="text-xs text-gray-400 font-medium">
+            <p className="text-xs text-ink-subtle font-medium">
               {warningText}
             </p>
           )}
@@ -74,7 +74,7 @@ const CommonConfirmModal: React.FC<CommonConfirmModalProps> = ({
               icon={FaTimes}
               onClick={handleClose}
               disabled={isLoading}
-              className="!bg-gray-100 !text-gray-700 hover:!bg-gray-200 !border-transparent px-6"
+              className="!bg-card-2 !text-ink-muted hover:!bg-line !border-transparent px-6"
             />
             <CustomButton
               text={isLoading ? loadingText : confirmText}

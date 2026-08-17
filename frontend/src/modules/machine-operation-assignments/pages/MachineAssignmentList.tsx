@@ -204,14 +204,14 @@ const MachineAssignmentList: React.FC = () => {
 
   return (
     <div>
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+      <div className="bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
         {/* Top Header */}
-        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-slate-200">
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-line">
           <div>
-            <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-3">
+            <h2 className="text-2xl font-bold text-ink flex items-center gap-3">
               Machine Operation Assignments
             </h2>
-            <p className="text-slate-500 text-sm mt-0.5">
+            <p className="text-ink-subtle text-sm mt-0.5">
               Manage weekly operator assignments and review complete historical logs
             </p>
           </div>
@@ -239,7 +239,7 @@ const MachineAssignmentList: React.FC = () => {
         </div>
 
         {/* Filters & Search Bar */}
-        <div className="p-6 bg-white border-b border-slate-200 space-y-4">
+        <div className="p-6 bg-card border-b border-line space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <SelectInput
               name="filterMachineId"
@@ -295,11 +295,11 @@ const MachineAssignmentList: React.FC = () => {
                 header: "WEEK PERIOD",
                 render: (item) => (
                   <div className="flex flex-col">
-                    <span className="font-semibold text-slate-800 text-sm">
+                    <span className="font-semibold text-ink text-sm">
                       {item.weekStartDate ? item.weekStartDate.split("T")[0] : "—"} to{" "}
                       {item.weekEndDate ? item.weekEndDate.split("T")[0] : "—"}
                     </span>
-                    <span className="text-[11px] text-slate-400">
+                    <span className="text-[11px] text-ink-subtle">
                       ID: {item.id}
                     </span>
                   </div>
@@ -309,7 +309,7 @@ const MachineAssignmentList: React.FC = () => {
                 header: "MACHINE",
                 render: (item) => (
                   <div>
-                    <div className="font-bold text-slate-800 text-sm">
+                    <div className="font-bold text-ink text-sm">
                       {(item as any).machine?.machineName || item.machineId}
                     </div>
                     <div className="text-xs text-blue-600 font-mono mt-0.5">
@@ -324,15 +324,15 @@ const MachineAssignmentList: React.FC = () => {
                   <div>
                     {(item as any).shift ? (
                       <div>
-                        <div className="font-semibold text-slate-800 text-sm">{(item as any).shift.shiftName}</div>
-                        <div className="text-[11px] text-slate-500 mt-0.5">
+                        <div className="font-semibold text-ink text-sm">{(item as any).shift.shiftName}</div>
+                        <div className="text-[11px] text-ink-subtle mt-0.5">
                           {(item as any).shift.startTime} - {(item as any).shift.endTime}
                         </div>
                       </div>
                     ) : (item as any).shiftId ? (
-                      <span className="font-semibold text-slate-800 text-sm">{(item as any).shiftId}</span>
+                      <span className="font-semibold text-ink text-sm">{(item as any).shiftId}</span>
                     ) : (
-                      <span className="text-slate-400 text-sm">—</span>
+                      <span className="text-ink-subtle text-sm">—</span>
                     )}
                   </div>
                 ),
@@ -348,12 +348,12 @@ const MachineAssignmentList: React.FC = () => {
                             <div className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs font-bold shrink-0">
                               {op.employee?.fullName?.charAt(0)?.toUpperCase() || "O"}
                             </div>
-                            <span className="font-semibold text-slate-700 text-[13px]">{op.employee?.fullName}</span>
+                            <span className="font-semibold text-ink-muted text-[13px]">{op.employee?.fullName}</span>
                           </div>
                         ))}
                       </div>
                     ) : (
-                      <span className="text-slate-400 text-sm">— Not Assigned —</span>
+                      <span className="text-ink-subtle text-sm">— Not Assigned —</span>
                     )}
                   </div>
                 ),
@@ -366,17 +366,17 @@ const MachineAssignmentList: React.FC = () => {
                     <div>
                       {inchargeName ? (
                         <>
-                          <div className="font-semibold text-slate-800 text-sm">
+                          <div className="font-semibold text-ink text-sm">
                             {inchargeName}
                           </div>
-                          <div className="text-xs text-slate-500 mt-0.5">
+                          <div className="text-xs text-ink-subtle mt-0.5">
                             <span className="px-1.5 py-0.5 bg-emerald-50 text-emerald-700 rounded text-[10px] font-semibold border border-emerald-200">
                               {item.inchargeRole?.name || "Machine Operator"}
                             </span>
                           </div>
                         </>
                       ) : (
-                        <span className="text-slate-400 text-sm">— Not Assigned —</span>
+                        <span className="text-ink-subtle text-sm">— Not Assigned —</span>
                       )}
                     </div>
                   );
@@ -405,7 +405,7 @@ const MachineAssignmentList: React.FC = () => {
                         onClick={() => handleToggleStatus(item)}
                         className={`p-2 rounded-lg transition-colors ${item.isActive
                           ? "bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
-                          : "bg-slate-100 text-slate-400 hover:bg-slate-200"
+                          : "bg-card-2 text-ink-subtle hover:bg-line"
                           }`}
                       >
                         {item.isActive ? <FaToggleOn size={18} /> : <FaToggleOff size={18} />}

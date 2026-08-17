@@ -257,11 +257,11 @@ const EodStockList: React.FC = () => {
 
     if (!isTodaySelected && isLocked) {
       return (
-        <div className="flex items-center gap-2 px-5 py-2.5 bg-slate-50 border-b border-slate-200 text-sm text-slate-600">
-          <FaLock size={12} className="flex-shrink-0 text-slate-400" />
+        <div className="flex items-center gap-2 px-5 py-2.5 bg-card-2 border-b border-line text-sm text-ink-muted">
+          <FaLock size={12} className="flex-shrink-0 text-ink-subtle" />
           <span>
             Stock locked as of{" "}
-            <span className="font-semibold text-slate-800">{formatDateTime(lastLockedAt!)}</span>
+            <span className="font-semibold text-ink">{formatDateTime(lastLockedAt!)}</span>
           </span>
         </div>
       );
@@ -281,7 +281,7 @@ const EodStockList: React.FC = () => {
 
     if (isFuture) {
       return (
-        <div className="flex items-center gap-2 px-5 py-2.5 bg-slate-50 border-b border-slate-200 text-sm text-slate-500">
+        <div className="flex items-center gap-2 px-5 py-2.5 bg-card-2 border-b border-line text-sm text-ink-subtle">
           <FaInfoCircle size={13} className="flex-shrink-0" />
           <span>Future date — no EOD data available yet.</span>
         </div>
@@ -289,11 +289,11 @@ const EodStockList: React.FC = () => {
     }
 
     return (
-      <div className="flex items-center gap-2 px-5 py-2.5 bg-slate-50 border-b border-slate-200 text-sm text-slate-600">
+      <div className="flex items-center gap-2 px-5 py-2.5 bg-card-2 border-b border-line text-sm text-ink-muted">
         <FaInfoCircle size={14} className="text-blue-500 flex-shrink-0" />
         <span>
           Showing stock for{" "}
-          <span className="font-semibold text-slate-800">
+          <span className="font-semibold text-ink">
             {asOfDate ? formatDate(asOfDate) : formatDate(selectedDate)}
           </span>
         </span>
@@ -303,14 +303,14 @@ const EodStockList: React.FC = () => {
 
   return (
     <div className="p-4 md:p-6">
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+      <div className="bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
 
         {/* ── Header ───────────────────────────────────────────────────────── */}
-        <div className="border-b border-slate-200 px-5 py-4">
+        <div className="border-b border-line px-5 py-4">
           {/* Row 1: title + action buttons */}
           <div className="flex items-center justify-between gap-3 mb-3">
             <div className="flex items-center gap-2.5">
-              <h2 className="text-xl font-bold text-slate-800 tracking-tight">EOD Stock</h2>
+              <h2 className="text-xl font-bold text-ink tracking-tight">EOD Stock</h2>
               <span className="px-1.5 py-0.5 text-[9px] font-extrabold text-orange-600 bg-orange-50 border border-orange-200 rounded tracking-widest uppercase">
                 INV
               </span>
@@ -391,16 +391,16 @@ const EodStockList: React.FC = () => {
             rowKey={(item) => item.id}
             emptyMessage={
               <div className="flex flex-col items-center justify-center py-16 text-center px-4">
-                <FaHistory size={32} className="text-slate-300 mb-3" />
-                <p className="text-slate-500 font-medium text-sm">{emptyMessage}</p>
+                <FaHistory size={32} className="text-ink-subtle mb-3" />
+                <p className="text-ink-subtle font-medium text-sm">{emptyMessage}</p>
               </div>
             }
-            rowClassName={(_, i) => (i % 2 === 0 ? "bg-white" : "bg-slate-50/40")}
+            rowClassName={(_, i) => (i % 2 === 0 ? "bg-card" : "bg-card-2/40")}
             columns={[
               {
                 header: "ITEM CODE",
                 render: (item) => (
-                  <span className="font-semibold text-slate-800 tracking-tight text-sm">
+                  <span className="font-semibold text-ink tracking-tight text-sm">
                     {item.itemCode}
                   </span>
                 ),
@@ -408,7 +408,7 @@ const EodStockList: React.FC = () => {
               {
                 header: "ITEM NAME",
                 render: (item) => (
-                  <span className="font-medium text-slate-800 text-sm">{item.itemName}</span>
+                  <span className="font-medium text-ink text-sm">{item.itemName}</span>
                 ),
               },
               {
@@ -418,14 +418,14 @@ const EodStockList: React.FC = () => {
               {
                 header: "STORE",
                 render: (item) => (
-                  <span className="text-slate-600 text-sm">{getStoreName(item.storeId)}</span>
+                  <span className="text-ink-muted text-sm">{getStoreName(item.storeId)}</span>
                 ),
               },
               {
                 header: "START QTY",
                 align: "right",
                 render: (item) => (
-                  <span className="text-slate-600 font-mono text-sm">
+                  <span className="text-ink-muted font-mono text-sm">
                     {formatQty(item.startQty, item.uom)}
                   </span>
                 ),
@@ -434,7 +434,7 @@ const EodStockList: React.FC = () => {
                 header: isTodaySelected && isLive ? "CURRENT QTY" : "EOD QTY",
                 align: "right",
                 render: (item) => (
-                  <span className={`font-bold font-mono text-sm flex items-center justify-end gap-1.5 ${item.recordedAt === null ? "text-blue-600" : "text-slate-900"
+                  <span className={`font-bold font-mono text-sm flex items-center justify-end gap-1.5 ${item.recordedAt === null ? "text-blue-600" : "text-ink"
                     }`}>
                     {formatQty(item.eodQty, item.uom)}
                     {item.recordedAt === null ? (
@@ -443,7 +443,7 @@ const EodStockList: React.FC = () => {
                         live
                       </span>
                     ) : (
-                      <FaLock size={9} className="text-slate-400" title={`Locked at ${formatDateTime(item.recordedAt)}`} />
+                      <FaLock size={9} className="text-ink-subtle" title={`Locked at ${formatDateTime(item.recordedAt)}`} />
                     )}
                   </span>
                 ),

@@ -144,11 +144,11 @@ const InventoryReportsCenter: React.FC = () => {
     },
     {
       header: "DATE",
-      render: (item: any) => <span className="text-gray-500 font-medium">{item.snapshotDate ? new Date(item.snapshotDate).toLocaleDateString() : "-"}</span>
+      render: (item: any) => <span className="text-ink-subtle font-medium">{item.snapshotDate ? new Date(item.snapshotDate).toLocaleDateString() : "-"}</span>
     },
     {
       header: "ITEM CODE",
-      render: (item: any) => <span className="font-semibold text-gray-800">{item.itemCode || "-"}</span>
+      render: (item: any) => <span className="font-semibold text-ink">{item.itemCode || "-"}</span>
     },
     {
       header: "ITEM NAME",
@@ -168,7 +168,7 @@ const InventoryReportsCenter: React.FC = () => {
 
     {
       header: "START QTY",
-      render: (item: any) => <span className="text-gray-600">{(item.startQty !== null && item.startQty !== undefined && item.startQty !== '') ? `${item.startQty} ${item.uom ? item.uom.split(',')[0] : ''}` : "-"}</span>
+      render: (item: any) => <span className="text-ink-muted">{(item.startQty !== null && item.startQty !== undefined && item.startQty !== '') ? `${item.startQty} ${item.uom ? item.uom.split(',')[0] : ''}` : "-"}</span>
     },
     {
       header: "EOD QTY",
@@ -180,11 +180,11 @@ const InventoryReportsCenter: React.FC = () => {
 
   return (
     <div className="w-full">
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-slate-200">
+      <div className="bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-line">
           <div>
-            <h2 className="text-2xl font-bold text-slate-800">Inventory Reports</h2>
-            {asOfDate && <p className="text-sm text-slate-500 mt-1">Data as of: {new Date(asOfDate).toLocaleDateString()}</p>}
+            <h2 className="text-2xl font-bold text-ink">Inventory Reports</h2>
+            {asOfDate && <p className="text-sm text-ink-subtle mt-1">Data as of: {new Date(asOfDate).toLocaleDateString()}</p>}
           </div>
 
           <div className="flex flex-wrap items-center gap-3 relative w-full lg:w-auto">
@@ -197,10 +197,10 @@ const InventoryReportsCenter: React.FC = () => {
           </div>
         </div>
 
-        <div className="p-6 border-b border-slate-200 bg-slate-50">
+        <div className="p-6 border-b border-line bg-card-2">
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
             <div>
-              <label className="block mb-1 text-[11px] uppercase tracking-wider text-slate-500 font-bold">Snapshot Date</label>
+              <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-bold">Snapshot Date</label>
               <DatePickerCalendar
                 name="draftDate"
                 value={draftDate}
@@ -208,7 +208,7 @@ const InventoryReportsCenter: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block mb-1 text-[11px] uppercase tracking-wider text-slate-500 font-bold">Category</label>
+              <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-bold">Category</label>
               <SelectInput
                 name="draftCategory"
                 value={draftCategory}
@@ -222,7 +222,7 @@ const InventoryReportsCenter: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block mb-1 text-[11px] uppercase tracking-wider text-slate-500 font-bold">Store</label>
+              <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-bold">Store</label>
               <SelectInput
                 name="draftStoreId"
                 value={draftStoreId}
@@ -233,12 +233,12 @@ const InventoryReportsCenter: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block mb-1 text-[11px] uppercase tracking-wider text-slate-500 font-bold">Search Item</label>
-              <input type="text" className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary shadow-sm" value={draftSearch} onChange={(e) => setDraftSearch(e.target.value)} placeholder="Search code or name..." />
+              <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-bold">Search Item</label>
+              <input type="text" className="w-full border border-line rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary shadow-sm" value={draftSearch} onChange={(e) => setDraftSearch(e.target.value)} placeholder="Search code or name..." />
             </div>
           </div>
 
-          <div className="flex items-center justify-between mt-6 pt-4 border-t border-slate-200">
+          <div className="flex items-center justify-between mt-6 pt-4 border-t border-line">
             <div>
               <ColumnToggle
                 columns={tableColumns}
@@ -249,7 +249,7 @@ const InventoryReportsCenter: React.FC = () => {
             <div className="flex items-center gap-3">
               <button
                 onClick={handleClearFilters}
-                className="px-4 py-2 text-sm font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-md transition-colors"
+                className="px-4 py-2 text-sm font-semibold text-ink-muted hover:text-ink hover:bg-card-2 rounded-md transition-colors"
               >
                 Clear All
               </button>

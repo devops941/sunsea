@@ -124,38 +124,38 @@ const AllProductionOrderList: React.FC = () => {
     const columns = [
         {
             header: "#",
-            render: (_: any, index: number) => <span className="text-slate-500">{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</span>
+            render: (_: any, index: number) => <span className="text-ink-subtle">{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</span>
         },
         {
             header: "PO NO",
-            render: (item: any) => <span className="font-semibold text-slate-800">{item.productionOrderId}</span>
+            render: (item: any) => <span className="font-semibold text-ink">{item.productionOrderId}</span>
         },
         {
             header: "SO NO",
             render: (item: any) => (
                 item.salesOrderDetails?.orderNo || item.sourceSalesOrderId ? (
-                    <span className="font-medium text-slate-700">{item.salesOrderDetails?.orderNo || item.sourceSalesOrderId}</span>
+                    <span className="font-medium text-ink-muted">{item.salesOrderDetails?.orderNo || item.sourceSalesOrderId}</span>
                 ) : (
-                    <span className="px-2 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600">Direct Order</span>
+                    <span className="px-2 py-1 rounded-full text-xs font-semibold bg-card-2 text-ink-muted">Direct Order</span>
                 )
             )
         },
         {
             header: "CUSTOMER",
-            render: (item: any) => item.salesOrderDetails?.customerName || <span className="text-slate-400 italic text-xs">N/A (Direct)</span>
+            render: (item: any) => item.salesOrderDetails?.customerName || <span className="text-ink-subtle italic text-xs">N/A (Direct)</span>
         },
         {
             header: "TOTAL PRODUCTS",
-            render: (item: any) => <span className="text-slate-700">{item.totalProducts ?? 1}</span>
+            render: (item: any) => <span className="text-ink-muted">{item.totalProducts ?? 1}</span>
         },
         {
             header: "TOTAL QTY",
-            render: (item: any) => <span className="text-slate-700">{item.totalProductionQuantity ?? item.targetQty}</span>
+            render: (item: any) => <span className="text-ink-muted">{item.totalProductionQuantity ?? item.targetQty}</span>
         },
         {
             header: "RAW MATERIALS",
             render: (item: any) => {
-                if (!item.items || item.items.length === 0) return <span className="text-slate-500">N/A</span>;
+                if (!item.items || item.items.length === 0) return <span className="text-ink-subtle">N/A</span>;
                 const rawMaterials = item.items.flatMap((po: any) => po.draftRawMaterials || []);
                 const visibleRMs = rawMaterials.slice(0, 2);
                 const hiddenRMs = rawMaterials.slice(2);
@@ -204,7 +204,7 @@ const AllProductionOrderList: React.FC = () => {
         //             status={item.colorType === 'mc' ? 'MULTI COLOR' : 'SINGLE COLOR'}
         //             customColor={item.colorType === 'mc' ? { bg: '#e0e7ff', text: '#3730a3' } : { bg: '#fef3c7', text: '#92400e' }}
         //         />
-        //     ) : <span className="text-slate-500">-</span>
+        //     ) : <span className="text-ink-subtle">-</span>
         // },
         {
             header: "STATUS",
@@ -218,7 +218,7 @@ const AllProductionOrderList: React.FC = () => {
         },
         {
             header: "CREATED DATE",
-            render: (item: any) => <span className="text-slate-600">{formatDate(item.createdAt)}</span>
+            render: (item: any) => <span className="text-ink-muted">{formatDate(item.createdAt)}</span>
         },
         {
             header: "ACTIONS",
@@ -232,11 +232,11 @@ const AllProductionOrderList: React.FC = () => {
 
     return (
         <div>
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
                 {/* Page Header */}
-                <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-slate-200">
+                <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-line">
                     <div>
-                        <h2 className="text-2xl font-bold text-slate-800">Production Order History</h2>
+                        <h2 className="text-2xl font-bold text-ink">Production Order History</h2>
                     </div>
                     <div className="flex flex-wrap items-center gap-3">
                         <div style={{ minWidth: '180px' }}>

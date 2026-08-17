@@ -42,16 +42,16 @@ const CommonModal: React.FC<CommonModalProps> = ({ show, onHide, title, children
     return (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200">
             <div
-                className={`bg-white rounded-xl shadow-xl w-full ${widthClass} animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh] ${overflowVisible ? 'overflow-visible' : 'overflow-hidden'}`}
+                className={`bg-card rounded-xl shadow-xl w-full ${widthClass} animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh] ${overflowVisible ? 'overflow-visible' : 'overflow-hidden'}`}
                 role="dialog"
                 aria-modal="true"
             >
                 {/* Header */}
-                <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50/50">
-                    <h3 className="text-lg font-bold text-gray-800 m-0">{title}</h3>
+                <div className="px-6 py-4 border-b border-line flex justify-between items-center bg-card-2/50">
+                    <h3 className="text-lg font-bold text-ink m-0">{title}</h3>
                     <button
                         onClick={onHide}
-                        className="text-gray-400 hover:text-gray-600 transition-colors p-1.5 rounded-md hover:bg-gray-200"
+                        className="text-ink-subtle hover:text-ink-muted transition-colors p-1.5 rounded-md hover:bg-line"
                     >
                         <FaTimes />
                     </button>
@@ -64,7 +64,7 @@ const CommonModal: React.FC<CommonModalProps> = ({ show, onHide, title, children
 
                 {/* Footer */}
                 {footer && (
-                    <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-end gap-3 rounded-b-xl">
+                    <div className="px-6 py-4 border-t border-line bg-card-2 flex justify-end gap-3 rounded-b-xl">
                         {footer}
                     </div>
                 )}

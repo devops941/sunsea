@@ -31,12 +31,12 @@ const CompanyProfile: React.FC = () => {
 
   return (
     <div className="p-4 md:p-6 min-h-screen bg-linear-to-br from-indigo-50 via-white to-blue-50">
-      <div className="max-w-5xl mx-auto bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden transition-all duration-300 hover:shadow-md">
+      <div className="max-w-5xl mx-auto bg-card rounded-2xl shadow-sm border border-line overflow-hidden transition-all duration-300 hover:shadow-md">
 
         {/* HEADER */}
         <div className="bg-linear-to-r from-indigo-600 via-blue-600 to-blue-500 px-6 py-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
           <div className="flex items-center gap-5">
-            <div className="w-16 h-16 md:w-20 md:h-20 bg-white rounded-xl shadow-md border-2 border-white/20 flex items-center justify-center p-2 shrink-0 overflow-hidden">
+            <div className="w-16 h-16 md:w-20 md:h-20 bg-card rounded-xl shadow-md border-2 border-white/20 flex items-center justify-center p-2 shrink-0 overflow-hidden">
               <img src={company.logoUrl || Logo} alt="Company Logo" className="w-full h-full object-contain" />
             </div>
             <div>
@@ -49,13 +49,13 @@ const CompanyProfile: React.FC = () => {
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-4 bg-white/10 backdrop-blur-md px-4 py-2 rounded-xl shadow-sm border border-white/20">
+          <div className="flex items-center gap-4 bg-card/10 backdrop-blur-md px-4 py-2 rounded-xl shadow-sm border border-white/20">
             <div className="flex items-center gap-2 text-white font-medium">
               <FaHashtag className="text-blue-200" />
               <span>{company.companyCode || "-"}</span>
             </div>
-            <div className="w-px h-5 bg-white/30"></div>
-            <div className="bg-white rounded-full"><StatusBadge status={company.isActive ? "ACTIVE" : "INACTIVE"} /></div>
+            <div className="w-px h-5 bg-card/30"></div>
+            <div className="bg-card rounded-full"><StatusBadge status={company.isActive ? "ACTIVE" : "INACTIVE"} /></div>
           </div>
         </div>
 
@@ -64,32 +64,32 @@ const CompanyProfile: React.FC = () => {
 
           {/* General */}
           <section>
-            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 border-b border-slate-100 pb-2 mb-4">
+            <h3 className="text-sm font-bold text-ink-subtle uppercase tracking-widest flex items-center gap-2 border-b border-line-soft pb-2 mb-4">
               <FaBuilding className="text-indigo-400" />
               General Information
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              <div className="flex flex-col space-y-1 p-3 bg-white rounded-xl border border-slate-100/50">
-                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Legal Name</span>
-                <span className="text-sm font-bold text-slate-800">{company.legalName || company.companyName || "-"}</span>
+              <div className="flex flex-col space-y-1 p-3 bg-card rounded-xl border border-line-soft/50">
+                <span className="text-xs font-semibold text-ink-subtle uppercase tracking-wider">Legal Name</span>
+                <span className="text-sm font-bold text-ink">{company.legalName || company.companyName || "-"}</span>
               </div>
-              <div className="flex flex-col space-y-1 p-3 bg-white rounded-xl border border-slate-100/50">
-                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Company Code</span>
-                <span className="text-sm font-bold text-slate-800">{company.companyCode || "-"}</span>
+              <div className="flex flex-col space-y-1 p-3 bg-card rounded-xl border border-line-soft/50">
+                <span className="text-xs font-semibold text-ink-subtle uppercase tracking-wider">Company Code</span>
+                <span className="text-sm font-bold text-ink">{company.companyCode || "-"}</span>
               </div>
             </div>
           </section>
 
           {/* Registration */}
           <section>
-            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 border-b border-slate-100 pb-2 mb-4">
+            <h3 className="text-sm font-bold text-ink-subtle uppercase tracking-widest flex items-center gap-2 border-b border-line-soft pb-2 mb-4">
               <FaFileInvoiceDollar className="text-emerald-400" />
               Registration Details
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              <div className="flex flex-col space-y-1 p-3 bg-white rounded-xl border border-slate-100/50">
-                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">GSTIN</span>
-                <span className="text-sm font-bold text-slate-800 tracking-wide">{company.gstin || "-"}</span>
+              <div className="flex flex-col space-y-1 p-3 bg-card rounded-xl border border-line-soft/50">
+                <span className="text-xs font-semibold text-ink-subtle uppercase tracking-wider">GSTIN</span>
+                <span className="text-sm font-bold text-ink tracking-wide">{company.gstin || "-"}</span>
               </div>
               <div className="flex flex-col space-y-1 p-3 bg-emerald-50/50 rounded-xl border border-emerald-100/50">
                 <span className="text-xs font-semibold text-emerald-600/70 uppercase tracking-wider">Currency</span>
@@ -100,67 +100,67 @@ const CompanyProfile: React.FC = () => {
 
           {/* Address */}
           <section>
-            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 border-b border-slate-100 pb-2 mb-4">
+            <h3 className="text-sm font-bold text-ink-subtle uppercase tracking-widest flex items-center gap-2 border-b border-line-soft pb-2 mb-4">
               <FaBuilding className="text-amber-400" />
               Address Information
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              <div className="flex flex-col space-y-1 p-3 bg-white rounded-xl border border-slate-100/50 lg:col-span-2">
-                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Address Line 1</span>
-                <span className="text-sm font-bold text-slate-800">{company.addressLine1 || "-"}</span>
+              <div className="flex flex-col space-y-1 p-3 bg-card rounded-xl border border-line-soft/50 lg:col-span-2">
+                <span className="text-xs font-semibold text-ink-subtle uppercase tracking-wider">Address Line 1</span>
+                <span className="text-sm font-bold text-ink">{company.addressLine1 || "-"}</span>
               </div>
-              <div className="flex flex-col space-y-1 p-3 bg-white rounded-xl border border-slate-100/50 lg:col-span-2">
-                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Address Line 2</span>
-                <span className="text-sm font-bold text-slate-800">{company.addressLine2 || "-"}</span>
+              <div className="flex flex-col space-y-1 p-3 bg-card rounded-xl border border-line-soft/50 lg:col-span-2">
+                <span className="text-xs font-semibold text-ink-subtle uppercase tracking-wider">Address Line 2</span>
+                <span className="text-sm font-bold text-ink">{company.addressLine2 || "-"}</span>
               </div>
-              <div className="flex flex-col space-y-1 p-3 bg-white rounded-xl border border-slate-100/50">
-                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">City</span>
-                <span className="text-sm font-bold text-slate-800">{company.city || "-"}</span>
+              <div className="flex flex-col space-y-1 p-3 bg-card rounded-xl border border-line-soft/50">
+                <span className="text-xs font-semibold text-ink-subtle uppercase tracking-wider">City</span>
+                <span className="text-sm font-bold text-ink">{company.city || "-"}</span>
               </div>
-              <div className="flex flex-col space-y-1 p-3 bg-white rounded-xl border border-slate-100/50">
-                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">State</span>
-                <span className="text-sm font-bold text-slate-800">{company.state || "-"}</span>
+              <div className="flex flex-col space-y-1 p-3 bg-card rounded-xl border border-line-soft/50">
+                <span className="text-xs font-semibold text-ink-subtle uppercase tracking-wider">State</span>
+                <span className="text-sm font-bold text-ink">{company.state || "-"}</span>
               </div>
-              <div className="flex flex-col space-y-1 p-3 bg-white rounded-xl border border-slate-100/50">
-                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Zipcode</span>
-                <span className="text-sm font-bold text-slate-800">{company.zipcode || "-"}</span>
+              <div className="flex flex-col space-y-1 p-3 bg-card rounded-xl border border-line-soft/50">
+                <span className="text-xs font-semibold text-ink-subtle uppercase tracking-wider">Zipcode</span>
+                <span className="text-sm font-bold text-ink">{company.zipcode || "-"}</span>
               </div>
-              <div className="flex flex-col space-y-1 p-3 bg-white rounded-xl border border-slate-100/50">
-                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Country</span>
-                <span className="text-sm font-bold text-slate-800">{company.country || "-"}</span>
+              <div className="flex flex-col space-y-1 p-3 bg-card rounded-xl border border-line-soft/50">
+                <span className="text-xs font-semibold text-ink-subtle uppercase tracking-wider">Country</span>
+                <span className="text-sm font-bold text-ink">{company.country || "-"}</span>
               </div>
             </div>
           </section>
 
           {/* Contact */}
           <section>
-            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 border-b border-slate-100 pb-2 mb-4">
+            <h3 className="text-sm font-bold text-ink-subtle uppercase tracking-widest flex items-center gap-2 border-b border-line-soft pb-2 mb-4">
               <FaPhone className="text-blue-400" />
               Contact Information
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              <div className="flex flex-col space-y-1 p-3 bg-white rounded-xl border border-slate-100/50">
-                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Phone</span>
-                <span className="text-sm font-bold text-slate-800">{company.phone || "-"}</span>
+              <div className="flex flex-col space-y-1 p-3 bg-card rounded-xl border border-line-soft/50">
+                <span className="text-xs font-semibold text-ink-subtle uppercase tracking-wider">Phone</span>
+                <span className="text-sm font-bold text-ink">{company.phone || "-"}</span>
               </div>
-              <div className="flex flex-col space-y-1 p-3 bg-white rounded-xl border border-slate-100/50">
-                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Email</span>
-                <span className="text-sm font-bold text-slate-800">{company.email || "-"}</span>
+              <div className="flex flex-col space-y-1 p-3 bg-card rounded-xl border border-line-soft/50">
+                <span className="text-xs font-semibold text-ink-subtle uppercase tracking-wider">Email</span>
+                <span className="text-sm font-bold text-ink">{company.email || "-"}</span>
               </div>
             </div>
           </section>
 
           {/* System */}
           <section>
-            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 border-b border-slate-100 pb-2 mb-4">
+            <h3 className="text-sm font-bold text-ink-subtle uppercase tracking-widest flex items-center gap-2 border-b border-line-soft pb-2 mb-4">
               <FaServer className="text-purple-400" />
               System Information
             </h3>
             <div className="grid grid-cols-1 gap-4">
-              <div className="flex flex-col space-y-3 p-4 bg-white rounded-xl border border-slate-100/50">
-                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Logo Image</span>
+              <div className="flex flex-col space-y-3 p-4 bg-card rounded-xl border border-line-soft/50">
+                <span className="text-xs font-semibold text-ink-subtle uppercase tracking-wider">Logo Image</span>
                 {company.logoUrl ? (
-                  <div className="bg-white p-2 border border-slate-200 rounded-lg shadow-sm inline-block w-max">
+                  <div className="bg-card p-2 border border-line rounded-lg shadow-sm inline-block w-max">
                     <img
                       src={company.logoUrl}
                       alt="Company Logo"
@@ -168,7 +168,7 @@ const CompanyProfile: React.FC = () => {
                     />
                   </div>
                 ) : (
-                  <span className="text-sm text-slate-400 italic">No Logo Uploaded</span>
+                  <span className="text-sm text-ink-subtle italic">No Logo Uploaded</span>
                 )}
               </div>
             </div>
@@ -178,7 +178,7 @@ const CompanyProfile: React.FC = () => {
 
         {/* FOOTER */}
         {canEdit && (
-          <div className="px-6 py-4 bg-white/80 border-t border-slate-100 flex justify-end">
+          <div className="px-6 py-4 bg-card/80 border-t border-line-soft flex justify-end">
             <CustomButton
               text="Edit Company Profile"
               icon={FaEdit}

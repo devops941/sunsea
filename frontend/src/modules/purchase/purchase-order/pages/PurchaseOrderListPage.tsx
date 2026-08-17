@@ -263,11 +263,11 @@ const PurchaseOrderListPage: React.FC = () => {
 
   return (
     <div className="w-full">
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+      <div className="bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
         {/* Page Header */}
-        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-slate-200">
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-line">
           <div>
-            <h2 className="text-2xl font-bold text-slate-800">Purchase Orders Management</h2>
+            <h2 className="text-2xl font-bold text-ink">Purchase Orders Management</h2>
           </div>
 
           <div className="flex flex-wrap items-center gap-3 relative w-full lg:w-auto">
@@ -287,12 +287,12 @@ const PurchaseOrderListPage: React.FC = () => {
               onOpen={handleOpenFilter}
             >
               <div className="mb-3">
-                <label className="block mb-1 text-[11px] uppercase tracking-wider text-gray-500 font-semibold">
+                <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-semibold">
                   From Date
                 </label>
                 <input
                   type="date"
-                  className="w-full border border-gray-200 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                  className="w-full border border-line rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
                   value={draftFromDate}
                   max={draftToDate || undefined}
                   onChange={(e) => setDraftFromDate(e.target.value)}
@@ -300,12 +300,12 @@ const PurchaseOrderListPage: React.FC = () => {
               </div>
 
               <div className="mb-3">
-                <label className="block mb-1 text-[11px] uppercase tracking-wider text-gray-500 font-semibold">
+                <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-semibold">
                   To Date
                 </label>
                 <input
                   type="date"
-                  className="w-full border border-gray-200 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+                  className="w-full border border-line rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
                   value={draftToDate}
                   min={draftFromDate || undefined}
                   onChange={(e) => setDraftToDate(e.target.value)}
@@ -313,11 +313,11 @@ const PurchaseOrderListPage: React.FC = () => {
               </div>
 
               <div className="mb-4">
-                <label className="block mb-1 text-[11px] uppercase tracking-wider text-gray-500 font-semibold">
+                <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-semibold">
                   Status
                 </label>
                 <select
-                  className="w-full border border-gray-200 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary bg-white"
+                  className="w-full border border-line rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary bg-card"
                   value={draftStatusFilter}
                   onChange={(e) => setDraftStatusFilter(e.target.value as PurchaseOrderStatus | "")}
                 >
@@ -363,7 +363,7 @@ const PurchaseOrderListPage: React.FC = () => {
               },
               {
                 header: "PO NUMBER",
-                render: (item) => <span className="font-semibold text-gray-800">{item.poNumber || "-"}</span>,
+                render: (item) => <span className="font-semibold text-ink">{item.poNumber || "-"}</span>,
               },
               {
                 header: "PO DATE",
@@ -465,9 +465,9 @@ const PurchaseOrderListPage: React.FC = () => {
           title="Send WhatsApp"
           message={
               <div className="text-left mt-2 flex flex-col gap-3">
-                  <p className="text-sm text-slate-500 mb-2">Are you sure you want to send the Purchase Order via WhatsApp?</p>
+                  <p className="text-sm text-ink-subtle mb-2">Are you sure you want to send the Purchase Order via WhatsApp?</p>
                   <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">Phone Number (with country code, e.g. 919876543210)</label>
+                      <label className="block text-sm font-medium text-ink-muted mb-1">Phone Number (with country code, e.g. 919876543210)</label>
                       {(() => {
                           const phones = [];
                           if (whatsappPo?.supplier) {
@@ -486,7 +486,7 @@ const PurchaseOrderListPage: React.FC = () => {
                           if (phones.length > 1) {
                               return (
                                   <select 
-                                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white"
+                                      className="w-full px-3 py-2 border border-line rounded-lg text-sm bg-card"
                                       value={recipientPhone}
                                       onChange={(e) => setRecipientPhone(e.target.value)}
                                   >
@@ -501,7 +501,7 @@ const PurchaseOrderListPage: React.FC = () => {
                           return (
                               <input
                                   type="text"
-                                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                                  className="w-full px-3 py-2 border border-line rounded-lg text-sm"
                                   value={recipientPhone}
                                   onChange={(e) => setRecipientPhone(e.target.value)}
                               />

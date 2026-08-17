@@ -110,10 +110,10 @@ const MachineList: React.FC = () => {
 
     return (
         <div>
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-slate-200">
+            <div className="bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
+                <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-line">
                     <div>
-                        <h2 className="text-2xl font-bold text-slate-800">Machine Management</h2>
+                        <h2 className="text-2xl font-bold text-ink">Machine Management</h2>
                     </div>
                     <div className="flex flex-wrap items-center gap-3 relative w-full lg:w-auto">
                         <SearchInput

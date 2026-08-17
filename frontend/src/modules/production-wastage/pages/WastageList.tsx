@@ -129,12 +129,12 @@ const WastageList: React.FC = () => {
   const displayWastages = wastages || [];
 
   return (
-    <div className="p-4 md:p-1 min-h-screen">
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+    <div className="p-4 md:p-1">
+      <div className="bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
         {/* Page Header */}
-        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-slate-200">
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-line">
           <div>
-            <h2 className="text-2xl font-bold text-slate-800">Production Wastage Auditing</h2>
+            <h2 className="text-2xl font-bold text-ink">Production Wastage Auditing</h2>
           </div>
           {/* <div className="flex items-center gap-3">
             <CustomButton
@@ -158,7 +158,7 @@ const WastageList: React.FC = () => {
           columns={[
             {
               header: "DATE",
-              render: (item: any) => <span className="font-medium text-slate-800">{new Date(item.wastageDate).toLocaleDateString()}</span>,
+              render: (item: any) => <span className="font-medium text-ink">{new Date(item.wastageDate).toLocaleDateString()}</span>,
             },
             {
               header: "PO REFERENCE",
@@ -166,20 +166,20 @@ const WastageList: React.FC = () => {
             },
             {
               header: "PRODUCT",
-              render: (item: any) => <span className="text-slate-600">{item.product?.productName || item.productId}</span>,
+              render: (item: any) => <span className="text-ink-muted">{item.product?.productName || item.productId}</span>,
             },
             {
               header: "MACHINE",
-              render: (item: any) => <span className="text-slate-500">{item.machine?.machineName || item.machineId}</span>,
+              render: (item: any) => <span className="text-ink-subtle">{item.machine?.machineName || item.machineId}</span>,
             },
             {
               header: "SHIFT",
-              render: (item: any) => <span className="text-slate-600">{item.shift?.shiftName || item.shiftId}</span>,
+              render: (item: any) => <span className="text-ink-muted">{item.shift?.shiftName || item.shiftId}</span>,
             },
 {
               header: "QUANTITY",
               render: (item: any) => (
-                <span className="font-bold text-slate-800">
+                <span className="font-bold text-ink">
                   {item.quantity} {item.uom && item.uom.toUpperCase() === "PCS" ? "kg" : String(item.uom || "kg").split(',')[0].toLowerCase()}
                 </span>
               ),
@@ -187,8 +187,8 @@ const WastageList: React.FC = () => {
             {
               header: "REASON",
               render: (item: any) => item.reason ? (
-                <span title={item.reason} className="block max-w-[150px] truncate cursor-help text-slate-500">{item.reason}</span>
-              ) : <span className="text-slate-500">-</span>,
+                <span title={item.reason} className="block max-w-[150px] truncate cursor-help text-ink-subtle">{item.reason}</span>
+              ) : <span className="text-ink-subtle">-</span>,
             },
             {
               header: "STATUS",

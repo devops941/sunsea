@@ -11,16 +11,15 @@ import {
   FaChevronRight,
   FaSignOutAlt,
 } from "react-icons/fa";
-import { FaCircle } from "react-icons/fa";
 import { FiPower, FiMenu, FiChevronsLeft, FiChevronsRight, FiLogOut } from "react-icons/fi";
 import Logo from "../../../assets/images/sun-sea.webp";
 import { sidebarItems } from "./sidebar.data";
 const Sidebar = () => {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
-  const [isCollapsed, setIsCollapsed] = useState(false);
   const [hoveredMenu, setHoveredMenu] = useState<string | null>(null);
   const [openMenu, setOpenMenu] = useState<string | null>("Dashboard");
+  const [openSubMenu, setOpenSubMenu] = useState<string | null>(null);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const location = useLocation();
   const isMenuActive = useCallback((menu: any) => {
@@ -51,10 +50,14 @@ const Sidebar = () => {
     }
     return false;
   }, [location.pathname]);
-  const activeCollapsed = isCollapsed;
-  const toggleMenu = (menu: string) => {
-    if (activeCollapsed) return;
-    setOpenMenu((prev) => (prev === menu ? null : menu));
+
+  const toggleMenu = (menuTitle: string) => {
+    setOpenMenu((prev) => (prev === menuTitle ? null : menuTitle));
+    setOpenSubMenu(null); // Close inner menu when outer menu toggles
+  };
+
+  const toggleSubMenu = (menuTitle: string) => {
+    setOpenSubMenu((prev) => (prev === menuTitle ? null : menuTitle));
   };
   const { user } = useAppSelector((state) => state.auth);
   const { data: company } = useAppSelector((state) => state.company);
@@ -146,32 +149,11 @@ const Sidebar = () => {
 
   return (
     <aside
-      className={`h-screen bg-[#ffffff] text-[#2A3547] relative overflow-visible flex flex-col transition-[width] duration-300 ease-in-out z-50 border-r border-black/10  ${activeCollapsed ? "w-[80px]" : "w-[260px]"}`}
+      className={`h-screen bg-nav text-nav-fg relative overflow-visible flex flex-col transition-[width] duration-300 ease-in-out z-50 border-r border-black/10  w-[250px]`}
     >
-      <div
-        className={`flex shrink-0 h-[72px] items-center border-b border-gray-200/70 ${activeCollapsed ? "justify-center gap-1 px-2" : "justify-between pl-2 pr-3"}`}
-      >
-        <div className={`bg-transparent flex items-center ${activeCollapsed ? "w-12 h-12 justify-center shrink-0" : "flex-1 h-[54px] justify-start overflow-hidden pl-0"}`}>
-          <img
-            src={activeCollapsed ? (company?.faviconUrl || company?.logoUrl || Logo) : (company?.logoUrl || Logo)}
-            alt={activeCollapsed ? "Company Favicon" : "Company Logo"}
-            className={`max-h-full max-w-full object-contain ${activeCollapsed ? "mx-auto" : "object-left"}`}
-          />
-        </div>
-        <div
-          className={`flex items-center justify-center cursor-pointer transition-all duration-200 hover:bg-gray-100 hover:text-primary text-[#2A3547] rounded-lg shrink-0 ${activeCollapsed ? "w-6 h-6" : "w-8 h-8"}`}
-          title="Toggle Sidebar"
-          onClick={(e) => {
-            e.preventDefault();
-            setIsCollapsed(!isCollapsed);
-          }}
-        >
-          {isCollapsed ? <FiChevronsRight size={18} /> : <FiChevronsLeft size={20} />}
-        </div>
-      </div>
+
       <div className="flex-1 px-5 py-4 overflow-y-auto overflow-x-hidden [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:bg-black/20 [&::-webkit-scrollbar-thumb]:rounded-full">
         {filteredSidebarItems.map((menu) => {
-          const Icon = menu.icon;
           // ── Flat top-level item (no children) → render as a direct link ──
           if (!menu.children && menu.path) {
             // Use isMenuActive() instead of NavLink's isActive so that activePaths
@@ -182,11 +164,11 @@ const Sidebar = () => {
               <div key={menu.title} className="relative mb-2.5">
                 <NavLink
                   to={resolvedPath}
-                  className={`w-full border-none outline-none cursor-pointer p-[10px_15px] rounded-sm flex items-center justify-between transition-all duration-300 hover:bg-gray-100 ${menuActive ? "!bg-gradient-to-r !from-blue-400 !to-primary !text-white font-semibold" : "bg-transparent text-[#2A3547]"} ${activeCollapsed ? "justify-center p-[14px]" : ""}`}
+                  onClick={() => setOpenMenu(null)}
+                  className={`w-full border-none outline-none cursor-pointer p-[10px_15px] rounded-sm flex items-center justify-between transition-all duration-300 ${menuActive ? "!bg-nav-active !text-nav-active-fg font-bold" : "bg-transparent text-nav-fg"}`}
                 >
-                  <div className={`flex items-center text-[15px] font-normal leading-[1.334rem] ${activeCollapsed ? "justify-center gap-0" : "gap-4"} ${menuActive ? "!text-white" : ""}`}>
-                    <Icon className={`min-w-[20px] text-[20px] ${menuActive ? "!text-white" : ""}`} />
-                    {!activeCollapsed && <span className={menuActive ? "!text-white" : ""}>{menu.title}</span>}
+                  <div className={`flex items-center text-[14px] font-bold leading-[1.334rem] transition-colors ${menuActive ? "!text-nav-active-fg" : "text-nav-fg"}`}>
+                    <span className={menuActive ? "!text-nav-active-fg" : "text-nav-fg"}>{menu.title}</span>
                   </div>
                 </NavLink>
               </div>
@@ -202,40 +184,51 @@ const Sidebar = () => {
               onMouseLeave={() => setHoveredMenu(null)}
             >
               <button
-                className={`w-full border-none outline-none cursor-pointer p-[14px_6px] rounded-xl flex items-center justify-between transition-all duration-300 hover:bg-gray-100 ${isMenuActive(menu) ? "!bg-gradient-to-r !from-blue-400 !to-primary !text-white font-semibold" : "bg-transparent text-[#2A3547]"} ${activeCollapsed ? "justify-center p-[14px]" : ""}`}
+                className={`w-full border-none outline-none cursor-pointer p-[14px_6px] rounded-xl flex items-center justify-between transition-all duration-300 bg-transparent text-nav-fg`}
                 onClick={() => toggleMenu(menu.title)}
               >
-                <div className={`flex items-center text-[15px] font-normal leading-[1.334rem] ${activeCollapsed ? "justify-center gap-0" : "gap-4"} ${isMenuActive(menu) ? "!text-white" : ""}`}>
-                  <Icon className={`min-w-[20px] text-[20px] ${isMenuActive(menu) ? "!text-white" : ""}`} />
-                  {!activeCollapsed && <span className={isMenuActive(menu) ? "!text-white" : ""}>{menu.title}</span>}
+                <div className={`flex items-center text-[15px] font-bold leading-[1.334rem] transition-colors text-nav-fg`}>
+                  <span className="text-nav-fg">{menu.title}</span>
                 </div>
-                {!activeCollapsed &&
-                  (isOpen ? <FaChevronDown className={`min-w-[14px] text-[14px] ${isMenuActive(menu) ? "!text-white" : ""}`} /> : <FaChevronRight className={`min-w-[14px] text-[14px] ${isMenuActive(menu) ? "!text-white" : ""}`} />)}
+                {isOpen ? <FaChevronDown className={`min-w-[14px] text-[14px] transition-colors text-nav-fg`} /> : <FaChevronRight className={`min-w-[14px] text-[14px] transition-colors text-nav-fg`} />}
               </button>
-              {!activeCollapsed && isOpen && (
+              {isOpen && (
                 <div className="mt-2 ml-3 pl-2 border-l-2 border-black/10 flex flex-col gap-1">
                   {menu.children?.map((subMenu) => (
                     <React.Fragment key={subMenu.title}>
                       {subMenu.children ? (
                         <>
                           {/* Parent Child */}
-                          <div className="no-underline text-[#2A3547] px-3 py-2.5 rounded-lg text-[15px] font-normal leading-[1.334rem] cursor-default">
-                            {subMenu.title}
-                          </div>
+                          <button
+                            className="w-full border-none outline-none cursor-pointer p-[10px_6px] rounded-lg flex items-center justify-between transition-all duration-300 bg-transparent text-nav-fg"
+                            onClick={() => toggleSubMenu(subMenu.title)}
+                          >
+                            <div className="flex items-center text-[15px] font-bold leading-[1.334rem] text-nav-fg">
+                              <span className="text-nav-fg">{subMenu.title}</span>
+                            </div>
+                            {openSubMenu === subMenu.title ? (
+                              <FaChevronDown className="min-w-[12px] text-[12px] text-nav-fg" />
+                            ) : (
+                              <FaChevronRight className="min-w-[12px] text-[12px] text-nav-fg" />
+                            )}
+                          </button>
                           {/* Child of Child */}
-                          {subMenu.children.map((child) =>
-                            child.path ? (
-                              <NavLink
-                                key={child.path}
-                                to={child.path}
-                                className={({ isActive }) =>
-                                  `no-underline px-3 py-2.5 rounded-lg text-[15px] font-normal leading-[1.334rem] transition-all duration-300 hover:bg-gray-100 flex items-center gap-3 pl-5 ${isActive ? "!bg-gradient-to-r !from-blue-400 !to-primary !text-white font-semibold" : "text-[#2A3547]"}`
-                                }
-                              >
-                                <FaCircle size={6} />
-                                {child.title}
-                              </NavLink>
-                            ) : null
+                          {openSubMenu === subMenu.title && (
+                            <div className="mt-1 flex flex-col gap-1 border-l-2 border-black/10 ml-3 pl-2">
+                              {subMenu.children.map((child) =>
+                                child.path ? (
+                                  <NavLink
+                                    key={child.path}
+                                    to={child.path}
+                                    className={({ isActive }) =>
+                                      `no-underline px-3 py-2.5 rounded-lg text-[15px] font-bold leading-[1.334rem] transition-all duration-300 flex items-center gap-3 pl-5 ${isActive && child.path === location.pathname + location.search ? "!bg-nav-active !text-nav-active-fg font-bold" : "text-nav-fg"}`
+                                    }
+                                  >
+                                    <span className={`transition-colors ${child.path === location.pathname + location.search ? "" : ""}`}>{child.title}</span>
+                                  </NavLink>
+                                ) : null
+                              )}
+                            </div>
                           )}
                         </>
                       ) : (
@@ -244,51 +237,10 @@ const Sidebar = () => {
                             key={subMenu.path}
                             to={subMenu.path}
                             className={({ isActive }) =>
-                              `no-underline px-3 py-2.5 rounded-lg text-[15px] font-normal leading-[1.334rem] transition-all duration-300 hover:bg-gray-100 ${isActive ? "!bg-gradient-to-r !from-blue-400 !to-primary !text-white font-semibold" : "text-[#2A3547]"}`
+                              `no-underline px-3 py-2.5 rounded-lg text-[15px] font-bold leading-[1.334rem] transition-all duration-300 flex items-center gap-3 ${isActive ? "!bg-nav-active !text-nav-active-fg font-bold" : "text-nav-fg"}`
                             }
                           >
-                            {subMenu.title}
-                          </NavLink>
-                        )
-                      )}
-                    </React.Fragment>
-                  ))}
-                </div>
-              )}
-              {activeCollapsed && hoveredMenu === menu.title && (
-                <div className="absolute top-0 left-[72px] w-[240px] bg-white rounded-xl overflow-hidden ">
-                  <div className="px-4 py-3.5 bg-white text-[#2A3547] font-semibold border-b border-black/10 text-[15px] leading-[1.334rem]">{menu.title}</div>
-                  {menu.children?.map((subMenu) => (
-                    <React.Fragment key={subMenu.title}>
-                      {subMenu.children ? (
-                        <>
-                          <div className="block px-4 py-3 no-underline text-[#2A3547] font-semibold mt-1 text-[15px] leading-[1.334rem]">
-                            {subMenu.title}
-                          </div>
-                          {subMenu.children.map((child) =>
-                            child.path ? (
-                              <NavLink
-                                key={child.path}
-                                to={child.path}
-                                className={({ isActive }) =>
-                                  `block px-4 py-3 no-underline transition-all duration-300 hover:bg-gray-100 pl-8 text-[15px] font-normal leading-[1.334rem] ${isActive ? "!bg-gradient-to-r !from-blue-400 !to-primary !text-white font-semibold" : "text-[#2A3547]"}`
-                                }
-                              >
-                                {child.title}
-                              </NavLink>
-                            ) : null
-                          )}
-                        </>
-                      ) : (
-                        subMenu.path && (
-                          <NavLink
-                            key={subMenu.path}
-                            to={subMenu.path}
-                            className={({ isActive }) =>
-                              `block px-4 py-3 no-underline transition-all duration-300 hover:bg-gray-100 text-[15px] font-normal leading-[1.334rem] ${isActive ? "!bg-gradient-to-r !from-blue-400 !to-primary !text-white font-semibold" : "text-[#2A3547]"}`
-                            }
-                          >
-                            {subMenu.title}
+                            <span className={`transition-colors ${subMenu.path === location.pathname ? "" : ""}`}>{subMenu.title}</span>
                           </NavLink>
                         )
                       )}
@@ -301,25 +253,23 @@ const Sidebar = () => {
         })}
       </div>
       <div className="p-4 mt-auto shrink-0">
-        <div className={`flex items-center p-3 rounded-2xl bg-[#eef5fa] hover:bg-[#e4eff8] transition-colors border border-blue-100/50 ${activeCollapsed ? "justify-center" : "justify-between"}`}>
-          {!activeCollapsed && (
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="w-10 h-10 rounded-full overflow-hidden shrink-0 bg-white shadow-sm flex items-center justify-center text-primary font-bold text-lg border border-white/50">
-                {avatarImage ? (
-                  <img src={avatarImage} alt="Profile" className="w-full h-full object-cover" />
-                ) : (
-                  getInitials(user?.fullName)
-                )}
-              </div>
-              <div className="flex flex-col min-w-0">
-                <span className="text-[15px] font-bold text-slate-800 leading-tight tracking-tight truncate">{user?.fullName || "Super Admin"}</span>
-                <span className="text-[13px] text-slate-500 font-medium truncate">{formatRole(user)}</span>
-              </div>
+        <div className={`flex items-center p-3 rounded-2xl bg-card hover:bg-card-2 transition-colors border border-line-soft justify-between`}>
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-full overflow-hidden shrink-0 bg-card-2 shadow-sm flex items-center justify-center text-primary font-bold text-lg border border-line">
+              {avatarImage ? (
+                <img src={avatarImage} alt="Profile" className="w-full h-full object-cover" />
+              ) : (
+                getInitials(user?.fullName)
+              )}
             </div>
-          )}
+            <div className="flex flex-col min-w-0">
+              <span className="text-[15px] font-bold text-ink leading-tight tracking-tight truncate">{user?.fullName || "Super Admin"}</span>
+              <span className="text-[13px] text-ink-subtle font-medium truncate">{formatRole(user)}</span>
+            </div>
+          </div>
           <button
             onClick={handleLogout}
-            className="text-primary hover:text-blue-700 hover:bg-blue-100/50 w-9 h-9 flex items-center justify-center rounded-full transition-colors shrink-0"
+            className="text-primary hover:text-blue-700 hover:white/50 w-9 h-9 flex items-center justify-center rounded-full transition-colors shrink-0"
             title="Logout"
           >
             <FiLogOut size={20} strokeWidth={2.5} />

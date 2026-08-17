@@ -115,12 +115,12 @@ const HourlyWorkReportEdit: React.FC = () => {
 
     return (
         <div className="p-4 md:p-6 min-h-screen">
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200">
+            <div className="bg-card rounded-2xl shadow-sm border border-line">
 
                 {/* Page Header */}
-                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 p-6 border-b border-slate-200">
+                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 p-6 border-b border-line">
                     <div>
-                        <h2 className="text-2xl font-bold text-slate-800 m-0">Edit Hourly Production Log</h2>
+                        <h2 className="text-2xl font-bold text-ink m-0">Edit Hourly Production Log</h2>
                     </div>
                     <div className="flex justify-end">
                         <BackButton text="Back to List" to="/hourly-work-reports" />
@@ -132,42 +132,42 @@ const HourlyWorkReportEdit: React.FC = () => {
 
                         {/* Left Card: Read-Only Reference Info */}
                         <div className="lg:col-span-2">
-                            <div className="bg-gray-50 border border-gray-200 rounded-lg p-5 h-full">
+                            <div className="bg-card-2 border border-line rounded-lg p-5 h-full">
                                 {isEditDisabled && (
                                     <div className="bg-rose-50 border border-rose-200 text-rose-700 px-4 py-3 rounded-xl flex items-center gap-2 text-xs font-semibold mb-4">
                                         <FaInfoCircle size={14} className="shrink-0 text-rose-500" />
                                         <span>This log is locked (shift completed, stopped, or final hour logged).</span>
                                     </div>
                                 )}
-                                <h6 className="text-base font-semibold text-gray-800 mb-4 border-b border-gray-100 pb-2">
+                                <h6 className="text-base font-semibold text-ink mb-4 border-b border-line-soft pb-2">
                                     Reference Plan Info
                                 </h6>
 
-                                <div className="bg-white rounded-lg p-4 border border-gray-100 space-y-4">
+                                <div className="bg-card rounded-lg p-4 border border-line-soft space-y-4">
                                     <div className="flex items-center gap-2 mb-1 text-sm font-semibold text-primary">
                                         <FaCheckCircle size={13} />
                                         <span>LOCKED FOR EDITING</span>
                                     </div>
 
                                     <div>
-                                        <span className="text-xs text-gray-400 block mb-0.5">Machine</span>
-                                        <strong className="text-gray-800 text-base">{machineName}</strong>
+                                        <span className="text-xs text-ink-subtle block mb-0.5">Machine</span>
+                                        <strong className="text-ink text-base">{machineName}</strong>
                                     </div>
                                     <div>
-                                        <span className="text-xs text-gray-400 block mb-0.5">Production Date</span>
-                                        <strong className="text-gray-800 text-base">{productionDate}</strong>
+                                        <span className="text-xs text-ink-subtle block mb-0.5">Production Date</span>
+                                        <strong className="text-ink text-base">{productionDate}</strong>
                                     </div>
                                     <div>
-                                        <span className="text-xs text-gray-400 block mb-0.5">Shift</span>
-                                        <strong className="text-gray-800 text-base">{shiftName}</strong>
+                                        <span className="text-xs text-ink-subtle block mb-0.5">Shift</span>
+                                        <strong className="text-ink text-base">{shiftName}</strong>
                                     </div>
                                     <div>
-                                        <span className="text-xs text-gray-400 block mb-0.5">Production Order</span>
+                                        <span className="text-xs text-ink-subtle block mb-0.5">Production Order</span>
                                         <strong className="text-lg text-primary">{productionOrderId}</strong>
                                     </div>
                                     <div>
-                                        <span className="text-xs text-gray-400 block mb-0.5">Product</span>
-                                        <strong className="text-gray-800">{productName}</strong>
+                                        <span className="text-xs text-ink-subtle block mb-0.5">Product</span>
+                                        <strong className="text-ink">{productName}</strong>
                                     </div>
                                 </div>
                             </div>
@@ -175,7 +175,7 @@ const HourlyWorkReportEdit: React.FC = () => {
 
                         {/* Right Section: Editable Log Parameters */}
                         <div className="lg:col-span-3">
-                            <h6 className="text-base font-semibold text-gray-800 mb-4 border-b border-gray-100 pb-2">
+                            <h6 className="text-base font-semibold text-ink mb-4 border-b border-line-soft pb-2">
                                 Log Parameters
                             </h6>
 
@@ -299,7 +299,7 @@ const HourlyWorkReportEdit: React.FC = () => {
                     </div>
 
                     {/* Form Actions */}
-                    <div className="flex justify-end items-center gap-3 pt-4 border-t border-gray-100">
+                    <div className="flex justify-end items-center gap-3 pt-4 border-t border-line-soft">
                         <CustomButton
                             text="Cancel"
                             icon={FaEraser}
@@ -348,7 +348,7 @@ const HourlyWorkReportEdit: React.FC = () => {
                             <FaCrown size={44} />
                         </div>
                     </div>
-                    <h3 className="text-2xl font-bold text-slate-800 mb-2">Congratulations!</h3>
+                    <h3 className="text-2xl font-bold text-ink mb-2">Congratulations!</h3>
                     <p className="text-slate-505 text-sm max-w-sm mx-auto mb-6">
                         You have recorded a new highest production capacity for this product on this machine!
                     </p>
@@ -364,39 +364,39 @@ const HourlyWorkReportEdit: React.FC = () => {
                             </span>
                         </div>
                         {newHighDetails?.previousCapacity > 0 && (
-                            <div className="text-xs text-slate-500 mt-2 bg-indigo-100/50 py-1 px-3 rounded-full inline-block">
-                                Previous High: <span className="font-semibold text-slate-700">{newHighDetails.previousCapacity} {uom || "units"}</span>
+                            <div className="text-xs text-ink-subtle mt-2 bg-indigo-100/50 py-1 px-3 rounded-full inline-block">
+                                Previous High: <span className="font-semibold text-ink-muted">{newHighDetails.previousCapacity} {uom || "units"}</span>
                             </div>
                         )}
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4 text-left max-w-md mx-auto bg-slate-50 p-5 rounded-2xl border border-slate-100 text-sm">
+                    <div className="grid grid-cols-2 gap-4 text-left max-w-md mx-auto bg-card-2 p-5 rounded-2xl border border-line-soft text-sm">
                         <div className="flex items-start gap-2.5">
                             <FaCalendarAlt className="text-indigo-500 mt-0.5 text-base shrink-0" />
                             <div>
-                                <span className="text-slate-400 text-xs block font-medium">Date</span>
-                                <strong className="text-slate-700 font-semibold">{newHighDetails?.date}</strong>
+                                <span className="text-ink-subtle text-xs block font-medium">Date</span>
+                                <strong className="text-ink-muted font-semibold">{newHighDetails?.date}</strong>
                             </div>
                         </div>
                         <div className="flex items-start gap-2.5">
                             <FaCogs className="text-indigo-500 mt-0.5 text-base shrink-0" />
                             <div>
-                                <span className="text-slate-400 text-xs block font-medium">Machine</span>
-                                <strong className="text-slate-700 font-semibold truncate block max-w-37.5" title={newHighDetails?.machineName}>{newHighDetails?.machineName}</strong>
+                                <span className="text-ink-subtle text-xs block font-medium">Machine</span>
+                                <strong className="text-ink-muted font-semibold truncate block max-w-37.5" title={newHighDetails?.machineName}>{newHighDetails?.machineName}</strong>
                             </div>
                         </div>
                         <div className="flex items-start gap-2.5">
                             <FaClock className="text-indigo-500 mt-0.5 text-base shrink-0" />
                             <div>
-                                <span className="text-slate-400 text-xs block font-medium">Shift</span>
-                                <strong className="text-slate-700 font-semibold">{newHighDetails?.shiftName}</strong>
+                                <span className="text-ink-subtle text-xs block font-medium">Shift</span>
+                                <strong className="text-ink-muted font-semibold">{newHighDetails?.shiftName}</strong>
                             </div>
                         </div>
                         <div className="flex items-start gap-2.5">
                             <FaUsers className="text-indigo-500 mt-0.5 text-base shrink-0" />
                             <div>
-                                <span className="text-slate-400 text-xs block font-medium">Operators</span>
-                                <strong className="text-slate-700 font-semibold block truncate max-w-37.5" title={newHighDetails?.operators}>
+                                <span className="text-ink-subtle text-xs block font-medium">Operators</span>
+                                <strong className="text-ink-muted font-semibold block truncate max-w-37.5" title={newHighDetails?.operators}>
                                     {newHighDetails?.operators}
                                 </strong>
                             </div>

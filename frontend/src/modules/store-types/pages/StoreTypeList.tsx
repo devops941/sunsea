@@ -33,10 +33,10 @@ const colorMap: Record<string, string> = {
 
 const StoreTypeList: React.FC = () => {
     return (
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-            <div className="p-6 border-b border-slate-200">
-                <h2 className="text-2xl font-bold text-slate-800">Store Categories</h2>
-                <p className="text-sm text-slate-500 mt-1">
+        <div className="bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
+            <div className="p-6 border-b border-line">
+                <h2 className="text-2xl font-bold text-ink">Store Categories</h2>
+                <p className="text-sm text-ink-subtle mt-1">
                     Store categories are fixed system-defined types. All stores must belong to one of the following categories.
                 </p>
             </div>
@@ -46,20 +46,20 @@ const StoreTypeList: React.FC = () => {
                     {STORE_CATEGORIES.map((cat) => (
                         <div
                             key={cat.code}
-                            className="border border-slate-200 rounded-xl p-5 flex flex-col gap-3"
+                            className="border border-line rounded-xl p-5 flex flex-col gap-3"
                         >
                             <div className="flex items-center gap-3">
                                 <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${colorMap[cat.color].split(' ')[0]}`}>
                                     {cat.icon}
                                 </div>
                                 <div>
-                                    <p className="font-semibold text-slate-800 text-sm">{cat.name}</p>
+                                    <p className="font-semibold text-ink text-sm">{cat.name}</p>
                                     <span className={`text-xs font-mono px-2 py-0.5 rounded border ${colorMap[cat.color]}`}>
                                         {cat.code}
                                     </span>
                                 </div>
                             </div>
-                            <p className="text-xs text-slate-500">{cat.description}</p>
+                            <p className="text-xs text-ink-subtle">{cat.description}</p>
                         </div>
                     ))}
                 </div>
