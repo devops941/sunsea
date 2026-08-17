@@ -4,7 +4,7 @@ import { FaChevronDown } from "react-icons/fa";
 
 interface Option {
   label: string | React.ReactNode;
-  value: string;
+  value: string | number;
   disabled?: boolean;
   selectedLabel?: string | React.ReactNode;
 }
@@ -12,7 +12,7 @@ interface Option {
 interface SelectInputProps {
   label?: string;
   name?: string;
-  value: string;
+  value: string | number;
   options: Option[];
   required?: boolean;
   hideLabel?: boolean;
@@ -44,7 +44,7 @@ const SelectInput: React.FC<SelectInputProps> = ({
   const [searchTerm, setSearchTerm] = useState("");
   const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
   const wrapperRef = useRef<HTMLDivElement>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
+  const triggerRef = useRef<any>(null);
   const portalRef = useRef<HTMLDivElement>(null);
 
   // Calculate dropdown position for portal rendering (auto-flip upwards if near bottom of viewport)
@@ -115,19 +115,19 @@ const SelectInput: React.FC<SelectInputProps> = ({
     };
   }, [isOpen, updateDropdownPosition]);
 
-  const handleSelect = (optionValue: string, optionDisabled?: boolean) => {
+  const handleSelect = (optionValue: string | number, optionDisabled?: boolean) => {
     if (optionDisabled) return;
 
     // Create a synthetic event matching React.ChangeEvent<HTMLSelectElement>
     const event = {
-      target: { name, value: optionValue }
+      target: { name, value: String(optionValue) }
     } as unknown as React.ChangeEvent<HTMLSelectElement>;
 
     onChange(event);
     setIsOpen(false);
   };
 
-  const selectedOption = options.find((o) => o.value === value);
+  const selectedOption = options.find((o) => String(o.value) === String(value ?? ""));
   const displayLabel = selectedOption
     ? (selectedOption.selectedLabel || selectedOption.label)
     : defaultOptionLabel || "Select an option";
@@ -172,53 +172,76 @@ const SelectInput: React.FC<SelectInputProps> = ({
           {options.map((opt, i) => <option key={i} value={opt.value}>{toPlainText(opt.label)}</option>)}
         </select>
 
-        <button
-          type="button"
-          ref={triggerRef}
-          disabled={disabled}
-          onClick={() => {
-            if (!disabled) {
-              if (!isOpen) updateDropdownPosition();
-              setIsOpen(!isOpen);
-            }
-          }}
-          className={`
-            w-full h-10 pl-4 pr-10
-            border rounded-md outline-none
-            text-[15px] font-medium flex items-center justify-between
-            transition-all duration-250 text-left
-            ${value ? "text-[#1f2937]" : "text-[#9ca3af]"}
-            ${error
-              ? "border-red-500 bg-white focus:border-red-500 focus:ring-4 focus:ring-red-500/15"
-              : "border-slate-300 bg-white hover:border-slate-400 focus:border-primary focus:ring-4 focus:ring-primary/15"
-            }
-            ${isOpen ? (error ? "border-red-500 ring-4 ring-red-500/15" : "border-primary ring-4 ring-primary/15") : ""}
-            ${disabled ? "bg-[#E5E7EB] cursor-not-allowed text-[#6B7280]" : "bg-white"}
-          `}
-        >
-          <span className="truncate">{displayLabel}</span>
-          <span className="absolute right-4 text-gray-500">
-            <FaChevronDown className={`text-xs transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
-          </span>
-        </button>
+        {searchable ? (
+          <input
+            type="text"
+            ref={triggerRef}
+            disabled={disabled}
+            value={isOpen ? searchTerm : toPlainText(displayLabel)}
+            placeholder={toPlainText(displayLabel)}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              if (!isOpen) {
+                updateDropdownPosition();
+                setIsOpen(true);
+              }
+            }}
+            onFocus={() => {
+              if (!disabled) {
+                updateDropdownPosition();
+                setIsOpen(true);
+              }
+            }}
+            className={`
+              w-full h-10 pl-4 pr-10
+              border rounded-md outline-none
+              text-[15px] font-medium flex items-center justify-between
+              transition-all duration-250 text-left
+              ${value ? "text-[#1f2937]" : "text-[#9ca3af]"}
+              ${error
+                ? "border-red-500 bg-white focus:border-red-500 focus:ring-4 focus:ring-red-500/15"
+                : "border-slate-300 bg-white hover:border-slate-400 focus:border-primary focus:ring-4 focus:ring-primary/15"
+              }
+              ${isOpen ? (error ? "border-red-500 ring-4 ring-red-500/15" : "border-primary ring-4 ring-primary/15") : ""}
+              ${disabled ? "bg-[#E5E7EB] cursor-not-allowed text-[#6B7280]" : "bg-white"}
+            `}
+          />
+        ) : (
+          <button
+            type="button"
+            ref={triggerRef}
+            disabled={disabled}
+            onClick={() => {
+              if (!disabled) {
+                if (!isOpen) updateDropdownPosition();
+                setIsOpen(!isOpen);
+              }
+            }}
+            className={`
+              w-full h-10 pl-4 pr-10
+              border rounded-md outline-none
+              text-[15px] font-medium flex items-center justify-between
+              transition-all duration-250 text-left
+              ${value ? "text-[#1f2937]" : "text-[#9ca3af]"}
+              ${error
+                ? "border-red-500 bg-white focus:border-red-500 focus:ring-4 focus:ring-red-500/15"
+                : "border-slate-300 bg-white hover:border-slate-400 focus:border-primary focus:ring-4 focus:ring-primary/15"
+              }
+              ${isOpen ? (error ? "border-red-500 ring-4 ring-red-500/15" : "border-primary ring-4 ring-primary/15") : ""}
+              ${disabled ? "bg-[#E5E7EB] cursor-not-allowed text-[#6B7280]" : "bg-white"}
+            `}
+          >
+            <span className="truncate">{displayLabel}</span>
+          </button>
+        )}
+
+        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none">
+          <FaChevronDown className={`text-xs transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
+        </span>
 
         {/* Custom Dropdown Menu (portal to avoid overflow clipping) */}
         {isOpen && createPortal(
-          <div ref={portalRef} className="bg-white border border-gray-100 rounded-lg shadow-lg max-h-60 flex flex-col py-1 animate-in fade-in zoom-in-95 duration-100" style={dropdownStyle}>
-            {searchable && (
-              <div className="p-2 border-b border-gray-100 sticky top-0 bg-white z-10 shrink-0">
-                <input
-                  type="text"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Search..."
-                  autoFocus
-                  className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-sm outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all"
-                  onClick={(e) => e.stopPropagation()}
-                />
-              </div>
-            )}
-
+          <div ref={portalRef} className="bg-white border border-gray-100 rounded-lg shadow-lg max-h-60 flex flex-col py-1 animate-in fade-in zoom-in-95 duration-100 overflow-hidden" style={dropdownStyle}>
             <div className="overflow-y-auto min-h-0 flex-1">
               {defaultOptionLabel && !searchTerm && (
                 <div
@@ -242,14 +265,14 @@ const SelectInput: React.FC<SelectInputProps> = ({
                     key={index}
                     onClick={() => handleSelect(option.value, option.disabled)}
                     className={`
-                  px-4 py-2.5 text-sm cursor-pointer
-                  transition-colors duration-150
-                  ${option.disabled ? "opacity-50 cursor-not-allowed text-gray-400" : ""}
-                  ${value === option.value
+                      px-4 py-2.5 text-sm cursor-pointer
+                      transition-colors duration-150
+                      ${option.disabled ? "opacity-50 cursor-not-allowed text-gray-400" : ""}
+                      ${value === option.value
                         ? "bg-primary/10 text-primary font-semibold"
                         : "text-gray-700 hover:bg-gray-50"
                       }
-                `}
+                    `}
                   >
                     {option.label}
                   </div>

@@ -26,6 +26,7 @@ import { fetchStores } from "../../../../features/stores/storeSlice";
 import { useSelector } from "react-redux";
 import FileUpload from "../../../../components/form/FileUpload/FileUpload";
 import CommonLoader from "../../../../components/ui/Loader/CommonLoader";
+import { getUomMultiplier } from "../pages/PurchaseOrderForm";
 
 
 
@@ -154,7 +155,7 @@ const InvoiceDetailPage: React.FC = () => {
         dispatch(fetchStores({ storeCategory: "RAW_MATERIAL" }));
         loadActiveUOMs();
         purchaseOrderService
-            .fetchAll({ status: "OPEN,PARTIALLY_RECEIVED" as any })
+            .fetchAll({ status: "APPROVED,OPEN,PARTIALLY_RECEIVED" as any })
             .then((res) => {
                 const list = Array.isArray(res) ? res : (res?.data || []);
                 setApprovedPOs(list);
@@ -219,7 +220,11 @@ const InvoiceDetailPage: React.FC = () => {
                         const qty = Number(item.quantity);
                         const unitPrice = Number(item.unitPrice);
                         const tax = Number(item.tax) || 0;
-                        const taxableAmount = qty * unitPrice;
+                        const itemRawMaterial = (rawMaterials || []).find(
+                            (rm: any) => String(rm.rawMaterialId) === String(item.productId) || String(rm.id) === String(item.productId)
+                        );
+                        const mult = getUomMultiplier(item.uom, itemRawMaterial?.baseUom);
+                        const taxableAmount = qty * mult * unitPrice;
                         const totalGstAmount = (taxableAmount * tax) / 100;
 
                         let cgstRate = 0, cgstAmount = 0, sgstRate = 0, sgstAmount = 0, igstRate = 0, igstAmount = 0;
@@ -289,7 +294,11 @@ const InvoiceDetailPage: React.FC = () => {
         setItems((prev) => {
             if (prev.length === 0) return prev;
             return prev.map((item) => {
-                const taxableAmount = item.qty * item.unitPrice;
+                const itemRawMaterial = (rawMaterials || []).find(
+                    (rm: any) => String(rm.rawMaterialId) === String(item.productId) || String(rm.id) === String(item.productId)
+                );
+                const mult = getUomMultiplier(item.uom, itemRawMaterial?.baseUom);
+                const taxableAmount = item.qty * mult * item.unitPrice;
                 const totalGstAmount = (taxableAmount * item.tax) / 100;
                 let cgstRate = 0, cgstAmount = 0, sgstRate = 0, sgstAmount = 0, igstRate = 0, igstAmount = 0;
                 if (isInterState) {
@@ -305,7 +314,7 @@ const InvoiceDetailPage: React.FC = () => {
             });
         });
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isInterState]);
+    }, [isInterState, rawMaterials]);
 
     // ── When PO selected → auto-fill ─────────────────────────────────────────────
     useEffect(() => {
@@ -370,7 +379,11 @@ const InvoiceDetailPage: React.FC = () => {
                         const qty = remainingQty > 0 ? remainingQty : 0;
                         const unitPrice = Number(item.unitPrice || 0);
                         const tax = Number(item.tax || 0);
-                        const taxableAmount = qty * unitPrice;
+                        const itemRawMaterial = (rawMaterials || []).find(
+                            (rm: any) => String(rm.rawMaterialId) === String(item.productId) || String(rm.id) === String(item.productId)
+                        );
+                        const mult = getUomMultiplier(item.uom, itemRawMaterial?.baseUom);
+                        const taxableAmount = qty * mult * unitPrice;
                         const totalGstAmount = (taxableAmount * tax) / 100;
                         const netAmount = taxableAmount + totalGstAmount;
 
@@ -535,8 +548,22 @@ const InvoiceDetailPage: React.FC = () => {
     };
 
     // ── Computed totals ───────────────────────────────────────────────────────────
-    const subtotal = useMemo(() => items.reduce((sum, i) => sum + i.qty * i.unitPrice, 0), [items]);
-    const totalTax = useMemo(() => items.reduce((sum, i) => sum + (i.qty * i.unitPrice * i.tax) / 100, 0), [items]);
+    const subtotal = useMemo(() => items.reduce((sum, i) => {
+        const itemRawMaterial = (rawMaterials || []).find(
+            (rm: any) => String(rm.rawMaterialId) === String(i.productId) || String(rm.id) === String(i.productId)
+        );
+        const mult = getUomMultiplier(i.uom, itemRawMaterial?.baseUom);
+        return sum + (i.qty * mult * i.unitPrice);
+    }, 0), [items, rawMaterials]);
+
+    const totalTax = useMemo(() => items.reduce((sum, i) => {
+        const itemRawMaterial = (rawMaterials || []).find(
+            (rm: any) => String(rm.rawMaterialId) === String(i.productId) || String(rm.id) === String(i.productId)
+        );
+        const mult = getUomMultiplier(i.uom, itemRawMaterial?.baseUom);
+        return sum + (i.qty * mult * i.unitPrice * i.tax) / 100;
+    }, 0), [items, rawMaterials]);
+
     const totalCgst = useMemo(() => items.reduce((sum, i) => sum + i.cgstAmount, 0), [items]);
     const totalSgst = useMemo(() => items.reduce((sum, i) => sum + i.sgstAmount, 0), [items]);
     const totalIgst = useMemo(() => items.reduce((sum, i) => sum + i.igstAmount, 0), [items]);
@@ -546,7 +573,11 @@ const InvoiceDetailPage: React.FC = () => {
         (items || []).forEach((item) => {
             const qty = Number(item.qty) || 0;
             const price = Number(item.unitPrice) || 0;
-            const taxable = qty * price;
+            const itemRawMaterial = (rawMaterials || []).find(
+                (rm: any) => String(rm.rawMaterialId) === String(item.productId) || String(rm.id) === String(item.productId)
+            );
+            const mult = getUomMultiplier(item.uom, itemRawMaterial?.baseUom);
+            const taxable = qty * mult * price;
             const rate = Number(item.tax) || 0;
             map.set(rate, (map.get(rate) || 0) + taxable);
         });
@@ -569,7 +600,7 @@ const InvoiceDetailPage: React.FC = () => {
                 igstAmount,
             };
         });
-    }, [items]);
+    }, [items, rawMaterials]);
     const discountAmount = useMemo(() => {
         if (form.discountType === "percent") return (subtotal * form.discountValue) / 100;
         return Number(form.discountValue) || 0;
@@ -633,12 +664,12 @@ const InvoiceDetailPage: React.FC = () => {
     const poOptions = useMemo(() => [
         { value: "", label: "Select PO" },
         ...approvedPOs.map((po: any) => {
-            const label = po.status === "PARTIALLY_RECEIVED"
-                ? `${po.poNumber || ""} (Partially Received)`
-                : (po.poNumber || "");
+            const supplierName = po.supplier?.supplierName || po.supplier?.displayName || po.supplier?.legalName || "";
+            const supplierPart = supplierName ? ` - ${supplierName}` : "";
+            const statusPart = po.status === "PARTIALLY_RECEIVED" ? " (Partially Received)" : "";
             return {
-                value: po.id || po.purchaseOrderId || "",
-                label
+                value: String(po.id || po.purchaseOrderId || ""),
+                label: `${po.poNumber || ""}${supplierPart}${statusPart}`,
             };
         }),
     ], [approvedPOs]);
@@ -680,17 +711,18 @@ const InvoiceDetailPage: React.FC = () => {
             updated[index] = { ...updated[index], [field]: value };
             const item = updated[index];
 
+            const itemRawMaterial = (rawMaterials || []).find(
+                (rm: any) => String(rm.rawMaterialId) === String(item.productId) || String(rm.id) === String(item.productId)
+            );
             if (!item.uom) {
-                const itemRawMaterial = rawMaterials.find(
-                    (rm) => String(rm.rawMaterialId) === String(item.productId)
-                );
                 const fallbackUoms = (activeUOMs || []).map((u: any) => u.uomName).join(",");
                 const baseUoms = itemRawMaterial?.baseUom || fallbackUoms;
                 const primaryUom = baseUoms.split(",")[0].trim();
                 updated[index].uom = primaryUom;
             }
 
-            const lineSubtotal = item.qty * item.unitPrice;
+            const mult = getUomMultiplier(updated[index].uom || item.uom, itemRawMaterial?.baseUom);
+            const lineSubtotal = item.qty * mult * item.unitPrice;
             const taxableAmount = lineSubtotal;
             const totalGstAmount = (taxableAmount * item.tax) / 100;
 
@@ -714,6 +746,13 @@ const InvoiceDetailPage: React.FC = () => {
             updated[index].igstAmount = igstAmount;
             updated[index].netAmount = taxableAmount + totalGstAmount;
             return updated;
+        });
+
+        setErrors((prev) => {
+            const next = { ...prev };
+            delete next[`items.${index}.${field}`];
+            if (field === "productId") delete next[`items.${index}.description`];
+            return next;
         });
     };
 
@@ -748,6 +787,23 @@ const InvoiceDetailPage: React.FC = () => {
             if (!form.shippingState) errs.shippingState = "Required";
             if (!form.shippingPincode) errs.shippingPincode = "Required";
         }
+
+        if (!items || items.length === 0) {
+            toast.error("Please add at least one item.");
+            return;
+        }
+
+        items.forEach((item, idx) => {
+            if (!item.productId) {
+                errs[`items.${idx}.productId`] = "Required";
+            }
+            if (item.qty === undefined || item.qty === null || item.qty === "" || Number(item.qty) <= 0) {
+                errs[`items.${idx}.qty`] = "Required";
+            }
+            if (item.unitPrice === undefined || item.unitPrice === null || item.unitPrice === "" || Number(item.unitPrice) <= 0) {
+                errs[`items.${idx}.unitPrice`] = "Required";
+            }
+        });
 
         if (Object.keys(errs).length > 0) {
             setErrors(errs);
@@ -788,7 +844,7 @@ const InvoiceDetailPage: React.FC = () => {
                 form.sameAsBilling ? form.billingPincode : form.shippingPincode
             );
             payload.append("sameAsBilling", String(form.sameAsBilling));
-            payload.append("updateStock", String(form.updateStock));
+            payload.append("updateStock", "true");
 
             if (form.receiveDate) payload.append("receiveDate", form.receiveDate);
             if (form.billDueDate) payload.append("billDueDate", form.billDueDate);
@@ -997,20 +1053,6 @@ const InvoiceDetailPage: React.FC = () => {
                             <div>
                                 <TextInput label="E-Way Bill" name="eWayBill" value={form.eWayBill} onChange={handleChange} placeholder="Optional" disabled={isEditMode} />
                             </div>
-                            <div>
-                                <div className="flex flex-col min-h-[68px] justify-end pb-[10px]">
-                                    <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-700 font-semibold mb-0">
-                                        <input
-                                            type="checkbox"
-                                            className="w-4 h-4 text-blue-600 rounded border-gray-300"
-                                            checked={form.updateStock}
-                                            onChange={(e) => setForm((prev: any) => ({ ...prev, updateStock: e.target.checked }))}
-                                            disabled={isEditMode}
-                                        />
-                                        <span>Update Stock</span>
-                                    </label>
-                                </div>
-                            </div>
                             {!isEditMode && (
                                 <div>
                                     <FileUpload
@@ -1029,20 +1071,26 @@ const InvoiceDetailPage: React.FC = () => {
                         {!isEditMode && <CustomButton text="Add Item" icon={FaPlus} type="button" onClick={addItem} />}
                     </div>
 
-                    <div className="w-full border border-gray-200 rounded-lg overflow-visible">
-                        <table className="w-full text-left border-collapse text-sm">
-                            <thead className="bg-gray-50 border-b border-gray-200 text-gray-600">
+                    <div className="rounded-xl border border-slate-200 bg-white [&_.mb-\[18px\]]:!mb-0 [&_.select-input-group]:!mb-0 overflow-visible">
+                        <table className="min-w-full divide-y divide-slate-200">
+                            <thead className="bg-slate-50/80">
                                 <tr>
-                                    <th className="p-2.5 font-semibold w-12 text-center align-middle">#</th>
-                                    <th className="p-2.5 font-semibold w-[40%] min-w-[220px] align-middle">PRODUCT / DESCRIPTION</th>
-                                    <th className="p-2.5 font-semibold w-56 align-middle">QUANTITY / UOM</th>
-                                    <th className="p-2.5 font-semibold w-32 align-middle">UNIT PRICE (₹)</th>
-                                    <th className="p-2.5 font-semibold w-40 align-middle">TAX %</th>
-                                    <th className="p-2.5 font-semibold w-36 text-right align-middle">NET (₹)</th>
-                                    <th className="p-2.5 font-semibold w-16 text-center align-middle">ACTION</th>
+                                    <th className="px-3 py-3 text-center text-[11px] font-bold text-slate-500 uppercase tracking-widest w-12 border-b border-slate-200">#</th>
+                                    <th className="px-3 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200">
+                                        PRODUCT / DESCRIPTION <span className="text-rose-500">*</span>
+                                    </th>
+                                    <th className="px-3 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200 min-w-[200px]">
+                                        QUANTITY / UOM <span className="text-rose-500">*</span>
+                                    </th>
+                                    <th className="px-3 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200">
+                                        UNIT PRICE (₹) <span className="text-rose-500">*</span>
+                                    </th>
+                                    <th className="px-3 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200">TAX %</th>
+                                    <th className="px-3 py-3 text-right text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200">NET (₹)</th>
+                                    <th className="px-3 py-3 text-center text-[11px] font-bold text-slate-500 uppercase tracking-widest w-16 border-b border-slate-200"></th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-gray-200 bg-white">
+                            <tbody className="divide-y divide-slate-100 bg-white">
                                 {items.map((item, idx) => {
                                     const itemRawMaterial = (rawMaterials || []).find(
                                         (rm: any) => String(rm.rawMaterialId) === String(item.productId) || String(rm.id) === String(item.productId) || String(rm.materialCode) === String(item.productId)
@@ -1052,9 +1100,9 @@ const InvoiceDetailPage: React.FC = () => {
                                     const materialName = itemRawMaterial?.materialName || itemRawMaterial?.productName || (item.description && item.description !== item.productId ? item.description : "") || item.productId || "—";
 
                                     return (
-                                        <tr key={idx} className="hover:bg-slate-50 transition-colors">
-                                            <td className="p-2 text-center text-gray-500 align-middle">{idx + 1}</td>
-                                            <td className="p-2 align-middle">
+                                        <tr key={idx} className="hover:bg-slate-50/50 transition-colors duration-200">
+                                            <td className="px-3 py-2 whitespace-nowrap text-sm font-medium text-slate-400 text-center">{idx + 1}</td>
+                                            <td className="px-3 py-2 whitespace-nowrap">
                                                 {isPOSelected || isEditMode ? (
                                                     <span className="font-semibold text-slate-800 text-sm px-1">{materialName}</span>
                                                 ) : (
@@ -1070,6 +1118,7 @@ const InvoiceDetailPage: React.FC = () => {
                                                                 label: rm.materialName || rm.productName || String(rm.rawMaterialId),
                                                             }))
                                                         ]}
+                                                        error={errors[`items.${idx}.productId`]}
                                                         onChange={(e) => {
                                                             const selId = e.target.value;
                                                             const selectedRm = rawMaterials.find((rm: any) => String(rm.rawMaterialId) === String(selId));
@@ -1096,36 +1145,60 @@ const InvoiceDetailPage: React.FC = () => {
                                                                     return updated;
                                                                 });
                                                             } else {
-                                                                updateItem(idx, "productId", selId);
+                                                                setItems((prev) => {
+                                                                    const updated = [...prev];
+                                                                    updated[idx] = {
+                                                                        ...updated[idx],
+                                                                        productId: "",
+                                                                        description: "",
+                                                                    };
+                                                                    return updated;
+                                                                });
                                                             }
+                                                            setErrors((prev) => {
+                                                                const next = { ...prev };
+                                                                delete next[`items.${idx}.productId`];
+                                                                delete next[`items.${idx}.description`];
+                                                                if (selectedRm && Number(selectedRm.unitPrice) > 0) {
+                                                                    delete next[`items.${idx}.unitPrice`];
+                                                                }
+                                                                return next;
+                                                            });
                                                         }}
                                                     />
                                                 )}
                                             </td>
-                                            <td className="p-2 align-middle">
+                                            <td className="px-3 py-2 whitespace-nowrap">
                                                 <QuantityInput
                                                     label=""
                                                     hideLabel={true}
                                                     name={`items[${idx}].qty`}
                                                     value={item.qty}
                                                     baseUoms={baseUoms}
+                                                    uom={item.uom}
+                                                    onUomChange={(newUom) => updateItem(idx, "uom", newUom)}
                                                     required
                                                     disabled={isEditMode}
                                                     error={errors[`items.${idx}.qty`]}
                                                     onChange={(e) => updateItem(idx, "qty", Number(e.target.value))}
                                                 />
                                             </td>
-                                            <td className="p-2 align-middle">
-                                                <input
-                                                    className="w-full border-gray-200 bg-gray-50 rounded px-2.5 py-1.5 text-sm outline-none border text-gray-600 font-medium cursor-not-allowed"
+                                            <td className="px-3 py-2 whitespace-nowrap">
+                                                <TextInput
+                                                    label=""
+                                                    hideLabel={true}
+                                                    name={`items[${idx}].unitPrice`}
                                                     type="number"
-                                                    min={0}
-                                                    step={0.01}
-                                                    value={item.unitPrice}
-                                                    disabled
+                                                    step="0.01"
+                                                    placeholder="0.00"
+                                                    preventNegative={true}
+                                                    value={String(item.unitPrice)}
+                                                    error={errors[`items.${idx}.unitPrice`]}
+                                                    onChange={(e) => updateItem(idx, "unitPrice", Number(e.target.value))}
+                                                    disabled={isEditMode}
                                                 />
                                             </td>
-                                            <td className="p-2 align-middle">
+                                            <td className="px-3 py-2 whitespace-nowrap">
                                                 <SelectInput
                                                     label=""
                                                     hideLabel={true}
@@ -1138,10 +1211,15 @@ const InvoiceDetailPage: React.FC = () => {
                                                 />
                                             </td>
 
-                                            <td className="p-2 text-right align-middle font-semibold text-gray-700">₹{item.netAmount.toFixed(2)}</td>
-                                            <td className="p-2 text-center align-middle">
+                                            <td className="px-3 py-2 whitespace-nowrap text-right font-medium text-slate-700">₹{item.netAmount.toFixed(2)}</td>
+                                            <td className="px-3 py-2 whitespace-nowrap text-center">
                                                 {!isEditMode && (
-                                                    <button type="button" onClick={() => removeItem(idx)} className="text-red-500 hover:text-red-700 p-1.5 rounded-full hover:bg-red-50 transition-colors" title="Remove Item">
+                                                    <button
+                                                        type="button"
+                                                        className="text-rose-400 hover:text-rose-600 hover:bg-rose-100 p-2 rounded-md disabled:opacity-40 disabled:hover:bg-transparent disabled:cursor-not-allowed transition-all duration-200 inline-flex items-center justify-center"
+                                                        onClick={() => removeItem(idx)}
+                                                        title="Remove Item"
+                                                    >
                                                         <FaTrash size={14} />
                                                     </button>
                                                 )}
@@ -1262,133 +1340,6 @@ const InvoiceDetailPage: React.FC = () => {
                                 <span className="font-extrabold text-blue-600 text-lg">₹{grandTotal.toFixed(2)}</span>
                             </div>
                         </div>
-                    </div>
-
-                    {/* Payment Details */}
-                    <div className="mt-6 border-t border-gray-200 pt-6">
-                        <h6 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-                            <FaCreditCard className="text-blue-600" /> Payment & Collection Details
-                        </h6>
-
-                        {/* Top Info Cards */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 bg-slate-50 p-4 border border-slate-100 rounded-lg">
-                            <div className="bg-white p-3 border border-slate-100 rounded shadow-xs">
-                                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Total Amount</span>
-                                <span className="text-lg font-bold text-slate-900">₹{grandTotal.toFixed(2)}</span>
-                            </div>
-                            <div className="bg-white p-3 border border-slate-100 rounded shadow-xs">
-                                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Total Paid</span>
-                                <span className="text-lg font-bold text-emerald-600">₹{totalPaid.toFixed(2)}</span>
-                            </div>
-                            <div className="bg-white p-3 border border-slate-100 rounded shadow-xs">
-                                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Balance Due</span>
-                                <span className={`text-lg font-bold ${balanceDue > 0 ? "text-amber-600" : "text-slate-500"}`}>
-                                    ₹{balanceDue.toFixed(2)}
-                                </span>
-                            </div>
-                        </div>
-
-                        {/* Overpayment Warning banner */}
-                        {isOverpaid && (
-                            <div className="mb-4 p-3 bg-amber-50 border border-amber-100 text-amber-800 text-sm font-semibold rounded-lg">
-                                Warning: Total paid amount (₹{totalPaid.toFixed(2)}) exceeds the invoice amount (₹{grandTotal.toFixed(2)}).
-                            </div>
-                        )}
-
-                        {/* Form controls to add a payment transaction */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 bg-slate-50/50 p-4 border border-slate-100/50 rounded-lg mb-4">
-                            <div>
-                                <TextInput
-                                    label="Amount"
-                                    type="number"
-                                    name="amount"
-                                    value={newPayment.amount}
-                                    onChange={(e) => setNewPayment(p => ({ ...p, amount: e.target.value }))}
-                                    placeholder="Enter amount"
-                                />
-                            </div>
-                            <div>
-                                <SelectInput
-                                    label="Method"
-                                    name="paymentMethod"
-                                    value={newPayment.paymentMethod}
-                                    options={[
-                                        { value: "Bank Transfer", label: "Bank Transfer" },
-                                        { value: "Cash", label: "Cash" },
-                                        { value: "Cheque", label: "Cheque" },
-                                        { value: "UPI", label: "UPI" },
-                                    ]}
-                                    onChange={(e) => setNewPayment(p => ({ ...p, paymentMethod: e.target.value }))}
-                                />
-                            </div>
-                            <div>
-                                <TextInput
-                                    label="Reference / UTR"
-                                    name="referenceNumber"
-                                    value={newPayment.referenceNumber}
-                                    onChange={(e) => setNewPayment(p => ({ ...p, referenceNumber: e.target.value }))}
-                                    placeholder="Enter UTR/Cheque ID"
-                                    disabled={newPayment.paymentMethod.toLowerCase() === "cash"}
-                                />
-                            </div>
-                            <div className="flex flex-col justify-between">
-                                <DatePickerCalendar
-                                    label="Payment Date"
-                                    name="paymentDate"
-                                    value={newPayment.paymentDate}
-                                    onChange={(e) => setNewPayment(p => ({ ...p, paymentDate: e.target.value }))}
-                                />
-                                <button
-                                    type="button"
-                                    onClick={handleAddPayment}
-                                    className="mt-3 w-full py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-bold shadow-xs transition-colors"
-                                >
-                                    Add Payment
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Table layout of added payments */}
-                        {payments.length > 0 ? (
-                            <div className="overflow-x-auto border border-slate-200 rounded-lg">
-                                <table className="w-full text-sm text-left border-collapse bg-white">
-                                    <thead className="bg-slate-50 text-slate-700 font-semibold border-b border-slate-200">
-                                        <tr>
-                                            <th className="p-3">Amount</th>
-                                            <th className="p-3">Payment Method</th>
-                                            <th className="p-3">Reference / UTR</th>
-                                            <th className="p-3">Payment Date</th>
-                                            <th className="p-3 text-center w-12">Action</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100">
-                                        {payments.map((p) => (
-                                            <tr key={p.id} className="hover:bg-slate-50/50">
-                                                <td className="p-3 font-semibold text-slate-900">₹{Number(p.amount).toFixed(2)}</td>
-                                                <td className="p-3 text-slate-600">{p.paymentMethod}</td>
-                                                <td className="p-3 text-slate-600">{p.referenceNumber || "—"}</td>
-                                                <td className="p-3 text-slate-500">{p.paymentDate}</td>
-                                                <td className="p-3 text-center">
-                                                    {!p.isPersisted && (
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => handleRemovePayment(p.id)}
-                                                            className="text-red-500 hover:text-red-700 p-1 transition-colors"
-                                                        >
-                                                            <FaTrash size={14} />
-                                                        </button>
-                                                    )}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        ) : (
-                            <div className="p-4 bg-slate-50 border border-dashed border-slate-200 rounded-lg text-center text-slate-400 italic text-sm">
-                                No payment transactions recorded. Use the inputs above to add a payment.
-                            </div>
-                        )}
                     </div>
 
                     {/* Actions */}

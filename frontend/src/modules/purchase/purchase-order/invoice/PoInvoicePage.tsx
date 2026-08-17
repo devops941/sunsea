@@ -7,6 +7,7 @@ import { useSelector } from "react-redux";
 import CustomButton from "../../../../components/ui/Button/Button";
 import CommonLoader from "../../../../components/ui/Loader/CommonLoader";
 import { purchaseOrderService } from "../../../../services/purchaseOrderService";
+import { rawMaterialService } from "../../../../services/rawMaterialService";
 
 // ─── Formatting helpers ─────────────────────────────────────────────────
 const formatMoney = (val: string | number | null | undefined) => {
@@ -46,14 +47,19 @@ const PoInvoicePage: React.FC = () => {
     const companyState = company?.state;
 
     const [po, setPo] = useState<any>(null);
+    const [rawMaterials, setRawMaterials] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         if (!id) return;
         setLoading(true);
-        purchaseOrderService.fetchById(id)
-            .then((data) => {
-                setPo(data);
+        Promise.all([
+            purchaseOrderService.fetchById(id),
+            rawMaterialService.fetchAll().catch(() => []),
+        ])
+            .then(([poData, materials]) => {
+                setPo(poData);
+                setRawMaterials(materials || []);
             })
             .catch(() => {
                 toast.error("Failed to load Purchase Order details");
@@ -89,12 +95,20 @@ const PoInvoicePage: React.FC = () => {
 
             const totalAmount = amount + cgstAmount + sgstAmount + igstAmount;
 
+            const rm = (rawMaterials || []).find(
+                (m: any) => String(m.rawMaterialId) === String(item.productId) || String(m.id) === String(item.productId)
+            );
+
+            const description = item.description || item.product?.productName || item.product?.materialName || item.rawMaterial?.materialName || rm?.materialName || item.productId || "N/A";
+            const hsnCode = item.hsnCode || item.product?.hsnCode || item.rawMaterial?.hsnCode || rm?.hsnCode || "—";
+
             return {
                 ...item,
+                description,
+                hsnCode,
                 qty,
                 rate,
                 amount,
-                hsnCode: item.product?.hsnCode || "—",
                 unit: item.uom || "Pcs.",
                 cgstRate,
                 sgstRate,
@@ -105,7 +119,7 @@ const PoInvoicePage: React.FC = () => {
                 totalAmount,
             };
         });
-    }, [po, isInterState]);
+    }, [po, rawMaterials, isInterState]);
 
     const totalCgst = useMemo(() => itemsWithTax.reduce((s: number, i: any) => s + i.cgstAmount, 0), [itemsWithTax]);
     const totalSgst = useMemo(() => itemsWithTax.reduce((s: number, i: any) => s + i.sgstAmount, 0), [itemsWithTax]);

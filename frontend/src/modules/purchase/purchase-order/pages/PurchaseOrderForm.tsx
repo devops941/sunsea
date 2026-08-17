@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { FaSave, FaPaperPlane, FaPlus, FaTrash, FaUser, FaMapMarkerAlt, FaBoxOpen, FaInfoCircle } from "react-icons/fa";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useSelector } from "react-redux";
 import CustomButton from "../../../../components/ui/Button/Button";
+import CommonLoader from "../../../../components/ui/Loader/CommonLoader";
 
 import TextInput from "../../../../components/form/TextInput/TextInput";
 import SelectInput from "../../../../components/form/SelectInput/SelectInput";
@@ -14,7 +15,7 @@ import CityStateSelect from "../../../../components/ui/CityStateSelect/CityState
 import type { StateCityOption } from "../../../../components/ui/CityStateSelect/CityStateSelect";
 
 import { validatePurchaseOrder } from "../validations/purchaseOrderValidation";
-import type { PurchaseOrderItem } from "../../../../features/purchaseOrder/types";
+import type { PurchaseOrderFormData, PurchaseOrderItem } from "../../../../features/purchaseOrder/types";
 import { useSuppliers } from "../../../../hooks/useSuppliers";
 import { useUOMs } from "../../../../hooks/useUOMs";
 import { rawMaterialService } from "../../../../services/rawMaterialService";
@@ -29,13 +30,14 @@ import { selectActiveGstTaxes, fetchGstTaxes } from "../../../../features/gst/gs
 import { fetchStores } from "../../../../features/stores/storeSlice";
 import { useSocketSync } from "../../../../hooks/useSocketSync";
 
-const initialFormData = {
+
+const initialFormData: PurchaseOrderFormData = {
   poNumber: "",
   poDate: new Date().toISOString().split("T")[0],
-  expectedDeliveryDate: "",
+  expectedDeliveryDate: new Date().toISOString().split("T")[0],
   supplierId: "",
   storeId: "",
-  status: "DRAFT" as const,
+  status: "DRAFT",
   createdByOn: "",
 
   billingAddressLine1: "",
@@ -52,10 +54,10 @@ const initialFormData = {
 
   remarks: "",
 
-  items: [] as PurchaseOrderItem[],
+  items: [],
 
   subtotal: 0,
-  discountType: "PERCENT" as "PERCENT" | "FLAT",
+  discountType: "PERCENT",
   discountValue: 0,
   totalDiscount: 0,
   totalTax: 0,
@@ -64,8 +66,6 @@ const initialFormData = {
   totalIgst: 0,
   netAmount: 0,
 };
-
-type PurchaseOrderFormData = typeof initialFormData;
 
 export const getUomMultiplier = (uom: string = "", baseUom: string = ""): number => {
   const u = (uom || "").trim().toLowerCase();
@@ -90,37 +90,101 @@ export const getUomMultiplier = (uom: string = "", baseUom: string = ""): number
   return 1;
 };
 
-const PurchaseOrderCreatePage: React.FC = () => {
-  const dispatch = useAppDispatch();
-  const navigate = useNavigate();
-  const { addPurchaseOrder } = usePurchaseOrders();
-  const user = useSelector((state: any) => state?.auth?.user);
+const mapPOToFormData = (po: any): PurchaseOrderFormData => {
+  if (!po) return initialFormData;
 
-  const [formData, setFormData] = useState<PurchaseOrderFormData>(initialFormData);
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  return {
+    poNumber: po.poNumber ?? "",
+    poDate: po.poDate ? po.poDate.split("T")[0] : "",
+    expectedDeliveryDate: po.expectedDeliveryDate ? po.expectedDeliveryDate.split("T")[0] : "",
+    supplierId: po.supplierId ? String(po.supplierId) : "",
+    status: po.status ?? "DRAFT",
+    createdByOn: po.createdBy ? String(po.createdBy) : "",
+
+    billingAddressLine1: po.billingAddressLine1 ?? "",
+    billingCountry: po.billingCountry ?? "India",
+    billingCity: po.billingCity ?? "",
+    billingState: po.billingState ?? "",
+    billingPincode: po.billingPincode ?? "",
+    sameAsBilling: po.sameAsBilling ?? false,
+    storeId: po.storeId ? String(po.storeId) : "",
+
+    shippingAddressLine1: po.shippingAddressLine1 ?? "",
+    shippingCountry: po.shippingCountry ?? "India",
+    shippingCity: po.shippingCity ?? "",
+    shippingState: po.shippingState ?? "",
+    shippingPincode: po.shippingPincode ?? "",
+    remarks: po.remarks ?? "",
+
+    items: po.items?.map((i: any) => ({
+      id: i.id,
+      productId: i.productId ? String(i.productId) : "",
+      product: i.product,
+      uom: i.uom ?? "",
+      quantity: Number(i.quantity ?? 0),
+      unitPrice: Number(i.unitPrice ?? 0),
+      tax: Number(i.tax ?? 0),
+      taxableAmount: Number(i.taxableAmount ?? 0),
+      cgstRate: Number(i.cgstRate ?? 0),
+      cgstAmount: Number(i.cgstAmount ?? 0),
+      sgstRate: Number(i.sgstRate ?? 0),
+      sgstAmount: Number(i.sgstAmount ?? 0),
+      igstRate: Number(i.igstRate ?? 0),
+      igstAmount: Number(i.igstAmount ?? 0),
+      lineTotal: Number(i.lineTotal ?? 0),
+    })) ?? [],
+
+    subtotal: Number(po.subtotal ?? 0),
+    discountType: po.discountType ?? "PERCENT",
+    discountValue: Number(po.discountValue ?? 0),
+    totalDiscount: Number(po.totalDiscount ?? 0),
+    totalTax: Number(po.totalTax ?? 0),
+    totalCgst: Number(po.totalCgst ?? 0),
+    totalSgst: Number(po.totalSgst ?? 0),
+    totalIgst: Number(po.totalIgst ?? 0),
+    netAmount: Number(po.netAmount ?? 0),
+  };
+};
+
+const PurchaseOrderForm: React.FC = () => {
+  const { id } = useParams<{ id: string }>();
+  const isEdit = !!id;
+  const navigate = useNavigate();
+  const location = useLocation();
+  const dispatch = useAppDispatch();
+
+  const { addPurchaseOrder, editPurchaseOrder } = usePurchaseOrders();
+  const user = useSelector((state: any) => state?.auth?.user);
   const { suppliers, loadSuppliers } = useSuppliers();
 
 
+  const [formData, setFormData] = useState<PurchaseOrderFormData>(initialFormData);
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [rawMaterials, setRawMaterials] = useState<RawMaterial[]>([]);
   const { data: company } = useSelector((state: any) => state.company);
   const { data: locations } = useAppSelector(state => state.locations);
   const { data: stores } = useAppSelector(state => state.stores);
   const { activeUOMs, loadActiveUOMs } = useUOMs();
-  const companyState = company?.state
+  const companyState = company?.state;
   const gstTaxes = useAppSelector(selectActiveGstTaxes);
   const gstLoading = useAppSelector((state) => state.gst.loading);
+
+  const [loading, setLoading] = useState(isEdit);
+  const [poNotFound, setPoNotFound] = useState(false);
+  const [fetchError, setFetchError] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSubmittingForApproval, setIsSubmittingForApproval] = useState(false);
+
 
   const selectedSupplier = useMemo(() => (suppliers || []).find(
     (s) => String(s?.id) === String(formData.supplierId)
   ), [suppliers, formData.supplierId]);
 
+  const isLocked = useMemo(() => {
+    if (!isEdit) return false;
+    return formData.status !== "DRAFT";
+  }, [isEdit, formData.status]);
 
-  // ============================================================
-  // INTER-STATE CHECK
-  // Rule requested: compare COMPANY state vs BILLING address state.
-  // Same state  -> CGST + SGST
-  // Diff state  -> IGST
-  // ============================================================
   const isInterState = useMemo(() => {
     if (!companyState || !formData.billingState) return false;
     return (
@@ -129,12 +193,62 @@ const PurchaseOrderCreatePage: React.FC = () => {
     );
   }, [companyState, formData.billingState]);
 
+  // Re-run GST split (CGST/SGST ↔ IGST) whenever inter-state flag changes
+  useEffect(() => {
+    setFormData((prev) => {
+      const updatedItems = (prev.items || []).map((item) => {
+        const qty = Number(item.quantity) || 0;
+        const price = Number(item.unitPrice) || 0;
+        const rawMaterial = (rawMaterials || []).find(
+          (rm: any) => String(rm.rawMaterialId) === String(item.productId)
+        );
+        const mult = getUomMultiplier(item.uom, rawMaterial?.baseUom);
+        const lineSubtotal = qty * mult * price;
+        const taxableAmount = lineSubtotal;
+        const totalGstRate = Number(item.tax) || 0;
+        const totalGstAmount = (taxableAmount * totalGstRate) / 100;
+
+        let cgstRate = 0, cgstAmount = 0, sgstRate = 0, sgstAmount = 0, igstRate = 0, igstAmount = 0;
+        if (isInterState) {
+          igstRate = totalGstRate;
+          igstAmount = totalGstAmount;
+        } else {
+          cgstRate = totalGstRate / 2;
+          sgstRate = totalGstRate / 2;
+          cgstAmount = totalGstAmount / 2;
+          sgstAmount = totalGstAmount / 2;
+        }
+
+        return {
+          ...item,
+          taxableAmount,
+          cgstRate, cgstAmount,
+          sgstRate, sgstAmount,
+          igstRate, igstAmount,
+          lineTotal: taxableAmount + totalGstAmount,
+          discount: 0,
+        };
+      });
+
+      return {
+        ...prev,
+        items: updatedItems,
+        ...recalculateTotals(updatedItems, isInterState),
+      };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isInterState]);
+
   const gstRateBreakdown = useMemo(() => {
     const map = new Map<number, number>();
     (formData.items || []).forEach((item) => {
       const qty = Number(item.quantity) || 0;
       const price = Number(item.unitPrice) || 0;
-      const taxable = qty * price;
+      const rawMaterial = (rawMaterials || []).find(
+        (rm: any) => String(rm.rawMaterialId) === String(item.productId)
+      );
+      const mult = getUomMultiplier(item.uom, rawMaterial?.baseUom);
+      const taxable = qty * mult * price;
       const rate = Number(item.tax) || 0;
       map.set(rate, (map.get(rate) || 0) + taxable);
     });
@@ -157,16 +271,12 @@ const PurchaseOrderCreatePage: React.FC = () => {
         igstAmount,
       };
     });
-  }, [formData.items]);
+  }, [formData.items, rawMaterials]);
 
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isSubmittingForApproval, setIsSubmittingForApproval] = useState(false);
 
-  // ============================================================
-  // FETCH DATA & REAL-TIME SOCKET SYNC
-  // ============================================================
+
   const refreshSuppliers = useCallback(() => {
-    loadSuppliers({ limit: 10 });
+    loadSuppliers({ limit: 1000 });
   }, [loadSuppliers]);
 
   const refreshRawMaterials = useCallback(async () => {
@@ -206,23 +316,61 @@ const PurchaseOrderCreatePage: React.FC = () => {
     refreshStores();
     loadActiveUOMs();
     refreshRawMaterials();
-    fetchNextCode();
-  }, [refreshSuppliers, dispatch, refreshStores, loadActiveUOMs, refreshRawMaterials, fetchNextCode]);
+    if (!isEdit) {
+      fetchNextCode();
+    }
+  }, [refreshSuppliers, dispatch, refreshStores, loadActiveUOMs, refreshRawMaterials, fetchNextCode, isEdit]);
 
   useEffect(() => {
-    setFormData((prev) => ({
-      ...prev,
-      createdByOn: user?.username || "",
-    }));
-  }, [user]);
+    if (!isEdit && user) {
+      setFormData((prev) => ({
+        ...prev,
+        createdByOn: user?.username || "",
+      }));
+    }
+  }, [user, isEdit]);
 
-  const [roundingSign, setRoundingSign] = useState<"+" | "-">("+");
-  const [roundingValue, setRoundingValue] = useState<number>(0);
+  // Load PO data for Edit Mode
+  useEffect(() => {
+    if (!isEdit || !id) return;
 
-  // ============================================================
-  // TOTALS RECALCULATION
-  // ============================================================
-  const recalculateTotals = (items: PurchaseOrderItem[], interState: boolean = isInterState, poDiscountType: "PERCENT" | "FLAT" = formData.discountType, poDiscountValue: number = formData.discountValue, rSign: "+" | "-" = roundingSign, rValue: number = roundingValue) => {
+    let mounted = true;
+    const fetchData = async () => {
+      setFetchError(false);
+      setPoNotFound(false);
+      setLoading(true);
+      try {
+        const po = await purchaseOrderService.fetchById(id);
+        if (mounted) {
+          if (!po) {
+            setPoNotFound(true);
+            return;
+          }
+          const poData = mapPOToFormData(po);
+          setFormData(poData);
+
+        }
+      } catch (err) {
+        console.error("Failed to fetch purchase order:", err);
+        if (mounted) {
+          setFetchError(true);
+          toast.error("Failed to load purchase order");
+        }
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+
+    fetchData();
+    return () => {
+      mounted = false;
+    };
+  }, [id, isEdit]);
+
+  const recalculateTotals = (
+    items: PurchaseOrderItem[],
+    interState: boolean = isInterState
+  ) => {
     let subtotal = 0;
     let totalTax = 0;
     let totalCgst = 0;
@@ -232,11 +380,12 @@ const PurchaseOrderCreatePage: React.FC = () => {
     items.forEach((item) => {
       const qty = Number(item.quantity) || 0;
       const price = Number(item.unitPrice) || 0;
-      const rawMaterial = (rawMaterials || []).find((rm: any) => String(rm.rawMaterialId) === String(item.productId));
+      const rawMaterial = (rawMaterials || []).find(
+        (rm: any) => String(rm.rawMaterialId) === String(item.productId)
+      );
       const mult = getUomMultiplier(item.uom, rawMaterial?.baseUom);
       const lineSubtotal = qty * mult * price;
 
-      // Taxable amount is exactly line subtotal
       const taxableAmount = lineSubtotal;
       const totalGstRate = Number(item.tax) || 0;
       const totalGstAmount = (taxableAmount * totalGstRate) / 100;
@@ -259,106 +408,21 @@ const PurchaseOrderCreatePage: React.FC = () => {
       totalIgst += igstAmount;
     });
 
-    let totalDiscount = 0;
-    if (poDiscountType === "PERCENT") {
-      totalDiscount = (subtotal * poDiscountValue) / 100;
-    } else {
-      totalDiscount = poDiscountValue;
-    }
-    if (totalDiscount > subtotal) {
-      totalDiscount = subtotal;
-    }
-
-    const roundingAdjust = rSign === "+" ? rValue : -rValue;
-
     return {
       subtotal,
-      totalDiscount,
+      totalDiscount: 0,
       totalTax,
       totalCgst,
       totalSgst,
       totalIgst,
-      netAmount: subtotal - totalDiscount + totalTax + roundingAdjust,
+      netAmount: subtotal + totalTax,
     };
   };
 
-  // ============================================================
-  // RECOMPUTE ITEM-LEVEL TAX SPLIT WHENEVER isInterState CHANGES
-  // (e.g. shipping state edited after items were already added)
-  // ============================================================
-  useEffect(() => {
-    setFormData((prev) => {
-      if (prev.items.length === 0) return prev;
-
-      const updatedItems = prev.items.map((item) => {
-        const qty = Number(item.quantity) || 0;
-        const price = Number(item.unitPrice) || 0;
-        const lineSubtotal = qty * price;
-
-        const taxableAmount = lineSubtotal;
-        const totalGstRate = Number(item.tax) || 0;
-        const totalGstAmount = (taxableAmount * totalGstRate) / 100;
-
-        let cgstRate = 0;
-        let cgstAmount = 0;
-        let sgstRate = 0;
-        let sgstAmount = 0;
-        let igstRate = 0;
-        let igstAmount = 0;
-
-        if (isInterState) {
-          igstRate = totalGstRate;
-          igstAmount = totalGstAmount;
-        } else {
-          cgstRate = totalGstRate / 2;
-          sgstRate = totalGstRate / 2;
-          cgstAmount = totalGstAmount / 2;
-          sgstAmount = totalGstAmount / 2;
-        }
-
-        return {
-          ...item,
-          taxableAmount,
-          cgstRate,
-          cgstAmount,
-          sgstRate,
-          sgstAmount,
-          igstRate,
-          igstAmount,
-          lineTotal: taxableAmount + totalGstAmount,
-          discount: 0,
-        };
-      });
-
-      return {
-        ...prev,
-        items: updatedItems,
-        ...recalculateTotals(updatedItems, isInterState),
-      };
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isInterState]);
-
-  // ============================================================
-  // HANDLE CHANGE
-  // ============================================================
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target;
-
-    if (name === "sameAsBilling") {
-      const checked = (e.target as HTMLInputElement).checked;
-      setFormData((prev) => ({
-        ...prev,
-        sameAsBilling: checked,
-        shippingAddressLine1: checked ? prev.billingAddressLine1 : "",
-        shippingCity: checked ? prev.billingCity : "",
-        shippingState: checked ? prev.billingState : "",
-        shippingPincode: checked ? prev.billingPincode : "",
-      }));
-      return;
-    }
 
     if (name === "supplierId") {
       const selectedSup = suppliers.find((s) => String(s.id) === String(value));
@@ -370,11 +434,6 @@ const PurchaseOrderCreatePage: React.FC = () => {
         billingState: selectedSup?.billingState || "",
         billingPincode: selectedSup?.billingPincode || "",
         billingCountry: selectedSup?.billingCountry || "India",
-        shippingAddressLine1: prev.sameAsBilling ? (selectedSup?.billingAddressLine1 || "") : prev.shippingAddressLine1,
-        shippingCity: prev.sameAsBilling ? (selectedSup?.billingCity || "") : prev.shippingCity,
-        shippingState: prev.sameAsBilling ? (selectedSup?.billingState || "") : prev.shippingState,
-        shippingPincode: prev.sameAsBilling ? (selectedSup?.billingPincode || "") : prev.shippingPincode,
-        shippingCountry: prev.sameAsBilling ? (selectedSup?.billingCountry || "India") : prev.shippingCountry,
         items: [],
         subtotal: 0,
         totalDiscount: 0,
@@ -418,6 +477,7 @@ const PurchaseOrderCreatePage: React.FC = () => {
           const rawMaterial = rawMaterials.find(
             (rm) => String(rm.rawMaterialId) === String(item.productId)
           );
+          const mult = getUomMultiplier(item.uom, rawMaterial?.baseUom);
 
           const activePriceObj = supplierPrices.find((p: any) => {
             const validFromDate = p.validFrom ? p.validFrom.split("T")[0] : "";
@@ -434,7 +494,7 @@ const PurchaseOrderCreatePage: React.FC = () => {
               : 0);
 
           const qty = Number(item.quantity) || 0;
-          const lineSubtotal = qty * parsedUnitPrice;
+          const lineSubtotal = qty * mult * parsedUnitPrice;
 
           const taxableAmount = lineSubtotal;
           const totalGstRate = Number(item.tax) || 0;
@@ -480,8 +540,9 @@ const PurchaseOrderCreatePage: React.FC = () => {
         return {
           ...prev,
           poDate: value,
+          expectedDeliveryDate: value,
           items: updatedItems,
-          ...recalculateTotals(updatedItems),
+          ...recalculateTotals(updatedItems, isInterState),
         };
       });
       if (errors.poDate) {
@@ -490,11 +551,7 @@ const PurchaseOrderCreatePage: React.FC = () => {
       return;
     }
 
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-
+    setFormData((prev) => ({ ...prev, [name]: value }));
     if (errors[name]) {
       setErrors((prev) => ({ ...prev, [name]: "" }));
     }
@@ -536,27 +593,8 @@ const PurchaseOrderCreatePage: React.FC = () => {
     setErrors((prev) => ({ ...prev, shippingCity: "" }));
   };
 
-  useEffect(() => {
-    if (formData.sameAsBilling) {
-      setFormData((prev) => ({
-        ...prev,
-        shippingAddressLine1: prev.billingAddressLine1,
-        shippingCity: prev.billingCity,
-        shippingState: prev.billingState,
-        shippingPincode: prev.billingPincode,
-      }));
-    }
-  }, [
-    formData.sameAsBilling,
-    formData.billingAddressLine1,
-    formData.billingCity,
-    formData.billingState,
-    formData.billingPincode,
-  ]);
 
-  // ============================================================
-  // ITEM HANDLERS
-  // ============================================================
+
   const handleItemChange = (index: number, field: keyof PurchaseOrderItem | "uom", value: any, selectedUom?: string) => {
     setFormData((prev) => {
       const items = [...prev.items];
@@ -606,8 +644,14 @@ const PurchaseOrderCreatePage: React.FC = () => {
       return {
         ...prev,
         items,
-        ...recalculateTotals(items),
+        ...recalculateTotals(items, isInterState),
       };
+    });
+
+    setErrors((prev) => {
+      const next = { ...prev };
+      delete next[`items.${index}.${field}`];
+      return next;
     });
   };
 
@@ -616,6 +660,7 @@ const PurchaseOrderCreatePage: React.FC = () => {
       (rm) => String(rm.rawMaterialId) === String(productId)
     );
 
+    let parsedUnitPrice = 0;
     setFormData((prev) => {
       const selectedSupObj = suppliers.find((s) => String(s.id) === String(prev.supplierId));
       const supplierPrices = selectedSupObj?.materialPrices || [];
@@ -628,7 +673,7 @@ const PurchaseOrderCreatePage: React.FC = () => {
           (!validToDate || validToDate >= dateToCheck);
       });
 
-      const parsedUnitPrice = activePriceObj
+      parsedUnitPrice = activePriceObj
         ? (typeof activePriceObj.price === "string" ? parseFloat(activePriceObj.price) : Number(activePriceObj.price))
         : (rawMaterial?.unitPrice
           ? (typeof rawMaterial.unitPrice === "string" ? parseFloat(rawMaterial.unitPrice) : Number(rawMaterial.unitPrice))
@@ -637,10 +682,13 @@ const PurchaseOrderCreatePage: React.FC = () => {
       const defaultTaxRateObj = gstTaxes?.find((t: any) => String(t.id) === String(rawMaterial?.gstTaxRateId));
       const defaultTaxRate = defaultTaxRateObj ? Number(defaultTaxRateObj.taxRate) : 0;
 
+      const defaultUom = rawMaterial?.baseUom ? rawMaterial.baseUom.split(",")[0].trim() : "";
+      const mult = getUomMultiplier(defaultUom, rawMaterial?.baseUom);
+
       const items = [...prev.items];
       const item = items[index];
       const qty = Number(item.quantity) || 0;
-      const lineSubtotal = qty * parsedUnitPrice;
+      const lineSubtotal = qty * mult * parsedUnitPrice;
 
       const taxableAmount = lineSubtotal;
       const totalGstRate = defaultTaxRate;
@@ -667,13 +715,13 @@ const PurchaseOrderCreatePage: React.FC = () => {
         ...item,
         productId,
         product: rawMaterial
-          ? ({
-            id: rawMaterial.rawMaterialId as any,
+          ? {
+            id: rawMaterial.rawMaterialId,
             productCode: rawMaterial.rawMaterialId,
             productName: rawMaterial.materialName,
             unit: rawMaterial.baseUom,
             unitPrice: parsedUnitPrice,
-          } as any)
+          }
           : undefined,
         unitPrice: parsedUnitPrice,
         uom: rawMaterial?.baseUom ? rawMaterial.baseUom.split(",")[0].trim() : "",
@@ -691,8 +739,17 @@ const PurchaseOrderCreatePage: React.FC = () => {
       return {
         ...prev,
         items,
-        ...recalculateTotals(items),
+        ...recalculateTotals(items, isInterState),
       };
+    });
+
+    setErrors((prev) => {
+      const next = { ...prev };
+      delete next[`items.${index}.productId`];
+      if (parsedUnitPrice > 0) {
+        delete next[`items.${index}.unitPrice`];
+      }
+      return next;
     });
   };
 
@@ -716,11 +773,10 @@ const PurchaseOrderCreatePage: React.FC = () => {
           lineTotal: 0,
         },
       ];
-
       return {
         ...prev,
         items,
-        ...recalculateTotals(items),
+        ...recalculateTotals(items, isInterState),
       };
     });
   };
@@ -731,22 +787,23 @@ const PurchaseOrderCreatePage: React.FC = () => {
       return {
         ...prev,
         items,
-        ...recalculateTotals(items),
+        ...recalculateTotals(items, isInterState),
       };
     });
   };
 
-  // ============================================================
-  // SUBMIT
-  // ============================================================
   const handleSubmit = async (
     e: React.FormEvent,
-    submitStatus: "DRAFT" | "PENDING"
+    submitStatus: "DRAFT" | "APPROVED"
   ) => {
     e.preventDefault();
 
+    if (isLocked) {
+      toast.error("This Purchase Order is in a read-only state and cannot be updated.");
+      return;
+    }
+
     const validationErrors = validatePurchaseOrder(formData);
-    console.log(validationErrors, "kjklj")
     if (Object.keys(validationErrors).length > 0) {
       setErrors(validationErrors);
       toast.error("Please fill all required fields correctly.");
@@ -756,99 +813,127 @@ const PurchaseOrderCreatePage: React.FC = () => {
     if (submitStatus === "DRAFT") setIsSubmitting(true);
     else setIsSubmittingForApproval(true);
 
+    const payload = {
+      poDate: formData.poDate,
+      expectedDeliveryDate: formData.expectedDeliveryDate,
+      supplierId: formData.supplierId,
+
+      billingAddressLine1: formData.billingAddressLine1,
+      billingCountry: formData.billingCountry || "India",
+      billingCity: formData.billingCity,
+      billingState: formData.billingState,
+      billingPincode: formData.billingPincode,
+      shippingAddressLine1: formData.shippingAddressLine1,
+      shippingCountry: formData.shippingCountry || "India",
+      shippingCity: formData.shippingCity,
+      shippingState: formData.shippingState,
+      shippingPincode: formData.shippingPincode,
+      remarks: formData.remarks,
+      storeId: formData.storeId,
+      discountType: formData.discountType,
+      discountValue: formData.discountValue,
+
+      items: formData.items.map((item) => ({
+        productId: item.productId,
+        uom: item.uom,
+        quantity: item.quantity,
+        unitPrice: Number(item.unitPrice) || 0,
+        tax: Number(item.tax) || 0,
+        taxableAmount: item.taxableAmount || 0,
+        cgstRate: item.cgstRate || 0,
+        cgstAmount: item.cgstAmount || 0,
+        sgstRate: item.sgstRate || 0,
+        sgstAmount: item.sgstAmount || 0,
+        igstRate: item.igstRate || 0,
+        igstAmount: item.igstAmount || 0,
+      })),
+
+      totalDiscount: formData.totalDiscount,
+      totalTax: formData.totalTax,
+      totalCgst: formData.totalCgst,
+      totalSgst: formData.totalSgst,
+      totalIgst: formData.totalIgst,
+      roundingAdjust: 0,
+      netAmount: formData.netAmount,
+
+      status: submitStatus,
+    };
+
     try {
-      await addPurchaseOrder({
-        poDate: formData.poDate,
-        expectedDeliveryDate: formData.expectedDeliveryDate,
-        supplierId: formData.supplierId,
-
-        billingAddressLine1: formData.billingAddressLine1,
-        billingCountry: formData.billingCountry || "India",
-        billingCity: formData.billingCity,
-        billingState: formData.billingState,
-        billingPincode: formData.billingPincode,
-        shippingAddressLine1: formData.shippingAddressLine1,
-        shippingCountry: formData.shippingCountry || "India",
-        shippingCity: formData.shippingCity,
-        shippingState: formData.shippingState,
-        shippingPincode: formData.shippingPincode,
-        remarks: formData.remarks,
-        storeId: formData.storeId,
-        discountType: formData.discountType,
-        discountValue: formData.discountValue,
-
-        items: formData.items.map((item) => ({
-          productId: item.productId,
-          uom: item.uom,
-          quantity: item.quantity,
-          unitPrice: item.unitPrice,
-          tax: item.tax || 0,
-          taxableAmount: item.taxableAmount || 0,
-          cgstRate: item.cgstRate || 0,
-          cgstAmount: item.cgstAmount || 0,
-          sgstRate: item.sgstRate || 0,
-          sgstAmount: item.sgstAmount || 0,
-          igstRate: item.igstRate || 0,
-          igstAmount: item.igstAmount || 0,
-        })),
-
-        totalDiscount: formData.totalDiscount,
-        totalTax: formData.totalTax,
-        totalCgst: formData.totalCgst,
-        totalSgst: formData.totalSgst,
-        totalIgst: formData.totalIgst,
-        roundingAdjust: roundingSign === "+" ? roundingValue : -roundingValue,
-        netAmount: formData.netAmount,
-
-        status: submitStatus,
-      });
-
-      toast.success(
-        submitStatus === "DRAFT"
-          ? "Purchase Order saved as draft!"
-          : "Purchase Order submitted for approval!"
-      );
+      if (isEdit) {
+        await editPurchaseOrder(id!, payload);
+        toast.success("Purchase Order updated successfully!");
+      } else {
+        await addPurchaseOrder(payload);
+        toast.success(
+          submitStatus === "DRAFT"
+            ? "Purchase Order saved as draft!"
+            : "Purchase Order approved successfully!"
+        );
+      }
       navigate("/purchase-orders");
     } catch (error: any) {
-      toast.error(error?.message || "Failed to create purchase order");
+      toast.error(error?.message || `Failed to ${isEdit ? "update" : "create"} purchase order`);
     } finally {
       setIsSubmitting(false);
       setIsSubmittingForApproval(false);
     }
   };
 
-  // ============================================================
-  // OPTIONS
-  // ============================================================
+  if (loading) {
+    return <CommonLoader text="Loading Purchase Order..." fullScreen={false} />;
+  }
+
+  if (poNotFound) {
+    return (
+      <div className="w-full mx-auto p-6 bg-white rounded-lg shadow-sm border border-gray-200 text-center my-8 max-w-lg">
+        <h2 className="text-xl font-bold text-red-600 mb-2">Purchase Order Not Found</h2>
+        <p className="text-gray-600 mb-6">The purchase order you are trying to edit does not exist or has been deleted.</p>
+        <BackButton text="Back to Purchase Orders" />
+      </div>
+    );
+  }
+
+  if (fetchError) {
+    return (
+      <div className="w-full mx-auto p-6 bg-white rounded-lg shadow-sm border border-gray-200 text-center my-8 max-w-lg">
+        <h2 className="text-xl font-bold text-red-600 mb-2">Failed to Load Purchase Order</h2>
+        <p className="text-gray-600 mb-6">Something went wrong while retrieving the purchase order data.</p>
+        <div className="flex justify-center gap-4">
+          <BackButton text="Back" />
+          <CustomButton text="Retry" onClick={() => window.location.reload()} />
+        </div>
+      </div>
+    );
+  }
+
   const supplierOptions = (suppliers || []).map((s) => ({
     value: s?.id ? String(s.id) : "",
-    label: `${s?.supplierCode || ""} - ${s?.legalName || ""}`,
+    label: s?.displayName || s?.legalName || "",
   }));
 
-  const gstOptions = useMemo(() => [
+  const gstOptions = [
     { value: "", label: gstLoading ? "Loading GST rates..." : "-- Select GST Rate --" },
     ...(gstTaxes || []).map((t: any) => ({
       value: String(t.taxRate),
       label: `${t.taxName} (${t.taxRate}%)`,
     })),
-  ], [gstTaxes, gstLoading]);
+  ];
 
-  const uomOptions = useMemo(() => [
+  const uomOptions = [
     { value: "", label: "-- Select UOM --" },
     ...(activeUOMs || []).map((uom: any) => ({
       value: uom.uomName,
       label: uom.uomName,
     })),
-  ], [activeUOMs]);
-
-  console.log(uomOptions, 'hkj')
+  ];
 
   const supplierMaterialIds = selectedSupplier?.materialPrices
     ? selectedSupplier.materialPrices.map((mp: any) => String(mp.rawMaterialId))
     : [];
 
   const filteredRawMaterials = supplierMaterialIds.length > 0
-    ? rawMaterials.filter((rm) => supplierMaterialIds.includes(String(rm.rawMaterialId)))
+    ? rawMaterials.filter((rm) => supplierMaterialIds.includes(String(rm.rawMaterialId)) || formData.items.some((item) => item.productId === rm.rawMaterialId))
     : rawMaterials;
 
   const productOptions = filteredRawMaterials.map((rm) => ({
@@ -856,24 +941,29 @@ const PurchaseOrderCreatePage: React.FC = () => {
     label: `${rm.rawMaterialId || ""} - ${rm.materialName || ""}`,
   }));
 
-  console.log(productOptions, "productOptions")
 
-  const todayStr = new Date().toISOString().split("T")[0];
-  const minDeliveryDate = formData.poDate && formData.poDate > todayStr ? formData.poDate : todayStr;
 
-  // ============================================================
-  // UI
-  // ============================================================
   return (
     <div className="w-full mx-auto">
-      <div className="bg-white  border border-gray-200">
-        <div className="px-6 py-4 ">
+      <div className="bg-white border border-gray-200">
+        <div className="px-6 py-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div><h2 className="text-xl font-bold text-gray-800">Create Purchase Order</h2></div>
+            <div>
+              <h2 className="text-xl font-bold text-gray-800">
+                {isEdit ? (isLocked ? "View Purchase Order" : "Edit Purchase Order") : "Create Purchase Order"}
+              </h2>
+            </div>
             <div><BackButton text="Back to List" /></div>
           </div>
         </div>
         <form className="px-6 py-3 space-y-4" noValidate>
+          {isLocked && (
+            <div className="mb-4 p-4 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg flex items-center gap-2 text-sm">
+              <span className="font-semibold">View Only Mode:</span>
+              This Purchase Order is in '{formData.status}' status and cannot be edited. Only Draft orders can be modified.
+            </div>
+          )}
+
           {/* Main Fields */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
             <div>
@@ -887,28 +977,37 @@ const PurchaseOrderCreatePage: React.FC = () => {
                 onChange={(e) => handleChange(e as any)}
                 required
                 error={errors.poDate}
-                disabled
+                disabled={isLocked || isEdit}
               />
             </div>
+
             <div>
-              <DatePickerCalendar
-                label="Expected Delivery Date"
-                name="expectedDeliveryDate"
-                value={formData.expectedDeliveryDate}
-                onChange={(e) => handleChange(e as any)}
+              <SelectInput
+                label="Supplier"
+                name="supplierId"
+                value={formData.supplierId}
+                options={[{ value: "", label: "-- Select Supplier --" }, ...supplierOptions]}
+                onChange={handleChange}
                 required
-                error={errors.expectedDeliveryDate}
-                minDate={minDeliveryDate}
+                searchable
+                disabled={isLocked || isEdit}
               />
-            </div>
-            <div>
-              <SelectInput label="Supplier" name="supplierId" value={formData.supplierId} options={[{ value: "", label: "-- Select Supplier --" }, ...supplierOptions]} onChange={handleChange} required searchable />
               {errors.supplierId && <div className="text-red-500 mt-1 text-sm">{errors.supplierId}</div>}
             </div>
             <div>
-              <SelectInput label="Store" name="storeId" value={formData.storeId} options={[{ label: "-- Select Store --", value: "" }, ...(stores || []).filter((s: any) => s.isActive).map((s: any) => ({ label: s.storeName, value: s.storeId }))]} required onChange={handleChange} searchable />
+              <SelectInput
+                label="Store"
+                name="storeId"
+                value={formData.storeId || ""}
+                options={[{ label: "-- Select Store --", value: "" }, ...(stores || []).filter((s: any) => s.isActive).map((s: any) => ({ label: s.storeName, value: s.storeId }))]}
+                required
+                onChange={handleChange}
+                searchable
+                disabled={isLocked}
+              />
               {errors.storeId && <div className="text-red-500 mt-1 text-sm">{errors.storeId}</div>}
             </div>
+
           </div>
 
           <div className="grid grid-cols-1 gap-4">
@@ -931,15 +1030,12 @@ const PurchaseOrderCreatePage: React.FC = () => {
                 onPincodeChange={(val) => setFormData(prev => ({ ...prev, billingPincode: val }))}
                 pincodeError={errors.billingPincode}
                 required
+                disabled={isLocked}
               />
             </div>
             <div>
               <div className="flex items-center justify-between mb-4">
                 <h6 className="text-lg font-semibold text-gray-800 mb-0">Shipping</h6>
-                {/* <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-700 mb-0">
-                  <input type="checkbox" className="w-4 h-4 text-blue-600 rounded border-gray-300" name="sameAsBilling" checked={formData.sameAsBilling} onChange={handleChange} />
-                  <span>Same as billing</span>
-                </label> */}
               </div>
 
               <AddressForm
@@ -958,13 +1054,14 @@ const PurchaseOrderCreatePage: React.FC = () => {
                 pincodeValue={formData.shippingPincode || ""}
                 onPincodeChange={(val) => setFormData(prev => ({ ...prev, shippingPincode: val }))}
                 pincodeError={errors.shippingPincode}
+                disabled={isLocked}
               />
             </div>
           </div>
 
           <div className="flex justify-between items-center mb-4 mt-6">
             <span className="text-lg font-semibold text-gray-800">Order Items</span>
-            <CustomButton text="Add Item" icon={FaPlus} onClick={addItem} type="button" />
+            <CustomButton text="Add Item" icon={FaPlus} onClick={addItem} type="button" disabled={isLocked} />
           </div>
 
           <div className="rounded-xl border border-slate-200 bg-white [&_.mb-\[18px\]]:!mb-0 [&_.select-input-group]:!mb-0 overflow-visible">
@@ -976,7 +1073,6 @@ const PurchaseOrderCreatePage: React.FC = () => {
                   <th className="px-3 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200 min-w-[200px]">QTY & UOM</th>
                   <th className="px-3 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200">UNIT PRICE (₹)</th>
                   <th className="px-3 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200">TAX %</th>
-                  {/* <th className="px-3 py-3 text-right text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200">GST (₹)</th> */}
                   <th className="px-3 py-3 text-right text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200">TOTAL (₹)</th>
                   <th className="px-3 py-3 text-center text-[11px] font-bold text-slate-500 uppercase tracking-widest w-16 border-b border-slate-200"></th>
                 </tr>
@@ -996,8 +1092,19 @@ const PurchaseOrderCreatePage: React.FC = () => {
                   return (
                     <tr key={index} className="hover:bg-slate-50/50 transition-colors duration-200">
                       <td className="px-3 py-2 whitespace-nowrap text-sm font-medium text-slate-400 text-center">{index + 1}</td>
-                      <td className="px-3 py-2 whitespace-nowrap"><SelectInput noMargin={true} name={`items[${index}].productId`} value={item.productId ? String(item.productId) : ""} options={[{ value: "", label: "-- Select Material --" }, ...productOptions]} onChange={(e) => handleItemProductChange(index, e.target.value)} error={errors[`items.${index}.productId`]} hideLabel /></td>
-                      <td className="px-3 py-2 whitespace-nowrap ">
+                      <td className="px-3 py-2 whitespace-nowrap">
+                        <SelectInput
+                          noMargin={true}
+                          name={`items[${index}].productId`}
+                          value={item.productId ? String(item.productId) : ""}
+                          options={[{ value: "", label: "-- Select Material --" }, ...productOptions]}
+                          onChange={(e) => handleItemProductChange(index, e.target.value)}
+                          error={errors[`items.${index}.productId`]}
+                          hideLabel
+                          disabled={isLocked}
+                        />
+                      </td>
+                      <td className="px-3 py-2 whitespace-nowrap">
                         <QuantityInput
                           name={`items[${index}].quantity`}
                           value={item.quantity}
@@ -1008,11 +1115,35 @@ const PurchaseOrderCreatePage: React.FC = () => {
                           error={errors[`items.${index}.quantity`]}
                           step="0.01"
                           hideLabel
+                          disabled={isLocked}
                         />
                       </td>
-                      <td className="px-3 py-2 whitespace-nowrap"><TextInput label="" name={`items[${index}].unitPrice`} type="number" value={String(item.unitPrice)} onChange={(e) => handleItemChange(index, "unitPrice", Number(e.target.value))} error={errors[`items.${index}.unitPrice`]} min={0} step={0.01} placeholder="0.00" disabled /></td>
-                      <td className="px-3 py-2 whitespace-nowrap"><SelectInput label="" noMargin={true} name={`items[${index}].tax`} options={gstOptions} value={String(item.tax || 0)} onChange={(e) => handleItemChange(index, "tax", Number(e.target.value))} hideLabel /></td>
-                      {/* <td className="px-3 py-2 whitespace-nowrap text-right font-medium text-slate-700">₹{gstAmount.toFixed(2)}</td> */}
+                      <td className="px-3 py-2 whitespace-nowrap">
+                        <TextInput
+                          label=""
+                          name={`items[${index}].unitPrice`}
+                          type="number"
+                          value={String(item.unitPrice)}
+                          onChange={(e) => handleItemChange(index, "unitPrice", Number(e.target.value))}
+                          error={errors[`items.${index}.unitPrice`]}
+                          min={0}
+                          step={0.01}
+                          placeholder="0.00"
+                          disabled={isLocked}
+                        />
+                      </td>
+                      <td className="px-3 py-2 whitespace-nowrap">
+                        <SelectInput
+                          label=""
+                          noMargin={true}
+                          name={`items[${index}].tax`}
+                          options={gstOptions}
+                          value={String(item.tax || 0)}
+                          onChange={(e) => handleItemChange(index, "tax", Number(e.target.value))}
+                          hideLabel
+                          disabled={isLocked}
+                        />
+                      </td>
                       <td className="px-3 py-2 whitespace-nowrap text-right font-medium text-slate-700">₹{lineTotal.toFixed(2)}</td>
                       <td className="px-3 py-2 whitespace-nowrap text-center">
                         <button
@@ -1020,6 +1151,7 @@ const PurchaseOrderCreatePage: React.FC = () => {
                           className="text-rose-400 hover:text-rose-600 hover:bg-rose-100 p-2 rounded-md disabled:opacity-40 disabled:hover:bg-transparent disabled:cursor-not-allowed transition-all duration-200 inline-flex items-center justify-center"
                           onClick={() => removeItem(index)}
                           title="Remove item"
+                          disabled={isLocked}
                         >
                           <FaTrash size={14} />
                         </button>
@@ -1027,43 +1159,26 @@ const PurchaseOrderCreatePage: React.FC = () => {
                     </tr>
                   );
                 })}
-                {formData.items.length === 0 && <tr><td colSpan={8} className="px-3 py-4 text-center text-slate-400 font-medium">No items added — click "Add Item" to begin</td></tr>}
+                {formData.items.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="px-3 py-4 text-center text-slate-400 font-medium">
+                      No items added — click "Add Item" to begin
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
             <div className="col-span-2">
-              <TextInput label="Remarks" name="remarks" value={formData.remarks} onChange={handleChange} />
+              <TextInput label="Remarks" name="remarks" value={formData.remarks} onChange={handleChange} disabled={isLocked} />
             </div>
             <div>
               <div className="bg-gray-50 rounded-lg border border-gray-200 p-4">
                 <h6 className="mb-3 font-bold text-blue-600">Order Summary</h6>
                 <div className="flex justify-between mb-2"><span>Subtotal:</span><span>₹{formData.subtotal.toFixed(2)}</span></div>
-                <div className="flex justify-between items-center mb-2 text-red-500 text-sm">
-                  <span className="flex items-center gap-2">Discount:
-                    <div className="w-24 [&_.mb-\[18px\]]:!mb-0 [&_.select-input-group]:!mb-0">
-                      <SelectInput name="discountType" options={[{ value: "PERCENT", label: "%" }, { value: "FLAT", label: "Flat" }]} value={formData.discountType || "PERCENT"} onChange={(e) => { setFormData(prev => { const newTotals = recalculateTotals(prev.items, isInterState, e.target.value as any, prev.discountValue); return { ...prev, discountType: e.target.value as any, ...newTotals }; }); }} hideLabel />
-                    </div>
-                    <div className="w-24 [&_.mb-\[18px\]]:!mb-0">
-                      <TextInput name="discountValue" type="number" min={0} step={0.01} value={String(formData.discountValue || 0)} onChange={(e) => { setFormData(prev => { const newTotals = recalculateTotals(prev.items, isInterState, prev.discountType, Number(e.target.value) || 0); return { ...prev, discountValue: Number(e.target.value) || 0, ...newTotals }; }); }} />
-                    </div>
-                  </span>
-                  <span>-₹{formData.totalDiscount.toFixed(2)}</span>
-                </div>
 
-                <div className="flex justify-between items-center mb-2 text-gray-600 text-sm">
-                  <span className="flex items-center gap-2">Round Off:
-                    <div className="flex items-center bg-white rounded border overflow-hidden h-[35px]">
-                      <button type="button" onClick={() => { setRoundingSign("+"); setFormData(prev => ({ ...prev, ...recalculateTotals(prev.items, isInterState, prev.discountType, prev.discountValue, "+", roundingValue) })); }} className={`px-2 py-1 h-full font-bold ${roundingSign === "+" ? "bg-green-600 text-white" : "bg-gray-100 text-gray-600"}`}>+</button>
-                      <button type="button" onClick={() => { setRoundingSign("-"); setFormData(prev => ({ ...prev, ...recalculateTotals(prev.items, isInterState, prev.discountType, prev.discountValue, "-", roundingValue) })); }} className={`px-2 py-1 h-full font-bold ${roundingSign === "-" ? "bg-red-500 text-white" : "bg-gray-100 text-gray-600"}`}>-</button>
-                    </div>
-                    <div className="w-24 [&_.mb-\[18px\]]:!mb-0">
-                      <TextInput name="roundingValue" type="number" min={0} step={0.01} value={String(roundingValue || 0)} onChange={(e) => { const val = Number(e.target.value) || 0; setRoundingValue(val); setFormData(prev => ({ ...prev, ...recalculateTotals(prev.items, isInterState, prev.discountType, prev.discountValue, roundingSign, val) })); }} />
-                    </div>
-                  </span>
-                  <span>{roundingSign === "+" ? "+" : "-"}₹{(roundingValue || 0).toFixed(2)}</span>
-                </div>
                 {isInterState ? (
                   gstRateBreakdown.length === 0 ? (
                     <div className="flex justify-between mb-2 text-green-600 text-sm"><span>Total IGST:</span><span>+₹{formData.totalIgst.toFixed(2)}</span></div>
@@ -1102,14 +1217,28 @@ const PurchaseOrderCreatePage: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex flex-wrap justify-end gap-3 mt-8 pt-4 border-t border-gray-200">
-            <CustomButton text={isSubmitting ? "Saving..." : "Save as Draft"} icon={isSubmitting ? undefined : FaSave} onClick={(e: any) => handleSubmit(e, "DRAFT")} type="button" disabled={isSubmitting || isSubmittingForApproval} />
-            <CustomButton text={isSubmittingForApproval ? "Submitting..." : "Submit for Approval"} icon={isSubmittingForApproval ? undefined : FaPaperPlane} onClick={(e: any) => handleSubmit(e, "PENDING")} type="button" disabled={isSubmitting || isSubmittingForApproval} />
-          </div>
+          {!isLocked && (
+            <div className="flex flex-wrap justify-end gap-3 mt-8 pt-4 border-t border-gray-200">
+              <CustomButton
+                text={isSubmitting ? "Saving..." : "Save as Draft"}
+                icon={isSubmitting ? undefined : FaSave}
+                onClick={(e: any) => handleSubmit(e, "DRAFT")}
+                type="button"
+                disabled={isSubmitting || isSubmittingForApproval}
+              />
+              <CustomButton
+                text={isSubmittingForApproval ? "Approving..." : "Approved"}
+                icon={isSubmittingForApproval ? undefined : FaPaperPlane}
+                onClick={(e: any) => handleSubmit(e, "APPROVED")}
+                type="button"
+                disabled={isSubmitting || isSubmittingForApproval}
+              />
+            </div>
+          )}
         </form>
       </div>
     </div>
   );
 };
 
-export default PurchaseOrderCreatePage;
+export default PurchaseOrderForm;

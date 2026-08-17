@@ -46,7 +46,7 @@ const RawMaterialCategoryList = lazy(() => import("../modules/raw-material-categ
 const WastageStoreList = lazy(() => import("../modules/wastage-store/pages/WastageStoreList"));
 const SalesProductList = lazy(() => import("../modules/sales-product/pages/SalesProductList"));
 
-const ProductForm = lazy(() => import("../modules/product/pages/ProductForm"));
+// const ProductForm = lazy(() => import("../modules/product/pages/ProductForm"));
 const RawMaterialForm = lazy(() => import("../modules/raw-materials/pages/RawMaterialForm"));
 const SalesProductForm = lazy(() => import("../modules/sales-product/pages/SalesProductForm"));
 const WastageStoreForm = lazy(() => import("../modules/wastage-store/pages/WastageStoreForm"));
@@ -64,6 +64,29 @@ const ShiftCreate = lazy(() => import("../modules/shifts/pages/ShiftCreate"));
 const ShiftEdit = lazy(() => import("../modules/shifts/pages/ShiftEdit"));
 
 const MachineList = lazy(() => import("../modules/machines/pages/MachineList"));
+const SupplierFormPage = lazy(() => import("../modules/supplier/pages/SupplierForm"));
+// const SupplierMaterialPricingList = lazy(() => import("../modules/supplier/pages/Suppliermaterialpricinglist"));
+
+// Products
+
+const ProductForm = lazy(() => import("../modules/product/pages/ProductForm"));
+
+
+
+// Administration
+// const UserList = lazy(() => import("../modules/users/pages/UserList"));
+
+// const PermissionList = lazy(() => import("../modules/permissions/pages/PermissionList"));
+
+
+// HR
+
+// Product Master Attributes
+
+
+
+
+// New modules
 const MachineCreate = lazy(() => import("../modules/machines/pages/MachineCreate"));
 const MachineEdit = lazy(() => import("../modules/machines/pages/MachineEdit"));
 const MachineAssignmentList = lazy(() => import("../modules/machine-operation-assignments/pages/MachineAssignmentList"));
@@ -160,13 +183,15 @@ const SalesInvoiceView = lazy(() => import("../modules/sales-order-invoice/Sales
 // PURCHASE
 // ===========================================================================
 const SupplierListPage = lazy(() => import("../modules/supplier/pages/SupplierList"));
-const SupplierCreatePage = lazy(() => import("../modules/supplier/pages/SupplierCreate"));
-const SupplierEditPage = lazy(() => import("../modules/supplier/pages/SupplierEdit"));
+
 const SupplierMaterialPricingList = lazy(() => import("../modules/supplier/pages/Suppliermaterialpricinglist"));
 
 const PurchaseOrderListPage = lazy(() => import("../modules/purchase/purchase-order/pages/PurchaseOrderListPage"));
-const PurchaseOrderCreatePage = lazy(() => import("../modules/purchase/purchase-order/pages/PurchaseOrderCreatePage"));
-const PurchaseOrderEditPage = lazy(() => import("../modules/purchase/purchase-order/pages/PurchaseOrderEditPage"));
+
+// Purchase Order Module
+
+const PurchaseOrderForm = lazy(() => import("../modules/purchase/purchase-order/pages/PurchaseOrderForm"));
+
 const PurchaseOrderViewPage = lazy(() => import("../modules/purchase/purchase-order/purchaseordeappovals/PurchaseOrderapprovalEdit"));
 const POMDApproval = lazy(() => import("../modules/purchase/purchase-order/purchaseordeappovals/PurchaseOrderapprovalList"));
 
@@ -449,10 +474,10 @@ const AppRoutes = () => {
 
             {/* ---------- Suppliers ---------- */}
             <Route element={<ProtectedRoute permission="suppliers.create" />}>
-              <Route path="/suppliers/create" element={<SupplierCreatePage />} />
+              <Route path="/suppliers/create" element={<SupplierFormPage />} />
             </Route>
             <Route element={<ProtectedRoute permission="suppliers.edit" />}>
-              <Route path="/suppliers/edit/:id" element={<SupplierEditPage />} />
+              <Route path="/suppliers/edit/:id" element={<SupplierFormPage />} />
             </Route>
             <Route element={<ProtectedRoute permission="supplierpricelist.view" />}>
               <Route path="/suppliers/:supplierId/material-prices" element={<SupplierMaterialPricingList />} />
@@ -617,10 +642,10 @@ const AppRoutes = () => {
               <Route path="/purchase-orders/view/:id" element={<PurchaseOrderViewPage />} />
             </Route>
             <Route element={<ProtectedRoute permission="purchaseOrders.create" />}>
-              <Route path="/purchase-orders/create" element={<PurchaseOrderCreatePage />} />
+              <Route path="/purchase-orders/create" element={<PurchaseOrderForm />} />
             </Route>
             <Route element={<ProtectedRoute permission="purchaseOrders.edit" />}>
-              <Route path="/purchase-orders/edit/:id" element={<PurchaseOrderEditPage />} />
+              <Route path="/purchase-orders/edit/:id" element={<PurchaseOrderForm />} />
             </Route>
             <Route element={<ProtectedRoute permission="invoice.view" />}>
               <Route path="/invoice/details/:id" element={<GrnInvoiceViewPage />} />

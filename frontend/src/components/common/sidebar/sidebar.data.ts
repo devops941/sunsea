@@ -238,7 +238,7 @@ export const sidebarItems: SidebarItem[] = [
     pathsByPermission: [
       { permission: "suppliers.view", path: "/suppliers" },
       { permission: "purchaseOrders.view", path: "/purchase-orders" },
-      { permission: "purchase-order-approvals.view", path: "/purchase-order-approvals" },
+
       { permission: "invoice.view", path: "/invoice" },
       { permission: "expenses.view", path: "/expenses" },
       { permission: "purchase-returns.view", path: "/purchase-returns" },
@@ -261,7 +261,7 @@ export const sidebarItems: SidebarItem[] = [
     activePaths: [
       "/suppliers",
       "/purchase-orders",
-      "/purchase-order-approvals",
+
       "/expenses",
       "/invoice",
       "/purchase-returns",
@@ -269,7 +269,7 @@ export const sidebarItems: SidebarItem[] = [
     permissionAny: [
       "suppliers.view",
       "purchaseOrders.view",
-      "purchase-order-approvals.view",
+
       "invoice.view",
       "expenses.view",
       "purchase-returns.view",
