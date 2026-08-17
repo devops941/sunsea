@@ -15,7 +15,6 @@ export const createProductSchema = z.object({
 
     uomId: z.string().optional(),
 
-    capacityLitres: z.coerce.number().optional(),
 
     productType: z.enum(["PRODUCTION", "SALES_PRODUCTION"]).optional(),
 
@@ -24,9 +23,10 @@ export const createProductSchema = z.object({
 
     hsnCode: z.string().trim().max(20).optional(),
     rate: z.coerce.number().optional(),
+    // Grade-based dynamic pricing stored as JSON { "<gradeId>": <rate> }
+    gradeRates: z.any().optional(),
 
     minimumQty: z.string().max(20).optional(),
-    maximumQty: z.string().max(20).optional(),
 
     // FormData booleans also arrive as the literal strings "true"/"false"
     isActive: z

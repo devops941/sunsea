@@ -27,6 +27,9 @@ export interface Product {
   category?: Category;
   uom?: UOM | null;
   hsnCode?: string | null;
+  rate?: number | null;
+  /** Grade-based dynamic pricing. Keys are grade names (e.g. "A", "B", "C"), values are prices. */
+  gradeRates?: Record<string, number> | null;
   gstRate?: number | null;
   cess?: number | null;
   b2b?: number | null;
@@ -34,7 +37,6 @@ export interface Product {
   b2c?: number | null;
   exportPrice?: number | null;
   minimumQty?: string;
-  maximumQty?: string;
 }
 
 
@@ -46,7 +48,6 @@ export interface CreateProductDto {
   displayName?: string;
   description?: string;
   uomId?: string;
-  capacityLitres?: number;
   typeCode?: string;
   productType?: ProductType;
   bundleQty?: number;
@@ -56,7 +57,7 @@ export interface CreateProductDto {
   tags?: string;
   isActive?: boolean;
   minimumQty?: number;
-  maximumQty?: number;
+  gradeRates?: Record<string, number>;
 }
 
 export interface UpdateProductDto {
@@ -67,7 +68,6 @@ export interface UpdateProductDto {
   displayName?: string;
   description?: string;
   uomId?: string;
-  capacityLitres?: number;
   typeCode?: string;
   productType?: ProductType;
   bundleQty?: number;
@@ -77,7 +77,7 @@ export interface UpdateProductDto {
   tags?: string;
   isActive?: boolean;
   minimumQty?: number;
-  maximumQty?: number;
+  gradeRates?: Record<string, number>;
 }
 
 export interface ProductState {

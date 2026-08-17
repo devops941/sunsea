@@ -82,7 +82,7 @@ class ProductService {
       }
     }
 
-    const payload: Prisma.ProductUncheckedCreateInput = {
+    const payload: Prisma.ProductUncheckedCreateInput & { gradeRates?: any } = {
       productCode: cleanRequiredString(data.productCode, 20),
       productName: cleanRequiredString(data.productName, 160),
       description: cleanString(data.description, 255),
@@ -91,15 +91,16 @@ class ProductService {
       categoryId: Number(data.categoryId),
       uomId: await this.resolvePcsUomId(),
 
-      capacityLitres: toNumberOrNull(data.capacityLitres),
       weightPerPiece: toNumberOrNull(data.weightPerPiece),
       weightUom: cleanString(data.weightUom, 10) || "kg",
       isActive: toBoolean(data.isActive, true),
 
       hsnCode: cleanString(data.hsnCode, 20),
       minimumQty: data.minimumQty || "0",
-      maximumQty: data.maximumQty || "0",
       rate: toNumberOrNull(data.rate),
+      gradeRates: data.gradeRates
+        ? (typeof data.gradeRates === "string" ? JSON.parse(data.gradeRates) : data.gradeRates)
+        : undefined,
 
       ...(uploadedImages.length
         ? {
@@ -453,7 +454,7 @@ class ProductService {
       }
     });
 
-    const payload: Prisma.ProductUncheckedUpdateInput = {
+    const payload: Prisma.ProductUncheckedUpdateInput & { gradeRates?: any } = {
       productCode: data.productCode !== undefined ? cleanRequiredString(data.productCode, 20) : undefined,
       productName: data.productName !== undefined ? cleanRequiredString(data.productName, 160) : undefined,
       description: data.description !== undefined ? cleanString(data.description, 255) : undefined,
@@ -461,15 +462,16 @@ class ProductService {
 
       categoryId: data.categoryId ? Number(data.categoryId) : undefined,
 
-      capacityLitres: data.capacityLitres !== undefined ? toNumberOrNull(data.capacityLitres) : undefined,
       weightPerPiece: data.weightPerPiece !== undefined ? toNumberOrNull(data.weightPerPiece) : undefined,
       weightUom: data.weightUom !== undefined ? (cleanString(data.weightUom, 10) || "kg") : undefined,
       minimumQty: data.minimumQty !== undefined ? data.minimumQty : undefined,
-      maximumQty: data.maximumQty !== undefined ? data.maximumQty : undefined,
       isActive: data.isActive !== undefined ? toBoolean(data.isActive, true) : undefined,
 
       hsnCode: data.hsnCode !== undefined ? cleanString(data.hsnCode, 20) : undefined,
       rate: data.rate !== undefined ? toNumberOrNull(data.rate) : undefined,
+      gradeRates: data.gradeRates !== undefined
+        ? (typeof data.gradeRates === "string" ? JSON.parse(data.gradeRates) : data.gradeRates)
+        : undefined,
 
       ...(data.openingStockQty && data.openingStockStoreId
         ? {
