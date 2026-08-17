@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import { useNavigate, useLocation, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { FaSave, FaEraser, FaTimes, FaPlus, FaImage } from "react-icons/fa";
 import { toast } from "react-toastify";
 import TextInput from "../../../components/form/TextInput/TextInput";
@@ -18,10 +18,10 @@ import { useSocketSync } from "../../../hooks/useSocketSync";
 import BackButton from "../../../components/ui/BackButton/BackButton";
 import DatePickerCalendar from "../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 import { employeeService } from "../../../services/employeeService";
-import { departmentService } from "../../../services/departmentService";
 import { roleService } from "../../../services/roleService";
 import { shiftService } from "../../../services/shiftService";
 import { machineService } from "../../../services/machineService";
+import { customerGradeService, type CustomerGrade } from "../../../services/customerGradeService";
 
 const MAX_IMAGES = 3;
 
@@ -35,16 +35,14 @@ const initialFormState = {
     productCode: "",
     productName: "",
     categoryId: "",
-    capacityLitres: "",
     weightPerPiece: "",
     weightUom: "kg",
-    productType: "PRODUCTION",
+    productType: "SALES_PRODUCTION",
     description: "",
     isActive: "true",
     hsnCode: "",
     rate: "",
     minimumQty: "",
-    maximumQty: "",
     openingStockQty: "",
     openingStockStoreId: "",
 };
@@ -58,21 +56,11 @@ type InitialCapacityRow = {
     capQty: string;
     capMachine: string;
 };
-type ExistingSnapshotRecord = {
-    id: string;
-    machineId: string;
-    shiftId: string;
-    capacity: string;
-    operators: string;
-    recordedAt: string;
-    type: "CURRENT" | "PREVIOUS";
-};
 
 const ProductForm: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const isEditMode = Boolean(id);
     const navigate = useNavigate();
-    const location = useLocation();
 
     const { addProduct, editProduct } = useProducts();
     const { categories, loadCategories } = useCategories();
@@ -91,14 +79,15 @@ const ProductForm: React.FC = () => {
 
     const [rawMaterials, setRawMaterials] = useState<RawMaterialRow[]>([]);
     const [allRawMaterials, setAllRawMaterials] = useState<any[]>([]);
-    const [existingSnapshots, setExistingSnapshots] = useState<Record<string, ExistingSnapshotRecord[]>>({});
     const [initialCapacities, setInitialCapacities] = useState<InitialCapacityRow[]>([]);
 
     const [employees, setEmployees] = useState<any[]>([]);
-    const [departments, setDepartments] = useState<any[]>([]);
     const [roles, setRoles] = useState<any[]>([]);
     const [shifts, setShifts] = useState<any[]>([]);
     const [machines, setMachines] = useState<any[]>([]);
+    const [customerGrades, setCustomerGrades] = useState<CustomerGrade[]>([]);
+    // Grade-based dynamic pricing: { "<gradeName>": "<rate>" }
+    const [gradeRates, setGradeRates] = useState<Record<string, string>>({});
 
     const fetchCategoriesData = useCallback(() => { loadCategories({ isActive: true }); }, [loadCategories]);
     const fetchStoresData = useCallback(() => {
@@ -120,12 +109,6 @@ const ProductForm: React.FC = () => {
             setEmployees(data);
         }).catch(() => {});
     }, []);
-    const fetchDepartmentsData = useCallback(() => {
-        departmentService.fetchAll().then((res: any) => {
-            const depts = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
-            setDepartments(depts);
-        }).catch(() => {});
-    }, []);
     const fetchRolesData = useCallback(() => {
         roleService.fetchAll({ limit: 100 }).then((res: any) => {
             const roleList = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
@@ -144,15 +127,21 @@ const ProductForm: React.FC = () => {
             setMachines(data);
         }).catch(() => {});
     }, []);
+    const fetchCustomerGradesData = useCallback(() => {
+        customerGradeService.getAll().then((res: any) => {
+            const data = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
+            setCustomerGrades(data);
+        }).catch(() => {});
+    }, []);
 
     useSocketSync("category", undefined, fetchCategoriesData);
     useSocketSync("store", undefined, fetchStoresData);
     useSocketSync("rawMaterial", undefined, fetchRawMaterialsData);
     useSocketSync("employee", undefined, fetchEmployeesData);
-    useSocketSync("department", undefined, fetchDepartmentsData);
     useSocketSync("role", undefined, fetchRolesData);
     useSocketSync("shift", undefined, fetchShiftsData);
     useSocketSync("machine", undefined, fetchMachinesData);
+    useSocketSync("customerGrade", undefined, fetchCustomerGradesData);
 
     const populateFormData = useCallback((productData: any) => {
         let latestStock: any = null;
@@ -164,16 +153,14 @@ const ProductForm: React.FC = () => {
             productCode: productData.productCode || "",
             productName: productData.productName || "",
             categoryId: productData.categoryId ? String(productData.categoryId) : "",
-            capacityLitres: productData.capacityLitres != null ? String(productData.capacityLitres) : "",
             weightPerPiece: productData.weightPerPiece != null ? String(productData.weightPerPiece) : "",
             weightUom: productData.weightUom || "kg",
-            productType: productData.productType || "PRODUCTION",
+            productType: productData.productType || "SALES_PRODUCTION",
             description: productData.description || "",
             isActive: productData.isActive ? "true" : "false",
             hsnCode: productData.hsnCode || "",
             rate: productData.rate != null ? String(productData.rate) : "",
             minimumQty: productData.minimumQty != null ? String(productData.minimumQty) : "",
-            maximumQty: productData.maximumQty != null ? String(productData.maximumQty) : "",
             openingStockQty: latestStock ? String(latestStock.onHandQty) : "",
             openingStockStoreId: latestStock ? String(latestStock.storeId) : "",
         });
@@ -187,43 +174,15 @@ const ProductForm: React.FC = () => {
             setRawMaterials([]);
         }
 
-        if (productData.capacityHistories && productData.capacityHistories.length > 0) {
-            const grouped = productData.capacityHistories.reduce((acc: any, curr: any) => {
-                if (!acc[curr.machineId]) acc[curr.machineId] = [];
-                acc[curr.machineId].push(curr);
-                return acc;
-            }, {});
-
-            const snapshotsByMachine: Record<string, ExistingSnapshotRecord[]> = {};
-            Object.keys(grouped).forEach(mId => {
-                const machineRecords = grouped[mId];
-                snapshotsByMachine[mId] = [];
-                if (machineRecords.length > 0) {
-                    snapshotsByMachine[mId].push({
-                        id: String(machineRecords[0].id),
-                        machineId: mId,
-                        shiftId: machineRecords[0].shiftId,
-                        capacity: String(machineRecords[0].newCapacity),
-                        operators: machineRecords[0].operators || "",
-                        recordedAt: new Date(machineRecords[0].productionDate).toISOString().split('T')[0],
-                        type: "CURRENT"
-                    });
-                }
-                if (machineRecords.length > 1) {
-                    snapshotsByMachine[mId].push({
-                        id: String(machineRecords[1].id),
-                        machineId: mId,
-                        shiftId: machineRecords[1].shiftId,
-                        capacity: String(machineRecords[1].newCapacity),
-                        operators: machineRecords[1].operators || "",
-                        recordedAt: new Date(machineRecords[1].productionDate).toISOString().split('T')[0],
-                        type: "PREVIOUS"
-                    });
-                }
-            });
-            setExistingSnapshots(snapshotsByMachine);
+        // Load grade-based rates from product data
+        if (productData.gradeRates && typeof productData.gradeRates === "object") {
+            const loaded: Record<string, string> = {};
+            for (const [key, val] of Object.entries(productData.gradeRates)) {
+                loaded[key] = String(val);
+            }
+            setGradeRates(loaded);
         } else {
-            setExistingSnapshots({});
+            setGradeRates({});
         }
 
         const images: ExistingProductImage[] = (productData.images || []).slice();
@@ -237,26 +196,21 @@ const ProductForm: React.FC = () => {
         fetchStoresData();
         fetchRawMaterialsData();
         fetchEmployeesData();
-        fetchDepartmentsData();
         fetchRolesData();
         fetchShiftsData();
         fetchMachinesData();
+        fetchCustomerGradesData();
 
         if (isEditMode && id) {
-            const stateData = location.state as any;
-            if (stateData && String(stateData.id) === String(id)) {
-                populateFormData(stateData);
-            } else {
-                setIsLoadingData(true);
-                productService.fetchById(id)
-                    .then(data => populateFormData(data))
-                    .catch(err => {
-                        console.error("Failed to fetch product:", err);
-                        toast.error("Failed to load product data");
-                        navigate("/products");
-                    })
-                    .finally(() => setIsLoadingData(false));
-            }
+            setIsLoadingData(true);
+            productService.fetchById(id)
+                .then(data => populateFormData(data))
+                .catch(err => {
+                    console.error("Failed to fetch product:", err);
+                    toast.error("Failed to load product data");
+                    navigate("/products");
+                })
+                .finally(() => setIsLoadingData(false));
         } else {
             productService.fetchNextId()
                 .then(nextCode => setFormData(prev => ({ ...prev, productCode: nextCode })))
@@ -312,11 +266,17 @@ const ProductForm: React.FC = () => {
             newErrors.minimumQty = "Minimum Stock Qty must be 0 or greater.";
         }
 
-        if (!formData.rate) {
-            newErrors.rate = "Required";
+        // Validate grade rates: at least one must be filled and all filled ones must be > 0
+        const filledGradeRates = Object.entries(gradeRates).filter(([, v]) => v.toString().trim() !== "");
+        if (filledGradeRates.length === 0) {
+            newErrors.gradeRates = "At least one grade rate is required.";
         } else {
-            const rate = Number(formData.rate);
-            if (isNaN(rate) || rate <= 0) newErrors.rate = "Must be > 0";
+            for (const [gradeName, val] of filledGradeRates) {
+                const n = Number(val);
+                if (isNaN(n) || n <= 0) {
+                    newErrors[`gradeRate_${gradeName}`] = "Must be > 0";
+                }
+            }
         }
 
         if (rawMaterials.length === 0) {
@@ -448,6 +408,7 @@ const ProductForm: React.FC = () => {
         setFormData(prev => ({ ...initialFormState, productCode: prev.productCode }));
         setRawMaterials([]);
         setInitialCapacities([]);
+        setGradeRates({});
         setErrors({});
         setNewImageFiles([]);
         setNewImagePreviews([]);
@@ -468,8 +429,7 @@ const ProductForm: React.FC = () => {
             payload.append("categoryId", formData.categoryId);
 
             const totalCapQty = initialCapacities.reduce((acc, cap) => acc + Number(cap.capQty || 0), 0);
-            const derivedCapacity = totalCapQty > 0 ? String(totalCapQty) : formData.capacityLitres;
-            if (derivedCapacity) payload.append("capacityLitres", derivedCapacity);
+            if (totalCapQty > 0) payload.append("capacityLitres", String(totalCapQty));
 
             if (formData.weightPerPiece) payload.append("weightPerPiece", formData.weightPerPiece);
             if (formData.weightUom) payload.append("weightUom", formData.weightUom);
@@ -481,8 +441,19 @@ const ProductForm: React.FC = () => {
             if (formData.hsnCode) payload.append("hsnCode", formData.hsnCode);
             if (formData.rate) payload.append("rate", formData.rate);
 
+            // Build grade rates object (only filled-in grades)
+            const builtGradeRates: Record<string, number> = {};
+            for (const [gradeName, val] of Object.entries(gradeRates)) {
+                const n = Number(val);
+                if (val.toString().trim() !== "" && !isNaN(n) && n > 0) {
+                    builtGradeRates[gradeName] = n;
+                }
+            }
+            if (Object.keys(builtGradeRates).length > 0) {
+                payload.append("gradeRates", JSON.stringify(builtGradeRates));
+            }
+
             payload.append("minimumQty", formData.minimumQty || "0");
-            payload.append("maximumQty", formData.maximumQty || "0");
 
             if (formData.openingStockQty) payload.append("openingStockQty", formData.openingStockQty);
             if (formData.openingStockStoreId) payload.append("openingStockStoreId", formData.openingStockStoreId);
@@ -662,12 +633,43 @@ const ProductForm: React.FC = () => {
                                 name="rate"
                                 type="number"
                                 step="0.01"
-                                required
                                 value={formData.rate}
                                 placeholder="0.00"
                                 onChange={handleChange}
                                 error={errors.rate}
                             />
+                            {/* ── Dynamic grade-based rates ── */}
+                            {customerGrades.length > 0 && (
+                                <div className="col-span-full">
+                                    <p className="text-sm font-medium text-gray-700 mb-2">
+                                        Grade Rates (₹) <span className="text-rose-500">*</span>
+                                    </p>
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                                        {customerGrades.map((grade) => (
+                                            <TextInput
+                                                key={grade.id}
+                                                label={`Grade ${grade.name} Rate (₹)`}
+                                                name={`gradeRate_${grade.name}`}
+                                                type="number"
+                                                step="0.01"
+                                                value={gradeRates[grade.name] ?? ""}
+                                                placeholder="0.00"
+                                                onChange={(e) => {
+                                                    const val = e.target.value;
+                                                    setGradeRates(prev => ({ ...prev, [grade.name]: val }));
+                                                    if (errors[`gradeRate_${grade.name}`] || errors.gradeRates) {
+                                                        setErrors(prev => ({ ...prev, [`gradeRate_${grade.name}`]: "", gradeRates: "" }));
+                                                    }
+                                                }}
+                                                error={errors[`gradeRate_${grade.name}`]}
+                                            />
+                                        ))}
+                                    </div>
+                                    {errors.gradeRates && (
+                                        <p className="mt-1 text-sm text-rose-500">{errors.gradeRates}</p>
+                                    )}
+                                </div>
+                            )}
                             <SelectInput
                                 label="Product Type"
                                 name="productType"
@@ -759,74 +761,12 @@ const ProductForm: React.FC = () => {
                         )}
                     </div>
 
-                    {isEditMode && (
-                        <div className="pt-2">
-                            <div className="text-sm bg-slate-50 border border-dashed border-slate-200 rounded-xl p-4 text-slate-500">
-                                Kit/combo assembly (building this product from other products) is managed separately under <strong>Kit Components</strong>.
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Existing Machine Production Snapshots (edit mode only) */}
-                    {isEditMode && (
-                        <div className="pt-6">
-                            <div className="flex justify-between items-center mb-3">
-                                <h6 className="text-base font-semibold text-gray-800 m-0">Machine Production Snapshots</h6>
-                            </div>
-                            {Object.keys(existingSnapshots).length > 0 ? (
-                                <div className="space-y-4">
-                                    {Object.keys(existingSnapshots).map(machineId => (
-                                        <div key={machineId} className="border border-slate-200 rounded-xl overflow-hidden">
-                                            <div className="bg-slate-50 px-4 py-2 border-b border-slate-200 font-semibold text-sm text-slate-700">
-                                                Machine: {machines.find(m => String(m.machineId) === machineId)?.machineName || machineId}
-                                            </div>
-                                            <table className="w-full text-left text-sm whitespace-nowrap">
-                                                <thead className="bg-white text-slate-500">
-                                                    <tr>
-                                                        <th className="px-4 py-2 font-medium border-b border-slate-100">Type</th>
-                                                        <th className="px-4 py-2 font-medium border-b border-slate-100">Date</th>
-                                                        <th className="px-4 py-2 font-medium border-b border-slate-100">Shift</th>
-                                                        <th className="px-4 py-2 font-medium border-b border-slate-100">Operators</th>
-                                                        <th className="px-4 py-2 font-medium border-b border-slate-100 text-right">Capacity</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody className="divide-y divide-slate-50 bg-white">
-                                                    {existingSnapshots[machineId].map(snap => (
-                                                        <tr key={snap.id}>
-                                                            <td className="px-4 py-2">
-                                                                <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${snap.type === 'CURRENT' ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-800'}`}>
-                                                                    {snap.type}
-                                                                </span>
-                                                            </td>
-                                                            <td className="px-4 py-2 text-slate-600">{snap.recordedAt}</td>
-                                                            <td className="px-4 py-2 text-slate-600">
-                                                                {shifts.find(s => s.shiftCode === snap.shiftId || s.id === snap.shiftId || s.shiftName === snap.shiftId)?.shiftName || snap.shiftId}
-                                                            </td>
-                                                            <td className="px-4 py-2 text-slate-600">{snap.operators}</td>
-                                                            <td className="px-4 py-2 text-slate-900 font-medium text-right">{snap.capacity}</td>
-                                                        </tr>
-                                                    ))}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    ))}
-                                </div>
-                            ) : (
-                                <div className="text-sm text-slate-500 italic bg-slate-50 p-4 rounded-xl border border-dashed border-slate-200 text-center">
-                                    No production snapshots exist yet.
-                                </div>
-                            )}
-                        </div>
-                    )}
-
-                    {/* Capacity Setup */}
-                    <div className="pt-2 mt-4">
+                    {/* Capacity Setup — create mode only */}
+                    {!isEditMode && <div className="pt-2 mt-4">
                         <div className="flex justify-between items-center mb-3">
-                            <h6 className="text-base font-semibold text-gray-800 m-0">
-                                {isEditMode ? "Add New Machine Production Snapshot" : "Initial Capacity Setup"}
-                            </h6>
+                            <h6 className="text-base font-semibold text-gray-800 m-0">Initial Capacity Setup</h6>
                             <CustomButton
-                                text={isEditMode ? "Add Snapshot" : "Add Capacity Setup"}
+                                text="Add Capacity Setup"
                                 icon={FaPlus}
                                 onClick={handleAddInitialCapacity}
                                 type="button"
@@ -928,7 +868,7 @@ const ProductForm: React.FC = () => {
                                 No {isEditMode ? "snapshots" : "initial capacity"} added. Click "{isEditMode ? "Add Snapshot" : "Add Capacity Setup"}" to configure machines and operators.
                             </div>
                         )}
-                    </div>
+                    </div>}
 
                     {/* Status & Description */}
                     <div className="pt-6">

@@ -275,7 +275,7 @@ const ProductList: React.FC = () => {
             header: "Rate (₹)",
             render: (product) => (
                 <span className="font-semibold text-ink">
-                    {product.rate != null ? `₹${product.rate}` : (product.mrp != null ? `₹${product.mrp}` : "-")}
+                    {product.rate != null ? `₹${product.rate}` : "-"}
                 </span>
             )
         },
@@ -384,7 +384,13 @@ const ProductList: React.FC = () => {
                                     })()
                                 },
                                 { label: "HSN Code", value: selectedProduct.hsnCode || "N/A" },
-                                { label: "Rate (₹)", value: selectedProduct.rate != null ? `₹${selectedProduct.rate}` : (selectedProduct.mrp != null ? `₹${selectedProduct.mrp}` : "N/A") },
+                                { label: "Rate (₹)", value: selectedProduct.rate != null ? `₹${selectedProduct.rate}` : "N/A" },
+                                ...(selectedProduct.gradeRates && typeof selectedProduct.gradeRates === "object" && Object.keys(selectedProduct.gradeRates).length > 0
+                                    ? Object.entries(selectedProduct.gradeRates as Record<string, number>).map(([grade, rate]) => ({
+                                        label: `Grade ${grade} Rate (₹)`,
+                                        value: `₹${rate}`,
+                                    }))
+                                    : []),
                                 {
                                     label: "Opening Stock Qty", value: (() => {
                                         const lastStock = selectedProduct.finishedGoodsStocks?.[selectedProduct.finishedGoodsStocks.length - 1];
