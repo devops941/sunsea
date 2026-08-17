@@ -292,8 +292,8 @@ export const payrollService = {
     return data.data;
   },
 
-  bulkUpsertAttendance: async (period: string, records: any[]) => {
-    const { data } = await apiClient.post(`${BASE}/attendance`, { period, records });
+  bulkUpsertAttendance: async (period: string, records: any[], clearedDates?: { employeeId: number; date: string }[]) => {
+    const { data } = await apiClient.post(`${BASE}/attendance`, { period, records, clearedDates });
     return data.data;
   },
 

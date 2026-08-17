@@ -113,8 +113,8 @@ class PayrollController {
   });
 
   bulkUpsertAttendance = asyncHandler(async (req: Request, res: Response) => {
-    const { period, records } = req.body;
-    const mapped = records.map((r: any) => ({
+    const { period, records, clearedDates } = req.body;
+    const mapped = (records || []).map((r: any) => ({
       employeeId:        BigInt(r.employeeId),
       date:              r.date,
       period,
@@ -123,9 +123,19 @@ class PayrollController {
       lateMinutes:       r.lateMinutes ?? 0,
       permissionMinutes: r.permissionMinutes ?? 0,
       salaryAdvance:     r.salaryAdvance ?? 0,
+      shiftId:           r.shiftId ?? null,
     }));
     const result = await payrollService.bulkUpsertAttendance(mapped);
-    res.json(new ApiResponse('Attendance saved', { count: result.length }));
+
+    // Delete cleared (null-status) cells from DB
+    let deletedCount = 0;
+    if (Array.isArray(clearedDates) && clearedDates.length > 0) {
+      deletedCount = await payrollService.deleteAttendanceRecords(
+        clearedDates.map((c: any) => ({ employeeId: BigInt(c.employeeId), date: c.date }))
+      );
+    }
+
+    res.json(new ApiResponse('Attendance saved', { count: result.length, deleted: deletedCount }));
   });
 
   // ── Payroll Run ──────────────────────────────────────────────────────────────

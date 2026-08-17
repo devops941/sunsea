@@ -131,8 +131,10 @@ const PayslipDocument = React.forwardRef<HTMLDivElement, PayslipDocumentProps>(
 
     // Deduction rows
     const dedRows: { label: string; amount: number }[] = [];
-    if (result.employeePf > 0)        dedRows.push({ label: 'Provident Fund (Employee @ 12%)', amount: result.employeePf });
-    if (result.employeeEsi > 0)       dedRows.push({ label: 'ESI (Employee @ 0.75%)',          amount: result.employeeEsi });
+    const empPfPct = result.pfWage > 0 ? ((Number(result.employeePf) / Number(result.pfWage)) * 100).toFixed(2).replace(/\.?0+$/, '') : '12';
+    const empEsiPct = (Number(result.earnedSalary) + Number(result.otPay)) > 0 ? ((Number(result.employeeEsi) / (Number(result.earnedSalary) + Number(result.otPay))) * 100).toFixed(2).replace(/\.?0+$/, '') : '0.75';
+    if (result.employeePf > 0)        dedRows.push({ label: `Provident Fund (Employee @ ${empPfPct}%)`, amount: result.employeePf });
+    if (result.employeeEsi > 0)       dedRows.push({ label: `ESI (Employee @ ${empEsiPct}%)`,          amount: result.employeeEsi });
     if (result.professionalTax > 0)   dedRows.push({ label: 'Professional Tax',                amount: result.professionalTax });
     if (result.lateEntryDeduction > 0)dedRows.push({ label: 'Late Entry Deduction',            amount: result.lateEntryDeduction });
     if (result.permissionDeduction>0) dedRows.push({ label: 'Permission Deduction',            amount: result.permissionDeduction });
@@ -342,28 +344,34 @@ const PayslipDocument = React.forwardRef<HTMLDivElement, PayslipDocumentProps>(
                     {/* Employer contributions note rows (like CGST/SGST in invoice) */}
                     {showEmpCont && (
                       <>
-                        {result.pfApplicable && (
+                        {result.pfApplicable && (() => {
+                          const emrPfPct = result.pfWage > 0 ? ((Number(result.employerPf) / Number(result.pfWage)) * 100).toFixed(2).replace(/\.?0+$/, '') : '12';
+                          return (
                           <tr>
                             <td style={{ ...cell() }} />
                             <td style={{ ...cell({ fontStyle: 'italic', color: '#444' }) }}>
-                              Employer PF Contribution @ 12% (Not deducted from salary)
+                              Employer PF Contribution @ {emrPfPct}% (Not deducted from salary)
                             </td>
-                            <td style={{ ...cell({ textAlign: 'center' }) }}>12%</td>
+                            <td style={{ ...cell({ textAlign: 'center' }) }}>{emrPfPct}%</td>
                             <td style={{ ...cell() }} />
                             <td style={{ ...cell({ textAlign: 'right', color: '#444' }) }}>{fmt(result.employerPf)}</td>
                           </tr>
-                        )}
-                        {result.esiApplicable && (
+                          );
+                        })()}
+                        {result.esiApplicable && (() => {
+                          const emrEsiPct = result.earnedSalary > 0 ? ((Number(result.employerEsi) / (Number(result.earnedSalary) + Number(result.otPay))) * 100).toFixed(2).replace(/\.?0+$/, '') : '3.25';
+                          return (
                           <tr>
                             <td style={{ ...cell() }} />
                             <td style={{ ...cell({ fontStyle: 'italic', color: '#444' }) }}>
-                              Employer ESI Contribution @ 3.25% (Not deducted from salary)
+                              Employer ESI Contribution @ {emrEsiPct}% (Not deducted from salary)
                             </td>
-                            <td style={{ ...cell({ textAlign: 'center' }) }}>3.25%</td>
+                            <td style={{ ...cell({ textAlign: 'center' }) }}>{emrEsiPct}%</td>
                             <td style={{ ...cell() }} />
                             <td style={{ ...cell({ textAlign: 'right', color: '#444' }) }}>{fmt(result.employerEsi)}</td>
                           </tr>
-                        )}
+                          );
+                        })()}
                       </>
                     )}
 
