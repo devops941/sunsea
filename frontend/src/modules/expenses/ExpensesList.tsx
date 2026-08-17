@@ -172,11 +172,11 @@ const ExpensesList: React.FC = () => {
 
   return (
     <div>
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+      <div className="bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
         {/* Page Header */}
-        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-slate-200">
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-line">
           <div>
-            <h2 className="text-2xl font-bold text-slate-800">Expense Management</h2>
+            <h2 className="text-2xl font-bold text-ink">Expense Management</h2>
           </div>
           <div className="flex flex-wrap items-center gap-3 relative w-full lg:w-auto">
             <SearchInput
@@ -185,7 +185,7 @@ const ExpensesList: React.FC = () => {
               placeholder="Search expenses..."
             />
             <select
-              className="border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-500"
+              className="border border-line rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-500"
               value={filterCategory}
               onChange={(e) => {
                 setFilterCategory(e.target.value);
@@ -228,7 +228,7 @@ const ExpensesList: React.FC = () => {
             {
               header: "CATEGORY",
               render: (item) => (
-                <span className="bg-slate-100 text-slate-700 px-2 py-1 rounded text-xs border border-slate-200">
+                <span className="bg-card-2 text-ink-muted px-2 py-1 rounded text-xs border border-line">
                   {item.expenseCategory}
                 </span>
               ),

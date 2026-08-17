@@ -106,11 +106,11 @@ const ProductionOrderHistoryView: React.FC = () => {
     return (
         <div className="p-6 h-full flex flex-col">
             <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-slate-800 m-0">Production Order Details: {id}</h2>
+                <h2 className="text-2xl font-bold text-ink m-0">Production Order Details: {id}</h2>
                 <BackButton />
             </div>
 
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex-1 overflow-auto">
+            <div className="bg-card rounded-2xl shadow-sm border border-line p-6 flex-1 overflow-auto">
                 {hasInsufficientStock && (
                     <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-center gap-2 mb-6 text-sm font-medium">
                         One or more required raw materials have insufficient stock. Please create a Raw Material Order before proceeding to Weekly Machine Assignment.
@@ -118,57 +118,57 @@ const ProductionOrderHistoryView: React.FC = () => {
                 )}
                 
                 {loading ? (
-                    <div className="text-center p-8 flex flex-col items-center justify-center text-slate-500">
+                    <div className="text-center p-8 flex flex-col items-center justify-center text-ink-subtle">
                         <div className="animate-spin rounded-full border-b-2 border-indigo-600 h-8 w-8 mb-4"></div> 
                         Loading details...
                     </div>
                 ) : (
                     <div className="space-y-6">
                         {/* General Details Grid */}
-                        <div className="bg-slate-50 p-6 rounded-xl border border-slate-200">
+                        <div className="bg-card-2 p-6 rounded-xl border border-line">
                             <div className="grid grid-cols-1 md:grid-cols-4 gap-y-6 gap-x-6">
                                 <div>
-                                    <div className="text-xs text-slate-500 font-medium mb-1 uppercase">Order No</div>
-                                    <div className="font-semibold text-slate-800 text-base">{displayOrder?.productionOrderId}</div>
+                                    <div className="text-xs text-ink-subtle font-medium mb-1 uppercase">Order No</div>
+                                    <div className="font-semibold text-ink text-base">{displayOrder?.productionOrderId}</div>
                                 </div>
                                 <div>
-                                    <div className="text-xs text-slate-500 font-medium mb-1 uppercase">Sales Order No</div>
-                                    <div className="font-semibold text-slate-800 text-base">
+                                    <div className="text-xs text-ink-subtle font-medium mb-1 uppercase">Sales Order No</div>
+                                    <div className="font-semibold text-ink text-base">
                                         {displayOrder?.salesOrderDetails?.orderNo || displayOrder?.sourceSalesOrderId ? (
                                             displayOrder?.salesOrderDetails?.orderNo || displayOrder?.sourceSalesOrderId
                                         ) : (
-                                            <span className="px-2 py-0.5 rounded-full bg-slate-200 text-slate-700 text-xs font-semibold">Direct Order</span>
+                                            <span className="px-2 py-0.5 rounded-full bg-line text-ink-muted text-xs font-semibold">Direct Order</span>
                                         )}
                                     </div>
                                 </div>
                                 <div>
-                                    <div className="text-xs text-slate-500 font-medium mb-1 uppercase">Customer</div>
-                                    <div className="font-semibold text-slate-800 text-base">
+                                    <div className="text-xs text-ink-subtle font-medium mb-1 uppercase">Customer</div>
+                                    <div className="font-semibold text-ink text-base">
                                         {displayOrder?.salesOrderDetails?.customerName ? (
                                             displayOrder?.salesOrderDetails?.customerName
                                         ) : (
-                                            <span className="text-slate-400 italic text-sm">N/A (Direct)</span>
+                                            <span className="text-ink-subtle italic text-sm">N/A (Direct)</span>
                                         )}
                                     </div>
                                 </div>
                                 <div>
-                                    <div className="text-xs text-slate-500 font-medium mb-1 uppercase">Order Date</div>
-                                    <div className="font-semibold text-slate-800 text-base">{formatDate(displayOrder?.orderDate)}</div>
+                                    <div className="text-xs text-ink-subtle font-medium mb-1 uppercase">Order Date</div>
+                                    <div className="font-semibold text-ink text-base">{formatDate(displayOrder?.orderDate)}</div>
                                 </div>
                                 <div>
-                                    <div className="text-xs text-slate-500 font-medium mb-1 uppercase">Due Date</div>
-                                    <div className="font-semibold text-slate-800 text-base">{formatDate(displayOrder?.dueDate)}</div>
+                                    <div className="text-xs text-ink-subtle font-medium mb-1 uppercase">Due Date</div>
+                                    <div className="font-semibold text-ink text-base">{formatDate(displayOrder?.dueDate)}</div>
                                 </div>
                                 <div>
-                                    <div className="text-xs text-slate-500 font-medium mb-1 uppercase">Priority</div>
-                                    <div className="font-semibold text-slate-800 text-base">{displayOrder?.priority || "-"}</div>
+                                    <div className="text-xs text-ink-subtle font-medium mb-1 uppercase">Priority</div>
+                                    <div className="font-semibold text-ink text-base">{displayOrder?.priority || "-"}</div>
                                 </div>
                                 <div>
-                                    <div className="text-xs text-slate-500 font-medium mb-1 uppercase">Order Type</div>
-                                    <div className="font-semibold text-slate-800 text-base">{displayOrder?.orderType || "-"}</div>
+                                    <div className="text-xs text-ink-subtle font-medium mb-1 uppercase">Order Type</div>
+                                    <div className="font-semibold text-ink text-base">{displayOrder?.orderType || "-"}</div>
                                 </div>
                                 <div>
-                                    <div className="text-xs text-slate-500 font-medium mb-1 uppercase">Status</div>
+                                    <div className="text-xs text-ink-subtle font-medium mb-1 uppercase">Status</div>
                                     <div className="flex flex-col gap-1">
                                         <div>
                                             <StatusBadge status={displayOrder?.status} />
@@ -190,33 +190,33 @@ const ProductionOrderHistoryView: React.FC = () => {
 
                         {/* Products List */}
                         {fullOrder?.products?.map((prod: any, idx: number) => (
-                            <div key={idx} className="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
-                                <div className="bg-white border-b border-slate-200 p-5">
-                                    <h4 className="text-lg font-bold text-slate-800">
-                                        Product {idx + 1}: <span className="text-primary">{prod.productName}</span> <span className="text-slate-500 text-sm font-normal">({prod.productCode})</span>
+                            <div key={idx} className="border border-line rounded-xl overflow-hidden shadow-sm">
+                                <div className="bg-card border-b border-line p-5">
+                                    <h4 className="text-lg font-bold text-ink">
+                                        Product {idx + 1}: <span className="text-primary">{prod.productName}</span> <span className="text-ink-subtle text-sm font-normal">({prod.productCode})</span>
                                     </h4>
                                     
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-5">
                                         <div>
-                                            <div className="text-xs text-slate-500 font-medium mb-1 uppercase">Production Qty</div>
-                                            <div className="font-semibold text-slate-800 text-base">{prod.quantity} {prod.uom?.toLowerCase() === 'ea' || prod.uom?.toLowerCase() === 'each' ? 'pcs' : prod.uom}</div>
+                                            <div className="text-xs text-ink-subtle font-medium mb-1 uppercase">Production Qty</div>
+                                            <div className="font-semibold text-ink text-base">{prod.quantity} {prod.uom?.toLowerCase() === 'ea' || prod.uom?.toLowerCase() === 'each' ? 'pcs' : prod.uom}</div>
                                         </div>
                                         <div>
-                                            <div className="text-xs text-slate-500 font-medium mb-1 uppercase">Weight Used</div>
-                                            <div className="font-semibold text-slate-800 text-base">{Number(prod.weightPerPieceUsed || 0).toFixed(3)} KG</div>
+                                            <div className="text-xs text-ink-subtle font-medium mb-1 uppercase">Weight Used</div>
+                                            <div className="font-semibold text-ink text-base">{Number(prod.weightPerPieceUsed || 0).toFixed(3)} KG</div>
                                         </div>
                                         <div>
-                                            <div className="text-xs text-slate-500 font-medium mb-1 uppercase">Unit (UOM)</div>
-                                            <div className="font-semibold text-slate-800 text-base">{prod.uom?.toLowerCase() === 'ea' || prod.uom?.toLowerCase() === 'each' ? 'pcs' : prod.uom}</div>
+                                            <div className="text-xs text-ink-subtle font-medium mb-1 uppercase">Unit (UOM)</div>
+                                            <div className="font-semibold text-ink text-base">{prod.uom?.toLowerCase() === 'ea' || prod.uom?.toLowerCase() === 'each' ? 'pcs' : prod.uom}</div>
                                         </div>
                                     </div>
                                 </div>
 
-                                <div className="p-5 bg-slate-50">
-                                    <div className="text-sm font-bold text-slate-700 mb-4 uppercase tracking-wider">Required Raw Materials</div>
-                                    <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-                                        <table className="w-full text-left text-sm text-slate-600">
-                                            <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 font-semibold text-xs uppercase">
+                                <div className="p-5 bg-card-2">
+                                    <div className="text-sm font-bold text-ink-muted mb-4 uppercase tracking-wider">Required Raw Materials</div>
+                                    <div className="bg-card border border-line rounded-lg overflow-hidden">
+                                        <table className="w-full text-left text-sm text-ink-muted">
+                                            <thead className="bg-card-2 border-b border-line text-ink-muted font-semibold text-xs uppercase">
                                                 <tr>
                                                     <th className="px-5 py-3.5">Raw Material Code</th>
                                                     <th className="px-5 py-3.5">Raw Material Name</th>
@@ -225,7 +225,7 @@ const ProductionOrderHistoryView: React.FC = () => {
                                                     <th className="px-5 py-3.5">Stock Status</th>
                                                 </tr>
                                             </thead>
-                                            <tbody className="divide-y divide-slate-100">
+                                            <tbody className="divide-y divide-line">
                                                 {prod.rawMaterials?.map((rm: any) => {
                                                     const stockRm = rawMaterialsMap.get(rm.rawMaterialId?.toString());
                                                     const required = Number(rm.requiredQty || 0);
@@ -245,9 +245,9 @@ const ProductionOrderHistoryView: React.FC = () => {
                                                     }
 
                                                     return (
-                                                        <tr key={rm.rawMaterialId} className="hover:bg-slate-50 transition-colors">
-                                                            <td className="px-5 py-4 font-medium text-slate-800">{rm.rawMaterialId}</td>
-                                                            <td className="px-5 py-4 text-slate-700">{materialName}</td>
+                                                        <tr key={rm.rawMaterialId} className="hover:bg-card-2 transition-colors">
+                                                            <td className="px-5 py-4 font-medium text-ink">{rm.rawMaterialId}</td>
+                                                            <td className="px-5 py-4 text-ink-muted">{materialName}</td>
                                                             <td className="px-5 py-4 font-medium">{required.toFixed(2)} {displayUom}</td>
                                                             <td className="px-5 py-4">{available.toFixed(2)} {displayUom}</td>
                                                             <td className="px-5 py-4">
@@ -258,7 +258,7 @@ const ProductionOrderHistoryView: React.FC = () => {
                                                 })}
                                                 {(!prod.rawMaterials || prod.rawMaterials.length === 0) && (
                                                     <tr>
-                                                        <td colSpan={5} className="text-center text-slate-500 p-8 italic">
+                                                        <td colSpan={5} className="text-center text-ink-subtle p-8 italic">
                                                             No raw materials defined for this product.
                                                         </td>
                                                     </tr>
@@ -327,9 +327,9 @@ const ProductionOrderHistoryView: React.FC = () => {
 
                             return (
                                 <>
-                                <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm mt-8">
-                                    <div className="bg-white border-b border-slate-200 p-5 flex justify-between items-center flex-wrap gap-4">
-                                        <h4 className="text-lg font-bold text-slate-800">
+                                <div className="border border-line rounded-xl overflow-hidden shadow-sm mt-8">
+                                    <div className="bg-card border-b border-line p-5 flex justify-between items-center flex-wrap gap-4">
+                                        <h4 className="text-lg font-bold text-ink">
                                             Shift-wise Production & Dispatch Details
                                         </h4>
                                         {(() => {
@@ -338,8 +338,8 @@ const ProductionOrderHistoryView: React.FC = () => {
                                             const hasShortfallStop = fullOrder?.status === "COMPLETED_WITH_SHORTFALL";
                                             
                                             return (
-                                                <div className="flex items-center gap-3 flex-wrap text-sm font-semibold text-slate-500 uppercase tracking-wider">
-                                                    <span>Target: <span className="text-slate-800 font-bold text-base">{targetVal}</span></span>
+                                                <div className="flex items-center gap-3 flex-wrap text-sm font-semibold text-ink-subtle uppercase tracking-wider">
+                                                    <span>Target: <span className="text-ink font-bold text-base">{targetVal}</span></span>
                                                     <span>|</span>
                                                     <span>Produced: <span className="text-green-600 font-bold text-base">{producedVal}</span></span>
                                                     <span>|</span>
@@ -356,10 +356,10 @@ const ProductionOrderHistoryView: React.FC = () => {
                                             );
                                         })()}
                                     </div>
-                                    <div className="p-5 bg-slate-50 overflow-x-auto">
-                                        <div className="bg-white border border-slate-200 rounded-lg overflow-hidden min-w-[750px]">
-                                            <table className="w-full text-left text-sm text-slate-600">
-                                                <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 font-semibold text-xs uppercase">
+                                    <div className="p-5 bg-card-2 overflow-x-auto">
+                                        <div className="bg-card border border-line rounded-lg overflow-hidden min-w-[750px]">
+                                            <table className="w-full text-left text-sm text-ink-muted">
+                                                <thead className="bg-card-2 border-b border-line text-ink-muted font-semibold text-xs uppercase">
                                                     <tr>
                                                         <th className="px-5 py-3.5">Date</th>
                                                         <th className="px-5 py-3.5">Shift</th>
@@ -370,7 +370,7 @@ const ProductionOrderHistoryView: React.FC = () => {
                                                         <th className="px-5 py-3.5 whitespace-nowrap text-center">Dispatch Status</th>
                                                     </tr>
                                                 </thead>
-                                                <tbody className="divide-y divide-slate-100">
+                                                <tbody className="divide-y divide-line">
                                                     {plans.length > 0 ? (
                                                         plans.map((plan: any, idx: number) => {
                                                             // Only COMPLETED plans with actual production contribute to dispatch.
@@ -385,10 +385,10 @@ const ProductionOrderHistoryView: React.FC = () => {
                                                             // Ready for Dispatch: plan is fully complete with production but not yet dispatched
                                                             const isReadyForDispatch = isFinalized && !isPlanDispatched;
 
-                                                            let dispatchBadge = <span className="inline-flex items-center px-3 py-1 bg-slate-100 text-slate-600 rounded-full text-xs font-semibold whitespace-nowrap">Not Dispatched</span>;
+                                                            let dispatchBadge = <span className="inline-flex items-center px-3 py-1 bg-card-2 text-ink-muted rounded-full text-xs font-semibold whitespace-nowrap">Not Dispatched</span>;
                                                             if (!hasProduction && plan.status === 'COMPLETED') {
                                                                 // Closed with no production — nothing to dispatch
-                                                                dispatchBadge = <span className="inline-flex items-center px-3 py-1 bg-slate-100 text-slate-500 rounded-full text-xs font-semibold whitespace-nowrap">No Production</span>;
+                                                                dispatchBadge = <span className="inline-flex items-center px-3 py-1 bg-card-2 text-ink-subtle rounded-full text-xs font-semibold whitespace-nowrap">No Production</span>;
                                                             } else if (isPlanDispatched) {
                                                                 dispatchBadge = <span className="inline-flex items-center px-3 py-1 bg-green-100 text-green-800 border border-green-200 rounded-full text-xs font-semibold whitespace-nowrap">Dispatched</span>;
                                                             } else if (isReadyForDispatch) {
@@ -396,11 +396,11 @@ const ProductionOrderHistoryView: React.FC = () => {
                                                             }
 
                                                             return (
-                                                                <tr key={plan.id || idx} className="hover:bg-slate-50 transition-colors">
-                                                                    <td className="px-5 py-4 font-medium text-slate-800">{plan.date}</td>
-                                                                    <td className="px-5 py-4 text-slate-700">{plan.shiftName}</td>
-                                                                    <td className="px-5 py-4 text-slate-700">{plan.machineName}</td>
-                                                                    <td className="px-5 py-4 font-semibold text-slate-700">{Number(plan.plannedQty || 0).toFixed(2)}</td>
+                                                                <tr key={plan.id || idx} className="hover:bg-card-2 transition-colors">
+                                                                    <td className="px-5 py-4 font-medium text-ink">{plan.date}</td>
+                                                                    <td className="px-5 py-4 text-ink-muted">{plan.shiftName}</td>
+                                                                    <td className="px-5 py-4 text-ink-muted">{plan.machineName}</td>
+                                                                    <td className="px-5 py-4 font-semibold text-ink-muted">{Number(plan.plannedQty || 0).toFixed(2)}</td>
                                                                     <td className="px-5 py-4 font-bold text-green-600">{Number(plan.producedQty || 0).toFixed(2)}</td>
                                                                     <td className="px-5 py-4">
                                                                         <StatusBadge status={plan.status} />
@@ -412,11 +412,11 @@ const ProductionOrderHistoryView: React.FC = () => {
                                                             );
                                                         })
                                                     ) : (
-                                                        <tr className="hover:bg-slate-50 transition-colors">
-                                                            <td className="px-5 py-4 font-medium text-slate-800">{new Date(displayOrder?.orderDate).toLocaleDateString()}</td>
-                                                            <td className="px-5 py-4 text-slate-700">General Shift</td>
-                                                            <td className="px-5 py-4 text-slate-700">{fullOrder?.Machine?.machineName || fullOrder?.machineMachineId || (displayOrder as any)?.machineName || (displayOrder as any)?.machineMachineId || '-'}</td>
-                                                            <td className="px-5 py-4 font-semibold text-slate-700">{Number(displayOrder?.targetQty || 0).toFixed(2)}</td>
+                                                        <tr className="hover:bg-card-2 transition-colors">
+                                                            <td className="px-5 py-4 font-medium text-ink">{new Date(displayOrder?.orderDate).toLocaleDateString()}</td>
+                                                            <td className="px-5 py-4 text-ink-muted">General Shift</td>
+                                                            <td className="px-5 py-4 text-ink-muted">{fullOrder?.Machine?.machineName || fullOrder?.machineMachineId || (displayOrder as any)?.machineName || (displayOrder as any)?.machineMachineId || '-'}</td>
+                                                            <td className="px-5 py-4 font-semibold text-ink-muted">{Number(displayOrder?.targetQty || 0).toFixed(2)}</td>
                                                             <td className="px-5 py-4 font-bold text-green-600">{Number(displayOrder?.producedQty || 0).toFixed(2)}</td>
                                                             <td className="px-5 py-4">
                                                                 <StatusBadge status={displayOrder?.status} />
@@ -427,7 +427,7 @@ const ProductionOrderHistoryView: React.FC = () => {
                                                                 ) : (displayOrder?.status === 'READY_FOR_DISPATCH' || displayOrder?.status === 'COMPLETED') ? (
                                                                     <span className="inline-flex items-center px-3 py-1 bg-blue-100 text-blue-800 border border-blue-200 rounded-full text-xs font-semibold whitespace-nowrap">Ready for Dispatch</span>
                                                                 ) : (
-                                                                    <span className="inline-flex items-center px-3 py-1 bg-slate-100 text-slate-600 rounded-full text-xs font-semibold whitespace-nowrap">Not Dispatched</span>
+                                                                    <span className="inline-flex items-center px-3 py-1 bg-card-2 text-ink-muted rounded-full text-xs font-semibold whitespace-nowrap">Not Dispatched</span>
                                                                 )}
                                                             </td>
                                                         </tr>
@@ -440,14 +440,14 @@ const ProductionOrderHistoryView: React.FC = () => {
 
                                 {/* Dispatch History Section */}
                                 {fullOrder?.goodsDispatchItems && fullOrder.goodsDispatchItems.length > 0 && (
-                                    <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm mt-8">
-                                        <div className="bg-white border-b border-slate-200 p-5">
-                                            <h4 className="text-lg font-bold text-slate-800">Dispatch History</h4>
+                                    <div className="border border-line rounded-xl overflow-hidden shadow-sm mt-8">
+                                        <div className="bg-card border-b border-line p-5">
+                                            <h4 className="text-lg font-bold text-ink">Dispatch History</h4>
                                         </div>
-                                        <div className="p-5 bg-slate-50 overflow-x-auto">
-                                            <div className="bg-white border border-slate-200 rounded-lg overflow-hidden min-w-[700px]">
-                                                <table className="w-full text-left text-sm text-slate-600">
-                                                    <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 font-semibold text-xs uppercase">
+                                        <div className="p-5 bg-card-2 overflow-x-auto">
+                                            <div className="bg-card border border-line rounded-lg overflow-hidden min-w-[700px]">
+                                                <table className="w-full text-left text-sm text-ink-muted">
+                                                    <thead className="bg-card-2 border-b border-line text-ink-muted font-semibold text-xs uppercase">
                                                         <tr>
                                                             <th className="px-5 py-3.5">Dispatch No</th>
                                                             <th className="px-5 py-3.5">Date</th>
@@ -458,7 +458,7 @@ const ProductionOrderHistoryView: React.FC = () => {
                                                             <th className="px-5 py-3.5">Status</th>
                                                         </tr>
                                                     </thead>
-                                                    <tbody className="divide-y divide-slate-100">
+                                                    <tbody className="divide-y divide-line">
                                                         {fullOrder.goodsDispatchItems?.map((item: any) => {
                                                             const dispatch = item?.dispatch || {};
                                                             const status = dispatch?.status || "PENDING_GATE_APPROVAL";
@@ -466,12 +466,12 @@ const ProductionOrderHistoryView: React.FC = () => {
                                                                 ? new Date(dispatch.dispatchDate).toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" })
                                                                 : "-";
                                                             return (
-                                                                <tr key={item.id} className="hover:bg-slate-50 transition-colors">
-                                                                    <td className="px-5 py-4 font-semibold text-slate-800">{dispatch.dispatchNumber || "-"}</td>
-                                                                    <td className="px-5 py-4 text-slate-600">{dispatchDate}</td>
-                                                                    <td className="px-5 py-4 text-slate-700">{dispatch.vehicleNumber || "-"}</td>
-                                                                    <td className="px-5 py-4 text-slate-700">{dispatch.driverName || "-"}</td>
-                                                                    <td className="px-5 py-4 font-semibold text-slate-700">{Number(item.dispatchQty || 0).toFixed(2)}</td>
+                                                                <tr key={item.id} className="hover:bg-card-2 transition-colors">
+                                                                    <td className="px-5 py-4 font-semibold text-ink">{dispatch.dispatchNumber || "-"}</td>
+                                                                    <td className="px-5 py-4 text-ink-muted">{dispatchDate}</td>
+                                                                    <td className="px-5 py-4 text-ink-muted">{dispatch.vehicleNumber || "-"}</td>
+                                                                    <td className="px-5 py-4 text-ink-muted">{dispatch.driverName || "-"}</td>
+                                                                    <td className="px-5 py-4 font-semibold text-ink-muted">{Number(item.dispatchQty || 0).toFixed(2)}</td>
                                                                     <td className="px-5 py-4 font-semibold text-blue-600">
                                                                         {item.receivedQty !== null && item.receivedQty !== undefined ? Number(item.receivedQty).toFixed(2) : "-"}
                                                                     </td>

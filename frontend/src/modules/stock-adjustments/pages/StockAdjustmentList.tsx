@@ -145,7 +145,7 @@ const getStockAdjustmentSourceInfo = (item: any) => {
   return {
     module: "Manual",
     detail: "",
-    badgeClass: "bg-slate-100 text-slate-600 border-slate-200",
+    badgeClass: "bg-card-2 text-ink-muted border-line",
   };
 };
 
@@ -246,8 +246,8 @@ const StockAdjustmentList: React.FC = () => {
       case "warning": return "bg-yellow-100 text-yellow-800";
       case "danger": return "bg-red-100 text-red-800";
       case "dark": return "bg-gray-800 text-gray-100";
-      case "light": return "bg-gray-100 text-gray-800";
-      default: return "bg-gray-100 text-gray-800";
+      case "light": return "bg-card-2 text-ink";
+      default: return "bg-card-2 text-ink";
     }
   };
 
@@ -260,12 +260,12 @@ const StockAdjustmentList: React.FC = () => {
   const totalPages = meta?.totalPages || Math.ceil((data?.length || 0) / ITEMS_PER_PAGE);
 
   return (
-    <div className="p-4 md:p-1 min-h-screen ">
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+    <div className="p-4 md:p-1 ">
+      <div className="bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
         {/* Page Header */}
-        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-slate-200">
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-line">
           <div>
-            <h2 className="text-2xl font-bold text-slate-800">Stock Adjustments</h2>
+            <h2 className="text-2xl font-bold text-ink">Stock Adjustments</h2>
           </div>
 
           <div className="flex flex-wrap items-center gap-3 relative w-full lg:w-auto">
@@ -288,11 +288,11 @@ const StockAdjustmentList: React.FC = () => {
               onOpen={handleOpenFilter}
             >
               <div className="mb-3">
-                <label className="block mb-1 text-[11px] uppercase tracking-wider text-slate-500 font-semibold">
+                <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-semibold">
                   Status
                 </label>
                 <select
-                  className="w-full border border-slate-200 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary bg-white text-slate-700 font-medium"
+                  className="w-full border border-line rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary bg-card text-ink-muted font-medium"
                   value={draftStatus}
                   onChange={(e) => setDraftStatus(e.target.value)}
                 >
@@ -305,11 +305,11 @@ const StockAdjustmentList: React.FC = () => {
               </div>
 
               <div className="mb-3">
-                <label className="block mb-1 text-[11px] uppercase tracking-wider text-slate-500 font-semibold">
+                <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-semibold">
                   Adjustment Type
                 </label>
                 <select
-                  className="w-full border border-slate-200 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary bg-white text-slate-700 font-medium"
+                  className="w-full border border-line rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary bg-card text-ink-muted font-medium"
                   value={draftAdjustmentType}
                   onChange={(e) => setDraftAdjustmentType(e.target.value)}
                 >
@@ -327,7 +327,7 @@ const StockAdjustmentList: React.FC = () => {
               </div>
 
               <div className="mb-3">
-                <label className="block mb-1 text-[11px] uppercase tracking-wider text-slate-500 font-semibold">
+                <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-semibold">
                   From Date
                 </label>
                 <DatePickerCalendar
@@ -339,7 +339,7 @@ const StockAdjustmentList: React.FC = () => {
               </div>
 
               <div className="mb-3">
-                <label className="block mb-1 text-[11px] uppercase tracking-wider text-slate-500 font-semibold">
+                <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-semibold">
                   To Date
                 </label>
                 <DatePickerCalendar
@@ -376,8 +376,8 @@ const StockAdjustmentList: React.FC = () => {
               accessor: "adjustmentNumber",
               render: (item) => (
                 <div>
-                  <div className="font-semibold text-slate-700">{item.adjustmentNumber}</div>
-                  <div className="text-xs text-slate-400 font-medium">{formatDate(item.adjustmentDate)}</div>
+                  <div className="font-semibold text-ink-muted">{item.adjustmentNumber}</div>
+                  <div className="text-xs text-ink-subtle font-medium">{formatDate(item.adjustmentDate)}</div>
                 </div>
               )
             },
@@ -408,7 +408,7 @@ const StockAdjustmentList: React.FC = () => {
                       {src.module}
                     </span>
                     {src.detail && (
-                      <div className="text-xs text-slate-500 font-mono mt-0.5 font-medium">
+                      <div className="text-xs text-ink-subtle font-mono mt-0.5 font-medium">
                         {src.detail}
                       </div>
                     )}
@@ -425,14 +425,14 @@ const StockAdjustmentList: React.FC = () => {
                 if (product?.productName) {
                   return (
                     <div>
-                      <div className="font-semibold text-sm text-slate-800">
+                      <div className="font-semibold text-sm text-ink">
                         {product.productName}
                       </div>
-                      <div className="text-xs text-slate-500">
+                      <div className="text-xs text-ink-subtle">
                         {product.productCode}
                       </div>
                       {item.items && item.items.length > 1 && (
-                        <div className="text-[10px] text-slate-400 mt-0.5">+{item.items.length - 1} more</div>
+                        <div className="text-[10px] text-ink-subtle mt-0.5">+{item.items.length - 1} more</div>
                       )}
                     </div>
                   );
@@ -440,32 +440,32 @@ const StockAdjustmentList: React.FC = () => {
                 if (rawMaterial?.materialName) {
                   return (
                     <div>
-                      <div className="font-semibold text-sm text-slate-800">
+                      <div className="font-semibold text-sm text-ink">
                         {rawMaterial.materialName}
                       </div>
                       {item.items && item.items.length > 1 && (
-                        <div className="text-[10px] text-slate-400 mt-0.5">+{item.items.length - 1} more</div>
+                        <div className="text-[10px] text-ink-subtle mt-0.5">+{item.items.length - 1} more</div>
                       )}
                     </div>
                   );
                 }
-                return <span className="text-slate-400">—</span>;
+                return <span className="text-ink-subtle">—</span>;
               }
             },
             {
               header: "ORIGINAL QTY",
               render: (item) => {
                 const firstItem = item.items?.[0];
-                if (!firstItem || firstItem.currentQty == null) return <span className="text-slate-400">—</span>;
+                if (!firstItem || firstItem.currentQty == null) return <span className="text-ink-subtle">—</span>;
                 const qty = Number(firstItem.currentQty);
                 const uom = firstItem.uom || firstItem.product?.baseUom || firstItem.rawMaterial?.baseUom || "";
                 const primaryUom = getPrimaryUom(uom);
                 const uomStr = primaryUom ? ` ${primaryUom}` : "";
                 return (
                   <div>
-                    <span className="font-semibold text-slate-700 text-sm">{qty}{uomStr}</span>
+                    <span className="font-semibold text-ink-muted text-sm">{qty}{uomStr}</span>
                     {item.items && item.items.length > 1 && (
-                      <div className="text-[10px] text-slate-400 mt-0.5">+{item.items.length - 1} more</div>
+                      <div className="text-[10px] text-ink-subtle mt-0.5">+{item.items.length - 1} more</div>
                     )}
                   </div>
                 );
@@ -475,18 +475,18 @@ const StockAdjustmentList: React.FC = () => {
               header: "ADJUSTED QTY",
               render: (item) => {
                 const firstItem = item.items?.[0];
-                if (!firstItem || firstItem.adjustedQty == null) return <span className="text-slate-400">—</span>;
+                if (!firstItem || firstItem.adjustedQty == null) return <span className="text-ink-subtle">—</span>;
                 const qty = Number(firstItem.adjustedQty);
                 const diff = Number(firstItem.difference || 0);
                 const uom = firstItem.uom || firstItem.product?.baseUom || firstItem.rawMaterial?.baseUom || "";
                 const primaryUom = getPrimaryUom(uom);
                 const uomStr = primaryUom ? ` ${primaryUom}` : "";
-                const diffColor = diff > 0 ? "text-green-600 bg-green-50 border border-green-200" : diff < 0 ? "text-red-600 bg-red-50 border border-red-200" : "text-slate-500 bg-slate-50";
+                const diffColor = diff > 0 ? "text-green-600 bg-green-50 border border-green-200" : diff < 0 ? "text-red-600 bg-red-50 border border-red-200" : "text-ink-subtle bg-card-2";
                 const diffSign = diff > 0 ? `+${diff}${primaryUom ? ` ${primaryUom}` : ''}` : `${diff}${primaryUom ? ` ${primaryUom}` : ''}`;
                 return (
                   <div>
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="font-bold text-slate-800 text-sm">{qty}{uomStr}</span>
+                      <span className="font-bold text-ink text-sm">{qty}{uomStr}</span>
                       {diff !== 0 && (
                         <span className={`text-[11px] font-bold px-1.5 py-0.5 rounded ${diffColor}`}>
                           {diffSign}
@@ -494,7 +494,7 @@ const StockAdjustmentList: React.FC = () => {
                       )}
                     </div>
                     {item.items && item.items.length > 1 && (
-                      <div className="text-[10px] text-slate-400 mt-0.5">+{item.items.length - 1} more</div>
+                      <div className="text-[10px] text-ink-subtle mt-0.5">+{item.items.length - 1} more</div>
                     )}
                   </div>
                 );
@@ -511,12 +511,12 @@ const StockAdjustmentList: React.FC = () => {
                   <div>
                     <span
                       title={fullTooltip}
-                      className="inline-block max-w-[200px] overflow-hidden text-ellipsis whitespace-nowrap text-slate-700 font-medium"
+                      className="inline-block max-w-[200px] overflow-hidden text-ellipsis whitespace-nowrap text-ink-muted font-medium"
                     >
                       {displayReason}
                     </span>
                     {item.items && item.items.length > 1 && (
-                      <div className="text-[10px] text-slate-400 mt-0.5">+{item.items.length - 1} more</div>
+                      <div className="text-[10px] text-ink-subtle mt-0.5">+{item.items.length - 1} more</div>
                     )}
                   </div>
                 );

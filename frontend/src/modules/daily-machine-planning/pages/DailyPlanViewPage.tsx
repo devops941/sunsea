@@ -151,7 +151,7 @@ const DailyPlanViewPage: React.FC = () => {
       render: (plan: any) => {
         const isCurrent = plan.dailyPlanId === viewPlan?.dailyPlanId;
         return (
-          <span className={`font-mono text-xs font-semibold ${isCurrent ? "text-indigo-700" : "text-slate-700"}`}>
+          <span className={`font-mono text-xs font-semibold ${isCurrent ? "text-indigo-700" : "text-ink-muted"}`}>
             {plan.dailyPlanId}
             {isCurrent && <span className="ml-1.5 text-[9px] bg-indigo-100 text-indigo-600 px-1.5 py-0.5 rounded font-bold uppercase">Current</span>}
           </span>
@@ -161,7 +161,7 @@ const DailyPlanViewPage: React.FC = () => {
     {
       header: "Date",
       render: (plan: any) => (
-        <span className="text-xs text-slate-600">
+        <span className="text-xs text-ink-muted">
           {plan.productionDate ? new Date(plan.productionDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—"}
         </span>
       )
@@ -169,7 +169,7 @@ const DailyPlanViewPage: React.FC = () => {
     {
       header: "Machine",
       render: (plan: any) => (
-        <span className="text-xs text-slate-600">
+        <span className="text-xs text-ink-muted">
           {plan.machine?.machineName || plan.machineId || "—"}
         </span>
       )
@@ -177,7 +177,7 @@ const DailyPlanViewPage: React.FC = () => {
     {
       header: "Shift",
       render: (plan: any) => (
-        <span className="text-[10px] bg-slate-100 text-slate-600 border border-slate-200 px-2 py-0.5 rounded font-medium">
+        <span className="text-[10px] bg-card-2 text-ink-muted border border-line px-2 py-0.5 rounded font-medium">
           {plan.shift?.shiftName || plan.shiftId || "—"}
         </span>
       )
@@ -186,7 +186,7 @@ const DailyPlanViewPage: React.FC = () => {
       header: "Planned",
       align: "center",
       render: (plan: any) => (
-        <span className="text-xs font-semibold text-slate-700">
+        <span className="text-xs font-semibold text-ink-muted">
           {Number(plan.plannedQty || 0).toLocaleString()}
         </span>
       )
@@ -199,7 +199,7 @@ const DailyPlanViewPage: React.FC = () => {
           ? plan.hourlyProductions.reduce((s: number, h: any) => s + Number(h.qtyProduced || 0), 0)
           : 0;
         return (
-          <span className={`text-xs font-bold ${producedQty >= Number(plan.plannedQty || 0) ? "text-emerald-600" : producedQty > 0 ? "text-amber-600" : "text-slate-400"}`}>
+          <span className={`text-xs font-bold ${producedQty >= Number(plan.plannedQty || 0) ? "text-emerald-600" : producedQty > 0 ? "text-amber-600" : "text-ink-subtle"}`}>
             {producedQty.toLocaleString()}
           </span>
         );
@@ -214,22 +214,22 @@ const DailyPlanViewPage: React.FC = () => {
 
   if (!viewPlan || !viewPlan.productionOrderId) {
     return (
-      <div className="p-6 h-full flex items-center justify-center text-slate-500">
+      <div className="p-6 h-full flex items-center justify-center text-ink-subtle">
         Loading...
       </div>
     );
   }
 
   return (
-    <div className="p-4 md:p-6 min-h-screen bg-white">
+    <div className="p-4 md:p-6 bg-card">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 bg-indigo-600 rounded-lg flex items-center justify-center flex-shrink-0">
             <FaIndustry className="text-white" size={16} />
           </div>
           <div>
-            <h3 className="text-xl font-bold text-slate-800 leading-tight">Daily Plan — {viewPlan.dailyPlanId}</h3>
-            <p className="text-xs text-slate-500 mt-0.5">{viewPlan.productionDate?.split("T")[0]} · {viewPlan.machine?.machineName || viewPlan.machineId} · {viewPlan.shift?.shiftName || viewPlan.shiftId}</p>
+            <h3 className="text-xl font-bold text-ink leading-tight">Daily Plan — {viewPlan.dailyPlanId}</h3>
+            <p className="text-xs text-ink-subtle mt-0.5">{viewPlan.productionDate?.split("T")[0]} · {viewPlan.machine?.machineName || viewPlan.machineId} · {viewPlan.shift?.shiftName || viewPlan.shiftId}</p>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -245,7 +245,7 @@ const DailyPlanViewPage: React.FC = () => {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-6">
+      <div className="flex-1 overflow-y-auto bg-card rounded-2xl shadow-sm border border-line p-6 space-y-6">
 
         {/* ── Weekly Production Target Progress ── */}
         {viewPlan.weeklyProgramId && (
@@ -253,7 +253,7 @@ const DailyPlanViewPage: React.FC = () => {
             <div className="flex items-center gap-2 mb-4">
               <FaChartBar className="text-indigo-500" size={16} />
               <h6 className="text-sm font-bold text-indigo-700 uppercase tracking-wider m-0">Weekly Target Progress</h6>
-              <span className="ml-auto text-xs text-indigo-400 font-mono bg-white/60 px-3 py-1 rounded-md border border-indigo-100">
+              <span className="ml-auto text-xs text-indigo-400 font-mono bg-card/60 px-3 py-1 rounded-md border border-indigo-100">
                 {viewPlan.weeklyProgramId}
               </span>
             </div>
@@ -268,23 +268,23 @@ const DailyPlanViewPage: React.FC = () => {
                 {/* Production Order Target */}
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-sm font-semibold text-slate-600">Production Order Target</span>
+                    <span className="text-sm font-semibold text-ink-muted">Production Order Target</span>
                     <div className="flex items-center gap-2">
-                      <span className="text-sm text-slate-500">{weeklyOrderProducedQty.toLocaleString()} / {weeklyOrderTargetQty.toLocaleString()} pcs</span>
+                      <span className="text-sm text-ink-subtle">{weeklyOrderProducedQty.toLocaleString()} / {weeklyOrderTargetQty.toLocaleString()} pcs</span>
                       <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${weeklyOrderPct >= 100 ? "bg-emerald-100 text-emerald-700" : weeklyOrderPct >= 50 ? "bg-indigo-100 text-indigo-700" : "bg-amber-100 text-amber-700"}`}>
                         {weeklyOrderPct}%
                       </span>
                     </div>
                   </div>
-                  <div className="h-2.5 bg-white/60 rounded-full overflow-hidden border border-indigo-100">
+                  <div className="h-2.5 bg-card/60 rounded-full overflow-hidden border border-indigo-100">
                     <div
                       className={`h-full rounded-full transition-all ${weeklyOrderPct >= 100 ? "bg-emerald-500" : weeklyOrderPct >= 50 ? "bg-indigo-500" : "bg-amber-400"}`}
                       style={{ width: `${weeklyOrderPct}%` }}
                     />
                   </div>
                   <div className="flex justify-between mt-1.5">
-                    <span className="text-xs text-slate-500">Produced: <strong className="text-emerald-600">{weeklyOrderProducedQty.toLocaleString()}</strong></span>
-                    <span className="text-xs text-slate-500">Remaining: <strong className="text-amber-600">{Math.max(0, weeklyOrderTargetQty - weeklyOrderProducedQty).toLocaleString()}</strong></span>
+                    <span className="text-xs text-ink-subtle">Produced: <strong className="text-emerald-600">{weeklyOrderProducedQty.toLocaleString()}</strong></span>
+                    <span className="text-xs text-ink-subtle">Remaining: <strong className="text-amber-600">{Math.max(0, weeklyOrderTargetQty - weeklyOrderProducedQty).toLocaleString()}</strong></span>
                   </div>
                 </div>
 
@@ -292,15 +292,15 @@ const DailyPlanViewPage: React.FC = () => {
                 {weeklyTargetQty > 0 && (
                   <div className="pt-3 border-t border-indigo-100/60">
                     <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-sm font-semibold text-slate-600">Weekly Program Target</span>
+                      <span className="text-sm font-semibold text-ink-muted">Weekly Program Target</span>
                       <div className="flex items-center gap-2">
-                        <span className="text-sm text-slate-500">{weeklyOrderProducedQty.toLocaleString()} / {weeklyTargetQty.toLocaleString()} pcs</span>
+                        <span className="text-sm text-ink-subtle">{weeklyOrderProducedQty.toLocaleString()} / {weeklyTargetQty.toLocaleString()} pcs</span>
                         <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${weeklyProgramPct >= 100 ? "bg-emerald-100 text-emerald-700" : weeklyProgramPct >= 50 ? "bg-blue-100 text-blue-700" : "bg-rose-100 text-rose-700"}`}>
                           {weeklyProgramPct}%
                         </span>
                       </div>
                     </div>
-                    <div className="h-2.5 bg-white/60 rounded-full overflow-hidden border border-indigo-100">
+                    <div className="h-2.5 bg-card/60 rounded-full overflow-hidden border border-indigo-100">
                       <div
                         className={`h-full rounded-full transition-all ${weeklyProgramPct >= 100 ? "bg-emerald-500" : weeklyProgramPct >= 50 ? "bg-blue-500" : "bg-rose-400"}`}
                         style={{ width: `${weeklyProgramPct}%` }}
@@ -333,8 +333,8 @@ const DailyPlanViewPage: React.FC = () => {
 
         {/* ── Plan Details Grid ── */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          <div className="rounded-xl border border-slate-200 p-5 bg-slate-50/40">
-            <h6 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">Plan Details</h6>
+          <div className="rounded-xl border border-line p-5 bg-card-2/40">
+            <h6 className="text-xs font-bold text-ink-subtle uppercase tracking-wider mb-4">Plan Details</h6>
             <dl className="space-y-3 text-sm">
               {[
                 { label: "Production Order", value: viewPlan.productionOrderId },
@@ -344,35 +344,35 @@ const DailyPlanViewPage: React.FC = () => {
                 { label: "Shift", value: viewPlan.shift?.shiftName || viewPlan.shiftId },
               ].map(({ label, value }) => (
                 <div key={label} className="flex items-start gap-2">
-                  <dt className="text-slate-500 font-medium w-40 flex-shrink-0">{label}:</dt>
-                  <dd className="text-slate-800 font-semibold">{value}</dd>
+                  <dt className="text-ink-subtle font-medium w-40 flex-shrink-0">{label}:</dt>
+                  <dd className="text-ink font-semibold">{value}</dd>
                 </div>
               ))}
             </dl>
           </div>
-          <div className="rounded-xl border border-slate-200 p-5 bg-slate-50/40">
-            <h6 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">Quantities & Status</h6>
+          <div className="rounded-xl border border-line p-5 bg-card-2/40">
+            <h6 className="text-xs font-bold text-ink-subtle uppercase tracking-wider mb-4">Quantities & Status</h6>
             <dl className="space-y-3 text-sm">
               <div className="flex items-start gap-2">
-                <dt className="text-slate-500 font-medium w-40 flex-shrink-0">Planned Qty:</dt>
-                <dd className="text-slate-800 font-semibold">{viewPlan.plannedQty} pcs</dd>
+                <dt className="text-ink-subtle font-medium w-40 flex-shrink-0">Planned Qty:</dt>
+                <dd className="text-ink font-semibold">{viewPlan.plannedQty} pcs</dd>
               </div>
               <div className="flex items-start gap-2">
-                <dt className="text-slate-500 font-medium w-40 flex-shrink-0">Planned Hours:</dt>
-                <dd className="text-slate-800 font-semibold">{viewPlan.plannedHours || "—"} hrs</dd>
+                <dt className="text-ink-subtle font-medium w-40 flex-shrink-0">Planned Hours:</dt>
+                <dd className="text-ink font-semibold">{viewPlan.plannedHours || "—"} hrs</dd>
               </div>
               <div className="flex items-center gap-2">
-                <dt className="text-slate-500 font-medium w-40 flex-shrink-0">Priority:</dt>
+                <dt className="text-ink-subtle font-medium w-40 flex-shrink-0">Priority:</dt>
                 <dd><StatusBadge status={viewPlan.priority || "MEDIUM"} /></dd>
               </div>
               <div className="flex items-center gap-2">
-                <dt className="text-slate-500 font-medium w-40 flex-shrink-0">Status:</dt>
+                <dt className="text-ink-subtle font-medium w-40 flex-shrink-0">Status:</dt>
                 <dd><StatusBadge status={viewPlan.status} /></dd>
               </div>
               {viewPlan.remarks && (
                 <div className="flex items-start gap-2 mt-2">
-                  <dt className="text-slate-500 font-medium w-40 flex-shrink-0">Remarks:</dt>
-                  <dd className="text-slate-700 text-sm leading-relaxed">{viewPlan.remarks}</dd>
+                  <dt className="text-ink-subtle font-medium w-40 flex-shrink-0">Remarks:</dt>
+                  <dd className="text-ink-muted text-sm leading-relaxed">{viewPlan.remarks}</dd>
                 </div>
               )}
             </dl>
@@ -381,9 +381,9 @@ const DailyPlanViewPage: React.FC = () => {
 
         {/* ── Post Production Steps ── */}
         {viewPlan.productionOrder?.productItem?.productionSteps?.length > 0 && (
-          <div className="border border-slate-200 rounded-xl overflow-hidden">
-            <div className="px-5 py-3 bg-slate-50 border-b border-slate-200">
-              <h6 className="text-xs font-bold text-slate-500 uppercase tracking-wider m-0">Post Production Steps</h6>
+          <div className="border border-line rounded-xl overflow-hidden">
+            <div className="px-5 py-3 bg-card-2 border-b border-line">
+              <h6 className="text-xs font-bold text-ink-subtle uppercase tracking-wider m-0">Post Production Steps</h6>
             </div>
             <div className="p-5 flex flex-wrap gap-3 items-center">
               {viewPlan.productionOrder.productItem.productionSteps.map((step: any, idx: number) => {
@@ -405,13 +405,13 @@ const DailyPlanViewPage: React.FC = () => {
                   ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                   : isActive
                   ? "bg-indigo-50 text-indigo-700 border-indigo-200"
-                  : "bg-slate-50 text-slate-400 border-slate-200";
+                  : "bg-card-2 text-ink-subtle border-line";
 
                 const dotColors = isCompleted
                   ? "bg-emerald-500 text-white"
                   : isActive
                   ? "bg-indigo-600 text-white"
-                  : "bg-slate-300 text-slate-500";
+                  : "bg-slate-300 text-ink-subtle";
 
                 return (
                   <React.Fragment key={step.id || idx}>
@@ -422,7 +422,7 @@ const DailyPlanViewPage: React.FC = () => {
                       {step.stepKey}
                     </span>
                     {idx < viewPlan.productionOrder.productItem.productionSteps.length - 1 && (
-                      <FaArrowRight className="text-slate-300 text-xs" />
+                      <FaArrowRight className="text-ink-subtle text-xs" />
                     )}
                   </React.Fragment>
                 );
@@ -433,49 +433,49 @@ const DailyPlanViewPage: React.FC = () => {
 
         {/* ── Hourly Production Logs ── */}
         <div>
-          <h6 className="text-sm font-bold text-slate-600 uppercase tracking-wider mb-4">Hourly Production Entries</h6>
+          <h6 className="text-sm font-bold text-ink-muted uppercase tracking-wider mb-4">Hourly Production Entries</h6>
           {loadingViewLogs ? (
-            <div className="flex items-center justify-center gap-2 py-10 border border-slate-200 rounded-xl bg-slate-50 text-slate-400 text-sm">
+            <div className="flex items-center justify-center gap-2 py-10 border border-line rounded-xl bg-card-2 text-ink-subtle text-sm">
               <div className="w-5 h-5 border-2 border-indigo-300 border-t-transparent rounded-full animate-spin" />
               Loading entries...
             </div>
           ) : viewHourlyLogs.length > 0 ? (
-            <div className="border border-slate-200 rounded-xl overflow-hidden">
+            <div className="border border-line rounded-xl overflow-hidden">
               <DataTable
                 columns={[
-                  { header: "Hour", align: "center", render: (h: any) => <span className="font-bold font-mono text-slate-700 text-sm">H{h.hourIndex}</span> },
+                  { header: "Hour", align: "center", render: (h: any) => <span className="font-bold font-mono text-ink-muted text-sm">H{h.hourIndex}</span> },
                   { header: "Produced", align: "center", render: (h: any) => <span className="font-bold text-emerald-600 text-base">{h.qtyProduced}</span> },
                   { header: "Reject", align: "center", render: (h: any) => <span className="text-rose-500 text-sm">{h.rejectQty || 0}</span> },
                   { header: "Scrap", align: "center", render: (h: any) => <span className="text-amber-500 text-sm">{h.scrapQty || 0}</span> },
-                  { header: "Downtime", align: "center", render: (h: any) => <span className="text-slate-500 text-sm">{h.downtime > 0 ? `${h.downtime} min` : "—"}</span> },
+                  { header: "Downtime", align: "center", render: (h: any) => <span className="text-ink-subtle text-sm">{h.downtime > 0 ? `${h.downtime} min` : "—"}</span> },
                   { header: "Avail%", align: "center", render: (h: any) => <span className="font-semibold text-emerald-700 text-sm">{h.availabilityPct !== undefined ? `${h.availabilityPct}%` : '—'}</span> },
                   { header: "Qual%", align: "center", render: (h: any) => <span className="font-semibold text-purple-700 text-sm">{h.qualityPct !== undefined ? `${h.qualityPct}%` : '—'}</span> },
                   { header: "OEE%", align: "center", render: (h: any) => <span className="font-extrabold text-indigo-700 text-sm">{h.hourlyOEE !== undefined ? `${h.hourlyOEE}%` : '—'}</span> },
-                  { header: "Operator", render: (h: any) => <span className="text-slate-600 font-medium text-sm truncate max-w-[150px] inline-block" title={h.operatorName || h.operatorId}>{h.operatorName || h.operatorId || "—"}</span> }
+                  { header: "Operator", render: (h: any) => <span className="text-ink-muted font-medium text-sm truncate max-w-[150px] inline-block" title={h.operatorName || h.operatorId}>{h.operatorName || h.operatorId || "—"}</span> }
                 ]}
                 data={viewHourlyLogs}
                 rowKey={(h: any) => h.hourlyProductionId}
                 minHeightClassName="min-h-0"
               />
               {/* Totals Footer */}
-              <div className="bg-slate-50 p-5 border-t border-slate-200 space-y-4">
+              <div className="bg-card-2 p-5 border-t border-line space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-4 text-sm font-bold">
-                  <span className="text-slate-500 text-xs uppercase tracking-wider">Totals:</span>
+                  <span className="text-ink-subtle text-xs uppercase tracking-wider">Totals:</span>
                   <div className="flex flex-wrap gap-5 text-sm">
                     <span className="text-emerald-600">✓ Produced: {viewHourlyLogs.reduce((s: any, h: any) => s + Number(h.qtyProduced || 0), 0)}</span>
                     <span className="text-rose-500">✕ Reject: {viewHourlyLogs.reduce((s: any, h: any) => s + Number(h.rejectQty || 0), 0)}</span>
                     <span className="text-amber-500">⚠ Scrap: {viewHourlyLogs.reduce((s: any, h: any) => s + Number(h.scrapQty || 0), 0)}</span>
-                    <span className="text-slate-500">↓ Downtime: {(() => { const t = viewHourlyLogs.reduce((s: any, h: any) => s + Number(h.downtime || 0), 0); return t > 0 ? `${t} min` : "—"; })()}</span>
+                    <span className="text-ink-subtle">↓ Downtime: {(() => { const t = viewHourlyLogs.reduce((s: any, h: any) => s + Number(h.downtime || 0), 0); return t > 0 ? `${t} min` : "—"; })()}</span>
                   </div>
                 </div>
-                <div className="flex flex-wrap items-center justify-between gap-4 text-sm pt-3 border-t border-slate-200 border-dashed">
+                <div className="flex flex-wrap items-center justify-between gap-4 text-sm pt-3 border-t border-line border-dashed">
                   <div className="flex gap-6 font-bold">
-                    <span className="text-slate-700">Total Produced: <span className="text-emerald-600 ml-2">{viewPlanOeeSummary?.producedQty ?? viewHourlyLogs.reduce((s: any, h: any) => s + Number(h.qtyProduced || 0), 0)} pcs</span></span>
-                    <span className="text-slate-700">Pending: <span className="text-amber-500 ml-2">{viewPlanOeeSummary?.remainingQty ?? (Number(viewPlan.plannedQty) - viewHourlyLogs.reduce((s: any, h: any) => s + Number(h.qtyProduced || 0), 0))} pcs</span></span>
+                    <span className="text-ink-muted">Total Produced: <span className="text-emerald-600 ml-2">{viewPlanOeeSummary?.producedQty ?? viewHourlyLogs.reduce((s: any, h: any) => s + Number(h.qtyProduced || 0), 0)} pcs</span></span>
+                    <span className="text-ink-muted">Pending: <span className="text-amber-500 ml-2">{viewPlanOeeSummary?.remainingQty ?? (Number(viewPlan.plannedQty) - viewHourlyLogs.reduce((s: any, h: any) => s + Number(h.qtyProduced || 0), 0))} pcs</span></span>
                   </div>
                   {viewPlan.carryForwardTo && viewPlan.carryForwardTo.length > 0 && (
                     <div className="flex items-center gap-2">
-                      <span className="text-slate-400 uppercase tracking-wider text-xs">Carried Forward To:</span>
+                      <span className="text-ink-subtle uppercase tracking-wider text-xs">Carried Forward To:</span>
                       <span className="text-indigo-700 font-bold bg-indigo-50 px-3 py-1 rounded border border-indigo-100 flex items-center gap-1.5 text-sm">
                         <FaShare className="text-xs" />
                         {viewPlan.carryForwardTo[0].dailyPlanId}
@@ -487,9 +487,9 @@ const DailyPlanViewPage: React.FC = () => {
               </div>
             </div>
           ) : (
-            <div className="flex flex-col items-center justify-center py-12 border border-slate-200 rounded-xl bg-slate-50 text-center">
+            <div className="flex flex-col items-center justify-center py-12 border border-line rounded-xl bg-card-2 text-center">
               <FaClipboardList className="text-slate-200 mb-3" size={40} />
-              <span className="text-slate-400 font-medium text-base">No hourly entries recorded yet for this plan.</span>
+              <span className="text-ink-subtle font-medium text-base">No hourly entries recorded yet for this plan.</span>
             </div>
           )}
         </div>
@@ -497,21 +497,21 @@ const DailyPlanViewPage: React.FC = () => {
         {/* ── Daily Target vs Actual Comparison ── */}
         {viewHourlyLogs.length > 0 && (
           <div>
-            <h6 className="text-sm font-bold text-slate-600 uppercase tracking-wider mb-4">Target vs Actual Comparison</h6>
-            <div className="border border-slate-200 rounded-xl overflow-hidden bg-white">
+            <h6 className="text-sm font-bold text-ink-muted uppercase tracking-wider mb-4">Target vs Actual Comparison</h6>
+            <div className="border border-line rounded-xl overflow-hidden bg-card">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="bg-slate-50 border-b border-slate-200">
-                    <th className="px-5 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Machine</th>
-                    <th className="px-5 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Product</th>
-                    <th className="px-5 py-3 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">Capacity</th>
-                    <th className="px-5 py-3 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">Produced</th>
-                    <th className="px-5 py-3 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">Pending</th>
-                    <th className="px-5 py-3 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">Efficiency</th>
-                    <th className="px-5 py-3 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
+                  <tr className="bg-card-2 border-b border-line">
+                    <th className="px-5 py-3 text-left text-xs font-bold text-ink-subtle uppercase tracking-wider">Machine</th>
+                    <th className="px-5 py-3 text-left text-xs font-bold text-ink-subtle uppercase tracking-wider">Product</th>
+                    <th className="px-5 py-3 text-center text-xs font-bold text-ink-subtle uppercase tracking-wider">Capacity</th>
+                    <th className="px-5 py-3 text-center text-xs font-bold text-ink-subtle uppercase tracking-wider">Produced</th>
+                    <th className="px-5 py-3 text-center text-xs font-bold text-ink-subtle uppercase tracking-wider">Pending</th>
+                    <th className="px-5 py-3 text-center text-xs font-bold text-ink-subtle uppercase tracking-wider">Efficiency</th>
+                    <th className="px-5 py-3 text-center text-xs font-bold text-ink-subtle uppercase tracking-wider">Status</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-line">
                   {(() => {
                     const capacity = Number(viewPlan.plannedQty || 0);
                     const totalProduced = Array.isArray(viewPlan.hourlyProductions)
@@ -537,13 +537,13 @@ const DailyPlanViewPage: React.FC = () => {
                     
                     return (
                       <tr>
-                        <td className="px-5 py-4 text-slate-700 font-medium">
+                        <td className="px-5 py-4 text-ink-muted font-medium">
                           {viewPlan.machine?.machineName || viewPlan.machineId || "—"}
                         </td>
-                        <td className="px-5 py-4 text-slate-700">
+                        <td className="px-5 py-4 text-ink-muted">
                           {viewPlan.productionOrder?.productItem?.productName || "—"}
                         </td>
-                        <td className="px-5 py-4 text-center text-slate-600 font-bold text-base">{capacity}</td>
+                        <td className="px-5 py-4 text-center text-ink-muted font-bold text-base">{capacity}</td>
                         <td className="px-5 py-4 text-center text-emerald-600 font-bold text-base">{totalProduced}</td>
                         <td className="px-5 py-4 text-center text-amber-600 font-bold text-base">{pending}</td>
                         <td className="px-5 py-4 text-center text-indigo-600 font-bold text-base">{efficiency}%</td>
@@ -560,25 +560,25 @@ const DailyPlanViewPage: React.FC = () => {
         )}
 
         {/* ── Production Order History ── */}
-        <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
-          <div className="px-5 py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+        <div className="border border-line rounded-xl overflow-hidden shadow-sm">
+          <div className="px-5 py-4 bg-card-2 border-b border-line flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <FaClipboardList className="text-slate-400" size={16} />
-              <h3 className="font-bold text-slate-800 m-0">Production Order History</h3>
-              <span className="text-xs text-slate-500 font-mono bg-slate-200/50 px-2 py-0.5 rounded border border-slate-300">
+              <FaClipboardList className="text-ink-subtle" size={16} />
+              <h3 className="font-bold text-ink m-0">Production Order History</h3>
+              <span className="text-xs text-ink-subtle font-mono bg-line/50 px-2 py-0.5 rounded border border-line">
                 {viewPlan.productionOrderId}
               </span>
             </div>
             {!loadingPOHistory && (
-              <span className="text-xs text-slate-500 bg-slate-200/50 px-3 py-1 rounded font-medium">
+              <span className="text-xs text-ink-subtle bg-line/50 px-3 py-1 rounded font-medium">
                 {poHistoryPlans.length} plan{poHistoryPlans.length !== 1 ? "s" : ""}
               </span>
             )}
           </div>
 
           {loadingPOHistory ? (
-            <div className="flex items-center justify-center gap-2 py-8 bg-slate-50 text-slate-400 text-sm">
-              <div className="w-5 h-5 border-2 border-slate-300 border-t-transparent rounded-full animate-spin" />
+            <div className="flex items-center justify-center gap-2 py-8 bg-card-2 text-ink-subtle text-sm">
+              <div className="w-5 h-5 border-2 border-line border-t-transparent rounded-full animate-spin" />
               Loading history...
             </div>
           ) : poHistoryPlans.length > 0 ? (
@@ -592,10 +592,10 @@ const DailyPlanViewPage: React.FC = () => {
                 density="compact"
                 rowClassName={(row) => row.dailyPlanId === viewPlan.dailyPlanId ? "bg-indigo-50/60 border-l-2 border-l-indigo-500" : ""}
               />
-              <div className="flex items-center justify-between bg-slate-50 border-t border-slate-200 px-5 py-4">
-                <div className="text-sm font-bold text-slate-600">Total</div>
+              <div className="flex items-center justify-between bg-card-2 border-t border-line px-5 py-4">
+                <div className="text-sm font-bold text-ink-muted">Total</div>
                 <div className="flex gap-10 md:gap-20 items-center pr-20">
-                  <div className="text-center text-sm font-bold text-slate-800">
+                  <div className="text-center text-sm font-bold text-ink">
                     Planned: {poHistoryPlans.reduce((s: number, p: any) => s + Number(p.plannedQty || 0), 0).toLocaleString()}
                   </div>
                   <div className="text-center text-sm font-bold text-emerald-700">
@@ -609,9 +609,9 @@ const DailyPlanViewPage: React.FC = () => {
               </div>
             </div>
           ) : (
-            <div className="flex flex-col items-center justify-center py-10 bg-slate-50 text-center">
+            <div className="flex flex-col items-center justify-center py-10 bg-card-2 text-center">
               <FaCalendarAlt className="text-slate-200 mb-3" size={32} />
-              <span className="text-slate-400 font-medium text-sm">No other daily plans found for this production order.</span>
+              <span className="text-ink-subtle font-medium text-sm">No other daily plans found for this production order.</span>
             </div>
           )}
         </div>

@@ -90,8 +90,8 @@ const SalesProductList: React.FC = () => {
             header: "SALES PRODUCT",
             render: (item) => (
                 <div>
-                    <div className="font-semibold text-gray-800">{item.salesProductName}</div>
-                    <span className="text-xs text-gray-400">Code: {item.salesProductCode}</span>
+                    <div className="font-semibold text-ink">{item.salesProductName}</div>
+                    <span className="text-xs text-ink-subtle">Code: {item.salesProductCode}</span>
                 </div>
             ),
         },
@@ -131,11 +131,11 @@ const SalesProductList: React.FC = () => {
 
     return (
         <div>
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-6 border-b border-slate-200">
+            <div className="bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-6 border-b border-line">
                     <div>
-                        <h2 className="text-2xl font-bold text-slate-800">Sales Product</h2>
-                        <p className="text-sm text-slate-500 mt-1">A sellable item assembled from Production Products — e.g. "3L Container" = "Container" + "Lid".</p>
+                        <h2 className="text-2xl font-bold text-ink">Sales Product</h2>
+                        <p className="text-sm text-ink-subtle mt-1">A sellable item assembled from Production Products — e.g. "3L Container" = "Container" + "Lid".</p>
                     </div>
                     <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
                         <div className="w-full md:w-64">

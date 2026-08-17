@@ -181,7 +181,7 @@ const PurchaseReportsCenter: React.FC = () => {
     },
     {
       header: "PO NUMBER",
-      render: (item: any) => <span className="font-semibold text-gray-800">{item.poNumber || "-"}</span>
+      render: (item: any) => <span className="font-semibold text-ink">{item.poNumber || "-"}</span>
     },
     {
       header: "PO DATE",
@@ -196,7 +196,7 @@ const PurchaseReportsCenter: React.FC = () => {
       render: (item: any) => (
         <div>
           <div className="font-semibold">{item.supplierName || "N/A"}</div>
-          <div className="text-[10px] text-gray-500">{item.supplierCode || "-"}</div>
+          <div className="text-[10px] text-ink-subtle">{item.supplierCode || "-"}</div>
         </div>
       )
     },
@@ -254,10 +254,10 @@ const PurchaseReportsCenter: React.FC = () => {
 
   return (
     <div className="w-full">
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-slate-200">
+      <div className="bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-line">
           <div>
-            <h2 className="text-2xl font-bold text-slate-800">Purchase Order Report</h2>
+            <h2 className="text-2xl font-bold text-ink">Purchase Order Report</h2>
           </div>
 
           <div className="flex flex-wrap items-center gap-3 relative w-full lg:w-auto">
@@ -270,10 +270,10 @@ const PurchaseReportsCenter: React.FC = () => {
           </div>
         </div>
 
-        <div className="p-6 border-b border-slate-200 bg-slate-50">
+        <div className="p-6 border-b border-line bg-card-2">
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
             <div>
-              <label className="block mb-1 text-[11px] uppercase tracking-wider text-slate-500 font-bold">Date Range</label>
+              <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-bold">Date Range</label>
               <SelectInput
                 name="dateRangePreset"
                 value={dateRangePreset}
@@ -283,7 +283,7 @@ const PurchaseReportsCenter: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block mb-1 text-[11px] uppercase tracking-wider text-slate-500 font-bold">Start Date</label>
+              <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-bold">Start Date</label>
               <DatePickerCalendar
                 name="draftStartDate"
                 value={draftStartDate}
@@ -291,7 +291,7 @@ const PurchaseReportsCenter: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block mb-1 text-[11px] uppercase tracking-wider text-slate-500 font-bold">End Date</label>
+              <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-bold">End Date</label>
               <DatePickerCalendar
                 name="draftEndDate"
                 value={draftEndDate}
@@ -299,11 +299,11 @@ const PurchaseReportsCenter: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block mb-1 text-[11px] uppercase tracking-wider text-slate-500 font-bold">PO No</label>
-              <input type="text" className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary shadow-sm" value={draftPoNumber} onChange={(e) => setDraftPoNumber(e.target.value)} placeholder="Search PO No..." />
+              <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-bold">PO No</label>
+              <input type="text" className="w-full border border-line rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary shadow-sm" value={draftPoNumber} onChange={(e) => setDraftPoNumber(e.target.value)} placeholder="Search PO No..." />
             </div>
             <div>
-              <label className="block mb-1 text-[11px] uppercase tracking-wider text-slate-500 font-bold">Supplier</label>
+              <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-bold">Supplier</label>
               <SelectInput
                 name="draftSupplierId"
                 value={draftSupplierId}
@@ -315,7 +315,7 @@ const PurchaseReportsCenter: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block mb-1 text-[11px] uppercase tracking-wider text-slate-500 font-bold">Status</label>
+              <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-bold">Status</label>
               <SelectInput
                 name="draftStatus"
                 value={draftStatus}
@@ -338,7 +338,7 @@ const PurchaseReportsCenter: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex items-center justify-between mt-6 pt-4 border-t border-slate-200">
+          <div className="flex items-center justify-between mt-6 pt-4 border-t border-line">
             <div>
               <ColumnToggle
                 columns={tableColumns}
@@ -349,7 +349,7 @@ const PurchaseReportsCenter: React.FC = () => {
             <div className="flex items-center gap-3">
               <button
                 onClick={handleClearFilters}
-                className="px-4 py-2 text-sm font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-md transition-colors"
+                className="px-4 py-2 text-sm font-semibold text-ink-muted hover:text-ink hover:bg-card-2 rounded-md transition-colors"
               >
                 Clear All
               </button>

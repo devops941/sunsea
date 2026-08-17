@@ -96,7 +96,9 @@
     }
 
     .inner-container {
-        padding: 15px;
+        /* Vertical only — the horizontal gutter comes from the
+           max-w-[1600px] wrapper in BaseLayout at every breakpoint. */
+        padding: 15px 0;
     }
 
     .sidebar-logo {

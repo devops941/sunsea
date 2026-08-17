@@ -101,7 +101,7 @@ const Employeelist: React.FC = () => {
       render: (emp) => {
         if (!emp.user) {
           return (
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-500 border border-slate-200/80">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-card-2 text-ink-subtle border border-line/80">
               <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
               No Login
             </span>
@@ -125,7 +125,7 @@ const Employeelist: React.FC = () => {
               {isActive ? "Enabled" : emp.user.status?.toUpperCase() || "Disabled"}
             </span>
             {emp.user.username && (
-              <span className="text-[11px] font-mono text-slate-500">
+              <span className="text-[11px] font-mono text-ink-subtle">
                 @{emp.user.username}
               </span>
             )}
@@ -161,18 +161,18 @@ const Employeelist: React.FC = () => {
     <div>
       <div className="">
 
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
           {/* Page Header */}
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-6 border-b border-slate-200">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-6 border-b border-line">
             <div>
-              <h2 className="text-2xl font-bold text-slate-800">Employee Management</h2>
+              <h2 className="text-2xl font-bold text-ink">Employee Management</h2>
             </div>
             <div className="flex items-center gap-3 w-full md:w-auto">
               <div className="relative w-full md:w-64">
-                <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-subtle" />
                 <input
                   type="text"
-                  className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                  className="w-full pl-10 pr-4 py-2 bg-card border border-line rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
                   placeholder="Search Employee..."
                   value={searchTerm}
                   onChange={handleSearch}

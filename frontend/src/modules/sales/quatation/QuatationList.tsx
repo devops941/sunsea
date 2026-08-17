@@ -206,11 +206,11 @@ const QuotationList: React.FC = () => {
 
     return (
         <div>
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
                 {/* Page Header */}
-                <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-slate-200">
+                <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-line">
                     <div>
-                        <h2 className="text-2xl font-bold text-slate-800">Quotation List</h2>
+                        <h2 className="text-2xl font-bold text-ink">Quotation List</h2>
                     </div>
                     <div className="flex flex-wrap items-center gap-3 relative w-full lg:w-auto">
                         <SearchInput
@@ -393,9 +393,9 @@ const QuotationList: React.FC = () => {
                 title="Send WhatsApp"
                 message={
                     <div className="text-left mt-2 flex flex-col gap-3">
-                        <p className="text-sm text-slate-500 mb-2">Are you sure you want to send the quotation via WhatsApp?</p>
+                        <p className="text-sm text-ink-subtle mb-2">Are you sure you want to send the quotation via WhatsApp?</p>
                         <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Phone Number (with country code, e.g. 919876543210)</label>
+                            <label className="block text-sm font-medium text-ink-muted mb-1">Phone Number (with country code, e.g. 919876543210)</label>
                             {(() => {
                                 const phones = [];
                                 if (whatsappOrder?.customer) {
@@ -417,7 +417,7 @@ const QuotationList: React.FC = () => {
                                 if (phones.length > 1) {
                                     return (
                                         <select 
-                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white"
+                                            className="w-full px-3 py-2 border border-line rounded-lg text-sm bg-card"
                                             value={recipientPhone}
                                             onChange={(e) => setRecipientPhone(e.target.value)}
                                         >
@@ -432,7 +432,7 @@ const QuotationList: React.FC = () => {
                                 return (
                                     <input
                                         type="text"
-                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                                        className="w-full px-3 py-2 border border-line rounded-lg text-sm"
                                         value={recipientPhone}
                                         onChange={(e) => setRecipientPhone(e.target.value)}
                                     />
@@ -440,9 +440,9 @@ const QuotationList: React.FC = () => {
                             })()}
                         </div>
                         {/* <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Message</label>
+                            <label className="block text-sm font-medium text-ink-muted mb-1">Message</label>
                             <textarea
-                                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                                className="w-full px-3 py-2 border border-line rounded-lg text-sm"
                                 rows={4}
                                 value={whatsappMessage}
                                 onChange={(e) => setWhatsappMessage(e.target.value)}

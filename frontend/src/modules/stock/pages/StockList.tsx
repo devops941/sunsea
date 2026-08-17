@@ -123,12 +123,12 @@ const StockList: React.FC<StockListProps> = ({ storeId: propStoreId }) => {
     ];
 
     return (
-        <div className="p-4 md:p-6 min-h-screen bg-white">
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="p-4 md:p-6 bg-card">
+            <div className="bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
                 {/* Page Header */}
-                <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-slate-200">
+                <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-line">
                     <div>
-                        <h2 className="text-2xl font-bold text-slate-800">
+                        <h2 className="text-2xl font-bold text-ink">
                             {stores.find((s) => s.storeId === activeStoreId)?.storeName || "Stock Ledger Management"}
                         </h2>
                     </div>
@@ -166,7 +166,7 @@ const StockList: React.FC<StockListProps> = ({ storeId: propStoreId }) => {
                     columns={[
                         {
                             header: "#",
-                            render: (_, index) => <span className="text-slate-500">{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</span>
+                            render: (_, index) => <span className="text-ink-subtle">{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</span>
                         },
                         {
                             header: "NAME",
@@ -176,14 +176,14 @@ const StockList: React.FC<StockListProps> = ({ storeId: propStoreId }) => {
                                 return (
                                     <div className="flex flex-col">
                                         <div className="flex items-center gap-2">
-                                            <span className="font-semibold text-slate-800">{matName}</span>
+                                            <span className="font-semibold text-ink">{matName}</span>
                                             {isWastage && (
                                                 <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-orange-100 text-orange-700 uppercase tracking-wider">
                                                     Wastage
                                                 </span>
                                             )}
                                         </div>
-                                        <span className="text-xs text-slate-500">ID: {item.rawMaterialId}</span>
+                                        <span className="text-xs text-ink-subtle">ID: {item.rawMaterialId}</span>
                                     </div>
                                 );
                             }
@@ -192,7 +192,7 @@ const StockList: React.FC<StockListProps> = ({ storeId: propStoreId }) => {
                             header: "CATEGORY",
                             render: (item) => {
                                 const catName = (item as any).category?.categoryName || item.rawMaterial?.category?.name || (item as any).categoryId || "-";
-                                return <span className="text-slate-600">{catName}</span>;
+                                return <span className="text-ink-muted">{catName}</span>;
                             }
                         },
                         {
@@ -201,8 +201,8 @@ const StockList: React.FC<StockListProps> = ({ storeId: propStoreId }) => {
                                 const locCode = (item as any).storeLocation?.locationCode || (item as any).store?.location?.locationCode || (item as any).store?.location?.locationName || (item as any).store?.locationDesc || item.locationId || "-";
                                 return (
                                     <div className="flex flex-col">
-                                        <span className="font-medium text-slate-700">{item.store?.storeName || item.storeId || "-"}</span>
-                                        <span className="text-xs text-slate-500">Loc: {locCode}</span>
+                                        <span className="font-medium text-ink-muted">{item.store?.storeName || item.storeId || "-"}</span>
+                                        <span className="text-xs text-ink-subtle">Loc: {locCode}</span>
                                     </div>
                                 );
                             }
@@ -214,8 +214,8 @@ const StockList: React.FC<StockListProps> = ({ storeId: propStoreId }) => {
                                 const minStock = Number((item as any).minimumStock || item.rawMaterial?.minimumStock || 0);
                                 return (
                                     <div className="flex flex-col">
-                                        <span className="text-slate-800">{formatDisplayQty(item.onHandQty, baseUom)}</span>
-                                        <span className="text-xs text-slate-500">{formatDisplayQty(minStock, baseUom, "Min: ")}</span>
+                                        <span className="text-ink">{formatDisplayQty(item.onHandQty, baseUom)}</span>
+                                        <span className="text-xs text-ink-subtle">{formatDisplayQty(minStock, baseUom, "Min: ")}</span>
                                     </div>
                                 );
                             }
@@ -224,7 +224,7 @@ const StockList: React.FC<StockListProps> = ({ storeId: propStoreId }) => {
                             header: "RESERVED",
                             render: (item) => {
                                 const baseUom = (item as any).baseUom || item.rawMaterial?.baseUom || "";
-                                return <span className="text-slate-600">{formatDisplayQty(item.reservedQty, baseUom)}</span>;
+                                return <span className="text-ink-muted">{formatDisplayQty(item.reservedQty, baseUom)}</span>;
                             }
                         },
                         {

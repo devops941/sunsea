@@ -6,6 +6,8 @@ import { store } from './app/store';
 import { injectStore } from './api/apiClient';
 
 import App from './App';
+import { ThemeProvider } from './providers/ThemeProvider';
+import ThemedToastContainer from './components/common/ThemedToastContainer';
 
 
 // Custom CSS
@@ -14,7 +16,6 @@ import './assets/css/responsive.css';
 
 // Toastify
 import 'react-toastify/dist/ReactToastify.css';
-import { ToastContainer } from 'react-toastify';
 
 // Inject store to avoid circular dependency in axios client
 injectStore(store);
@@ -24,21 +25,14 @@ ReactDOM.createRoot(
 ).render(
   <React.StrictMode>
     <Provider store={store}>
-      <BrowserRouter>
-        <App />
+      <ThemeProvider>
+        <BrowserRouter>
+          <App />
 
-        <ToastContainer
-          position="top-right"
-          autoClose={3000}
-          hideProgressBar={false}
-          newestOnTop={true}
-          closeOnClick
-          pauseOnHover
-          draggable
-          theme="light"
-        />
-        
-      </BrowserRouter>
+          <ThemedToastContainer />
+
+        </BrowserRouter>
+      </ThemeProvider>
     </Provider>
   </React.StrictMode>
 );

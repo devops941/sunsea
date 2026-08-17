@@ -285,11 +285,11 @@ const LocationList: React.FC = () => {
     return (
         <div>
             <div className="">
-                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className="bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
                     {/* Page Header */}
-                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-6 border-b border-slate-200">
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-6 border-b border-line">
                         <div>
-                            <h2 className="text-2xl font-bold text-slate-800">Location Management</h2>
+                            <h2 className="text-2xl font-bold text-ink">Location Management</h2>
                         </div>
                         <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
                             <div className="w-48">
@@ -306,10 +306,10 @@ const LocationList: React.FC = () => {
                                 />
                             </div>
                             <div className="relative w-full md:w-64">
-                                <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-subtle" />
                                 <input
                                     type="text"
-                                    className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                                    className="w-full pl-10 pr-4 py-2 bg-card border border-line rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
                                     placeholder="Search locations..."
                                     value={searchTerm}
                                     onChange={handleSearch}

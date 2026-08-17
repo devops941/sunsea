@@ -148,8 +148,8 @@ const WastageStoreList: React.FC = () => {
             header: "NAME",
             render: (item) => (
                 <div>
-                    <div className="font-semibold text-gray-800">{item.materialName}</div>
-                    <span className="text-xs text-gray-400">ID: {item.rawMaterialId}</span>
+                    <div className="font-semibold text-ink">{item.materialName}</div>
+                    <span className="text-xs text-ink-subtle">ID: {item.rawMaterialId}</span>
                 </div>
             ),
         },
@@ -169,7 +169,7 @@ const WastageStoreList: React.FC = () => {
             header: "PHYSICAL STOCK",
             render: (item) => (
                 <div>
-                    <div className="font-semibold text-gray-800">{formatStockQty(item.onHandQty, item.baseUom)}</div>
+                    <div className="font-semibold text-ink">{formatStockQty(item.onHandQty, item.baseUom)}</div>
                 </div>
             ),
         },
@@ -195,11 +195,11 @@ const WastageStoreList: React.FC = () => {
 
     return (
         <div>
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
                 {/* Page Header */}
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-6 border-b border-slate-200">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-6 border-b border-line">
                     <div>
-                        <h2 className="text-2xl font-bold text-slate-800">Wastage Products Management</h2>
+                        <h2 className="text-2xl font-bold text-ink">Wastage Products Management</h2>
                     </div>
                     <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
                         <div className="w-48">

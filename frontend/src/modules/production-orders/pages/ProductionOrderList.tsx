@@ -412,27 +412,27 @@ const ProductionOrderList: React.FC = () => {
     const columns = [
         {
             header: "#",
-            render: (_: any, index: number) => <span className="text-slate-500">{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</span>
+            render: (_: any, index: number) => <span className="text-ink-subtle">{(currentPage - 1) * ITEMS_PER_PAGE + index + 1}</span>
         },
         {
             header: "PO NO",
-            render: (item: any) => <span className="font-semibold text-slate-800">{item.primaryPO ? item.primaryPO.productionOrderId : item.orderNo}</span>
+            render: (item: any) => <span className="font-semibold text-ink">{item.primaryPO ? item.primaryPO.productionOrderId : item.orderNo}</span>
         },
         {
             header: "ORDER DATE",
-            render: (item: any) => <span className="text-slate-700">{formatDate(item.orderDate)}</span>
+            render: (item: any) => <span className="text-ink-muted">{formatDate(item.orderDate)}</span>
         },
         {
             header: "EXPECTED DATE",
-            render: (item: any) => <span className="text-slate-700">{item.expectedCompletionDate ? formatDate(item.expectedCompletionDate) : "-"}</span>
+            render: (item: any) => <span className="text-ink-muted">{item.expectedCompletionDate ? formatDate(item.expectedCompletionDate) : "-"}</span>
         },
         {
             header: "CUSTOMER",
-            render: (item: any) => <span className="text-slate-700">{item.customer?.firmName || "-"}</span>
+            render: (item: any) => <span className="text-ink-muted">{item.customer?.firmName || "-"}</span>
         },
         {
             header: "PRODUCTS",
-            render: (item: any) => <span className="text-slate-700">{item.productionOrders && item.productionOrders.length > 0
+            render: (item: any) => <span className="text-ink-muted">{item.productionOrders && item.productionOrders.length > 0
                 ? item.productionOrders.map((po: any) => po.productItem?.productName || "Unknown Product").join(", ")
                 : item.items?.map((it: any) => it.product?.productName || "Unknown Product").join(", ") || "-"
             }</span>
@@ -444,7 +444,7 @@ const ProductionOrderList: React.FC = () => {
                 const visibleRMs = rawMaterials.slice(0, 2);
                 const hiddenRMs = rawMaterials.slice(2);
 
-                if (rawMaterials.length === 0) return <span className="text-slate-500">N/A</span>;
+                if (rawMaterials.length === 0) return <span className="text-ink-subtle">N/A</span>;
 
                 return (
                     <div className="flex flex-wrap gap-1 items-center">
@@ -662,28 +662,28 @@ const ProductionOrderList: React.FC = () => {
                 </div>
             ) : (
                 fullOrder?.products?.map((prod: any, idx: number) => (
-                    <div key={idx} className="mt-4 border-t border-slate-200 pt-4">
-                        <h6 className="text-base font-bold text-slate-800 mb-3">Product {idx + 1}: {prod.productName} ({prod.productCode})</h6>
+                    <div key={idx} className="mt-4 border-t border-line pt-4">
+                        <h6 className="text-base font-bold text-ink mb-3">Product {idx + 1}: {prod.productName} ({prod.productCode})</h6>
                         
-                        <div className="grid grid-cols-3 gap-4 mb-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
+                        <div className="grid grid-cols-3 gap-4 mb-4 bg-card-2 p-4 rounded-xl border border-line-soft">
                             <div>
-                                <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Production Qty</div>
-                                <div className="text-sm font-bold text-slate-800 mt-1">{prod.quantity} {prod.uom?.toLowerCase() === 'ea' || prod.uom?.toLowerCase() === 'each' ? 'pcs' : prod.uom}</div>
+                                <div className="text-xs font-semibold text-ink-subtle uppercase tracking-wide">Production Qty</div>
+                                <div className="text-sm font-bold text-ink mt-1">{prod.quantity} {prod.uom?.toLowerCase() === 'ea' || prod.uom?.toLowerCase() === 'each' ? 'pcs' : prod.uom}</div>
                             </div>
                             <div>
-                                <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Weight Used</div>
-                                <div className="text-sm font-bold text-slate-800 mt-1">{Number(prod.weightPerPieceUsed || 0).toFixed(3)} KG</div>
+                                <div className="text-xs font-semibold text-ink-subtle uppercase tracking-wide">Weight Used</div>
+                                <div className="text-sm font-bold text-ink mt-1">{Number(prod.weightPerPieceUsed || 0).toFixed(3)} KG</div>
                             </div>
                             <div>
-                                <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Unit (UOM)</div>
-                                <div className="text-sm font-bold text-slate-800 mt-1">{prod.uom?.toLowerCase() === 'ea' || prod.uom?.toLowerCase() === 'each' ? 'pcs' : prod.uom}</div>
+                                <div className="text-xs font-semibold text-ink-subtle uppercase tracking-wide">Unit (UOM)</div>
+                                <div className="text-sm font-bold text-ink mt-1">{prod.uom?.toLowerCase() === 'ea' || prod.uom?.toLowerCase() === 'each' ? 'pcs' : prod.uom}</div>
                             </div>
                         </div>
 
-                        <div className="text-sm font-semibold text-slate-700 mb-2 mt-4">Required Raw Materials</div>
-                        <div className="w-full border border-slate-200 rounded-lg overflow-hidden mb-3">
+                        <div className="text-sm font-semibold text-ink-muted mb-2 mt-4">Required Raw Materials</div>
+                        <div className="w-full border border-line rounded-lg overflow-hidden mb-3">
                             <table className="w-full text-left border-collapse text-sm">
-                                <thead className="bg-slate-50 border-b border-slate-200 text-slate-600">
+                                <thead className="bg-card-2 border-b border-line text-ink-muted">
                                     <tr>
                                         <th className="p-2 font-semibold">RAW MATERIAL CODE</th>
                                         <th className="p-2 font-semibold">RAW MATERIAL NAME</th>
@@ -692,7 +692,7 @@ const ProductionOrderList: React.FC = () => {
                                         <th className="p-2 font-semibold text-center">STOCK STATUS</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-slate-200 bg-white">
+                                <tbody className="divide-y divide-line bg-card">
                                     {prod.rawMaterials?.map((rm: any) => {
                                         const stockRm = rawMaterialsMap.get(rm.rawMaterialId?.toString());
                                         const required = Number(rm.requiredQty || 0);
@@ -713,11 +713,11 @@ const ProductionOrderList: React.FC = () => {
                                         }
 
                                         return (
-                                            <tr key={rm.rawMaterialId} className="hover:bg-slate-50 transition-colors">
-                                                <td className="p-2 font-semibold text-slate-700">{rm.rawMaterialId}</td>
-                                                <td className="p-2 text-slate-600">{materialName}</td>
-                                                <td className="p-2 text-right text-slate-700">{required.toFixed(2)} {displayUom}</td>
-                                                <td className="p-2 text-right text-slate-700">{available.toFixed(2)} {displayUom}</td>
+                                            <tr key={rm.rawMaterialId} className="hover:bg-card-2 transition-colors">
+                                                <td className="p-2 font-semibold text-ink-muted">{rm.rawMaterialId}</td>
+                                                <td className="p-2 text-ink-muted">{materialName}</td>
+                                                <td className="p-2 text-right text-ink-muted">{required.toFixed(2)} {displayUom}</td>
+                                                <td className="p-2 text-right text-ink-muted">{available.toFixed(2)} {displayUom}</td>
                                                 <td className="p-2 text-center">
                                                     <StatusBadge status={isAvailable ? "AVAILABLE" : "INSUFFICIENT"} />
                                                 </td>
@@ -726,7 +726,7 @@ const ProductionOrderList: React.FC = () => {
                                     })}
                                     {(!prod.rawMaterials || prod.rawMaterials.length === 0) && (
                                         <tr>
-                                            <td colSpan={5} className="text-center text-slate-500 p-4">
+                                            <td colSpan={5} className="text-center text-ink-subtle p-4">
                                                 No raw materials defined for this product.
                                             </td>
                                         </tr>
@@ -756,11 +756,11 @@ const ProductionOrderList: React.FC = () => {
 
     return (
         <div>
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
                 {/* Page Header */}
-                <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-slate-200">
+                <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-line">
                     <div>
-                        <h2 className="text-2xl font-bold text-slate-800">Production Order Management</h2>
+                        <h2 className="text-2xl font-bold text-ink">Production Order Management</h2>
                     </div>
                     <div className="flex flex-wrap items-center gap-3">
                         {(can("weekly_programs.create") || can("weekly_programs.view")) && (

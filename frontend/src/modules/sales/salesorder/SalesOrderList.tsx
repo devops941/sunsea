@@ -199,11 +199,11 @@ const SalesOrderList: React.FC = () => {
 
     return (
         <div>
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
                 {/* Page Header */}
-                <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-slate-200">
+                <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-line">
                     <div>
-                        <h2 className="text-2xl font-bold text-slate-800">Draft Orders List</h2>
+                        <h2 className="text-2xl font-bold text-ink">Draft Orders List</h2>
                     </div>
 
                     <div className="flex flex-wrap items-center gap-3 relative w-full lg:w-auto">
@@ -342,26 +342,26 @@ const SalesOrderList: React.FC = () => {
 
                         {/* Modal Wrapper */}
                         <div className="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
-                            <div className="relative transform overflow-hidden rounded-2xl bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-4xl">
+                            <div className="relative transform overflow-hidden rounded-2xl bg-card text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-4xl">
                                 {/* Header */}
-                                <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-                                    <h3 className="text-lg font-bold text-slate-800">
+                                <div className="px-6 py-4 border-b border-line-soft flex items-center justify-between">
+                                    <h3 className="text-lg font-bold text-ink">
                                         Sales Order Estimate
                                     </h3>
                                     <button
                                         onClick={() => setShowEstimateModal(false)}
-                                        className="rounded-lg p-1 text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition-colors"
+                                        className="rounded-lg p-1 text-ink-subtle hover:bg-card-2 hover:text-ink-muted transition-colors"
                                     >
                                         <FaTimes size={18} />
                                     </button>
                                 </div>
 
                                 {/* Body */}
-                                <div className="p-6 bg-slate-50 min-h-[400px]">
+                                <div className="p-6 bg-card-2 min-h-[400px]">
                                     {loadingEstimate ? (
                                         <div className="flex flex-col items-center justify-center py-20 h-full">
                                             <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"></div>
-                                            <span className="mt-4 text-slate-500 font-semibold">Loading estimate details...</span>
+                                            <span className="mt-4 text-ink-subtle font-semibold">Loading estimate details...</span>
                                         </div>
                                     ) : estimateOrder ? (
                                         <DocumentPrintLayout subtitle="Sales Order" title="ESTIMATE">
@@ -372,17 +372,17 @@ const SalesOrderList: React.FC = () => {
                                             />
                                         </DocumentPrintLayout>
                                     ) : (
-                                        <div className="text-center py-10 text-slate-500">
+                                        <div className="text-center py-10 text-ink-subtle">
                                             Failed to load order estimate.
                                         </div>
                                     )}
                                 </div>
 
                                 {/* Footer */}
-                                <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
+                                <div className="px-6 py-4 border-t border-line-soft bg-card-2 flex items-center justify-between">
                                     <button
                                         onClick={() => setShowEstimateModal(false)}
-                                        className="px-4 py-2 border border-slate-200 text-slate-600 rounded-lg text-sm font-semibold hover:bg-slate-100 hover:text-slate-800 transition-colors"
+                                        className="px-4 py-2 border border-line text-ink-muted rounded-lg text-sm font-semibold hover:bg-card-2 hover:text-ink transition-colors"
                                     >
                                         Close
                                     </button>

@@ -238,12 +238,12 @@ const HourlyWorkReportList: React.FC = () => {
             align: "center",
             render: (group) => {
                 const isExpanded = !!expandedGroups[group.key];
-                return isExpanded ? <FaChevronUp className="text-slate-400" /> : <FaChevronDown className="text-slate-400" />;
+                return isExpanded ? <FaChevronUp className="text-ink-subtle" /> : <FaChevronDown className="text-ink-subtle" />;
             }
         },
         {
             header: "DATE",
-            render: (group) => <span className="font-medium text-slate-500">{new Date(group.productionDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
+            render: (group) => <span className="font-medium text-ink-subtle">{new Date(group.productionDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
         },
         {
             header: "MACHINE",
@@ -273,29 +273,29 @@ const HourlyWorkReportList: React.FC = () => {
         },
         {
             header: "TARGET",
-            render: (group) => <span className="font-bold text-slate-800">{group.plannedQty} <span className="text-xs text-slate-500 font-normal">{group.uom}</span></span>
+            render: (group) => <span className="font-bold text-ink">{group.plannedQty} <span className="text-xs text-ink-subtle font-normal">{group.uom}</span></span>
         },
         {
             header: "TOTAL PRODUCED",
             render: (group) => {
                 const isActiveNoEntry = group.weeklyProgramStatus === "IN_PROGRESS" && group.hours.length === 0;
                 if (isActiveNoEntry) {
-                    return <span className="text-slate-400">— PCS</span>;
+                    return <span className="text-ink-subtle">— PCS</span>;
                 }
-                return <span className="font-bold text-emerald-600">{group.totalQtyProduced} <span className="text-xs text-slate-500 font-normal">{group.uom}</span></span>;
+                return <span className="font-bold text-emerald-600">{group.totalQtyProduced} <span className="text-xs text-ink-subtle font-normal">{group.uom}</span></span>;
             }
         },
         {
             header: "REJECT / SCRAP",
             render: (group) => (
                 <>
-                    <span className="text-red-500 text-xs font-semibold">R: {group.totalRejectQty}</span> <span className="text-slate-300 mx-1">|</span> <span className="text-amber-500 text-xs font-semibold">S: {group.totalScrapQty}</span>
+                    <span className="text-red-500 text-xs font-semibold">R: {group.totalRejectQty}</span> <span className="text-ink-subtle mx-1">|</span> <span className="text-amber-500 text-xs font-semibold">S: {group.totalScrapQty}</span>
                 </>
             )
         },
         {
             header: "DOWNTIME",
-            render: (group) => <span className="text-slate-400">{group.totalDowntime > 0 ? `${group.totalDowntime} Mins` : "-"}</span>
+            render: (group) => <span className="text-ink-subtle">{group.totalDowntime > 0 ? `${group.totalDowntime} Mins` : "-"}</span>
         },
         {
             header: "ACTIONS",
@@ -358,36 +358,36 @@ const HourlyWorkReportList: React.FC = () => {
         if (!isExpanded) return null;
 
         return (
-            <div className="bg-slate-50 p-4 border-b border-slate-200">
-                <div className="rounded-2xl p-5 border border-slate-200 bg-white shadow-sm">
+            <div className="bg-card-2 p-4 border-b border-line">
+                <div className="rounded-2xl p-5 border border-line bg-card shadow-sm">
                     {/* SHIFT SUMMARY DASHBOARD */}
                     <div className="flex items-center justify-between mb-5">
-                        <h6 className="font-bold mb-0 text-slate-800 tracking-wide text-sm uppercase">
+                        <h6 className="font-bold mb-0 text-ink tracking-wide text-sm uppercase">
                             SHIFT SUMMARY DASHBOARD
                         </h6>
                        
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                        <div className="p-4 rounded-xl border border-slate-100 bg-slate-50/50 text-center">
-                            <div className="text-slate-500 text-[11px] font-bold mb-1 uppercase tracking-wider">Efficiency (OEE)</div>
-                            <h3 className="mb-0 font-bold text-slate-800 text-2xl">
+                        <div className="p-4 rounded-xl border border-line-soft bg-card-2/50 text-center">
+                            <div className="text-ink-subtle text-[11px] font-bold mb-1 uppercase tracking-wider">Efficiency (OEE)</div>
+                            <h3 className="mb-0 font-bold text-ink text-2xl">
                                 {group.plannedQty > 0 ? ((group.totalQtyProduced / group.plannedQty) * 100).toFixed(1) : 0}%
                             </h3>
                         </div>
-                        <div className="p-4 rounded-xl border border-slate-100 bg-slate-50/50 text-center">
-                            <div className="text-slate-500 text-[11px] font-bold mb-1 uppercase tracking-wider">Total Produced</div>
+                        <div className="p-4 rounded-xl border border-line-soft bg-card-2/50 text-center">
+                            <div className="text-ink-subtle text-[11px] font-bold mb-1 uppercase tracking-wider">Total Produced</div>
                             <h3 className="mb-0 font-bold text-emerald-600 text-2xl">
                                 {group.totalQtyProduced}
                             </h3>
                         </div>
-                        <div className="p-4 rounded-xl border border-slate-100 bg-slate-50/50 text-center">
-                            <div className="text-slate-500 text-[11px] font-bold mb-1 uppercase tracking-wider">Scrap Rate</div>
+                        <div className="p-4 rounded-xl border border-line-soft bg-card-2/50 text-center">
+                            <div className="text-ink-subtle text-[11px] font-bold mb-1 uppercase tracking-wider">Scrap Rate</div>
                             <h3 className="mb-0 font-bold text-amber-500 text-2xl">
                                 {group.totalQtyProduced > 0 ? ((group.totalScrapQty / group.totalQtyProduced) * 100).toFixed(1) : 0}%
                             </h3>
                         </div>
-                        <div className="p-4 rounded-xl border border-slate-100 bg-slate-50/50 text-center">
-                            <div className="text-slate-500 text-[11px] font-bold mb-1 uppercase tracking-wider">Total Downtime</div>
+                        <div className="p-4 rounded-xl border border-line-soft bg-card-2/50 text-center">
+                            <div className="text-ink-subtle text-[11px] font-bold mb-1 uppercase tracking-wider">Total Downtime</div>
                             <h3 className="mb-0 font-bold text-red-500 text-2xl">
                                 {group.totalDowntime > 0 ? `${group.totalDowntime} min` : "0 min"}
                             </h3>
@@ -395,9 +395,9 @@ const HourlyWorkReportList: React.FC = () => {
                     </div>
 
                     {/* TIMELINE */}
-                    <h6 className="font-bold mb-4 text-slate-500 uppercase tracking-wide text-xs">Hourly Timeline</h6>
+                    <h6 className="font-bold mb-4 text-ink-subtle uppercase tracking-wide text-xs">Hourly Timeline</h6>
                     {group.hours.length === 0 ? (
-                        <div className="text-center text-slate-400 p-6 border border-dashed border-slate-200 rounded-xl bg-slate-50">
+                        <div className="text-center text-ink-subtle p-6 border border-dashed border-line rounded-xl bg-card-2">
                             No hours logged yet for this shift. Click "Log Next Hour" to start.
                         </div>
                     ) : (
@@ -409,32 +409,32 @@ const HourlyWorkReportList: React.FC = () => {
                                         {hasIssues && <div className="absolute left-0 top-0 bottom-0 rounded-l-xl w-1.5 bg-red-500"></div>}
                                         {!hasIssues && <div className="absolute left-0 top-0 bottom-0 rounded-l-xl w-1.5 bg-emerald-500"></div>}
                                         <div className="mr-6 text-center ml-3 min-w-[60px]">
-                                            <div className="font-bold text-slate-400 text-[10px] uppercase mb-1 tracking-wider">Hour</div>
-                                            <h4 className="mb-0 font-bold font-mono text-slate-800 text-2xl">{h.hourIndex}</h4>
+                                            <div className="font-bold text-ink-subtle text-[10px] uppercase mb-1 tracking-wider">Hour</div>
+                                            <h4 className="mb-0 font-bold font-mono text-ink text-2xl">{h.hourIndex}</h4>
                                         </div>
                                         <div className="flex-grow grid grid-cols-5 items-center gap-4">
                                             <div>
-                                                <div className="text-[11px] font-bold tracking-wide uppercase text-slate-500 mb-1">Produced</div>
-                                                <div className="font-bold text-emerald-600 text-xl">{h.qtyProduced} <span className="text-xs text-slate-400">{group.uom}</span></div>
+                                                <div className="text-[11px] font-bold tracking-wide uppercase text-ink-subtle mb-1">Produced</div>
+                                                <div className="font-bold text-emerald-600 text-xl">{h.qtyProduced} <span className="text-xs text-ink-subtle">{group.uom}</span></div>
                                             </div>
                                             <div>
-                                                <div className="text-[11px] font-bold tracking-wide uppercase text-slate-500 mb-1">Reject</div>
-                                                <div className={h.rejectQty > 0 ? "font-bold text-red-500 text-lg" : "text-slate-400 text-lg"}>{h.rejectQty || 0}</div>
+                                                <div className="text-[11px] font-bold tracking-wide uppercase text-ink-subtle mb-1">Reject</div>
+                                                <div className={h.rejectQty > 0 ? "font-bold text-red-500 text-lg" : "text-ink-subtle text-lg"}>{h.rejectQty || 0}</div>
                                             </div>
                                             <div>
-                                                <div className="text-[11px] font-bold tracking-wide uppercase text-slate-500 mb-1">Scrap</div>
-                                                <div className={h.scrapQty > 0 ? "font-bold text-amber-500 text-lg" : "text-slate-400 text-lg"}>{h.scrapQty || 0}</div>
+                                                <div className="text-[11px] font-bold tracking-wide uppercase text-ink-subtle mb-1">Scrap</div>
+                                                <div className={h.scrapQty > 0 ? "font-bold text-amber-500 text-lg" : "text-ink-subtle text-lg"}>{h.scrapQty || 0}</div>
                                             </div>
                                             <div>
-                                                <div className="text-[11px] font-bold tracking-wide uppercase text-slate-500 mb-1">Downtime</div>
-                                                <div className={h.downtime > 0 ? "font-bold text-red-500 text-lg" : "text-slate-400 text-lg"}>
+                                                <div className="text-[11px] font-bold tracking-wide uppercase text-ink-subtle mb-1">Downtime</div>
+                                                <div className={h.downtime > 0 ? "font-bold text-red-500 text-lg" : "text-ink-subtle text-lg"}>
                                                     {h.downtime > 0 ? `${h.downtime} min` : "—"}
-                                                    {h.downtimeReason && <div className="text-[10px] font-normal text-slate-500 leading-tight mt-0.5">{h.downtimeReason}</div>}
+                                                    {h.downtimeReason && <div className="text-[10px] font-normal text-ink-subtle leading-tight mt-0.5">{h.downtimeReason}</div>}
                                                 </div>
                                             </div>
                                             <div>
-                                                <div className="text-[11px] font-bold tracking-wide uppercase text-slate-500 mb-1">Operator</div>
-                                                <div className="text-slate-800 text-sm font-medium truncate max-w-[120px]" title={h.operatorName || h.operatorId}>{h.operatorName || h.operatorId || "—"}</div>
+                                                <div className="text-[11px] font-bold tracking-wide uppercase text-ink-subtle mb-1">Operator</div>
+                                                <div className="text-ink text-sm font-medium truncate max-w-[120px]" title={h.operatorName || h.operatorId}>{h.operatorName || h.operatorId || "—"}</div>
                                             </div>
                                         </div>
                                         <div className="ml-4 flex gap-2">
@@ -448,7 +448,7 @@ const HourlyWorkReportList: React.FC = () => {
                                                     )}
                                                 </>
                                             ) : (
-                                                <span className="text-slate-400 text-xs font-semibold select-none flex items-center bg-slate-100 border border-slate-200 rounded px-2.5 py-1">Locked</span>
+                                                <span className="text-ink-subtle text-xs font-semibold select-none flex items-center bg-card-2 border border-line rounded px-2.5 py-1">Locked</span>
                                             )}
                                         </div>
                                     </div>
@@ -463,11 +463,11 @@ const HourlyWorkReportList: React.FC = () => {
 
     return (
         <div>
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
                 {/* Page Header */}
-                <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-slate-200">
+                <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-line">
                     <div>
-                        <h2 className="text-2xl font-bold text-slate-800">Hourly Production Logs</h2>
+                        <h2 className="text-2xl font-bold text-ink">Hourly Production Logs</h2>
                     </div>
                     <div className="flex flex-wrap items-center gap-3">
                         <SearchInput
@@ -535,28 +535,28 @@ const HourlyWorkReportList: React.FC = () => {
                     maxWidth="5xl"
                 >
                     {/* Summary info strip */}
-                    <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-5 p-4 bg-slate-50 rounded-xl border border-slate-200">
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-5 p-4 bg-card-2 rounded-xl border border-line">
                         <div>
-                            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">Date</div>
-                            <div className="text-sm font-semibold text-slate-700">
+                            <div className="text-[10px] font-bold uppercase tracking-wider text-ink-subtle mb-0.5">Date</div>
+                            <div className="text-sm font-semibold text-ink-muted">
                                 {new Date(selectedViewGroup.productionDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                             </div>
                         </div>
                         <div>
-                            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">Machine</div>
-                            <div className="text-sm font-semibold text-slate-700">{selectedViewGroup.machineName}</div>
+                            <div className="text-[10px] font-bold uppercase tracking-wider text-ink-subtle mb-0.5">Machine</div>
+                            <div className="text-sm font-semibold text-ink-muted">{selectedViewGroup.machineName}</div>
                         </div>
                         <div>
-                            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">Product</div>
-                            <div className="text-sm font-semibold text-slate-700">{selectedViewGroup.productName}</div>
+                            <div className="text-[10px] font-bold uppercase tracking-wider text-ink-subtle mb-0.5">Product</div>
+                            <div className="text-sm font-semibold text-ink-muted">{selectedViewGroup.productName}</div>
                         </div>
                         <div>
-                            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">PO ID</div>
+                            <div className="text-[10px] font-bold uppercase tracking-wider text-ink-subtle mb-0.5">PO ID</div>
                             <div className="text-sm font-semibold text-indigo-600">{selectedViewGroup.productionOrderId}</div>
                         </div>
                         <div>
-                            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-0.5">Operator(s)</div>
-                            <div className="text-sm font-semibold text-slate-700">
+                            <div className="text-[10px] font-bold uppercase tracking-wider text-ink-subtle mb-0.5">Operator(s)</div>
+                            <div className="text-sm font-semibold text-ink-muted">
                                 {selectedViewGroup.hours && selectedViewGroup.hours.length > 0
                                     ? [...new Set(selectedViewGroup.hours.map((h: any) => h.operatorName || h.operatorId).filter(Boolean))].join(", ")
                                     : "N/A"}
@@ -565,49 +565,49 @@ const HourlyWorkReportList: React.FC = () => {
                     </div>
 
                     {/* Hourly entries table */}
-                    <div className="overflow-x-auto rounded-xl border border-slate-200">
+                    <div className="overflow-x-auto rounded-xl border border-line">
                         <table className="w-full text-sm">
                             <thead>
-                                <tr className="bg-slate-100 border-b border-slate-200">
-                                    <th className="py-3 px-4 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">Hour</th>
-                                    <th className="py-3 px-4 text-center text-[11px] font-bold uppercase tracking-wider text-slate-500">Produced</th>
-                                    <th className="py-3 px-4 text-center text-[11px] font-bold uppercase tracking-wider text-slate-500">Reject</th>
-                                    <th className="py-3 px-4 text-center text-[11px] font-bold uppercase tracking-wider text-slate-500">Scrap</th>
-                                    <th className="py-3 px-4 text-center text-[11px] font-bold uppercase tracking-wider text-slate-500">Downtime</th>
-                                    <th className="py-3 px-4 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">Operator</th>
-                                    <th className="py-3 px-4 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">Remarks</th>
+                                <tr className="bg-card-2 border-b border-line">
+                                    <th className="py-3 px-4 text-left text-[11px] font-bold uppercase tracking-wider text-ink-subtle">Hour</th>
+                                    <th className="py-3 px-4 text-center text-[11px] font-bold uppercase tracking-wider text-ink-subtle">Produced</th>
+                                    <th className="py-3 px-4 text-center text-[11px] font-bold uppercase tracking-wider text-ink-subtle">Reject</th>
+                                    <th className="py-3 px-4 text-center text-[11px] font-bold uppercase tracking-wider text-ink-subtle">Scrap</th>
+                                    <th className="py-3 px-4 text-center text-[11px] font-bold uppercase tracking-wider text-ink-subtle">Downtime</th>
+                                    <th className="py-3 px-4 text-left text-[11px] font-bold uppercase tracking-wider text-ink-subtle">Operator</th>
+                                    <th className="py-3 px-4 text-left text-[11px] font-bold uppercase tracking-wider text-ink-subtle">Remarks</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {selectedViewGroup.hours.map((hour: any, idx: number) => {
                                     const hasIssues = hour.rejectQty > 0 || hour.scrapQty > 0 || hour.downtime > 0;
                                     return (
-                                        <tr key={hour.hourlyProductionId || idx} className={`border-b border-slate-100 ${hasIssues ? "bg-red-50" : "bg-white"}`}>
-                                            <td className="py-3 px-4 font-bold text-slate-700">Hour {hour.hourIndex}</td>
-                                            <td className="py-3 px-4 text-center font-bold text-emerald-600">{hour.qtyProduced} <span className="text-xs text-slate-400 font-normal">{selectedViewGroup.uom}</span></td>
+                                        <tr key={hour.hourlyProductionId || idx} className={`border-b border-line-soft ${hasIssues ? "bg-red-50" : "bg-card"}`}>
+                                            <td className="py-3 px-4 font-bold text-ink-muted">Hour {hour.hourIndex}</td>
+                                            <td className="py-3 px-4 text-center font-bold text-emerald-600">{hour.qtyProduced} <span className="text-xs text-ink-subtle font-normal">{selectedViewGroup.uom}</span></td>
                                             <td className="py-3 px-4 text-center font-semibold text-red-500">{hour.rejectQty || 0}</td>
                                             <td className="py-3 px-4 text-center font-semibold text-amber-500">{hour.scrapQty || 0}</td>
-                                            <td className="py-3 px-4 text-center text-slate-500">{hour.downtime > 0 ? `${hour.downtime} min` : "—"}</td>
-                                            <td className="py-3 px-4 text-slate-700">{hour.operatorName || hour.operatorId || "—"}</td>
-                                            <td className="py-3 px-4 text-slate-500 text-xs">{hour.remarks || "—"}</td>
+                                            <td className="py-3 px-4 text-center text-ink-subtle">{hour.downtime > 0 ? `${hour.downtime} min` : "—"}</td>
+                                            <td className="py-3 px-4 text-ink-muted">{hour.operatorName || hour.operatorId || "—"}</td>
+                                            <td className="py-3 px-4 text-ink-subtle text-xs">{hour.remarks || "—"}</td>
                                         </tr>
                                     );
                                 })}
                             </tbody>
                             <tfoot>
-                                <tr className="bg-slate-50 border-t-2 border-slate-300">
-                                    <td className="py-3 px-4 font-bold text-slate-600 uppercase text-xs tracking-wide">Total</td>
+                                <tr className="bg-card-2 border-t-2 border-line">
+                                    <td className="py-3 px-4 font-bold text-ink-muted uppercase text-xs tracking-wide">Total</td>
                                     <td className={`py-3 px-4 text-center font-bold text-lg ${selectedViewGroup.totalQtyProduced >= selectedViewGroup.plannedQty ? "text-emerald-600" : "text-red-500"}`}>
                                         {selectedViewGroup.totalQtyProduced}
-                                        <span className="text-xs font-normal text-slate-400 ml-1">{selectedViewGroup.uom}</span>
+                                        <span className="text-xs font-normal text-ink-subtle ml-1">{selectedViewGroup.uom}</span>
                                     </td>
                                     <td className="py-3 px-4 text-center font-bold text-red-500">{selectedViewGroup.totalRejectQty}</td>
                                     <td className="py-3 px-4 text-center font-bold text-amber-500">{selectedViewGroup.totalScrapQty}</td>
-                                    <td className="py-3 px-4 text-center text-slate-500 font-semibold">
+                                    <td className="py-3 px-4 text-center text-ink-subtle font-semibold">
                                         {selectedViewGroup.totalDowntime > 0 ? `${selectedViewGroup.totalDowntime} min` : "—"}
                                     </td>
-                                    <td colSpan={2} className="py-3 px-4 text-slate-500 text-xs">
-                                        <span className="font-semibold text-slate-600">Planned:</span> {selectedViewGroup.plannedQty} {selectedViewGroup.uom}
+                                    <td colSpan={2} className="py-3 px-4 text-ink-subtle text-xs">
+                                        <span className="font-semibold text-ink-muted">Planned:</span> {selectedViewGroup.plannedQty} {selectedViewGroup.uom}
                                         {selectedViewGroup.totalQtyProduced < selectedViewGroup.plannedQty && (
                                             <span className="ml-3 text-red-500 font-bold">
                                                 ↓ {selectedViewGroup.plannedQty - selectedViewGroup.totalQtyProduced} {selectedViewGroup.uom} short

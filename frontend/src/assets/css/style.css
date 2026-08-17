@@ -3,9 +3,107 @@
 
 @theme {
     --color-primary: var(--color-red-600);
+
+    /* ── Nav / sidebar chrome ─────────────────────────────────────────────
+       The bar inverts between themes: a LIGHT teal bar in light mode and a
+       BRIGHT teal bar in dark mode. Because the background flips, the text
+       cannot be a fixed white — each background is paired with its own
+       foreground token so contrast survives both themes.
+
+         nav            bar background
+         nav-fg         label text on the bar
+         nav-active     active pill / selected row background
+         nav-active-fg  text inside that pill
+         nav-hover      hover wash on the bar
+         accent         teal used for text on normal cards (dropdowns)
+
+       The bar keeps the SAME bright teal in both themes — it is a brand
+       surface, not a page surface, so it does not invert. Consequently the
+       nav tokens are defined once here and are NOT overridden in the dark
+       block below; only `accent` differs, because that one paints text on
+       card surfaces, which do invert.
+
+       The text on the bar is dark in both themes by necessity: #14B8A6 is
+       mid-luminance, so #042F2E reaches 5.8:1 while white manages only
+       2.5:1 and pale teal #CCFBF1 just 2.2:1 — both well under the 4.5:1 AA
+       floor. Do not switch the bar text to white. */
+    --color-nav: #14B8A6;
+    --color-nav-fg: #042F2E;
+    --color-nav-active: #042F2E;
+    --color-nav-active-fg: #CCFBF1;
+    --color-nav-hover: #2DD4BF;
+    --color-accent: #0F766E;
+
+    /* ── Semantic theme tokens ────────────────────────────────────────────
+       Tailwind emits these as var() references (e.g. .bg-card resolves to
+       `background-color: var(--color-card)`), so redefining the variables
+       under :root[data-theme="dark"] below re-themes the whole app at
+       runtime with no rebuild and no `dark:` variants in the markup.
+
+       Deliberately named apart from the legacy --color-surface/-bg/-border
+       set further down this file, which is plain CSS and generates no
+       utilities; overriding those here would collide.
+
+         page       app background behind the cards
+         card       raised surface (cards, modals, dropdowns)
+         card-2     subtle inset / hover fill on top of `card`
+         ink        primary text
+         ink-muted  secondary text
+         ink-subtle labels, placeholders, disabled
+         line       default border
+         line-soft  low-contrast divider (table rows)
+         head       table header band
+       ------------------------------------------------------------------- */
+    --color-page: #F8FAFC;
+    --color-card: #FFFFFF;
+    --color-card-2: #F8FAFC;
+    --color-ink: #1E293B;
+    --color-ink-muted: #475569;
+    --color-ink-subtle: #94A3B8;
+    --color-line: #E2E8F0;
+    --color-line-soft: #F1F5F9;
+    --color-head: #E5EAEF;
+
     --radius-sm: 6px;
     --radius-md: 10px;
     --radius-lg: 16px;
+}
+
+/* ── Dark palette ─────────────────────────────────────────────────────────
+   `:root[data-theme="dark"]` is specificity (0,2,0), so it reliably beats
+   both the `@theme` output and the legacy `:root` block regardless of source
+   order. ThemeProvider sets the attribute on <html>.
+   The legacy --color-surface/-bg/-border/-text-* vars are re-pointed too, so
+   the handful of components still using them inline follow the theme.
+   ------------------------------------------------------------------------- */
+:root[data-theme="dark"] {
+    /* Nav tokens are intentionally absent here — the bar is identical in both
+       themes (see the note in @theme). Only `accent` flips, because it paints
+       text on card surfaces and those do invert: the light-mode teal is too
+       dark to read on a dark card. */
+    --color-accent: #2DD4BF;
+
+    --color-page: #0B1120;
+    --color-card: #151D2C;
+    --color-card-2: #1C2536;
+    --color-ink: #E2E8F0;
+    --color-ink-muted: #94A3B8;
+    --color-ink-subtle: #64748B;
+    --color-line: #2A3548;
+    --color-line-soft: #202A3C;
+    --color-head: #1E293B;
+
+    /* legacy vars, kept in sync */
+    --color-bg: #0B1120;
+    --color-surface: #151D2C;
+    --color-border: #2A3548;
+    --color-text-primary: #E2E8F0;
+    --color-text-secondary: #94A3B8;
+    --color-text-muted: #64748B;
+    --color-neutral-light: #1C2536;
+    --color-secondary-light: #1C2536;
+
+    color-scheme: dark;
 }
 
 /* Override Bootstrap !important utility classes with our Tailwind Theme Color */
@@ -188,7 +286,7 @@ ul {
     padding: 0 16px;
     border: 1px solid #e2e8f0;
     border-radius: 10px;
-    background: #ffffff;
+    background: var(--color-card);
     color: #334155;
     font-size: 14px;
     font-weight: 600;
@@ -219,7 +317,7 @@ ul {
     padding: 0 16px;
     border: 1px solid #e2e8f0;
     border-radius: 10px;
-    background: #ffffff;
+    background: var(--color-card);
     font-size: 14px;
     font-weight: 600;
     color: #475569;
@@ -464,13 +562,15 @@ ul {
 .inner-container {
     width: 100%;
     min-width: 0;
-    padding: 14px;
-    background: #ffffff;
+    /* Horizontal gutter comes from the max-w-[1600px] wrapper in BaseLayout —
+       keeping it here too double-padded every page. Vertical spacing stays so
+       cards clear the nav and footer. */
+    margin: 14px 0;
+    background: var(--color-card);
     /* border: 1px solid #e8edf2; */
 
     /* box-shadow:
         0 2px 8px rgba(15, 23, 42, 0.04); */
-    min-height: calc(100vh - 120px);
 }
 
 .page-header {
@@ -538,7 +638,7 @@ ul {
     border: 1px solid #dbe2ea;
     border-radius: 12px;
 
-    background: #ffffff;
+    background: var(--color-card);
 
     font-size: 14px;
 

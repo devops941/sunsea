@@ -58,14 +58,14 @@ const CommonViewModal: React.FC<CommonViewModalProps> = ({
       {/* Modal Content */}
       <div 
         ref={modalRef}
-        className={`relative w-full ${sizeClasses[size]} max-h-[90vh] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200`}
+        className={`relative w-full ${sizeClasses[size]} max-h-[90vh] bg-card rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200`}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/50">
-          <h3 className="text-lg font-semibold text-slate-800">{modalTitle}</h3>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-line-soft bg-card-2/50">
+          <h3 className="text-lg font-semibold text-ink">{modalTitle}</h3>
           <button
             onClick={onHide}
-            className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary/20"
+            className="p-2 text-ink-subtle hover:text-ink-muted hover:bg-card-2 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary/20"
           >
             <FiX size={20} />
           </button>
@@ -82,9 +82,9 @@ const CommonViewModal: React.FC<CommonViewModalProps> = ({
                 </div>
               )} */}
               <div>
-                <h4 className="text-xl font-bold text-slate-900 mb-1">{headerTitle}</h4>
+                <h4 className="text-xl font-bold text-ink mb-1">{headerTitle}</h4>
                 {headerSubtitle && (
-                  <p className="text-sm font-medium text-slate-500">{headerSubtitle}</p>
+                  <p className="text-sm font-medium text-ink-subtle">{headerSubtitle}</p>
                 )}
               </div>
             </div>
@@ -98,17 +98,17 @@ const CommonViewModal: React.FC<CommonViewModalProps> = ({
           {/* Sections */}
           <div className="space-y-6">
             {sections.map((section, sIdx) => (
-              <div key={sIdx} className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
+              <div key={sIdx} className="bg-card rounded-xl border border-line-soft shadow-sm overflow-hidden">
                 {section.title && (
-                  <div className="px-5 py-3 bg-slate-50 border-b border-slate-100">
-                    <h6 className="text-sm font-semibold text-slate-700 uppercase tracking-wider">{section.title}</h6>
+                  <div className="px-5 py-3 bg-card-2 border-b border-line-soft">
+                    <h6 className="text-sm font-semibold text-ink-muted uppercase tracking-wider">{section.title}</h6>
                   </div>
                 )}
                 <div className="p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-y-5 gap-x-8">
                   {section.fields.map((field, fIdx) => (
                     <div key={fIdx} className={`flex flex-col gap-1.5 ${field.xs === 12 ? 'col-span-full' : ''}`}>
-                      <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">{field.label}</span>
-                      <span className="text-sm font-medium text-slate-800 break-words">{field.value || "-"}</span>
+                      <span className="text-xs font-medium text-ink-subtle uppercase tracking-wide">{field.label}</span>
+                      <span className="text-sm font-medium text-ink break-words">{field.value || "-"}</span>
                     </div>
                   ))}
                 </div>
@@ -125,7 +125,7 @@ const CommonViewModal: React.FC<CommonViewModalProps> = ({
 
         {/* Footer */}
         {footer && (
-          <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex items-center justify-end gap-3 rounded-b-2xl">
+          <div className="px-6 py-4 border-t border-line-soft bg-card-2 flex items-center justify-end gap-3 rounded-b-2xl">
             {footer}
           </div>
         )}

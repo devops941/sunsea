@@ -255,7 +255,7 @@ const WeeklyMachineScheduleList: React.FC = () => {
             accessor: "expand",
             align: "center",
             render: (row) => (
-                <div className="text-slate-400">
+                <div className="text-ink-subtle">
                     {expandedGroups[row.weekKey] ? <FaChevronDown size={12} /> : <FaCaretRight size={12} />}
                 </div>
             ),
@@ -264,7 +264,7 @@ const WeeklyMachineScheduleList: React.FC = () => {
             header: "WEEK PERIOD",
             accessor: "weekKey",
             render: (row) => (
-                <span className="font-bold text-slate-800">
+                <span className="font-bold text-ink">
                     {getFormattedWeekLabel(row.weekStartDate, row.weekEndDate)}
                 </span>
             )
@@ -294,30 +294,30 @@ const WeeklyMachineScheduleList: React.FC = () => {
     const renderSubRow = (row: any) => {
         if (!expandedGroups[row.weekKey]) return null;
         return (
-            <div className="bg-white/80 px-6 py-5 shadow-inner">
-                <div className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">
+            <div className="bg-card/80 px-6 py-5 shadow-inner">
+                <div className="text-xs font-bold text-ink-subtle uppercase tracking-widest mb-4">
                     Production Orders Scheduled for this Week
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                     {row.ordersList.map((order: any) => (
-                        <div key={order.productionOrderId} className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm hover:shadow-md transition-shadow relative group">
+                        <div key={order.productionOrderId} className="bg-card rounded-xl p-4 border border-line shadow-sm hover:shadow-md transition-shadow relative group">
                             <div className="flex justify-between items-start mb-2">
                                 <div>
-                                    <h4 className="font-bold text-slate-800 text-sm">{order.productionOrderNumber}</h4>
-                                    <p className="text-xs text-slate-500">{order.productName}</p>
+                                    <h4 className="font-bold text-ink text-sm">{order.productionOrderNumber}</h4>
+                                    <p className="text-xs text-ink-subtle">{order.productName}</p>
                                 </div>
                                 <StatusBadge status={order.status} />
                             </div>
                             
                             <div className="mt-3 space-y-1">
                                 <div className="flex justify-between text-xs">
-                                    <span className="text-slate-500">Planned Qty:</span>
-                                    <span className="font-medium text-slate-700">{order.plannedQty} {order.uom?.toLowerCase() === 'ea' || order.uom?.toLowerCase() === 'each' ? 'pcs' : order.uom}</span>
+                                    <span className="text-ink-subtle">Planned Qty:</span>
+                                    <span className="font-medium text-ink-muted">{order.plannedQty} {order.uom?.toLowerCase() === 'ea' || order.uom?.toLowerCase() === 'each' ? 'pcs' : order.uom}</span>
                                 </div>
                             </div>
 
-                            <div className="mt-4 pt-3 border-t border-slate-100">
-                                <div className="text-[11px] font-semibold text-slate-500 mb-2 uppercase">Scheduled Machines</div>
+                            <div className="mt-4 pt-3 border-t border-line-soft">
+                                <div className="text-[11px] font-semibold text-ink-subtle mb-2 uppercase">Scheduled Machines</div>
                                 <div className="space-y-2">
                                     {order.schedules
                                         .filter((schedule: any) => Number(schedule.plannedQty) > 0)
@@ -331,19 +331,19 @@ const WeeklyMachineScheduleList: React.FC = () => {
                                         const assignedShiftId = schedule.shiftId || linkedDailyPlan?.shiftId;
                                         
                                         return (
-                                        <div key={schedule.weeklyProgramId} className="flex items-center justify-between bg-slate-50 p-2 rounded-lg border border-slate-100">
+                                        <div key={schedule.weeklyProgramId} className="flex items-center justify-between bg-card-2 p-2 rounded-lg border border-line-soft">
                                             <div className="flex flex-col">
                                                 <span className="text-xs font-medium text-indigo-700">
                                                     {assignedMachine?.machineName || schedule.machineName || (assignedMachineId ? `Machine ${assignedMachineId}` : "Machine Not Assigned")}
                                                 </span>
                                                 <div className="flex items-center gap-1 mt-0.5">
                                                     {assignedMachineId && (
-                                                        <span className="text-[10px] text-slate-400">ID: {assignedMachineId}</span>
+                                                        <span className="text-[10px] text-ink-subtle">ID: {assignedMachineId}</span>
                                                     )}
                                                     {(assignedShift?.shiftName || assignedShiftId) && (
                                                         <>
-                                                            <span className="text-[10px] text-slate-300 mx-1">|</span>
-                                                            <span className="text-[10px] text-slate-500 bg-slate-200/60 px-1 rounded">Shift: {assignedShift?.shiftName || assignedShiftId}</span>
+                                                            <span className="text-[10px] text-ink-subtle mx-1">|</span>
+                                                            <span className="text-[10px] text-ink-subtle bg-line/60 px-1 rounded">Shift: {assignedShift?.shiftName || assignedShiftId}</span>
                                                         </>
                                                     )}
                                                 </div>
@@ -380,11 +380,11 @@ const WeeklyMachineScheduleList: React.FC = () => {
 
     return (
         <div>
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
                 {/* Page Header */}
-                <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-slate-200">
+                <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-line">
                     <div>
-                        <h2 className="text-2xl font-bold text-slate-800">Weekly Machine Schedules</h2>
+                        <h2 className="text-2xl font-bold text-ink">Weekly Machine Schedules</h2>
                     </div>
                     <div className="flex flex-wrap items-center gap-3">
                         <div className="w-[160px]">
@@ -424,13 +424,13 @@ const WeeklyMachineScheduleList: React.FC = () => {
                 
                 {/* Pagination */}
                 {totalPages > 1 && (
-                    <div className="flex items-center justify-center gap-2 py-4 border-t border-slate-200">
-                        <button className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-40" disabled={currentPage === 1} onClick={() => setCurrentPage(prev => prev - 1)}>
-                            <svg className="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+                    <div className="flex items-center justify-center gap-2 py-4 border-t border-line">
+                        <button className="p-2 rounded-lg border border-line hover:bg-card-2 disabled:opacity-40" disabled={currentPage === 1} onClick={() => setCurrentPage(prev => prev - 1)}>
+                            <svg className="w-4 h-4 text-ink-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
                         </button>
-                        <span className="text-sm text-slate-600">Page {currentPage} of {totalPages}</span>
-                        <button className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-40" disabled={currentPage === totalPages} onClick={() => setCurrentPage(prev => prev + 1)}>
-                            <svg className="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                        <span className="text-sm text-ink-muted">Page {currentPage} of {totalPages}</span>
+                        <button className="p-2 rounded-lg border border-line hover:bg-card-2 disabled:opacity-40" disabled={currentPage === totalPages} onClick={() => setCurrentPage(prev => prev + 1)}>
+                            <svg className="w-4 h-4 text-ink-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
                         </button>
                     </div>
                 )}

@@ -274,7 +274,7 @@ const ProductList: React.FC = () => {
         {
             header: "Rate (₹)",
             render: (product) => (
-                <span className="font-semibold text-slate-800">
+                <span className="font-semibold text-ink">
                     {product.rate != null ? `₹${product.rate}` : (product.mrp != null ? `₹${product.mrp}` : "-")}
                 </span>
             )
@@ -288,8 +288,8 @@ const ProductList: React.FC = () => {
                             const minQty = product.minimumQty || 0;
                 return (
                     <div className="flex flex-col items-center">
-                        <span className="font-semibold text-slate-800">{onHandQty}</span>
-                        <span className="text-xs text-slate-500">Min: {minQty}</span>
+                        <span className="font-semibold text-ink">{onHandQty}</span>
+                        <span className="text-xs text-ink-subtle">Min: {minQty}</span>
                     </div>
                 );
             }
@@ -312,11 +312,11 @@ const ProductList: React.FC = () => {
     return (
         <div>
             <div>
-                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className="bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
                     {/* Page Header */}
-                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-6 border-b border-slate-200">
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-6 border-b border-line">
                         <div>
-                            <h2 className="text-2xl font-bold text-slate-800">Production Product</h2>
+                            <h2 className="text-2xl font-bold text-ink">Production Product</h2>
                         </div>
                         <div className="flex items-center gap-3 w-full md:w-auto">
                             <div className="w-full md:w-48">
@@ -332,10 +332,10 @@ const ProductList: React.FC = () => {
                                 />
                             </div>
                             <div className="relative w-full md:w-64">
-                                <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-subtle" />
                                 <input
                                     type="text"
-                                    className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                                    className="w-full pl-10 pr-4 py-2 bg-card border border-line rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
                                     placeholder="Search product..."
                                     value={searchTerm}
                                     onChange={handleSearch}
@@ -407,9 +407,9 @@ const ProductList: React.FC = () => {
                         <div className="mt-6 flex flex-col gap-6">
                             {/* Premium Product Images Gallery */}
                             {((selectedProduct?.images && selectedProduct.images.length > 0) || selectedProduct?.imageUrl) && (
-                                <div className="bg-slate-50/70 p-4 rounded-xl border border-slate-200/80 shadow-sm">
+                                <div className="bg-card-2/70 p-4 rounded-xl border border-line/80 shadow-sm">
                                     <div className="flex items-center justify-between mb-3">
-                                        <h6 className="text-xs font-bold text-slate-700 tracking-wider uppercase flex items-center gap-2">
+                                        <h6 className="text-xs font-bold text-ink-muted tracking-wider uppercase flex items-center gap-2">
                                             <span>Product Images</span>
                                             <span className="text-[11px] font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100">
                                                 {selectedProduct.images?.length || 1} Image{(selectedProduct.images?.length || 1) > 1 ? 's' : ''}
@@ -423,7 +423,7 @@ const ProductList: React.FC = () => {
                                         ).map((img: any, idx: number) => (
                                             <div 
                                                 key={idx} 
-                                                className="relative group aspect-square rounded-xl border border-slate-200 bg-white overflow-hidden shadow-sm hover:shadow-md transition-all duration-200"
+                                                className="relative group aspect-square rounded-xl border border-line bg-card overflow-hidden shadow-sm hover:shadow-md transition-all duration-200"
                                             >
                                                 <img
                                                     src={getImageUrl(img.imageUrl)}
@@ -446,20 +446,20 @@ const ProductList: React.FC = () => {
                                     {/* BOM Section */}
                                     {selectedProduct.billOfMaterials.some((rm: any) => Number(rm.percentage) > 0) && (
                                         <div>
-                                            <h6 className="text-sm font-semibold text-slate-800 mb-2">Raw Materials Composition (BOM)</h6>
-                                            <div className="border border-slate-200 rounded-lg overflow-hidden">
+                                            <h6 className="text-sm font-semibold text-ink mb-2">Raw Materials Composition (BOM)</h6>
+                                            <div className="border border-line rounded-lg overflow-hidden">
                                                 <table className="w-full text-left text-sm whitespace-nowrap">
-                                                    <thead className="bg-slate-50 text-slate-600">
+                                                    <thead className="bg-card-2 text-ink-muted">
                                                         <tr>
-                                                            <th className="px-4 py-2 font-semibold border-b border-slate-200">Raw Material</th>
-                                                            <th className="px-4 py-2 font-semibold border-b border-slate-200 text-right">Percentage (%)</th>
+                                                            <th className="px-4 py-2 font-semibold border-b border-line">Raw Material</th>
+                                                            <th className="px-4 py-2 font-semibold border-b border-line text-right">Percentage (%)</th>
                                                         </tr>
                                                     </thead>
-                                                    <tbody className="divide-y divide-slate-100 bg-white">
+                                                    <tbody className="divide-y divide-line bg-card">
                                                         {selectedProduct.billOfMaterials
                                                             .filter((rm: any) => Number(rm.percentage) > 0)
                                                             .map((rm: any, idx: number) => (
-                                                                <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
+                                                                <tr key={idx} className="hover:bg-card-2/50 transition-colors">
                                                                     <td className="px-4 py-2">{rm.rawMaterial?.materialName || rm.rawMaterialId}</td>
                                                                     <td className="px-4 py-2 text-right">{rm.percentage} %</td>
                                                                 </tr>
@@ -474,29 +474,29 @@ const ProductList: React.FC = () => {
 
                             {/* Capacity History Section */}
                             <div>
-                                <h6 className="text-sm font-semibold text-slate-800 mb-2">
+                                <h6 className="text-sm font-semibold text-ink mb-2">
                                     Capacity History
                                     {selectedProduct?.capacityLitres != null && (
-                                        <span className="text-xs font-normal text-slate-500 ms-2">
+                                        <span className="text-xs font-normal text-ink-subtle ms-2">
                                             (Current: {Number(selectedProduct.capacityLitres).toLocaleString()} / Shift)
                                         </span>
                                     )}
                                 </h6>
                                 {loadingCapacity ? (
-                                    <div className="text-center py-3 text-sm text-slate-500">Loading...</div>
+                                    <div className="text-center py-3 text-sm text-ink-subtle">Loading...</div>
                                 ) : capacityRecords.filter(r => r.machineId !== "INITIAL").length > 0 ? (
-                                    <div className="border border-slate-200 rounded-lg overflow-hidden">
+                                    <div className="border border-line rounded-lg overflow-hidden">
                                         <table className="w-full text-left text-sm whitespace-nowrap">
-                                            <thead className="bg-slate-50 text-slate-600">
+                                            <thead className="bg-card-2 text-ink-muted">
                                                 <tr>
-                                                    <th className="px-4 py-2 font-semibold border-b border-slate-200">Type</th>
-                                                    <th className="px-4 py-2 font-semibold border-b border-slate-200">Date</th>
-                                                    <th className="px-4 py-2 font-semibold border-b border-slate-200">Shift</th>
-                                                    <th className="px-4 py-2 font-semibold border-b border-slate-200">Operators</th>
-                                                    <th className="px-4 py-2 font-semibold border-b border-slate-200 text-right">Capacity</th>
+                                                    <th className="px-4 py-2 font-semibold border-b border-line">Type</th>
+                                                    <th className="px-4 py-2 font-semibold border-b border-line">Date</th>
+                                                    <th className="px-4 py-2 font-semibold border-b border-line">Shift</th>
+                                                    <th className="px-4 py-2 font-semibold border-b border-line">Operators</th>
+                                                    <th className="px-4 py-2 font-semibold border-b border-line text-right">Capacity</th>
                                                 </tr>
                                             </thead>
-                                            <tbody className="divide-y divide-slate-100 bg-white">
+                                            <tbody className="divide-y divide-line bg-card">
                                                 {(() => {
                                                     const filtered = capacityRecords.filter((r: any) => r.machineId !== "INITIAL");
                                                     // Group by machineId, preserving order-of-first-appearance
@@ -517,17 +517,17 @@ const ProductList: React.FC = () => {
                                                         return (
                                                         <React.Fragment key={machineId}>
                                                             {/* Machine group header: show id + name */}
-                                                            <tr className="bg-slate-100">
-                                                                <td colSpan={5} className="px-4 py-1.5 text-xs font-bold text-slate-600 uppercase tracking-wider">
-                                                                    {machineId}{machineName !== machineId && <span className="font-normal normal-case text-slate-500 ms-1">— {machineName}</span>}
+                                                            <tr className="bg-card-2">
+                                                                <td colSpan={5} className="px-4 py-1.5 text-xs font-bold text-ink-muted uppercase tracking-wider">
+                                                                    {machineId}{machineName !== machineId && <span className="font-normal normal-case text-ink-subtle ms-1">— {machineName}</span>}
                                                                 </td>
                                                             </tr>
                                                             {groups[machineId].map((r: any, idx: number) => {
                                                                 const isCurrent = idx === 0;
                                                                 return (
-                                                                    <tr key={r.id || `${machineId}-${idx}`} className={`hover:bg-slate-50/50 transition-colors ${isCurrent ? "bg-blue-50/40" : ""}`}>
+                                                                    <tr key={r.id || `${machineId}-${idx}`} className={`hover:bg-card-2/50 transition-colors ${isCurrent ? "bg-blue-50/40" : ""}`}>
                                                                         <td className="px-4 py-2">
-                                                                            <span className={`inline-flex items-center gap-1 text-xs font-bold uppercase tracking-wider ${isCurrent ? "text-blue-600" : "text-slate-500"}`}>
+                                                                            <span className={`inline-flex items-center gap-1 text-xs font-bold uppercase tracking-wider ${isCurrent ? "text-blue-600" : "text-ink-subtle"}`}>
                                                                                 {isCurrent ? "Current" : "Previous"}
                                                                             </span>
                                                                         </td>
@@ -546,7 +546,7 @@ const ProductList: React.FC = () => {
                                         </table>
                                     </div>
                                 ) : (
-                                    <div className="text-center py-3 text-sm text-slate-400">No capacity history available.</div>
+                                    <div className="text-center py-3 text-sm text-ink-subtle">No capacity history available.</div>
                                 )}
                             </div>
                         </div>
@@ -569,21 +569,21 @@ const ProductList: React.FC = () => {
                 {/* Manual Capacity Change Modal */}
                 {showCapModal && capProduct && (
                     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40">
-                        <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
-                            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
-                                <h3 className="text-lg font-bold text-slate-800">Change Capacity</h3>
-                                <button onClick={() => setShowCapModal(false)} className="text-slate-400 hover:text-slate-600 text-xl leading-none">&times;</button>
+                        <div className="bg-card rounded-xl shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+                            <div className="flex items-center justify-between px-6 py-4 border-b border-line">
+                                <h3 className="text-lg font-bold text-ink">Change Capacity</h3>
+                                <button onClick={() => setShowCapModal(false)} className="text-ink-subtle hover:text-ink-muted text-xl leading-none">&times;</button>
                             </div>
                             <div className="p-6 space-y-4">
                                 <div className="flex items-center gap-3 mb-2">
-                                    <span className="text-sm font-semibold text-slate-700">Product:</span>
-                                    <span className="text-sm text-slate-600">{capProduct.productName}</span>
+                                    <span className="text-sm font-semibold text-ink-muted">Product:</span>
+                                    <span className="text-sm text-ink-muted">{capProduct.productName}</span>
                                     {capMachine ? (
-                                        <span className="text-xs text-slate-400">
+                                        <span className="text-xs text-ink-subtle">
                                             (Machine Current: {getMachineCurrentCap(capMachine).toLocaleString()} / Shift)
                                         </span>
                                     ) : (
-                                        <span className="text-xs text-slate-400">
+                                        <span className="text-xs text-ink-subtle">
                                             (Product Current: {capProduct.capacityLitres != null ? Number(capProduct.capacityLitres).toLocaleString() : 0} / Shift)
                                         </span>
                                     )}
@@ -651,7 +651,7 @@ const ProductList: React.FC = () => {
                                     </div>
                                 </div>
                             </div>
-                            <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-200">
+                            <div className="flex justify-end gap-3 px-6 py-4 border-t border-line">
                                 <CustomButton text="Cancel" variant="secondary" onClick={() => setShowCapModal(false)} />
                                 <CustomButton text={savingCap ? "Saving..." : "Save"} onClick={handleCapSave} disabled={savingCap} />
                             </div>
