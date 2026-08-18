@@ -5,7 +5,6 @@ import { toast } from "react-toastify";
 import { usePermission } from "../../../hooks/usePermission";
 
 import ViewButton from "../../../components/ui/viewbutton/ViewButton";
-import CommonViewModal from "../../../components/ui/CommonViewModal/CommonViewModal";
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import { salesOrderService, type SalesOrder, type SalesOrderStatus } from "../../../services/salesOrderService";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
@@ -15,9 +14,10 @@ import CustomButton from "../../../components/ui/Button/Button";
 import { useSocketSync } from "../../../hooks/useSocketSync";
 import EmailButton from "../../../components/ui/EmailButton/EmailButton";
 import WhatsappButton from "../../../components/ui/WhatsappButton/WhatsappButton";
-import { Mail, MessageCircle } from "lucide-react";
+import { Download, Mail, MessageCircle } from "lucide-react";
 import EditButton from "../../../components/ui/EditButton/EditButton";
 import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
+import IconButton from "../../../components/ui/IconButton/IconButton";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -33,9 +33,6 @@ const QuotationList: React.FC = () => {
     const [searchTerm, setSearchTerm] = useState(initialSearch);
     const [currentPage, setCurrentPage] = useState(1);
     const [total, setTotal] = useState(0);
-
-    const [showViewModal, setShowViewModal] = useState(false);
-    const [selectedItem, setSelectedItem] = useState<SalesOrder | null>(null);
 
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [itemToDelete, setItemToDelete] = useState<number | null>(null);
@@ -53,7 +50,8 @@ const QuotationList: React.FC = () => {
     const [whatsappMessage, setWhatsappMessage] = useState("");
     const [sendingWhatsapp, setSendingWhatsapp] = useState(false);
 
-    // ─── Fetch only CONFIRMED and MD_REJECTED orders ────────────────────────────
+    const [downloading, setDownloading] = useState<number | null>(null);
+
     const fetchOrders = useCallback(async () => {
         if (!can("sales-orders.view")) return;
         setLoading(true);
@@ -62,10 +60,7 @@ const QuotationList: React.FC = () => {
                 page: currentPage,
                 pageSize: ITEMS_PER_PAGE,
                 search: searchTerm || undefined,
-                // Quotation-stage only — CONFIRMED stays in the Sales Orders list.
-                // DRAFT included so newly saved (unsubmitted) quotations show up here.
                 status: [
-                    'DRAFT',
                     'QUOTATION_IN_PROGRESS',
                     'QUOTATION_COMPLETED',
                     'PENDING_MD_APPROVAL',
@@ -106,13 +101,13 @@ const QuotationList: React.FC = () => {
         if (itemToDelete === null) return;
         try {
             await salesOrderService.delete(itemToDelete);
-            toast.success("Sales order deleted successfully!");
+            toast.success("Quotation deleted successfully!");
             setShowDeleteModal(false);
             setItemToDelete(null);
             fetchOrders();
         } catch (error: any) {
             console.error("❌ Delete error:", error);
-            toast.error(error?.response?.data?.message || "Failed to delete order");
+            toast.error(error?.response?.data?.message || "Failed to delete quotation");
         }
     };
 
@@ -145,7 +140,6 @@ const QuotationList: React.FC = () => {
                 emailSubject,
                 emailMessage
             );
-
             toast.success("Email sent successfully!");
             setShowEmailModal(false);
         } catch (err: any) {
@@ -153,6 +147,19 @@ const QuotationList: React.FC = () => {
             toast.error(err?.response?.data?.message || "Failed to send email");
         } finally {
             setSendingEmail(false);
+        }
+    };
+
+    const handleDownload = async (item: SalesOrder) => {
+        setDownloading(item.id);
+        try {
+            await salesOrderService.downloadQuotation(item.id, item.orderNo);
+            toast.success("PDF downloaded!");
+        } catch (err: any) {
+            console.error(err);
+            toast.error(err?.response?.data?.message || "Failed to download PDF");
+        } finally {
+            setDownloading(null);
         }
     };
 
@@ -184,7 +191,6 @@ const QuotationList: React.FC = () => {
                 formattedPhone,
                 whatsappMessage
             );
-
             toast.success("WhatsApp message sent successfully!");
             setShowWhatsappModal(false);
         } catch (err: any) {
@@ -205,10 +211,10 @@ const QuotationList: React.FC = () => {
     const formatCurrency = (amount: number) =>
         `₹${(amount ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`;
 
+    // Open the full details page (same as the Sales Order list) instead of a popup
     const handleOpenView = useCallback((item: SalesOrder) => {
-        setSelectedItem(item);
-        setShowViewModal(true);
-    }, []);
+        navigate(`/sales-order/details/${item.id}`);
+    }, [navigate]);
 
     const handleOpenEdit = useCallback(
         (item: SalesOrder) => {
@@ -272,11 +278,16 @@ const QuotationList: React.FC = () => {
                                 <div className="flex items-center gap-2">
                                     <ViewButton onClick={() => handleOpenView(item)} />
                                     <EditButton onClick={() => handleOpenEdit(item)} />
+                                    <IconButton
+                                        icon={Download}
+                                        variant="primary"
+                                        title="Download PDF"
+                                        disabled={downloading === item.id}
+                                        onClick={() => handleDownload(item)}
+                                    />
                                     <EmailButton onClick={() => handleOpenEmailModal(item)} />
                                     <WhatsappButton onClick={() => handleOpenWhatsappModal(item)} />
-                                    {item.status === 'DRAFT' && (
-                                        <DeleteButton onClick={() => { setItemToDelete(item.id); setShowDeleteModal(true); }} />
-                                    )}
+                                    <DeleteButton onClick={() => { setItemToDelete(item.id); setShowDeleteModal(true); }} />
                                     {(item.status === 'MD_APPROVED' || item.status === 'CUSTOMER_APPROVED') && can("sales-orders.edit") && (
                                         <button
                                             type="button"
@@ -300,110 +311,13 @@ const QuotationList: React.FC = () => {
                     ]}
                 />
 
-                {/* View Modal */}
-                <CommonViewModal
-                    show={showViewModal}
-                    onHide={() => setShowViewModal(false)}
-                    modalTitle="Sales order details"
-                    avatarText={selectedItem ? selectedItem.orderNo.charAt(0).toUpperCase() : ""}
-                    headerTitle={selectedItem ? selectedItem.orderNo : ""}
-                    headerSubtitle={
-                        selectedItem
-                            ? `Customer: ${selectedItem.customer?.displayName || selectedItem.customer?.firmName || "N/A"}`
-                            : ""
-                    }
-                    sections={
-                        selectedItem
-                            ? [
-                                {
-                                    fields: [
-                                        { label: "Order No", value: selectedItem.orderNo },
-                                        { label: "Order Date", value: formatDate(selectedItem.orderDate) },
-                                        {
-                                            label: "Customer",
-                                            value:
-                                                selectedItem.customer?.displayName ||
-                                                selectedItem.customer?.firmName ||
-                                                "N/A",
-                                        },
-                                        { label: "Mobile Number", value: selectedItem.mobile || "N/A" },
-                                        ...(selectedItem.transportName ? [{ label: "Transport", value: selectedItem.transportName }] : []),
-                                    ],
-                                },
-                                {
-                                    title: "Address details",
-                                    fields: [
-                                        {
-                                            label: "Billing address",
-                                            value: selectedItem.billingAddressLine1
-                                                ? [
-                                                    selectedItem.billingAddressLine1,
-                                                    selectedItem.billingCity,
-                                                    selectedItem.billingState,
-                                                    selectedItem.billingPincode,
-                                                ]
-                                                    .filter(Boolean)
-                                                    .join(", ")
-                                                : "N/A",
-                                        },
-                                        {
-                                            label: "Shipping address",
-                                            value: selectedItem.shippingAddressLine1
-                                                ? [
-                                                    selectedItem.shippingAddressLine1,
-                                                    selectedItem.shippingCity,
-                                                    selectedItem.shippingState,
-                                                    selectedItem.shippingPincode,
-                                                ]
-                                                    .filter(Boolean)
-                                                    .join(", ")
-                                                : "Same as billing",
-                                        },
-                                    ],
-                                },
-                                {
-                                    title: "Order summary",
-                                    fields: [
-                                        { label: "Total items", value: String(selectedItem.items?.length ?? 0) },
-                                        { label: "Subtotal", value: formatCurrency(selectedItem.subtotal) },
-                                        { label: "Total discount", value: formatCurrency(selectedItem.totalDiscount) },
-                                        { label: "Net amount", value: formatCurrency(selectedItem.netAmount) },
-                                        { label: "Status", value: selectedItem.status || "Draft" },
-                                        { label: "Remarks", value: selectedItem.remarks || "N/A" },
-                                        { label: "Internal notes", value: selectedItem.internalNotes || "N/A" },
-                                    ],
-                                },
-                                {
-                                    title: "Approval trail",
-                                    fields: [
-                                        { label: "MD approval", value: selectedItem.mdApprovalStatus },
-                                        { label: "MD rejection reason", value: selectedItem.mdRejectionReason || "N/A" },
-                                        { label: "Customer approval", value: selectedItem.customerApprovalStatus },
-                                        {
-                                            label: "Customer rejection reason",
-                                            value: selectedItem.customerRejectionReason || "N/A",
-                                        },
-                                    ],
-                                },
-                                {
-                                    title: "Timestamps",
-                                    fields: [
-                                        { label: "Created at", value: formatDate(selectedItem.createdAt) },
-                                        { label: "Last updated", value: formatDate(selectedItem.updatedAt) },
-                                    ],
-                                },
-                            ]
-                            : []
-                    }
-                />
-
                 {/* Delete Modal */}
                 <CommonConfirmModal
                     show={showDeleteModal}
                     onHide={() => setShowDeleteModal(false)}
                     onConfirm={handleDeleteConfirm}
-                    title="Confirm delete"
-                    message="Are you sure you want to delete this sales order?"
+                    title="Confirm Delete Quotation"
+                    message="Are you sure you want to delete this quotation?"
                     confirmText="Delete"
                     confirmVariant="danger"
                 />
@@ -478,15 +392,6 @@ const QuotationList: React.FC = () => {
                                 );
                             })()}
                         </div>
-                        {/* <div>
-                            <label className="block text-sm font-medium text-ink-muted mb-1">Message</label>
-                            <textarea
-                                className="w-full px-3 py-2 border border-line rounded-lg text-sm"
-                                rows={4}
-                                value={whatsappMessage}
-                                onChange={(e) => setWhatsappMessage(e.target.value)}
-                            />
-                        </div> */}
                     </div>
                 }
                 warningText="This will generate a PDF and send it to the customer's WhatsApp."
@@ -496,6 +401,7 @@ const QuotationList: React.FC = () => {
                 confirmVariant="primary"
                 isLoading={sendingWhatsapp}
             />
+
         </div>
     );
 };

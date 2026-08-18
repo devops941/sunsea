@@ -35,7 +35,7 @@ const INCLUDE_GST = {
             gstTaxRate: { select: { id: true, taxName: true, taxRate: true, taxType: true } },
         },
     },
-    customer: { select: { id: true, firmName: true, displayName: true } },
+    customer: { select: { id: true, firmName: true, displayName: true, addresses: true, openingBalance: true, openingBalanceType: true } },
     createdByUser: { select: { userId: true, fullName: true } },
 } as const;
 
@@ -46,7 +46,7 @@ const INCLUDE_EST = {
             product: { select: { id: true, productCode: true, productName: true } },
         },
     },
-    customer: { select: { id: true, firmName: true, displayName: true } },
+    customer: { select: { id: true, firmName: true, displayName: true, addresses: true, openingBalance: true, openingBalanceType: true } },
     createdByUser: { select: { userId: true, fullName: true } },
 } as const;
 
@@ -63,20 +63,22 @@ function safeDec(value: string | null | undefined, fallback = ""): string {
  * Only keys that are present on `data` are included in the returned object.
  */
 function encryptEstMeta(data: {
-    orderDate?:        Date | string;
-    isInterState?:     boolean;
-    mobile?:           string | null;
-    referenceText?:    string | null;
-    narration?:        string | null;
-    orderType?:        string | null;
-    salesPersonName?:  string | null;
-    productionStatus?: string | null;
-    subtotal?:         Prisma.Decimal;
-    netAmount?:        Prisma.Decimal;
-    totalTax?:         Prisma.Decimal;
-    totalCgst?:        Prisma.Decimal;
-    totalSgst?:        Prisma.Decimal;
-    totalIgst?:        Prisma.Decimal;
+    orderDate?:          Date | string;
+    isInterState?:       boolean;
+    mobile?:             string | null;
+    referenceText?:      string | null;
+    narration?:          string | null;
+    orderType?:          string | null;
+    salesPersonName?:    string | null;
+    productionStatus?:   string | null;
+    subtotal?:           Prisma.Decimal;
+    netAmount?:          Prisma.Decimal;
+    totalTax?:           Prisma.Decimal;
+    totalCgst?:          Prisma.Decimal;
+    totalSgst?:          Prisma.Decimal;
+    totalIgst?:          Prisma.Decimal;
+    orderDiscountType?:  string | null;
+    orderDiscountValue?: Prisma.Decimal | number | null;
 }): Record<string, string | null> {
     const enc: Record<string, string | null> = {};
 
@@ -102,6 +104,13 @@ function encryptEstMeta(data: {
     if ("totalCgst" in data && data.totalCgst !== undefined) enc.a12 = encryptField(data.totalCgst.toString());
     if ("totalSgst" in data && data.totalSgst !== undefined) enc.a13 = encryptField(data.totalSgst.toString());
     if ("totalIgst" in data && data.totalIgst !== undefined) enc.a14 = encryptField(data.totalIgst.toString());
+
+    // a15 = orderDiscountType, a16 = orderDiscountValue (both encrypted)
+    if ("orderDiscountType"  in data) enc.a15 = data.orderDiscountType  ? encryptField(data.orderDiscountType)  : null;
+    if ("orderDiscountValue" in data) {
+        const dv = data.orderDiscountValue;
+        enc.a16 = (dv !== null && dv !== undefined) ? encryptField(dv.toString()) : null;
+    }
 
     return enc;
 }
@@ -169,6 +178,8 @@ function decryptEstRow(row: any): any {
         totalCgst:       new Prisma.Decimal(safeDec(row.a12, "0")),
         totalSgst:       new Prisma.Decimal(safeDec(row.a13, "0")),
         totalIgst:       new Prisma.Decimal(safeDec(row.a14, "0")),
+        orderDiscountType:  safeDec(row.a15) || null,
+        orderDiscountValue: row.a16 ? new Prisma.Decimal(safeDec(row.a16, "0")) : null,
         items:           decItems,
     };
 }
@@ -283,8 +294,15 @@ class SalesOrderService {
      */
     private resolveGstRates(raw: any, gstRateMap: Map<string, Prisma.Decimal>, isInterState: boolean): GstItemInput {
         const hasExplicit = raw.cgstRate != null || raw.sgstRate != null || raw.igstRate != null;
-        if (hasExplicit || !raw.gstTaxRateId) {
+        if (hasExplicit) {
             return { gstTaxRateId: raw.gstTaxRateId, cgstRate: raw.cgstRate, sgstRate: raw.sgstRate, igstRate: raw.igstRate };
+        }
+        if (!raw.gstTaxRateId) {
+            // No GST selection — default to 18% (matches the quotation form default)
+            // so sales-order amounts always carry a proper GST breakdown.
+            return isInterState
+                ? { gstTaxRateId: null, igstRate: 18 }
+                : { gstTaxRateId: null, cgstRate: 9, sgstRate: 9 };
         }
         const taxRate = gstRateMap.get(raw.gstTaxRateId);
         if (!taxRate) {
@@ -343,22 +361,28 @@ class SalesOrderService {
         // ── Estimated users write ONLY to the encrypted ord_proc_aux_meta table ──
         if (useEstimatedTable(permissions)) {
             // Estimated totals: amount-only (Σ lineTotal), no GST — stored encrypted.
-            const estSubtotal = lineItems.reduce((s, l) => s.add(l.lineTotal), ZERO);
+            // DRAFT orders keep order totals at ZERO until quotation is submitted/approved.
+            const isDraft = data.status === "DRAFT";
+            const estSubtotal = isDraft ? ZERO : lineItems.reduce((s, l) => s.add(l.lineTotal), ZERO);
             const encMeta = encryptEstMeta({
-                orderDate:        new Date(data.orderDate),
-                isInterState:     data.isInterState ?? false,
-                mobile:           data.mobile || null,
-                referenceText:    data.referenceText || null,
-                narration:        data.narration,
-                orderType:        data.orderType,
-                salesPersonName:  data.salesPersonName || null,
-                productionStatus: "NOT_STARTED",
-                subtotal:  estSubtotal,
-                netAmount: estSubtotal,
-                totalTax:  ZERO,
-                totalCgst: ZERO,
-                totalSgst: ZERO,
-                totalIgst: ZERO,
+                orderDate:          new Date(data.orderDate),
+                isInterState:       data.isInterState ?? false,
+                mobile:             data.mobile || null,
+                referenceText:      data.referenceText || null,
+                narration:          data.narration,
+                orderType:          data.orderType,
+                salesPersonName:    data.salesPersonName || null,
+                productionStatus:   "NOT_STARTED",
+                subtotal:           estSubtotal,
+                netAmount:          estSubtotal,
+                totalTax:           ZERO,
+                totalCgst:          ZERO,
+                totalSgst:          ZERO,
+                totalIgst:          ZERO,
+                orderDiscountType:  (data as any).orderDiscountType  ?? null,
+                orderDiscountValue: (data as any).orderDiscountValue != null
+                    ? new Prisma.Decimal((data as any).orderDiscountValue)
+                    : null,
             });
 
             const estOrder = await (prisma as any).ordProcAuxMeta.create({
@@ -388,12 +412,21 @@ class SalesOrderService {
             return { ...l, gstTaxRateId: raw.gstTaxRateId ?? null, ...gst };
         });
 
-        // Compute totals up front so DRAFT orders show real amounts in lists.
-        const createSubtotal  = itemsWithGst.reduce((s, l) => s.add(l.lineTotal),   ZERO);
-        const createTotalCgst = itemsWithGst.reduce((s, l) => s.add(l.cgstAmount),  ZERO);
-        const createTotalSgst = itemsWithGst.reduce((s, l) => s.add(l.sgstAmount),  ZERO);
-        const createTotalIgst = itemsWithGst.reduce((s, l) => s.add(l.igstAmount),  ZERO);
+        // DRAFT orders keep order totals at ZERO until quotation is submitted/approved.
+        const isDraft = data.status === "DRAFT";
+        const createSubtotal  = isDraft ? ZERO : itemsWithGst.reduce((s, l) => s.add(l.lineTotal),   ZERO);
+        const createTotalCgst = isDraft ? ZERO : itemsWithGst.reduce((s, l) => s.add(l.cgstAmount),  ZERO);
+        const createTotalSgst = isDraft ? ZERO : itemsWithGst.reduce((s, l) => s.add(l.sgstAmount),  ZERO);
+        const createTotalIgst = isDraft ? ZERO : itemsWithGst.reduce((s, l) => s.add(l.igstAmount),  ZERO);
         const createTotalTax  = createTotalCgst.add(createTotalSgst).add(createTotalIgst);
+
+        // Order-level discount (PERCENT of subtotal, or FLAT amount)
+        const discountValue = new Prisma.Decimal((data as any).orderDiscountValue ?? 0);
+        const createDiscount = isDraft || discountValue.lte(0)
+            ? ZERO
+            : ((data as any).orderDiscountType === "FLAT"
+                ? discountValue
+                : createSubtotal.mul(discountValue).div(100));
 
         const gstOrder = await prisma.salesOrder.create({
             data: {
@@ -410,7 +443,10 @@ class SalesOrderService {
                 createdBy:    data.createdBy,
                 status:       data.status,
                 subtotal:  createSubtotal,
-                netAmount: createSubtotal.add(createTotalTax),
+                netAmount: createSubtotal.add(createTotalTax).sub(createDiscount),
+                totalDiscount: createDiscount,
+                orderDiscountType:  (data as any).orderDiscountType ?? null,
+                orderDiscountValue: (data as any).orderDiscountValue ?? null,
                 totalTax:  createTotalTax,
                 totalCgst: createTotalCgst,
                 totalSgst: createTotalSgst,
@@ -419,6 +455,7 @@ class SalesOrderService {
                     create: itemsWithGst.map(l => ({
                         productId:     l.productId,
                         quantity:      l.quantity,
+                        unitPrice:     l.rate,        // ← store effective rate per unit
                         lineTotal:     l.lineTotal,
                         gstTaxRateId:  l.gstTaxRateId,
                         taxableAmount: l.taxableAmount,
@@ -479,30 +516,35 @@ class SalesOrderService {
         const gstOrderBy = { [query.sortBy]: query.sortOrder };
         const estOrderBy = { [estSortBy]:    query.sortOrder };
 
-        if (useEstimatedTable(permissions)) {
-            const [rows, total] = await Promise.all([
-                (prisma as any).ordProcAuxMeta.findMany({
-                    where: estWhere, include: INCLUDE_EST, orderBy: estOrderBy, skip, take: pageSize,
-                }),
-                (prisma as any).ordProcAuxMeta.count({ where: estWhere }),
-            ]);
-            return {
-                data: rows.map((r: any) => ({ ...decryptEstRow(r), _source: "estimated" })),
-                total, page, pageSize,
-                totalPages: Math.ceil(total / pageSize),
-            };
-        } else {
-            const [rows, total] = await Promise.all([
-                prisma.salesOrder.findMany({
-                    where: gstWhere as any, include: INCLUDE_GST as any, orderBy: gstOrderBy, skip, take: pageSize,
-                }),
-                prisma.salesOrder.count({ where: gstWhere as any }),
-            ]);
-            return {
-                data: rows.map((r: any) => ({ ...r, _source: "gst" })),
-                total, page, pageSize,
-                totalPages: Math.ceil(total / pageSize),
-            };
+        try {
+            if (useEstimatedTable(permissions)) {
+                const [rows, total] = await Promise.all([
+                    (prisma as any).ordProcAuxMeta.findMany({
+                        where: estWhere, include: INCLUDE_EST, orderBy: estOrderBy, skip, take: pageSize,
+                    }),
+                    (prisma as any).ordProcAuxMeta.count({ where: estWhere }),
+                ]);
+                return {
+                    data: rows.map((r: any) => ({ ...decryptEstRow(r), _source: "estimated" })),
+                    total, page, pageSize,
+                    totalPages: Math.ceil(total / pageSize),
+                };
+            } else {
+                const [rows, total] = await Promise.all([
+                    prisma.salesOrder.findMany({
+                        where: gstWhere as any, include: INCLUDE_GST as any, orderBy: gstOrderBy, skip, take: pageSize,
+                    }),
+                    prisma.salesOrder.count({ where: gstWhere as any }),
+                ]);
+                return {
+                    data: rows.map((r: any) => ({ ...r, _source: "gst" })),
+                    total, page, pageSize,
+                    totalPages: Math.ceil(total / pageSize),
+                };
+            }
+        } catch (err: any) {
+            console.error("❌ findAll error:", err?.message || err);
+            throw err;
         }
     }
 
@@ -549,7 +591,7 @@ class SalesOrderService {
         const existing = await this.findById(id, permissions);
         const existingStatus = (existing as any).status as string;
 
-        if (!["DRAFT", "CONFIRMED"].includes(existingStatus)) {
+        if (!["DRAFT", "CONFIRMED", "QUOTATION_IN_PROGRESS", "QUOTATION_COMPLETED", "MD_REJECTED", "CUSTOMER_REJECTED"].includes(existingStatus)) {
             throw new ApiError(409, `Cannot edit order in status ${existingStatus}.`);
         }
 
@@ -560,8 +602,15 @@ class SalesOrderService {
             // Status is plaintext
             if (data.status !== undefined) updateData.status = data.status;
 
-            // Encrypt scalar field changes
+            // Encrypt scalar field changes (discount fields go through encryptEstMeta as a15/a16)
             const toEncrypt: Parameters<typeof encryptEstMeta>[0] = {};
+
+            if ((data as any).orderDiscountType  !== undefined) toEncrypt.orderDiscountType  = (data as any).orderDiscountType  ?? null;
+            if ((data as any).orderDiscountValue !== undefined) {
+                toEncrypt.orderDiscountValue = (data as any).orderDiscountValue != null
+                    ? new Prisma.Decimal((data as any).orderDiscountValue)
+                    : null;
+            }
             if (data.mobile             !== undefined) toEncrypt.mobile           = data.mobile || null;
             if ((data as any).salesPersonName !== undefined) toEncrypt.salesPersonName = (data as any).salesPersonName || null;
             if (data.orderType          !== undefined) toEncrypt.orderType        = data.orderType || null;
@@ -637,8 +686,19 @@ class SalesOrderService {
                 const updTotalSgst = itemsWithGst.reduce((s, l) => s.add(l.sgstAmount), ZERO);
                 const updTotalIgst = itemsWithGst.reduce((s, l) => s.add(l.igstAmount), ZERO);
                 const updTotalTax  = updTotalCgst.add(updTotalSgst).add(updTotalIgst);
+
+                // Order-level discount: use the incoming value, else keep the stored one
+                const updDiscType  = (data as any).orderDiscountType  ?? (existing as any).orderDiscountType ?? "PERCENT";
+                const updDiscValue = new Prisma.Decimal((data as any).orderDiscountValue ?? (existing as any).orderDiscountValue ?? 0);
+                const updDiscount  = updDiscValue.lte(0)
+                    ? ZERO
+                    : (updDiscType === "FLAT" ? updDiscValue : updSubtotal.mul(updDiscValue).div(100));
+
                 updateData.subtotal  = updSubtotal;
-                updateData.netAmount = updSubtotal.add(updTotalTax);
+                updateData.netAmount = updSubtotal.add(updTotalTax).sub(updDiscount);
+                updateData.totalDiscount = updDiscount;
+                if ((data as any).orderDiscountType  !== undefined) updateData.orderDiscountType  = (data as any).orderDiscountType;
+                if ((data as any).orderDiscountValue !== undefined) updateData.orderDiscountValue = (data as any).orderDiscountValue;
                 updateData.totalCgst = updTotalCgst;
                 updateData.totalSgst = updTotalSgst;
                 updateData.totalIgst = updTotalIgst;
@@ -647,6 +707,7 @@ class SalesOrderService {
                     create: itemsWithGst.map(l => ({
                         productId:     l.productId,
                         quantity:      l.quantity,
+                        unitPrice:     l.rate,        // ← store effective rate per unit
                         lineTotal:     l.lineTotal,
                         gstTaxRateId:  l.gstTaxRateId,
                         taxableAmount: l.taxableAmount,
@@ -694,18 +755,58 @@ class SalesOrderService {
 
     private async updateStatus(id: number, newStatus: SalesOrderStatus, permissions: string[]) {
         if (useEstimatedTable(permissions)) {
+            const rawItems = await (prisma as any).ordProcAuxMetaItem.findMany({ where: { auxMetaId: id } });
+            const subtotal = (rawItems as any[]).reduce((s: Prisma.Decimal, item: any) => {
+                return s.add(new Prisma.Decimal(safeDec(item.b3, "0")));
+            }, ZERO);
+            const encFinancials = encryptEstMeta({
+                subtotal,
+                netAmount: subtotal,
+                totalTax:  ZERO,
+                totalCgst: ZERO,
+                totalSgst: ZERO,
+                totalIgst: ZERO,
+            });
             const updated = await (prisma as any).ordProcAuxMeta.update({
-                where: { id }, data: { status: newStatus }, include: INCLUDE_EST,
+                where: { id },
+                data:  { status: newStatus, ...encFinancials },
+                include: INCLUDE_EST,
             });
             return { ...decryptEstRow(updated), _source: "estimated" };
         } else {
+            const items = await prisma.salesOrderItem.findMany({ where: { salesOrderId: id } });
+            const subtotal  = items.reduce((s, l) => s.add(l.lineTotal),              ZERO);
+            const totalCgst = items.reduce((s, l) => s.add((l as any).cgstAmount ?? ZERO), ZERO);
+            const totalSgst = items.reduce((s, l) => s.add((l as any).sgstAmount ?? ZERO), ZERO);
+            const totalIgst = items.reduce((s, l) => s.add((l as any).igstAmount ?? ZERO), ZERO);
+            const totalTax  = totalCgst.add(totalSgst).add(totalIgst);
             const updated = await prisma.salesOrder.update({
-                where: { id }, data: { status: newStatus as any }, include: INCLUDE_GST,
+                where: { id },
+                data: {
+                    status:    newStatus as any,
+                    subtotal,
+                    netAmount: subtotal.add(totalTax),
+                    totalCgst,
+                    totalSgst,
+                    totalIgst,
+                    totalTax,
+                },
+                include: INCLUDE_GST,
             });
             try {
                 await (prisma as any).ordProcAuxMeta.updateMany({
                     where: { orderNo: (updated as any).orderNo },
-                    data: { status: newStatus },
+                    data: {
+                        status: newStatus,
+                        ...encryptEstMeta({
+                            subtotal,
+                            netAmount: subtotal.add(totalTax),
+                            totalTax,
+                            totalCgst,
+                            totalSgst,
+                            totalIgst,
+                        }),
+                    },
                 });
             } catch (e) { /* ignore */ }
             return { ...updated, _source: "gst" };
@@ -714,8 +815,8 @@ class SalesOrderService {
 
     async submitForApproval(id: number, permissions: string[] = []) {
         const existing = await this.findById(id, permissions);
-        if (!["DRAFT", "CONFIRMED"].includes((existing as any).status)) {
-            throw new ApiError(409, `Only DRAFT/CONFIRMED orders can be submitted. Current: ${(existing as any).status}`);
+        if (!["DRAFT", "CONFIRMED", "QUOTATION_IN_PROGRESS", "MD_REJECTED", "CUSTOMER_REJECTED"].includes((existing as any).status)) {
+            throw new ApiError(409, `Only DRAFT/CONFIRMED/QUOTATION_IN_PROGRESS orders can be submitted. Current: ${(existing as any).status}`);
         }
         if ((existing as any).items.length === 0) throw new ApiError(400, "Cannot submit an order with no items");
 
@@ -726,9 +827,18 @@ class SalesOrderService {
             const subtotal = (rawItems as any[]).reduce((s: Prisma.Decimal, item: any) => {
                 return s.add(new Prisma.Decimal(safeDec(item.b3, "0")));
             }, ZERO);
+
+            // Apply the stored order-level discount (mirrors the GST path logic)
+            const estDiscType  = (existing as any).orderDiscountType ?? "PERCENT";
+            const estDiscValue = new Prisma.Decimal((existing as any).orderDiscountValue ?? 0);
+            const estDiscount  = estDiscValue.lte(0)
+                ? ZERO
+                : (estDiscType === "FLAT" ? estDiscValue : subtotal.mul(estDiscValue).div(100));
+            const estNetAmount = subtotal.sub(estDiscount);
+
             const encFinancials = encryptEstMeta({
                 subtotal,
-                netAmount: subtotal,
+                netAmount: estNetAmount,
                 totalTax:  ZERO,
                 totalCgst: ZERO,
                 totalSgst: ZERO,
@@ -755,12 +865,21 @@ class SalesOrderService {
             const totalSgst = items.reduce((s, l) => s.add((l as any).sgstAmount ?? ZERO), ZERO);
             const totalIgst = items.reduce((s, l) => s.add((l as any).igstAmount ?? ZERO), ZERO);
             const totalTax  = totalCgst.add(totalSgst).add(totalIgst);
+
+            // Preserve the stored order-level discount in the recomputed totals
+            const discType  = (existing as any).orderDiscountType ?? "PERCENT";
+            const discValue = new Prisma.Decimal((existing as any).orderDiscountValue ?? 0);
+            const discount  = discValue.lte(0)
+                ? ZERO
+                : (discType === "FLAT" ? discValue : subtotal.mul(discValue).div(100));
+
             const updated = await prisma.salesOrder.update({
                 where: { id },
                 data: {
                     status:    "PENDING_MD_APPROVAL" as any,
                     subtotal,
-                    netAmount: subtotal.add(totalTax),
+                    netAmount: subtotal.add(totalTax).sub(discount),
+                    totalDiscount: discount,
                     totalCgst,
                     totalSgst,
                     totalIgst,

@@ -51,6 +51,7 @@ app.use(
       "ngrok-skip-browser-warning",
       "Bypass-Tunnel-Reminder",
     ],
+    exposedHeaders: ["Content-Disposition"],
   })
 );
 

@@ -20,6 +20,9 @@ import { SalesOrderEstimateContent } from "../../../components/salesOrder/SalesO
 import { FiClipboard, FiFileText } from "react-icons/fi";
 import { useSocketSync } from "../../../hooks/useSocketSync";
 import { usePermission } from "../../../hooks/usePermission";
+import TextInput from "../../../components/form/TextInput/TextInput";
+import SelectInput from "../../../components/form/SelectInput/SelectInput";
+import IconButton from "../../../components/ui/IconButton/IconButton";
 
 
 const ITEMS_PER_PAGE = 10;
@@ -28,9 +31,9 @@ const ITEMS_PER_PAGE = 10;
 
 const AllSalesOrderList: React.FC = () => {
     const navigate = useNavigate();
-    const { can, isSuperAdmin } = usePermission();
-    const canViewEstimate = isSuperAdmin || can("sales-orders.view-estimate");
-    const canViewGst      = isSuperAdmin || can("sales-orders.view-gst");
+    const { can, isSuperAdmin, permissions } = usePermission();
+    const isEstimateUser = !isSuperAdmin && permissions.includes("sales-orders.view-estimate") && !permissions.includes("sales-orders.view-gst");
+    const isGstUser = !isEstimateUser;
     const [data, setData] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const location = useLocation();
@@ -80,11 +83,13 @@ const AllSalesOrderList: React.FC = () => {
                 return;
             }
 
-            const canvas = await html2canvas(element, { scale: 2, useCORS: true });
+            // scale 3 renders borders crisply so every table line prints as solid
+            // black — same weight as the outer outline (no gray anti-alias blur)
+            const canvas = await html2canvas(element, { scale: 3, useCORS: true });
             const imgData = canvas.toDataURL("image/png");
 
             const pdf = new jsPDF("p", "mm", "a4");
-            const margin = 10;
+            const margin = 8; // consistent margin on all sides
             const pageWidth = pdf.internal.pageSize.getWidth();
             const pageHeight = pdf.internal.pageSize.getHeight();
 
@@ -92,21 +97,28 @@ const AllSalesOrderList: React.FC = () => {
             const imgHeight = (canvas.height * imgWidth) / canvas.width;
             const availableHeight = pageHeight - 2 * margin;
 
-            let heightLeft = imgHeight;
-            let position = margin;
+            if (imgHeight <= availableHeight) {
+                // Single page — fill the available area inside the margins
+                pdf.addImage(imgData, "PNG", margin, margin, imgWidth, availableHeight);
+            } else {
+                // Multi-page — slice across pages
+                let heightLeft = imgHeight;
+                let position = margin;
 
-            pdf.addImage(imgData, "PNG", margin, position, imgWidth, imgHeight);
-            heightLeft -= availableHeight;
-
-            while (heightLeft > 0) {
-                position -= availableHeight;
-                pdf.addPage();
                 pdf.addImage(imgData, "PNG", margin, position, imgWidth, imgHeight);
                 heightLeft -= availableHeight;
+
+                while (heightLeft > 0) {
+                    position -= availableHeight;
+                    pdf.addPage();
+                    pdf.addImage(imgData, "PNG", margin, position, imgWidth, imgHeight);
+                    heightLeft -= availableHeight;
+                }
             }
 
             if (action === "download") {
-                pdf.save(`Estimate-${estimateOrder?.orderNo || "estimate"}.pdf`);
+                // File name = sales order number (e.g. SO-2026-001.pdf)
+                pdf.save(`${estimateOrder?.orderNo || "sales-order"}.pdf`);
             } else {
                 const pdfUrl = pdf.output("bloburl");
                 window.open(pdfUrl, "_blank");
@@ -169,6 +181,17 @@ const AllSalesOrderList: React.FC = () => {
                 fromDate: fromDate || undefined,
                 toDate: toDate || undefined,
                 dispatchType: dispatchType || undefined,
+                status: [
+                    "DRAFT",
+                    "CONFIRMED",
+                    "IN_PRODUCTION",
+                    "PLANNED",
+                    "READY_FOR_DISPATCH",
+                    "PARTIALLY_DISPATCHED",
+                    "DISPATCHED",
+                    "COMPLETED",
+                    "CANCELLED",
+                ] as any,
             });
 
             setData(response.data || []);
@@ -262,48 +285,34 @@ const AllSalesOrderList: React.FC = () => {
                             onClear={handleClearFilters}
                             onOpen={handleOpenFilter}
                         >
-                            <div className="mb-3">
-                                <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-semibold">
-                                    From Date
-                                </label>
-                                <input
+                            <div className="space-y-3">
+                                <TextInput
+                                    label="From Date"
+                                    name="fromDate"
                                     type="date"
-                                    className="w-full border border-line rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-red-500"
                                     value={draftFromDate}
                                     max={draftToDate || undefined}
                                     onChange={(e) => setDraftFromDate(e.target.value)}
                                 />
-                            </div>
 
-                            <div className="mb-3">
-                                <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-semibold">
-                                    To Date
-                                </label>
-                                <input
+                                <TextInput
+                                    label="To Date"
+                                    name="toDate"
                                     type="date"
-                                    className="w-full border border-line rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-red-500"
                                     value={draftToDate}
                                     min={draftFromDate || undefined}
                                     onChange={(e) => setDraftToDate(e.target.value)}
                                 />
-                            </div>
 
-                            <div className="mb-4">
-                                <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-semibold">
-                                    Dispatch Type
-                                </label>
-                                <select
-                                    className="w-full border border-line rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-red-500 bg-card"
+                                <SelectInput
+                                    label="Dispatch Type"
+                                    name="dispatchType"
                                     value={draftDispatchType}
+                                    defaultOptionLabel="All"
+                                    options={DISPATCH_TYPE_OPTIONS}
+                                    searchable={false}
                                     onChange={(e) => setDraftDispatchType(e.target.value)}
-                                >
-                                    <option value="">All</option>
-                                    {DISPATCH_TYPE_OPTIONS.map((opt) => (
-                                        <option key={opt.value} value={opt.value}>
-                                            {opt.label}
-                                        </option>
-                                    ))}
-                                </select>
+                                />
                             </div>
                         </FilterPopover>
 
@@ -347,29 +356,12 @@ const AllSalesOrderList: React.FC = () => {
                             render: (item) => (
                                 <div className="flex items-center justify-center gap-2">
                                     <ViewButton onClick={() => handleOpenView(item.id)} />
-                                    {canViewEstimate && (
-                                        <button
-                                            type="button"
-                                            title="View Estimated Pricing"
-                                            onClick={() => handleOpenEstimate(item.id)}
-                                            className="
-                                           w-10 h-10
-                                           flex items-center justify-center
-                                           rounded-xl
-                                           border-none
-                                           cursor-pointer
-                                           bg-violet-500/10
-                                           text-violet-600
-                                           transition-all duration-300 ease-in-out
-                                           hover:-translate-y-[3px]
-                                           hover:bg-violet-500/20
-                                           hover:shadow-[0_8px_18px_rgba(139,92,246,0.18)]
-                                           active:scale-95
-                                          "
-                                        >
-                                            <FiClipboard className="text-[18px]" />
-                                        </button>
-                                    )}
+                                    <IconButton
+                                        icon={FiClipboard}
+                                        variant="info"
+                                        title={isGstUser ? "Print / View Sales Order" : "View Estimated Pricing"}
+                                        onClick={() => handleOpenEstimate(item.id)}
+                                    />
                                     {can("sales-orders.edit") && <EditButton onClick={() => handleOpenEdit(item)} />}
                                     {can("sales-orders.delete") && <DeleteButton onClick={() => triggerDelete(item.id)} />}
                                 </div>
@@ -394,7 +386,7 @@ const AllSalesOrderList: React.FC = () => {
                             {/* Header */}
                             <div className="px-6 py-4 border-b border-line-soft flex items-center justify-between">
                                 <h3 className="text-lg font-bold text-ink">
-                                    Sales Order Estimate
+                                    {isGstUser ? "Sales Order Confirmation" : "Sales Order Estimate"}
                                 </h3>
                                 <button
                                     onClick={() => setShowEstimateModal(false)}
@@ -409,10 +401,13 @@ const AllSalesOrderList: React.FC = () => {
                                 {loadingEstimate ? (
                                     <div className="flex flex-col items-center justify-center py-20 h-full">
                                         <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600"></div>
-                                        <span className="mt-4 text-ink-subtle font-semibold">Loading estimate details...</span>
+                                        <span className="mt-4 text-ink-subtle font-semibold">Loading details...</span>
                                     </div>
                                 ) : estimateOrder ? (
-                                    <DocumentPrintLayout subtitle="Sales Order" title="ESTIMATE">
+                                    <DocumentPrintLayout
+                                        subtitle="Sales Order"
+                                        title={isGstUser ? "SALES ORDER" : "ESTIMATE"}
+                                    >
                                         <SalesOrderEstimateContent
                                             estimateOrder={estimateOrder}
                                             formatDate={formatDate}
@@ -421,19 +416,13 @@ const AllSalesOrderList: React.FC = () => {
                                     </DocumentPrintLayout>
                                 ) : (
                                     <div className="text-center py-10 text-ink-subtle">
-                                        Failed to load order estimate.
+                                        Failed to load sales order details.
                                     </div>
                                 )}
                             </div>
 
                             {/* Footer */}
-                            <div className="px-6 py-4 border-t border-line-soft bg-card-2 flex items-center justify-between">
-                                <button
-                                    onClick={() => setShowEstimateModal(false)}
-                                    className="px-4 py-2 border border-line text-ink-muted rounded-lg text-sm font-semibold hover:bg-card-2 hover:text-ink transition-colors"
-                                >
-                                    Close
-                                </button>
+                            <div className="px-6 py-4 border-t border-line-soft bg-card-2 flex items-center justify-end">
                                 {estimateOrder && (
                                     <div className="flex gap-2">
                                         <CustomButton
@@ -467,7 +456,7 @@ const AllSalesOrderList: React.FC = () => {
             {/* Print-Only Estimate Section */}
             {estimateOrder && (
                 <div id="print-only-estimate-section" className="hidden print:block">
-                    <DocumentPrintLayout subtitle="Sales Order" title="ESTIMATE">
+                    <DocumentPrintLayout subtitle="Sales Order" title={isGstUser ? "SALES ORDER" : "ESTIMATE"}>
                         <SalesOrderEstimateContent
                             estimateOrder={estimateOrder}
                             formatDate={formatDate}
@@ -480,7 +469,7 @@ const AllSalesOrderList: React.FC = () => {
             {/* Off-screen section for PDF generation */}
             {estimateOrder && (
                 <div id="pdf-estimate-section" style={{ position: "absolute", left: "-9999px", top: "0", width: "794px", minHeight: "1123px", background: "white" }}>
-                    <DocumentPrintLayout subtitle="Sales Order" title="ESTIMATE">
+                    <DocumentPrintLayout subtitle="Sales Order" title={isGstUser ? "SALES ORDER" : "ESTIMATE"}>
                         <SalesOrderEstimateContent
                             estimateOrder={estimateOrder}
                             formatDate={formatDate}

@@ -13,9 +13,7 @@ export const generateQuotationHtml = (quotationOrder: any, company: any): string
         }).format(amount);
     };
 
-    const getUnitPrice = (item: any) => {
-        return item.unitPrice;
-    };
+    const n = (v: any): number => Number(v ?? 0);
 
     const isInterState = quotationOrder.isInterState;
     const baseColSpan = isInterState ? 7 : 8;
@@ -34,27 +32,31 @@ export const generateQuotationHtml = (quotationOrder: any, company: any): string
 
     let itemsHtml = '';
     quotationOrder.items?.forEach((item: any, idx: number) => {
-        const uom = item.product?.uom?.uomName || "Pcs.";
-        const unitPrice = getUnitPrice(item);
-        const subtotal = item.lineSubtotal || (item.quantity * item.unitPrice);
+        const uom      = item.product?.uom?.uomName || "Pcs.";
+        const qty       = n(item.quantity);
+        // taxableAmount = qty × unitPrice (subtotal before tax)
+        const taxable   = n(item.taxableAmount) || (qty * n(item.unitPrice));
+        // Derive unitPrice from taxableAmount/qty for older records where unitPrice was not stored
+        const unitPrice = n(item.unitPrice) || (qty > 0 ? taxable / qty : 0);
+        const lineTotal = n(item.lineTotal);
 
         let taxHtml = '';
         if (isInterState) {
             taxHtml = `
                 <td class="text-right border border-slate-300 px-2.5 py-2 align-middle text-black">
-                    ${formatCurrency(item.igstAmount || item.gstAmount || 0)}
-                    <div class="text-[10px] text-black">(${item.igstRate || item.gstRate || 0}%)</div>
+                    ${formatCurrency(n(item.igstAmount) || n(item.gstAmount))}
+                    <div class="text-[10px] text-black">(${n(item.igstRate) || n(item.gstRate)}%)</div>
                 </td>
             `;
         } else {
             taxHtml = `
                 <td class="text-right border border-slate-300 px-2.5 py-2 align-middle text-black">
-                    ${formatCurrency(item.cgstAmount || (Number(item.gstAmount || 0) / 2))}
-                    <div class="text-[10px] text-black">(${item.cgstRate || (Number(item.gstRate || 0) / 2)}%)</div>
+                    ${formatCurrency(n(item.cgstAmount) || n(item.gstAmount) / 2)}
+                    <div class="text-[10px] text-black">(${n(item.cgstRate) || n(item.gstRate) / 2}%)</div>
                 </td>
                 <td class="text-right border border-slate-300 px-2.5 py-2 align-middle text-black">
-                    ${formatCurrency(item.sgstAmount || (Number(item.gstAmount || 0) / 2))}
-                    <div class="text-[10px] text-black">(${item.sgstRate || (Number(item.gstRate || 0) / 2)}%)</div>
+                    ${formatCurrency(n(item.sgstAmount) || n(item.gstAmount) / 2)}
+                    <div class="text-[10px] text-black">(${n(item.sgstRate) || n(item.gstRate) / 2}%)</div>
                 </td>
             `;
         }
@@ -63,12 +65,12 @@ export const generateQuotationHtml = (quotationOrder: any, company: any): string
             <tr>
                 <td class="text-center border border-slate-300 px-2.5 py-2 align-middle text-black">${idx + 1}.</td>
                 <td class="border border-slate-300 px-2.5 py-2 align-middle font-medium text-black">${item.product?.productName || "N/A"}</td>
-                <td class="text-right border border-slate-300 px-2.5 py-2 align-middle font-bold text-black">${item.quantity}</td>
+                <td class="text-right border border-slate-300 px-2.5 py-2 align-middle font-bold text-black">${qty}</td>
                 <td class="text-center border border-slate-300 px-2.5 py-2 align-middle text-black">${uom}</td>
-                <td class="text-right border border-slate-300 px-2.5 py-2 align-middle text-black">${formatCurrency(Number(unitPrice))}</td>
-                <td class="text-right border border-slate-300 px-2.5 py-2 align-middle text-black">${formatCurrency(subtotal)}</td>
+                <td class="text-right border border-slate-300 px-2.5 py-2 align-middle text-black">${formatCurrency(unitPrice)}</td>
+                <td class="text-right border border-slate-300 px-2.5 py-2 align-middle text-black">${formatCurrency(taxable)}</td>
                 ${taxHtml}
-                <td class="text-right border border-slate-300 px-2.5 py-2 align-middle font-bold text-black">${formatCurrency(item.lineTotal)}</td>
+                <td class="text-right border border-slate-300 px-2.5 py-2 align-middle font-bold text-black">${formatCurrency(lineTotal)}</td>
             </tr>
         `;
     });
@@ -76,26 +78,26 @@ export const generateQuotationHtml = (quotationOrder: any, company: any): string
     let footerHtml = `
         <tr>
             <td colspan="${footerColSpan}" class="text-right border border-slate-300 px-2.5 py-2 font-bold text-black">Subtotal:</td>
-            <td class="text-right border border-slate-300 px-2.5 py-2 font-bold text-black">${formatCurrency(quotationOrder.subtotal)}</td>
+            <td class="text-right border border-slate-300 px-2.5 py-2 font-bold text-black">${formatCurrency(n(quotationOrder.subtotal))}</td>
         </tr>
     `;
 
-    if (quotationOrder.totalDiscount > 0) {
+    if (n(quotationOrder.totalDiscount) > 0) {
         footerHtml += `
             <tr>
                 <td colspan="${footerColSpan}" class="text-right border border-slate-300 px-2.5 py-2 font-bold text-black">Discount:</td>
-                <td class="text-right border border-slate-300 px-2.5 py-2 font-bold text-black">-${formatCurrency(quotationOrder.totalDiscount)}</td>
+                <td class="text-right border border-slate-300 px-2.5 py-2 font-bold text-black">-${formatCurrency(n(quotationOrder.totalDiscount))}</td>
             </tr>
         `;
     }
 
     if (isInterState) {
-        if (quotationOrder.totalIgst || quotationOrder.totalGst) {
+        if (n(quotationOrder.totalIgst) || n(quotationOrder.totalGst)) {
             footerHtml += `
                 <tr>
                     <td colspan="${footerColSpan}" class="text-right border border-slate-300 px-2.5 py-2 font-bold text-black">IGST:</td>
                     <td class="text-right border border-slate-300 px-2.5 py-2 font-bold text-black">
-                        ${formatCurrency(quotationOrder.totalIgst || quotationOrder.totalGst || 0)}
+                        ${formatCurrency(n(quotationOrder.totalIgst) || n(quotationOrder.totalGst))}
                     </td>
                 </tr>
             `;
@@ -105,13 +107,13 @@ export const generateQuotationHtml = (quotationOrder: any, company: any): string
             <tr>
                 <td colspan="${footerColSpan}" class="text-right border border-slate-300 px-2.5 py-2 font-bold text-black">CGST:</td>
                 <td class="text-right border border-slate-300 px-2.5 py-2 font-bold text-black">
-                    ${formatCurrency(quotationOrder.totalCgst || (Number(quotationOrder.totalGst || 0) / 2))}
+                    ${formatCurrency(n(quotationOrder.totalCgst) || n(quotationOrder.totalGst) / 2)}
                 </td>
             </tr>
             <tr>
                 <td colspan="${footerColSpan}" class="text-right border border-slate-300 px-2.5 py-2 font-bold text-black">SGST:</td>
                 <td class="text-right border border-slate-300 px-2.5 py-2 font-bold text-black">
-                    ${formatCurrency(quotationOrder.totalSgst || (Number(quotationOrder.totalGst || 0) / 2))}
+                    ${formatCurrency(n(quotationOrder.totalSgst) || n(quotationOrder.totalGst) / 2)}
                 </td>
             </tr>
         `;
@@ -120,7 +122,7 @@ export const generateQuotationHtml = (quotationOrder: any, company: any): string
     footerHtml += `
         <tr class="bg-[#f7f7f7]">
             <td colspan="${footerColSpan}" class="text-right border border-slate-300 px-2.5 py-2 font-bold text-[14px] text-black">Total Net Amount:</td>
-            <td class="text-right border border-slate-300 px-2.5 py-2 font-bold text-[14px] text-black">${formatCurrency(quotationOrder.netAmount)}</td>
+            <td class="text-right border border-slate-300 px-2.5 py-2 font-bold text-[14px] text-black">${formatCurrency(n(quotationOrder.netAmount))}</td>
         </tr>
     `;
 

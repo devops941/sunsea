@@ -307,19 +307,53 @@ export const salesOrderService = {
         return response.data?.data || response.data;
     },
 
-    emailQuotation: async (id: number | string, recipientEmail: string, subject: string, message: string): Promise<any> => {
+    /** Downloads quotation/estimate PDF — format is determined by the logged-in user's role on the backend */
+    downloadQuotation: async (id: number | string, orderNo?: string): Promise<void> => {
+        const response = await apiClient.get(
+            `${config.salesOrder.getById}/${id}/download-quotation`,
+            { responseType: 'blob' }
+        );
+        // Prefer Content-Disposition header; fallback to orderNo passed from list
+        const disposition = response.headers['content-disposition'] || '';
+        const headerMatch = disposition.match(/filename="?([^";\r\n"]+)"?/);
+        const filename = headerMatch
+            ? headerMatch[1]
+            : orderNo
+                ? `${orderNo}.pdf`
+                : `${id}.pdf`;
+
+        const blob = new Blob([response.data], { type: 'application/pdf' });
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement('a');
+        a.href     = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => { URL.revokeObjectURL(url); document.body.removeChild(a); }, 200);
+    },
+
+    emailQuotation: async (
+        id: number | string,
+        recipientEmail: string,
+        subject: string,
+        message: string
+    ): Promise<any> => {
         const response = await apiClient.post(`${config.salesOrder.getById}/${id}/email-quotation`, {
             recipientEmail,
             subject,
-            message
+            message,
         });
         return response.data?.data || response.data;
     },
 
-    whatsappQuotation: async (id: number | string, to: string, message: string): Promise<any> => {
+    whatsappQuotation: async (
+        id: number | string,
+        to: string,
+        message: string
+    ): Promise<any> => {
         const response = await apiClient.post(`${config.salesOrder.getById}/${id}/whatsapp-quotation`, {
             to,
-            message
+            message,
         });
         return response.data?.data || response.data;
     },

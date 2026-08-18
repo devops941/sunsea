@@ -482,15 +482,92 @@ const RolePermissionMapping: React.FC = () => {
     }
   }, [selectedRoleId, busy, assignedIds, activeRoleId, removePermissionFromRole, assignPermissionsToRole]);
 
-  // Row: toggle all 4 actions for a module
+  // Special access toggle — Smart preset toggle for view-estimate and view-gst
+  const toggleSpecialAccess = useCallback(async (perm: Permission) => {
+    if (!selectedRoleId || busy) return;
+
+    if (perm.action === "view-estimate" || perm.action === "view-gst") {
+      const isTurningOn = !assignedIds.has(perm.id);
+
+      if (isTurningOn) {
+        setBusy(true);
+        try {
+          const presetMap: Record<string, { module: string; action: string }[]> = {
+            "view-estimate": [
+              { module: "sales-orders", action: "view-estimate" },
+              { module: "sales-orders", action: "view" },
+              { module: "sales-orders", action: "create" },
+              { module: "sales-orders", action: "edit" },
+              { module: "quotations", action: "view" },
+              { module: "quotations", action: "create" },
+              { module: "quotations", action: "edit" },
+              { module: "quotations", action: "submit" },
+            ],
+            "view-gst": [
+              { module: "sales-orders", action: "view-gst" },
+              { module: "sales-orders", action: "view" },
+              { module: "sales-orders", action: "create" },
+              { module: "sales-orders", action: "edit" },
+              { module: "sales-orders", action: "delete" },
+              { module: "quotations", action: "view" },
+              { module: "quotations", action: "create" },
+              { module: "quotations", action: "edit" },
+              { module: "quotations", action: "submit" },
+              { module: "quotations", action: "convert" },
+            ],
+          };
+
+          const targets = presetMap[perm.action] || [];
+          const idsToAdd: number[] = [];
+
+          targets.forEach(t => {
+            const found = permissions.find(p => p.module === t.module && p.action === t.action);
+            if (found && !assignedIds.has(found.id)) {
+              idsToAdd.push(found.id);
+            }
+          });
+
+          // Handle conflict: if turning on view-estimate, remove view-gst and vice-versa
+          const conflictAction = MUTUALLY_EXCLUSIVE[perm.action];
+          if (conflictAction) {
+            const conflictPerm = permissions.find(p => p.module === perm.module && p.action === conflictAction);
+            if (conflictPerm && assignedIds.has(conflictPerm.id)) {
+              await removePermissionFromRole(activeRoleId, conflictPerm.id);
+            }
+          }
+
+          if (idsToAdd.length > 0) {
+            await assignPermissionsToRole(activeRoleId, idsToAdd);
+          }
+
+          toast.success(
+            perm.action === "view-estimate"
+              ? "Estimation profile applied (Sales Orders & Quotations auto-enabled)"
+              : "GST profile applied (Sales Orders & Quotations auto-enabled)"
+          );
+        } catch (err: any) {
+          toast.error(err.message || "Failed to update permission");
+        } finally {
+          setBusy(false);
+        }
+        return;
+      }
+    }
+
+    toggleOne(perm);
+  }, [selectedRoleId, busy, assignedIds, permissions, activeRoleId, removePermissionFromRole, assignPermissionsToRole, toggleOne]);
+
+  // Row: toggle standard actions for a module
   const toggleRow = useCallback((modPerms: Permission[]) => {
     if (!selectedRoleId || modPerms.length === 0) return;
-    const allOn = modPerms.every(p => assignedIds.has(p.id));
+    const standardPerms = modPerms.filter(p => STANDARD_ACTION_KEYS.has(p.action));
+    const targetPerms = standardPerms.length > 0 ? standardPerms : modPerms;
+    const allOn = targetPerms.every(p => assignedIds.has(p.id));
     runBatch(async () => {
       if (allOn) {
-        for (const p of modPerms) await removePermissionFromRole(activeRoleId, p.id);
+        for (const p of targetPerms) await removePermissionFromRole(activeRoleId, p.id);
       } else {
-        const toAdd = modPerms.filter(p => !assignedIds.has(p.id)).map(p => p.id);
+        const toAdd = targetPerms.filter(p => !assignedIds.has(p.id)).map(p => p.id);
         if (toAdd.length) await assignPermissionsToRole(activeRoleId, toAdd);
       }
     }, allOn ? "Row permissions cleared" : "Row permissions granted");
@@ -514,10 +591,12 @@ const RolePermissionMapping: React.FC = () => {
     }, allOn ? `All "${actionKey}" cleared` : `All "${actionKey}" granted`);
   }, [selectedRoleId, activeGroup, assignedIds, activeRoleId, removePermissionFromRole, assignPermissionsToRole, runBatch]);
 
-  // Group: toggle every permission in active section
+  // Group: toggle standard permissions in active section (excludes Special Access)
   const toggleGroup = useCallback(() => {
     if (!selectedRoleId) return;
-    const all = activeGroup.modules.flatMap(m => m.existingPerms);
+    const all = activeGroup.modules
+      .flatMap(m => m.existingPerms)
+      .filter(p => STANDARD_ACTION_KEYS.has(p.action));
     if (all.length === 0) return;
     const allOn = all.every(p => assignedIds.has(p.id));
     runBatch(async () => {
@@ -542,7 +621,9 @@ const RolePermissionMapping: React.FC = () => {
   }, [activeGroup, assignedIds]);
 
   const groupState = useMemo(() => {
-    const all = activeGroup.modules.flatMap(m => m.existingPerms);
+    const all = activeGroup.modules
+      .flatMap(m => m.existingPerms)
+      .filter(p => STANDARD_ACTION_KEYS.has(p.action));
     if (!all.length) return { checked: false, indeterminate: false };
     const n = all.filter(p => assignedIds.has(p.id)).length;
     return { checked: n === all.length, indeterminate: n > 0 && n < all.length };
@@ -780,23 +861,25 @@ const RolePermissionMapping: React.FC = () => {
                               </td>
                             </tr>
 
-                            {/* Extra permissions sub-row — Super Admin only */}
+                            {/* Dedicated Special Access Row */}
                             {isSuperAdmin && extraPerms.length > 0 && (
-                              <tr className={`${rowBg}`}>
-                                <td colSpan={ACTIONS.length + 2} className="pb-3 pt-0 px-5">
-                                  <div className="flex items-center gap-2 mb-1.5">
-                                    <FaKey className="text-violet-400" size={9} />
-                                    <span className="text-[10px] font-semibold text-violet-400 uppercase tracking-wider">
-                                      Special Access
-                                    </span>
+                              <tr className="bg-violet-50/40 border-b border-gray-100 transition-colors hover:bg-violet-50/70">
+                                <td className="py-3.5 px-5">
+                                  <div className="flex items-center gap-2">
+                                    <FaKey className="text-violet-500 text-xs shrink-0" />
+                                    <div className="font-semibold text-violet-900 text-sm">{mod.label} Special Access</div>
                                   </div>
-                                  <div className="flex flex-wrap gap-2">
+                                  <div className="text-[10px] text-violet-500/80 font-mono mt-0.5">{mod.key} (special permissions)</div>
+                                </td>
+                                <td colSpan={ACTIONS.length + 1} className="py-3.5 px-5">
+                                  <div className="flex flex-wrap items-center gap-2">
                                     {extraPerms.map(perm => {
                                       const isOn = assignedIds.has(perm.id);
+                                      const isSpecialPreset = perm.action === "view-estimate" || perm.action === "view-gst";
                                       // Check if a conflicting action is currently ON for this role
                                       const conflictAction = MUTUALLY_EXCLUSIVE[perm.action];
                                       const conflictPerm = conflictAction ? mod.byAction[conflictAction] : undefined;
-                                      const isBlocked = !!conflictPerm && assignedIds.has(conflictPerm.id);
+                                      const isBlocked = !isSpecialPreset && !!conflictPerm && assignedIds.has(conflictPerm.id);
                                       const isDisabled = busy || isBlocked;
 
                                       return (
@@ -817,13 +900,13 @@ const RolePermissionMapping: React.FC = () => {
                                                 type="checkbox"
                                                 checked={isOn}
                                                 onChange={() => {
-                                                  if (isBlocked) {
+                                                  if (isBlocked && !isSpecialPreset) {
                                                     toast.warning(
                                                       `Remove "${formatActionLabel(conflictAction!)}" first before assigning "${formatActionLabel(perm.action)}"`
                                                     );
                                                     return;
                                                   }
-                                                  toggleOne(perm);
+                                                  toggleSpecialAccess(perm);
                                                 }}
                                                 disabled={isDisabled}
                                                 className="w-3 h-3 rounded shrink-0"

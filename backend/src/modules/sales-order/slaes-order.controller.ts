@@ -6,6 +6,7 @@ import { ApiResponse } from "../../utils/ApiResponse";
 import { asyncHandler } from "../../utils/asyncHandler";
 import { getIO } from "../../socket/socket";
 import { generateQuotationHtml } from "../../templates/quotationTemplate";
+import { generateEstimateHtml } from "../../templates/estimateTemplate";
 import { generatePdfFromHtml } from "../../utils/pdfGenerator";
 import { sendEmail } from "../../utils/mailer";
 import {
@@ -105,23 +106,68 @@ class SalesOrderController {
         return res.status(200).json(new ApiResponse("Order status fetched successfully", status));
     });
 
+    /**
+     * Super admin → Estimate PDF (admins have no granular permissions loaded).
+     * Users with sales-orders.view-estimate → Estimate PDF.
+     * Everyone else → GST Quotation PDF.
+     */
+    private isEstimateFormat(req: Request, permissions: string[]): boolean {
+        const isSuperAdmin = String(req.user?.userId ?? "").startsWith("admin_");
+        return isSuperAdmin || permissions.includes("sales-orders.view-estimate");
+    }
+
+    private resolveQuotationHtml(order: any, company: any, req: Request, permissions: string[]): string {
+        return this.isEstimateFormat(req, permissions)
+            ? generateEstimateHtml(order, company)
+            : generateQuotationHtml(order, company);
+    }
+
+    private resolveLabel(req: Request, permissions: string[]): string {
+        return this.isEstimateFormat(req, permissions) ? "Estimate" : "Quotation";
+    }
+
+    /** GET /:id/download-quotation — streams PDF, format auto-detected from permissions */
+    downloadQuotation = asyncHandler(async (req: Request, res: Response) => {
+        const perms = getPerms(req);
+        const order = await salesOrderService.findById(Number(req.params.id), perms);
+        if (!order) return res.status(404).json(new ApiResponse("Order not found"));
+
+        const company = await companyService.getCompany();
+        const htmlContent = this.resolveQuotationHtml(order, company, req, perms);
+        const pdfBuffer = await generatePdfFromHtml(htmlContent);
+
+        const label    = this.resolveLabel(req, perms);
+        const filename = `${label}-${(order as any).orderNo}.pdf`;
+
+        res.set({
+            "Content-Type": "application/pdf",
+            "Content-Disposition": `attachment; filename="${filename}"`,
+            "Content-Length": pdfBuffer.length,
+        });
+        res.send(pdfBuffer);
+    });
+
     emailQuotation = asyncHandler(async (req: Request, res: Response) => {
         const { recipientEmail, subject, message } = req.body;
         if (!recipientEmail) {
             return res.status(400).json(new ApiResponse("Recipient email is required"));
         }
-        const order = await salesOrderService.findById(Number(req.params.id), getPerms(req));
+        const perms = getPerms(req);
+        const order = await salesOrderService.findById(Number(req.params.id), perms);
         if (!order) return res.status(404).json(new ApiResponse("Order not found"));
 
         const company = await companyService.getCompany();
-        const htmlContent = generateQuotationHtml(order, company);
+        const htmlContent = this.resolveQuotationHtml(order, company, req, perms);
         const pdfBuffer = await generatePdfFromHtml(htmlContent);
+
+        const label    = this.resolveLabel(req, perms);
+        const filename = `${label}-${(order as any).orderNo}.pdf`;
 
         await sendEmail({
             to: recipientEmail,
-            subject: subject || `Quotation for Order ${(order as any).orderNo}`,
-            text: message || `Please find the attached quotation.`,
-            attachments: [{ filename: `Quotation-${(order as any).orderNo}.pdf`, content: pdfBuffer }],
+            subject: subject || `${label} for Order ${(order as any).orderNo}`,
+            text: message || `Please find the attached ${label.toLowerCase()}.`,
+            attachments: [{ filename, content: pdfBuffer }],
         });
         return res.status(200).json(new ApiResponse("Email sent successfully!"));
     });
@@ -136,16 +182,18 @@ class SalesOrderController {
         const { to, message } = req.body;
         if (!to) return res.status(400).json(new ApiResponse("Recipient phone number is required"));
 
-        const order = await salesOrderService.findById(Number(req.params.id), getPerms(req));
+        const perms = getPerms(req);
+        const order = await salesOrderService.findById(Number(req.params.id), perms);
         if (!order) return res.status(404).json(new ApiResponse("Order not found"));
 
         const company = await companyService.getCompany();
-        const htmlContent = generateQuotationHtml(order, company);
+        const htmlContent = this.resolveQuotationHtml(order, company, req, perms);
         const pdfBuffer = await generatePdfFromHtml(htmlContent);
-        const filename = `Quotation-${(order as any).orderNo}.pdf`;
+        const label    = this.resolveLabel(req, perms);
+        const filename = `${label}-${(order as any).orderNo}.pdf`;
         const { WhatsappService } = require("../whatsappservice/whatsapp.service");
         const mediaId = await WhatsappService.uploadMedia(pdfBuffer, filename, "application/pdf");
-        await WhatsappService.sendDocumentMessage(to, mediaId, filename, message || `Quotation for Order ${(order as any).orderNo}`);
+        await WhatsappService.sendDocumentMessage(to, mediaId, filename, message || `${label} for Order ${(order as any).orderNo}`);
         return res.status(200).json(new ApiResponse("WhatsApp message sent successfully!"));
     });
 

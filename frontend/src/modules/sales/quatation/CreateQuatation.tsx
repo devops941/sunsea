@@ -1,5 +1,5 @@
 // src/pages/sales/QuotationForm/QuotationForm.tsx
-import React, { useEffect, useMemo, useState, useCallback } from "react";
+import React, { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { FaSave, FaPaperPlane, FaCircleNotch, FaExclamationTriangle, FaUser, FaCalendarAlt, FaTruck, FaGlobe, FaMapMarkerAlt, FaFileAlt, FaPhone } from "react-icons/fa";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
@@ -141,16 +141,19 @@ const QuotationForm: React.FC = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const { id: idParam } = useParams<{ id: string }>();
-    const { can } = usePermission();
+    const { can, isSuperAdmin, permissions } = usePermission();
 
-    // ── Non-GST (estimate) user: reads/writes the encrypted ord_proc_aux_meta table.
-    //    Anyone WITHOUT the GST permission gets the Estimate form (DO no + Include GST
-    //    checkbox). GST users and super admin (holds all perms) get the Quotation form.
-    const isEstimateUser = !can("sales-orders.view-gst");
+    // ── Estimate User: Holds sales-orders.view-estimate AND NOT sales-orders.view-gst ──
+    //    Estimate users get Create Estimate, DO No, DO Date, Estimate Items, WITH Include GST checkbox.
+    const isEstimateUser = !isSuperAdmin && permissions.includes("sales-orders.view-estimate") && !permissions.includes("sales-orders.view-gst");
+
+    // ── GST User: Everyone else (Super Admin, GST users, or non-estimate users) ──
+    //    GST users get Create Quotation, Quotation No, Quotation Date, Quotation Items, NO Include GST checkbox, compulsory GST.
+    const isGstUser = !isEstimateUser;
 
     // ── GST toggle — only relevant for estimated users. GST users always have GST on.
     const [includeGstInEstimate, setIncludeGstInEstimate] = useState(false);
-    const gstEnabled = !isEstimateUser || includeGstInEstimate;
+    const gstEnabled = isGstUser || includeGstInEstimate;
 
     // ── Doc number label: estimated users see "DO No", GST users see "Quotation No"
     const docNoLabel = isEstimateUser ? "DO No" : "Quotation No";
@@ -158,6 +161,7 @@ const QuotationForm: React.FC = () => {
 
     // ─── State ──────────────────────────────────────────────────
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [loadingOrder, setLoadingOrder] = useState(false);
     const [isEditMode, setIsEditMode] = useState(false);
     const [quotationId, setQuotationId] = useState<number | null>(null);
     const [rejectionReason, setRejectionReason] = useState<string | null>(null);
@@ -200,6 +204,18 @@ const QuotationForm: React.FC = () => {
     const { loadCustomers, customers, loading: customersLoading } = useCustomers();
     const { loadProducts, products, loading: productsLoading } = useProducts();
     const { employees, loadEmployees } = useEmployees();
+
+    // Always-current ref so async callbacks (loadOrder, handleDraftOrderSelect)
+    // read the latest products even if they captured a stale closure.
+    const productsRef = useRef(products);
+    useEffect(() => { productsRef.current = products; }, [products]);
+
+    // Refs for isEditMode and quotationId — prevents stale-closure bugs in onSubmit
+    // (same pattern as productsRef above).
+    const isEditModeRef = useRef(isEditMode);
+    const quotationIdRef = useRef<number | null>(quotationId);
+    useEffect(() => { isEditModeRef.current = isEditMode; }, [isEditMode]);
+    useEffect(() => { quotationIdRef.current = quotationId; }, [quotationId]);
 
     // ── Watch values ──
     const items = watch("items");
@@ -339,7 +355,9 @@ const QuotationForm: React.FC = () => {
 
         const items = order.items && order.items.length > 0
             ? order.items.map((item: any) => {
-                const product = products.find((p: any) => String(p.id) === String(item.productId));
+                // Use productsRef so we always read the latest loaded products
+                // even when this function is called inside an async callback.
+                const product = productsRef.current.find((p: any) => String(p.id) === String(item.productId));
                 const gradedPrice = product ? resolveGradedUnitPrice(product) : 0;
                 const itemRate = item.unitPrice ?? item.rate ?? item.estimatedRate ?? (Number(item.quantity) > 0 && Number(item.lineTotal) > 0 ? Number(item.lineTotal) / Number(item.quantity) : gradedPrice);
                 // Reconstruct combined GST rate from stored item tax columns
@@ -381,6 +399,7 @@ const QuotationForm: React.FC = () => {
             billingState: billing.state,
             billingPincode: billing.pincode,
             sameAsBilling: order.sameAsBilling || false,
+            isInterState: (order as any).isInterState ?? false,
             shippingAddressLine1: shipping?.addressLine1 || "",
             shippingCity: shipping?.city || "",
             shippingState: shipping?.state || "",
@@ -428,6 +447,7 @@ const QuotationForm: React.FC = () => {
         }
 
         const loadOrder = async () => {
+            setLoadingOrder(true);
             try {
                 // Always fetch the FULL order from the API — the list-row state
                 // lacks item pricing / customer addresses needed by the form.
@@ -436,6 +456,8 @@ const QuotationForm: React.FC = () => {
             } catch (error) {
                 toast.error("Failed to load quotation");
                 navigate("/quatation-order");
+            } finally {
+                setLoadingOrder(false);
             }
         };
 
@@ -467,8 +489,8 @@ const QuotationForm: React.FC = () => {
     useEffect(() => {
         loadCustomers();
         loadProducts();
-        loadEmployees({});
-    }, [loadCustomers, loadProducts, loadEmployees]);
+        if (can("employees.view")) loadEmployees({});
+    }, [loadCustomers, loadProducts, loadEmployees, can]);
 
     // ─── Fetch customer's previous orders on customer change (create mode only) ──
     useEffect(() => {
@@ -485,7 +507,7 @@ const QuotationForm: React.FC = () => {
                     pageSize: 50,
                 });
                 setCustomerOrders((res.data || []).filter((o: any) =>
-                    ['CONFIRMED', 'DRAFT', 'QUOTATION_IN_PROGRESS', 'QUOTATION_COMPLETED', 'CUSTOMER_APPROVED', 'MD_APPROVED'].includes(o.status)
+                    ['CONFIRMED', 'QUOTATION_IN_PROGRESS', 'QUOTATION_COMPLETED', 'CUSTOMER_APPROVED', 'MD_APPROVED'].includes(o.status)
                 ));
             } catch (_) {
                 setCustomerOrders([]);
@@ -579,7 +601,10 @@ const QuotationForm: React.FC = () => {
     }, [customers, customerId]);
 
     // ─── Update unit prices for current items when Customer changes ──
+    // Skip in edit mode — the saved unit prices from the order must not be
+    // overwritten by grade prices when the form first loads.
     useEffect(() => {
+        if (idParam) return;   // edit mode: keep saved prices
         if (customerId && items && items.length > 0 && products.length > 0) {
             items.forEach((item: any, index: number) => {
                 if (item.productId) {
@@ -593,7 +618,7 @@ const QuotationForm: React.FC = () => {
                 }
             });
         }
-    }, [customerId, products, resolveGradedUnitPrice, setValue]);
+    }, [idParam, customerId, products, resolveGradedUnitPrice, setValue]);
 
     // ─── Re-populate product IDs when products load ──
     useEffect(() => {
@@ -807,7 +832,12 @@ const QuotationForm: React.FC = () => {
                 gstTaxRateId: gstEnabled ? (item.gstTaxRateId || undefined) : undefined,
             }));
 
-            const payload = {
+            // idParam from the URL is the single source of truth for edit mode.
+            // State/refs can lag on HMR remounts; the URL param never lies.
+            const currentIsEditMode = Boolean(idParam);
+            const currentQuotationId = idParam ? Number(idParam) : null;
+
+            const payload: any = {
                 orderNo: data.quotationNo,
                 orderDate: new Date(data.quotationDate).toISOString(),
                 expectedCompletionDate: data.validUntil ? new Date(data.validUntil).toISOString() : undefined,
@@ -828,17 +858,20 @@ const QuotationForm: React.FC = () => {
                 items: transformedItems,
                 orderDiscountType: data.orderDiscountType,
                 orderDiscountValue: data.orderDiscountValue,
+                // Quotations always start in QUOTATION_IN_PROGRESS so they appear
+                // in the Quotation List and not in the Sales Order list.
+                status: currentIsEditMode ? undefined : "QUOTATION_IN_PROGRESS",
             };
 
             let response;
 
-            if (isEditMode && quotationId) {
-                response = await salesOrderService.update(quotationId, payload);
+            if (currentIsEditMode && currentQuotationId) {
+                response = await salesOrderService.update(currentQuotationId, payload);
             } else {
                 response = await salesOrderService.create(payload);
             }
 
-            const orderId = isEditMode ? quotationId! : response.id;
+            const orderId = currentIsEditMode ? currentQuotationId! : response.id;
 
             // Apply the single order-level discount (if any) — this replaces
             // the old per-item updateDiscounts call entirely.
@@ -854,7 +887,7 @@ const QuotationForm: React.FC = () => {
                 await salesOrderService.submitForApproval(orderId);
                 toast.success("Quotation submitted for MD approval!");
             } else {
-                toast.success(isEditMode ? "Quotation updated successfully!" : "Quotation created successfully as DRAFT!");
+                toast.success(currentIsEditMode ? "Quotation updated successfully!" : "Quotation created successfully as DRAFT!");
             }
 
             navigate("/quatation-order");
@@ -868,7 +901,7 @@ const QuotationForm: React.FC = () => {
     };
 
     // ─── Render ──────────────────────────────────────────────────
-    const isLoading = customersLoading || productsLoading;
+    const isLoading = customersLoading || productsLoading || loadingOrder;
     const billing = {
         addressLine1: watch("billingAddressLine1"),
         city: watch("billingCity"),
