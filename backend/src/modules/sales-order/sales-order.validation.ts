@@ -74,14 +74,34 @@ export type Address = z.infer<typeof addressSchema>;
 
 /**
  * Sales Order Item Input (shared shape used inside create/update body)
+ * Includes optional GST fields — only used when the role has sales-orders.view-gst permission.
  */
 const salesOrderItemInputSchema = z.object({
     productId: z.union([z.string(), z.number()])
         .refine((val) => !isNaN(Number(val)), "Product ID must be a valid number"),
     quantity: z.number().positive("Quantity must be positive")
         .refine((val) => Number.isFinite(val) && val > 0, "Quantity must be a valid positive number"),
+    // Manually entered unit price (overrides grade-based pricing when present)
+    unitPrice: z.number().positive("Unit price must be positive").optional().nullable(),
+    // GST fields (optional — stored in sales_order_items)
     gstTaxRateId: z.string().uuid("GST Tax Rate ID must be a valid UUID").optional().nullable(),
+    cgstRate: z.number().min(0).max(100).optional().nullable(),
+    sgstRate: z.number().min(0).max(100).optional().nullable(),
+    igstRate: z.number().min(0).max(100).optional().nullable(),
 });
+
+/**
+ * Estimated item input — one estimated rate per product.
+ * Stored encrypted in the auxiliary table.
+ */
+const estimatedItemInputSchema = z.object({
+    productId: z.union([z.string(), z.number()])
+        .refine((val) => !isNaN(Number(val)), "Product ID must be a valid number"),
+    estimatedRate: z.number().positive("Estimated rate must be positive"),
+    estimatedQuantity: z.number().positive("Estimated quantity must be positive").optional(),
+});
+
+export type EstimatedItemInput = z.infer<typeof estimatedItemInputSchema>;
 
 /**
  * Create Sales Order Validation
@@ -91,77 +111,22 @@ const salesOrderBodyShape = z.object({
     orderNo: z.string().min(1, "Order number is required").max(30, "..."),
     orderDate: z.string().datetime({ message: "Invalid order date format" })
         .refine((val) => !isNaN(Date.parse(val)), "Invalid order date"),
-    expectedCompletionDate: z.string().datetime({ message: "Invalid completion date format" })
-        .refine((val) => !isNaN(Date.parse(val)), "Invalid completion date")
-        .refine((val) => {
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            const inputDate = new Date(val);
-            inputDate.setHours(0, 0, 0, 0);
-            return inputDate >= today;
-        }, "Expected completion date must be today or a future date"),
     customerId: z.string().uuid("Customer ID must be a valid UUID"),
     mobile: z.string().optional().nullable(),
     isInterState: z.boolean().default(false).optional(),
-    paymentTermId: z.number().int().positive("...").optional().nullable(),
-    dispatchType: z.string().min(1, "Dispatch Type is required"),
     orderType: z.union([OrderTypeEnum, z.literal("")]).optional().transform(val => val === "" ? undefined : val),
     referenceText: z.string().optional().nullable(),
     salesPersonName: z.string().optional().nullable(),
     status: SalesOrderStatusEnum.default("DRAFT"),
-    billingAddressLine1: z.string().min(1, "Billing Address Line 1 is required"),
-    billingCity: z.string().min(1, "Billing City is required"),
-    billingState: z.string().min(1, "Billing State is required"),
-    billingPincode: z.string().min(1, "Billing Pincode is required"),
-    billingCountry: z.string().optional().nullable().default("India"),
-
-    shippingAddressLine1: z.string().optional().nullable(),
-    shippingCity: z.string().optional().nullable(),
-    shippingState: z.string().optional().nullable(),
-    shippingPincode: z.string().optional().nullable(),
-    shippingCountry: z.string().optional().nullable().default("India"),
-    // removed sameAsBilling
-    remarks: z.string().max(500, "Remarks must be less than 500 characters").optional().nullable(),
-    internalNotes: z.string().max(1000, "Internal notes must be less than 1000 characters").optional().nullable(),
-    mdApprovalStatus: ApprovalStatusEnum.default("PENDING").optional(),
-    mdApprovedBy: z.string().min(1).max(36).optional().nullable(),
-    mdApprovedAt: z.string().datetime({ message: "Invalid approval date format" }).optional().nullable(),
-    mdRejectionReason: z.string().max(500).optional().nullable(),
-    customerApprovalStatus: ApprovalStatusEnum.default("PENDING").optional(),
-    customerApprovedAt: z.string().datetime({ message: "Invalid customer approval date format" }).optional().nullable(),
-    customerRejectionReason: z.string().max(500).optional().nullable(),
+    narration: z.string().max(1000, "Narration must be less than 1000 characters").optional().nullable(),
     createdBy: z.string().min(1).max(36).optional().nullable(),
-    orderDiscountType: DiscountTypeEnum.optional(),
-    orderDiscountValue: z.union([z.string(), z.number()])
-        .optional()
-        .refine((val) => val === undefined || val === null || val === "" || !isNaN(Number(val)), "Discount value must be a valid number")
-        .transform((val) => val !== undefined && val !== null && val !== "" ? Number(val) : undefined),
     items: z.array(salesOrderItemInputSchema).min(1, "At least one item is required"),
+    // Estimated pricing section — encrypted at rest, restricted by sales-orders.view-estimate permission
+    estimatedItems: z.array(estimatedItemInputSchema).optional().nullable(),
+    estimatedNarration: z.string().max(1000).optional().nullable(),
 });
 
 const salesOrderBodyRefined = salesOrderBodyShape.superRefine((data, ctx) => {
-    if (data.expectedCompletionDate && data.orderDate) {
-        if (new Date(data.expectedCompletionDate) < new Date(data.orderDate)) {
-            ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Expected completion date must be after order date", path: ["expectedCompletionDate"] });
-        }
-    }
-    if (!data.shippingAddressLine1) {
-        ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: "Shipping address is required",
-            path: ["shippingAddressLine1"],
-        });
-    }
-    if (data.mdApprovalStatus === "APPROVED") {
-        if (!data.mdApprovedBy) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Approved by is required when status is APPROVED", path: ["mdApprovedBy"] });
-        if (!data.mdApprovedAt) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Approved at is required when status is APPROVED", path: ["mdApprovedAt"] });
-    }
-    if (data.mdApprovalStatus === "REJECTED" && !data.mdRejectionReason) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Rejection reason is required when status is REJECTED", path: ["mdRejectionReason"] });
-    }
-    if (data.customerApprovalStatus === "APPROVED" && !data.customerApprovedAt) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Customer approved at is required when status is APPROVED", path: ["customerApprovedAt"] });
-    }
     if (data.orderType === "salesperson" && !data.salesPersonName) {
         ctx.addIssue({
             code: z.ZodIssueCode.custom,
@@ -175,9 +140,6 @@ const salesOrderBodyRefined = salesOrderBodyShape.superRefine((data, ctx) => {
             message: "Reference text is required when order source is Reference",
             path: ["referenceText"],
         });
-    }
-    if (data.customerApprovalStatus === "REJECTED" && !data.customerRejectionReason) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Customer rejection reason is required when status is REJECTED", path: ["customerRejectionReason"] });
     }
 
     // Reject duplicate (productId) pairs at the validation layer too,
@@ -268,11 +230,7 @@ export const salesOrderQuerySchema = z.object({
             .optional()
             .transform(parseStatuses),
 
-        mdApprovalStatus: ApprovalStatusEnum.optional(),
-        dispatchType: z.string().optional(),
         orderType: OrderTypeEnum.optional(),
-
-        customerApprovalStatus: ApprovalStatusEnum.optional(),
 
         search: z
             .string()
@@ -292,7 +250,7 @@ export const salesOrderQuerySchema = z.object({
 
         // Sorting
         sortBy: z
-            .enum(["orderDate", "createdAt", "orderNo", "expectedCompletionDate"])
+            .enum(["orderDate", "createdAt", "orderNo"])
             .optional()
             .default("createdAt"),
 
@@ -361,45 +319,6 @@ export const bulkCreateSalesOrderItemsSchema = z.object({
     })
 });
 
-/**
- * Update Discounts Validation
- * Body: array of { itemId, discountType, discountValue }
- * Every item belonging to the order should be included; items omitted
- * are NOT reset — only items present in the array are updated.
- */
-export const updateSalesOrderDiscountsSchema = z.object({
-    params: z.object({
-        id: z
-            .string()
-            .or(z.number())
-            .refine((val) => !isNaN(Number(val)), "Sales order ID must be a valid number"),
-    }),
-    body: z.object({
-        items: z
-            .array(
-                z.object({
-                    itemId: z
-                        .union([z.string(), z.number()])
-                        .refine((val) => !isNaN(Number(val)), "Item ID must be a valid number"),
-                    discountType: DiscountTypeEnum,
-                    discountValue: z
-                        .number()
-                        .min(0, "Discount value cannot be negative"),
-                })
-            )
-            .min(1, "At least one item discount is required"),
-    }).superRefine((data, ctx) => {
-        data.items.forEach((item, idx) => {
-            if (item.discountType === "PERCENT" && item.discountValue > 100) {
-                ctx.addIssue({
-                    code: z.ZodIssueCode.custom,
-                    message: "Percent discount cannot exceed 100",
-                    path: ["items", idx, "discountValue"],
-                });
-            }
-        });
-    }),
-});
 
 /**
  * Submit For MD Approval Validation
@@ -428,65 +347,6 @@ export const reopenSalesOrderSchema = z.object({
     }),
 });
 
-/**
- * Approval Decision Schemas
- */
-export const mdApprovalDecisionSchema = z.object({
-    body: z.object({
-        decision: z.enum(["APPROVED", "REJECTED"], {
-            error: (issue) => {
-                if (issue.input === undefined) {
-                    return { message: "Decision is required" };
-                }
-                return { message: "Decision must be APPROVED or REJECTED" };
-            }
-        }),
-        approverId: z
-            .string()
-            .min(1, "Approver ID is required")
-            .max(36, "Approver ID must be less than 36 characters"),
-        rejectionReason: z
-            .string()
-            .max(500, "Rejection reason must be less than 500 characters")
-            .optional()
-            .nullable(),
-    }).superRefine((data, ctx) => {
-        if (data.decision === "REJECTED" && !data.rejectionReason) {
-            ctx.addIssue({
-                code: z.ZodIssueCode.custom,
-                message: "Rejection reason is required when decision is REJECTED",
-                path: ["rejectionReason"],
-            });
-        }
-    }),
-});
-
-export const customerApprovalDecisionSchema = z.object({
-    body: z.object({
-        decision: z.enum(["APPROVED", "REJECTED"], {
-            error: (issue) => {
-                if (issue.input === undefined) {
-                    return { message: "Decision is required" };
-                }
-                return { message: "Decision must be APPROVED or REJECTED" };
-            }
-        }),
-        rejectionReason: z
-            .string()
-            .max(500, "Rejection reason must be less than 500 characters")
-            .optional()
-            .nullable(),
-    }).superRefine((data, ctx) => {
-        if (data.decision === "REJECTED" && !data.rejectionReason) {
-            ctx.addIssue({
-                code: z.ZodIssueCode.custom,
-                message: "Rejection reason is required when decision is REJECTED",
-                path: ["rejectionReason"],
-            });
-        }
-    }),
-});
-
 // ============================================
 // Type Exports
 // ============================================
@@ -497,6 +357,3 @@ export type SalesOrderQueryInput = z.infer<typeof salesOrderQuerySchema>["query"
 export type CreateSalesOrderItemInput = z.infer<typeof createSalesOrderItemSchema>["body"];
 export type UpdateSalesOrderItemInput = z.infer<typeof updateSalesOrderItemSchema>["body"];
 export type BulkCreateSalesOrderItemsInput = z.infer<typeof bulkCreateSalesOrderItemsSchema>["body"];
-export type UpdateSalesOrderDiscountsInput = z.infer<typeof updateSalesOrderDiscountsSchema>["body"];
-export type MdApprovalDecisionInput = z.infer<typeof mdApprovalDecisionSchema>["body"];
-export type CustomerApprovalDecisionInput = z.infer<typeof customerApprovalDecisionSchema>["body"];

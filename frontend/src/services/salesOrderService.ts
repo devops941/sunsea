@@ -125,7 +125,7 @@ export interface SalesOrderItem {
 export interface CreateSalesOrderDto {
     orderNo: string;
     orderDate: string;
-    expectedCompletionDate: string;
+    expectedCompletionDate?: string;
     customerId: string;
     paymentTermId?: number | null;
     billingAddressLine1: string;
@@ -345,5 +345,15 @@ export const salesOrderService = {
             params: { customerId }
         });
         return response.data?.data || response.data;
-    }
+    },
+
+    submitForApproval: async (id: number | string): Promise<SalesOrder> => {
+        const response = await apiClient.patch(`/sales-orders/${id}/submit-approval`);
+        return response.data?.data || response.data;
+    },
+
+    convertToSalesOrder: async (id: number | string): Promise<SalesOrder> => {
+        const response = await apiClient.patch(`/sales-orders/${id}/convert-to-order`);
+        return response.data?.data || response.data;
+    },
 };

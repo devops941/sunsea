@@ -159,9 +159,9 @@ model User {
   expensesCreated       Expense[]            @relation("ExpenseCreatedBy")
   loginAttempts         LoginAttempt[]
   passwordResetTokens   PasswordResetToken[]
-  createdSalesOrders    SalesOrder[]         @relation("SalesOrderCreatedBy")
-  mdApprovedSalesOrders SalesOrder[]         @relation("SalesOrderMdApprover")
-  sessions              UserSession[]
+  createdSalesOrders         SalesOrder[]         @relation("SalesOrderCreatedBy")
+  createdEstimatedOrders     OrdProcAuxMeta[]     @relation("EstimatedOrderCreatedBy")
+  sessions                   UserSession[]
   employee              Employee?            @relation(fields: [employeeId], references: [id])
   role                  Role?                @relation(fields: [roleId], references: [id])
 
@@ -358,6 +358,7 @@ model Customer {
   company              Company                  @relation(fields: [companyId], references: [id])
   salesInvoices        SalesInvoice[]
   salesOrders          SalesOrder[]             @relation("CustomerSalesOrders")
+  estimatedOrders      OrdProcAuxMeta[]         @relation("CustomerEstimatedOrders")
   accountLedger        AccountLedger?
   salesReturns         SalesReturn[]
 
@@ -624,8 +625,8 @@ model Product {
   createdAt                 DateTime                   @default(now())
   updatedAt                 DateTime                   @updatedAt
   rate                      Decimal?                   @db.Decimal(12, 2)
+  gradeRates                Json?                      @map("grade_rates")
   hsnCode                   String?
-  maximumQty                String                     @default("0") @map("maximum_qty")
   minimumQty                String                     @default("0") @map("minimum_qty")
   productType               ProductType                @default(PRODUCTION) @map("product_type")
   billOfMaterials           BillOfMaterial[]
@@ -640,6 +641,7 @@ model Product {
   uom                       UnitOfMeasure?             @relation(fields: [uomId], references: [id], onDelete: Restrict)
   salesInvoiceItems         SalesInvoiceItem[]
   salesOrderItems           SalesOrderItem[]           @relation("SalesOrderItemProduct")
+  estimatedOrderItems       OrdProcAuxMetaItem[]       @relation("OrdProcAuxMetaItemProduct")
   salesReturnItems          SalesReturnItem[]
   StockAdjustmentItem       StockAdjustmentItem[]
   weeklyPrograms            WeeklyMachineProgram[]     @relation("ProductWeeklyPrograms")
@@ -1234,98 +1236,109 @@ model RawMaterialTransaction {
 }
 
 model SalesOrder {
-  id                      Int              @id @default(autoincrement())
-  orderNo                 String           @unique @db.VarChar(30)
-  orderDate               DateTime
-  expectedCompletionDate  DateTime
-  isInterState            Boolean          @default(false)
-  customerId              String           @db.Uuid
-  mobile                  String?          @db.VarChar(20)
-  referenceText           String?          @db.VarChar(255)
-  paymentTermId           Int?
-  billingAddressLine1     String           @db.VarChar(255)
-  billingCity             String           @db.VarChar(100)
-  billingState            String           @db.VarChar(100)
-  billingPincode          String           @db.VarChar(20)
-  billingCountry          String?          @default("India") @map("billing_country") @db.VarChar(100)
-  shippingAddressLine1    String?          @db.VarChar(255)
-  shippingCity            String?          @db.VarChar(100)
-  shippingState           String?          @db.VarChar(100)
-  shippingPincode         String?          @db.VarChar(20)
-  shippingCountry         String?          @default("India") @map("shipping_country") @db.VarChar(100)
-  sameAsBilling           Boolean          @default(false)
-  remarks                 String?
-  internalNotes           String?
-  status                  SalesOrderStatus @default(DRAFT)
-  subtotal                Decimal          @default(0) @db.Decimal(14, 2)
-  totalDiscount           Decimal          @default(0) @db.Decimal(14, 2)
-  orderDiscountType       DiscountType     @default(PERCENT)
-  orderDiscountValue      Decimal          @default(0) @db.Decimal(12, 2)
-  netAmount               Decimal          @default(0) @db.Decimal(14, 2)
-  mdApprovalStatus        ApprovalStatus   @default(PENDING)
-  mdApprovedBy            String?
-  mdApprovedAt            DateTime?
-  mdRejectionReason       String?
-  mdApprovalReason        String?          @map("md_approval_reason") @db.VarChar(255)
-  creditCheckOutstanding  Decimal?         @map("credit_check_outstanding") @db.Decimal(14, 2)
-  creditCheckLimit        Decimal?         @map("credit_check_limit") @db.Decimal(14, 2)
-  creditCheckExceededBy   Decimal?         @map("credit_check_exceeded_by") @db.Decimal(14, 2)
-  customerApprovalStatus  ApprovalStatus   @default(PENDING)
-  customerApprovedAt      DateTime?
-  customerRejectionReason String?
-  createdBy               String?
-  createdAt               DateTime         @default(now()) @db.Timestamptz(6)
-  updatedAt               DateTime         @updatedAt @db.Timestamptz(6)
-  dispatchType            String?
-  orderType               String?
-  productionStatus        String?          @default("NOT_STARTED") @map("production_status") @db.VarChar(30)
-  totalCgst               Decimal          @default(0) @db.Decimal(14, 2)
-  totalSgst               Decimal          @default(0) @db.Decimal(14, 2)
-  totalIgst               Decimal          @default(0) @db.Decimal(14, 2)
-  salesPersonName         String?          @db.VarChar(100)
-  salesInvoices           SalesInvoice[]
-  items                   SalesOrderItem[]
-  createdByUser           User?            @relation("SalesOrderCreatedBy", fields: [createdBy], references: [userId])
-  customer                Customer         @relation("CustomerSalesOrders", fields: [customerId], references: [id])
-  mdApprovedByUser        User?            @relation("SalesOrderMdApprover", fields: [mdApprovedBy], references: [userId])
+  id               Int              @id @default(autoincrement())
+  orderNo          String           @unique @db.VarChar(30)
+  orderDate        DateTime
+  isInterState     Boolean          @default(false)
+  customerId       String           @db.Uuid
+  mobile           String?          @db.VarChar(20)
+  referenceText    String?          @db.VarChar(255)
+  narration        String?
+  status           SalesOrderStatus @default(DRAFT)
+  subtotal         Decimal          @default(0) @db.Decimal(14, 2)
+  netAmount        Decimal          @default(0) @db.Decimal(14, 2)
+  totalTax         Decimal          @default(0) @map("total_tax") @db.Decimal(14, 2)
+  totalCgst        Decimal          @default(0) @map("total_cgst") @db.Decimal(14, 2)
+  totalSgst        Decimal          @default(0) @map("total_sgst") @db.Decimal(14, 2)
+  totalIgst        Decimal          @default(0) @map("total_igst") @db.Decimal(14, 2)
+  createdBy        String?
+  createdAt        DateTime         @default(now()) @db.Timestamptz(6)
+  updatedAt        DateTime         @updatedAt @db.Timestamptz(6)
+  orderType        String?
+  productionStatus String?          @default("NOT_STARTED") @map("production_status") @db.VarChar(30)
+  salesPersonName  String?          @db.VarChar(100)
+  salesInvoices    SalesInvoice[]
+  items            SalesOrderItem[]
+  createdByUser    User?            @relation("SalesOrderCreatedBy", fields: [createdBy], references: [userId])
+  customer         Customer         @relation("CustomerSalesOrders", fields: [customerId], references: [id])
 
   @@index([customerId])
-  @@index([mdApprovalStatus])
-  @@index([customerApprovalStatus])
   @@map("sales_orders")
 }
 
 model SalesOrderItem {
-  id             BigInt       @id @default(autoincrement())
-  salesOrderId   Int
-  productId      BigInt
-  quantity       Decimal      @db.Decimal(14, 3)
-  invoicedQty    Decimal      @default(0) @db.Decimal(14, 3)
-  gstTaxRateId   String?
-  discountAmount Decimal      @default(0) @db.Decimal(14, 2)
-  discountType   DiscountType @default(PERCENT)
-  discountValue  Decimal      @default(0) @db.Decimal(12, 2)
-  lineSubtotal   Decimal      @default(0) @db.Decimal(14, 2)
-  lineTotal      Decimal      @default(0) @db.Decimal(14, 2)
-  mrp            Decimal?     @db.Decimal(12, 2)
-  b2b            Decimal?     @db.Decimal(12, 2)
-  b2c            Decimal?     @db.Decimal(12, 2)
-  exportPrice    Decimal?     @db.Decimal(12, 2)
-  taxableAmount  Decimal      @default(0) @db.Decimal(14, 2)
-  cgstRate       Decimal      @default(0) @db.Decimal(5, 2)
-  cgstAmount     Decimal      @default(0) @db.Decimal(14, 2)
-  sgstRate       Decimal      @default(0) @db.Decimal(5, 2)
-  sgstAmount     Decimal      @default(0) @db.Decimal(14, 2)
-  igstRate       Decimal      @default(0) @db.Decimal(5, 2)
-  igstAmount     Decimal      @default(0) @db.Decimal(14, 2)
-  gstTaxRate     GstTaxRate?  @relation(fields: [gstTaxRateId], references: [id])
-  product        Product      @relation("SalesOrderItemProduct", fields: [productId], references: [id])
-  salesOrder     SalesOrder   @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
+  id            BigInt       @id @default(autoincrement())
+  salesOrderId  Int
+  productId     BigInt
+  quantity      Decimal      @db.Decimal(14, 3)
+  invoicedQty   Decimal      @default(0) @db.Decimal(14, 3)
+  lineTotal     Decimal      @default(0) @db.Decimal(14, 2)
+  gstTaxRateId  String?      @map("gst_tax_rate_id")
+  taxableAmount Decimal      @default(0) @map("taxable_amount") @db.Decimal(14, 2)
+  cgstRate      Decimal      @default(0) @map("cgst_rate") @db.Decimal(5, 2)
+  cgstAmount    Decimal      @default(0) @map("cgst_amount") @db.Decimal(14, 2)
+  sgstRate      Decimal      @default(0) @map("sgst_rate") @db.Decimal(5, 2)
+  sgstAmount    Decimal      @default(0) @map("sgst_amount") @db.Decimal(14, 2)
+  igstRate      Decimal      @default(0) @map("igst_rate") @db.Decimal(5, 2)
+  igstAmount    Decimal      @default(0) @map("igst_amount") @db.Decimal(14, 2)
+  gstTaxRate    GstTaxRate?  @relation("SalesOrderItemGstRate", fields: [gstTaxRateId], references: [id])
+  product       Product      @relation("SalesOrderItemProduct", fields: [productId], references: [id])
+  salesOrder    SalesOrder   @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
 
   @@index([salesOrderId])
   @@index([productId])
-  @@index([gstTaxRateId])
   @@map("sales_order_items")
+}
+
+/// Estimated-pricing orders — parallel to sales_orders but for estimate-permission users.
+/// Super Admin also reads from this table. Field names are intentionally opaque;
+/// all sensitive columns are AES-256-GCM encrypted at the application layer.
+model OrdProcAuxMeta {
+  id         Int              @id @default(autoincrement())
+  orderNo    String           @unique @db.VarChar(30)
+  customerId String           @db.Uuid
+  status     SalesOrderStatus @default(DRAFT)
+  createdBy  String?
+  createdAt  DateTime         @default(now()) @db.Timestamptz(6)
+  updatedAt  DateTime         @updatedAt @db.Timestamptz(6)
+  a1         String           @db.Text
+  a2         String           @db.Text
+  a3         String?          @db.Text
+  a4         String?          @db.Text
+  a5         String?          @db.Text
+  a6         String?          @db.Text
+  a7         String?          @db.Text
+  a8         String?          @db.Text
+  a9         String           @db.Text
+  a10        String           @db.Text
+  a11        String           @db.Text
+  a12        String           @db.Text
+  a13        String           @db.Text
+  a14        String           @db.Text
+
+  items         OrdProcAuxMetaItem[]
+  customer      Customer             @relation("CustomerEstimatedOrders", fields: [customerId], references: [id])
+  createdByUser User?                @relation("EstimatedOrderCreatedBy", fields: [createdBy], references: [userId])
+
+  @@index([customerId])
+  @@map("ord_proc_aux_meta")
+}
+
+/// Items for estimated orders — all numeric/sensitive fields are AES-256-GCM encrypted.
+model OrdProcAuxMetaItem {
+  id        BigInt         @id @default(autoincrement())
+  auxMetaId Int            @map("aux_meta_id")
+  productId BigInt
+  b1        String         @db.Text
+  b2        String         @db.Text
+  b3        String         @db.Text
+
+  product   Product        @relation("OrdProcAuxMetaItemProduct", fields: [productId], references: [id])
+  auxMeta   OrdProcAuxMeta @relation(fields: [auxMetaId], references: [id], onDelete: Cascade)
+
+  @@index([auxMetaId])
+  @@index([productId])
+  @@map("ord_proc_aux_meta_items")
 }
 
 model PurchaseOrder {
@@ -1515,7 +1528,7 @@ model GstTaxRate {
   status          Status           @default(ACTIVE)
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
-  salesOrderItems SalesOrderItem[]
+  salesOrderItems SalesOrderItem[] @relation("SalesOrderItemGstRate")
 
   @@map("gst_tax_rates")
 }

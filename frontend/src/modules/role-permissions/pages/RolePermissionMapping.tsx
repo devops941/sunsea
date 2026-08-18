@@ -3,12 +3,14 @@ import {
   FaShieldAlt, FaSlidersH, FaCogs, FaUsersCog,
   FaBoxOpen, FaShoppingCart, FaWarehouse, FaChartBar,
   FaLayerGroup, FaBox, FaDollarSign, FaCalendarCheck, FaTachometerAlt,
+  FaLock, FaKey,
 } from "react-icons/fa";
 import { toast } from "react-toastify";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import CommonLoader from "../../../components/ui/Loader/CommonLoader";
 import { useRoles } from "../../../hooks/useRoles";
 import { usePermissions } from "../../../hooks/usePermissions";
+import { usePermission } from "../../../hooks/usePermission";
 import { useSocket } from "../../../providers/SocketProvider";
 import type { Permission } from "../../../features/permissions/types";
 
@@ -193,6 +195,7 @@ const MODULE_GROUPS: ModuleGroup[] = [
     colorId: "products",
     modules: [
       { key: "products", label: "Product Master" },
+      { key: "sales_products", label: "Sales Products" },
       { key: "categories", label: "Categories" },
       { key: "uoms", label: "Units of Measure (UOM)" },
       { key: "raw_materials", label: "Raw Materials" },
@@ -212,6 +215,7 @@ const MODULE_GROUPS: ModuleGroup[] = [
       { key: "purchase-order-approvals", label: "MD Approvals" },
       { key: "invoice", label: "Bill & Invoice" },
       { key: "expenses", label: "Expenses" },
+      { key: "purchase-returns", label: "Purchase Returns" },
     ],
   },
   {
@@ -222,10 +226,9 @@ const MODULE_GROUPS: ModuleGroup[] = [
     modules: [
       { key: "customers", label: "Customers" },
       { key: "sales-orders", label: "Sales Orders" },
-      { key: "draft-orders", label: "Draft Orders" },
       { key: "quotations", label: "Quotations" },
-      { key: "pending-quotations", label: "MD Approvals" },
       { key: "sales-invoices", label: "Sales Invoice" },
+      { key: "sales-returns", label: "Sales Returns" },
     ],
   },
   {
@@ -322,6 +325,25 @@ const ACTIONS = [
   { key: "delete", label: "Delete", headerColor: "text-rose-600", hex: "#e11d48", colBg: "bg-rose-50/50" },
 ] as const;
 
+const STANDARD_ACTION_KEYS = new Set(ACTIONS.map(a => a.key));
+
+/**
+ * Mutually exclusive extra permissions — if one is assigned the other is blocked.
+ * Key = action that is ON → Value = action that must stay OFF.
+ */
+const MUTUALLY_EXCLUSIVE: Record<string, string> = {
+  "view-gst":      "view-estimate",
+  "view-estimate": "view-gst",
+};
+
+/** Format "view-gst" → "View GST", "view-estimate" → "View Estimate" */
+function formatActionLabel(action: string): string {
+  return action.split("-").map(w => {
+    if (w.toLowerCase() === "gst") return "GST";
+    return w.charAt(0).toUpperCase() + w.slice(1);
+  }).join(" ");
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Custom Checkbox  (supports indeterminate state)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -359,6 +381,7 @@ const Cb: React.FC<CbProps> = ({ checked, indeterminate, disabled, onChange, hex
 // ─────────────────────────────────────────────────────────────────────────────
 const RolePermissionMapping: React.FC = () => {
   const { roles, loadRoles } = useRoles();
+  const { isSuperAdmin } = usePermission();
   const {
     permissions,
     rolePermissions,
@@ -412,7 +435,9 @@ const RolePermissionMapping: React.FC = () => {
         const byAction: Record<string, Permission | undefined> = {};
         modPerms.forEach(p => { byAction[p.action] = p; });
         const assignedCount = modPerms.filter(p => assignedIds.has(p.id)).length;
-        return { ...mod, byAction, existingPerms: modPerms, assignedCount };
+        // Extra = permissions beyond the 4 standard actions (e.g. view-gst, view-estimate)
+        const extraPerms = modPerms.filter(p => !STANDARD_ACTION_KEYS.has(p.action));
+        return { ...mod, byAction, existingPerms: modPerms, assignedCount, extraPerms };
       });
       const totalPerms = modules.reduce((s, m) => s + m.existingPerms.length, 0);
       const assignedTotal = modules.reduce((s, m) => s + m.assignedCount, 0);
@@ -701,59 +726,129 @@ const RolePermissionMapping: React.FC = () => {
                         const rowAll = rowPerms.length > 0 && rowAssigned === rowPerms.length;
                         const rowPartial = rowAssigned > 0 && rowAssigned < rowPerms.length;
                         const hasPerms = rowPerms.length > 0;
+                        const extraPerms = mod.extraPerms ?? [];
+                        const rowBg = idx % 2 === 1 ? "bg-gray-50/25" : "";
 
                         return (
-                          <tr
-                            key={mod.key}
-                            className={`transition-colors hover:bg-gray-50/80 ${idx % 2 === 1 ? "bg-gray-50/25" : ""}`}
-                          >
-                            {/* Entity name */}
-                            <td className="py-3 px-5">
-                              <div className="font-semibold text-gray-800 text-sm">{mod.label}</div>
-                              <div className="text-[10px] text-gray-400 font-mono mt-0.5">{mod.key}</div>
-                            </td>
+                          <React.Fragment key={mod.key}>
+                            <tr className={`transition-colors hover:bg-gray-50/80 ${rowBg} ${extraPerms.length > 0 ? "border-b-0" : ""}`}>
+                              {/* Entity name */}
+                              <td className="py-3 px-5">
+                                <div className="font-semibold text-gray-800 text-sm">{mod.label}</div>
+                                <div className="text-[10px] text-gray-400 font-mono mt-0.5">{mod.key}</div>
+                              </td>
 
-                            {/* View / Add / Edit / Delete checkboxes */}
-                            {ACTIONS.map(action => {
-                              const perm = mod.byAction[action.key];
-                              return (
-                                <td key={action.key} className={`py-3 px-3 text-center ${action.colBg}`}>
-                                  {perm ? (
-                                    <Cb
-                                      checked={assignedIds.has(perm.id)}
-                                      onChange={() => toggleOne(perm)}
-                                      hex={action.hex}
-                                      disabled={busy}
-                                    />
-                                  ) : (
-                                    <span
-                                      className="inline-block rounded"
-                                      style={{ width: 22, height: 2, background: "#e5e7eb" }}
-                                    />
-                                  )}
+                              {/* View / Add / Edit / Delete checkboxes */}
+                              {ACTIONS.map(action => {
+                                const perm = mod.byAction[action.key];
+                                return (
+                                  <td key={action.key} className={`py-3 px-3 text-center ${action.colBg}`}>
+                                    {perm ? (
+                                      <Cb
+                                        checked={assignedIds.has(perm.id)}
+                                        onChange={() => toggleOne(perm)}
+                                        hex={action.hex}
+                                        disabled={busy}
+                                      />
+                                    ) : (
+                                      <span
+                                        className="inline-block rounded"
+                                        style={{ width: 22, height: 2, background: "#e5e7eb" }}
+                                      />
+                                    )}
+                                  </td>
+                                );
+                              })}
+
+                              {/* Row all checkbox */}
+                              <td className="py-3 px-3 text-center">
+                                {hasPerms ? (
+                                  <Cb
+                                    checked={rowAll}
+                                    indeterminate={rowPartial}
+                                    onChange={() => toggleRow(rowPerms)}
+                                    hex="#6b7280"
+                                    disabled={busy}
+                                    size={15}
+                                  />
+                                ) : (
+                                  <span
+                                    className="inline-block rounded"
+                                    style={{ width: 22, height: 2, background: "#e5e7eb" }}
+                                  />
+                                )}
+                              </td>
+                            </tr>
+
+                            {/* Extra permissions sub-row — Super Admin only */}
+                            {isSuperAdmin && extraPerms.length > 0 && (
+                              <tr className={`${rowBg}`}>
+                                <td colSpan={ACTIONS.length + 2} className="pb-3 pt-0 px-5">
+                                  <div className="flex items-center gap-2 mb-1.5">
+                                    <FaKey className="text-violet-400" size={9} />
+                                    <span className="text-[10px] font-semibold text-violet-400 uppercase tracking-wider">
+                                      Special Access
+                                    </span>
+                                  </div>
+                                  <div className="flex flex-wrap gap-2">
+                                    {extraPerms.map(perm => {
+                                      const isOn = assignedIds.has(perm.id);
+                                      // Check if a conflicting action is currently ON for this role
+                                      const conflictAction = MUTUALLY_EXCLUSIVE[perm.action];
+                                      const conflictPerm = conflictAction ? mod.byAction[conflictAction] : undefined;
+                                      const isBlocked = !!conflictPerm && assignedIds.has(conflictPerm.id);
+                                      const isDisabled = busy || isBlocked;
+
+                                      return (
+                                        <div key={perm.id} className="relative group">
+                                          <label
+                                            className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-[11px] font-semibold border transition-all select-none ${
+                                              isBlocked
+                                                ? "bg-red-50 border-red-200 text-red-400 cursor-not-allowed opacity-60"
+                                                : isOn
+                                                  ? "bg-violet-100 border-violet-400 text-violet-800 shadow-sm cursor-pointer"
+                                                  : "bg-white border-gray-200 text-gray-600 hover:border-violet-300 hover:bg-violet-50 cursor-pointer"
+                                            } ${busy && !isBlocked ? "opacity-50 cursor-wait" : ""}`}
+                                          >
+                                            {isBlocked ? (
+                                              <FaLock size={9} className="text-red-400 shrink-0" />
+                                            ) : (
+                                              <input
+                                                type="checkbox"
+                                                checked={isOn}
+                                                onChange={() => {
+                                                  if (isBlocked) {
+                                                    toast.warning(
+                                                      `Remove "${formatActionLabel(conflictAction!)}" first before assigning "${formatActionLabel(perm.action)}"`
+                                                    );
+                                                    return;
+                                                  }
+                                                  toggleOne(perm);
+                                                }}
+                                                disabled={isDisabled}
+                                                className="w-3 h-3 rounded shrink-0"
+                                                style={{ accentColor: "#7c3aed" }}
+                                              />
+                                            )}
+                                            {formatActionLabel(perm.action)}
+                                          </label>
+                                          {/* Tooltip on conflict */}
+                                          {isBlocked && (
+                                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover:block z-20 pointer-events-none">
+                                              <div className="bg-gray-900 text-white text-[10px] rounded px-2 py-1 whitespace-nowrap shadow-lg">
+                                                Conflicts with <span className="font-bold">{formatActionLabel(conflictAction!)}</span>
+                                                <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900" />
+                                              </div>
+                                            </div>
+                                          )}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
                                 </td>
-                              );
-                            })}
-
-                            {/* Row all checkbox */}
-                            <td className="py-3 px-3 text-center">
-                              {hasPerms ? (
-                                <Cb
-                                  checked={rowAll}
-                                  indeterminate={rowPartial}
-                                  onChange={() => toggleRow(rowPerms)}
-                                  hex="#6b7280"
-                                  disabled={busy}
-                                  size={15}
-                                />
-                              ) : (
-                                <span
-                                  className="inline-block rounded"
-                                  style={{ width: 22, height: 2, background: "#e5e7eb" }}
-                                />
-                              )}
-                            </td>
-                          </tr>
+                              </tr>
+                            )}
+                          </React.Fragment>
                         );
                       })}
                     </tbody>
@@ -770,6 +865,13 @@ const RolePermissionMapping: React.FC = () => {
                     <Cb checked={false} indeterminate onChange={() => { }} hex="#6b7280" size={13} disabled />
                     <span className="text-[11px] text-gray-400">Partially assigned</span>
                   </div>
+                  {isSuperAdmin && (
+                    <div className="flex items-center gap-1.5">
+                      <FaKey className="text-violet-400" size={10} />
+                      <span className="text-[11px] text-violet-500 font-medium">Special Access</span>
+                      <span className="text-[11px] text-gray-400">— Super Admin only · mutually exclusive pairs are auto-locked</span>
+                    </div>
+                  )}
                   {busy && (
                     <div className="ml-auto flex items-center gap-1.5 text-xs text-gray-500">
                       <svg className="animate-spin w-3.5 h-3.5 text-gray-400" viewBox="0 0 24 24" fill="none">

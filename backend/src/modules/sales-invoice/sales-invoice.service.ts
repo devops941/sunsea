@@ -23,7 +23,7 @@ class SalesInvoiceService {
     const company = await prisma.company.findUnique({ where: { id: currentUser.companyId } });
     if (!company) throw new ApiError(404, "Company not found");
 
-    const isInterState = company.state?.toLowerCase().trim() !== customer.billingState?.toLowerCase().trim();
+    const isInterState = company.state?.toLowerCase().trim() !== (customer as any).billingState?.toLowerCase().trim();
 
     // Calculate items and totals
     let subTotal = 0;
@@ -389,7 +389,6 @@ class SalesInvoiceService {
             email: true,
             addresses: true,
             mobile: true,
-            transports: true,
           },
         },
         salesOrder: {
@@ -400,9 +399,7 @@ class SalesInvoiceService {
             shippingCity: true,
             shippingState: true,
             shippingPincode: true,
-            shippingCountry: true,
             mobile: true,
-            transportName: true,
           },
         },
         items: {
@@ -537,7 +534,7 @@ class SalesInvoiceService {
       const company = await tx.company.findUnique({ where: { id: currentUser.companyId } });
       if (!company) throw new ApiError(404, "Company not found");
 
-      const isInterState = company.state?.toLowerCase().trim() !== customer.billingState?.toLowerCase().trim();
+      const isInterState = company.state?.toLowerCase().trim() !== (customer as any).billingState?.toLowerCase().trim();
 
       let subTotal = 0;
       let taxTotal = 0;

@@ -1,1250 +1,871 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../config/prisma";
 import { ApiError } from "../../utils/ApiError";
+import { encryptField, decryptField } from "../../utils/fieldEncryption";
 import {
     CreateSalesOrderInput,
     UpdateSalesOrderInput,
     SalesOrderQueryInput,
-    MdApprovalDecisionInput,
-    CustomerApprovalDecisionInput,
-    UpdateSalesOrderDiscountsInput,
-    SalesOrderStatus
+    SalesOrderStatus,
 } from "./sales-order.validation";
 
-// ─── Type Definitions ──────────────────────────────────────────────────
+// ─── Permission keys ───────────────────────────────────────────────────────────
 
-type ProductPricingRow = {
-    id: bigint;
-    b2b: Prisma.Decimal | null;
-    mrp: Prisma.Decimal | null;
-    b2c: Prisma.Decimal | null;
-    exportPrice: Prisma.Decimal | null;
-    gstTaxRateId: string | null;
-    gstRate: Prisma.Decimal | null;
-};
+const PERM_ESTIMATE = "sales-orders.view-estimate";
 
-type LineCalculation = {
-    productId: bigint;
-    quantity: Prisma.Decimal;
-    b2b: Prisma.Decimal | null;
-    mrp: Prisma.Decimal | null;
-    b2c: Prisma.Decimal | null;
-    exportPrice: Prisma.Decimal | null;
-    lineSubtotal: Prisma.Decimal;
-    discountType: "PERCENT" | "FLAT";
-    discountValue: Prisma.Decimal;
-    discountAmount: Prisma.Decimal;
-    taxableValue: Prisma.Decimal; // stored as taxableAmount in DB
-    cgstRate: Prisma.Decimal;
-    cgstAmount: Prisma.Decimal;
-    sgstRate: Prisma.Decimal;
-    sgstAmount: Prisma.Decimal;
-    igstRate: Prisma.Decimal;
-    igstAmount: Prisma.Decimal;
-    lineTotal: Prisma.Decimal;
-    gstTaxRateId: string | null;
-};
+/**
+ * Returns true when the user should read/write the estimated (OrdProcAuxMeta) table.
+ * This covers: estimate-only users AND super-admin (has both permissions).
+ */
+function useEstimatedTable(permissions: string[]): boolean {
+    return permissions.includes(PERM_ESTIMATE);
+}
 
-type IncomingItem = {
-    productId: string | number | bigint;
-    quantity: number | string;
-};
+// ─── Shared zero constant ──────────────────────────────────────────────────────
 
-const BASE_PRICE_KEY = "__base__";
+const ZERO = new Prisma.Decimal(0);
 
-// ─── Service Implementation ──────────────────────────────────────────
+// ─── Prisma include shapes ─────────────────────────────────────────────────────
+
+/** Include for GST orders (sales_orders → sales_order_items) */
+const INCLUDE_GST = {
+    items: {
+        include: {
+            product: { select: { id: true, productCode: true, productName: true } },
+            gstTaxRate: { select: { id: true, taxName: true, taxRate: true, taxType: true } },
+        },
+    },
+    customer: { select: { id: true, firmName: true, displayName: true } },
+    createdByUser: { select: { userId: true, fullName: true } },
+} as const;
+
+/** Include for estimated orders (ord_proc_aux_meta → ord_proc_aux_meta_items) */
+const INCLUDE_EST = {
+    items: {
+        include: {
+            product: { select: { id: true, productCode: true, productName: true } },
+        },
+    },
+    customer: { select: { id: true, firmName: true, displayName: true } },
+    createdByUser: { select: { userId: true, fullName: true } },
+} as const;
+
+// ─── Encryption helpers ────────────────────────────────────────────────────────
+
+/** Safely decrypt a field; returns fallback on failure (avoids crashing on bad/null data). */
+function safeDec(value: string | null | undefined, fallback = ""): string {
+    if (!value) return fallback;
+    try { return decryptField(value); } catch { return fallback; }
+}
+
+/**
+ * Encrypts the semantic OrdProcAuxMeta fields into their opaque DB column names.
+ * Only keys that are present on `data` are included in the returned object.
+ */
+function encryptEstMeta(data: {
+    orderDate?:        Date | string;
+    isInterState?:     boolean;
+    mobile?:           string | null;
+    referenceText?:    string | null;
+    narration?:        string | null;
+    orderType?:        string | null;
+    salesPersonName?:  string | null;
+    productionStatus?: string | null;
+    subtotal?:         Prisma.Decimal;
+    netAmount?:        Prisma.Decimal;
+    totalTax?:         Prisma.Decimal;
+    totalCgst?:        Prisma.Decimal;
+    totalSgst?:        Prisma.Decimal;
+    totalIgst?:        Prisma.Decimal;
+}): Record<string, string | null> {
+    const enc: Record<string, string | null> = {};
+
+    if ("orderDate" in data && data.orderDate !== undefined) {
+        const d = data.orderDate instanceof Date
+            ? data.orderDate.toISOString()
+            : String(data.orderDate);
+        enc.a1 = encryptField(d);
+    }
+    if ("isInterState" in data && data.isInterState !== undefined) {
+        enc.a2 = encryptField(data.isInterState);
+    }
+    if ("mobile"          in data) enc.a3  = data.mobile          ? encryptField(data.mobile)          : null;
+    if ("referenceText"   in data) enc.a4  = data.referenceText   ? encryptField(data.referenceText)   : null;
+    if ("narration"       in data) enc.a5  = data.narration       ? encryptField(data.narration)       : null;
+    if ("orderType"       in data) enc.a6  = data.orderType       ? encryptField(data.orderType)       : null;
+    if ("salesPersonName" in data) enc.a7  = data.salesPersonName ? encryptField(data.salesPersonName) : null;
+    if ("productionStatus" in data) enc.a8 = data.productionStatus ? encryptField(data.productionStatus) : null;
+
+    if ("subtotal"  in data && data.subtotal  !== undefined) enc.a9  = encryptField(data.subtotal.toString());
+    if ("netAmount" in data && data.netAmount !== undefined) enc.a10 = encryptField(data.netAmount.toString());
+    if ("totalTax"  in data && data.totalTax  !== undefined) enc.a11 = encryptField(data.totalTax.toString());
+    if ("totalCgst" in data && data.totalCgst !== undefined) enc.a12 = encryptField(data.totalCgst.toString());
+    if ("totalSgst" in data && data.totalSgst !== undefined) enc.a13 = encryptField(data.totalSgst.toString());
+    if ("totalIgst" in data && data.totalIgst !== undefined) enc.a14 = encryptField(data.totalIgst.toString());
+
+    return enc;
+}
+
+/** Returns the zero-set for all financial encrypted columns (used for DRAFT orders). */
+function encryptEstMetaZeroFinancials(): Record<string, string> {
+    return {
+        a9:  encryptField("0"),
+        a10: encryptField("0"),
+        a11: encryptField("0"),
+        a12: encryptField("0"),
+        a13: encryptField("0"),
+        a14: encryptField("0"),
+    };
+}
+
+/**
+ * Encrypts an estimated order item's numeric fields into opaque DB column names.
+ * Non-sensitive FK fields (productId) remain plaintext.
+ */
+function encryptEstItem(item: {
+    productId:   bigint;
+    quantity:    Prisma.Decimal;
+    rate:        Prisma.Decimal;
+    lineTotal:   Prisma.Decimal;
+}): { productId: bigint; b1: string; b2: string; b3: string } {
+    return {
+        productId: item.productId,
+        b1: encryptField(item.quantity.toString()),
+        b2: encryptField(item.rate.toString()),
+        b3: encryptField(item.lineTotal.toString()),
+    };
+}
+
+/**
+ * Decrypts a raw OrdProcAuxMeta DB row (with optional items) into a semantic shape
+ * that matches the frontend's expected SalesOrder-like structure.
+ */
+function decryptEstRow(row: any): any {
+    if (!row) return row;
+
+    const decItems = Array.isArray(row.items)
+        ? row.items.map((item: any) => ({
+            ...item,
+            quantity:      new Prisma.Decimal(safeDec(item.b1, "0")),
+            estimatedRate: new Prisma.Decimal(safeDec(item.b2, "0")),
+            lineTotal:     new Prisma.Decimal(safeDec(item.b3, "0")),
+        }))
+        : [];
+
+    const rawOrderDate = safeDec(row.a1, "");
+    return {
+        ...row,
+        orderDate:       rawOrderDate ? new Date(rawOrderDate) : null,
+        isInterState:    safeDec(row.a2, "false") === "true",
+        mobile:          safeDec(row.a3) || null,
+        referenceText:   safeDec(row.a4) || null,
+        narration:       safeDec(row.a5) || null,
+        orderType:       safeDec(row.a6) || null,
+        salesPersonName: safeDec(row.a7) || null,
+        productionStatus: safeDec(row.a8, "NOT_STARTED") || "NOT_STARTED",
+        subtotal:        new Prisma.Decimal(safeDec(row.a9,  "0")),
+        netAmount:       new Prisma.Decimal(safeDec(row.a10, "0")),
+        totalTax:        new Prisma.Decimal(safeDec(row.a11, "0")),
+        totalCgst:       new Prisma.Decimal(safeDec(row.a12, "0")),
+        totalSgst:       new Prisma.Decimal(safeDec(row.a13, "0")),
+        totalIgst:       new Prisma.Decimal(safeDec(row.a14, "0")),
+        items:           decItems,
+    };
+}
+
+// ─── Types ─────────────────────────────────────────────────────────────────────
+
+type IncomingItem = { productId: string | number | bigint; quantity: number | string };
+
+interface GstItemInput {
+    gstTaxRateId?: string | null;
+    cgstRate?:     number | null;
+    sgstRate?:     number | null;
+    igstRate?:     number | null;
+}
+
+// ─── Service ───────────────────────────────────────────────────────────────────
 
 class SalesOrderService {
 
-    // ─── Internal helpers ──────────────────────────────────────────────
+    // ─── Shared helpers ──────────────────────────────────────────────────────
 
     private async assertProductsExist(productIds: bigint[]) {
-        if (productIds.length === 0) {
-            throw new ApiError(400, "No product IDs provided");
-        }
-
-        const uniqueProductIds = [...new Set(productIds.map((id) => id.toString()))];
+        if (productIds.length === 0) throw new ApiError(400, "No product IDs provided");
+        const unique = [...new Set(productIds.map(id => id.toString()))];
         const found = await prisma.product.findMany({
-            where: {
-                id: { in: uniqueProductIds.map((id) => BigInt(id)) },
-                isActive: true
-            },
+            where: { id: { in: unique.map(id => BigInt(id)) }, isActive: true },
             select: { id: true },
         });
-
-        if (found.length !== uniqueProductIds.length) {
-            const foundIds = new Set(found.map((f) => f.id.toString()));
-            const missing = uniqueProductIds.filter((id) => !foundIds.has(id));
+        if (found.length !== unique.length) {
+            const foundIds = new Set(found.map(f => f.id.toString()));
+            const missing = unique.filter(id => !foundIds.has(id));
             throw new ApiError(404, `Product(s) not found or inactive: ${missing.join(", ")}`);
         }
     }
 
     private assertNoDuplicateProducts(items: IncomingItem[]) {
-        const seenAt = new Map<string, number>();
-        const duplicateIndexes = new Set<number>();
-        const duplicatePairs = new Set<string>();
-
-        items.forEach((item, index) => {
-            const key = `${item.productId.toString()}`;
-            if (seenAt.has(key)) {
-                duplicateIndexes.add(seenAt.get(key)!);
-                duplicateIndexes.add(index);
-                duplicatePairs.add(key);
-            } else {
-                seenAt.set(key, index);
-            }
+        const seen = new Map<string, number>();
+        const dupes = new Set<string>();
+        items.forEach(item => {
+            const key = String(item.productId);
+            if (seen.has(key)) dupes.add(key);
+            else seen.set(key, 0);
         });
-
-        if (duplicateIndexes.size > 0) {
-            const readable = [...duplicatePairs].map((key) => {
-                return `productId=${key}`;
-            });
-            throw new ApiError(400, `Duplicate item(s) found: ${readable.join(" | ")}`);
+        if (dupes.size > 0) {
+            throw new ApiError(400, `Duplicate item(s): ${[...dupes].map(k => `productId=${k}`).join(" | ")}`);
         }
     }
 
-    private async getProductPricingMap(
-        items: { productId: bigint; gstTaxRateId?: string | null }[]
-    ): Promise<Map<string, ProductPricingRow>> {
-        const uniqueProductIds = [...new Set(items.map((i) => i.productId.toString()))]
-            .map((id) => BigInt(id));
-
+    private async computeLineTotals(
+        items: { productId: bigint; quantity: Prisma.Decimal; unitPrice?: Prisma.Decimal | number | string | null }[],
+        customerGradeName?: string | null,
+    ) {
+        const uniqueIds = [...new Set(items.map(i => i.productId.toString()))];
         const products = await prisma.product.findMany({
-            where: { id: { in: uniqueProductIds } },
-            select: {
-                id: true,
-                rate: true,
-            },
+            where: { id: { in: uniqueIds.map(id => BigInt(id)) } },
+            select: { id: true, rate: true, gradeRates: true } as any,
         });
 
-        // Resolve GST tax rates
-        const allGstTaxRateIds = new Set<string>();
-        for (const item of items) {
-            if (item.gstTaxRateId) allGstTaxRateIds.add(item.gstTaxRateId);
-        }
-        const gstTaxRates = await prisma.gstTaxRate.findMany({
-            where: { id: { in: Array.from(allGstTaxRateIds) } },
-            select: { id: true, taxRate: true }
-        });
-        const gstTaxRateMap = new Map(gstTaxRates.map((r) => [r.id, r.taxRate]));
+        const rateMap = new Map(products.map((p: any) => {
+            let effectiveRate: Prisma.Decimal = p.rate ?? ZERO;
+            if (customerGradeName && p.gradeRates && typeof p.gradeRates === "object") {
+                const gradeRates = p.gradeRates as Record<string, number>;
+                const gClean = customerGradeName.toUpperCase().replace(/[^A-Z0-9]/g, "");
+                for (const [k, val] of Object.entries(gradeRates)) {
+                    const kClean = k.toUpperCase().replace(/[^A-Z0-9]/g, "");
+                    if (kClean === gClean || kClean.endsWith(gClean) || gClean.endsWith(kClean)) {
+                        if (val != null && !isNaN(Number(val)) && Number(val) > 0) {
+                            effectiveRate = new Prisma.Decimal(val);
+                            break;
+                        }
+                    }
+                }
+            }
+            return [p.id.toString(), effectiveRate];
+        }));
 
-        const map = new Map<string, ProductPricingRow>();
-
-        for (const p of products) {
-            const baseRow: ProductPricingRow = {
-                id: p.id,
-                gstTaxRateId: null,
-                gstRate: null,
-                b2b: p.rate,
-                mrp: p.rate,
-                b2c: p.rate,
-                exportPrice: p.rate,
+        return items.map(item => {
+            let rate: Prisma.Decimal;
+            if (item.unitPrice !== undefined && item.unitPrice !== null && item.unitPrice !== "" && !isNaN(Number(item.unitPrice))) {
+                rate = new Prisma.Decimal(item.unitPrice);
+            } else {
+                rate = rateMap.get(item.productId.toString()) ?? ZERO;
+            }
+            return {
+                productId: item.productId,
+                quantity:  item.quantity,
+                rate,
+                lineTotal: item.quantity.mul(rate),
             };
-            map.set(`${p.id.toString()}`, baseRow);
+        });
+    }
+
+    /**
+     * Builds a map of gstTaxRateId → taxRate so item GST amounts can be derived
+     * when the client sends only the gstTaxRateId (no explicit cgst/sgst/igst rates).
+     */
+    private async buildGstRateMap(items: any[]): Promise<Map<string, Prisma.Decimal>> {
+        const ids = [...new Set(
+            items.map(i => i.gstTaxRateId).filter((id: any): id is string => Boolean(id))
+        )];
+        if (ids.length === 0) return new Map();
+        const taxes = await prisma.gstTaxRate.findMany({
+            where: { id: { in: ids } },
+            select: { id: true, taxRate: true },
+        });
+        return new Map(taxes.map(t => [t.id, new Prisma.Decimal(t.taxRate as any)]));
+    }
+
+    /**
+     * Fills in cgst/sgst/igst rates from the GST tax master when the item only
+     * carries a gstTaxRateId. Intra-state: rate split 50/50 CGST+SGST. Inter-state: full IGST.
+     */
+    private resolveGstRates(raw: any, gstRateMap: Map<string, Prisma.Decimal>, isInterState: boolean): GstItemInput {
+        const hasExplicit = raw.cgstRate != null || raw.sgstRate != null || raw.igstRate != null;
+        if (hasExplicit || !raw.gstTaxRateId) {
+            return { gstTaxRateId: raw.gstTaxRateId, cgstRate: raw.cgstRate, sgstRate: raw.sgstRate, igstRate: raw.igstRate };
         }
-        return map;
+        const taxRate = gstRateMap.get(raw.gstTaxRateId);
+        if (!taxRate) {
+            return { gstTaxRateId: raw.gstTaxRateId, cgstRate: raw.cgstRate, sgstRate: raw.sgstRate, igstRate: raw.igstRate };
+        }
+        if (isInterState) {
+            return { gstTaxRateId: raw.gstTaxRateId, igstRate: taxRate.toNumber() };
+        }
+        const half = taxRate.div(2).toNumber();
+        return { gstTaxRateId: raw.gstTaxRateId, cgstRate: half, sgstRate: half };
     }
 
-    private resolvePricing(
-        map: Map<string, ProductPricingRow>,
-        productId: bigint
-    ): ProductPricingRow | undefined {
-        return map.get(`${productId.toString()}`);
-    }
-
-    private resolveUnitPrice(
-        pricing: { b2b: Prisma.Decimal | null; mrp: Prisma.Decimal | null; b2c: Prisma.Decimal | null; exportPrice: Prisma.Decimal | null }
-    ): Prisma.Decimal {
-        return pricing.b2b ?? pricing.mrp ?? pricing.b2c ?? pricing.exportPrice ?? new Prisma.Decimal(0);
-    }
-
-    // ─── Core line calculator with GST split ─────────────────────────
-
-    private calculateLine(params: {
-        productId: bigint;
-        quantity: Prisma.Decimal;
-        pricing: ProductPricingRow;
-        discountType?: "PERCENT" | "FLAT";
-        discountValue?: Prisma.Decimal;
-        customGstTaxRateId?: string | null;
-        customGstRate?: Prisma.Decimal | null;
-        isInterState?: boolean;
-    }): LineCalculation {
-        const { productId, quantity, pricing, isInterState = false } = params;
-
-        const unitPrice = this.resolveUnitPrice(pricing);
-        const mrp = pricing.mrp;
-        const b2b = pricing.b2b;
-        const b2c = pricing.b2c;
-        const exportPrice = pricing.exportPrice;
-
-        const gstTaxRateId = params.customGstTaxRateId !== undefined ? params.customGstTaxRateId : pricing.gstTaxRateId;
-        const totalGstRate = params.customGstRate !== undefined && params.customGstRate !== null
-            ? params.customGstRate
-            : (pricing.gstRate ?? new Prisma.Decimal(0));
-
-        const lineSubtotal = quantity.mul(unitPrice);
-
-        const discountType = params.discountType ?? "PERCENT";
-        const discountValue = params.discountValue ?? new Prisma.Decimal(0);
-
-        const rawDiscountAmount = discountType === "PERCENT"
-            ? lineSubtotal.mul(discountValue).div(100)
-            : discountValue;
-
-        const discountAmount = rawDiscountAmount.gt(lineSubtotal) ? lineSubtotal : rawDiscountAmount;
-        const taxableValue = lineSubtotal.sub(discountAmount);
-        const totalGstAmount = taxableValue.mul(totalGstRate).div(100);
-
-        // Split GST based on isInterState
-        let cgstRate: Prisma.Decimal, sgstRate: Prisma.Decimal, igstRate: Prisma.Decimal;
-        let cgstAmount: Prisma.Decimal, sgstAmount: Prisma.Decimal, igstAmount: Prisma.Decimal;
+    private computeGstAmounts(lineTotal: Prisma.Decimal, gst: GstItemInput, isInterState: boolean) {
+        const taxable = lineTotal;
+        let cgstRate = ZERO, sgstRate = ZERO, igstRate = ZERO;
 
         if (isInterState) {
-            igstRate = totalGstRate;
-            cgstRate = new Prisma.Decimal(0);
-            sgstRate = new Prisma.Decimal(0);
-            igstAmount = totalGstAmount;
-            cgstAmount = new Prisma.Decimal(0);
-            sgstAmount = new Prisma.Decimal(0);
+            igstRate = new Prisma.Decimal(gst.igstRate ?? 0);
         } else {
-            cgstRate = totalGstRate.div(2);
-            sgstRate = totalGstRate.div(2);
-            igstRate = new Prisma.Decimal(0);
-            cgstAmount = totalGstAmount.div(2);
-            sgstAmount = totalGstAmount.div(2);
-            igstAmount = new Prisma.Decimal(0);
+            cgstRate = new Prisma.Decimal(gst.cgstRate ?? 0);
+            sgstRate = new Prisma.Decimal(gst.sgstRate ?? 0);
         }
 
-        const lineTotal = taxableValue.add(totalGstAmount); // no cess in schema
+        const cgstAmount = taxable.mul(cgstRate).div(100);
+        const sgstAmount = taxable.mul(sgstRate).div(100);
+        const igstAmount = taxable.mul(igstRate).div(100);
 
-        return {
-            productId,
-            quantity,
-            b2b,
-            mrp,
-            b2c,
-            exportPrice,
-            lineSubtotal,
-            discountType,
-            discountValue,
-            discountAmount,
-            taxableValue,
-            cgstRate,
-            cgstAmount,
-            sgstRate,
-            sgstAmount,
-            igstRate,
-            igstAmount,
-            lineTotal,
-            gstTaxRateId,
-        };
+        return { taxableAmount: taxable, cgstRate, cgstAmount, sgstRate, sgstAmount, igstRate, igstAmount };
     }
 
-    private calculateLinesWithOrderDiscount(
-        items: Array<{
-            productId: bigint;
-            quantity: Prisma.Decimal;
-            pricing: ProductPricingRow;
-            gstTaxRateId?: string | null;
-            customGstRate?: Prisma.Decimal | null;
-        }>,
-        isInterState: boolean,
-        orderDiscountType: "PERCENT" | "FLAT",
-        orderDiscountValue: Prisma.Decimal
-    ): LineCalculation[] {
-        const baseLines = items.map((item) => {
-            return this.calculateLine({
-                productId: item.productId,
-                quantity: item.quantity,
-                pricing: item.pricing,
-                customGstTaxRateId: item.gstTaxRateId,
-                customGstRate: item.customGstRate,
-                isInterState,
-                discountType: "PERCENT",
-                discountValue: new Prisma.Decimal(0),
-            });
-        });
+    // ─── Create ──────────────────────────────────────────────────────────────
 
-        const subtotal = baseLines.reduce((sum, line) => sum.add(line.lineSubtotal), new Prisma.Decimal(0));
-
-        const rawDiscount = orderDiscountType === "PERCENT"
-            ? subtotal.mul(orderDiscountValue).div(100)
-            : orderDiscountValue;
-        const totalDiscount = rawDiscount.gt(subtotal) ? subtotal : rawDiscount;
-
-        return baseLines.map((baseLine, index) => {
-            const share = subtotal.gt(0) ? baseLine.lineSubtotal.div(subtotal) : new Prisma.Decimal(0);
-            const itemDiscount = totalDiscount.mul(share);
-            const item = items[index];
-
-            return this.calculateLine({
-                productId: baseLine.productId,
-                quantity: baseLine.quantity,
-                pricing: item.pricing,
-                customGstTaxRateId: item.gstTaxRateId,
-                customGstRate: item.customGstRate,
-                isInterState,
-                discountType: "FLAT",
-                discountValue: itemDiscount,
-            });
-        });
-    }
-
-    private calculateLinesWithoutOrderDiscount(
-        items: Array<{
-            productId: bigint;
-            quantity: Prisma.Decimal;
-            pricing: ProductPricingRow;
-            gstTaxRateId?: string | null;
-            customGstRate?: Prisma.Decimal | null;
-        }>,
-        isInterState: boolean
-    ): LineCalculation[] {
-        return items.map((item) => {
-            return this.calculateLine({
-                productId: item.productId,
-                quantity: item.quantity,
-                pricing: item.pricing,
-                customGstTaxRateId: item.gstTaxRateId,
-                customGstRate: item.customGstRate,
-                isInterState,
-                discountType: "PERCENT",
-                discountValue: new Prisma.Decimal(0),
-            });
-        });
-    }
-
-    async create(data: CreateSalesOrderInput) {
-
-        if (!data.items || data.items.length === 0) {
-            throw new ApiError(400, "At least one item is required");
-        }
-
+    async create(data: CreateSalesOrderInput, permissions: string[] = []) {
+        if (!data.items || data.items.length === 0) throw new ApiError(400, "At least one item is required");
         this.assertNoDuplicateProducts(data.items);
 
         const customer = await prisma.customer.findUnique({
             where: { id: data.customerId },
+            include: { customerGrade: { select: { name: true } } },
         });
-        if (!customer) {
-            throw new ApiError(404, `Customer with ID ${data.customerId} not found`);
+        if (!customer) throw new ApiError(404, `Customer ${data.customerId} not found`);
+
+        await this.assertProductsExist(data.items.map(i => BigInt(i.productId)));
+
+        // Duplicate orderNo check
+        const existingCheck = useEstimatedTable(permissions)
+            ? await (prisma as any).ordProcAuxMeta.findUnique({ where: { orderNo: data.orderNo } })
+            : await prisma.salesOrder.findUnique({ where: { orderNo: data.orderNo } });
+        if (existingCheck) throw new ApiError(409, `Order No "${data.orderNo}" already exists`);
+
+        const lineItems = await this.computeLineTotals(
+            data.items.map(i => ({ productId: BigInt(i.productId), quantity: new Prisma.Decimal(i.quantity), unitPrice: (i as any).unitPrice })),
+            (customer as any).customerGrade?.name ?? null,
+        );
+
+        // ── Estimated users write ONLY to the encrypted ord_proc_aux_meta table ──
+        if (useEstimatedTable(permissions)) {
+            // Estimated totals: amount-only (Σ lineTotal), no GST — stored encrypted.
+            const estSubtotal = lineItems.reduce((s, l) => s.add(l.lineTotal), ZERO);
+            const encMeta = encryptEstMeta({
+                orderDate:        new Date(data.orderDate),
+                isInterState:     data.isInterState ?? false,
+                mobile:           data.mobile || null,
+                referenceText:    data.referenceText || null,
+                narration:        data.narration,
+                orderType:        data.orderType,
+                salesPersonName:  data.salesPersonName || null,
+                productionStatus: "NOT_STARTED",
+                subtotal:  estSubtotal,
+                netAmount: estSubtotal,
+                totalTax:  ZERO,
+                totalCgst: ZERO,
+                totalSgst: ZERO,
+                totalIgst: ZERO,
+            });
+
+            const estOrder = await (prisma as any).ordProcAuxMeta.create({
+                data: {
+                    orderNo:    data.orderNo,
+                    customerId: data.customerId,
+                    status:     data.status,
+                    createdBy:  data.createdBy,
+                    ...encMeta,
+                    items: {
+                        create: lineItems.map(l => encryptEstItem(l)),
+                    },
+                },
+                include: INCLUDE_EST,
+            });
+            return { ...decryptEstRow(estOrder), _source: "estimated" };
         }
 
-        const productIds = data.items.map((i) => BigInt(i.productId));
-        await this.assertProductsExist(productIds);
-
-        const existingOrderNo = await prisma.salesOrder.findUnique({
-            where: { orderNo: data.orderNo },
-        });
-        if (existingOrderNo) {
-            throw new ApiError(409, `Order No "${data.orderNo}" already exists`);
-        }
-
-
+        // ── GST users write ONLY to the sales_orders table ───────────────────
         const isInterState = data.isInterState ?? false;
-
-        const pricingMap = await this.getProductPricingMap(
-            data.items.map((i) => ({ productId: BigInt(i.productId), gstTaxRateId: i.gstTaxRateId }))
-        );
-
-        const customGstTaxRateIds = new Set<string>();
-        data.items.forEach((i) => {
-            if (i.gstTaxRateId) customGstTaxRateIds.add(i.gstTaxRateId);
-        });
-        const customGstTaxRates = await prisma.gstTaxRate.findMany({
-            where: { id: { in: Array.from(customGstTaxRateIds) } },
-            select: { id: true, taxRate: true }
-        });
-        const customGstTaxRateMap = new Map(customGstTaxRates.map((r) => [r.id, r.taxRate]));
-
-        const orderDiscountType = data.orderDiscountType ?? "PERCENT";
-        const orderDiscountValue = data.orderDiscountValue !== undefined ? new Prisma.Decimal(data.orderDiscountValue) : new Prisma.Decimal(0);
-        const hasOrderDiscount = orderDiscountValue.gt(0);
-
-        const pricedItems = data.items.map((item) => {
-            const productId = BigInt(item.productId);
-            const pricing = this.resolvePricing(pricingMap, productId);
-            if (!pricing) {
-                throw new ApiError(404, `Product with ID ${item.productId} not found`);
-            }
-
-            let customGstRate: Prisma.Decimal | null = null;
-            if (item.gstTaxRateId) {
-                const rate = customGstTaxRateMap.get(item.gstTaxRateId);
-                if (rate === undefined) {
-                    throw new ApiError(400, `GST Tax Rate with ID ${item.gstTaxRateId} not found`);
-                }
-                customGstRate = rate;
-            }
-
-            return {
-                productId,
-                quantity: new Prisma.Decimal(item.quantity),
-                pricing,
-                gstTaxRateId: item.gstTaxRateId,
-                customGstRate,
-            };
+        // Derive cgst/sgst/igst rates from the GST tax master when only gstTaxRateId was sent
+        const gstRateMap = await this.buildGstRateMap(data.items);
+        const itemsWithGst = lineItems.map((l, idx) => {
+            const raw = data.items[idx] as any;
+            const gstInput = this.resolveGstRates(raw, gstRateMap, isInterState);
+            const gst = this.computeGstAmounts(l.lineTotal, gstInput, isInterState);
+            return { ...l, gstTaxRateId: raw.gstTaxRateId ?? null, ...gst };
         });
 
-        const lineCalcs = hasOrderDiscount
-            ? this.calculateLinesWithOrderDiscount(
-                pricedItems,
-                isInterState,
-                orderDiscountType,
-                orderDiscountValue
-            )
-            : this.calculateLinesWithoutOrderDiscount(
-                pricedItems,
-                isInterState
-            );
+        // Compute totals up front so DRAFT orders show real amounts in lists.
+        const createSubtotal  = itemsWithGst.reduce((s, l) => s.add(l.lineTotal),   ZERO);
+        const createTotalCgst = itemsWithGst.reduce((s, l) => s.add(l.cgstAmount),  ZERO);
+        const createTotalSgst = itemsWithGst.reduce((s, l) => s.add(l.sgstAmount),  ZERO);
+        const createTotalIgst = itemsWithGst.reduce((s, l) => s.add(l.igstAmount),  ZERO);
+        const createTotalTax  = createTotalCgst.add(createTotalSgst).add(createTotalIgst);
 
-        const orderTotals = lineCalcs.reduce(
-            (acc, line) => ({
-                subtotal: acc.subtotal.add(line.lineSubtotal),
-                totalDiscount: acc.totalDiscount.add(line.discountAmount),
-                totalCgst: acc.totalCgst.add(line.cgstAmount),
-                totalSgst: acc.totalSgst.add(line.sgstAmount),
-                totalIgst: acc.totalIgst.add(line.igstAmount),
-                netAmount: acc.netAmount.add(line.lineTotal),
-            }),
-            {
-                subtotal: new Prisma.Decimal(0),
-                totalDiscount: new Prisma.Decimal(0),
-                totalCgst: new Prisma.Decimal(0),
-                totalSgst: new Prisma.Decimal(0),
-                totalIgst: new Prisma.Decimal(0),
-                netAmount: new Prisma.Decimal(0),
-            }
-        );
-
-        const reasons: string[] = [];
-        let mdApprovalReason: string | null = null;
-        let creditCheckOutstanding: Prisma.Decimal | null = null;
-        let creditCheckLimit: Prisma.Decimal | null = null;
-        let creditCheckExceededBy: Prisma.Decimal | null = null;
-
-        return prisma.salesOrder.create({
+        const gstOrder = await prisma.salesOrder.create({
             data: {
-                orderNo: data.orderNo,
-                orderDate: new Date(data.orderDate),
-                expectedCompletionDate: new Date(data.expectedCompletionDate),
+                orderNo:      data.orderNo,
+                orderDate:    new Date(data.orderDate),
                 isInterState,
-                customerId: data.customerId,
-                mobile: data.mobile || null,
+                customerId:   data.customerId,
+                mobile:       data.mobile || null,
                 // @ts-ignore
                 salesPersonName: data.salesPersonName || null,
-                paymentTermId: data.paymentTermId,
-                billingAddressLine1: data.billingAddressLine1,
-                billingCity: data.billingCity,
-                billingState: data.billingState,
-                billingPincode: data.billingPincode,
-                billingCountry: data.billingCountry || "India",
-                shippingAddressLine1: data.shippingAddressLine1,
-                shippingCity: data.shippingCity,
-                shippingState: data.shippingState,
-                shippingPincode: data.shippingPincode,
-                shippingCountry: data.shippingCountry || "India",
-                remarks: data.remarks,
-                dispatchType: data.dispatchType,
-                orderType: data.orderType,
+                orderType:    data.orderType,
                 referenceText: data.referenceText || null,
-                internalNotes: data.internalNotes,
-                createdBy: data.createdBy,
-                status: data.status,
-                orderDiscountType,
-                orderDiscountValue,
-                subtotal: orderTotals.subtotal,
-                totalDiscount: orderTotals.totalDiscount,
-                totalCgst: orderTotals.totalCgst,
-                totalSgst: orderTotals.totalSgst,
-                totalIgst: orderTotals.totalIgst,
-                netAmount: orderTotals.netAmount,
-                mdApprovalReason,
-                creditCheckOutstanding,
-                creditCheckLimit,
-                creditCheckExceededBy,
+                narration:    data.narration,
+                createdBy:    data.createdBy,
+                status:       data.status,
+                subtotal:  createSubtotal,
+                netAmount: createSubtotal.add(createTotalTax),
+                totalTax:  createTotalTax,
+                totalCgst: createTotalCgst,
+                totalSgst: createTotalSgst,
+                totalIgst: createTotalIgst,
                 items: {
-                    create: lineCalcs.map((line) => ({
-                        productId: line.productId,
-                        quantity: line.quantity,
-                        mrp: line.mrp,
-                        b2b: line.b2b,
-                        b2c: line.b2c,
-                        exportPrice: line.exportPrice,
-                        discountType: line.discountType,
-                        discountValue: line.discountValue,
-                        discountAmount: line.discountAmount,
-                        lineSubtotal: line.lineSubtotal,
-                        taxableAmount: line.taxableValue,
-                        cgstRate: line.cgstRate,
-                        cgstAmount: line.cgstAmount,
-                        sgstRate: line.sgstRate,
-                        sgstAmount: line.sgstAmount,
-                        igstRate: line.igstRate,
-                        igstAmount: line.igstAmount,
-                        lineTotal: line.lineTotal,
-                        gstTaxRateId: line.gstTaxRateId,
+                    create: itemsWithGst.map(l => ({
+                        productId:     l.productId,
+                        quantity:      l.quantity,
+                        lineTotal:     l.lineTotal,
+                        gstTaxRateId:  l.gstTaxRateId,
+                        taxableAmount: l.taxableAmount,
+                        cgstRate:      l.cgstRate,
+                        cgstAmount:    l.cgstAmount,
+                        sgstRate:      l.sgstRate,
+                        sgstAmount:    l.sgstAmount,
+                        igstRate:      l.igstRate,
+                        igstAmount:    l.igstAmount,
                     })),
                 },
             },
-            include: {
-                items: {
-                    include: {
-                        product: {
-                            select: {
-                                id: true,
-                                productCode: true,
-                                productName: true,
-                            }
-                        }
-                    }
-                },
-                customer: {
-                    select: {
-                        id: true,
-                        firmName: true,
-                        displayName: true,
-                    }
-                },
-            },
+            include: INCLUDE_GST,
         });
+
+        return { ...gstOrder, _source: "gst" };
     }
 
-    // ─── List and Find ──────────────────────────────────────────────────
+    // ─── List ────────────────────────────────────────────────────────────────
 
-    async findAll(query: SalesOrderQueryInput) {
-        const page = Math.max(1, query.page);
+    async findAll(query: SalesOrderQueryInput, permissions: string[] = []) {
+        const page     = Math.max(1, query.page);
         const pageSize = Math.min(100, Math.max(1, query.pageSize));
+        const skip     = (page - 1) * pageSize;
 
-        const where: Prisma.SalesOrderWhereInput = {
-            ...(query.customerId && { customerId: query.customerId }),
-            ...(query.status && query.status.length > 0 && {
-                status: { in: query.status as SalesOrderStatus[] }
-            }),
-            ...(query.dispatchType && {
-                dispatchType: { equals: query.dispatchType, mode: "insensitive" }
-            }),
-            ...(query.orderType && { orderType: query.orderType }),
-            ...(query.mdApprovalStatus && { mdApprovalStatus: query.mdApprovalStatus as any }),
-            ...(query.customerApprovalStatus && { customerApprovalStatus: query.customerApprovalStatus as any }),
-            ...(query.search && {
-                OR: [
-                    { orderNo: { contains: query.search, mode: "insensitive" } },
-                    { customer: { displayName: { contains: query.search, mode: "insensitive" } } }
-                ]
-            }),
-            ...((query.fromDate || query.toDate) && {
-                orderDate: {
-                    ...(query.fromDate && { gte: new Date(query.fromDate) }),
-                    ...(query.toDate && { lte: new Date(query.toDate) }),
-                }
-            }),
+        const searchFilter = query.search
+            ? { OR: [
+                { orderNo:  { contains: query.search, mode: "insensitive" as const } },
+                { customer: { displayName: { contains: query.search, mode: "insensitive" as const } } },
+            ] }
+            : {};
+
+        const dateFilter = (query.fromDate || query.toDate)
+            ? { orderDate: {
+                ...(query.fromDate && { gte: new Date(query.fromDate) }),
+                ...(query.toDate   && { lte: new Date(query.toDate) }),
+            } }
+            : {};
+
+        // GST table — all fields plaintext, full filter support
+        const gstWhere = {
+            ...(query.customerId    && { customerId: query.customerId }),
+            ...(query.status?.length && { status: { in: query.status as SalesOrderStatus[] } }),
+            ...(query.orderType     && { orderType: query.orderType }),
+            ...searchFilter,
+            ...dateFilter,
         };
 
-        const [data, total] = await Promise.all([
-            prisma.salesOrder.findMany({
-                where,
+        // Estimated table — orderDate is encrypted; skip date filter & orderType
+        const estWhere = {
+            ...(query.customerId    && { customerId: query.customerId }),
+            ...(query.status?.length && { status: { in: query.status as SalesOrderStatus[] } }),
+            ...searchFilter,
+        };
+
+        // Can't sort by encrypted orderDate; fall back to createdAt
+        const estSortBy  = query.sortBy === "orderDate" ? "createdAt" : query.sortBy;
+        const gstOrderBy = { [query.sortBy]: query.sortOrder };
+        const estOrderBy = { [estSortBy]:    query.sortOrder };
+
+        if (useEstimatedTable(permissions)) {
+            const [rows, total] = await Promise.all([
+                (prisma as any).ordProcAuxMeta.findMany({
+                    where: estWhere, include: INCLUDE_EST, orderBy: estOrderBy, skip, take: pageSize,
+                }),
+                (prisma as any).ordProcAuxMeta.count({ where: estWhere }),
+            ]);
+            return {
+                data: rows.map((r: any) => ({ ...decryptEstRow(r), _source: "estimated" })),
+                total, page, pageSize,
+                totalPages: Math.ceil(total / pageSize),
+            };
+        } else {
+            const [rows, total] = await Promise.all([
+                prisma.salesOrder.findMany({
+                    where: gstWhere as any, include: INCLUDE_GST as any, orderBy: gstOrderBy, skip, take: pageSize,
+                }),
+                prisma.salesOrder.count({ where: gstWhere as any }),
+            ]);
+            return {
+                data: rows.map((r: any) => ({ ...r, _source: "gst" })),
+                total, page, pageSize,
+                totalPages: Math.ceil(total / pageSize),
+            };
+        }
+    }
+
+    // ─── Find by ID ──────────────────────────────────────────────────────────
+
+    async findById(id: number, permissions: string[] = []) {
+        if (useEstimatedTable(permissions)) {
+            const order = await (prisma as any).ordProcAuxMeta.findUnique({
+                where: { id },
                 include: {
-                    customer: {
-                        select: { id: true, firmName: true, displayName: true }
-                    },
                     items: {
                         include: {
-                            product: {
-                                select: { id: true, productCode: true, productName: true }
-                            }
+                            product: { select: { id: true, productCode: true, productName: true } },
                         },
                     },
+                    customer: { include: { customerGrade: true, customerType: true, addresses: true } },
+                    createdByUser: { select: { userId: true, fullName: true } },
                 },
-                orderBy: { [query.sortBy]: query.sortOrder },
-                skip: (page - 1) * pageSize,
-                take: pageSize,
-            }),
-            prisma.salesOrder.count({ where }),
-        ]);
-
-        return { data, total, page, pageSize, totalPages: Math.ceil(total / pageSize) };
-    }
-
-    async findById(id: number) {
-        const order = await prisma.salesOrder.findUnique({
-            where: { id },
-            include: {
-                customer: true,
-                items: {
-                    include: {
-                        product: true
-                    }
-                },
-                mdApprovedByUser: {
-                    select: { userId: true, fullName: true }
-                },
-                createdByUser: {
-                    select: { userId: true, fullName: true }
-                },
-            },
-        });
-
-        if (!order) {
-            throw new ApiError(404, `Sales order with ID ${id} not found`);
-        }
-        return order;
-    }
-
-    // ─── Update Sales Order ─────────────────────────────────────────────
-
-    async update(id: number, data: UpdateSalesOrderInput) {
-        const existing = await this.findById(id);
-
-        if (existing.mdApprovalStatus === "APPROVED") {
-            throw new ApiError(409, "Cannot edit a sales order after MD approval");
-        }
-
-        const editableStatuses = ["DRAFT", "CONFIRMED", "MD_REJECTED"];
-        if (!editableStatuses.includes(existing.status)) {
-            throw new ApiError(409, `Cannot edit order in status ${existing.status}.`);
-        }
-
-        const updateData: Prisma.SalesOrderUncheckedUpdateInput = {};
-
-        if (existing.status === "MD_REJECTED") {
-            updateData.mdApprovalStatus = "PENDING";
-            updateData.mdApprovedBy = null;
-            updateData.mdApprovedAt = null;
-            updateData.mdRejectionReason = null;
-            updateData.customerApprovalStatus = "PENDING";
-            updateData.customerApprovedAt = null;
-            updateData.customerRejectionReason = null;
-        }
-
-        if (data.mobile !== undefined) updateData.mobile = data.mobile;
-        // @ts-ignore
-        if (data.salesPersonName !== undefined) updateData.salesPersonName = data.salesPersonName;
-        if (data.expectedCompletionDate) updateData.expectedCompletionDate = new Date(data.expectedCompletionDate);
-        if (data.paymentTermId !== undefined) updateData.paymentTermId = data.paymentTermId;
-        if (data.dispatchType !== undefined) updateData.dispatchType = data.dispatchType;
-        if (data.orderType !== undefined) updateData.orderType = data.orderType;
-        if (data.referenceText !== undefined) updateData.referenceText = data.referenceText;
-
-        if (data.remarks !== undefined) updateData.remarks = data.remarks;
-        if (data.internalNotes !== undefined) updateData.internalNotes = data.internalNotes;
-        if (data.status !== undefined) updateData.status = data.status;
-        if (data.isInterState !== undefined) updateData.isInterState = data.isInterState;
-
-        if (data.orderDiscountType !== undefined) {
-            updateData.orderDiscountType = data.orderDiscountType;
-        }
-        if (data.orderDiscountValue !== undefined) {
-            updateData.orderDiscountValue = new Prisma.Decimal(data.orderDiscountValue);
-        }
-
-        const orderDiscountType = data.orderDiscountType !== undefined ? data.orderDiscountType : (existing.orderDiscountType ?? "PERCENT");
-        const orderDiscountValue = data.orderDiscountValue !== undefined ? new Prisma.Decimal(data.orderDiscountValue) : new Prisma.Decimal(existing.orderDiscountValue ?? 0);
-
-        const isInterState = data.isInterState ?? existing.isInterState;
-
-        if (data.billingAddressLine1 !== undefined) {
-            updateData.billingAddressLine1 = data.billingAddressLine1;
-        }
-        if (data.billingCity !== undefined) {
-            updateData.billingCity = data.billingCity;
-        }
-        if (data.billingState !== undefined) {
-            updateData.billingState = data.billingState;
-        }
-        if (data.billingPincode !== undefined) {
-            updateData.billingPincode = data.billingPincode;
-        }
-        if (data.billingCountry !== undefined) {
-            updateData.billingCountry = data.billingCountry;
-        }
-
-        if (data.dispatchType !== undefined) {
-            updateData.dispatchType = data.dispatchType;
-        }
-
-        if (data.orderType !== undefined) {
-            updateData.orderType = data.orderType;
-        }
-
-        if (data.shippingAddressLine1 !== undefined) {
-            updateData.shippingAddressLine1 = data.shippingAddressLine1;
-        }
-        if (data.shippingCity !== undefined) {
-            updateData.shippingCity = data.shippingCity;
-        }
-        if (data.shippingState !== undefined) {
-            updateData.shippingState = data.shippingState;
-        }
-        if (data.shippingPincode !== undefined) {
-            updateData.shippingPincode = data.shippingPincode;
-        }
-        if (data.shippingCountry !== undefined) {
-            updateData.shippingCountry = data.shippingCountry;
-        }
-
-
-        if (data.remarks !== undefined) {
-            updateData.remarks = data.remarks;
-        }
-
-        if (data.internalNotes !== undefined) {
-            updateData.internalNotes = data.internalNotes;
-        }
-
-        if (data.status !== undefined) {
-            updateData.status = data.status;
-        }
-
-        // Handle items update if provided
-        if (data.items) {
-            this.assertNoDuplicateProducts(data.items);
-
-            const productIds = data.items.map((i) => BigInt(i.productId));
-            await this.assertProductsExist(productIds);
-
-            const pricingMap = await this.getProductPricingMap(
-                data.items.map((i) => ({ productId: BigInt(i.productId), gstTaxRateId: i.gstTaxRateId }))
-            );
-
-            const customGstTaxRateIds = new Set<string>();
-            data.items.forEach((i) => {
-                if (i.gstTaxRateId) customGstTaxRateIds.add(i.gstTaxRateId);
             });
-            const customGstTaxRates = await prisma.gstTaxRate.findMany({
-                where: { id: { in: Array.from(customGstTaxRateIds) } },
-                select: { id: true, taxRate: true }
-            });
-            const customGstTaxRateMap = new Map(customGstTaxRates.map((r) => [r.id, r.taxRate]));
-
-            const lineCalcs = this.calculateLinesWithOrderDiscount(
-                data.items.map((item) => {
-                    const productId = BigInt(item.productId);
-                    const pricing = this.resolvePricing(pricingMap, productId);
-                    if (!pricing) {
-                        throw new ApiError(404, `Product with ID ${item.productId} not found`);
-                    }
-
-                    let customGstRate: Prisma.Decimal | null = null;
-                    if (item.gstTaxRateId) {
-                        const rate = customGstTaxRateMap.get(item.gstTaxRateId);
-                        if (rate === undefined) {
-                            throw new ApiError(400, `GST Tax Rate with ID ${item.gstTaxRateId} not found`);
-                        }
-                        customGstRate = rate;
-                    }
-
-                    return {
-                        productId,
-                        quantity: new Prisma.Decimal(item.quantity),
-                        pricing,
-                        gstTaxRateId: item.gstTaxRateId,
-                        customGstRate,
-                    };
-                }),
-                isInterState,
-                orderDiscountType,
-                orderDiscountValue
-            );
-
-            // Replace items
-            await prisma.salesOrderItem.deleteMany({
-                where: { salesOrderId: id }
-            });
-
-            updateData.items = {
-                create: lineCalcs.map((line) => ({
-                    productId: line.productId,
-                    quantity: line.quantity,
-                    mrp: line.mrp,
-                    b2b: line.b2b,
-                    b2c: line.b2c,
-                    exportPrice: line.exportPrice,
-                    discountType: line.discountType,
-                    discountValue: line.discountValue,
-                    discountAmount: line.discountAmount,
-                    lineSubtotal: line.lineSubtotal,
-                    taxableAmount: line.taxableValue,
-                    cgstRate: line.cgstRate,
-                    cgstAmount: line.cgstAmount,
-                    sgstRate: line.sgstRate,
-                    sgstAmount: line.sgstAmount,
-                    igstRate: line.igstRate,
-                    igstAmount: line.igstAmount,
-                    lineTotal: line.lineTotal,
-                    gstTaxRateId: line.gstTaxRateId,
-                })),
-            };
-
-            const orderTotals = lineCalcs.reduce(
-                (acc, line) => ({
-                    subtotal: acc.subtotal.add(line.lineSubtotal),
-                    totalDiscount: acc.totalDiscount.add(line.discountAmount),
-                    totalCgst: acc.totalCgst.add(line.cgstAmount),
-                    totalSgst: acc.totalSgst.add(line.sgstAmount),
-                    totalIgst: acc.totalIgst.add(line.igstAmount),
-                    netAmount: acc.netAmount.add(line.lineTotal),
-                }),
-                {
-                    subtotal: new Prisma.Decimal(0),
-                    totalDiscount: new Prisma.Decimal(0),
-                    totalCgst: new Prisma.Decimal(0),
-                    totalSgst: new Prisma.Decimal(0),
-                    totalIgst: new Prisma.Decimal(0),
-                    netAmount: new Prisma.Decimal(0),
-                }
-            );
-
-            updateData.subtotal = orderTotals.subtotal;
-            updateData.totalDiscount = orderTotals.totalDiscount;
-            updateData.totalCgst = orderTotals.totalCgst;
-            updateData.totalSgst = orderTotals.totalSgst;
-            updateData.totalIgst = orderTotals.totalIgst;
-            updateData.netAmount = orderTotals.netAmount;
-        } else if (data.orderDiscountType !== undefined || data.orderDiscountValue !== undefined) {
-            const lineCalcs = this.calculateLinesWithOrderDiscount(
-                existing.items.map((item) => ({
-                    productId: item.productId,
-                    quantity: item.quantity,
-                    pricing: {
-                        id: item.productId,
-                        b2b: item.b2b,
-                        mrp: item.mrp,
-                        b2c: item.b2c,
-                        exportPrice: item.exportPrice,
-                        gstTaxRateId: item.gstTaxRateId,
-                        gstRate: item.igstRate.gt(0) ? item.igstRate : item.cgstRate.add(item.sgstRate),
-                    },
-                    gstTaxRateId: item.gstTaxRateId,
-                    customGstRate: item.igstRate.gt(0) ? item.igstRate : item.cgstRate.add(item.sgstRate),
-                })),
-                isInterState,
-                orderDiscountType,
-                orderDiscountValue
-            );
-
-            await prisma.$transaction(async (tx) => {
-                for (let i = 0; i < existing.items.length; i++) {
-                    const line = lineCalcs[i];
-                    const item = existing.items[i];
-                    await tx.salesOrderItem.update({
-                        where: { id: item.id },
-                        data: {
-                            discountType: line.discountType,
-                            discountValue: line.discountValue,
-                            discountAmount: line.discountAmount,
-                            taxableAmount: line.taxableValue,
-                            cgstAmount: line.cgstAmount,
-                            sgstAmount: line.sgstAmount,
-                            igstAmount: line.igstAmount,
-                            lineTotal: line.lineTotal,
-                        }
-                    });
-                }
-            });
-
-            const orderTotals = lineCalcs.reduce(
-                (acc, line) => ({
-                    subtotal: acc.subtotal.add(line.lineSubtotal),
-                    totalDiscount: acc.totalDiscount.add(line.discountAmount),
-                    totalCgst: acc.totalCgst.add(line.cgstAmount),
-                    totalSgst: acc.totalSgst.add(line.sgstAmount),
-                    totalIgst: acc.totalIgst.add(line.igstAmount),
-                    netAmount: acc.netAmount.add(line.lineTotal),
-                }),
-                {
-                    subtotal: new Prisma.Decimal(0),
-                    totalDiscount: new Prisma.Decimal(0),
-                    totalCgst: new Prisma.Decimal(0),
-                    totalSgst: new Prisma.Decimal(0),
-                    totalIgst: new Prisma.Decimal(0),
-                    netAmount: new Prisma.Decimal(0),
-                }
-            );
-
-            updateData.subtotal = orderTotals.subtotal;
-            updateData.totalDiscount = orderTotals.totalDiscount;
-            updateData.totalCgst = orderTotals.totalCgst;
-            updateData.totalSgst = orderTotals.totalSgst;
-            updateData.totalIgst = orderTotals.totalIgst;
-            updateData.netAmount = orderTotals.netAmount;
-        }
-
-        return prisma.salesOrder.update({
-            where: { id },
-            data: updateData,
-            include: {
-                items: {
-                    include: {
-                        product: {
-                            select: { id: true, productCode: true, productName: true }
-                        }
-                    }
-                },
-                customer: {
-                    select: { id: true, firmName: true, displayName: true }
-                },
-            },
-        });
-    }
-
-    // ─── Update Item Discounts ──────────────────────────────────────────
-
-    async updateDiscounts(id: number, data: UpdateSalesOrderDiscountsInput) {
-        const existing = await this.findById(id);
-
-        if (existing.status !== "DRAFT" && existing.status !== "CONFIRMED" && existing.status !== "MD_REJECTED") {
-            throw new ApiError(409, `Cannot edit discounts once order status is ${existing.status}.`);
-        }
-
-        const itemIds = data.items.map((i) => BigInt(i.itemId));
-
-        // Fetch items with stored price tiers and GST rates
-        const existingItems = await prisma.salesOrderItem.findMany({
-            where: { id: { in: itemIds }, salesOrderId: id },
-            select: {
-                id: true,
-                quantity: true,
-                b2b: true,
-                mrp: true,
-                b2c: true,
-                exportPrice: true,
-                lineSubtotal: true,
-                discountAmount: true,
-                taxableAmount: true,
-                cgstRate: true,
-                sgstRate: true,
-                igstRate: true,
-                cgstAmount: true,
-                sgstAmount: true,
-                igstAmount: true,
-            }
-        });
-
-        if (existingItems.length !== itemIds.length) {
-            const foundIds = new Set(existingItems.map((i) => i.id.toString()));
-            const missing = itemIds
-                .filter((id) => !foundIds.has(id.toString()))
-                .map((id) => id.toString());
-            throw new ApiError(404, `Item(s) not found on this sales order: ${missing.join(", ")}`);
-        }
-
-        const itemMap = new Map(existingItems.map((i) => [i.id.toString(), i]));
-
-        return prisma.$transaction(async (tx) => {
-            let runningSubtotal = new Prisma.Decimal(0);
-            let runningDiscount = new Prisma.Decimal(0);
-            let runningCgst = new Prisma.Decimal(0);
-            let runningSgst = new Prisma.Decimal(0);
-            let runningIgst = new Prisma.Decimal(0);
-
-            const isInterState = existing.isInterState;
-
-            for (const incoming of data.items) {
-                const current = itemMap.get(incoming.itemId.toString())!;
-
-                const unitPrice = this.resolveUnitPrice({
-                    b2b: current.b2b,
-                    mrp: current.mrp,
-                    b2c: current.b2c,
-                    exportPrice: current.exportPrice,
-                });
-
-                const newLineSubtotal = current.quantity.mul(unitPrice);
-
-                const discountAmount = incoming.discountType === "PERCENT"
-                    ? newLineSubtotal.mul(incoming.discountValue).div(100)
-                    : new Prisma.Decimal(incoming.discountValue);
-
-                const cappedDiscount = discountAmount.gt(newLineSubtotal) ? newLineSubtotal : discountAmount;
-                const newTaxableValue = newLineSubtotal.sub(cappedDiscount);
-
-                // Determine total GST rate from stored split rates
-                let totalGstRate: Prisma.Decimal;
-                if (isInterState) {
-                    totalGstRate = current.igstRate;
-                } else {
-                    totalGstRate = current.cgstRate.add(current.sgstRate);
-                }
-
-                const totalGstAmount = newTaxableValue.mul(totalGstRate).div(100);
-
-                let newCgstAmount: Prisma.Decimal, newSgstAmount: Prisma.Decimal, newIgstAmount: Prisma.Decimal;
-                if (isInterState) {
-                    newIgstAmount = totalGstAmount;
-                    newCgstAmount = new Prisma.Decimal(0);
-                    newSgstAmount = new Prisma.Decimal(0);
-                } else {
-                    newCgstAmount = totalGstAmount.div(2);
-                    newSgstAmount = totalGstAmount.div(2);
-                    newIgstAmount = new Prisma.Decimal(0);
-                }
-
-                const newLineTotal = newTaxableValue.add(totalGstAmount);
-
-                await tx.salesOrderItem.update({
-                    where: { id: current.id },
-                    data: {
-                        discountType: incoming.discountType,
-                        discountValue: new Prisma.Decimal(incoming.discountValue),
-                        discountAmount: cappedDiscount,
-                        lineSubtotal: newLineSubtotal,
-                        taxableAmount: newTaxableValue,
-                        cgstAmount: newCgstAmount,
-                        sgstAmount: newSgstAmount,
-                        igstAmount: newIgstAmount,
-                        lineTotal: newLineTotal,
-                    },
-                });
-
-                runningSubtotal = runningSubtotal.add(newLineSubtotal);
-                runningDiscount = runningDiscount.add(cappedDiscount);
-                runningCgst = runningCgst.add(newCgstAmount);
-                runningSgst = runningSgst.add(newSgstAmount);
-                runningIgst = runningIgst.add(newIgstAmount);
-            }
-
-            // Add untouched items (not in the update list)
-            const untouchedItems = existing.items.filter(
-                (i) => !itemMap.has(i.id.toString())
-            );
-            for (const item of untouchedItems) {
-                runningSubtotal = runningSubtotal.add(item.lineSubtotal);
-                runningDiscount = runningDiscount.add(item.discountAmount);
-                runningCgst = runningCgst.add(item.cgstAmount);
-                runningSgst = runningSgst.add(item.sgstAmount);
-                runningIgst = runningIgst.add(item.igstAmount);
-            }
-
-            const netAmount = runningSubtotal
-                .sub(runningDiscount)
-                .add(runningCgst)
-                .add(runningSgst)
-                .add(runningIgst);
-
-            return tx.salesOrder.update({
+            if (!order) throw new ApiError(404, `Estimated order with ID ${id} not found`);
+            return { ...decryptEstRow(order), _source: "estimated" };
+        } else {
+            const order = await prisma.salesOrder.findUnique({
                 where: { id },
-                data: {
-                    subtotal: runningSubtotal,
-                    totalDiscount: runningDiscount,
-                    totalCgst: runningCgst,
-                    totalSgst: runningSgst,
-                    totalIgst: runningIgst,
-                    netAmount,
-                },
                 include: {
+                    customer: { include: { customerGrade: true, customerType: true, addresses: true } },
                     items: {
                         include: {
-                            product: {
-                                select: { id: true, productCode: true, productName: true }
-                            }
-                        }
+                            product: true,
+                            gstTaxRate: { select: { id: true, taxName: true, taxRate: true, taxType: true } },
+                        },
                     },
-                    customer: {
-                        select: { id: true, firmName: true, displayName: true }
-                    },
+                    createdByUser: { select: { userId: true, fullName: true } },
                 },
             });
-        });
+            if (!order) throw new ApiError(404, `Sales order with ID ${id} not found`);
+            return { ...order, _source: "gst" };
+        }
     }
 
-    // ─── Workflow Actions ──────────────────────────────────────────────
+    // ─── Update ──────────────────────────────────────────────────────────────
 
-    async submitForMdApproval(id: number) {
-        const existing = await this.findById(id);
-        if (existing.status !== "DRAFT" && existing.status !== "CONFIRMED" && existing.status !== "MD_REJECTED") {
-            throw new ApiError(409, `Only orders in DRAFT status can be submitted for MD approval. Current status: ${existing.status}`);
-        }
-        if (existing.items.length === 0) {
-            throw new ApiError(400, "Cannot submit an order with no items");
-        }
-        return prisma.salesOrder.update({
-            where: { id },
-            data: { status: "PENDING_MD_APPROVAL" },
-            include: {
-                items: {
-                    include: {
-                        product: {
-                            select: { id: true, productCode: true, productName: true }
-                        }
-                    }
-                },
-                customer: {
-                    select: { id: true, firmName: true, displayName: true }
-                },
-            },
-        });
-    }
+    async update(id: number, data: UpdateSalesOrderInput, permissions: string[] = []) {
+        const existing = await this.findById(id, permissions);
+        const existingStatus = (existing as any).status as string;
 
-    async reopen(id: number) {
-        const existing = await this.findById(id);
-        if (existing.status !== "MD_REJECTED" && existing.status !== "CUSTOMER_REJECTED") {
-            throw new ApiError(409, `Only orders with status MD_REJECTED or CUSTOMER_REJECTED can be reopened. Current status: ${existing.status}`);
-        }
-        return prisma.salesOrder.update({
-            where: { id },
-            data: {
-                status: "DRAFT",
-                mdApprovalStatus: "PENDING",
-                mdApprovedBy: null,
-                mdApprovedAt: null,
-                mdRejectionReason: null,
-                customerApprovalStatus: "PENDING",
-                customerApprovedAt: null,
-                customerRejectionReason: null,
-            },
-            include: {
-                items: {
-                    include: {
-                        product: {
-                            select: { id: true, productCode: true, productName: true }
-                        }
-                    }
-                },
-                customer: {
-                    select: { id: true, firmName: true, displayName: true }
-                },
-            },
-        });
-    }
-
-    async delete(id: number) {
-        const existing = await this.findById(id);
-        if (existing.status !== "DRAFT") {
-            throw new ApiError(409, `Only orders with status draft can be deleted`);
-        }
-        return prisma.salesOrder.delete({ where: { id } });
-    }
-
-    async decideMdApproval(id: number, data: MdApprovalDecisionInput) {
-        const existing = await this.findById(id);
-        if (existing.status !== "PENDING_MD_APPROVAL") {
-            throw new ApiError(409, `Order must be in PENDING_MD_APPROVAL status. Current status: ${existing.status}`);
-        }
-        if (existing.mdApprovalStatus !== "PENDING") {
-            throw new ApiError(409, `MD approval already decided (${existing.mdApprovalStatus})`);
-        }
-        if (data.decision === "REJECTED" && !data.rejectionReason) {
-            throw new ApiError(400, "Rejection reason is required when rejecting");
+        if (!["DRAFT", "CONFIRMED"].includes(existingStatus)) {
+            throw new ApiError(409, `Cannot edit order in status ${existingStatus}.`);
         }
 
-        let approverId = data.approverId;
-        if (approverId && approverId.startsWith("admin_")) {
-            const firstUser = await prisma.user.findFirst();
-            if (firstUser) {
-                approverId = firstUser.userId;
-            } else {
-                approverId = null as any;
+        if (useEstimatedTable(permissions)) {
+            // ── Estimated update ──────────────────────────────────────────────
+            const updateData: Record<string, any> = {};
+
+            // Status is plaintext
+            if (data.status !== undefined) updateData.status = data.status;
+
+            // Encrypt scalar field changes
+            const toEncrypt: Parameters<typeof encryptEstMeta>[0] = {};
+            if (data.mobile             !== undefined) toEncrypt.mobile           = data.mobile || null;
+            if ((data as any).salesPersonName !== undefined) toEncrypt.salesPersonName = (data as any).salesPersonName || null;
+            if (data.orderType          !== undefined) toEncrypt.orderType        = data.orderType || null;
+            if (data.referenceText      !== undefined) toEncrypt.referenceText    = data.referenceText || null;
+            if (data.narration          !== undefined) toEncrypt.narration        = data.narration || null;
+            if (data.isInterState       !== undefined) toEncrypt.isInterState     = data.isInterState;
+            Object.assign(updateData, encryptEstMeta(toEncrypt));
+
+            if (data.items) {
+                // New items — recalculate item-level data; order totals stay ZERO until submitForApproval
+                this.assertNoDuplicateProducts(data.items);
+                await this.assertProductsExist(data.items.map(i => BigInt(i.productId)));
+
+                const lineItems = await this.computeLineTotals(
+                    data.items.map(i => ({
+                        productId: BigInt(i.productId),
+                        quantity:  new Prisma.Decimal(i.quantity),
+                        unitPrice: (i as any).unitPrice,
+                    })),
+                );
+
+                // Always store ZERO for order-level totals; calculated only at submitForApproval
+                Object.assign(updateData, encryptEstMetaZeroFinancials());
+
+                await (prisma as any).ordProcAuxMetaItem.deleteMany({ where: { auxMetaId: id } });
+                updateData.items = { create: lineItems.map(l => encryptEstItem(l)) };
             }
-        }
 
-        return prisma.salesOrder.update({
-            where: { id },
-            data: {
-                mdApprovalStatus: data.decision,
-                mdApprovedBy: approverId,
-                mdApprovedAt: new Date(),
-                mdRejectionReason: data.decision === "REJECTED" ? data.rejectionReason : null,
-                status: data.decision === "APPROVED" ? "IN_PRODUCTION" : "MD_REJECTED",
-            },
-            include: {
-                items: {
-                    include: {
-                        product: {
-                            select: { id: true, productCode: true, productName: true }
-                        }
-                    }
-                },
-                customer: {
-                    select: { id: true, firmName: true, displayName: true }
-                },
-            },
-        });
+            const updated = await (prisma as any).ordProcAuxMeta.update({
+                where: { id }, data: updateData, include: INCLUDE_EST,
+            });
+            return { ...decryptEstRow(updated), _source: "estimated" };
+
+        } else {
+            // ── GST update ────────────────────────────────────────────────────
+            const updateData: Prisma.SalesOrderUncheckedUpdateInput = {};
+            if (data.mobile        !== undefined) updateData.mobile         = data.mobile;
+            // @ts-ignore
+            if ((data as any).salesPersonName !== undefined) updateData.salesPersonName = (data as any).salesPersonName;
+            if (data.orderType     !== undefined) updateData.orderType      = data.orderType;
+            if (data.referenceText !== undefined) updateData.referenceText  = data.referenceText;
+            if (data.narration     !== undefined) updateData.narration      = data.narration;
+            if (data.status        !== undefined) updateData.status         = data.status;
+            if (data.isInterState  !== undefined) updateData.isInterState   = data.isInterState;
+
+            if (data.items) {
+                this.assertNoDuplicateProducts(data.items);
+                await this.assertProductsExist(data.items.map(i => BigInt(i.productId)));
+
+                const lineItems = await this.computeLineTotals(
+                    data.items.map(i => ({
+                        productId: BigInt(i.productId),
+                        quantity:  new Prisma.Decimal(i.quantity),
+                        unitPrice: (i as any).unitPrice,
+                    })),
+                );
+
+                const isInterState = data.isInterState ?? (existing as any).isInterState ?? false;
+                // Derive cgst/sgst/igst rates from the GST tax master when only gstTaxRateId was sent
+                const updGstRateMap = await this.buildGstRateMap(data.items);
+                const itemsWithGst = lineItems.map((l, idx) => {
+                    const raw = data.items![idx] as any;
+                    const gstInput = this.resolveGstRates(raw, updGstRateMap, isInterState);
+                    const gst = this.computeGstAmounts(l.lineTotal, gstInput, isInterState);
+                    return { ...l, gstTaxRateId: raw.gstTaxRateId ?? null, ...gst };
+                });
+
+                await prisma.salesOrderItem.deleteMany({ where: { salesOrderId: id } });
+
+                // Recompute order-level totals so drafts show real amounts in lists.
+                const updSubtotal  = itemsWithGst.reduce((s, l) => s.add(l.lineTotal),  ZERO);
+                const updTotalCgst = itemsWithGst.reduce((s, l) => s.add(l.cgstAmount), ZERO);
+                const updTotalSgst = itemsWithGst.reduce((s, l) => s.add(l.sgstAmount), ZERO);
+                const updTotalIgst = itemsWithGst.reduce((s, l) => s.add(l.igstAmount), ZERO);
+                const updTotalTax  = updTotalCgst.add(updTotalSgst).add(updTotalIgst);
+                updateData.subtotal  = updSubtotal;
+                updateData.netAmount = updSubtotal.add(updTotalTax);
+                updateData.totalCgst = updTotalCgst;
+                updateData.totalSgst = updTotalSgst;
+                updateData.totalIgst = updTotalIgst;
+                updateData.totalTax  = updTotalTax;
+                updateData.items = {
+                    create: itemsWithGst.map(l => ({
+                        productId:     l.productId,
+                        quantity:      l.quantity,
+                        lineTotal:     l.lineTotal,
+                        gstTaxRateId:  l.gstTaxRateId,
+                        taxableAmount: l.taxableAmount,
+                        cgstRate:      l.cgstRate,
+                        cgstAmount:    l.cgstAmount,
+                        sgstRate:      l.sgstRate,
+                        sgstAmount:    l.sgstAmount,
+                        igstRate:      l.igstRate,
+                        igstAmount:    l.igstAmount,
+                    })),
+                };
+            }
+
+            const updated = await prisma.salesOrder.update({ where: { id }, data: updateData, include: INCLUDE_GST });
+
+            // ── Sync status to estimated table ───────────────────────────────
+            try {
+                const estUpdateData: Record<string, any> = {};
+                if (data.status !== undefined) estUpdateData.status = data.status;
+                if (Object.keys(estUpdateData).length > 0) {
+                    await (prisma as any).ordProcAuxMeta.updateMany({
+                        where: { orderNo: (updated as any).orderNo },
+                        data: estUpdateData,
+                    });
+                }
+            } catch (e) { /* ignore */ }
+
+            return { ...updated, _source: "gst" };
+        }
     }
 
-    async decideCustomerApproval(id: number, data: CustomerApprovalDecisionInput) {
-        const existing = await this.findById(id);
-        if (existing.status !== "PENDING_CUSTOMER_APPROVAL") {
-            throw new ApiError(409, `Order must be in PENDING_CUSTOMER_APPROVAL status. Current status: ${existing.status}`);
+    // ─── Delete ──────────────────────────────────────────────────────────────
+
+    async delete(id: number, permissions: string[] = []) {
+        if (useEstimatedTable(permissions)) {
+            await this.findById(id, permissions);
+            return (prisma as any).ordProcAuxMeta.delete({ where: { id } });
+        } else {
+            await this.findById(id);
+            return prisma.salesOrder.delete({ where: { id } });
         }
-        if (existing.mdApprovalStatus !== "APPROVED") {
-            throw new ApiError(409, "Customer approval is not available until MD has approved this order");
-        }
-        if (existing.customerApprovalStatus !== "PENDING") {
-            throw new ApiError(409, `Customer approval already decided (${existing.customerApprovalStatus})`);
-        }
-        if (data.decision === "REJECTED" && !data.rejectionReason) {
-            throw new ApiError(400, "Rejection reason is required when rejecting");
-        }
-        return prisma.salesOrder.update({
-            where: { id },
-            data: {
-                customerApprovalStatus: data.decision,
-                customerApprovedAt: data.decision === "APPROVED" ? new Date() : null,
-                customerRejectionReason: data.decision === "REJECTED" ? data.rejectionReason : null,
-                status: data.decision === "APPROVED" ? "CONFIRMED" : "CUSTOMER_REJECTED",
-            },
-            include: {
-                items: {
-                    include: {
-                        product: {
-                            select: { id: true, productCode: true, productName: true }
-                        }
-                    }
-                },
-                customer: {
-                    select: { id: true, firmName: true, displayName: true }
-                },
-            },
-        });
     }
 
-    async getNextSalesOrderCode() {
-        const currentYear = new Date().getFullYear();
-        const lastSalesOrder = await prisma.salesOrder.findFirst({
-            where: { orderNo: { startsWith: `SO-${currentYear}-` } },
-            orderBy: { id: "desc" },
-        });
-        if (!lastSalesOrder) {
-            return `SO-${currentYear}-001`;
+    // ─── Workflow (status transitions) ───────────────────────────────────────
+
+    private async updateStatus(id: number, newStatus: SalesOrderStatus, permissions: string[]) {
+        if (useEstimatedTable(permissions)) {
+            const updated = await (prisma as any).ordProcAuxMeta.update({
+                where: { id }, data: { status: newStatus }, include: INCLUDE_EST,
+            });
+            return { ...decryptEstRow(updated), _source: "estimated" };
+        } else {
+            const updated = await prisma.salesOrder.update({
+                where: { id }, data: { status: newStatus as any }, include: INCLUDE_GST,
+            });
+            try {
+                await (prisma as any).ordProcAuxMeta.updateMany({
+                    where: { orderNo: (updated as any).orderNo },
+                    data: { status: newStatus },
+                });
+            } catch (e) { /* ignore */ }
+            return { ...updated, _source: "gst" };
         }
-        const lastCode = lastSalesOrder.orderNo;
-        const match = lastCode.match(/SO-\d{4}-(\d+)/);
-        if (!match) {
-            return `SO-${currentYear}-001`;
-        }
-        const nextNumber = parseInt(match[1], 10) + 1;
-        const paddedNumber = String(nextNumber).padStart(3, "0");
-        return `SO-${currentYear}-${paddedNumber}`;
     }
 
-    async getOrderStatus(id: number) {
-        const order = await this.findById(id);
+    async submitForApproval(id: number, permissions: string[] = []) {
+        const existing = await this.findById(id, permissions);
+        if (!["DRAFT", "CONFIRMED"].includes((existing as any).status)) {
+            throw new ApiError(409, `Only DRAFT/CONFIRMED orders can be submitted. Current: ${(existing as any).status}`);
+        }
+        if ((existing as any).items.length === 0) throw new ApiError(400, "Cannot submit an order with no items");
+
+        // ── Calculate financials at quotation-send time ──────────────────────
+        if (useEstimatedTable(permissions)) {
+            // Read encrypted items → sum line totals → encrypt order totals
+            const rawItems = await (prisma as any).ordProcAuxMetaItem.findMany({ where: { auxMetaId: id } });
+            const subtotal = (rawItems as any[]).reduce((s: Prisma.Decimal, item: any) => {
+                return s.add(new Prisma.Decimal(safeDec(item.b3, "0")));
+            }, ZERO);
+            const encFinancials = encryptEstMeta({
+                subtotal,
+                netAmount: subtotal,
+                totalTax:  ZERO,
+                totalCgst: ZERO,
+                totalSgst: ZERO,
+                totalIgst: ZERO,
+            });
+            const updated = await (prisma as any).ordProcAuxMeta.update({
+                where: { id },
+                data:  { status: "PENDING_MD_APPROVAL", ...encFinancials },
+                include: INCLUDE_EST,
+            });
+            try {
+                await prisma.salesOrder.updateMany({
+                    where: { orderNo: (existing as any).orderNo },
+                    data: { status: "PENDING_MD_APPROVAL" as any },
+                });
+            } catch (e) { /* ignore */ }
+            return { ...decryptEstRow(updated), _source: "estimated" };
+
+        } else {
+            // Read GST items → compute order-level totals → save with new status
+            const items = await prisma.salesOrderItem.findMany({ where: { salesOrderId: id } });
+            const subtotal  = items.reduce((s, l) => s.add(l.lineTotal),              ZERO);
+            const totalCgst = items.reduce((s, l) => s.add((l as any).cgstAmount ?? ZERO), ZERO);
+            const totalSgst = items.reduce((s, l) => s.add((l as any).sgstAmount ?? ZERO), ZERO);
+            const totalIgst = items.reduce((s, l) => s.add((l as any).igstAmount ?? ZERO), ZERO);
+            const totalTax  = totalCgst.add(totalSgst).add(totalIgst);
+            const updated = await prisma.salesOrder.update({
+                where: { id },
+                data: {
+                    status:    "PENDING_MD_APPROVAL" as any,
+                    subtotal,
+                    netAmount: subtotal.add(totalTax),
+                    totalCgst,
+                    totalSgst,
+                    totalIgst,
+                    totalTax,
+                },
+                include: INCLUDE_GST,
+            });
+            try {
+                await (prisma as any).ordProcAuxMeta.updateMany({
+                    where: { orderNo: (updated as any).orderNo },
+                    data: {
+                        status: "PENDING_MD_APPROVAL",
+                        ...encryptEstMeta({
+                            subtotal,
+                            netAmount: subtotal.add(totalTax),
+                            totalTax,
+                            totalCgst,
+                            totalSgst,
+                            totalIgst,
+                        }),
+                    },
+                });
+            } catch (e) { /* ignore */ }
+            return { ...updated, _source: "gst" };
+        }
+    }
+
+    async approveOrder(id: number, permissions: string[] = []) {
+        const existing = await this.findById(id, permissions);
+        if ((existing as any).status !== "PENDING_MD_APPROVAL") {
+            throw new ApiError(409, `Order must be in PENDING_MD_APPROVAL status. Current: ${(existing as any).status}`);
+        }
+        return this.updateStatus(id, "IN_PRODUCTION", permissions);
+    }
+
+    async rejectOrder(id: number, permissions: string[] = []) {
+        const existing = await this.findById(id, permissions);
+        if ((existing as any).status !== "PENDING_MD_APPROVAL") {
+            throw new ApiError(409, `Order must be in PENDING_MD_APPROVAL status. Current: ${(existing as any).status}`);
+        }
+        return this.updateStatus(id, "MD_REJECTED", permissions);
+    }
+
+    async reopen(id: number, permissions: string[] = []) {
+        const existing = await this.findById(id, permissions);
+        if (!["MD_REJECTED", "CUSTOMER_REJECTED"].includes((existing as any).status)) {
+            throw new ApiError(409, `Cannot reopen order with status ${(existing as any).status}`);
+        }
+        return this.updateStatus(id, "DRAFT", permissions);
+    }
+
+    async convertToSalesOrder(id: number, permissions: string[] = []) {
+        const existing = await this.findById(id, permissions);
+        const currentStatus = (existing as any).status as string;
+        if (!["MD_APPROVED", "CUSTOMER_APPROVED", "PENDING_MD_APPROVAL"].includes(currentStatus)) {
+            throw new ApiError(409, `Cannot convert order with status ${currentStatus} to sales order`);
+        }
+        return this.updateStatus(id, "CONFIRMED", permissions);
+    }
+
+    // ─── Next order number ───────────────────────────────────────────────────
+
+    async getNextSalesOrderCode(_permissions: string[] = []) {
+        const year   = new Date().getFullYear();
+        const prefix = `SO-${year}-`;
+
+        // Check BOTH tables so order numbers never collide
+        const [lastGst, lastEst] = await Promise.all([
+            prisma.salesOrder.findFirst({
+                where:   { orderNo: { startsWith: prefix } },
+                orderBy: { id: "desc" },
+                select:  { orderNo: true },
+            }),
+            (prisma as any).ordProcAuxMeta.findFirst({
+                where:   { orderNo: { startsWith: prefix } },
+                orderBy: { id: "desc" },
+                select:  { orderNo: true },
+            }).catch(() => null),
+        ]);
+
+        const extractNum = (orderNo: string | null | undefined) => {
+            if (!orderNo) return 0;
+            const match = orderNo.match(/SO-\d{4}-(\d+)/);
+            return match ? parseInt(match[1], 10) : 0;
+        };
+
+        const maxNum = Math.max(extractNum(lastGst?.orderNo), extractNum(lastEst?.orderNo));
+        return `${prefix}${String(maxNum + 1).padStart(3, "0")}`;
+    }
+
+    // ─── Order status ────────────────────────────────────────────────────────
+
+    async getOrderStatus(id: number, permissions: string[] = []) {
+        const order = await this.findById(id, permissions);
         return {
-            id: order.id,
-            orderNo: order.orderNo,
-            status: order.status,
-            mdApprovalStatus: order.mdApprovalStatus,
-            customerApprovalStatus: order.customerApprovalStatus,
-            canEdit: order.status === "DRAFT",
-            canDelete: order.mdApprovalStatus !== "APPROVED",
-            canEditDiscounts: order.status === "DRAFT",
-            canSubmitForMdApproval: order.status === "DRAFT" && order.items.length > 0,
-            canApproveMd: order.status === "PENDING_MD_APPROVAL" && order.mdApprovalStatus === "PENDING",
-            canApproveCustomer: order.status === "PENDING_CUSTOMER_APPROVAL"
-                && order.mdApprovalStatus === "APPROVED"
-                && order.customerApprovalStatus === "PENDING",
-            canReopen: order.status === "MD_REJECTED" || order.status === "CUSTOMER_REJECTED",
-            totalItems: order.items.length,
-            subtotal: order.subtotal,
-            totalDiscount: order.totalDiscount,
-            totalCgst: order.totalCgst,
-            totalSgst: order.totalSgst,
-            totalIgst: order.totalIgst,
-            netAmount: order.netAmount,
-            orderDate: order.orderDate,
-            expectedCompletionDate: order.expectedCompletionDate,
-            customerName: order.customer.displayName || order.customer.firmName,
+            id:         (order as any).id,
+            orderNo:    (order as any).orderNo,
+            status:     (order as any).status,
+            _source:    (order as any)._source,
+            canEdit:               ["DRAFT", "CONFIRMED"].includes((order as any).status),
+            canDelete:             (order as any).status === "DRAFT",
+            canSubmitForApproval:  ["DRAFT", "CONFIRMED"].includes((order as any).status) && (order as any).items.length > 0,
+            canApprove:            (order as any).status === "PENDING_MD_APPROVAL",
+            canReject:             (order as any).status === "PENDING_MD_APPROVAL",
+            canReopen:             ["MD_REJECTED", "CUSTOMER_REJECTED"].includes((order as any).status),
         };
     }
 }

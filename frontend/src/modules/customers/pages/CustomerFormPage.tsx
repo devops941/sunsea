@@ -120,10 +120,9 @@ const CtrlText = ({ field, label, placeholder, required, type, disabled, error, 
 );
 
 // Groups a set of fields under a labeled heading so related inputs read as one unit.
-const FieldGroup = ({ icon: Icon, title, children }: { icon: React.ElementType; title: string; children: React.ReactNode }) => (
+const FieldGroup = ({ title, children }: { icon?: React.ElementType; title: string; children: React.ReactNode }) => (
   <div className="space-y-4">
     <h5 className="font-bold text-slate-700 flex items-center gap-2">
-      <Icon className="text-blue-500" size={14} />
       {title}
     </h5>
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-6">
@@ -468,14 +467,12 @@ const CustomerFormPage: React.FC = () => {
             {!isEditMode && (
               <CustomButton
                 text="Clear Form"
-                icon={FaEraser}
                 onClick={handleClear}
                 type="button"
               />
             )}
             <CustomButton
               text={isSubmitting ? "Saving..." : "Save Customer"}
-              icon={FaSave}
               type="submit"
               disabled={isSubmitting}
             />

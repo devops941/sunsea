@@ -283,7 +283,6 @@ export const sidebarItems: SidebarItem[] = [
     pathsByPermission: [
       { permission: "customers.view", path: "/customers" },
       { permission: "sales-orders.view", path: "/sales-order" },
-      { permission: "draft-orders.view", path: "/draft-order" },
       { permission: "quotations.view", path: "/quatation-order" },
       { permission: "pending-quotations.view", path: "/pending-quotations" },
       { permission: "sales-invoices.view", path: "/sales-invoices" },
@@ -299,7 +298,6 @@ export const sidebarItems: SidebarItem[] = [
         ]
       },
       { title: "Sales Orders", path: "/sales-order", permission: "sales-orders.view" },
-      { title: "Draft Orders", path: "/draft-order", permission: "draft-orders.view" },
       { title: "Quotations", path: "/quatation-order", permission: "quotations.view" },
       { title: "MD Approvals", path: "/pending-quotations", permission: "pending-quotations.view" },
       { title: "Sales Invoice", path: "/sales-invoices", permission: "sales-invoices.view" },
@@ -308,7 +306,6 @@ export const sidebarItems: SidebarItem[] = [
     activePaths: [
       "/customers",
       "/sales-order",
-      "/draft-order",
       "/quatation-order",
       "/pending-quotations",
       "/sales-invoices",
@@ -317,7 +314,6 @@ export const sidebarItems: SidebarItem[] = [
     permissionAny: [
       "customers.view",
       "sales-orders.view",
-      "draft-orders.view",
       "quotations.view",
       "pending-quotations.view",
       "sales-invoices.view",

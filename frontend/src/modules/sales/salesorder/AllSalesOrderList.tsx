@@ -5,6 +5,9 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 
 import ViewButton from "../../../components/ui/viewbutton/ViewButton";
+import EditButton from "../../../components/ui/EditButton/EditButton";
+import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
+import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import CustomButton from "../../../components/ui/Button/Button";
 import { salesOrderService } from "../../../services/salesOrderService";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
@@ -25,7 +28,9 @@ const ITEMS_PER_PAGE = 10;
 
 const AllSalesOrderList: React.FC = () => {
     const navigate = useNavigate();
-    const { can } = usePermission();
+    const { can, isSuperAdmin } = usePermission();
+    const canViewEstimate = isSuperAdmin || can("sales-orders.view-estimate");
+    const canViewGst      = isSuperAdmin || can("sales-orders.view-gst");
     const [data, setData] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const location = useLocation();
@@ -39,6 +44,28 @@ const AllSalesOrderList: React.FC = () => {
     const [estimateOrder, setEstimateOrder] = useState<any | null>(null);
     const [loadingEstimate, setLoadingEstimate] = useState(false);
     const [generatingPdf, setGeneratingPdf] = useState(false);
+
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [itemToDelete, setItemToDelete] = useState<number | null>(null);
+
+    const handleDeleteConfirm = async () => {
+        if (itemToDelete === null) return;
+        try {
+            await salesOrderService.delete(itemToDelete);
+            toast.success("Sales order deleted successfully!");
+            setShowDeleteModal(false);
+            setItemToDelete(null);
+            fetchOrders();
+        } catch (error: any) {
+            console.error("❌ Delete error:", error);
+            toast.error(error?.response?.data?.message || "Failed to delete order");
+        }
+    };
+
+    const triggerDelete = useCallback((id: number) => {
+        setItemToDelete(id);
+        setShowDeleteModal(true);
+    }, []);
 
     const generatePdf = async (action: "view" | "download") => {
         if (!estimateOrder) return;
@@ -203,6 +230,10 @@ const AllSalesOrderList: React.FC = () => {
         navigate(`/sales-order/details/${id}`);
     };
 
+    const handleOpenEdit = useCallback((item: any) => {
+        navigate(`/sales-order/edit/${item.id}`, { state: item });
+    }, [navigate]);
+
     const handleOpenAdd = () => {
         navigate("/sales-order/create");
     };
@@ -311,31 +342,36 @@ const AllSalesOrderList: React.FC = () => {
                         { header: "STATUS", render: (item) => <StatusBadge status={item.status} /> },
                         {
                             header: "ACTIONS",
-                            width: "120px",
+                            width: "210px",
+                            align: "center",
                             render: (item) => (
-                                <div className="flex justify-start gap-2">
+                                <div className="flex items-center justify-center gap-2">
                                     <ViewButton onClick={() => handleOpenView(item.id)} />
-                                    <button
-                                        type="button"
-                                        title="View Sales Order Estimate"
-                                        onClick={() => handleOpenEstimate(item.id)}
-                                        className="
-                                       w-10 h-10
-                                       flex items-center justify-center
-                                       rounded-xl
-                                       border-none
-                                       cursor-pointer
-                                       bg-violet-500/10
-                                       text-violet-600
-                                       transition-all duration-300 ease-in-out
-                                       hover:-translate-y-[3px]
-                                       hover:bg-violet-500/20
-                                       hover:shadow-[0_8px_18px_rgba(139,92,246,0.18)]
-                                       active:scale-95
-                                     "
-                                    >
-                                        <FiClipboard className="text-[18px]" />
-                                    </button>
+                                    {canViewEstimate && (
+                                        <button
+                                            type="button"
+                                            title="View Estimated Pricing"
+                                            onClick={() => handleOpenEstimate(item.id)}
+                                            className="
+                                           w-10 h-10
+                                           flex items-center justify-center
+                                           rounded-xl
+                                           border-none
+                                           cursor-pointer
+                                           bg-violet-500/10
+                                           text-violet-600
+                                           transition-all duration-300 ease-in-out
+                                           hover:-translate-y-[3px]
+                                           hover:bg-violet-500/20
+                                           hover:shadow-[0_8px_18px_rgba(139,92,246,0.18)]
+                                           active:scale-95
+                                          "
+                                        >
+                                            <FiClipboard className="text-[18px]" />
+                                        </button>
+                                    )}
+                                    {can("sales-orders.edit") && <EditButton onClick={() => handleOpenEdit(item)} />}
+                                    {can("sales-orders.delete") && <DeleteButton onClick={() => triggerDelete(item.id)} />}
                                 </div>
                             ),
                         },
@@ -453,6 +489,17 @@ const AllSalesOrderList: React.FC = () => {
                     </DocumentPrintLayout>
                 </div>
             )}
+
+            {/* Delete Modal */}
+            <CommonConfirmModal
+                show={showDeleteModal}
+                onHide={() => setShowDeleteModal(false)}
+                onConfirm={handleDeleteConfirm}
+                title="Delete Sales Order"
+                message="Are you sure you want to delete this sales order? This action cannot be undone."
+                confirmText="Delete"
+                confirmVariant="danger"
+            />
         </div>
     );
 };
