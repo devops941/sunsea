@@ -29,6 +29,8 @@ export interface Customer {
   customerCode: string;
   firmName: string;
   displayName?: string | null;
+  customerType?: { id: number; name: string } | null;
+  customerGrade?: { id: number; name: string } | null;
   mobile: any;
   email?: string | null;
   gstin?: string | null;
@@ -55,6 +57,7 @@ export interface Customer {
   routeId?: string | null;
   status: string;
   addresses?: CustomerAddress[];
+  transports?: CustomerTransport[];
   createdAt: string;
   updatedAt: string;
   createdUser?: {

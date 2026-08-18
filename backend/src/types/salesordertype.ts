@@ -15,19 +15,19 @@ export interface SalesOrderItemInput {
 export interface CreateSalesOrderInput {
     orderNo: string;
     orderDate: string; // ISO date string
-    expectedCompletionDate: string;
+    expectedCompletionDate?: string;
 
     customerId: string; // uuid
 
     paymentTermId?: number;
 
-    billingAddress: AddressInput;
+    billingAddress?: AddressInput;
     shippingAddress?: AddressInput;
 
     items: SalesOrderItemInput[];
 
     remarks?: string;
-    internalNotes?: string;
+    narration?: string;
 
     createdBy?: string; // uuid, from auth context
 }

@@ -10,22 +10,21 @@ import { generatePdfFromHtml } from "../../utils/pdfGenerator";
 import { sendEmail } from "../../utils/mailer";
 import {
     SalesOrderQueryInput,
-    MdApprovalDecisionInput,
-    CustomerApprovalDecisionInput,
-    UpdateSalesOrderDiscountsInput,
-    ApprovalStatusEnum,
     SalesOrderStatusEnum,
     SalesOrderStatus
 } from "./sales-order.validation";
 
+/** Extract permissions array from request user */
+function getPerms(req: Request): string[] {
+    return Array.isArray(req.user?.permissions) ? req.user.permissions : [];
+}
+
 class SalesOrderController {
 
     create = asyncHandler(async (req: Request, res: Response) => {
-        const order = await salesOrderService.create(req.body);
+        const order = await salesOrderService.create(req.body, getPerms(req));
         getIO().emit("salesOrder:created", order);
-        return res.status(201).json(
-            new ApiResponse("Sales Order created successfully", order)
-        );
+        return res.status(201).json(new ApiResponse("Sales Order created successfully", order));
     });
 
     checkCreditBlock = asyncHandler(async (req: Request, res: Response) => {
@@ -33,11 +32,8 @@ class SalesOrderController {
         if (!customerId) {
             return res.status(400).json(new ApiResponse("customerId is required", { blocked: false }));
         }
-
         const blockResult = await creditCheckService.hasBlockingPendingOrder(customerId);
-        return res.status(200).json(
-            new ApiResponse("Credit block check completed successfully", blockResult)
-        );
+        return res.status(200).json(new ApiResponse("Credit block check completed successfully", blockResult));
     });
 
     findAll = asyncHandler(async (req: Request, res: Response) => {
@@ -47,227 +43,134 @@ class SalesOrderController {
             customerId: req.query.customerId as string,
             orderNo: req.query.orderNo as string,
             status: this.parseSalesOrderStatuses(req.query.status),
-            mdApprovalStatus: this.parseApprovalStatus(req.query.mdApprovalStatus),
-            customerApprovalStatus: this.parseApprovalStatus(req.query.customerApprovalStatus),
-            dispatchType: req.query.dispatchType as SalesOrderQueryInput["dispatchType"],
             search: req.query.search as string,
             fromDate: req.query.fromDate as string,
             toDate: req.query.toDate as string,
             sortBy: this.parseSortBy(req.query.sortBy) ?? "createdAt",
             sortOrder: this.parseSortOrder(req.query.sortOrder) ?? "desc",
         };
-        const orders = await salesOrderService.findAll(query);
-        return res.status(200).json(
-            new ApiResponse("Sales Orders fetched successfully", orders)
-        );
+        const orders = await salesOrderService.findAll(query, getPerms(req));
+        return res.status(200).json(new ApiResponse("Sales Orders fetched successfully", orders));
     });
 
     findById = asyncHandler(async (req: Request, res: Response) => {
-        const { id } = req.params;
-        const order = await salesOrderService.findById(Number(id));
-        return res.status(200).json(
-            new ApiResponse("Sales Order fetched successfully", order)
-        );
+        const order = await salesOrderService.findById(Number(req.params.id), getPerms(req));
+        return res.status(200).json(new ApiResponse("Sales Order fetched successfully", order));
     });
 
     update = asyncHandler(async (req: Request, res: Response) => {
-        const { id } = req.params;
-        const order = await salesOrderService.update(Number(id), req.body);
+        const order = await salesOrderService.update(Number(req.params.id), req.body, getPerms(req));
         getIO().emit("salesOrder:updated", order);
-        return res.status(200).json(
-            new ApiResponse("Sales Order updated successfully", order)
-        );
+        return res.status(200).json(new ApiResponse("Sales Order updated successfully", order));
     });
 
     delete = asyncHandler(async (req: Request, res: Response) => {
-        const { id } = req.params;
-        await salesOrderService.delete(Number(id));
-        getIO().emit("salesOrder:deleted", { id: Number(id) });
-        return res.status(200).json(
-            new ApiResponse("Sales Order deleted successfully")
-        );
+        const id = Number(req.params.id);
+        await salesOrderService.delete(id, getPerms(req));
+        getIO().emit("salesOrder:deleted", { id });
+        return res.status(200).json(new ApiResponse("Sales Order deleted successfully"));
     });
 
-    getNextCode = asyncHandler(async (_req: Request, res: Response) => {
-        const nextCode = await salesOrderService.getNextSalesOrderCode();
-        return res.status(200).json(
-            new ApiResponse(
-                "Next sales order code fetched successfully",
-                { nextCode }
-            )
-        );
+    getNextCode = asyncHandler(async (req: Request, res: Response) => {
+        const nextCode = await salesOrderService.getNextSalesOrderCode(getPerms(req));
+        return res.status(200).json(new ApiResponse("Next sales order code fetched successfully", { nextCode }));
     });
 
-    updateDiscounts = asyncHandler(async (req: Request, res: Response) => {
-        const { id } = req.params;
-        const discountData: UpdateSalesOrderDiscountsInput = req.body;
-        const order = await salesOrderService.updateDiscounts(Number(id), discountData);
+    submitForApproval = asyncHandler(async (req: Request, res: Response) => {
+        const order = await salesOrderService.submitForApproval(Number(req.params.id), getPerms(req));
         getIO().emit("salesOrder:updated", order);
-        return res.status(200).json(
-            new ApiResponse("Sales Order discounts updated successfully", order)
-        );
-    });
-
-    submitForMdApproval = asyncHandler(async (req: Request, res: Response) => {
-        const { id } = req.params;
-        const order = await salesOrderService.submitForMdApproval(Number(id));
-        getIO().emit("salesOrder:updated", order);
-        return res.status(200).json(
-            new ApiResponse("Sales Order submitted for MD approval", order)
-        );
+        return res.status(200).json(new ApiResponse("Sales Order submitted for approval", order));
     });
 
     reopen = asyncHandler(async (req: Request, res: Response) => {
-        const { id } = req.params;
-        const order = await salesOrderService.reopen(Number(id));
+        const order = await salesOrderService.reopen(Number(req.params.id), getPerms(req));
         getIO().emit("salesOrder:updated", order);
-        return res.status(200).json(
-            new ApiResponse("Sales Order reopened for editing", order)
-        );
+        return res.status(200).json(new ApiResponse("Sales Order reopened for editing", order));
     });
 
-    mdApprove = asyncHandler(async (req: Request, res: Response) => {
-        const { id } = req.params;
-        const approvalData: MdApprovalDecisionInput = req.body;
-        const order = await salesOrderService.decideMdApproval(Number(id), approvalData);
+    approveOrder = asyncHandler(async (req: Request, res: Response) => {
+        const order = await salesOrderService.approveOrder(Number(req.params.id), getPerms(req));
         getIO().emit("salesOrder:updated", order);
-        return res.status(200).json(
-            new ApiResponse("Sales Order MD approval recorded successfully", order)
-        );
+        return res.status(200).json(new ApiResponse("Sales Order approved successfully", order));
     });
 
-    customerApprove = asyncHandler(async (req: Request, res: Response) => {
-        const { id } = req.params;
-        const approvalData: CustomerApprovalDecisionInput = req.body;
-        const order = await salesOrderService.decideCustomerApproval(Number(id), approvalData);
+    rejectOrder = asyncHandler(async (req: Request, res: Response) => {
+        const order = await salesOrderService.rejectOrder(Number(req.params.id), getPerms(req));
         getIO().emit("salesOrder:updated", order);
-        return res.status(200).json(
-            new ApiResponse("Sales Order customer approval recorded successfully", order)
-        );
+        return res.status(200).json(new ApiResponse("Sales Order rejected", order));
     });
 
     getStatus = asyncHandler(async (req: Request, res: Response) => {
-        const { id } = req.params;
-        const status = await salesOrderService.getOrderStatus(Number(id));
-        return res.status(200).json(
-            new ApiResponse("Order status fetched successfully", status)
-        );
+        const status = await salesOrderService.getOrderStatus(Number(req.params.id), getPerms(req));
+        return res.status(200).json(new ApiResponse("Order status fetched successfully", status));
     });
 
     emailQuotation = asyncHandler(async (req: Request, res: Response) => {
-        const { id } = req.params;
         const { recipientEmail, subject, message } = req.body;
-
         if (!recipientEmail) {
             return res.status(400).json(new ApiResponse("Recipient email is required"));
         }
-
-        const order = await salesOrderService.findById(Number(id));
-        if (!order) {
-            return res.status(404).json(new ApiResponse("Order not found"));
-        }
+        const order = await salesOrderService.findById(Number(req.params.id), getPerms(req));
+        if (!order) return res.status(404).json(new ApiResponse("Order not found"));
 
         const company = await companyService.getCompany();
-
         const htmlContent = generateQuotationHtml(order, company);
         const pdfBuffer = await generatePdfFromHtml(htmlContent);
 
         await sendEmail({
             to: recipientEmail,
-            subject: subject || `Quotation for Order ${order.orderNo}`,
+            subject: subject || `Quotation for Order ${(order as any).orderNo}`,
             text: message || `Please find the attached quotation.`,
-            attachments: [
-                {
-                    filename: `Quotation-${order.orderNo}.pdf`,
-                    content: pdfBuffer,
-                }
-            ]
+            attachments: [{ filename: `Quotation-${(order as any).orderNo}.pdf`, content: pdfBuffer }],
         });
-
         return res.status(200).json(new ApiResponse("Email sent successfully!"));
     });
 
+    convertToSalesOrder = asyncHandler(async (req: Request, res: Response) => {
+        const order = await salesOrderService.convertToSalesOrder(Number(req.params.id), getPerms(req));
+        getIO().emit("salesOrder:updated", order);
+        return res.status(200).json(new ApiResponse("Quotation converted to sales order successfully", order));
+    });
+
     whatsappQuotation = asyncHandler(async (req: Request, res: Response) => {
-        const { id } = req.params;
         const { to, message } = req.body;
+        if (!to) return res.status(400).json(new ApiResponse("Recipient phone number is required"));
 
-        if (!to) {
-            return res.status(400).json(new ApiResponse("Recipient phone number is required"));
-        }
-
-        const order = await salesOrderService.findById(Number(id));
-        if (!order) {
-            return res.status(404).json(new ApiResponse("Order not found"));
-        }
+        const order = await salesOrderService.findById(Number(req.params.id), getPerms(req));
+        if (!order) return res.status(404).json(new ApiResponse("Order not found"));
 
         const company = await companyService.getCompany();
-
-        // 1. Generate PDF buffer
         const htmlContent = generateQuotationHtml(order, company);
         const pdfBuffer = await generatePdfFromHtml(htmlContent);
-        
-        const filename = `Quotation-${order.orderNo}.pdf`;
-        
+        const filename = `Quotation-${(order as any).orderNo}.pdf`;
         const { WhatsappService } = require("../whatsappservice/whatsapp.service");
-
-        // 2. Upload media
         const mediaId = await WhatsappService.uploadMedia(pdfBuffer, filename, "application/pdf");
-
-        // 3. Send message with the document
-        await WhatsappService.sendDocumentMessage(to, mediaId, filename, message || `Quotation for Order ${order.orderNo}`);
-
+        await WhatsappService.sendDocumentMessage(to, mediaId, filename, message || `Quotation for Order ${(order as any).orderNo}`);
         return res.status(200).json(new ApiResponse("WhatsApp message sent successfully!"));
     });
 
+    // ─── Private helpers ──────────────────────────────────────────────────────
 
-    // ─── Private helper methods ──────────────────────────────────────
-
-    private parseApprovalStatus(value: unknown): "APPROVED" | "REJECTED" | "PENDING" | undefined {
-        if (!value || typeof value !== 'string') return undefined;
-        const status = value.toUpperCase();
-        if (status === 'APPROVED' || status === 'REJECTED' || status === 'PENDING') {
-            return status as "APPROVED" | "REJECTED" | "PENDING";
-        }
-        return undefined;
-    }
-
-    private parseSalesOrderStatus(value: unknown): string | undefined {
-        if (!value || typeof value !== 'string') return undefined;
-        const result = SalesOrderStatusEnum.safeParse(value.toUpperCase());
-        return result.success ? result.data : undefined;
-    }
-
-    private parseSortBy(value: unknown): "orderDate" | "createdAt" | "orderNo" | "expectedCompletionDate" | undefined {
-        if (!value || typeof value !== 'string') return undefined;
-        const sortBy = value.toLowerCase();
-        if (sortBy === 'orderDate' || sortBy === 'createdAt' || sortBy === 'orderNo' || sortBy === 'expectedCompletionDate') {
-            return sortBy as "orderDate" | "createdAt" | "orderNo" | "expectedCompletionDate";
-        }
-        return undefined;
+    private parseSortBy(value: unknown): "orderDate" | "createdAt" | "orderNo" | undefined {
+        if (!value || typeof value !== "string") return undefined;
+        const v = value.toLowerCase();
+        return (v === "orderDate" || v === "createdAt" || v === "orderNo") ? v as any : undefined;
     }
 
     private parseSortOrder(value: unknown): "asc" | "desc" | undefined {
-        if (!value || typeof value !== 'string') return undefined;
-        const sortOrder = value.toLowerCase();
-        if (sortOrder === 'asc' || sortOrder === 'desc') {
-            return sortOrder as "asc" | "desc";
-        }
-        return undefined;
+        if (!value || typeof value !== "string") return undefined;
+        const v = value.toLowerCase();
+        return (v === "asc" || v === "desc") ? v as any : undefined;
     }
 
     private parseSalesOrderStatuses(value: unknown): SalesOrderStatus[] | undefined {
-        if (!value || typeof value !== 'string') return undefined;
-        const statuses = value.split(',').map(s => s.trim().toUpperCase());
-        const validStatuses: SalesOrderStatus[] = [];
-        for (const s of statuses) {
-            const result = SalesOrderStatusEnum.safeParse(s);
-            if (result.success) {
-                validStatuses.push(result.data);
-            } else {
-                console.warn(`Invalid status ignored: ${s}`);
-            }
+        if (!value || typeof value !== "string") return undefined;
+        const valid: SalesOrderStatus[] = [];
+        for (const s of value.split(",").map(s => s.trim().toUpperCase())) {
+            const r = SalesOrderStatusEnum.safeParse(s);
+            if (r.success) valid.push(r.data);
         }
-        return validStatuses.length > 0 ? validStatuses : undefined;
+        return valid.length > 0 ? valid : undefined;
     }
 }
 

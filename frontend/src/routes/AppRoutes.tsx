@@ -166,7 +166,6 @@ const CustomerListPage = lazy(() => import("../modules/customers/pages/CustomerL
 const CustomerFormPage = lazy(() => import("../modules/customers/pages/CustomerFormPage"));
 
 const AllSalesOrderList = lazy(() => import("../modules/sales/salesorder/AllSalesOrderList"));
-const DraftSalesOrderList = lazy(() => import("../modules/sales/salesorder/SalesOrderList"));
 const SalesOrderCreate = lazy(() => import("../modules/sales/salesorder/CreateOrder"));
 const OrderDetails = lazy(() => import("../modules/sales/salesorder/SalesOrderDetail"));
 
@@ -405,9 +404,6 @@ const AppRoutes = () => {
               <Route element={<ProtectedRoute permission="sales-orders.view" />}>
                 <Route path="/sales-order" element={<AllSalesOrderList />} />
               </Route>
-              <Route element={<ProtectedRoute permission="draft-orders.view" />}>
-                <Route path="/draft-order" element={<DraftSalesOrderList />} />
-              </Route>
               <Route element={<ProtectedRoute permission="quotations.view" />}>
                 <Route path="/quatation-order" element={<QuotationList />} />
               </Route>
@@ -618,8 +614,14 @@ const AppRoutes = () => {
             <Route element={<ProtectedRoute permission="sales-orders.create" />}>
               <Route path="/sales-order/create" element={<SalesOrderCreate />} />
             </Route>
+            <Route element={<ProtectedRoute permissionAny={["sales-orders.create", "sales-orders.view", "draft-orders.edit"]} />}>
+              <Route path="/sales-order/edit/:id" element={<SalesOrderCreate />} />
+            </Route>
             <Route element={<ProtectedRoute permission="draft-orders.edit" />}>
               <Route path="/draft-order/edit/:id" element={<SalesOrderCreate />} />
+            </Route>
+            <Route element={<ProtectedRoute permission="quotations.create" />}>
+              <Route path="/quatation-order/create" element={<QuotationCreate />} />
             </Route>
             <Route element={<ProtectedRoute permission="quotations.edit" />}>
               <Route path="/quatation-order/edit/:id" element={<QuotationCreate />} />

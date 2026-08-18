@@ -1,9 +1,9 @@
-import React, { useEffect, useMemo, useState, useRef } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useSelector } from "react-redux";
-import { FaSave, FaEraser, FaArrowLeft, FaPlus, FaTrash, FaCalendarAlt, FaPaperPlane } from "react-icons/fa";
-import { useNavigate, useLocation } from "react-router-dom";
+import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
+import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
-import { useForm, useFieldArray, Controller } from "react-hook-form";
+import { useForm, useFieldArray, Controller, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import TextInput from "../../../components/form/TextInput/TextInput";
@@ -12,23 +12,27 @@ import CustomButton from "../../../components/ui/Button/Button";
 import BackButton from "../../../components/ui/BackButton/BackButton";
 import TextArea from "../../../components/form/TextArea/TextArea";
 import DateInput from "../../../components/form/DateInput/DateInput";
-import AddressForm from "../../../components/form/AddressFrom/AddressFrom";
-import OrderItemsTable from "../../../components/form/OrderItemsTable/OrderItemsTable";
 import { useCustomers } from "../../../hooks/useCustomers";
-import { useProducts } from "../../../hooks/useProducts";
 import { salesOrderService } from "../../../services/salesOrderService";
 import { useEmployees } from "../../../hooks/useEmployees";
-import { customerService } from "../../../services/customerService";
-import DatePickerCalendar from "../../../components/ui/DatePickerCalendar/DatePickerCalendar";
-import { COLOUR_OPTIONS, CUSTOMER_TYPE_OPTIONS, DISPATCH_TYPE_OPTIONS, ORDER_TYPE_OPTIONS } from "../../../constants/selectOption";
+import { salesProductService } from "../../../services/salesProductService";
+import { ORDER_TYPE_OPTIONS } from "../../../constants/selectOption";
 import { useSocketSync } from "../../../hooks/useSocketSync";
 
+// ─── Zod Schemas ──────────────────────────────────────────────────────────────
+
+const componentSchema = z.object({
+    componentProductId: z.string(),
+    productName: z.string(),
+    perUnit: z.number(),
+    included: z.boolean(),
+    quantity: z.string(),
+});
+
 const orderItemSchema = z.object({
-    productCode: z.string().min(1, "Product is required"),
-    quantity: z
-        .string()
-        .min(1, "Required")
-        .refine(v => !isNaN(Number(v)) && Number(v) > 0, { message: "Must be > 0" }),
+    salesProductId: z.string().min(1, "Sales product is required"),
+    orderQuantity: z.string(),
+    components: z.array(componentSchema),
 });
 
 const salesOrderSchema = z
@@ -36,107 +40,48 @@ const salesOrderSchema = z
         id: z.number().optional(),
         orderNo: z.string().min(1, "Order No is required"),
         orderDate: z.string().min(1, "Order Date is required"),
-        expectedCompletionDate: z.string().min(1, "Expected completion date is required"),
         customerId: z.string().min(1, "Customer is required"),
         mobile: z.string().optional().nullable(),
         orderType: z.string().optional(),
-        dispatchType: z.string().min(1, "Dispatch Type is required"),
         referenceText: z.string().optional(),
         salesPersonName: z.string().optional(),
-        paymentTermId: z.string().optional(),
         isInterState: z.boolean(),
-
-        billingAddressLine1: z.string().min(1, "Billing address is required"),
-        billingCity: z.string().min(1, "City is required"),
-        billingState: z.string().min(1, "State is required"),
-        billingPincode: z.string().min(1, "Pincode is required").regex(/^\d{6}$/, "Must be a 6-digit pincode"),
-
-        shippingAddressLine1: z.string().optional(),
-        shippingCity: z.string().optional(),
-        shippingState: z.string().optional(),
-        shippingPincode: z.string().optional(),
 
         items: z.array(orderItemSchema).min(1, "At least one item is required"),
 
-        remarks: z.string().optional(),
-        internalNotes: z.string().optional(),
+        narration: z.string().optional(),
     })
     .superRefine((data, ctx) => {
-        if (!data.shippingAddressLine1?.trim())
-            ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Shipping address is required", path: ["shippingAddressLine1"] });
-        if (!data.shippingCity?.trim())
-            ctx.addIssue({ code: z.ZodIssueCode.custom, message: "City is required", path: ["shippingCity"] });
-        if (!data.shippingState?.trim())
-            ctx.addIssue({ code: z.ZodIssueCode.custom, message: "State is required", path: ["shippingState"] });
-        if (!data.shippingPincode?.trim())
-            ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Pincode is required", path: ["shippingPincode"] });
-        else if (!/^\d{6}$/.test(data.shippingPincode))
-            ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Must be a 6-digit pincode", path: ["shippingPincode"] });
-
-        const currentToday = new Date().toISOString().split("T")[0];
-        if (data.expectedCompletionDate) {
-            if (data.expectedCompletionDate < currentToday) {
-                ctx.addIssue({
-                    code: z.ZodIssueCode.custom,
-                    message: "Expected completion date must be today or a future date",
-                    path: ["expectedCompletionDate"],
-                });
-            } else if (data.orderDate && data.expectedCompletionDate < data.orderDate) {
-                ctx.addIssue({
-                    code: z.ZodIssueCode.custom,
-                    message: "Must be on or after the order date",
-                    path: ["expectedCompletionDate"],
-                });
-            }
-        }
-
         if (data.orderType === "salesperson" && !data.salesPersonName?.trim()) {
-            ctx.addIssue({
-                code: z.ZodIssueCode.custom,
-                message: "Salesperson name is required",
-                path: ["salesPersonName"],
-            });
+            ctx.addIssue({ code: "custom", message: "Salesperson name is required", path: ["salesPersonName"] });
         }
-
         if (data.orderType === "reference" && !data.referenceText?.trim()) {
-            ctx.addIssue({
-                code: z.ZodIssueCode.custom,
-                message: "Reference text is required",
-                path: ["referenceText"],
-            });
+            ctx.addIssue({ code: "custom", message: "Reference text is required", path: ["referenceText"] });
         }
     });
 
-type SalesOrderFormValues = z.infer<typeof salesOrderSchema> & {
-    billingAddress?: {
-        addressLine1?: string;
-        city?: string;
-        state?: string;
-        pincode?: string;
-    } | null;
-    shippingAddress?: {
-        addressLine1?: string;
-        city?: string;
-        state?: string;
-        pincode?: string;
-    } | null;
-    customer?: {
-        id: string;
-        firmName: string;
-        displayName: string;
-    } | null;
-    items?: Array<{
-        id?: string | number;
-        salesOrderId?: number;
-        productId?: string | number;
-        productCode?: string | number;
-        quantity?: string | number;
-        product?: {
-            id?: string | number;
-            productCode: string;
-            productName: string;
-        };
-    }>;
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+type ComponentItem = {
+    componentProductId: string;
+    productName: string;
+    perUnit: number;
+    included: boolean;
+    quantity: string;
+};
+
+type SalesOrderFormValues = {
+    id?: number;
+    orderNo: string;
+    orderDate: string;
+    customerId: string;
+    mobile?: string | null;
+    orderType?: string;
+    referenceText?: string;
+    salesPersonName?: string;
+    isInterState: boolean;
+    items: Array<{ salesProductId: string; orderQuantity: string; components: ComponentItem[] }>;
+    narration?: string;
 };
 
 const today = new Date().toISOString().split("T")[0];
@@ -145,225 +90,412 @@ const defaultValues: SalesOrderFormValues = {
     id: undefined,
     orderNo: "",
     orderDate: today,
-    expectedCompletionDate: "",
     customerId: "",
     mobile: "",
     salesPersonName: "",
-    paymentTermId: "",
-    billingAddressLine1: "",
-    billingCity: "",
-    billingState: "",
-    dispatchType: "",
     orderType: "",
     referenceText: "",
-    billingPincode: "",
-    shippingAddressLine1: "",
-    shippingCity: "",
-    shippingState: "",
-    shippingPincode: "",
-    isInterState: false,   // <-- default false
-    items: [{ productCode: "", quantity: "" }],
-    remarks: "",
-    internalNotes: "",
+    isInterState: false,
+    items: [{ salesProductId: "", orderQuantity: "1", components: [] }],
+    narration: "",
 };
 
-// ─── Helper Components ──────────────────────────────────────────────────
-
-type CtrlTextProps = {
-    label: string;
-    placeholder?: string;
-    required?: boolean;
-    type?: string;
-    disabled?: boolean;
-    error?: string;
-    field: {
-        name: string;
-        value: any;
-        onChange: React.ChangeEventHandler<HTMLInputElement>;
-        onBlur: React.FocusEventHandler<HTMLInputElement>;
-    };
-};
-
-const CtrlText: React.FC<CtrlTextProps> = ({ field, label, placeholder, required, type, disabled, error }) => (
-    <TextInput
-        label={label}
-        name={field.name}
-        value={field.value ?? ""}
-        onChange={field.onChange}
-        onBlur={field.onBlur}
-        placeholder={placeholder}
-        required={required}
-        type={type}
-        disabled={disabled}
-        error={error}
-    />
-);
+// ─── Helper ───────────────────────────────────────────────────────────────────
 
 const Err: React.FC<{ message?: string }> = ({ message }) =>
     message ? <div className="text-red-500 mt-1 text-sm">{message}</div> : null;
 
-// ─── Main Component ─────────────────────────────────────────────────────
+/** Build components list from a SalesProduct, filtered to SALES_PRODUCTION only */
+function buildComponents(sp: any, orderQty: number = 1): ComponentItem[] {
+    return (sp?.components || [])
+        .filter((comp: any) => comp.componentProduct?.productType === "SALES_PRODUCTION")
+        .map((comp: any) => {
+            const perUnit = Number(comp.quantity ?? 1);
+            return {
+                componentProductId: String(comp.componentProductId),
+                productName: comp.componentProduct?.productName || comp.componentProduct?.productCode || String(comp.componentProductId),
+                perUnit,
+                included: true,
+                quantity: String(perUnit * orderQty),
+            };
+        });
+}
+
+/** Reconstruct form items from saved SalesOrder items and SalesProducts */
+function reconstructFormItems(orderItems: any[], salesProducts: any[]): Array<{ salesProductId: string; orderQuantity: string; components: ComponentItem[] }> {
+    if (!Array.isArray(orderItems) || orderItems.length === 0) {
+        return [{ salesProductId: "", orderQuantity: "1", components: [] }];
+    }
+
+    const result: Array<{ salesProductId: string; orderQuantity: string; components: ComponentItem[] }> = [];
+    const processedOrderItemIds = new Set<any>();
+
+    salesProducts.forEach(sp => {
+        const spComps = (sp?.components || []).filter(
+            (comp: any) => comp.componentProduct?.productType === "SALES_PRODUCTION"
+        );
+
+        const matchingOrderItems = orderItems.filter(oi =>
+            spComps.some((c: any) => String(c.componentProductId) === String(oi.productId))
+        );
+
+        if (matchingOrderItems.length > 0) {
+            matchingOrderItems.forEach(oi => processedOrderItemIds.add(oi.id || oi.productId));
+
+            const firstMatch = matchingOrderItems[0];
+            const matchingSpComp = spComps.find(
+                (c: any) => String(c.componentProductId) === String(firstMatch.productId)
+            );
+            const perUnit = Number(matchingSpComp?.quantity || 1);
+            const calcOrderQty = Math.max(1, Math.round(Number(firstMatch.quantity || 1) / perUnit));
+
+            const components: ComponentItem[] = spComps.map((c: any) => {
+                const compPerUnit = Number(c.quantity || 1);
+                const oi = matchingOrderItems.find(
+                    item => String(item.productId) === String(c.componentProductId)
+                );
+                return {
+                    componentProductId: String(c.componentProductId),
+                    productName: c.componentProduct?.productName || c.componentProduct?.productCode || String(c.componentProductId),
+                    perUnit: compPerUnit,
+                    included: Boolean(oi),
+                    quantity: oi ? String(oi.quantity) : String(compPerUnit * calcOrderQty),
+                };
+            });
+
+            result.push({
+                salesProductId: String(sp.id),
+                orderQuantity: String(calcOrderQty),
+                components,
+            });
+        }
+    });
+
+    const remainingItems = orderItems.filter(oi => !processedOrderItemIds.has(oi.id || oi.productId));
+    remainingItems.forEach(oi => {
+        const directSp = salesProducts.find(s => String(s.id) === String(oi.productId));
+        if (directSp) {
+            const qty = Math.max(1, Number(oi.quantity) || 1);
+            result.push({
+                salesProductId: String(directSp.id),
+                orderQuantity: String(qty),
+                components: buildComponents(directSp, qty),
+            });
+        }
+    });
+
+    return result.length > 0 ? result : [{ salesProductId: "", orderQuantity: "1", components: [] }];
+}
+
+// ─── Per-Item Row ─────────────────────────────────────────────────────────────
+
+interface ItemRowProps {
+    control: any;
+    index: number;
+    errors: any;
+    salesProducts: any[];
+    salesProductOptions: { value: string; label: string }[];
+    remove: (index: number) => void;
+    canRemove: boolean;
+    setValue: any;
+}
+
+const ItemRow: React.FC<ItemRowProps> = ({
+    control, index, errors, salesProducts, salesProductOptions, remove, canRemove, setValue,
+}) => {
+    const itemValue = useWatch({ control, name: `items.${index}` });
+    const allItems = useWatch({ control, name: "items" }) || [];
+    const components: ComponentItem[] = itemValue?.components || [];
+    const orderQty = itemValue?.orderQuantity ?? "1";
+
+    const filteredOptions = useMemo(() => {
+        const selectedInOtherRows = new Set(
+            allItems
+                .filter((_: any, i: number) => i !== index)
+                .map((item: any) => String(item?.salesProductId))
+                .filter(Boolean)
+        );
+
+        return salesProductOptions.map(opt => ({
+            ...opt,
+            disabled: selectedInOtherRows.has(String(opt.value)),
+        }));
+    }, [salesProductOptions, allItems, index]);
+
+    const toggleIncluded = (compIdx: number) => {
+        const updated = components.map((c, i) =>
+            i === compIdx ? { ...c, included: !c.included } : c
+        );
+        setValue(`items.${index}.components`, updated);
+    };
+
+    const setCompQty = (compIdx: number, qty: string) => {
+        const updated = components.map((c, i) =>
+            i === compIdx ? { ...c, quantity: qty } : c
+        );
+        setValue(`items.${index}.components`, updated);
+    };
+
+    const handleOrderQtyChange = (qty: string) => {
+        setValue(`items.${index}.orderQuantity`, qty);
+        const numQty = Math.max(1, Number(qty) || 1);
+        const updated = components.map(c => ({
+            ...c,
+            quantity: String(c.perUnit * numQty),
+        }));
+        setValue(`items.${index}.components`, updated);
+    };
+
+    const handleProductChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const spId = e.target.value;
+        const sp = salesProducts.find(s => String(s.id) === spId);
+        setValue(`items.${index}.salesProductId`, spId);
+        setValue(`items.${index}.orderQuantity`, "1");
+        setValue(`items.${index}.components`, sp ? buildComponents(sp, 1) : []);
+    };
+
+    const hasComponents = components.length > 0;
+    const hasNoSalesProductionComponents = itemValue?.salesProductId &&
+        salesProducts.find(s => String(s.id) === itemValue.salesProductId)?.components?.length > 0 &&
+        components.length === 0;
+
+    return (
+        <div className="border border-slate-200 rounded-lg p-4 bg-white mb-3">
+            {/* ── Top row: number + product + qty + delete ── */}
+            <div className="flex items-end gap-3">
+                <span className="text-sm font-medium text-slate-400 pb-2 w-5 shrink-0">{index + 1}</span>
+
+                <div className="flex-1 min-w-0">
+                    <SelectInput
+                        label="Sales Product"
+                        name={`items.${index}.salesProductId`}
+                        value={itemValue?.salesProductId || ""}
+                        options={filteredOptions}
+                        onChange={handleProductChange}
+                        defaultOptionLabel="Select sales product"
+                        error={(errors.items as any)?.[index]?.salesProductId?.message}
+                        searchable
+                    />
+                </div>
+
+                {/* Order Quantity */}
+                <div className="shrink-0 w-32">
+                    <TextInput
+                        label="Order Qty"
+                        name={`items.${index}.orderQuantity`}
+                        type="number"
+                        value={orderQty}
+                        min="1"
+                        preventNegative
+                        onChange={e => handleOrderQtyChange(e.target.value)}
+                    />
+                </div>
+
+                {/* Remove */}
+                <div className="pb-1 shrink-0">
+                    <DeleteButton
+                        onClick={() => remove(index)}
+                        disabled={!canRemove}
+                        disabledMessage="At least one item is required."
+                    />
+                </div>
+            </div>
+
+            {/* ── Warning / Components ── */}
+            <div className="ml-8 mt-2">
+                {hasNoSalesProductionComponents && (
+                    <p className="text-xs text-amber-500">
+                        This product has no "Sales Production" type components.
+                    </p>
+                )}
+
+                {hasComponents && (
+                    <div className="rounded-md border border-slate-100 overflow-hidden">
+                        {/* Header */}
+                        <div className="grid grid-cols-[auto_1fr_auto_120px] gap-2 px-3 py-2 bg-slate-50 border-b border-slate-100">
+                            <div className="w-5" />
+                            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Component</span>
+                            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider text-center w-16">Per Unit</span>
+                            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider text-center">Quantity</span>
+                        </div>
+
+                        {/* Component rows */}
+                        {components.map((comp, compIdx) => (
+                            <div
+                                key={comp.componentProductId}
+                                className={`grid grid-cols-[auto_1fr_auto_120px] gap-2 items-center px-3 py-2 border-b border-slate-50 last:border-b-0 transition-colors ${comp.included ? "bg-white" : "bg-slate-50 opacity-60"}`}
+                            >
+                                <input
+                                    type="checkbox"
+                                    checked={comp.included}
+                                    onChange={() => toggleIncluded(compIdx)}
+                                    className="w-4 h-4 rounded accent-blue-600 cursor-pointer"
+                                />
+
+                                <span className={`text-sm ${comp.included ? "text-slate-700" : "line-through text-slate-400"}`}>
+                                    {comp.productName}
+                                </span>
+
+                                {/* Per-unit badge */}
+                                <span className="text-xs text-slate-400 text-center w-16">×{comp.perUnit}</span>
+
+                                {/* Per-component Qty input */}
+                                <input
+                                    type="number"
+                                    min="0"
+                                    value={comp.quantity}
+                                    disabled={!comp.included}
+                                    onChange={e => setCompQty(compIdx, e.target.value)}
+                                    className={`w-full text-sm border rounded px-2 py-1 text-center focus:outline-none focus:ring-1 focus:ring-blue-400 transition
+                                        ${comp.included
+                                            ? "border-slate-300 bg-white text-slate-800"
+                                            : "border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed"
+                                        }`}
+                                />
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
+// ─── Main Component ───────────────────────────────────────────────────────────
 
 const SalesOrderForm: React.FC = () => {
     const navigate = useNavigate();
     const location = useLocation();
+    const { id: idParam } = useParams<{ id: string }>();
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [orderId, setOrderId] = useState<number | null>(null);
-    const isEditMode = useMemo(() => Boolean((location.state as any)?.id), [location.state]);
-    const [shippingResetKey, setShippingResetKey] = useState(0);
+    const [salesProducts, setSalesProducts] = useState<any[]>([]);
+
+    const state = location.state as any;
+    const targetId = idParam ? Number(idParam) : state?.id ? Number(state.id) : null;
+    const isEditMode = Boolean(targetId);
+
     const { data: company } = useSelector((state: any) => state.company);
     const companyState = company?.state;
 
-    const handleBillingStateChange = (stateName: string) => {
-        setValue("billingState", stateName, { shouldValidate: true });
-        setValue("billingCity", "", { shouldValidate: true });
-    };
+    const { control, handleSubmit, watch, setValue, reset, formState: { errors } } =
+        useForm<SalesOrderFormValues>({
+            resolver: zodResolver(salesOrderSchema) as any,
+            defaultValues,
+        });
 
-    const handleBillingCityChange = (cityName: string) => {
-        setValue("billingCity", cityName, { shouldValidate: true });
-    };
-
-    const handleShippingStateChange = (stateName: string) => {
-        setValue("shippingState", stateName, { shouldValidate: true });
-        setValue("shippingCity", "", { shouldValidate: true });
-    };
-
-    const handleShippingCityChange = (cityName: string) => {
-        setValue("shippingCity", cityName, { shouldValidate: true });
-    };
-
-    const {
-        control,
-        handleSubmit,
-        watch,
-        setValue,
-        reset,
-        formState: { errors },
-    } = useForm<SalesOrderFormValues>({
-        resolver: zodResolver(salesOrderSchema),
-        defaultValues,
-    });
-
-    const { fields, append, remove } = useFieldArray({
-        control,
-        name: "items"
-    });
+    const { fields, append, remove } = useFieldArray({ control, name: "items" });
 
     const { loadCustomers, customers } = useCustomers();
-    const { loadProducts, products } = useProducts();
-    const { employees, loadEmployees } = useEmployees();
+    const { loadEmployees } = useEmployees();
 
     useSocketSync("customer", undefined, loadCustomers);
-    useSocketSync("product", undefined, loadProducts);
-    useSocketSync("employee", undefined, loadEmployees);
+
     const justResetRef = React.useRef(false);
 
-    // ─── Reset form when location state changes ──────────────────────
+    // ─── Load Sales Products & Order Data ──────────────────────────────
     useEffect(() => {
-        const state = location.state as any;
-        justResetRef.current = true;
+        let isMounted = true;
 
-        if (state?.id) {
-            setOrderId(state.id);
+        const loadData = async () => {
+            try {
+                const productsData = await salesProductService.fetchAll();
+                const activeProducts = Array.isArray(productsData) ? productsData.filter((sp: any) => sp.isActive !== false) : [];
+                if (isMounted) setSalesProducts(activeProducts);
 
+                if (targetId) {
+                    setOrderId(targetId);
+                    const orderData = await salesOrderService.fetchById(targetId);
+                    if (!isMounted) return;
 
-            const items = state.items && Array.isArray(state.items) && state.items.length > 0
-                ? state.items.map((item: any) => ({
-                    productCode: String(
-                        item.productId ?? item.product?.id ?? item.productCode ?? ""
-                    ),
-                    quantity: String(item.quantity ?? ""),
-                }))
-                : [{ productCode: "", quantity: "" }];
+                    const formItems = reconstructFormItems(orderData.items || [], activeProducts);
 
-            reset({
-                id: state.id,
-                orderNo: state.orderNo || "",
-                orderDate: state.orderDate?.split("T")[0] || today,
-                dispatchType: state.dispatchType || "",
-                orderType: state.orderType || "",
-                expectedCompletionDate: state.expectedCompletionDate?.split("T")[0] || "",
-                customerId: state.customerId != null ? String(state.customerId) : "",
-                mobile: state.mobile || "",
-                referenceText: state.referenceText || "",
-                salesPersonName: state.salesPersonName || "",
-                paymentTermId: state.paymentTermId != null ? String(state.paymentTermId) : "",
-                billingAddressLine1: state.billingAddressLine1 || "",
-                billingCity: state.billingCity || "",
-                billingState: state.billingState || "",
-                billingPincode: state.billingPincode || "",
-                shippingAddressLine1: state.shippingAddressLine1 || "",
-                shippingCity: state.shippingCity || "",
-                shippingState: state.shippingState || "",
-                shippingPincode: state.shippingPincode || "",
-                remarks: state.remarks || "",
-                internalNotes: state.internalNotes || "",
-                items: items,
-            });
-        } else {
-            setOrderId(null);
-            reset(defaultValues);
-        }
-    }, [location, reset]);
+                    justResetRef.current = true;
+                    reset({
+                        id: orderData.id,
+                        orderNo: orderData.orderNo || "",
+                        orderDate: orderData.orderDate ? orderData.orderDate.split("T")[0] : today,
+                        orderType: orderData.orderType || "",
+                        customerId: orderData.customerId != null ? String(orderData.customerId) : "",
+                        mobile: orderData.mobile || "",
+                        referenceText: orderData.referenceText || "",
+                        salesPersonName: orderData.salesPersonName || "",
+                        narration: orderData.remarks || orderData.internalNotes || "",
+                        items: formItems,
+                        isInterState: Boolean(orderData.isInterState),
+                    });
+                } else {
+                    setOrderId(null);
+                    reset(defaultValues);
+                    // Auto-fetch next order number for new orders
+                    try {
+                        const nextCode = await salesOrderService.getNextOrderNo();
+                        if (isMounted && nextCode) {
+                            setValue("orderNo", nextCode);
+                        }
+                    } catch (err) {
+                        console.error("❌ Failed to fetch next order number:", err);
+                    }
+                }
+            } catch (err) {
+                console.error("❌ Failed to load sales order edit data:", err);
+            }
+        };
 
-    // ─── Load data on mount ──────────────────────────────────────────
+        loadData();
+
+        return () => {
+            isMounted = false;
+        };
+    }, [targetId, reset]);
+
+    // ─── Load on mount ───────────────────────────────────────────────
     useEffect(() => {
         loadCustomers();
-        loadProducts();
         loadEmployees({});
-    }, [loadCustomers, loadProducts, loadEmployees]);
+    }, [loadCustomers, loadEmployees]);
 
-    // ─── Memoized options ────────────────────────────────────────────
-    const customerOptions = useMemo(() => {
-        return customers.map((d) => ({
-            value: String(d.id),
-            label: d.displayName || d.firmName,
-        }));
-    }, [customers]);
+    // ─── Options ─────────────────────────────────────────────────────
+    const customerOptions = useMemo(() =>
+        customers.map(d => {
+            const name = d.displayName || d.firmName;
+            const type = d.customerType?.name;
+            const grade = d.customerGrade?.name;
+            const location = d.billingCity || d.billingState;
+            const tags = [
+                type ? `(${type})` : null,
+                grade ? `[${grade.charAt(0).toUpperCase()}]` : null,
+                location || null,
+            ].filter(Boolean).join(" · ");
+            return { value: String(d.id), label: tags ? `${name} ${tags}` : name };
+        }),
+        [customers]
+    );
 
-
-
-    const productOptions = useMemo(() => {
-        return products.map((d) => ({
-            value: String(d?.id),
-            label: `${d.productName}`,
-        }));
-    }, [products]);
+    const salesProductOptions = useMemo(() =>
+        salesProducts.map(sp => ({
+            value: String(sp.id),
+            label: sp.salesProductName || sp.salesProductCode,
+        })),
+        [salesProducts]
+    );
 
     // ─── Watched fields ──────────────────────────────────────────────
-    const billingAddressLine1 = watch("billingAddressLine1");
-    const billingCity = watch("billingCity");
-    const billingState = watch("billingState");
-    const billingPincode = watch("billingPincode");
-    const shippingAddressLine1 = watch("shippingAddressLine1");
-    const shippingState = watch("shippingState");
-    const shippingCity = watch("shippingCity");
-    const shippingPincode = watch("shippingPincode");
     const selectedCustomerId = watch("customerId");
     const orderType = watch("orderType");
 
-    const [selectedShippingIndex, setSelectedShippingIndex] = useState<string>("");
-
-    const selectedCustomer = useMemo(() => {
-        if (!selectedCustomerId) return null;
-        return customers.find(c => String(c.id) === selectedCustomerId);
-    }, [selectedCustomerId, customers]);
+    const selectedCustomer = useMemo(() =>
+        customers.find(c => String(c.id) === selectedCustomerId) || null,
+        [selectedCustomerId, customers]
+    );
 
     const mobileOptions = useMemo(() => {
         if (!selectedCustomer) return [];
         const mobile = selectedCustomer.mobile;
         if (Array.isArray(mobile)) {
-            return mobile.map((m: any) => ({
-                value: m.number,
-                label: `${m.label || 'Mobile'}: ${m.number}`,
-                selectedLabel: m.number,
-            }));
+            return mobile.map((m: any) => ({ value: m.number, label: `${m.label || "Mobile"}: ${m.number}`, selectedLabel: m.number }));
         } else if (typeof mobile === "string" && mobile.trim()) {
-            return [{
-                value: mobile,
-                label: `Primary: ${mobile}`,
-                selectedLabel: mobile,
-            }];
+            return [{ value: mobile, label: `Primary: ${mobile}`, selectedLabel: mobile }];
         }
         return [];
     }, [selectedCustomer]);
@@ -371,8 +503,8 @@ const SalesOrderForm: React.FC = () => {
     useEffect(() => {
         if (isEditMode) return;
         if (mobileOptions.length > 0) {
-            const currentMobile = watch("mobile");
-            if (!currentMobile || !mobileOptions.some(opt => opt.value === currentMobile)) {
+            const cur = watch("mobile");
+            if (!cur || !mobileOptions.some(o => o.value === cur)) {
                 setValue("mobile", mobileOptions[0].value, { shouldValidate: true });
             }
         } else {
@@ -380,152 +512,70 @@ const SalesOrderForm: React.FC = () => {
         }
     }, [mobileOptions, setValue, isEditMode]);
 
-    const shippingAddressOptions = useMemo(() => {
-        if (!selectedCustomer?.addresses || selectedCustomer.addresses.length === 0) return [];
-        return selectedCustomer.addresses.map((addr: any, idx: number) => {
-            const a = addr.address || addr;
-            const addressParts = [a?.addressLine1, a?.addressLine2, a?.city, a?.state, a?.pincode].filter(Boolean);
-            const fullAddressStr = addressParts.join(", ");
-            return {
-                label: fullAddressStr || (addr.label && addr.label !== `Address ${idx + 1}` ? addr.label : `Address ${idx + 1}`),
-                value: String(idx),
-                original: a,
-            };
-        });
-    }, [selectedCustomer]);
-
-    const handleShippingAddressSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
-        const idxStr = e.target.value;
-        setSelectedShippingIndex(idxStr);
-        if (!idxStr) {
-            setValue("shippingAddressLine1", "", { shouldValidate: true });
-            setValue("shippingCity", "", { shouldValidate: true });
-            setValue("shippingState", "", { shouldValidate: true });
-            setValue("shippingPincode", "", { shouldValidate: true });
-            return;
-        }
-        if (!selectedCustomer?.addresses) return;
-        const item = selectedCustomer.addresses[Number(idxStr)];
-        const addrObj: any = (item as any)?.address || item;
-        if (addrObj) {
-            setValue("shippingAddressLine1", addrObj.addressLine1 || "", { shouldValidate: true });
-            setValue("shippingCity", addrObj.city || "", { shouldValidate: true });
-            setValue("shippingState", addrObj.state || "", { shouldValidate: true });
-            setValue("shippingPincode", addrObj.pincode || "", { shouldValidate: true });
-        }
-    };
-
-    const formItems = watch("items");
-
-    const proposedTotal = useMemo(() => {
-        if (!formItems || !Array.isArray(formItems)) return 0;
-        let sum = 0;
-        formItems.forEach((item) => {
-            if (!item.productCode || !item.quantity) return;
-            const p = products.find((prod) => String(prod.id) === String(item.productCode));
-            if (!p) return;
-
-            let unitPrice = p.b2b ?? p.mrp ?? p.b2c ?? p.exportPrice ?? 0;
-
-            const qty = Number(item.quantity) || 0;
-            const lineSubtotal = unitPrice * qty;
-            const gstRate = p.gstRate ?? 0;
-            const lineGst = (lineSubtotal * gstRate) / 100;
-            sum += lineSubtotal + lineGst;
-        });
-        return sum;
-    }, [formItems, products]);
-    // ─── Auto‑generate order number ──────────────────────────────────
+    // ─── Clear salesperson/reference ────────────────────────────────
     useEffect(() => {
-        const state = location.state as any;
-        if (state?.id) return;
-
-        salesOrderService.getNextOrderNo().then((orderNo) => {
-            setValue("orderNo", orderNo);
-        });
-    }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-    // ─── Populate addresses when customer changes ────────────────────
-    useEffect(() => {
-        if (isEditMode || !selectedCustomerId) return;
-
-        const selected = customers.find(c => String(c.id) === selectedCustomerId);
-        if (!selected) return;
-
-        setValue("billingAddressLine1", selected.billingAddressLine1 || "", { shouldValidate: true });
-        setValue("billingCity", selected.billingCity || "", { shouldValidate: true });
-        setValue("billingState", selected.billingState || "", { shouldValidate: true });
-        setValue("billingPincode", selected.billingPincode || "", { shouldValidate: true });
-
-        setValue("shippingAddressLine1", selected.shippingAddressLine1 || "", { shouldValidate: true });
-        setValue("shippingCity", selected.shippingCity || "", { shouldValidate: true });
-        setValue("shippingState", selected.shippingState || "", { shouldValidate: true });
-        setValue("shippingPincode", selected.shippingPincode || "", { shouldValidate: true });
-    }, [selectedCustomerId, customers, setValue, isEditMode]);
-
-    // ─── Clear sales person when order type changes ──────────────────
-    useEffect(() => {
-        if (justResetRef.current) {
-            justResetRef.current = false;
-            return;
-        }
-        if (orderType !== "salesperson") {
-            setValue("salesPersonName", "", { shouldValidate: true });
-        }
-        if (orderType !== "reference") {
-            setValue("referenceText", "", { shouldValidate: true });
-        }
+        if (justResetRef.current) { justResetRef.current = false; return; }
+        if (orderType !== "salesperson") setValue("salesPersonName", "", { shouldValidate: true });
+        if (orderType !== "reference") setValue("referenceText", "", { shouldValidate: true });
     }, [orderType, setValue]);
 
+    // ─── Inter-state calc ────────────────────────────────────────────
     const computedIsInterState = useMemo(() => {
-        if (!companyState || !billingState) return false;
-        return companyState.toLowerCase().trim() !== billingState.toLowerCase().trim();
-    }, [companyState, billingState]);
+        const custBillingState = selectedCustomer?.billingState;
+        if (!companyState || !custBillingState) return false;
+        return companyState.toLowerCase().trim() !== custBillingState.toLowerCase().trim();
+    }, [companyState, selectedCustomer]);
 
     useEffect(() => {
         setValue("isInterState", computedIsInterState, { shouldValidate: true });
     }, [computedIsInterState, setValue]);
 
-    // ─── Submit handler ──────────────────────────────────────────────
+    // ─── Submit ──────────────────────────────────────────────────────
     const onSubmit = async (data: SalesOrderFormValues, action: "draft" | "quotation") => {
         setIsSubmitting(true);
         try {
-            const transformedItems = data.items.map(item => ({
-                productId: Number(item.productCode),
-                quantity: Number(item.quantity)
+            // Flatten per-component quantities, merging duplicates
+            const expandedMap = new Map<number, number>();
+
+            data.items.forEach(item => {
+                (item.components || [])
+                    .filter(c => c.included && Number(c.quantity) > 0)
+                    .forEach(c => {
+                        const id = Number(c.componentProductId);
+                        expandedMap.set(id, (expandedMap.get(id) || 0) + Number(c.quantity));
+                    });
+            });
+
+            if (expandedMap.size === 0) {
+                toast.error("Please add at least one component with a quantity > 0.");
+                return;
+            }
+
+            const transformedItems = Array.from(expandedMap.entries()).map(([productId, quantity]) => ({
+                productId,
+                quantity,
             }));
+
             const payload: any = {
                 orderNo: data.orderNo,
                 orderDate: new Date(data.orderDate).toISOString(),
-                expectedCompletionDate: new Date(data.expectedCompletionDate).toISOString(),
                 customerId: data.customerId,
                 mobile: data.mobile || null,
                 orderType: data.orderType,
-                dispatchType: data.dispatchType,
                 referenceText: data.referenceText || null,
                 salesPersonName: data.salesPersonName || null,
-                paymentTermId: data.paymentTermId ? Number(data.paymentTermId) : null,
-                billingAddressLine1: data.billingAddressLine1 ?? '',
-                billingCity: data.billingCity ?? '',
-                billingState: data.billingState ?? '',
-                billingPincode: data.billingPincode ?? '',
-                shippingAddressLine1: data.shippingAddressLine1 ?? '',
-                shippingCity: data.shippingCity ?? '',
-                shippingState: data.shippingState ?? '',
-                shippingPincode: data.shippingPincode ?? '',
-                isInterState: data.isInterState,   // <-- include the flag
-                remarks: data.remarks,
-                internalNotes: data.internalNotes,
+                isInterState: data.isInterState,
+                narration: data.narration,
                 items: transformedItems,
                 status: action === "quotation" ? "CONFIRMED" : "DRAFT",
             };
 
             if (isEditMode && orderId) {
                 await salesOrderService.update(orderId, payload);
-                toast.success(`Sales Order updated successfully!`);
+                toast.success("Sales Order updated successfully!");
             } else {
                 await salesOrderService.create(payload);
-                toast.success(`Sales Order created successfully!`);
+                toast.success("Sales Order created successfully!");
             }
 
             navigate(-1);
@@ -541,17 +591,13 @@ const SalesOrderForm: React.FC = () => {
     return (
         <div className="w-full mx-auto">
             <div className="bg-white border border-gray-200">
-                {/* Page Header */}
-                <div className="px-6 py-4 ">
+                {/* Header */}
+                <div className="px-6 py-4">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                        <div>
-                            <h2 className="text-xl font-bold text-gray-800">
-                                {isEditMode ? "Edit Sales Order" : "Create Sales Order"}
-                            </h2>
-                        </div>
-                        <div>
-                            <BackButton text="Back to List" />
-                        </div>
+                        <h2 className="text-xl font-bold text-gray-800">
+                            {isEditMode ? "Edit Sales Order" : "Create Sales Order"}
+                        </h2>
+                        <BackButton text="Back to List" />
                     </div>
                 </div>
 
@@ -560,7 +606,7 @@ const SalesOrderForm: React.FC = () => {
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                         <div>
                             <Controller name="orderNo" control={control} render={({ field }) => (
-                                <CtrlText field={field} label="Order No" placeholder="e.g. SO-2024-001" required error={errors.orderNo?.message} disabled />
+                                <TextInput label="Order No" name={field.name} value={field.value ?? ""} onChange={field.onChange} onBlur={field.onBlur} required disabled error={errors.orderNo?.message} />
                             )} />
                         </div>
 
@@ -575,28 +621,13 @@ const SalesOrderForm: React.FC = () => {
                             <Controller name="mobile" control={control} render={({ field }) => (
                                 <SelectInput label="Mobile Number" name={field.name} value={field.value ?? ""} options={mobileOptions} defaultOptionLabel={mobileOptions.length > 0 ? "Select Mobile Number" : "No mobile numbers found"} onChange={field.onChange} disabled={!selectedCustomerId} />
                             )} />
-                            <Err message={errors.mobile?.message} />
                         </div>
 
                         <div>
                             <Controller name="orderDate" control={control} render={({ field }) => (
-                                <DateInput label="Order Date" name={field.name} value={field.value} icon={<FaCalendarAlt />} required disabled={true} onChange={field.onChange} />
+                                <DateInput label="Order Date" name={field.name} value={field.value} required disabled onChange={field.onChange} />
                             )} />
                             <Err message={errors.orderDate?.message} />
-                        </div>
-
-                        <div>
-                            <Controller name="expectedCompletionDate" control={control} render={({ field }) => (
-                                <DatePickerCalendar label="Expected Completion Date" name={field.name} value={field.value} required onChange={field.onChange} />
-                            )} />
-                            <Err message={errors.expectedCompletionDate?.message} />
-                        </div>
-
-                        <div>
-                            <Controller name="dispatchType" control={control} render={({ field }) => (
-                                <SelectInput label="Dispatch Type" name={field.name} value={field.value || ''} options={DISPATCH_TYPE_OPTIONS} required defaultOptionLabel="select dispatch type" onChange={field.onChange} />
-                            )} />
-                            <Err message={errors.dispatchType?.message} />
                         </div>
 
                         <div>
@@ -605,133 +636,71 @@ const SalesOrderForm: React.FC = () => {
                             )} />
                         </div>
 
-                        {(orderType === "salesperson") && (
+                        {orderType === "salesperson" && (
                             <div>
                                 <Controller name="salesPersonName" control={control} render={({ field }) => (
-                                    <TextInput label="Salesperson Name" name={field.name} value={field.value ?? ""} placeholder="Enter Salesperson Name" onChange={field.onChange} />
+                                    <TextInput label="Salesperson Name" name={field.name} value={field.value ?? ""} placeholder="Enter Salesperson Name" onChange={field.onChange} onBlur={field.onBlur} />
                                 )} />
                                 <Err message={errors.salesPersonName?.message} />
                             </div>
                         )}
 
-                        {(orderType === "reference") && (
+                        {orderType === "reference" && (
                             <div>
                                 <Controller name="referenceText" control={control} render={({ field }) => (
-                                    <TextInput label="Reference Name" name={field.name} value={field.value ?? ""} placeholder="Enter name or reference" onChange={field.onChange} />
+                                    <TextInput label="Reference Name" name={field.name} value={field.value ?? ""} placeholder="Enter name or reference" onChange={field.onChange} onBlur={field.onBlur} />
                                 )} />
                                 <Err message={errors.referenceText?.message} />
                             </div>
                         )}
-
-                        <div>
-                            <Controller name="transportName" control={control} render={({ field }) => (
-                                <SelectInput label="Transport" name={field.name} value={field.value ?? ""} options={transportOptions} defaultOptionLabel={transportOptions.length > 0 ? "Select Transport" : "No Transports found"} disabled={transportOptions.length === 0} onChange={field.onChange} />
-                            )} />
-                        </div>
-                    </div>
-
-
-
-                    <div className="grid grid-cols-1  gap-4">
-                        {/* Billing */}
-                        <div>
-                            <h6 className="text-lg font-semibold text-gray-800 mb-4">Billing</h6>
-                            <AddressForm
-                                addressValue={billingAddressLine1 || ""}
-                                onAddressChange={(val) => setValue("billingAddressLine1", val, { shouldValidate: true })}
-                                addressError={errors.billingAddressLine1?.message}
-                                stateValue={billingState || ""}
-                                onStateChange={handleBillingStateChange}
-                                stateError={errors.billingState?.message}
-                                cityValue={billingCity || ""}
-                                onCityChange={handleBillingCityChange}
-                                cityError={errors.billingCity?.message}
-                                pincodeValue={billingPincode || ""}
-                                onPincodeChange={(val) => setValue("billingPincode", val, { shouldValidate: true })}
-                                pincodeError={errors.billingPincode?.message}
-                                required
-                            />
-                        </div>
-
-                        {/* Shipping */}
-                        <div>
-                            <div className="flex items-center justify-between mb-4">
-                                <h6 className="text-lg font-semibold text-gray-800 mb-0">Shipping</h6>
-                            </div>
-
-                            <div className="mb-4">
-                                    <SelectInput
-                                        label="Select Saved Address"
-                                        options={shippingAddressOptions}
-                                        value={selectedShippingIndex}
-                                        onChange={handleShippingAddressSelect}
-                                        defaultOptionLabel={shippingAddressOptions.length > 0 ? "-- Select saved address --" : "No additional addresses saved"}
-                                        disabled={shippingAddressOptions.length === 0}
-                                    />
-                                </div>
-
-                            <AddressForm
-                                addressValue={shippingAddressLine1 || ""}
-                                onAddressChange={(val) => setValue("shippingAddressLine1", val, { shouldValidate: true })}
-                                addressError={errors.shippingAddressLine1?.message}
-                                stateValue={shippingState || ""}
-                                onStateChange={handleShippingStateChange}
-                                stateError={errors.shippingState?.message}
-                                cityValue={shippingCity || ""}
-                                onCityChange={handleShippingCityChange}
-                                cityError={errors.shippingCity?.message}
-                                pincodeValue={shippingPincode || ""}
-                                onPincodeChange={(val) => setValue("shippingPincode", val, { shouldValidate: true })}
-                                pincodeError={errors.shippingPincode?.message}
-                                required
-                                resetKey={shippingResetKey}
-                            />
-                        </div>
                     </div>
 
                     {/* ── Order Items ── */}
-
-                    <div className="flex justify-between items-center mb-4">
-                        <span className="text-lg font-semibold text-gray-800">Order Items</span>
-                        <CustomButton text="Add Item" variant="secondary" icon={FaPlus} onClick={() => append({ productCode: "", quantity: "" })} />
-                    </div>
-                    {errors.items?.root && <Err message={errors.items.root.message} />}
-
-                    <OrderItemsTable
-                        control={control}
-                        fields={fields}
-                        errors={errors}
-                        productOptions={productOptions}
-                        remove={remove}
-                        editable={true}
-                    />
-
-                    {/* ── Remarks ── */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
-                        <div>
-                            <Controller name="remarks" control={control} render={({ field }) => (
-                                <TextArea label="Remarks" name="remarks" value={field.value ?? ""} placeholder="Any remarks for the customer..." rows={2} onChange={field.onChange} />
-                            )} />
+                    <div>
+                        <div className="flex justify-between items-center mb-3">
+                            <span className="text-lg font-semibold text-gray-800">Order Items</span>
+                            <CustomButton
+                                text="Add Sales Product"
+                                variant="secondary"
+                                onClick={() => append({ salesProductId: "", orderQuantity: "1", components: [] })}
+                            />
                         </div>
-                        <div>
-                            <Controller name="internalNotes" control={control} render={({ field }) => (
-                                <TextArea label="Internal Notes" name="internalNotes" value={field.value ?? ""} placeholder="Internal notes (not visible to customer)..." rows={2} onChange={field.onChange} />
-                            )} />
-                        </div>
+
+                        {typeof errors.items?.message === "string" && <Err message={errors.items.message} />}
+
+                        {fields.map((field, index) => (
+                            <ItemRow
+                                key={field.id}
+                                control={control}
+                                index={index}
+                                errors={errors}
+                                salesProducts={salesProducts}
+                                salesProductOptions={salesProductOptions}
+                                remove={remove}
+                                canRemove={fields.length > 1}
+                                setValue={setValue}
+                            />
+                        ))}
                     </div>
 
+                    {/* ── Narration ── */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+                        <div>
+                            <Controller name="narration" control={control} render={({ field }) => (
+                                <TextArea label="Narration" name="narration" value={field.value ?? ""} placeholder="Enter narration..." rows={3} onChange={field.onChange} />
+                            )} />
+                        </div>
+                    </div>
 
-
-
-                    {/* ── Form Actions ── */}
+                    {/* ── Actions ── */}
                     <div className="flex flex-wrap justify-end gap-3 mt-8 pt-4 border-t border-gray-200">
-                        <CustomButton text="Clear" variant="danger" icon={FaEraser} onClick={() => reset(defaultValues)} disabled={isSubmitting} />
-                        <CustomButton variant="secondary" text={isSubmitting ? "Saving..." : "Save Order"} icon={isSubmitting ? undefined : FaSave} type="button" onClick={handleSubmit((data) => onSubmit(data, "draft"))} disabled={isSubmitting} />
-                        <CustomButton text={isSubmitting ? "Sending..." : "Send to Quotation"} icon={isSubmitting ? undefined : FaPaperPlane} type="button" onClick={handleSubmit((data) => onSubmit(data, "quotation"))} disabled={isSubmitting} />
+                        <CustomButton text="Clear" variant="danger" onClick={() => reset(defaultValues)} disabled={isSubmitting} />
+                        <CustomButton variant="secondary" text={isSubmitting ? "Saving..." : "Save Order"} type="button" onClick={handleSubmit((data) => onSubmit(data as SalesOrderFormValues, "draft"))} disabled={isSubmitting} />
+                        <CustomButton text={isSubmitting ? "Sending..." : "Send to Quotation"} type="button" onClick={handleSubmit((data) => onSubmit(data as SalesOrderFormValues, "quotation"))} disabled={isSubmitting} />
                     </div>
                 </form>
-            </div >
-        </div >
+            </div>
+        </div>
     );
 };
 

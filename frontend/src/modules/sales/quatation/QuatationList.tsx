@@ -17,6 +17,7 @@ import EmailButton from "../../../components/ui/EmailButton/EmailButton";
 import WhatsappButton from "../../../components/ui/WhatsappButton/WhatsappButton";
 import { Mail, MessageCircle } from "lucide-react";
 import EditButton from "../../../components/ui/EditButton/EditButton";
+import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -61,7 +62,19 @@ const QuotationList: React.FC = () => {
                 page: currentPage,
                 pageSize: ITEMS_PER_PAGE,
                 search: searchTerm || undefined,
-                status: ['CONFIRMED', 'MD_REJECTED'] as SalesOrderStatus[],
+                // Quotation-stage only — CONFIRMED stays in the Sales Orders list.
+                // DRAFT included so newly saved (unsubmitted) quotations show up here.
+                status: [
+                    'DRAFT',
+                    'QUOTATION_IN_PROGRESS',
+                    'QUOTATION_COMPLETED',
+                    'PENDING_MD_APPROVAL',
+                    'MD_APPROVED',
+                    'MD_REJECTED',
+                    'PENDING_CUSTOMER_APPROVAL',
+                    'CUSTOMER_APPROVED',
+                    'CUSTOMER_REJECTED',
+                ] as SalesOrderStatus[],
             });
 
             setData(response.data || []);
@@ -218,6 +231,13 @@ const QuotationList: React.FC = () => {
                             onChange={handleSearch}
                             placeholder="Search orders..."
                         />
+                        {can("quotations.create") && (
+                            <CustomButton
+                                text="Create Quotation"
+                                onClick={() => navigate('/quatation-order/create')}
+                                className="!bg-blue-600 !text-white hover:!bg-blue-700"
+                            />
+                        )}
                     </div>
                 </div>
 
@@ -254,7 +274,26 @@ const QuotationList: React.FC = () => {
                                     <EditButton onClick={() => handleOpenEdit(item)} />
                                     <EmailButton onClick={() => handleOpenEmailModal(item)} />
                                     <WhatsappButton onClick={() => handleOpenWhatsappModal(item)} />
-                                    {/* <DeleteButton onClick={() => triggerDelete(item.id)} /> */}
+                                    {item.status === 'DRAFT' && (
+                                        <DeleteButton onClick={() => { setItemToDelete(item.id); setShowDeleteModal(true); }} />
+                                    )}
+                                    {(item.status === 'MD_APPROVED' || item.status === 'CUSTOMER_APPROVED') && can("sales-orders.edit") && (
+                                        <button
+                                            type="button"
+                                            className="px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700"
+                                            onClick={async () => {
+                                                try {
+                                                    await salesOrderService.convertToSalesOrder(item.id);
+                                                    toast.success("Converted to sales order!");
+                                                    fetchOrders();
+                                                } catch (err: any) {
+                                                    toast.error(err?.response?.data?.message || "Failed to convert to sales order");
+                                                }
+                                            }}
+                                        >
+                                            Convert to SO
+                                        </button>
+                                    )}
                                 </div>
                             ),
                         },

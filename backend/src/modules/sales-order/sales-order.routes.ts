@@ -8,11 +8,8 @@ import {
     updateSalesOrderSchema,
     salesOrderIdSchema,
     salesOrderQuerySchema,
-    updateSalesOrderDiscountsSchema,
     submitForMdApprovalSchema,
     reopenSalesOrderSchema,
-    mdApprovalDecisionSchema,
-    customerApprovalDecisionSchema,
 } from "./sales-order.validation";
 import { requirePermission } from "../../middleware/permission.middleware";
 
@@ -100,22 +97,30 @@ router.delete(
 );
 
 
-// ─── Quotation workflow actions (same SalesOrder resource) ────────────
+// ─── Workflow actions ────────────────────────────────────────────────
 
 router.patch(
-    "/:id/discounts",
-    authMiddleware,
-    requirePermission("sales-orders.edit"),
-    validateMiddleware(updateSalesOrderDiscountsSchema),
-    SalesOrderController.updateDiscounts
-);
-
-router.patch(
-    "/:id/submit-md-approval",
+    "/:id/submit-approval",
     authMiddleware,
     requirePermission("sales-orders.edit"),
     validateMiddleware(submitForMdApprovalSchema),
-    SalesOrderController.submitForMdApproval
+    SalesOrderController.submitForApproval
+);
+
+router.patch(
+    "/:id/approve",
+    authMiddleware,
+    requirePermission("pending-quotations.edit"),
+    validateMiddleware(salesOrderIdSchema),
+    SalesOrderController.approveOrder
+);
+
+router.patch(
+    "/:id/reject",
+    authMiddleware,
+    requirePermission("pending-quotations.edit"),
+    validateMiddleware(salesOrderIdSchema),
+    SalesOrderController.rejectOrder
 );
 
 router.patch(
@@ -127,18 +132,11 @@ router.patch(
 );
 
 router.patch(
-    "/:id/md-approve",
+    "/:id/convert-to-order",
     authMiddleware,
-    requirePermission("pending-quotations.edit"),
-    validateMiddleware(mdApprovalDecisionSchema),
-    SalesOrderController.mdApprove
-);
-
-router.patch(
-    "/:id/customer-approve",
-    authMiddleware,
-    validateMiddleware(customerApprovalDecisionSchema),
-    SalesOrderController.customerApprove
+    requirePermission("sales-orders.edit"),
+    validateMiddleware(salesOrderIdSchema),
+    SalesOrderController.convertToSalesOrder
 );
 
 export default router;
