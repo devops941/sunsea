@@ -1247,6 +1247,9 @@ model SalesOrder {
   status           SalesOrderStatus @default(DRAFT)
   subtotal         Decimal          @default(0) @db.Decimal(14, 2)
   netAmount        Decimal          @default(0) @db.Decimal(14, 2)
+ totalDiscount    Decimal          @default(0) @map("total_discount") @db.Decimal(14, 2)
+  orderDiscountType  String?        @map("order_discount_type") @db.VarChar(10)
+  orderDiscountValue Decimal?       @map("order_discount_value") @db.Decimal(14, 2)
   totalTax         Decimal          @default(0) @map("total_tax") @db.Decimal(14, 2)
   totalCgst        Decimal          @default(0) @map("total_cgst") @db.Decimal(14, 2)
   totalSgst        Decimal          @default(0) @map("total_sgst") @db.Decimal(14, 2)
@@ -1272,6 +1275,7 @@ model SalesOrderItem {
   productId     BigInt
   quantity      Decimal      @db.Decimal(14, 3)
   invoicedQty   Decimal      @default(0) @db.Decimal(14, 3)
+  unitPrice     Decimal      @default(0) @map("unit_price") @db.Decimal(14, 2)
   lineTotal     Decimal      @default(0) @db.Decimal(14, 2)
   gstTaxRateId  String?      @map("gst_tax_rate_id")
   taxableAmount Decimal      @default(0) @map("taxable_amount") @db.Decimal(14, 2)
@@ -1315,6 +1319,8 @@ model OrdProcAuxMeta {
   a12        String           @db.Text
   a13        String           @db.Text
   a14        String           @db.Text
+  a15        String?          @db.Text
+  a16        String?          @db.Text
 
   items         OrdProcAuxMetaItem[]
   customer      Customer             @relation("CustomerEstimatedOrders", fields: [customerId], references: [id])

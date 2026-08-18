@@ -62,6 +62,14 @@ router.get(
     SalesOrderController.findById
 );
 
+router.get(
+    "/:id/download-quotation",
+    authMiddleware,
+    requirePermission("sales-orders.view"),
+    validateMiddleware(salesOrderIdSchema),
+    SalesOrderController.downloadQuotation
+);
+
 router.post(
     "/:id/email-quotation",
     authMiddleware,

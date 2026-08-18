@@ -18,6 +18,7 @@ import { useEmployees } from "../../../hooks/useEmployees";
 import { salesProductService } from "../../../services/salesProductService";
 import { ORDER_TYPE_OPTIONS } from "../../../constants/selectOption";
 import { useSocketSync } from "../../../hooks/useSocketSync";
+import { usePermission } from "../../../hooks/usePermission";
 
 // ─── Zod Schemas ──────────────────────────────────────────────────────────────
 
@@ -386,6 +387,7 @@ const SalesOrderForm: React.FC = () => {
 
     const { fields, append, remove } = useFieldArray({ control, name: "items" });
 
+    const { can } = usePermission();
     const { loadCustomers, customers } = useCustomers();
     const { loadEmployees } = useEmployees();
 
@@ -452,8 +454,8 @@ const SalesOrderForm: React.FC = () => {
     // ─── Load on mount ───────────────────────────────────────────────
     useEffect(() => {
         loadCustomers();
-        loadEmployees({});
-    }, [loadCustomers, loadEmployees]);
+        if (can("employees.view")) loadEmployees({});
+    }, [loadCustomers, loadEmployees, can]);
 
     // ─── Options ─────────────────────────────────────────────────────
     const customerOptions = useMemo(() =>
@@ -567,15 +569,15 @@ const SalesOrderForm: React.FC = () => {
                 isInterState: data.isInterState,
                 narration: data.narration,
                 items: transformedItems,
-                status: action === "quotation" ? "CONFIRMED" : "DRAFT",
+                status: action === "order" || action === "confirm" ? "CONFIRMED" : "DRAFT",
             };
 
             if (isEditMode && orderId) {
                 await salesOrderService.update(orderId, payload);
-                toast.success("Sales Order updated successfully!");
+                toast.success(payload.status === "DRAFT" ? "Sales Order Draft updated successfully!" : "Sales Order updated successfully!");
             } else {
                 await salesOrderService.create(payload);
-                toast.success("Sales Order created successfully!");
+                toast.success(payload.status === "DRAFT" ? "Sales Order Draft created successfully!" : "Sales Order created successfully!");
             }
 
             navigate(-1);
@@ -695,8 +697,8 @@ const SalesOrderForm: React.FC = () => {
                     {/* ── Actions ── */}
                     <div className="flex flex-wrap justify-end gap-3 mt-8 pt-4 border-t border-gray-200">
                         <CustomButton text="Clear" variant="danger" onClick={() => reset(defaultValues)} disabled={isSubmitting} />
-                        <CustomButton variant="secondary" text={isSubmitting ? "Saving..." : "Save Order"} type="button" onClick={handleSubmit((data) => onSubmit(data as SalesOrderFormValues, "draft"))} disabled={isSubmitting} />
-                        <CustomButton text={isSubmitting ? "Sending..." : "Send to Quotation"} type="button" onClick={handleSubmit((data) => onSubmit(data as SalesOrderFormValues, "quotation"))} disabled={isSubmitting} />
+                        <CustomButton variant="secondary" text={isSubmitting ? "Saving..." : "Save as Draft"} type="button" onClick={handleSubmit((data) => onSubmit(data as SalesOrderFormValues, "draft"))} disabled={isSubmitting} />
+                        <CustomButton text={isSubmitting ? "Saving..." : "Save Order"} type="button" onClick={handleSubmit((data) => onSubmit(data as SalesOrderFormValues, "order"))} disabled={isSubmitting} />
                     </div>
                 </form>
             </div>

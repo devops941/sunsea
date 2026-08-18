@@ -89,7 +89,7 @@ const TopNavbar: React.FC<NavbarProps> = ({
       </div>
 
       {/* Right Section */}
-      <div className="flex items-center gap-4 relative" ref={dropdownRef}>
+      <div className="flex items-center gap-3 relative" ref={dropdownRef}>
         {/* Profile */}
         <div
           className="flex items-center gap-3 p-1.5 pr-4 rounded-full cursor-pointer transition-all hover:bg-gray-50"
@@ -116,6 +116,17 @@ const TopNavbar: React.FC<NavbarProps> = ({
             </span>
           </div>
         </div>
+
+        {/* Direct Logout Button */}
+        <button
+          type="button"
+          onClick={() => setShowLogoutModal(true)}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-500 hover:text-white transition-all font-semibold text-xs border border-red-200 cursor-pointer shadow-xs"
+          title="Logout"
+        >
+          <FaSignOutAlt className="text-sm" />
+          <span className="hidden sm:inline">Logout</span>
+        </button>
 
         {/* Dropdown Menu */}
         {showDropdown && (

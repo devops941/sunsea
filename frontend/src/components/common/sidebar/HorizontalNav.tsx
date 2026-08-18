@@ -167,9 +167,29 @@ const HorizontalNav = () => {
         </ul>
       </div>
 
-      {/* ── RIGHT: Theme switch ── */}
-      <div className="flex items-center gap-2 pl-3 shrink-0">
+      {/* ── RIGHT: Theme switch & Logout ── */}
+      <div className="flex items-center gap-3 pl-3 shrink-0">
+        {user && (
+          <div className="hidden xl:flex items-center gap-2 px-2.5 py-1 rounded-lg bg-nav-hover border border-white/10 text-xs">
+            <span className="font-semibold text-nav-fg">{user.fullName || "User"}</span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-nav-fg/80 font-mono">
+              {formatRole(user)}
+            </span>
+          </div>
+        )}
+
         <ThemeToggle />
+
+        {/* Direct Logout Button */}
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/20 text-red-200 hover:bg-red-500 hover:text-white transition-all font-semibold text-xs border border-red-500/30 cursor-pointer shadow-xs"
+          title="Logout"
+        >
+          <FiLogOut className="text-sm" />
+          <span className="hidden sm:inline">Logout</span>
+        </button>
       </div>
 
       {/* ── FIXED PORTAL FOR DROPDOWNS (Prevents scroll clipping) ── */}
@@ -233,6 +253,17 @@ const HorizontalNav = () => {
           </div>
         </div>
       )}
+
+      {/* Logout Confirmation Modal */}
+      <CommonConfirmModal
+        show={showLogoutModal}
+        onHide={() => setShowLogoutModal(false)}
+        onConfirm={handleConfirmLogout}
+        title="Confirm Logout"
+        message="Are you sure you want to log out of your account?"
+        confirmText="Logout"
+        confirmVariant="danger"
+      />
     </div>
   );
 };

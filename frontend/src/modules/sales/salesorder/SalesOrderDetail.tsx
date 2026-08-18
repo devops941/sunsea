@@ -44,12 +44,6 @@ const APPROVAL_MODIFIER: Record<string, "active" | "inactive" | "hold"> = {
     REJECTED: "inactive",
 };
 
-const PRODUCTION_MODIFIER: Record<string, "active" | "inactive" | "hold"> = {
-    NOT_STARTED: "hold",
-    IN_PROGRESS: "hold",
-    COMPLETED: "active",
-};
-
 const getBadgeColor = (status: string | null | undefined, modifierMap: Record<string, "active" | "inactive" | "hold">) => {
     const modifier = modifierMap[status || ""] || "hold";
     if (modifier === "active") return "bg-green-500/10 text-green-500 border-green-500/20";
@@ -139,9 +133,19 @@ const SalesOrderDetail: React.FC = () => {
         : customer?.shippingPincode || customer?.addresses?.[1]?.address?.pincode || "";
 
     const isEstimated = (order as any)._source === "estimated";
-    // Amounts are calculated only when the order is submitted for approval (Send to Quotation).
-    // Both DRAFT and CONFIRMED are pre-quotation states — hide all pricing.
-    const showPricing = !["DRAFT", "CONFIRMED"].includes(order.status ?? "");
+    // Show pricing only after the order has entered the quotation workflow.
+    // DRAFT and CONFIRMED direct sales orders hide amounts until a quotation is submitted.
+    const QUOTATION_WORKFLOW_STATUSES = new Set([
+        "QUOTATION_IN_PROGRESS",
+        "QUOTATION_COMPLETED",
+        "PENDING_MD_APPROVAL",
+        "MD_APPROVED",
+        "MD_REJECTED",
+        "PENDING_CUSTOMER_APPROVAL",
+        "CUSTOMER_APPROVED",
+        "CUSTOMER_REJECTED",
+    ]);
+    const showPricing = QUOTATION_WORKFLOW_STATUSES.has(order.status ?? "");
 
     return (
         <div className="w-full mx-auto space-y-6">
@@ -197,10 +201,6 @@ const SalesOrderDetail: React.FC = () => {
                                     <DetailBox label="Order Source Platform" value={order.orderType || "—"} />
                                     <DetailBox label="Salesperson Name" value={order.salesPersonName || "—"} />
                                     {order.referenceText && <DetailBox label="Reference Name" value={order.referenceText} />}
-                                    <DetailBox
-                                        label="Production Status"
-                                        value={<div className="mt-1"><StatusPill status={(order as any).productionStatus} modifierMap={PRODUCTION_MODIFIER} /></div>}
-                                    />
                                     {(order as any).narration && (
                                         <div className="col-span-2 sm:col-span-3">
                                             <DetailBox label="Narration" value={(order as any).narration} />
