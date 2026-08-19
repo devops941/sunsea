@@ -390,4 +390,15 @@ export const salesOrderService = {
         const response = await apiClient.patch(`/sales-orders/${id}/convert-to-order`);
         return response.data?.data || response.data;
     },
+
+    markInQuotation: async (id: number | string): Promise<void> => {
+        await apiClient.patch(`/sales-orders/${id}/mark-in-quotation`);
+    },
+
+    // Returns only CONFIRMED GST sales orders for a customer — always queries
+    // the GST table regardless of the caller's role (used for "Load from Previous Order" dropdown).
+    getSourceOrders: async (customerId: string): Promise<SalesOrder[]> => {
+        const response = await apiClient.get('/sales-orders/source-orders', { params: { customerId } });
+        return response.data?.data || [];
+    },
 };

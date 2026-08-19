@@ -391,6 +391,10 @@ class SalesOrderService {
                     customerId: data.customerId,
                     status:     data.status,
                     createdBy:  data.createdBy,
+                    // Store which OrdProcAuxMeta order this estimate was created from
+                    sourceEstOrderId: (data as any).sourceSalesOrderId
+                        ? Number((data as any).sourceSalesOrderId)
+                        : null,
                     ...encMeta,
                     items: {
                         create: lineItems.map(l => encryptEstItem(l)),
@@ -447,6 +451,8 @@ class SalesOrderService {
                 totalDiscount: createDiscount,
                 orderDiscountType:  (data as any).orderDiscountType ?? null,
                 orderDiscountValue: (data as any).orderDiscountValue ?? null,
+                // @ts-ignore
+                sourceSalesOrderId: (data as any).sourceSalesOrderId ? Number((data as any).sourceSalesOrderId) : null,
                 totalTax:  createTotalTax,
                 totalCgst: createTotalCgst,
                 totalSgst: createTotalSgst,
@@ -912,7 +918,7 @@ class SalesOrderService {
         if ((existing as any).status !== "PENDING_MD_APPROVAL") {
             throw new ApiError(409, `Order must be in PENDING_MD_APPROVAL status. Current: ${(existing as any).status}`);
         }
-        return this.updateStatus(id, "IN_PRODUCTION", permissions);
+        return this.updateStatus(id, "MD_APPROVED", permissions);
     }
 
     async rejectOrder(id: number, permissions: string[] = []) {
@@ -937,7 +943,104 @@ class SalesOrderService {
         if (!["MD_APPROVED", "CUSTOMER_APPROVED", "PENDING_MD_APPROVAL"].includes(currentStatus)) {
             throw new ApiError(409, `Cannot convert order with status ${currentStatus} to sales order`);
         }
-        return this.updateStatus(id, "CONFIRMED", permissions);
+        return this.updateStatus(id, "QUOTATION_COMPLETED", permissions);
+    }
+
+    /**
+     * Returns CONFIRMED GST sales orders for a customer — used exclusively for
+     * the "Load from previous order" dropdown in the Create Estimate form.
+     * Always queries the SalesOrder (GST) table regardless of caller permissions,
+     * so only truly unquoted orders appear.
+     */
+    async getSourceOrders(customerId: string, permissions: string[] = []) {
+        if (useEstimatedTable(permissions)) {
+            // ── Estimated users: source orders are CONFIRMED OrdProcAuxMeta records ──
+            const usedSources = await (prisma as any).ordProcAuxMeta.findMany({
+                where: { customerId, sourceEstOrderId: { not: null } },
+                select: { sourceEstOrderId: true },
+            });
+            const usedIds = usedSources.map((r: any) => r.sourceEstOrderId).filter(Boolean) as number[];
+
+            const rows = await (prisma as any).ordProcAuxMeta.findMany({
+                where: {
+                    customerId,
+                    status: "CONFIRMED",
+                    ...(usedIds.length > 0 && { id: { notIn: usedIds } }),
+                },
+                include: {
+                    items: {
+                        include: { product: { select: { id: true, productCode: true, productName: true } } },
+                    },
+                    customer: { select: { id: true, firmName: true, displayName: true } },
+                },
+                orderBy: { createdAt: "desc" },
+            });
+            return rows.map((r: any) => decryptEstRow(r));
+        }
+
+        // ── GST users: source orders are CONFIRMED SalesOrder records ──
+        const [estSources, gstSources] = await Promise.all([
+            (prisma as any).ordProcAuxMeta.findMany({
+                where: { customerId, sourceSalesOrderId: { not: null } },
+                select: { sourceSalesOrderId: true },
+            }),
+            prisma.salesOrder.findMany({
+                where: { customerId, sourceSalesOrderId: { not: null } } as any,
+                select: { sourceSalesOrderId: true } as any,
+            }),
+        ]);
+        const usedIds = [
+            ...estSources.map((r: any) => r.sourceSalesOrderId),
+            ...(gstSources as any[]).map((r: any) => r.sourceSalesOrderId),
+        ].filter(Boolean) as number[];
+
+        const orders = await prisma.salesOrder.findMany({
+            where: {
+                customerId,
+                status: "CONFIRMED" as any,
+                ...(usedIds.length > 0 && { id: { notIn: usedIds } }),
+            },
+            select: {
+                id: true,
+                orderNo: true,
+                status: true,
+                orderDate: true,
+                customer: { select: { id: true, firmName: true, displayName: true } },
+                items: {
+                    select: {
+                        productId: true,
+                        quantity: true,
+                        unitPrice: true,
+                        lineTotal: true,
+                        gstTaxRateId: true,
+                        product: { select: { id: true, productCode: true, productName: true } },
+                    },
+                },
+            },
+            orderBy: { createdAt: "desc" },
+        });
+        return orders;
+    }
+
+    /**
+     * Mark a GST sales order as QUOTATION_IN_PROGRESS — used when an estimate
+     * is created from that order so it no longer appears in the "Load from
+     * previous order" dropdown. Always updates the SalesOrder table regardless
+     * of the caller's permission set.
+     */
+    async markInQuotation(id: number) {
+        const order = await prisma.salesOrder.findUnique({ where: { id }, select: { id: true, status: true } });
+        if (!order) throw new ApiError(404, `Sales order with ID ${id} not found`);
+        if (order.status !== "CONFIRMED") {
+            // Already in quotation flow or beyond — nothing to do, not an error
+            return { id, status: order.status };
+        }
+        const updated = await prisma.salesOrder.update({
+            where: { id },
+            data:  { status: "QUOTATION_IN_PROGRESS" as any },
+            select: { id: true, status: true, orderNo: true },
+        });
+        return updated;
     }
 
     // ─── Next order number ───────────────────────────────────────────────────

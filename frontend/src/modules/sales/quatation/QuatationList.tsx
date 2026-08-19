@@ -18,6 +18,7 @@ import { Download, Mail, MessageCircle } from "lucide-react";
 import EditButton from "../../../components/ui/EditButton/EditButton";
 import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
 import IconButton from "../../../components/ui/IconButton/IconButton";
+import ToggleSwitch from "../../../components/ui/ToggleSwitch/ToggleSwitch";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -51,6 +52,10 @@ const QuotationList: React.FC = () => {
     const [sendingWhatsapp, setSendingWhatsapp] = useState(false);
 
     const [downloading, setDownloading] = useState<number | null>(null);
+
+    const [showApproveModal, setShowApproveModal] = useState(false);
+    const [itemToApprove, setItemToApprove] = useState<SalesOrder | null>(null);
+    const [approvingId, setApprovingId] = useState<number | null>(null);
 
     const fetchOrders = useCallback(async () => {
         if (!can("sales-orders.view")) return;
@@ -147,6 +152,22 @@ const QuotationList: React.FC = () => {
             toast.error(err?.response?.data?.message || "Failed to send email");
         } finally {
             setSendingEmail(false);
+        }
+    };
+
+    const handleApproveConfirm = async () => {
+        if (!itemToApprove) return;
+        setApprovingId(itemToApprove.id);
+        try {
+            await salesOrderService.approveMd(itemToApprove.id, { decision: 'APPROVED', approverId: '' });
+            toast.success("Quotation approved by MD!");
+            setShowApproveModal(false);
+            setItemToApprove(null);
+            fetchOrders();
+        } catch (err: any) {
+            toast.error(err?.response?.data?.message || "Failed to approve");
+        } finally {
+            setApprovingId(null);
         }
     };
 
@@ -277,7 +298,9 @@ const QuotationList: React.FC = () => {
                             render: (item) => (
                                 <div className="flex items-center gap-2">
                                     <ViewButton onClick={() => handleOpenView(item)} />
-                                    <EditButton onClick={() => handleOpenEdit(item)} />
+                                    {item.status !== 'MD_APPROVED' && (
+                                        <EditButton onClick={() => handleOpenEdit(item)} />
+                                    )}
                                     <IconButton
                                         icon={Download}
                                         variant="primary"
@@ -287,8 +310,11 @@ const QuotationList: React.FC = () => {
                                     />
                                     <EmailButton onClick={() => handleOpenEmailModal(item)} />
                                     <WhatsappButton onClick={() => handleOpenWhatsappModal(item)} />
-                                    <DeleteButton onClick={() => { setItemToDelete(item.id); setShowDeleteModal(true); }} />
-                                    {(item.status === 'MD_APPROVED' || item.status === 'CUSTOMER_APPROVED') && can("sales-orders.edit") && (
+                                    {item.status !== 'MD_APPROVED' && (
+                                        <DeleteButton onClick={() => { setItemToDelete(item.id); setShowDeleteModal(true); }} />
+                                    )}
+
+                                    {(item.status === 'MD_APPROVED' || item.status === 'CUSTOMER_APPROVED') && (
                                         <button
                                             type="button"
                                             className="px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700"
@@ -304,6 +330,13 @@ const QuotationList: React.FC = () => {
                                         >
                                             Convert to SO
                                         </button>
+                                    )}
+                                    {item.status === 'PENDING_MD_APPROVAL' && (
+                                        <ToggleSwitch
+                                            checked={false}
+                                            title="Approve for MD"
+                                            onChange={() => { setItemToApprove(item); setShowApproveModal(true); }}
+                                        />
                                     )}
                                 </div>
                             ),
@@ -337,6 +370,18 @@ const QuotationList: React.FC = () => {
                 confirmIcon={Mail}
                 confirmVariant="primary"
                 isLoading={sendingEmail}
+            />
+
+            <CommonConfirmModal
+                show={showApproveModal}
+                onHide={() => { setShowApproveModal(false); setItemToApprove(null); }}
+                onConfirm={handleApproveConfirm}
+                title="Approve Quotation"
+                message={`Are you sure you want to MD-approve quotation ${itemToApprove?.orderNo}?`}
+                confirmText="Approve"
+                loadingText="Approving..."
+                confirmVariant="primary"
+                isLoading={approvingId !== null}
             />
 
             <CommonConfirmModal

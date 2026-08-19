@@ -1257,9 +1257,10 @@ model SalesOrder {
   createdBy        String?
   createdAt        DateTime         @default(now()) @db.Timestamptz(6)
   updatedAt        DateTime         @updatedAt @db.Timestamptz(6)
-  orderType        String?
-  productionStatus String?          @default("NOT_STARTED") @map("production_status") @db.VarChar(30)
-  salesPersonName  String?          @db.VarChar(100)
+  orderType          String?
+  productionStatus   String?          @default("NOT_STARTED") @map("production_status") @db.VarChar(30)
+  salesPersonName    String?          @db.VarChar(100)
+  sourceSalesOrderId Int?             @map("source_sales_order_id")
   salesInvoices    SalesInvoice[]
   items            SalesOrderItem[]
   createdByUser    User?            @relation("SalesOrderCreatedBy", fields: [createdBy], references: [userId])
@@ -1321,6 +1322,8 @@ model OrdProcAuxMeta {
   a14        String           @db.Text
   a15        String?          @db.Text
   a16        String?          @db.Text
+  sourceSalesOrderId Int?     @map("source_sales_order_id")
+  sourceEstOrderId   Int?     @map("source_est_order_id")
 
   items         OrdProcAuxMetaItem[]
   customer      Customer             @relation("CustomerEstimatedOrders", fields: [customerId], references: [id])

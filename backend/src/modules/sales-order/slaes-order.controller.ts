@@ -178,6 +178,19 @@ class SalesOrderController {
         return res.status(200).json(new ApiResponse("Quotation converted to sales order successfully", order));
     });
 
+    markInQuotation = asyncHandler(async (req: Request, res: Response) => {
+        const order = await salesOrderService.markInQuotation(Number(req.params.id));
+        getIO().emit("salesOrder:updated", order);
+        return res.status(200).json(new ApiResponse("Order marked as in-quotation successfully", order));
+    });
+
+    getSourceOrders = asyncHandler(async (req: Request, res: Response) => {
+        const customerId = req.query.customerId as string;
+        if (!customerId) return res.status(400).json(new ApiResponse("customerId is required", []));
+        const orders = await salesOrderService.getSourceOrders(customerId, getPerms(req));
+        return res.status(200).json(new ApiResponse("Source orders fetched successfully", orders));
+    });
+
     whatsappQuotation = asyncHandler(async (req: Request, res: Response) => {
         const { to, message } = req.body;
         if (!to) return res.status(400).json(new ApiResponse("Recipient phone number is required"));
