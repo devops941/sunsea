@@ -1,27 +1,35 @@
-import React, { useState, useEffect } from "react";
-import { FaUndo, FaPlus, FaTimes, FaTrash, FaEraser, FaSave } from "react-icons/fa";
+import React, { useState, useEffect, useMemo } from "react";
+import { FaUndo, FaPlus, FaTimes, FaEraser, FaSave } from "react-icons/fa";
 import { toast } from "react-toastify";
 import { returnService, type SalesReturn } from "../../../../services/returnService";
 import { customerService } from "../../../../services/customerService";
 
 import { productService } from "../../../../services/productService";
+import { salesProductService } from "../../../../services/salesProductService";
 import { useAppSelector } from "../../../../hooks/reduxHooks";
-
 import DataTable from "../../../../components/ui/table/DataTable";
 import SearchInput from "../../../../components/ui/SearchInput/SearchInput";
 import ViewButton from "../../../../components/ui/viewbutton/ViewButton";
 import CustomButton from "../../../../components/ui/Button/Button";
 import CommonModal from "../../../../components/ui/Modal/CommonModal";
+import CommonViewModal from "../../../../components/ui/CommonViewModal/CommonViewModal";
 import SelectInput from "../../../../components/form/SelectInput/SelectInput";
 import TextInput from "../../../../components/form/TextInput/TextInput";
+import QuantityInput from "../../../../components/form/QuantityInput/QuantityInput";
+import DeleteButton from "../../../../components/ui/DeleteButton/DeleteButton";
+import { useUOM } from "../../../../hooks/useUOM";
+import { formatStockQty, convertToPrimaryUom } from "../../../../utils/uomConversion";
 import { useSocketSync } from "../../../../hooks/useSocketSync";
 
 interface FormReturnRow {
   productId: number;
   salesInvoiceItemId?: string;
   description: string;
+  productCode?: string;
+  productGroup?: string;
   quantity: number;
   weight: number;
+  uom: string;
   maxReturnable: number;
   unitPrice: number;
   taxRate: number;
@@ -29,6 +37,7 @@ interface FormReturnRow {
 }
 
 const ITEMS_PER_PAGE = 10;
+const UOM_OPTIONS = ["kg", "g", "t"];
 
 export const SalesReturnPage: React.FC = () => {
   const [returns, setReturns] = useState<SalesReturn[]>([]);
@@ -42,27 +51,30 @@ export const SalesReturnPage: React.FC = () => {
   const [currentPage, setCurrentPage] = useState<number>(1);
 
   const { data: company } = useAppSelector((state) => state.company);
+  const { units } = useUOM();
 
   // Form states
   const [customerId, setCustomerId] = useState<string>("");
   const [allProducts, setAllProducts] = useState<any[]>([]);
+  const [salesProductsList, setSalesProductsList] = useState<any[]>([]);
 
-  const [reason, setReason] = useState<string>("");
   const [narration, setNarration] = useState<string>("");
   const [returnRows, setReturnRows] = useState<FormReturnRow[]>([]);
 
   const loadData = async () => {
     setLoading(true);
     try {
-      const [rData, cRes, pList] = await Promise.all([
+      const [rData, cRes, pList, spList] = await Promise.all([
         returnService.fetchSalesReturns(),
         customerService.fetchAll({ page: 1, limit: 500 }),
         productService.fetchAll(),
+        salesProductService.fetchAll(),
       ]);
       setReturns(rData || []);
       const cList = Array.isArray(cRes) ? cRes : cRes?.customers || [];
       setCustomers(cList);
       setAllProducts(pList || []);
+      setSalesProductsList(Array.isArray(spList) ? spList : []);
     } catch (err: any) {
       toast.error(err?.message || "Failed to load sales returns");
     } finally {
@@ -78,26 +90,114 @@ export const SalesReturnPage: React.FC = () => {
   useSocketSync("salesInvoice", undefined, loadData);
   useSocketSync("customer", undefined, loadData);
 
-  // When Customer changes, load all products as return rows
+  // Filter Sales Products only
+  const availableSalesProducts = useMemo(() => {
+    const selectedCustomer = customers.find((c: any) => String(c.id) === String(customerId));
+    const gradeName = selectedCustomer?.customerGrade?.name || selectedCustomer?.grade;
+
+    const salesProductsOnly = allProducts.filter((p: any) => {
+      if (p.isActive === false) return false;
+      const pType = String(p.productType || "").toUpperCase();
+      return pType === "SALES_PRODUCTION" || pType === "SALES";
+    });
+
+    return salesProductsOnly.map((p: any) => {
+      let defaultPrice = Number(p.rate || 0);
+
+      if (gradeName && p.gradeRates && typeof p.gradeRates === "object") {
+        const gradePrice = p.gradeRates[gradeName];
+        if (gradePrice !== undefined && gradePrice !== null && !isNaN(Number(gradePrice))) {
+          defaultPrice = Number(gradePrice);
+        }
+      }
+
+      let uomCode = String(p.uom?.code || p.uom?.uomCode || p.uom?.name || p.weightUom || "kg").toLowerCase();
+      if (uomCode === "ton" || uomCode === "tonne" || uomCode === "tons") uomCode = "t";
+      if (!UOM_OPTIONS.includes(uomCode)) uomCode = "kg";
+
+      const groupName = p.category?.name || p.category?.categoryName || "Sales Group";
+
+      return {
+        productId: Number(p.id),
+        productCode: p.productCode || "",
+        productGroup: groupName,
+        description: p.productName || p.displayName || `Product #${p.id}`,
+        weight: Number(p.weightPerPiece || 0),
+        uom: uomCode,
+        unitPrice: defaultPrice,
+        taxRate: Number(p.gstRate || 0),
+      };
+    });
+  }, [customerId, customers, allProducts]);
+
+  const createEmptyRow = (): FormReturnRow => ({
+    productId: 0,
+    description: "",
+    productCode: "",
+    productGroup: "",
+    quantity: 0,
+    weight: 0,
+    uom: "kg",
+    maxReturnable: 999999,
+    unitPrice: 0,
+    taxRate: 0,
+  });
+
+  // When Customer changes, initialize or update rows
   useEffect(() => {
     if (!customerId) {
       setReturnRows([]);
       return;
     }
-    // Pre-fill rows from all active products
-    const rows: FormReturnRow[] = allProducts
-      .filter((p: any) => p.isActive !== false)
-      .map((p: any) => ({
-        productId: Number(p.id),
-        description: p.productName || p.displayName || `Product #${p.id}`,
-        quantity: 0,
-        weight: Number(p.weightPerPiece || 0),
-        maxReturnable: 999999,
-        unitPrice: Number(p.rate || 0),
-        taxRate: Number(p.gstRate || 0),
-      }));
-    setReturnRows(rows);
-  }, [customerId, allProducts]);
+    if (returnRows.length === 0) {
+      setReturnRows([createEmptyRow()]);
+    } else {
+      setReturnRows((prev) =>
+        prev.map((row) => {
+          if (!row.productId) return row;
+          const found = availableSalesProducts.find((p) => p.productId === row.productId);
+          return found ? { ...row, unitPrice: found.unitPrice } : row;
+        })
+      );
+    }
+  }, [customerId]);
+
+  const handleAddRow = () => {
+    setReturnRows((prev) => [...prev, createEmptyRow()]);
+  };
+
+  const handleProductSelect = (index: number, selectedProductIdStr: string) => {
+    const prodId = Number(selectedProductIdStr);
+    const found = availableSalesProducts.find((p) => p.productId === prodId);
+
+    setReturnRows((prev) => {
+      const updated = [...prev];
+      if (found) {
+        updated[index] = {
+          ...updated[index],
+          productId: found.productId,
+          description: found.description,
+          productCode: found.productCode,
+          productGroup: found.productGroup,
+          weight: found.weight,
+          uom: found.uom,
+          unitPrice: found.unitPrice,
+          taxRate: found.taxRate,
+          quantity: updated[index].quantity > 0 ? updated[index].quantity : 1,
+        };
+      } else {
+        updated[index] = {
+          ...updated[index],
+          productId: 0,
+          description: "",
+          productCode: "",
+          productGroup: "",
+          unitPrice: 0,
+        };
+      }
+      return updated;
+    });
+  };
 
   const handleRowFieldChange = (index: number, field: 'quantity' | 'weight' | 'unitPrice', value: number) => {
     setReturnRows((prev) => {
@@ -107,8 +207,19 @@ export const SalesReturnPage: React.FC = () => {
     });
   };
 
+  const handleRowUomChange = (index: number, uom: string) => {
+    setReturnRows((prev) => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], uom };
+      return updated;
+    });
+  };
+
   const handleRemoveRow = (index: number) => {
-    setReturnRows((prev) => prev.filter((_, i) => i !== index));
+    setReturnRows((prev) => {
+      const filtered = prev.filter((_, i) => i !== index);
+      return filtered.length === 0 ? [createEmptyRow()] : filtered;
+    });
   };
 
   // Calculate totals
@@ -123,14 +234,9 @@ export const SalesReturnPage: React.FC = () => {
       return;
     }
 
-    if (!reason.trim()) {
-      toast.error("Reason for Return is required for audit trail");
-      return;
-    }
-
-    const activeReturnItems = returnRows.filter((r) => r.quantity > 0);
+    const activeReturnItems = returnRows.filter((r) => r.productId > 0 && r.quantity > 0);
     if (activeReturnItems.length === 0) {
-      toast.error("Please enter a return quantity greater than 0 for at least one item");
+      toast.error("Please select a product and enter a quantity greater than 0 for at least one item");
       return;
     }
 
@@ -139,15 +245,17 @@ export const SalesReturnPage: React.FC = () => {
       await returnService.createSalesReturn({
         customerId,
         refundMode: "CREDIT_NOTE",
-        reason: reason.trim(),
+        reason: "Sales Return",
         narration,
         companyId: company.id,
         items: activeReturnItems.map((r) => ({
           productId: r.productId,
           quantity: r.quantity,
+          weight: r.weight,
+          uom: r.uom,
           unitPrice: r.unitPrice,
           taxRate: r.taxRate,
-          reason: r.reason || reason,
+          reason: r.reason || "Sales Return",
         })),
       });
 
@@ -165,7 +273,6 @@ export const SalesReturnPage: React.FC = () => {
   const resetForm = () => {
     setCustomerId("");
     setReturnRows([]);
-    setReason("");
     setNarration("");
   };
 
@@ -297,7 +404,7 @@ export const SalesReturnPage: React.FC = () => {
         show={showModal}
         onHide={() => setShowModal(false)}
         title="New Sales Return (Credit Note)"
-        maxWidth="3xl"
+        maxWidth="4xl"
         footer={
           <div className="flex items-center justify-end gap-2 w-full">
             <CustomButton
@@ -319,7 +426,7 @@ export const SalesReturnPage: React.FC = () => {
         }
       >
         <form onSubmit={handleSubmit} className="space-y-4 p-1">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
             <SelectInput
               label="CUSTOMER"
               name="customerId"
@@ -329,21 +436,17 @@ export const SalesReturnPage: React.FC = () => {
               searchable
               options={customers.map((c: any) => {
                 const name = c.displayName || c.firmName;
-                const grade = c.customerGrade?.name;
-                const type = c.customerType?.name;
-                const parts = [name, grade, type].filter(Boolean);
+                const rawGrade = c.customerGrade?.name || c.grade || "";
+                const gradeShort = rawGrade ? rawGrade.replace(/grade\s*/i, "").trim() : "";
+                const gradeTag = gradeShort ? `(${gradeShort})` : null;
+
+                const location = c.billingCity || c.city || c.shippingCity || c.customerType?.name;
+                const locationTag = location ? `(${location.toLowerCase()})` : null;
+
+                const parts = [name, gradeTag, locationTag].filter(Boolean);
                 return { label: parts.join(' - '), value: String(c.id) };
               })}
               onChange={(e) => setCustomerId(e.target.value)}
-            />
-
-            <TextInput
-              label="REASON FOR RETURN"
-              name="reason"
-              value={reason}
-              required
-              placeholder="e.g. Defective goods / Customer return"
-              onChange={(e) => setReason(e.target.value)}
             />
           </div>
 
@@ -351,23 +454,38 @@ export const SalesReturnPage: React.FC = () => {
           <div className="pt-2">
             <div className="flex items-center justify-between mb-2">
               <label className="block text-xs font-semibold text-slate-700 uppercase">Return Line Items</label>
+              <CustomButton
+                text="Add Item"
+                icon={FaPlus}
+                onClick={handleAddRow}
+                variant="primary"
+                size="sm"
+                type="button"
+              />
             </div>
 
             {returnRows.length === 0 ? (
-              <div className="p-4 border border-dashed border-slate-200 rounded-lg text-center text-xs text-slate-400">
-                Select a Customer to load products.
+              <div className="p-4 border border-dashed border-slate-200 rounded-lg text-center text-xs text-slate-400 flex flex-col items-center gap-2">
+                <span>No line items added.</span>
+                <button
+                  type="button"
+                  onClick={handleAddRow}
+                  className="text-blue-600 hover:underline font-semibold"
+                >
+                  + Click here to add item
+                </button>
               </div>
             ) : (
-              <div className="border border-slate-200 rounded-lg overflow-hidden max-h-72 overflow-y-auto">
+              <div className="border border-slate-200 rounded-lg overflow-hidden max-h-80 overflow-y-auto">
                 <table className="w-full text-left text-xs text-slate-700">
-                  <thead className="bg-slate-50 uppercase font-semibold text-slate-600 border-b border-slate-200 sticky top-0">
+                  <thead className="bg-slate-50 uppercase font-semibold text-slate-600 border-b border-slate-200 sticky top-0 z-10">
                     <tr>
-                      <th className="px-3 py-2">Product</th>
-                      <th className="px-3 py-2 w-24 text-center">Qty</th>
-                      <th className="px-3 py-2 w-24 text-center">Weight (kg)</th>
-                      <th className="px-3 py-2 w-28 text-center">Unit Price (₹)</th>
-                      <th className="px-3 py-2 w-28 text-right">Total (₹)</th>
-                      <th className="px-3 py-2 w-10 text-center"></th>
+                      <th className="px-3 py-3 min-w-[220px]">Product & Group</th>
+                      <th className="px-3 py-3 w-24 text-center">Qty</th>
+                      <th className="px-3 py-3 w-44 text-center">Weight / UOM</th>
+                      <th className="px-3 py-3 w-32 text-center">Unit Price (₹)</th>
+                      <th className="px-3 py-3 w-32 text-right">Total (₹)</th>
+                      <th className="px-3 py-3 w-12 text-center"></th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200 bg-white">
@@ -375,49 +493,62 @@ export const SalesReturnPage: React.FC = () => {
                       const lineTot = row.quantity * row.unitPrice;
                       return (
                         <tr key={idx} className={`hover:bg-slate-50 ${row.quantity > 0 ? 'bg-blue-50/40' : ''}`}>
-                          <td className="px-3 py-2 font-medium">{row.description}</td>
-                          <td className="px-3 py-2 text-center">
+                          <td className="px-3 py-2.5 align-middle min-w-[220px]">
+                            <SelectInput
+                              name={`product-${idx}`}
+                              value={row.productId ? String(row.productId) : ""}
+                              defaultOptionLabel="-- Select Product --"
+                              searchable
+                              noMargin
+                              options={availableSalesProducts.map((p) => ({
+                                label: p.productGroup ? `${p.description} — (${p.productGroup})` : p.description,
+                                value: String(p.productId),
+                              }))}
+                              onChange={(e) => handleProductSelect(idx, e.target.value)}
+                            />
+                          </td>
+                          <td className="px-3 py-2.5 align-middle text-center">
                             <input
                               type="number"
                               min="0"
                               step="1"
                               value={row.quantity || ""}
                               onChange={(e) => handleRowFieldChange(idx, 'quantity', parseFloat(e.target.value) || 0)}
-                              className="w-20 px-2 py-1 border border-slate-200 rounded text-center font-bold text-blue-600 focus:outline-none focus:border-blue-500"
+                              className="w-20 h-10 px-2 border border-slate-200 rounded-md text-center font-bold text-blue-600 focus:outline-none focus:border-blue-500 text-sm shadow-2xs"
                             />
                           </td>
-                          <td className="px-3 py-2 text-center">
-                            <input
-                              type="number"
-                              min="0"
-                              step="0.01"
+                          <td className="px-3 py-2.5 align-middle text-center min-w-[170px]">
+                            <QuantityInput
+                              hideLabel
+                              name={`weight-${idx}`}
                               value={row.weight || ""}
-                              onChange={(e) => handleRowFieldChange(idx, 'weight', parseFloat(e.target.value) || 0)}
-                              className="w-20 px-2 py-1 border border-slate-200 rounded text-center text-slate-700 focus:outline-none focus:border-blue-500"
+                              baseUoms="kg, g, t"
+                              uom={row.uom || "kg"}
+                              onChange={(e: any) => handleRowFieldChange(idx, 'weight', parseFloat(e.target.value) || 0)}
+                              onUomChange={(newUom: string) => handleRowUomChange(idx, newUom)}
                             />
                           </td>
-                          <td className="px-3 py-2 text-center">
+                          <td className="px-3 py-2.5 align-middle text-center">
                             <input
                               type="number"
                               min="0"
                               step="0.01"
                               value={row.unitPrice || ""}
                               onChange={(e) => handleRowFieldChange(idx, 'unitPrice', parseFloat(e.target.value) || 0)}
-                              className="w-24 px-2 py-1 border border-slate-200 rounded text-center text-slate-700 focus:outline-none focus:border-blue-500"
+                              className="w-28 h-10 px-3 border border-slate-200 rounded-md text-center text-slate-700 focus:outline-none focus:border-blue-500 text-sm font-medium shadow-2xs"
                             />
                           </td>
-                          <td className="px-3 py-2 text-right font-mono font-semibold text-slate-900">
-                            {lineTot > 0 ? `₹${lineTot.toFixed(2)}` : '—'}
+                          <td className="px-3 py-2.5 align-middle text-right">
+                            <div className="h-10 flex items-center justify-end font-mono font-bold text-slate-900 text-sm">
+                              {lineTot > 0 ? `₹${lineTot.toFixed(2)}` : '—'}
+                            </div>
                           </td>
-                          <td className="px-3 py-2 text-center">
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveRow(idx)}
-                              className="text-slate-400 hover:text-rose-600 p-1"
-                              title="Remove item"
-                            >
-                              <FaTrash size={12} />
-                            </button>
+                          <td className="px-4 py-3 align-top text-center">
+                            
+                              <DeleteButton 
+                                onClick={() => handleRemoveRow(idx)}
+                              > 
+                              </DeleteButton> 
                           </td>
                         </tr>
                       );
@@ -450,72 +581,33 @@ export const SalesReturnPage: React.FC = () => {
         </form>
       </CommonModal>
 
-      {/* Sales Return Detail Modal */}
-      {selectedViewReturn && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 overflow-y-auto">
-          <div className="bg-white rounded-xl shadow-xl border border-slate-200 w-full max-w-2xl overflow-hidden my-8">
-            <div className="p-5 border-b border-slate-200 bg-blue-50/50 flex items-center justify-between">
-              <div>
-                <span className="text-xs font-semibold text-blue-700 uppercase tracking-wider">Sales Return Detail</span>
-                <h3 className="text-xl font-bold text-slate-900 font-mono flex items-center gap-2 mt-0.5">
-                  {selectedViewReturn.returnNo}
-                </h3>
-              </div>
-              <button
-                onClick={() => setSelectedViewReturn(null)}
-                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition"
-              >
-                <FaTimes />
-              </button>
-            </div>
-
-            <div className="p-6 space-y-6 max-h-[75vh] overflow-y-auto text-sm">
-              {/* Key Metadata */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
-                <div>
-                  <div className="text-xs text-slate-500 font-medium">Return Date</div>
-                  <div className="font-semibold text-slate-800 mt-0.5">
-                    {new Date(selectedViewReturn.returnDate).toLocaleDateString("en-IN")}
-                  </div>
-                </div>
-
-                <div>
-                  <div className="text-xs text-slate-500 font-medium">Customer</div>
-                  <div className="font-semibold text-slate-800 mt-0.5">
-                    {selectedViewReturn.customer?.firmName || "-"}
-                  </div>
-                </div>
-
-                <div>
-                  <div className="text-xs text-slate-500 font-medium">Sales Invoice</div>
-                  <div className="font-semibold text-slate-800 mt-0.5">
-                    {selectedViewReturn.salesInvoiceId ? `INV #${selectedViewReturn.salesInvoiceId}` : "Direct Return"}
-                  </div>
-                </div>
-
-                <div>
-                  <div className="text-xs text-slate-500 font-medium">Refund Mode</div>
-                  <div className="font-semibold text-slate-800 mt-0.5">
-                    {selectedViewReturn.refundMode || "CREDIT_NOTE"}
-                  </div>
-                </div>
-
-                <div>
-                  <div className="text-xs text-slate-500 font-medium">Status</div>
-                  <div className="font-semibold text-emerald-700 mt-0.5">
-                    {selectedViewReturn.status}
-                  </div>
-                </div>
-
-                <div>
-                  <div className="text-xs text-slate-500 font-medium">Grand Total</div>
-                  <div className="font-bold text-blue-600 font-mono mt-0.5">
-                    ₹{Number(selectedViewReturn.grandTotal).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                  </div>
-                </div>
-              </div>
-
-              {/* Items List */}
+      {/* Sales Return Detail Modal using CommonViewModal */}
+      <CommonViewModal
+        show={Boolean(selectedViewReturn)}
+        onHide={() => setSelectedViewReturn(null)}
+        modalTitle="Sales Return Details"
+        avatarText={selectedViewReturn?.returnNo ? "SR" : ""}
+        headerTitle={selectedViewReturn?.returnNo || ""}
+        headerSubtitle={selectedViewReturn?.customer?.firmName || ""}
+        statusNode={
+          <span className="inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
+            {selectedViewReturn?.status || "COMPLETED"}
+          </span>
+        }
+        sections={[
+          {
+            fields: [
+              { label: "Return Date", value: selectedViewReturn ? new Date(selectedViewReturn.returnDate).toLocaleDateString("en-IN") : "-" },
+              { label: "Customer", value: selectedViewReturn?.customer?.firmName || "-" },
+              { label: "Sales Invoice", value: selectedViewReturn?.salesInvoiceId ? `INV #${selectedViewReturn.salesInvoiceId}` : "Direct Return" },
+              { label: "Refund Mode", value: selectedViewReturn?.refundMode || "CREDIT_NOTE" },
+              { label: "Grand Total", value: selectedViewReturn ? `₹${Number(selectedViewReturn.grandTotal).toLocaleString("en-IN", { minimumFractionDigits: 2 })}` : "-" },
+            ],
+          },
+        ]}
+        customContent={
+          selectedViewReturn && (
+            <div className="space-y-4">
               <div>
                 <h4 className="font-semibold text-slate-800 mb-3 text-xs uppercase tracking-wider">
                   Returned Items List
@@ -526,6 +618,7 @@ export const SalesReturnPage: React.FC = () => {
                       <tr>
                         <th className="px-3 py-2.5">Product ID / Item</th>
                         <th className="px-3 py-2.5 text-center">Qty</th>
+                        <th className="px-3 py-2.5 text-center">Weight / UOM</th>
                         <th className="px-3 py-2.5 text-right">Unit Price (₹)</th>
                         <th className="px-3 py-2.5 text-right">Tax Rate</th>
                         <th className="px-3 py-2.5 text-right">Line Total (₹)</th>
@@ -541,6 +634,9 @@ export const SalesReturnPage: React.FC = () => {
                             <td className="px-3 py-2.5 text-center font-bold text-slate-800">
                               {item.quantity}
                             </td>
+                            <td className="px-3 py-2.5 text-center font-medium text-slate-700">
+                              {item.weight != null ? formatStockQty(item.weight, item.uom) : '—'}
+                            </td>
                             <td className="px-3 py-2.5 text-right font-mono">
                               ₹{Number(item.unitPrice).toFixed(2)}
                             </td>
@@ -554,7 +650,7 @@ export const SalesReturnPage: React.FC = () => {
                         ))
                       ) : (
                         <tr>
-                          <td colSpan={5} className="px-4 py-6 text-center text-slate-400">
+                          <td colSpan={6} className="px-4 py-6 text-center text-slate-400">
                             No item details found for this return.
                           </td>
                         </tr>
@@ -571,18 +667,9 @@ export const SalesReturnPage: React.FC = () => {
                 </div>
               )}
             </div>
-
-            <div className="p-4 border-t border-slate-200 bg-slate-50 flex justify-end">
-              <button
-                onClick={() => setSelectedViewReturn(null)}
-                className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg font-medium text-sm transition shadow-sm"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+          )
+        }
+      />
     </div>
   );
 };

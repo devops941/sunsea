@@ -4,6 +4,8 @@ export const salesReturnItemSchema = z.object({
   productId: z.number().int(),
   salesInvoiceItemId: z.string().uuid().optional().nullable(),
   quantity: z.number().positive(),
+  weight: z.number().nonnegative().optional().nullable(),
+  uom: z.string().optional().nullable(),
   unitPrice: z.number().nonnegative(),
   taxRate: z.number().nonnegative().optional().default(0),
   reason: z.string().optional(),

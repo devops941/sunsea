@@ -5,6 +5,8 @@ export interface SalesReturnItem {
   productId: number;
   salesInvoiceItemId?: string | null;
   quantity: number;
+  weight?: number | null;
+  uom?: string | null;
   unitPrice: number;
   taxRate?: number;
   lineTotal?: number;
@@ -42,6 +44,8 @@ export interface CreateSalesReturnDto {
     productId: number;
     salesInvoiceItemId?: string;
     quantity: number;
+    weight?: number;
+    uom?: string;
     unitPrice: number;
     taxRate?: number;
     reason?: string;
