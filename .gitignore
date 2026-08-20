@@ -14,8 +14,10 @@
 *.p12
 *.pfx
 secrets.json
-
-
+.mcp.json
+mcp-servers/
+figma-plugin
+figma-mcp
 # ============================================================
 # PYTHON / FASTAPI (backend)
 # ============================================================
@@ -141,3 +143,6 @@ temp/
 Command 
 .claude/
 .agent/ 
+
+CLAUDE.md
+SUNSEA_ERP_FLOW.html

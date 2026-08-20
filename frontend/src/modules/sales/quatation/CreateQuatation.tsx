@@ -502,13 +502,11 @@ const QuotationForm: React.FC = () => {
         const fetchPrevOrders = async () => {
             setLoadingCustomerOrders(true);
             try {
-                const res = await salesOrderService.fetchAll({
-                    customerId,
-                    pageSize: 50,
-                });
-                setCustomerOrders((res.data || []).filter((o: any) =>
-                    ['CONFIRMED', 'QUOTATION_IN_PROGRESS', 'QUOTATION_COMPLETED', 'CUSTOMER_APPROVED', 'MD_APPROVED'].includes(o.status)
-                ));
+                // getSourceOrders always queries the GST SalesOrder table and
+                // returns only CONFIRMED orders — so already-quoted orders
+                // (QUOTATION_IN_PROGRESS, etc.) are never shown here.
+                const orders = await salesOrderService.getSourceOrders(customerId);
+                setCustomerOrders(orders);
             } catch (_) {
                 setCustomerOrders([]);
             } finally {
@@ -840,6 +838,7 @@ const QuotationForm: React.FC = () => {
             const payload: any = {
                 orderNo: data.quotationNo,
                 orderDate: new Date(data.quotationDate).toISOString(),
+                sourceSalesOrderId: (!currentIsEditMode && selectedPrevOrderId) ? selectedPrevOrderId : undefined,
                 expectedCompletionDate: data.validUntil ? new Date(data.validUntil).toISOString() : undefined,
                 customerId: data.customerId,
                 paymentTermId: data.paymentTermId ? Number(data.paymentTermId) : null,

@@ -362,8 +362,8 @@ const AllSalesOrderList: React.FC = () => {
                                         title={isGstUser ? "Print / View Sales Order" : "View Estimated Pricing"}
                                         onClick={() => handleOpenEstimate(item.id)}
                                     />
-                                    {can("sales-orders.edit") && <EditButton onClick={() => handleOpenEdit(item)} />}
-                                    {can("sales-orders.delete") && <DeleteButton onClick={() => triggerDelete(item.id)} />}
+                                    {can("sales-orders.edit") && item.status !== "CONFIRMED" && <EditButton onClick={() => handleOpenEdit(item)} />}
+                                    {can("sales-orders.delete") && item.status !== "CONFIRMED" && <DeleteButton onClick={() => triggerDelete(item.id)} />}
                                 </div>
                             ),
                         },
