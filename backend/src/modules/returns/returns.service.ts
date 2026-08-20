@@ -101,6 +101,8 @@ class ReturnsService {
             productId: BigInt(item.productId),
             salesInvoiceItemId: item.salesInvoiceItemId || null,
             quantity: new Prisma.Decimal(item.quantity),
+            weight: item.weight ? new Prisma.Decimal(item.weight) : null,
+            uom: item.uom || null,
             unitPrice: new Prisma.Decimal(item.unitPrice),
             taxRate: new Prisma.Decimal(item.taxRate || 0),
             lineTotal: new Prisma.Decimal(lineTotal),
