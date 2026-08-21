@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-const ItemCategoryTypeEnum = z.enum(["RAW_MATERIAL", "FINISHED_GOODS", "SEMI_FINISHED"]);
+const ItemCategoryTypeEnum = z.enum(["RAW_MATERIAL", "FINISHED_GOODS", "SEMI_FINISHED", "WASTAGE", "CONSUMABLE"]);
 const AdjustmentStatusEnum = z.enum(["DRAFT", "PENDING_APPROVAL", "APPROVED", "REJECTED"]);
 const AdjustmentTypeEnum = z.enum([
   "PRODUCTION_MATERIAL_ISSUE",

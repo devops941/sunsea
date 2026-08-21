@@ -42,8 +42,6 @@ const config = {
     product: {
         base: "/products",
         productNextId: "/products/next-id",
-        category: "/product/categories",
-        categoryNextId: "/product/categories/next-id",
         uom: "/product/uoms",
         uomNextId: "/product/uoms/next-id",
         getActiveUom: "/product/uoms/active",
@@ -56,17 +54,9 @@ const config = {
         base: "/store-types",
         nextId: "/store-types/next-id",
     },
-    location: {
-        base: "/locations",
-        nextId: "/locations/next-id",
-    },
     rawMaterial: {
         base: "/raw-materials",
         nextId: "/raw-materials/next-id",
-    },
-    rawMaterialCategory: {
-        base: "/raw-material-categories",
-        nextId: "/raw-material-categories/next-id",
     },
     rawMaterialStock: {
         base: "/raw-material-stocks",
@@ -157,8 +147,13 @@ const config = {
 
     email: {
         base: "/email-config"
-    }
-
-
+    },
+    category: {
+        base: "/categories",
+        nextCode: "/categories/next-code",
+    },
+    inventory: {
+        eodStock: "/inventory/eod-stock",
+    },
 }
 export default config;

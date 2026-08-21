@@ -6,19 +6,6 @@ export const mapRawMaterial = (item: any): RawMaterial => ({
   rawMaterialId: item.rawMaterialId,
   materialName: item.materialName,
 
-  categoryId: item.categoryId,
-  category: item.category
-    ? {
-      id: item.category.id,
-      code: item.category.categoryCode,
-      name: item.category.categoryName,
-      description: item.category.description || "",
-      status: item.category.isActive ? "ACTIVE" : "INACTIVE",
-      createdAt: item.category.createdAt,
-      updatedAt: item.category.updatedAt,
-    }
-    : null,
-
   hsnCode: item.hsnCode,
   minimumStock: item.minimumStock,
 
@@ -48,6 +35,9 @@ export const mapRawMaterial = (item: any): RawMaterial => ({
   onHandQty: item.onHandQty,
   reservedQty: item.reservedQty,
 
+  categoryId: item.categoryId ?? null,
+  category: item.category ?? null,
+
   narration: item.narration ?? item.remarks,
   lastMovementAt: item.lastMovementAt,
 
@@ -62,10 +52,33 @@ export const mapRawMaterial = (item: any): RawMaterial => ({
 });
 
 export const rawMaterialService = {
-  fetchAll: async (params?: { search?: string; storeId?: string; isActive?: boolean }): Promise<RawMaterial[]> => {
+  fetchAll: async (params?: {
+    search?: string;
+    storeId?: string;
+    isActive?: boolean;
+    itemType?: string;
+    categoryId?: string;
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: string;
+  }): Promise<any> => {
     const response = await apiClient.get(config.rawMaterial.base, { params });
-    const list = response.data?.data || response.data;
-    return Array.isArray(list) ? list.map(mapRawMaterial) : [];
+    const payload = response.data?.data || response.data;
+    // Handle paginated response shape
+    if (payload && "rawMaterials" in payload) {
+      return {
+        rawMaterials: Array.isArray(payload.rawMaterials)
+          ? payload.rawMaterials.map(mapRawMaterial)
+          : [],
+        total: payload.total,
+        page: payload.page,
+        limit: payload.limit,
+        totalPages: payload.totalPages,
+      };
+    }
+    // Fallback for plain array (legacy)
+    return Array.isArray(payload) ? payload.map(mapRawMaterial) : [];
   },
 
   fetchById: async (id: string): Promise<RawMaterial> => {

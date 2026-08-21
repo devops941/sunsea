@@ -1,5 +1,5 @@
-import type { Category } from "../categories/types";
 import type { UOM } from "../uoms/types";
+import type { Category } from "../categories/types";
 
 export type ProductType = "PRODUCTION" | "SALES_PRODUCTION";
 
@@ -10,7 +10,6 @@ export interface Product {
   productName: string;
   displayName: string | null;
   description: string | null;
-  categoryId: number;
   uomId: number | null;
   capacityLitres: number | null;
   typeCode: string | null;
@@ -24,7 +23,6 @@ export interface Product {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
-  category?: Category;
   uom?: UOM | null;
   hsnCode?: string | null;
   rate?: number | null;
@@ -37,13 +35,14 @@ export interface Product {
   b2c?: number | null;
   exportPrice?: number | null;
   minimumQty?: string;
+  categoryId?: number | null;
+  category?: Category | null;
 }
 
 
 export interface CreateProductDto {
   productCode: string;
   productName: string;
-  categoryId: string;
   itemCode?: string;
   displayName?: string;
   description?: string;
@@ -58,12 +57,12 @@ export interface CreateProductDto {
   isActive?: boolean;
   minimumQty?: number;
   gradeRates?: Record<string, number>;
+  categoryId?: number | null;
 }
 
 export interface UpdateProductDto {
   productCode?: string;
   productName?: string;
-  categoryId?: string;
   itemCode?: string;
   displayName?: string;
   description?: string;
@@ -78,6 +77,7 @@ export interface UpdateProductDto {
   isActive?: boolean;
   minimumQty?: number;
   gradeRates?: Record<string, number>;
+  categoryId?: number | null;
 }
 
 export interface ProductState {

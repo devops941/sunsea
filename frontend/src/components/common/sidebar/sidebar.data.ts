@@ -148,30 +148,29 @@ export const sidebarItems: SidebarItem[] = [
     icon: FiDatabase,
     path: "/uoms",
     pathsByPermission: [
-      { permission: "uoms.view", path: "/uoms" },
       { permission: "categories.view", path: "/categories" },
-      { permission: "raw_material_categories.view", path: "/raw-material-categories" },
+      { permission: "stores.view", path: "/storage-stores" },
+      { permission: "uoms.view", path: "/uoms" },
       { permission: "raw_materials.view", path: "/raw-materials" },
       { permission: "wastage-store.view", path: "/wastage-store" },
       { permission: "products.view", path: "/products" },
       { permission: "sales_products.view", path: "/sales-products" },
     ],
     children: [
-      { title: "UOM", path: "/uoms", permission: "uoms.view" },
       {
         title: "Categories",
         permission: "categories.view",
         children: [
           { title: "Category List", path: "/categories", permission: "categories.view" },
-          { title: "Add Category", path: "/categories?action=add", permission: "categories.create" }
-        ]
+          { title: "Add Category", path: "/categories/create", permission: "categories.create" },
+        ],
       },
       {
-        title: "RM Categories",
-        permission: "raw_material_categories.view",
+        title: "Store & Locations",
+        permission: "stores.view",
         children: [
-          { title: "RM Category List", path: "/raw-material-categories", permission: "raw_material_categories.view" },
-          { title: "Add RM Category", path: "/raw-material-categories?action=add", permission: "raw_material_categories.create" }
+          { title: "Storage Store List", path: "/storage-stores", permission: "stores.view" },
+          { title: "Add Storage Store", path: "/storage-stores/create", permission: "stores.create" }
         ]
       },
       {
@@ -210,24 +209,26 @@ export const sidebarItems: SidebarItem[] = [
       },
     ],
     activePaths: [
-      "/products",
       "/categories",
+      "/categories/create",
+      "/products",
       "/uoms",
       "/colours",
       "/sizes",
       "/raw-materials",
-      "/raw-material-categories",
       "/wastage-store",
       "/sales-products",
+      "/storage-stores",
+      "/storage-stores/create",
     ],
     permissionAny: [
-      "products.view",
       "categories.view",
+      "products.view",
       "uoms.view",
       "raw_materials.view",
-      "raw_material_categories.view",
       "wastage-store.view",
       "sales_products.view",
+      "stores.view",
     ],
   },
   // 5. Purchase
@@ -401,25 +402,6 @@ export const sidebarItems: SidebarItem[] = [
       "eod-stock.view",
     ],
   },
-  // 9. Store & Locations
-  {
-    title: "Store & Locations",
-    icon: FiMapPin,
-    path: "/storage-stores",
-    pathsByPermission: [
-      { permission: "stores.view", path: "/storage-stores" },
-      { permission: "store-types.view", path: "/store-types" },
-      { permission: "locations.view", path: "/locations" },
-    ],
-    children: [
-      { title: "Storage Stores", path: "/storage-stores", permission: "stores.view" },
-      { title: "Store Categories", path: "/store-types", permission: "store-types.view" },
-      { title: "Locations", path: "/locations", permission: "locations.view" },
-    ],
-    activePaths: ["/storage-stores", "/store-types", "/locations"],
-    permissionAny: ["stores.view", "store-types.view", "locations.view"],
-  },
-
   // 10. Accounts
   {
     title: "Accounts",

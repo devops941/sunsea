@@ -132,9 +132,6 @@ const SalesOrderDetail: React.FC = () => {
         ? order.shippingPincode
         : customer?.shippingPincode || customer?.addresses?.[1]?.address?.pincode || "";
 
-    const isEstimated = (order as any)._source === "estimated";
-    // Show pricing only after the order has entered the quotation workflow.
-    // DRAFT and CONFIRMED direct sales orders hide amounts until a quotation is submitted.
     const QUOTATION_WORKFLOW_STATUSES = new Set([
         "QUOTATION_IN_PROGRESS",
         "QUOTATION_COMPLETED",
@@ -277,13 +274,7 @@ const SalesOrderDetail: React.FC = () => {
                                                 <th className="py-3 pl-4 pr-2 text-left text-[11px] font-bold uppercase tracking-wider w-8">#</th>
                                                 <th className="py-3 px-2 text-left text-[11px] font-bold uppercase tracking-wider">Product</th>
                                                 <th className="py-3 px-2 text-right text-[11px] font-bold uppercase tracking-wider">Qty</th>
-                                                {showPricing && isEstimated && (
-                                                    <>
-                                                        <th className="py-3 px-2 text-right text-[11px] font-bold uppercase tracking-wider">Est. Rate</th>
-                                                        <th className="py-3 pr-4 pl-2 text-right text-[11px] font-bold uppercase tracking-wider">Line Total</th>
-                                                    </>
-                                                )}
-                                                {showPricing && !isEstimated && (
+                                                {showPricing && (
                                                     <>
                                                         <th className="py-3 px-2 text-right text-[11px] font-bold uppercase tracking-wider">Unit Price</th>
                                                         {order.isInterState ? (
@@ -316,20 +307,7 @@ const SalesOrderDetail: React.FC = () => {
 
                                                         <td className="py-3 px-2 text-right text-ink font-medium">{qty}</td>
 
-                                                        {/* Estimated order columns */}
-                                                        {showPricing && isEstimated && (
-                                                            <>
-                                                                <td className="py-3 px-2 text-right text-ink font-medium">
-                                                                    {formatMoney(item.estimatedRate ?? 0)}
-                                                                </td>
-                                                                <td className="py-3 pr-4 pl-2 text-right font-semibold text-ink">
-                                                                    {formatMoney(item.lineTotal ?? (Number(item.estimatedRate ?? 0) * qty))}
-                                                                </td>
-                                                            </>
-                                                        )}
-
-                                                        {/* GST order columns */}
-                                                        {showPricing && !isEstimated && (
+                                                        {showPricing && (
                                                             <>
                                                                 <td className="py-3 px-2 text-right text-ink font-medium">{formatMoney(unitPrice)}</td>
                                                                 {order.isInterState ? (

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { toast } from "react-toastify";
 
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
@@ -10,8 +10,11 @@ import ViewButton from "../../../components/ui/viewbutton/ViewButton";
 import DataTable from "../../../components/ui/table/DataTable";
 import SearchInput from "../../../components/ui/SearchInput/SearchInput";
 import ExportCSVButton from "../../../components/ui/ExportCSVButton/ExportCSVButton";
-import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import CommonViewModal from "../../../components/ui/CommonViewModal/CommonViewModal";
+
+import FilterPopover from "../../../components/ui/FilterPopover/FilterPopover";
+import SelectInput from "../../../components/form/SelectInput/SelectInput";
+import { categoryService } from "../../../services/categoryService";
 
 const formatUom = (uomCode: string | undefined) => {
     if (!uomCode) return "PCS";
@@ -37,10 +40,35 @@ const FinishedStockList: React.FC<FinishedStockListProps> = ({ storeId: propStor
     const [showViewModal, setShowViewModal] = useState(false);
     const [selectedItem, setSelectedItem] = useState<any>(null);
 
-    // Debounce search
+    const [categoryFilter, setCategoryFilter] = useState("");
+    const [appliedCategory, setAppliedCategory] = useState("");
+    const [categoryOptions, setCategoryOptions] = useState<{ value: string; label: string }[]>([]);
+
+    const fetchCategoriesData = useCallback(async () => {
+        try {
+            const res = await categoryService.fetchAll({ type: "PRODUCT", isActive: true });
+            const list = res?.categories ?? (Array.isArray(res) ? res : []);
+            setCategoryOptions(list.map((c: any) => ({ value: String(c.id), label: c.name || c.categoryName || c.code })));
+        } catch {
+            // silent
+        }
+    }, []);
+
     useEffect(() => {
-        const timer = setTimeout(() => setDebouncedSearch(searchTerm), 500);
-        return () => clearTimeout(timer);
+        fetchCategoriesData();
+    }, [fetchCategoriesData]);
+
+    // Debounce search — 300 ms
+    const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    useEffect(() => {
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        debounceRef.current = setTimeout(() => {
+            setDebouncedSearch(searchTerm);
+            setCurrentPage(1);
+        }, 300);
+        return () => {
+            if (debounceRef.current) clearTimeout(debounceRef.current);
+        };
     }, [searchTerm]);
 
     // Reset page to 1 when storeId changes
@@ -48,15 +76,16 @@ const FinishedStockList: React.FC<FinishedStockListProps> = ({ storeId: propStor
         setCurrentPage(1);
     }, [activeStoreId]);
 
-    // Fetch stocks based on search, page, limit and storeId
+    // Fetch stocks based on search, page, limit, storeId and categoryId
     useEffect(() => {
         dispatch(fetchFinishedGoodsStocks({
             storeId: activeStoreId,
             search: debouncedSearch,
+            categoryId: appliedCategory || undefined,
             page: currentPage,
             limit: ITEMS_PER_PAGE
         }));
-    }, [dispatch, activeStoreId, debouncedSearch, currentPage]);
+    }, [dispatch, activeStoreId, debouncedSearch, appliedCategory, currentPage]);
 
     useEffect(() => {
         if (error) {
@@ -70,14 +99,27 @@ const FinishedStockList: React.FC<FinishedStockListProps> = ({ storeId: propStor
         deleted: finishedGoodsStockDeleted,
     });
 
-    const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleSearch = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
         setSearchTerm(e.target.value);
-        setCurrentPage(1);
-    };
+    }, []);
 
     const handleOpenView = useCallback((item: any) => {
         setSelectedItem(item);
         setShowViewModal(true);
+    }, []);
+
+    const hasActiveFilters = !!appliedCategory;
+    const activeFilterCount = appliedCategory ? 1 : 0;
+
+    const handleApplyFilters = useCallback(() => {
+        setAppliedCategory(categoryFilter);
+        setCurrentPage(1);
+    }, [categoryFilter]);
+
+    const handleClearFilters = useCallback(() => {
+        setCategoryFilter("");
+        setAppliedCategory("");
+        setCurrentPage(1);
     }, []);
 
     // Pagination logic
@@ -88,17 +130,11 @@ const FinishedStockList: React.FC<FinishedStockListProps> = ({ storeId: propStor
         { header: "Store / Location", accessor: (item: any) => item.store?.storeName },
         { header: "Product Code", accessor: (item: any) => item.product?.productCode },
         { header: "Product Name", accessor: (item: any) => item.product?.productName },
-        { header: "Category", accessor: (item: any) => item.product?.category?.categoryName || "N/A" },
+        { header: "Category", accessor: (item: any) => item.product?.category?.name || item.product?.category?.categoryName || "N/A" },
         { header: "Color", accessor: (item: any) => item.product?.colors?.map((c: any) => c.color?.colorName).join(", ") || "N/A" },
         { header: "Size", accessor: (item: any) => item.product?.size?.sizeName || "N/A" },
         { header: "Physical Stock", accessor: (item: any) => `${item.onHandQty} ${formatUom(item.product?.uom?.uomCode)}` },
     ];
-
-    const formatDate = (dateStr: string) => {
-        if (!dateStr) return "N/A";
-        const d = new Date(dateStr);
-        return d.toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" });
-    };
 
     return (
         <div className="p-4 md:p-6 bg-card">
@@ -115,6 +151,28 @@ const FinishedStockList: React.FC<FinishedStockListProps> = ({ storeId: propStor
                             onChange={handleSearch}
                             placeholder="Search stock..."
                         />
+                        <FilterPopover
+                            activeFilterCount={activeFilterCount}
+                            hasActiveFilters={hasActiveFilters}
+                            onApply={handleApplyFilters}
+                            onClear={handleClearFilters}
+                        >
+                            <div className="space-y-3">
+                                <div>
+                                    <label className="block text-xs font-semibold text-ink-muted mb-1.5 uppercase tracking-wider">
+                                        Category
+                                    </label>
+                                    <SelectInput
+                                        name="categoryFilter"
+                                        value={categoryFilter}
+                                        onChange={(e) => setCategoryFilter(e.target.value)}
+                                        options={categoryOptions}
+                                        defaultOptionLabel="All Categories"
+                                        noMargin
+                                    />
+                                </div>
+                            </div>
+                        </FilterPopover>
                         <ExportCSVButton
                             data={data || []}
                             columns={exportColumns}
@@ -149,16 +207,8 @@ const FinishedStockList: React.FC<FinishedStockListProps> = ({ storeId: propStor
                         },
                         {
                             header: "CATEGORY",
-                            render: (item) => <span className="text-ink-muted">{item.product?.category?.categoryName || "N/A"}</span>
+                            render: (item) => <span className="text-ink-muted">{item.product?.category?.name || item.product?.category?.categoryName || "N/A"}</span>
                         },
-                        // {
-                        //     header: "COLOR",
-                        //     render: (item) => <span className="text-ink-muted">{item.product?.colors?.map((c: any) => c.color?.colorName).join(", ") || "N/A"}</span>
-                        // },
-                        // {
-                        //     header: "SIZE",
-                        //     render: (item) => <span className="text-ink-muted">{item.product?.size?.sizeName ? `${item.product.size.sizeName} (${item.product.size.sizeCode})` : "N/A"}</span>
-                        // },
                         {
                             header: "STORE / LOCATION",
                             render: (item) => <span className="font-medium text-ink-muted">{item.store?.storeName || "N/A"}</span>
@@ -202,9 +252,7 @@ const FinishedStockList: React.FC<FinishedStockListProps> = ({ storeId: propStor
                             fields: [
                                 { label: "Product Code", value: selectedItem.product?.productCode || "N/A" },
                                 { label: "Product Name", value: selectedItem.product?.productName || "N/A" },
-                                { label: "Category", value: selectedItem.product?.category?.categoryName || "N/A" },
-                                // { label: "Color", value: selectedItem.product?.colors?.map((c: any) => c.color?.colorName).join(", ") || "N/A" },
-                                // { label: "Size", value: selectedItem.product?.size?.sizeName ? `${selectedItem.product.size.sizeName} (${selectedItem.product.size.sizeCode})` : "N/A" },
+                                { label: "Category", value: selectedItem.product?.category?.name || selectedItem.product?.category?.categoryName || "N/A" },
                                 { label: "Store / Location", value: selectedItem.store?.storeName || "N/A" },
                                 { label: "HSN Code", value: selectedItem.product?.hsnCode || "N/A" },
                             ]
@@ -214,10 +262,7 @@ const FinishedStockList: React.FC<FinishedStockListProps> = ({ storeId: propStor
                             fields: [
                                 { label: "Physical Stock (On Hand)", value: `${selectedItem.onHandQty} ${formatUom(selectedItem.product?.uom?.uomCode)}` },
                                 { label: "Minimum Quantity limit", value: `${(selectedItem.product as any)?.minimumQty || "0"} ${formatUom(selectedItem.product?.uom?.uomCode)}` },
-                                { label: "Maximum Quantity limit", value: `${(selectedItem.product as any)?.maximumQty || "0"} ${formatUom(selectedItem.product?.uom?.uomCode)}` },
                                 { label: "Weight Per Piece", value: selectedItem.product?.weightPerPiece != null ? `${selectedItem.product.weightPerPiece} ${(selectedItem.product as any)?.weightUom || "kg"}` : "N/A" },
-                                { label: "Dimensions (L×B×H)", value: selectedItem.product?.dimensions || "N/A" },
-                                { label: "Last Updated", value: formatDate(selectedItem.updatedAt) },
                             ]
                         }
                     ] : []}

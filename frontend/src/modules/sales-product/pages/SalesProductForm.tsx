@@ -12,6 +12,7 @@ import OrderItemsTable from "../../../components/form/OrderItemsTable/OrderItems
 import { salesProductService } from "../../../services/salesProductService";
 import { productService } from "../../../services/productService";
 import { usePermission } from "../../../hooks/usePermission";
+import { useSocketSync } from "../../../hooks/useSocketSync";
 
 type ComponentItem = { productCode: string; quantity: string };
 
@@ -53,9 +54,16 @@ const SalesProductForm: React.FC = () => {
     const { fields, append, remove, replace } = useFieldArray({ control, name: "items" });
     const currentItems = useWatch({ control, name: "items" }) || [];
 
-    useEffect(() => {
+    const loadProducts = useCallback(() => {
         productService.fetchAll().then(setProducts).catch(() => {});
     }, []);
+
+    useEffect(() => {
+        loadProducts();
+    }, [loadProducts]);
+
+    // Keep products dropdown fresh when a product is added/updated in another tab
+    useSocketSync("product", undefined, loadProducts);
 
     // Automatically calculate overall Sales Product Rate (₹) when components or quantities change
     useEffect(() => {

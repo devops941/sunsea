@@ -51,11 +51,12 @@ class FinishedGoodsStockService {
     });
   }
 
-  async findAll(query?: { page?: number; limit?: number; storeId?: string; search?: string }) {
+  async findAll(query?: { page?: number; limit?: number; storeId?: string; search?: string; categoryId?: string }) {
     const page = query?.page;
     const limit = query?.limit;
     const storeId = query?.storeId;
     const search = query?.search;
+    const categoryId = query?.categoryId;
 
     const whereClause: any = {};
 
@@ -63,8 +64,16 @@ class FinishedGoodsStockService {
       whereClause.storeId = storeId;
     }
 
+    if (categoryId) {
+      whereClause.product = {
+        ...(whereClause.product || {}),
+        categoryId: Number(categoryId),
+      };
+    }
+
     if (search) {
       whereClause.product = {
+        ...(whereClause.product || {}),
         OR: [
           { productName: { contains: search, mode: 'insensitive' } },
           { productCode: { contains: search, mode: 'insensitive' } },
@@ -86,7 +95,7 @@ class FinishedGoodsStockService {
         },
       },
       orderBy: {
-        updatedAt: "desc",
+        createdAt: "asc",
       },
     };
 

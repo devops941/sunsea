@@ -38,7 +38,7 @@ class RawMaterialService {
             ? new Date(data.lastMovementAt)
             : null,
           status: data.status ?? "Active",
-          itemType: data.itemType ?? null,
+          itemType: data.itemType ?? "RAW_MATERIAL",
         }
       });
 
@@ -48,8 +48,31 @@ class RawMaterialService {
     });
   }
 
-  async findAll(params: { search?: string; storeId?: string; isActive?: boolean } = {}) {
-    const { search, storeId, isActive } = params;
+  async findAll(params: {
+    search?: string;
+    storeId?: string;
+    isActive?: boolean;
+    itemType?: string;
+    categoryId?: string;
+    status?: string;
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: "asc" | "desc";
+  } = {}) {
+    const {
+      search,
+      storeId,
+      isActive,
+      itemType,
+      categoryId,
+      status,
+      page,
+      limit,
+      sortBy = "rawMaterialId",
+      sortOrder = "asc",
+    } = params;
+
     const whereClause: any = {};
 
     if (search) {
@@ -63,25 +86,57 @@ class RawMaterialService {
       whereClause.storeId = storeId;
     }
 
+    if (categoryId) {
+      whereClause.categoryId = Number(categoryId);
+    }
+
+    if (status) {
+      whereClause.status = status;
+    }
+
     if (isActive !== undefined) {
       whereClause.isActive = isActive;
     }
 
-    return prisma.rawMaterial.findMany({
+    if (itemType) {
+      if (itemType === "RAW_MATERIAL") {
+        // Include legacy records with null itemType — treat them as RAW_MATERIAL
+        const typeFilter = { OR: [{ itemType: "RAW_MATERIAL" }, { itemType: null }] };
+        whereClause.AND = whereClause.AND ? [...whereClause.AND, typeFilter] : [typeFilter];
+      } else {
+        whereClause.itemType = itemType;
+      }
+    }
+
+    const queryOptions: any = {
       where: whereClause,
       include: {
-        store: {
-          include: {
-            location: true
-          }
-        },
+        store: { include: { location: true } },
         category: true,
         storeLocation: true,
       },
-      orderBy: {
-        rawMaterialId: "asc",
-      },
-    });
+      orderBy: { [sortBy]: sortOrder },
+    };
+
+    if (page !== undefined || limit !== undefined) {
+      const p = page || 1;
+      const l = limit || 10;
+      queryOptions.skip = (p - 1) * l;
+      queryOptions.take = l;
+    }
+
+    const [rawMaterials, total] = await Promise.all([
+      prisma.rawMaterial.findMany(queryOptions),
+      prisma.rawMaterial.count({ where: whereClause }),
+    ]);
+
+    return {
+      rawMaterials,
+      total,
+      page: page || 1,
+      limit: limit || total,
+      totalPages: limit ? Math.ceil(total / limit) : 1,
+    };
   }
 
   async findById(rawMaterialId: string) {

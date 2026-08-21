@@ -17,8 +17,8 @@ export const executeDeleteWithValidation = async <T>(
         return await deleteOperation();
     } catch (error) {
         if (error instanceof Prisma.PrismaClientKnownRequestError) {
-            // P2003: Foreign key constraint failed
-            if (error.code === 'P2003') {
+            // P2003: Foreign key constraint failed, P2014: Required relation violation
+            if (error.code === 'P2003' || error.code === 'P2014') {
                 throw new ApiError(
                     409, 
                     `Cannot delete this ${resourceName} because it is currently in use or referenced by other records.`

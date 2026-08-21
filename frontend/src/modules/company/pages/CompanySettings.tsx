@@ -13,6 +13,7 @@ import IndiaPhoneInput from "../../../components/ui/PhoneInput/PhoneInput";
 import type { RootState, AppDispatch } from '../../../app/store';
 import { usePermission } from "../../../hooks/usePermission";
 import CommonLoader from "../../../components/ui/Loader/CommonLoader";
+import ThemeToggle from "../../../components/common/ThemeToggle";
 import { fetchCompany, updateCompany } from '../../../features/company/companySlice';
 import type { UpdateCompanyDto } from '../../../features/company/types';
 import { validatePhoneEntries } from "../../../components/ui/PhoneInput/PhoneInput";
@@ -170,19 +171,22 @@ const CompanySettings: React.FC = () => {
   // Onboarding Screen Design
   if (company && !company.isOnboarded) {
     return (
-      <div className="fixed inset-0 z-9999 bg-gray-100 flex justify-center items-start overflow-y-auto min-h-screen py-10 px-4">
+      <div className="fixed inset-0 z-9999 bg-page text-ink flex justify-center items-start overflow-y-auto min-h-screen py-10 px-4">
+        <div className="absolute top-4 right-6 z-10">
+          <ThemeToggle />
+        </div>
         <div className="w-full max-w-5xl mx-auto">
           <div className="text-center mb-8">
-            <h2 className="text-3xl font-bold text-gray-800 pb-2">Welcome to Sunsea ERP</h2>
-            <p className="text-gray-500">Please complete your company onboarding to get started.</p>
+            <h2 className="text-3xl font-bold text-ink pb-2">Welcome to Sunsea ERP</h2>
+            <p className="text-ink-muted">Please complete your company onboarding to get started.</p>
           </div>
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+          <div className="bg-card rounded-xl shadow-lg border border-line-soft">
             <form onSubmit={handleSubmit} className="px-6 py-6 space-y-8" noValidate>
               {/* General Info */}
               <div>
                 <div className="flex items-center gap-2 mb-4">
                   <FaInfoCircle className="text-primary text-xl" />
-                  <h6 className="text-lg font-semibold text-gray-800 m-0">General Info & Logo</h6>
+                  <h6 className="text-lg font-semibold text-ink m-0">General Info & Logo</h6>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
@@ -209,7 +213,7 @@ const CompanySettings: React.FC = () => {
               <div>
                 <div className="flex items-center gap-2 mb-4">
                   <FaFileAlt className="text-primary text-xl" />
-                  <h6 className="text-lg font-semibold text-gray-800 m-0">Registration Details</h6>
+                  <h6 className="text-lg font-semibold text-ink m-0">Registration Details</h6>
                 </div>
                 <div className="grid grid-cols-1 gap-4">
                   <div>
@@ -222,7 +226,7 @@ const CompanySettings: React.FC = () => {
               <div>
                 <div className="flex items-center gap-2 mb-4">
                   <FaMapMarkerAlt className="text-primary text-xl" />
-                  <h6 className="text-lg font-semibold text-gray-800 m-0">Address Details</h6>
+                  <h6 className="text-lg font-semibold text-ink m-0">Address Details</h6>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
@@ -262,7 +266,7 @@ const CompanySettings: React.FC = () => {
               <div>
                 <div className="flex items-center gap-2 mb-4">
                   <FaPhoneAlt className="text-primary text-xl" />
-                  <h6 className="text-lg font-semibold text-gray-800 m-0">Contact Details</h6>
+                  <h6 className="text-lg font-semibold text-ink m-0">Contact Details</h6>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
@@ -288,7 +292,7 @@ const CompanySettings: React.FC = () => {
                 </div>
               </div>
 
-              <div className="flex justify-center mt-8 pt-4 border-t border-gray-200">
+              <div className="flex justify-center mt-8 pt-4 border-t border-line-soft">
                 <Button text="Complete Onboarding" icon={FaSave} type="submit" disabled={loading} className="py-3 px-8 text-lg" />
               </div>
             </form>

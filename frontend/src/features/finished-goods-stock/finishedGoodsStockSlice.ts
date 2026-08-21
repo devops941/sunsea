@@ -36,7 +36,7 @@ const finishedGoodsStockSlice = createSlice({
                     (m) => String(m.storeId) === String(action.payload.storeId) && String(m.productItemId) === String(action.payload.productItemId)
                 );
                 if (!exists) {
-                    state.data.unshift(action.payload);
+                    state.data.push(action.payload);
                 }
             }
         },

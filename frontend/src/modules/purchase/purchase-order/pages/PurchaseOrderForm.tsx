@@ -25,7 +25,6 @@ import { purchaseOrderService } from "../../../../services/purchaseOrderService"
 import BackButton from "../../../../components/ui/BackButton/BackButton";
 import AddressForm from "../../../../components/form/AddressFrom/AddressFrom";
 import { useAppDispatch, useAppSelector } from "../../../../hooks/reduxHooks";
-import { fetchLocations } from "../../../../features/locations/locationSlice";
 import { selectActiveGstTaxes, fetchGstTaxes } from "../../../../features/gst/gstSlice";
 import { fetchStores } from "../../../../features/stores/storeSlice";
 import { useSocketSync } from "../../../../hooks/useSocketSync";
@@ -162,7 +161,6 @@ const PurchaseOrderForm: React.FC = () => {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [rawMaterials, setRawMaterials] = useState<RawMaterial[]>([]);
   const { data: company } = useSelector((state: any) => state.company);
-  const { data: locations } = useAppSelector(state => state.locations);
   const { data: stores } = useAppSelector(state => state.stores);
   const { activeUOMs, loadActiveUOMs } = useUOMs();
   const companyState = company?.state;
@@ -311,7 +309,6 @@ const PurchaseOrderForm: React.FC = () => {
 
   useEffect(() => {
     refreshSuppliers();
-    dispatch(fetchLocations(undefined));
     dispatch(fetchGstTaxes(undefined));
     refreshStores();
     loadActiveUOMs();
@@ -319,7 +316,7 @@ const PurchaseOrderForm: React.FC = () => {
     if (!isEdit) {
       fetchNextCode();
     }
-  }, [refreshSuppliers, dispatch, refreshStores, loadActiveUOMs, refreshRawMaterials, fetchNextCode, isEdit]);
+  }, [refreshSuppliers, dispatch, refreshStores, loadActiveUOMs, refreshRawMaterials, fetchNextCode, isEdit]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!isEdit && user) {
@@ -450,16 +447,9 @@ const PurchaseOrderForm: React.FC = () => {
     }
 
     if (name === "storeId") {
-      const selectedStore = (stores || []).find((s: any) => String(s.storeId) === String(value));
-      const selectedLoc = (locations || []).find((l: any) => String(l.locationId || l.id) === String(selectedStore?.locationId));
       setFormData((prev) => ({
         ...prev,
         storeId: value,
-        shippingAddressLine1: selectedLoc?.address || "",
-        shippingCity: selectedLoc?.city || "",
-        shippingState: selectedLoc?.state || "",
-        shippingPincode: (selectedLoc as any)?.pincode || "625017",
-        shippingCountry: selectedLoc?.country || "India",
       }));
       if (errors.storeId) {
         setErrors((prev) => ({ ...prev, storeId: "" }));

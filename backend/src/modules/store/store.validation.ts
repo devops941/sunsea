@@ -15,7 +15,7 @@ export const createStoreSchema = z.object({
     storeName: z
       .string()
       .min(1, "Store Name is required")
-      .max(50, "Store Name cannot exceed 50 characters"),
+      .max(100, "Store Name cannot exceed 100 characters"),
 
     storeCategory: StoreCategoryEnum.optional().nullable(),
 
@@ -26,7 +26,7 @@ export const createStoreSchema = z.object({
       .nullable(),
 
     storeCode: z.string().max(20).optional().nullable(),
-    locationDesc: z.string().max(120).optional().nullable(),
+    locationDesc: z.string().max(500).optional().nullable(),
     inchargeId: z.union([z.string(), z.number(), z.bigint()]).optional().nullable(),
     allowNegative: z.boolean().optional(),
     costMethod: z.string().max(10).optional(),

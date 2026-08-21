@@ -84,4 +84,12 @@ export class StockAdjustmentController {
       data: orders,
     });
   });
+
+  static getNextAdjustmentNumber = asyncHandler(async (_req: Request, res: Response) => {
+    const nextNumber = await StockAdjustmentService.getNextAdjustmentNumber();
+    res.json({
+      success: true,
+      data: nextNumber,
+    });
+  });
 }

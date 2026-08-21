@@ -5,15 +5,6 @@ import type { Product, CreateProductDto, UpdateProductDto } from "../features/pr
 const mapProduct = (p: any): Product => {
   return {
     ...p,
-    category: p.category ? {
-      id: p.category.id,
-      code: p.category.categoryCode,
-      name: p.category.categoryName,
-      description: p.category.description || "",
-      status: p.category.isActive ? "ACTIVE" : "INACTIVE",
-      createdAt: p.category.createdAt,
-      updatedAt: p.category.updatedAt
-    } : undefined,
     uom: p.uom ? {
       id: p.uom.id,
       code: p.uom.uomCode,
@@ -27,7 +18,7 @@ const mapProduct = (p: any): Product => {
 };
 
 export const productService = {
-  fetchAll: async (params?: { search?: string; categoryId?: string }): Promise<Product[]> => {
+  fetchAll: async (params?: { search?: string }): Promise<Product[]> => {
     const response = await apiClient.get(config.product.base, {
       params
     });

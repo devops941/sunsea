@@ -160,7 +160,6 @@ model User {
   loginAttempts         LoginAttempt[]
   passwordResetTokens   PasswordResetToken[]
   createdSalesOrders         SalesOrder[]         @relation("SalesOrderCreatedBy")
-  createdEstimatedOrders     OrdProcAuxMeta[]     @relation("EstimatedOrderCreatedBy")
   sessions                   UserSession[]
   employee              Employee?            @relation(fields: [employeeId], references: [id])
   role                  Role?                @relation(fields: [roleId], references: [id])
@@ -358,7 +357,6 @@ model Customer {
   company              Company                  @relation(fields: [companyId], references: [id])
   salesInvoices        SalesInvoice[]
   salesOrders          SalesOrder[]             @relation("CustomerSalesOrders")
-  estimatedOrders      OrdProcAuxMeta[]         @relation("CustomerEstimatedOrders")
   accountLedger        AccountLedger?
   salesReturns         SalesReturn[]
 
@@ -568,35 +566,6 @@ model Shift {
   @@map("shifts")
 }
 
-model Category {
-  id            Int           @id @default(autoincrement())
-  categoryCode  String        @unique
-  categoryName  String
-  description   String?
-  isActive      Boolean       @default(true)
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
-  products      Product[]
-  subCategories SubCategory[]
-
-  @@map("categories")
-}
-
-model SubCategory {
-  id              Int      @id @default(autoincrement())
-  subCategoryCode String   @unique
-  subCategoryName String
-  description     String?
-  categoryId      Int
-  isActive        Boolean  @default(true)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  category        Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-
-  @@unique([id, categoryId])
-  @@index([categoryId])
-  @@map("sub_categories")
-}
 
 model ProductImage {
   id        BigInt  @id @default(autoincrement())
@@ -614,7 +583,6 @@ model Product {
   productCode               String                     @unique
   productName               String
   description               String?
-  categoryId                Int
   uomId                     Int?
   capacityLitres            Decimal?                   @db.Decimal(6, 2)
   weightPerPiece            Decimal?                   @db.Decimal(10, 2)
@@ -629,6 +597,7 @@ model Product {
   hsnCode                   String?
   minimumQty                String                     @default("0") @map("minimum_qty")
   productType               ProductType                @default(PRODUCTION) @map("product_type")
+  categoryId                Int?                       @map("category_id")
   billOfMaterials           BillOfMaterial[]
   finishedGoodsStocks       FinishedGoodsStock[]
   finishedGoodsTransactions FinishedGoodsTransaction[]
@@ -637,11 +606,10 @@ model Product {
   productionOrders          ProductionOrder[]
   productionSteps           ProductionStep[]
   productionWastages        ProductionWastage[]
-  category                  Category                   @relation(fields: [categoryId], references: [id])
   uom                       UnitOfMeasure?             @relation(fields: [uomId], references: [id], onDelete: Restrict)
+  category                  Category?                  @relation(fields: [categoryId], references: [id])
   salesInvoiceItems         SalesInvoiceItem[]
   salesOrderItems           SalesOrderItem[]           @relation("SalesOrderItemProduct")
-  estimatedOrderItems       OrdProcAuxMetaItem[]       @relation("OrdProcAuxMetaItemProduct")
   salesReturnItems          SalesReturnItem[]
   StockAdjustmentItem       StockAdjustmentItem[]
   weeklyPrograms            WeeklyMachineProgram[]     @relation("ProductWeeklyPrograms")
@@ -649,7 +617,6 @@ model Product {
   capacityHistories         ProductCapacityHistory[]
   usedInSalesProducts       SalesProductComponent[]
 
-  @@index([categoryId])
   @@index([uomId])
   @@index([productName])
   @@map("products")
@@ -804,7 +771,7 @@ model Store {
   costMethod                String                     @default("WAVG") @map("cost_method") @db.VarChar(10)
   gstPlace                  String?                    @map("gst_place") @db.VarChar(50)
   inchargeId                BigInt?                    @map("incharge_id")
-  locationDesc              String?                    @map("location_desc") @db.VarChar(120)
+  locationDesc              String?                    @map("location_desc") @db.VarChar(500)
   status                    String                     @default("Active") @map("status") @db.VarChar(20)
   storeCode                 String?                    @unique @map("store_code") @db.VarChar(20)
   businessPlaceId           BigInt?
@@ -846,21 +813,6 @@ model StoreLocation {
   @@map("store_locations")
 }
 
-model RawMaterialCategory {
-  id           Int           @id @default(autoincrement())
-  categoryCode String        @unique @map("category_code") @db.VarChar(20)
-  categoryName String        @unique @map("category_name") @db.VarChar(100)
-  description  String?       @map("description") @db.VarChar(255)
-  isActive     Boolean       @default(true) @map("is_active")
-  createdAt    DateTime      @default(now()) @map("created_at")
-  updatedAt    DateTime      @updatedAt @map("updated_at")
-  createdBy    String?       @map("created_by") @db.VarChar(36)
-  updatedBy    String?       @map("updated_by") @db.VarChar(36)
-  rawMaterials RawMaterial[]
-
-  @@index([isActive])
-  @@map("raw_material_categories")
-}
 
 model RawMaterial {
   rawMaterialId           String                   @id @map("raw_material_id") @db.VarChar(20)
@@ -874,7 +826,6 @@ model RawMaterial {
   createdBy               String?                  @map("created_by") @db.VarChar(36)
   updatedBy               String?                  @map("updated_by") @db.VarChar(36)
   storeId                 String?                  @map("store_id") @db.VarChar(20)
-  categoryId              Int?                     @map("category_id")
   hsnCode                 String?                  @map("hsn_code") @db.VarChar(20)
   minimumStock            Decimal?                 @map("minimum_stock") @db.Decimal(14, 3)
   status                  String                   @default("Active") @map("status") @db.VarChar(20)
@@ -886,18 +837,18 @@ model RawMaterial {
   narration               String?                  @map("narration") @db.VarChar(255)
   itemType                String?                  @map("item_type") @db.VarChar(50)
   flaggedForReview        Boolean                  @default(false) @map("flagged_for_review")
+  categoryId              Int?                     @map("category_id")
   billOfMaterials         BillOfMaterial[]
   grnInvoiceItems         GrnInvoiceItem[]
   productionWastages      ProductionWastage[]
   targetedWastages        ProductionWastage[]      @relation("TargetWastageProduct")
   rawMaterialTransactions RawMaterialTransaction[]
-  category                RawMaterialCategory?     @relation(fields: [categoryId], references: [id])
   storeLocation           StoreLocation?           @relation(fields: [locationId], references: [id])
   purchaseReturnItems     PurchaseReturnItem[]
   store                   Store?                   @relation("StoreToRawMaterial", fields: [storeId], references: [storeId])
   StockAdjustmentItem     StockAdjustmentItem[]
+  category                Category?                @relation(fields: [categoryId], references: [id])
 
-  @@index([categoryId])
   @@index([storeId])
   @@index([locationId])
   @@index([isActive])
@@ -1295,61 +1246,6 @@ model SalesOrderItem {
   @@map("sales_order_items")
 }
 
-/// Estimated-pricing orders — parallel to sales_orders but for estimate-permission users.
-/// Super Admin also reads from this table. Field names are intentionally opaque;
-/// all sensitive columns are AES-256-GCM encrypted at the application layer.
-model OrdProcAuxMeta {
-  id         Int              @id @default(autoincrement())
-  orderNo    String           @unique @db.VarChar(30)
-  customerId String           @db.Uuid
-  status     SalesOrderStatus @default(DRAFT)
-  createdBy  String?
-  createdAt  DateTime         @default(now()) @db.Timestamptz(6)
-  updatedAt  DateTime         @updatedAt @db.Timestamptz(6)
-  a1         String           @db.Text
-  a2         String           @db.Text
-  a3         String?          @db.Text
-  a4         String?          @db.Text
-  a5         String?          @db.Text
-  a6         String?          @db.Text
-  a7         String?          @db.Text
-  a8         String?          @db.Text
-  a9         String           @db.Text
-  a10        String           @db.Text
-  a11        String           @db.Text
-  a12        String           @db.Text
-  a13        String           @db.Text
-  a14        String           @db.Text
-  a15        String?          @db.Text
-  a16        String?          @db.Text
-  sourceSalesOrderId Int?     @map("source_sales_order_id")
-  sourceEstOrderId   Int?     @map("source_est_order_id")
-
-  items         OrdProcAuxMetaItem[]
-  customer      Customer             @relation("CustomerEstimatedOrders", fields: [customerId], references: [id])
-  createdByUser User?                @relation("EstimatedOrderCreatedBy", fields: [createdBy], references: [userId])
-
-  @@index([customerId])
-  @@map("ord_proc_aux_meta")
-}
-
-/// Items for estimated orders — all numeric/sensitive fields are AES-256-GCM encrypted.
-model OrdProcAuxMetaItem {
-  id        BigInt         @id @default(autoincrement())
-  auxMetaId Int            @map("aux_meta_id")
-  productId BigInt
-  b1        String         @db.Text
-  b2        String         @db.Text
-  b3        String         @db.Text
-
-  product   Product        @relation("OrdProcAuxMetaItemProduct", fields: [productId], references: [id])
-  auxMeta   OrdProcAuxMeta @relation(fields: [auxMetaId], references: [id], onDelete: Cascade)
-
-  @@index([auxMetaId])
-  @@index([productId])
-  @@map("ord_proc_aux_meta_items")
-}
-
 model PurchaseOrder {
   id                   String              @id @default(uuid()) @db.Uuid
   poNumber             String              @unique
@@ -1570,6 +1466,7 @@ model ProductionWastage {
   updatedAt              DateTime          @updatedAt @map("updated_at")
   targetWastageProductId String?           @map("target_wastage_product_id") @db.VarChar(20)
   storeId                String?           @map("store_id") @db.VarChar(20)
+  categoryId             Int?              @map("category_id")
   hourlyProduction       HourlyProduction? @relation(fields: [hourlyProductionId], references: [hourlyProductionId])
   machine                Machine           @relation(fields: [machineId], references: [machineId], onDelete: Cascade)
   product                Product           @relation(fields: [productId], references: [id], onDelete: Cascade)
@@ -1578,6 +1475,7 @@ model ProductionWastage {
   shift                  Shift             @relation(fields: [shiftId], references: [shiftCode], onDelete: Cascade)
   store                  Store?            @relation(fields: [storeId], references: [storeId])
   targetWastageProduct   RawMaterial?      @relation("TargetWastageProduct", fields: [targetWastageProductId], references: [rawMaterialId])
+  category               Category?         @relation(fields: [categoryId], references: [id])
 
   @@index([productionOrderId])
   @@index([hourlyProductionId])
@@ -1878,6 +1776,7 @@ model ProductCapacityHistory {
   @@map("product_capacity_history")
 }
 
+
 enum BusinessPlaceType {
   HEAD_OFFICE
   BRANCH_OFFICE
@@ -2096,6 +1995,33 @@ enum VoucherType {
   SALES_RETURN
   PURCHASE_RETURN
   EXPENSE
+}
+
+enum CategoryType {
+  PRODUCT
+  RAW_MATERIAL
+  WASTAGE
+}
+
+model Category {
+  id          Int          @id @default(autoincrement())
+  code        String       @unique @db.VarChar(20)
+  name        String       @db.VarChar(100)
+  description String?      @db.VarChar(255)
+  type        CategoryType
+  isActive    Boolean      @default(true) @map("is_active")
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+  createdBy   String?      @map("created_by") @db.VarChar(36)
+  updatedBy   String?      @map("updated_by") @db.VarChar(36)
+
+  rawMaterials       RawMaterial[]
+  products           Product[]
+  productionWastages ProductionWastage[]
+
+  @@index([type])
+  @@index([isActive])
+  @@map("categories")
 }
 
 model AccountLedger {

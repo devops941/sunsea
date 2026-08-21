@@ -331,10 +331,7 @@ const STANDARD_ACTION_KEYS = new Set(ACTIONS.map(a => a.key));
  * Mutually exclusive extra permissions — if one is assigned the other is blocked.
  * Key = action that is ON → Value = action that must stay OFF.
  */
-const MUTUALLY_EXCLUSIVE: Record<string, string> = {
-  "view-gst":      "view-estimate",
-  "view-estimate": "view-gst",
-};
+const MUTUALLY_EXCLUSIVE: Record<string, string> = {};
 
 /** Format "view-gst" → "View GST", "view-estimate" → "View Estimate" */
 function formatActionLabel(action: string): string {

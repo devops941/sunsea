@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { FaSearch, FaPlus, FaCog } from "react-icons/fa";
+import { FaPlus, FaCog } from "react-icons/fa";
 import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 
@@ -15,9 +15,9 @@ import DataTable, { type DataTableColumn } from "../../../components/ui/table/Da
 import DatePickerCalendar from "../../../components/ui/DatePickerCalendar/DatePickerCalendar";
 import MultiSelect from "../../../components/form/multiSelect/MultiSelect";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
+import SearchInput from "../../../components/ui/SearchInput/SearchInput";
 import TextInput from "../../../components/form/TextInput/TextInput";
 import { useProducts } from "../../../hooks/useProducts";
-import { useCategories } from "../../../hooks/useCategories";
 import { productCapacityHistoryService } from "../../../services/productCapacityHistoryService";
 import { employeeService } from "../../../services/employeeService";
 import { departmentService } from "../../../services/departmentService";
@@ -27,13 +27,13 @@ import { machineService } from "../../../services/machineService";
 import { useSocketSync } from "../../../hooks/useSocketSync";
 import { usePermission } from "../../../hooks/usePermission";
 import { getImageUrl } from "../../../utils/ImageUrls";
+import { categoryService } from "../../../services/categoryService";
 
 const ITEMS_PER_PAGE = 10;
 
 const ProductList: React.FC = () => {
     const navigate = useNavigate();
     const { products, loading, error, loadProducts, removeProduct } = useProducts();
-    const { categories, loadCategories } = useCategories();
     const { can } = usePermission();
 
     const [showViewModal, setShowViewModal] = useState(false);
@@ -47,6 +47,7 @@ const ProductList: React.FC = () => {
 
     const [searchTerm, setSearchTerm] = useState(initialSearch);
     const [categoryFilter, setCategoryFilter] = useState("");
+    const [categoryOptions, setCategoryOptions] = useState<{ label: string; value: string }[]>([]);
 
     // Custom confirm delete state
     const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -73,12 +74,6 @@ const ProductList: React.FC = () => {
 
     useEffect(() => {
         if (can("products.view")) {
-            loadCategories({ isActive: true });
-        }
-    }, [can, loadCategories]);
-
-    useEffect(() => {
-        if (can("products.view")) {
             employeeService.fetchAll({ limit: 500 }).then((res: any) => {
                 const data = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : Array.isArray(res?.employees) ? res.employees : [];
                 setEmployees(data);
@@ -98,18 +93,23 @@ const ProductList: React.FC = () => {
             machineService.getAll().then((res: any) => {
                 const data = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
                 setMachines(data);
-            }).catch((err: any) => {
-                console.error("Failed to fetch machines:", err);
-            });
+            }).catch(() => {});
         }
     }, [can]);
+
+    useEffect(() => {
+        categoryService.fetchAll({ type: "PRODUCT", isActive: true }).then((res: any) => {
+            const list = res?.categories ?? res ?? [];
+            setCategoryOptions(Array.isArray(list) ? list.map((c: any) => ({ label: c.name, value: String(c.id) })) : []);
+        }).catch(() => {});
+    }, []);
 
     useEffect(() => {
         const timer = setTimeout(() => {
             if (can("products.view")) {
                 loadProducts({ search: searchTerm, categoryId: categoryFilter || undefined });
             }
-        }, 500);
+        }, 300);
         return () => clearTimeout(timer);
     }, [searchTerm, categoryFilter, loadProducts, can]);
 
@@ -132,15 +132,15 @@ const ProductList: React.FC = () => {
         }
     });
 
-    const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleSearch = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
         setSearchTerm(e.target.value);
         setCurrentPage(1);
-    };
+    }, []);
 
-    const handleCategoryFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const handleCategoryFilter = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
         setCategoryFilter(e.target.value);
         setCurrentPage(1);
-    };
+    }, []);
 
     const handleView = useCallback(async (product: any) => {
         setSelectedProduct(product);
@@ -149,8 +149,7 @@ const ProductList: React.FC = () => {
         try {
             const records = await productCapacityHistoryService.fetchByProduct(Number(product.id));
             setCapacityRecords(records);
-        } catch (err) {
-            console.error("Failed to load capacity history:", err);
+        } catch {
             setCapacityRecords([]);
         } finally {
             setLoadingCapacity(false);
@@ -163,7 +162,7 @@ const ProductList: React.FC = () => {
         });
     }, [navigate]);
 
-    const openCapModal = (product: any) => {
+    const openCapModal = useCallback((product: any) => {
         setCapProduct(product);
         setCapDate(new Date().toISOString().split("T")[0]);
         setCapShift("");
@@ -178,7 +177,7 @@ const ProductList: React.FC = () => {
         productCapacityHistoryService.fetchByProduct(Number(product.id))
             .then((records: any[]) => setCapHistoryRecords(records))
             .catch(() => setCapHistoryRecords([]));
-    };
+    }, []);
 
     // Derive current capacity for the selected machine (highest recorded newCapacity)
     const getMachineCurrentCap = (machineId: string): number => {
@@ -221,7 +220,7 @@ const ProductList: React.FC = () => {
             });
             toast.success("Capacity updated successfully!");
             setShowCapModal(false);
-            loadProducts(searchTerm);
+            loadProducts({ search: searchTerm, categoryId: categoryFilter || undefined });
         } catch (err: any) {
             toast.error(err.message || "Failed to update capacity");
         } finally {
@@ -235,13 +234,13 @@ const ProductList: React.FC = () => {
     }, []);
 
     const handleDeleteConfirm = async () => {
-        if (productToDelete !== null) {
+        if (productToDelete !== null && !isDeleting) {
             setIsDeleting(true);
             try {
                 await removeProduct(productToDelete);
                 toast.success("Product deleted successfully!");
             } catch (err: any) {
-                const errorMessage = typeof err === 'string' ? err : err?.message || "Failed to delete product";
+                const errorMessage = typeof err === 'string' ? err : err?.response?.data?.message || err?.message || "Failed to delete product";
                 toast.error(errorMessage);
             } finally {
                 setIsDeleting(false);
@@ -267,7 +266,6 @@ const ProductList: React.FC = () => {
     const columns: DataTableColumn<any>[] = [
         { header: "#", render: (_, index) => startIndex + index + 1, width: "60px", align: "center" },
         { header: "Product Name", accessor: "productName" },
-        { header: "Category", render: (product) => product.category?.name || product.category?.categoryName || "N/A" },
         {
             header: "Product Type",
             render: (product) => (
@@ -324,27 +322,21 @@ const ProductList: React.FC = () => {
                         <div>
                             <h2 className="text-2xl font-bold text-ink">Production Product</h2>
                         </div>
-                        <div className="flex items-center gap-3 w-full md:w-auto">
-                            <div className="w-full md:w-48">
+                        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+                            <div className="w-48">
                                 <SelectInput
-                                    hideLabel
                                     name="categoryFilter"
                                     value={categoryFilter}
-                                    onChange={handleCategoryFilterChange}
-                                    options={[
-                                        { value: "", label: "All Categories" },
-                                        ...(categories || []).map((c: any) => ({ value: String(c.id), label: c.name })),
-                                    ]}
+                                    onChange={handleCategoryFilter}
+                                    options={categoryOptions}
+                                    defaultOptionLabel="All Categories"
                                 />
                             </div>
-                            <div className="relative w-full md:w-64">
-                                <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-subtle" />
-                                <input
-                                    type="text"
-                                    className="w-full pl-10 pr-4 py-2 bg-card border border-line rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-                                    placeholder="Search product..."
+                            <div className="w-full md:w-64">
+                                <SearchInput
                                     value={searchTerm}
                                     onChange={handleSearch}
+                                    placeholder="Search product..."
                                 />
                             </div>
                             {can("products.create") && <CustomButton text="Add Product" icon={FaPlus} onClick={() => navigate("/products/create")} />}
@@ -380,7 +372,6 @@ const ProductList: React.FC = () => {
                             fields: [
                                 { label: "Product Name", value: selectedProduct.productName },
                                 { label: "Product Code", value: selectedProduct.productCode },
-                                { label: "Category", value: selectedProduct.category?.name || selectedProduct.category?.categoryName || "N/A" },
                                 { label: "Product Type", value: selectedProduct.productType === "SALES_PRODUCTION" ? "Sales Production" : "Production" },
                                 {
                                     label: "Weight per Piece", value: (() => {
@@ -486,8 +477,8 @@ const ProductList: React.FC = () => {
 
                             {/* Capacity History Section */}
                             <div>
-                                <h6 className="text-sm font-semibold text-ink mb-2">
-                                    Capacity History
+                                <h6 className="text-sm font-semibold text-ink mb-2 flex items-center justify-between">
+                                    <span>Capacity History</span>
                                     {selectedProduct?.capacityLitres != null && (
                                         <span className="text-xs font-normal text-ink-subtle ms-2">
                                             (Current: {Number(selectedProduct.capacityLitres).toLocaleString()} / Shift)
@@ -495,58 +486,62 @@ const ProductList: React.FC = () => {
                                     )}
                                 </h6>
                                 {loadingCapacity ? (
-                                    <div className="text-center py-3 text-sm text-ink-subtle">Loading...</div>
-                                ) : capacityRecords.filter(r => r.machineId !== "INITIAL").length > 0 ? (
-                                    <div className="border border-line rounded-lg overflow-hidden">
+                                    <div className="text-center py-4 text-sm text-ink-subtle">Loading...</div>
+                                ) : capacityRecords.length > 0 ? (
+                                    <div className="border border-line rounded-lg overflow-x-auto max-w-full">
                                         <table className="w-full text-left text-sm whitespace-nowrap">
                                             <thead className="bg-card-2 text-ink-muted">
                                                 <tr>
-                                                    <th className="px-4 py-2 font-semibold border-b border-line">Type</th>
-                                                    <th className="px-4 py-2 font-semibold border-b border-line">Date</th>
-                                                    <th className="px-4 py-2 font-semibold border-b border-line">Shift</th>
-                                                    <th className="px-4 py-2 font-semibold border-b border-line">Operators</th>
-                                                    <th className="px-4 py-2 font-semibold border-b border-line text-right">Capacity</th>
+                                                    <th className="px-4 py-2.5 font-semibold border-b border-line">Type</th>
+                                                    <th className="px-4 py-2.5 font-semibold border-b border-line">Date</th>
+                                                    <th className="px-4 py-2.5 font-semibold border-b border-line">Shift</th>
+                                                    <th className="px-4 py-2.5 font-semibold border-b border-line">Machine</th>
+                                                    <th className="px-4 py-2.5 font-semibold border-b border-line">Operators</th>
+                                                    <th className="px-4 py-2.5 font-semibold border-b border-line text-right">Capacity</th>
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-line bg-card">
                                                 {(() => {
-                                                    const filtered = capacityRecords.filter((r: any) => r.machineId !== "INITIAL");
                                                     // Group by machineId, preserving order-of-first-appearance
                                                     const groups: Record<string, any[]> = {};
                                                     const machineOrder: string[] = [];
-                                                    filtered.forEach((r: any) => {
-                                                        if (!groups[r.machineId]) {
-                                                            groups[r.machineId] = [];
-                                                            machineOrder.push(r.machineId);
+                                                    capacityRecords.forEach((r: any) => {
+                                                        const key = r.machineId || "INITIAL";
+                                                        if (!groups[key]) {
+                                                            groups[key] = [];
+                                                            machineOrder.push(key);
                                                         }
-                                                        if (groups[r.machineId].length < 2) {
-                                                            groups[r.machineId].push(r);
+                                                        if (groups[key].length < 2) {
+                                                            groups[key].push(r);
                                                         }
                                                     });
                                                     return machineOrder.map((machineId) => {
+                                                        const isInitial = machineId === "INITIAL";
                                                         const machineObj = machines.find((m: any) => m.machineId === machineId);
-                                                        const machineName = machineObj?.machineName || machineId;
+                                                        const machineName = isInitial ? "Initial Setup" : (machineObj?.machineName || machineId);
                                                         return (
                                                         <React.Fragment key={machineId}>
-                                                            {/* Machine group header: show id + name */}
-                                                            <tr className="bg-card-2">
-                                                                <td colSpan={5} className="px-4 py-1.5 text-xs font-bold text-ink-muted uppercase tracking-wider">
-                                                                    {machineId}{machineName !== machineId && <span className="font-normal normal-case text-ink-subtle ms-1">— {machineName}</span>}
+                                                            {/* Machine group header */}
+                                                            <tr className="bg-card-2/80">
+                                                                <td colSpan={6} className="px-4 py-2 text-xs font-bold text-ink-muted uppercase tracking-wider border-b border-line/60">
+                                                                    {isInitial ? "Initial Setup" : machineId}
+                                                                    {!isInitial && machineName !== machineId && <span className="font-normal normal-case text-ink-subtle ms-1.5">— {machineName}</span>}
                                                                 </td>
                                                             </tr>
                                                             {groups[machineId].map((r: any, idx: number) => {
                                                                 const isCurrent = idx === 0;
                                                                 return (
-                                                                    <tr key={r.id || `${machineId}-${idx}`} className={`hover:bg-card-2/50 transition-colors ${isCurrent ? "bg-blue-50/40" : ""}`}>
-                                                                        <td className="px-4 py-2">
-                                                                            <span className={`inline-flex items-center gap-1 text-xs font-bold uppercase tracking-wider ${isCurrent ? "text-blue-600" : "text-ink-subtle"}`}>
-                                                                                {isCurrent ? "Current" : "Previous"}
+                                                                    <tr key={r.id || `${machineId}-${idx}`} className={`hover:bg-card-2/50 transition-colors ${isCurrent ? "bg-primary/10" : ""}`}>
+                                                                        <td className="px-4 py-2.5">
+                                                                            <span className={`inline-flex items-center gap-1 text-xs font-bold uppercase tracking-wider ${isInitial ? "text-emerald-500" : isCurrent ? "text-primary" : "text-ink-subtle"}`}>
+                                                                                {isInitial ? "Initial" : isCurrent ? "Current" : "Previous"}
                                                                             </span>
                                                                         </td>
-                                                                        <td className="px-4 py-2">{new Date(r.productionDate).toLocaleDateString()}</td>
-                                                                        <td className="px-4 py-2">{r.shiftId || "-"}</td>
-                                                                        <td className="px-4 py-2">{r.operators || "-"}</td>
-                                                                        <td className="px-4 py-2 text-right font-semibold">{Number(r.newCapacity).toLocaleString()}</td>
+                                                                        <td className="px-4 py-2.5 text-ink">{new Date(r.productionDate).toLocaleDateString()}</td>
+                                                                        <td className="px-4 py-2.5 text-ink">{r.shiftId && r.shiftId !== "INITIAL" ? r.shiftId : "-"}</td>
+                                                                        <td className="px-4 py-2.5 text-ink">{isInitial ? "-" : (machineObj?.machineName || machineId)}</td>
+                                                                        <td className="px-4 py-2.5 text-ink">{r.operators || "-"}</td>
+                                                                        <td className="px-4 py-2.5 text-right font-semibold text-ink">{Number(r.newCapacity).toLocaleString()}</td>
                                                                     </tr>
                                                                 );
                                                             })}
@@ -558,7 +553,7 @@ const ProductList: React.FC = () => {
                                         </table>
                                     </div>
                                 ) : (
-                                    <div className="text-center py-3 text-sm text-ink-subtle">No capacity history available.</div>
+                                    <div className="text-center py-4 text-sm text-ink-subtle bg-card-2/40 rounded-lg border border-line/50">No capacity history available.</div>
                                 )}
                             </div>
                         </div>
@@ -567,15 +562,14 @@ const ProductList: React.FC = () => {
 
                 {/* Custom Delete Confirm Modal */}
                 <CommonConfirmModal
-                    isOpen={showDeleteModal}
-                    onClose={() => setShowDeleteModal(false)}
+                    show={showDeleteModal}
+                    onHide={() => setShowDeleteModal(false)}
                     onConfirm={handleDeleteConfirm}
                     title="Confirm Delete"
                     message="Are you sure you want to delete this product?"
                     confirmText={isDeleting ? "Deleting..." : "Delete"}
-                    cancelText="Cancel"
+                    confirmVariant="danger"
                     isDangerous={true}
-                    isLoading={isDeleting}
                 />
 
                 {/* Manual Capacity Change Modal */}

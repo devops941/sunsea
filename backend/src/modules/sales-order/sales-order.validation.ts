@@ -93,19 +93,6 @@ const salesOrderItemInputSchema = z.object({
 });
 
 /**
- * Estimated item input — one estimated rate per product.
- * Stored encrypted in the auxiliary table.
- */
-const estimatedItemInputSchema = z.object({
-    productId: z.union([z.string(), z.number()])
-        .refine((val) => !isNaN(Number(val)), "Product ID must be a valid number"),
-    estimatedRate: z.union([z.number(), z.string()]).transform(Number).refine((val) => Number.isFinite(val) && val > 0, "Estimated rate must be positive"),
-    estimatedQuantity: z.union([z.number(), z.string()]).optional().nullable().transform((val) => (val != null && val !== "" && !isNaN(Number(val)) ? Number(val) : undefined)),
-});
-
-export type EstimatedItemInput = z.infer<typeof estimatedItemInputSchema>;
-
-/**
  * Create Sales Order Validation
  */
 
@@ -126,9 +113,6 @@ const salesOrderBodyShape = z.object({
     orderDiscountType: DiscountTypeEnum.optional().nullable(),
     orderDiscountValue: z.coerce.number().min(0).optional().nullable(),
     items: z.array(salesOrderItemInputSchema).min(1, "At least one item is required"),
-    // Estimated pricing section — encrypted at rest, restricted by sales-orders.view-estimate permission
-    estimatedItems: z.array(estimatedItemInputSchema).optional().nullable(),
-    estimatedNarration: z.string().max(1000).optional().nullable(),
 });
 
 const salesOrderBodyRefined = salesOrderBodyShape.superRefine((data, ctx) => {

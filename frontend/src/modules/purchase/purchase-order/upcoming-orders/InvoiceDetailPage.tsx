@@ -17,7 +17,6 @@ import { purchaseOrderService } from "../../../../services/purchaseOrderService"
 import { grnInvoiceService } from "../../../../services/grnInvoiceService";
 import type { PurchaseOrder } from "../../../../features/purchaseOrder/types";
 import { useAppDispatch, useAppSelector } from "../../../../hooks/reduxHooks";
-import { fetchLocations } from "../../../../features/locations/locationSlice";
 import { useSuppliers } from "../../../../hooks/useSuppliers";
 import { useUOMs } from "../../../../hooks/useUOMs";
 import { rawMaterialService } from "../../../../services/rawMaterialService";
@@ -73,7 +72,6 @@ const InvoiceDetailPage: React.FC = () => {
     const isEditMode = Boolean(id);
     const dispatch = useAppDispatch();
     const { suppliers, loadSuppliers } = useSuppliers();
-    const { data: locations } = useAppSelector((state: any) => state.locations);
     const { data: stores } = useAppSelector((state: any) => state.stores);
     const gstTaxes = useAppSelector(selectActiveGstTaxes);
     const gstLoading = useAppSelector((state: any) => state.gst.loading);
@@ -150,7 +148,6 @@ const InvoiceDetailPage: React.FC = () => {
 
     // ── Fetch on mount ────────────────────────────────────────────────────────────
     useEffect(() => {
-        dispatch(fetchLocations(undefined));
         dispatch(fetchGstTaxes(undefined));
         dispatch(fetchStores({ storeCategory: "RAW_MATERIAL" }));
         loadActiveUOMs();
@@ -426,7 +423,7 @@ const InvoiceDetailPage: React.FC = () => {
             })
             .catch(() => toast.error("Failed to load PO details"))
             .finally(() => setLoadingPO(false));
-    }, [form.poId, locations, suppliers, stores]);
+    }, [form.poId, suppliers, stores]);
 
     // ── When supplier selected manually → auto-fill supplier details ──────────────
     useEffect(() => {
@@ -463,32 +460,18 @@ const InvoiceDetailPage: React.FC = () => {
         }
     }, [form.supplierId, form.poId, suppliers]);
 
-    // ── When store selected manually → auto-fill shipping ──────────────────────
+    // ── When store selected manually → clear shipping fields ──────────────────────
     useEffect(() => {
         if (form.poId) return;
-        const storeObj = (stores || []).find((s: any) => String(s.storeId) === String(form.storeId));
-        const locObj = (locations || []).find((l: any) => String(l.locationId || l.id) === String(storeObj?.locationId));
-        if (locObj) {
-            setForm((prev) => ({
-                ...prev,
-                shippingAddressLine1: locObj.address || "",
-                shippingCity: locObj.city || "",
-                shippingState: locObj.state || "",
-                shippingPincode: (locObj as any).pincode || "625017",
-                shippingCountry: locObj.country || "India",
-                sameAsBilling: false,
-            }));
-        } else {
-            setForm((prev) => ({
-                ...prev,
-                shippingAddressLine1: "",
-                shippingCity: "",
-                shippingState: "",
-                shippingPincode: "",
-                shippingCountry: "India",
-            }));
-        }
-    }, [form.storeId, form.poId, stores, locations]);
+        setForm((prev) => ({
+            ...prev,
+            shippingAddressLine1: "",
+            shippingCity: "",
+            shippingState: "",
+            shippingPincode: "",
+            shippingCountry: "India",
+        }));
+    }, [form.storeId, form.poId, stores]);
 
     // ── Same as billing sync effect ──────────────────────────────────────────────
     useEffect(() => {

@@ -41,6 +41,7 @@ export const createProductionWastageSchema = z.object({
     isRecyclable: z.boolean().optional().default(false),
     sentForRework: z.boolean().optional().default(false),
     status: WastageStatusEnum.optional().default("DRAFT"),
+    categoryId: z.number().int().positive().optional().nullable(),
   }),
 });
 

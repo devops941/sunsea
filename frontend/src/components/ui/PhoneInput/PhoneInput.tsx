@@ -420,20 +420,20 @@ const IndiaPhoneInput: React.FC<IndiaPhoneInputProps> = (props) => {
                         <div
                             className="
                                 absolute z-[100000] top-[calc(100%+4px)] left-0 right-0
-                                bg-white border border-gray-100 rounded-lg
-                                shadow-lg overflow-hidden
+                                bg-card border border-line-soft rounded-lg
+                                shadow-xl overflow-hidden text-ink
                                 animate-in fade-in zoom-in-95 duration-100
                             "
                         >
                             {/* add-entry row */}
                             {!atMax && availableTypes.length > 0 && (
-                                <div className="p-2.5 border-b border-slate-100 flex flex-col gap-2">
+                                <div className="p-2.5 border-b border-line-soft flex flex-col gap-2">
                                     <select
                                         value={draftName}
                                         onChange={(e) => handleNameChange(e.target.value)}
                                         className="
-                                            h-9 px-3 rounded-md border border-slate-200 bg-slate-50
-                                            text-[14px] font-medium text-slate-800
+                                            h-9 px-3 rounded-md border border-line-soft bg-card-2
+                                            text-[14px] font-medium text-ink
                                             outline-none appearance-none
                                             focus:border-primary transition-colors duration-200
                                         "
@@ -446,15 +446,15 @@ const IndiaPhoneInput: React.FC<IndiaPhoneInputProps> = (props) => {
                                     <div
                                         className={`
                                             flex items-center gap-2
-                                            h-10 px-3 rounded-md border bg-slate-50
+                                            h-10 px-3 rounded-md border bg-card-2
                                             transition-colors duration-200
                                             ${draftError
                                                 ? 'border-red-400'
-                                                : 'border-slate-200 focus-within:border-primary'
+                                                : 'border-line-soft focus-within:border-primary'
                                             }
                                         `}
                                     >
-                                        <span className="text-[15px] font-medium text-slate-500 select-none">+91</span>
+                                        <span className="text-[15px] font-medium text-ink-subtle select-none">+91</span>
                                         <input
                                             type="text"
                                             inputMode="numeric"
@@ -465,8 +465,8 @@ const IndiaPhoneInput: React.FC<IndiaPhoneInputProps> = (props) => {
                                             onKeyDown={handleKeyDown}
                                             className="
                                                 flex-1 h-full border-none outline-none bg-transparent
-                                                text-[15px] font-medium text-slate-800
-                                                placeholder:text-slate-400
+                                                text-[15px] font-medium text-ink
+                                                placeholder:text-ink-subtle/60
                                             "
                                         />
                                     </div>
@@ -482,7 +482,7 @@ const IndiaPhoneInput: React.FC<IndiaPhoneInputProps> = (props) => {
                             {/* selected entries list */}
                             <div className="max-h-48 overflow-y-auto py-1">
                                 {entries.length === 0 ? (
-                                    <div className="px-4 py-3 text-sm text-gray-400 text-center">
+                                    <div className="px-4 py-3 text-sm text-ink-subtle text-center">
                                         No numbers added yet
                                     </div>
                                 ) : (
@@ -491,17 +491,17 @@ const IndiaPhoneInput: React.FC<IndiaPhoneInputProps> = (props) => {
                                             key={`${entry.number}-${idx}`}
                                             className="
                                                 flex items-center justify-between gap-2
-                                                px-4 py-2 hover:bg-gray-50
+                                                px-4 py-2 hover:bg-card-2
                                                 transition-colors duration-150
                                             "
                                         >
                                             <span className="flex items-center gap-2 min-w-0">
                                                 <Check size={14} className="text-primary shrink-0 mt-0.5" />
                                                 <span className="flex flex-col min-w-0">
-                                                    <span className="text-[14px] font-semibold text-gray-800 leading-tight">
+                                                    <span className="text-[14px] font-semibold text-ink leading-tight">
                                                         {formatNumber(entry.number)}
                                                     </span>
-                                                    <span className="text-[11px] font-medium text-gray-400 leading-tight">
+                                                    <span className="text-[11px] font-medium text-ink-subtle leading-tight">
                                                         {entry.label}
                                                     </span>
                                                 </span>
@@ -513,7 +513,7 @@ const IndiaPhoneInput: React.FC<IndiaPhoneInputProps> = (props) => {
                                                 className="
                                                     flex items-center justify-center
                                                     w-6 h-6 rounded-full shrink-0
-                                                    text-gray-400 hover:text-red-500 hover:bg-red-50
+                                                    text-ink-subtle hover:text-red-500 hover:bg-red-500/10
                                                     transition-colors duration-150
                                                 "
                                             >
@@ -525,7 +525,7 @@ const IndiaPhoneInput: React.FC<IndiaPhoneInputProps> = (props) => {
                             </div>
 
                             {atMax && (
-                                <div className="px-4 py-2 text-xs font-medium text-gray-400 border-t border-gray-100">
+                                <div className="px-4 py-2 text-xs font-medium text-ink-subtle border-t border-line-soft">
                                     Maximum {maxNumbers} numbers added
                                 </div>
                             )}

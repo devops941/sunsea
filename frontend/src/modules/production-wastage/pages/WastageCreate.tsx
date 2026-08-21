@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { FaSave, FaArrowLeft } from "react-icons/fa";
+import { FaSave } from "react-icons/fa";
+import CustomButton from "../../../components/ui/Button/Button";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
@@ -14,6 +15,7 @@ import TextInput from "../../../components/form/TextInput/TextInput";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import { z } from "zod";
 import BackButton from "../../../components/ui/BackButton/BackButton";
+import { categoryService } from "../../../services/categoryService";
 
 const wastageSchema = z.object({
   wastageDate: z.string().min(1, "Wastage date is required"),
@@ -83,10 +85,12 @@ const WastageForm: React.FC = () => {
     remarks: "",
     isRecyclable: false,
     sentForRework: false,
+    categoryId: "" as string | number,
   });
 
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [categoryOptions, setCategoryOptions] = useState<{ label: string; value: string | number }[]>([]);
 
   useEffect(() => {
     dispatch(fetchProductionOrders());
@@ -95,6 +99,13 @@ const WastageForm: React.FC = () => {
     dispatch(fetchShifts());
     dispatch(fetchRawMaterials(undefined));
     dispatch(fetchActiveUOMs());
+    categoryService.fetchAll({ type: "WASTAGE", isActive: true }).then((res) => {
+      const list = res?.categories ?? res ?? [];
+      setCategoryOptions([
+        { label: "Select Category", value: "" },
+        ...list.map((c: any) => ({ label: c.name, value: c.id })),
+      ]);
+    }).catch(() => {});
   }, [dispatch]);
 
   // Load existing log details if in edit mode
@@ -119,6 +130,7 @@ const WastageForm: React.FC = () => {
         remarks: state.remarks || "",
         isRecyclable: Boolean(state.isRecyclable),
         sentForRework: Boolean(state.sentForRework),
+        categoryId: state.categoryId ?? "",
       });
     }
   }, [isEdit, location.state]);
@@ -160,6 +172,8 @@ const WastageForm: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (loading) return;
+
     const result = wastageSchema.safeParse(formData);
     if (!result.success) {
       const fieldErrors: Record<string, string> = {};
@@ -182,10 +196,11 @@ const WastageForm: React.FC = () => {
       reason: formData.reason || null,
       correctiveAction: formData.correctiveAction || null,
       remarks: formData.remarks || null,
+      categoryId: formData.categoryId ? Number(formData.categoryId) : null,
       status: "APPROVED",
     };
 
-    setLoading(false);
+    setLoading(true);
     try {
       if (isEdit) {
         await dispatch(
@@ -263,7 +278,7 @@ const WastageForm: React.FC = () => {
                 </div>
                 <div>
                   <SelectInput
-                    label="Wastage Type classification"
+                    label="Wastage Type Classification"
                     name="wastageType"
                     value={formData.wastageType}
                     options={WASTAGE_TYPES}
@@ -271,6 +286,16 @@ const WastageForm: React.FC = () => {
                     required
                   />
                   {errors.wastageType && <span className="text-red-500 text-xs mt-1 block">{errors.wastageType}</span>}
+                </div>
+                <div>
+                  <SelectInput
+                    label="Wastage Category"
+                    name="categoryId"
+                    value={formData.categoryId}
+                    options={categoryOptions}
+                    onChange={handleChange}
+                    searchable
+                  />
                 </div>
                 <div>
                   <SelectInput
@@ -462,25 +487,19 @@ const WastageForm: React.FC = () => {
             </div>
 
             <div className="p-6 bg-white border-t border-slate-200 flex justify-end gap-3 rounded-b-2xl">
-              <button
+              <CustomButton
                 type="button"
-                className="px-6 py-2.5 rounded-lg text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 font-semibold transition-colors flex items-center gap-2"
+                text="Cancel"
+                variant="secondary"
                 onClick={() => navigate("/production-wastages")}
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="px-6 py-2.5 rounded-lg text-white font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                style={{ backgroundColor: "var(--color-primary, #003428)" }}
                 disabled={loading}
-              >
-                {loading ? (
-                  <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> Saving...</>
-                ) : (
-                  <><FaSave /> {isEdit ? "Update Log" : "Submit Log"}</>
-                )}
-              </button>
+              />
+              <CustomButton
+                type="submit"
+                text={loading ? "Saving..." : isEdit ? "Update Log" : "Submit Log"}
+                icon={FaSave}
+                disabled={loading}
+              />
             </div>
           </form>
         </div>

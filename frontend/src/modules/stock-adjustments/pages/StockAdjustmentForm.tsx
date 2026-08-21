@@ -11,6 +11,7 @@ import {
   updateStockAdjustment,
   clearCurrent,
   fetchProductionOrdersForIssue,
+  fetchNextAdjustmentNumber,
 } from "../../../features/stock-adjustments/stockAdjustmentSlice";
 import { fetchRawMaterials } from "../../../features/raw-materials/rawMaterialSlice";
 import { fetchProducts } from "../../../features/product/productSlice";
@@ -126,6 +127,7 @@ const StockAdjustmentForm: React.FC = () => {
     (state) => (state as any).finishedGoodsStocks || {}
   );
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState<any>({
     adjustmentNumber: "",
     adjustmentDate: new Date().toISOString().split("T")[0],
@@ -249,12 +251,14 @@ const StockAdjustmentForm: React.FC = () => {
         );
       }
     } else if (!isEditMode) {
-      setFormData((prev: any) => ({
-        ...prev,
-        adjustmentNumber: `ADJ-${Date.now().toString().slice(-6)}`,
-      }));
+      // Fetch sequential number from backend
+      dispatch(fetchNextAdjustmentNumber()).then((action: any) => {
+        if (action.payload) {
+          setFormData((prev: any) => ({ ...prev, adjustmentNumber: action.payload }));
+        }
+      });
     }
-  }, [currentAdjustment, isEditMode, rawMaterials, products]);
+  }, [currentAdjustment, isEditMode, rawMaterials, products, dispatch]);
 
   // ── Handle PO selection ─────────────────
   const handlePOSelect = (poId: string) => {
@@ -665,6 +669,8 @@ const StockAdjustmentForm: React.FC = () => {
   // ── Submit ──────────────────────────────
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     setErrors({});
 
     if (isPMI) {
@@ -684,6 +690,7 @@ const StockAdjustmentForm: React.FC = () => {
         });
         setErrors(newErrors);
         toast.error(pmiValidation.error.issues[0].message);
+        setIsSubmitting(false);
         return;
       }
 
@@ -691,10 +698,12 @@ const StockAdjustmentForm: React.FC = () => {
       for (const item of pmiItems) {
         if (item.issueQty <= 0) {
           toast.error("Issue Quantity must be greater than zero.");
+          setIsSubmitting(false);
           return;
         }
         if (item.issueQty > item.availableStock) {
           toast.error(`Issue Qty for ${item.materialName} exceeds available stock (${item.availableStock}).`);
+          setIsSubmitting(false);
           return;
         }
       }
@@ -731,6 +740,7 @@ const StockAdjustmentForm: React.FC = () => {
         navigate("/inventory/stock-adjustments");
       } catch (err: any) {
         toast.error(err || "An error occurred");
+        setIsSubmitting(false);
       }
       return;
     }
@@ -769,6 +779,7 @@ const StockAdjustmentForm: React.FC = () => {
       });
       setErrors(newErrors);
       toast.error(validation.error.issues[0].message);
+      setIsSubmitting(false);
       return;
     }
 
@@ -783,6 +794,7 @@ const StockAdjustmentForm: React.FC = () => {
       navigate("/inventory/stock-adjustments");
     } catch (err: any) {
       toast.error(err || "An error occurred");
+      setIsSubmitting(false);
     }
   };
 
@@ -791,29 +803,29 @@ const StockAdjustmentForm: React.FC = () => {
   // ── Render ──────────────────────────────
   return (
     <div className="w-full mx-auto">
-      <div className="bg-white  border border-gray-200">
+      <div className="bg-card rounded-2xl shadow-sm border border-line overflow-hidden">
         {/* Page Header */}
-        <div className="px-6 py-4 border-b border-gray-100">
+        <div className="px-6 py-4 border-b border-line">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <h2 className="text-xl font-bold text-gray-800">
+            <h2 className="text-xl font-bold text-ink">
               {isEditMode ? "Edit Stock Adjustment" : "New Stock Adjustment"}
             </h2>
             <BackButton text="Back" to="/inventory/stock-adjustments" />
           </div>
         </div>
 
-        <form onSubmit={(e) => e.preventDefault()} className="px-6 py-3 space-y-4" noValidate>
+        <form onSubmit={(e) => e.preventDefault()} className="px-6 py-4 space-y-4" noValidate>
           {/* Section 1: Adjustment Information */}
           <div className="mb-6">
             <div className="mb-6">
-              <h2 className="text-lg font-bold text-slate-900">Adjustment Details</h2>
-              <p className="text-sm text-slate-500 mt-0.5">
+              <h2 className="text-lg font-bold text-ink">Adjustment Details</h2>
+              <p className="text-sm text-ink-subtle mt-0.5">
                 Add items to adjust inventory levels. Each item can have a separate reason.
               </p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block mb-1 text-xs font-bold text-slate-700 uppercase tracking-wider">
+                <label className="block mb-1 text-xs font-bold text-ink-muted uppercase tracking-wider">
                   Date <span className="text-red-500">*</span>
                 </label>
                 <DatePickerCalendar
@@ -867,21 +879,21 @@ const StockAdjustmentForm: React.FC = () => {
                 </div>
                 {selectedPO && (
                   <>
-                    <div className="px-3 py-2 bg-white border border-slate-200 rounded-lg flex flex-col justify-center min-h-[66px]">
-                      <span className="text-xs text-slate-500 mb-1">Product</span>
-                      <span className="text-sm font-semibold text-slate-800 truncate">
+                    <div className="px-3 py-2 bg-card-2 border border-line rounded-lg flex flex-col justify-center min-h-[66px]">
+                      <span className="text-xs text-ink-subtle mb-1">Product</span>
+                      <span className="text-sm font-semibold text-ink truncate">
                         {selectedPO.productItem?.productName || "—"}
                       </span>
                     </div>
-                    <div className="px-3 py-2 bg-white border border-slate-200 rounded-lg flex flex-col justify-center min-h-[66px]">
-                      <span className="text-xs text-slate-500 mb-1">Planned Qty</span>
-                      <span className="text-sm font-semibold text-slate-800">
+                    <div className="px-3 py-2 bg-card-2 border border-line rounded-lg flex flex-col justify-center min-h-[66px]">
+                      <span className="text-xs text-ink-subtle mb-1">Planned Qty</span>
+                      <span className="text-sm font-semibold text-ink">
                         {Number(selectedPO.targetQty).toLocaleString()} {selectedPO.uom}
                       </span>
                     </div>
-                    <div className="px-3 py-2 bg-white border border-slate-200 rounded-lg flex flex-col justify-center min-h-[66px]">
-                      <span className="text-xs text-slate-500 mb-1">Machine</span>
-                      <span className="text-sm font-semibold text-slate-800 truncate">
+                    <div className="px-3 py-2 bg-card-2 border border-line rounded-lg flex flex-col justify-center min-h-[66px]">
+                      <span className="text-xs text-ink-subtle mb-1">Machine</span>
+                      <span className="text-sm font-semibold text-ink truncate">
                         {selectedPO.Machine?.machineName || selectedPO.machineMachineId || "—"}
                       </span>
                     </div>
@@ -890,7 +902,7 @@ const StockAdjustmentForm: React.FC = () => {
               </div>
 
               {!formData.productionOrderId && (
-                <div className="mt-3 p-3 bg-blue-50 border border-blue-200 text-blue-700 rounded-lg flex items-center gap-2 text-sm">
+                <div className="mt-3 p-3 bg-blue-950/40 border border-blue-800 text-blue-300 rounded-lg flex items-center gap-2 text-sm">
                   <FaInfoCircle className="flex-shrink-0" />
                   <span>
                     Select a Production Order to load its reserved raw materials for issue.
@@ -903,38 +915,38 @@ const StockAdjustmentForm: React.FC = () => {
 
           {/* Section 3: Raw Materials to Issue (PMI Only) */}
           {isPMI && selectedPO && pmiItems.length > 0 && (
-            <div className="pt-2 border-t border-gray-100 mt-4">
-              <h6 className="text-base font-semibold text-gray-800 mb-3">3. Raw Materials to Issue</h6>
-              <div className="rounded-xl border border-slate-200 bg-white [&_.mb-\[18px\]]:!mb-0 [&_.select-input-group]:!mb-0 overflow-visible">
-                <table className="min-w-full divide-y divide-slate-200">
-                  <thead className="bg-slate-50/80">
+            <div className="pt-2 border-t border-line mt-4">
+              <h6 className="text-base font-semibold text-ink mb-3">3. Raw Materials to Issue</h6>
+              <div className="rounded-xl border border-line bg-card [&_.mb-\[18px\]]:!mb-0 [&_.select-input-group]:!mb-0 overflow-visible">
+                <table className="min-w-full divide-y divide-line">
+                  <thead className="bg-card-2">
                     <tr>
-                      <th className="px-3 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200">RM CODE</th>
-                      <th className="px-3 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200">MATERIAL NAME</th>
-                      <th className="px-3 py-3 text-right text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200">REQUIRED QTY</th>
-                      <th className="px-3 py-3 text-right text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200">RESERVED QTY</th>
-                      <th className="px-3 py-3 text-right text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200">ALREADY ISSUED</th>
-                      <th className="px-3 py-3 text-right text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200">REMAINING</th>
-                      <th className="px-3 py-3 text-right text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200">AVAILABLE STOCK</th>
-                      <th className="px-3 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200">UOM</th>
-                      <th className="px-3 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200 min-w-[200px]">STORE*</th>
-                      <th className="px-3 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200 min-w-[150px]">ISSUE QTY*</th>
-                      <th className="px-3 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200 min-w-[180px]">REMARKS</th>
+                      <th className="px-3 py-3 text-left text-[11px] font-bold text-ink-muted uppercase tracking-widest border-b border-line">RM CODE</th>
+                      <th className="px-3 py-3 text-left text-[11px] font-bold text-ink-muted uppercase tracking-widest border-b border-line">MATERIAL NAME</th>
+                      <th className="px-3 py-3 text-right text-[11px] font-bold text-ink-muted uppercase tracking-widest border-b border-line">REQUIRED QTY</th>
+                      <th className="px-3 py-3 text-right text-[11px] font-bold text-ink-muted uppercase tracking-widest border-b border-line">RESERVED QTY</th>
+                      <th className="px-3 py-3 text-right text-[11px] font-bold text-ink-muted uppercase tracking-widest border-b border-line">ALREADY ISSUED</th>
+                      <th className="px-3 py-3 text-right text-[11px] font-bold text-ink-muted uppercase tracking-widest border-b border-line">REMAINING</th>
+                      <th className="px-3 py-3 text-right text-[11px] font-bold text-ink-muted uppercase tracking-widest border-b border-line">AVAILABLE STOCK</th>
+                      <th className="px-3 py-3 text-left text-[11px] font-bold text-ink-muted uppercase tracking-widest border-b border-line">UOM</th>
+                      <th className="px-3 py-3 text-left text-[11px] font-bold text-ink-muted uppercase tracking-widest border-b border-line min-w-[200px]">STORE*</th>
+                      <th className="px-3 py-3 text-left text-[11px] font-bold text-ink-muted uppercase tracking-widest border-b border-line min-w-[150px]">ISSUE QTY*</th>
+                      <th className="px-3 py-3 text-left text-[11px] font-bold text-ink-muted uppercase tracking-widest border-b border-line min-w-[180px]">REMARKS</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100">
+                  <tbody className="divide-y divide-line">
                     {pmiItems.map((item, index) => {
                       const isOver = item.issueQty > item.availableStock;
                       return (
-                        <tr key={index} className={`hover:bg-slate-50/50 transition-colors ${isOver ? 'bg-red-50' : ''}`}>
-                          <td className="px-4 py-3 font-mono text-xs">{item.rawMaterialId}</td>
-                          <td className="px-4 py-3 font-medium text-slate-800">{item.materialName}</td>
-                          <td className="px-4 py-3 text-right">{Number(item.requiredQty).toFixed(2)}</td>
-                          <td className="px-4 py-3 text-right">{Number(item.reservedQty).toFixed(2)}</td>
-                          <td className="px-4 py-3 text-right">{Number(item.alreadyIssuedQty).toFixed(2)}</td>
-                          <td className="px-4 py-3 text-right text-yellow-600 font-semibold">{Number(item.remainingQty).toFixed(2)}</td>
-                          <td className="px-4 py-3 text-right text-green-600 font-semibold">{Number(item.availableStock).toFixed(2)}</td>
-                          <td className="px-4 py-3 text-slate-500">{item.uom}</td>
+                        <tr key={index} className={`hover:bg-card-2/50 transition-colors ${isOver ? 'bg-red-950/40' : ''}`}>
+                          <td className="px-4 py-3 font-mono text-xs text-ink-subtle">{item.rawMaterialId}</td>
+                          <td className="px-4 py-3 font-medium text-ink">{item.materialName}</td>
+                          <td className="px-4 py-3 text-right text-ink-muted">{Number(item.requiredQty).toFixed(2)}</td>
+                          <td className="px-4 py-3 text-right text-ink-muted">{Number(item.reservedQty).toFixed(2)}</td>
+                          <td className="px-4 py-3 text-right text-ink-muted">{Number(item.alreadyIssuedQty).toFixed(2)}</td>
+                          <td className="px-4 py-3 text-right text-yellow-400 font-semibold">{Number(item.remainingQty).toFixed(2)}</td>
+                          <td className="px-4 py-3 text-right text-green-400 font-semibold">{Number(item.availableStock).toFixed(2)}</td>
+                          <td className="px-4 py-3 text-ink-subtle">{item.uom}</td>
                           <td className="px-4 py-3 align-top">
                             <SelectInput
                               label=""
@@ -995,23 +1007,23 @@ const StockAdjustmentForm: React.FC = () => {
           {!isPMI && (
             <div className="pt-2 mt-4">
               <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 mb-4">
-                <h3 className="text-base font-bold text-slate-800 m-0">Items to Adjust</h3>
+                <h3 className="text-base font-bold text-ink m-0">Items to Adjust</h3>
                 <div className="flex items-center gap-2.5">
-                  <select
-                    value={selectedCategoryFilter}
-                    onChange={(e) => {
-                      setSelectedCategoryFilter(e.target.value);
-                      if (!isAddProductsOpen) setIsAddProductsOpen(true);
-                    }}
-                    className="px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-sm text-slate-700 font-medium focus:outline-none focus:border-primary shadow-sm hover:border-slate-300 transition-all cursor-pointer"
-                  >
-                    <option value="All Categories">All Categories</option>
-                    {categories.map((c) => (
-                      <option key={c} value={c}>
-                        {c}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="[&_.mb-4]:!mb-0 [&_.mb-\[18px\]]:!mb-0">
+                    <SelectInput
+                      label=""
+                      hideLabel
+                      noMargin
+                      name="categoryFilter"
+                      value={selectedCategoryFilter}
+                      onChange={(e) => {
+                        setSelectedCategoryFilter(e.target.value);
+                        if (!isAddProductsOpen) setIsAddProductsOpen(true);
+                      }}
+                      options={categories.map((c) => ({ value: c, label: c }))}
+                      defaultOptionLabel="All Categories"
+                    />
+                  </div>
 
                   <div className="relative select-add-products-container">
                     <CustomButton
@@ -1019,32 +1031,32 @@ const StockAdjustmentForm: React.FC = () => {
                       icon={FaPlus}
                       size="sm"
                       onClick={() => setIsAddProductsOpen(!isAddProductsOpen)}
-                      className="!bg-white !text-slate-800 hover:!bg-slate-50 !border !border-slate-200 shadow-sm"
+                      className="!bg-card-2 !text-ink hover:!bg-line !border !border-line shadow-sm"
                     />
 
                     {isAddProductsOpen && (
-                      <div className="absolute right-0 mt-2 w-80 sm:w-96 max-h-96 overflow-y-auto bg-white rounded-2xl shadow-2xl border border-slate-200/80 p-3 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
-                        <div className="flex gap-2 mb-2">
-                          <input
-                            type="text"
-                            placeholder="Search products or materials..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="flex-1 px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:bg-white transition-all"
-                            autoFocus
-                          />
-                          <select
+                      <div className="absolute right-0 mt-2 w-80 sm:w-96 max-h-96 overflow-y-auto bg-card rounded-2xl shadow-2xl border border-line-soft p-3 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+                        <div className="flex gap-2 mb-2 [&_.mb-4]:!mb-0 [&_.mb-\[18px\]]:!mb-0">
+                          <div className="flex-1">
+                            <TextInput
+                              label=""
+                              name="productSearch"
+                              placeholder="Search products or materials..."
+                              value={searchQuery}
+                              onChange={(e) => setSearchQuery(e.target.value)}
+                              autoFocus
+                            />
+                          </div>
+                          <SelectInput
+                            label=""
+                            hideLabel
+                            noMargin
+                            name="categoryFilterDropdown"
                             value={selectedCategoryFilter}
                             onChange={(e) => setSelectedCategoryFilter(e.target.value)}
-                            className="px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 font-medium focus:outline-none focus:border-primary"
-                          >
-                            <option value="All Categories">All</option>
-                            {categories.map((c) => (
-                              <option key={c} value={c}>
-                                {c}
-                              </option>
-                            ))}
-                          </select>
+                            options={categories.map((c) => ({ value: c, label: c }))}
+                            defaultOptionLabel="All"
+                          />
                         </div>
                         <div className="space-y-1 max-h-72 overflow-y-auto pr-1">
                           {filteredItemsForSelect.length > 0 ? (
@@ -1061,24 +1073,24 @@ const StockAdjustmentForm: React.FC = () => {
                                   }}
                                   className={`p-2.5 border border-transparent rounded-xl transition-all flex items-center justify-between group ${
                                     added
-                                      ? "opacity-50 cursor-not-allowed bg-slate-50"
-                                      : "hover:bg-primary/5 hover:border-primary/20 cursor-pointer"
+                                      ? "opacity-50 cursor-not-allowed bg-card-2"
+                                      : "hover:bg-primary/10 hover:border-primary/20 cursor-pointer"
                                   }`}
                                 >
                                   <div>
-                                    <div className={`text-sm font-semibold text-slate-800 ${!added && "group-hover:text-primary"} transition-colors`}>
+                                    <div className={`text-sm font-semibold text-ink ${!added && "group-hover:text-primary"} transition-colors`}>
                                       {item.name}
                                     </div>
-                                    <div className="text-xs text-slate-400 font-mono mt-0.5">
+                                    <div className="text-xs text-ink-subtle font-mono mt-0.5">
                                       {item.itemCode} • {item.category || "General"}
                                     </div>
                                   </div>
                                   {added ? (
-                                    <span className="px-2 py-1 text-[10px] font-bold bg-green-100 text-green-700 rounded-lg uppercase tracking-wider flex items-center gap-1">
+                                    <span className="px-2 py-1 text-[10px] font-bold bg-green-900/30 text-green-400 rounded-lg uppercase tracking-wider flex items-center gap-1">
                                       ✓ Added
                                     </span>
                                   ) : (
-                                    <span className="px-2 py-1 text-[10px] font-bold bg-slate-100 group-hover:bg-primary/10 text-slate-600 group-hover:text-primary rounded-lg transition-colors uppercase tracking-wider">
+                                    <span className="px-2 py-1 text-[10px] font-bold bg-card-2 group-hover:bg-primary/20 text-ink-muted group-hover:text-primary rounded-lg transition-colors uppercase tracking-wider">
                                       {item.typeLabel}
                                     </span>
                                   )}
@@ -1086,7 +1098,7 @@ const StockAdjustmentForm: React.FC = () => {
                               );
                             })
                           ) : (
-                            <div className="py-6 text-center text-sm text-slate-400">
+                            <div className="py-6 text-center text-sm text-ink-subtle">
                               No items match your filter/search.
                             </div>
                           )}
@@ -1097,35 +1109,35 @@ const StockAdjustmentForm: React.FC = () => {
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-slate-200/80 overflow-visible bg-white shadow-sm">
-                <table className="min-w-full divide-y divide-slate-200">
-                  <thead className="bg-slate-50 border-b border-slate-200">
+              <div className="rounded-2xl border border-line overflow-visible bg-card shadow-sm">
+                <table className="min-w-full divide-y divide-line">
+                  <thead className="bg-card-2 border-b border-line">
                     <tr>
-                      <th className="px-5 py-3.5 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">
+                      <th className="px-5 py-3.5 text-left text-xs font-bold text-ink-muted uppercase tracking-wider">
                         Product
                       </th>
-                      <th className="px-4 py-3.5 text-left text-xs font-bold text-slate-600 uppercase tracking-wider min-w-[160px]">
+                      <th className="px-4 py-3.5 text-left text-xs font-bold text-ink-muted uppercase tracking-wider min-w-[160px]">
                         Store
                       </th>
-                      <th className="px-4 py-3.5 text-center text-xs font-bold text-slate-600 uppercase tracking-wider w-28">
+                      <th className="px-4 py-3.5 text-center text-xs font-bold text-ink-muted uppercase tracking-wider w-28">
                         Current
                       </th>
-                      <th className="px-4 py-3.5 text-center text-xs font-bold text-slate-600 uppercase tracking-wider min-w-[240px]">
+                      <th className="px-4 py-3.5 text-center text-xs font-bold text-ink-muted uppercase tracking-wider min-w-[240px]">
                         Adjust
                       </th>
-                      <th className="px-4 py-3.5 text-center text-xs font-bold text-slate-600 uppercase tracking-wider w-28">
+                      <th className="px-4 py-3.5 text-center text-xs font-bold text-ink-muted uppercase tracking-wider w-28">
                         New Total
                       </th>
-                      <th className="px-4 py-3.5 text-left text-xs font-bold text-slate-600 uppercase tracking-wider min-w-[160px]">
+                      <th className="px-4 py-3.5 text-left text-xs font-bold text-ink-muted uppercase tracking-wider min-w-[160px]">
                         Reason <span className="text-rose-500">*</span>
                       </th>
-                      <th className="px-4 py-3.5 text-left text-xs font-bold text-slate-600 uppercase tracking-wider min-w-[200px]">
+                      <th className="px-4 py-3.5 text-left text-xs font-bold text-ink-muted uppercase tracking-wider min-w-[200px]">
                         Notes
                       </th>
-                      <th className="px-4 py-3.5 text-center text-xs font-bold text-slate-600 uppercase tracking-wider w-12"></th>
+                      <th className="px-4 py-3.5 text-center text-xs font-bold text-ink-muted uppercase tracking-wider w-12"></th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100">
+                  <tbody className="divide-y divide-line">
                     {formData.items.length > 0 ? (
                       formData.items.map((item: any, index: number) => {
                         const diffInBase = Number(item.difference || 0);
@@ -1138,13 +1150,13 @@ const StockAdjustmentForm: React.FC = () => {
                         const selectedUom = item.selectedUom || baseUom;
 
                         return (
-                          <tr key={index} className="hover:bg-slate-50/60 transition-colors group">
+                          <tr key={index} className="hover:bg-card-2/50 transition-colors group">
                             {/* Product */}
                             <td className="px-5 py-4 align-middle">
-                              <div className="font-bold text-slate-800 text-sm">
+                              <div className="font-bold text-ink text-sm">
                                 {item.name || "Unnamed Item"}
                               </div>
-                              <div className="text-xs text-slate-400 font-mono mt-0.5 uppercase tracking-wide">
+                              <div className="text-xs text-ink-subtle font-mono mt-0.5 uppercase tracking-wide">
                                 {item.itemCode || ""} • {item.categoryName || item.itemType || "ITEM"}
                               </div>
                               {errors[`items.${index}.itemSelection`] && (
@@ -1176,7 +1188,7 @@ const StockAdjustmentForm: React.FC = () => {
 
                             {/* Current */}
                             <td className="px-4 py-4 align-middle text-center">
-                              <span className="font-bold text-slate-800 text-base">
+                              <span className="font-bold text-ink text-base">
                                 {current}
                                 {baseUom}
                               </span>
@@ -1193,7 +1205,7 @@ const StockAdjustmentForm: React.FC = () => {
                                     const numVal = Number(currentInputVal || 0);
                                     handleItemDifferenceChange(index, numVal - 1, selectedUom);
                                   }}
-                                  className="!bg-white !text-slate-700 hover:!bg-slate-100 !border !border-slate-200 !px-3 !h-10"
+                                  className="!bg-card-2 !text-ink hover:!bg-line !border !border-line !px-3 !h-10"
                                 />
                                 <div className="flex-1 min-w-[140px] [&_.mb-4]:!mb-0">
                                   <QuantityInput
@@ -1221,24 +1233,24 @@ const StockAdjustmentForm: React.FC = () => {
                                     const numVal = Number(currentInputVal || 0);
                                     handleItemDifferenceChange(index, numVal + 1, selectedUom);
                                   }}
-                                  className="!bg-white !text-slate-700 hover:!bg-slate-100 !border !border-slate-200 !px-3 !h-10"
+                                  className="!bg-card-2 !text-ink hover:!bg-line !border !border-line !px-3 !h-10"
                                 />
                               </div>
                             </td>
 
                             {/* New Total */}
                             <td className="px-4 py-4 align-middle text-center">
-                              <div className="font-bold text-slate-900 text-base">
+                              <div className="font-bold text-ink text-base">
                                 {newTotal}
                                 {baseUom}
                               </div>
                               <div
                                 className={`text-xs font-bold mt-0.5 ${
                                   diffInBase > 0
-                                    ? "text-green-600"
+                                    ? "text-green-400"
                                     : diffInBase < 0
-                                    ? "text-red-600"
-                                    : "text-slate-400"
+                                    ? "text-red-400"
+                                    : "text-ink-subtle"
                                 }`}
                               >
                                 {diffInBase > 0
@@ -1291,16 +1303,18 @@ const StockAdjustmentForm: React.FC = () => {
                       })
                     ) : (
                       <tr>
-                        <td colSpan={7} className="text-center py-12 text-slate-400 text-sm">
+                        <td colSpan={7} className="text-center py-12 text-ink-subtle text-sm">
                           <div className="flex flex-col items-center justify-center gap-2">
                             <span>No items added for adjustment yet.</span>
-                            <button
-                              type="button"
+                            <span
+                              role="button"
+                              tabIndex={0}
                               onClick={() => setIsAddProductsOpen(true)}
-                              className="text-primary font-semibold hover:underline"
+                              onKeyDown={(e) => e.key === "Enter" && setIsAddProductsOpen(true)}
+                              className="text-primary font-semibold hover:underline cursor-pointer"
                             >
                               Click + to select products or raw materials
-                            </button>
+                            </span>
                           </div>
                         </td>
                       </tr>
@@ -1315,7 +1329,7 @@ const StockAdjustmentForm: React.FC = () => {
           )}
 
           {/* Form Actions */}
-          <div className="flex items-center justify-between pt-6 mt-6 border-t border-slate-100">
+          <div className="flex items-center justify-between pt-6 mt-6 border-t border-line">
             <div>
               {!isPMI && formData.items.length > 0 && (
                 <CustomButton
@@ -1335,11 +1349,11 @@ const StockAdjustmentForm: React.FC = () => {
                 type="button"
               />
               <CustomButton
-                text={isPMI ? "Save Material Issue" : `Confirm Adjustment (${formData.items.length})`}
+                text={isSubmitting ? "Saving..." : isPMI ? "Save Material Issue" : `Confirm Adjustment (${formData.items.length})`}
                 icon={FaSave}
                 type="submit"
                 onClick={handleSubmit}
-                disabled={loading}
+                disabled={isSubmitting || loading}
               />
             </div>
           </div>

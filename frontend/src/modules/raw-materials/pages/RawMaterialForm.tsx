@@ -10,17 +10,17 @@ import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
 import { createRawMaterial, updateRawMaterial } from "../../../features/raw-materials/rawMaterialSlice";
 import { fetchStores } from "../../../features/stores/storeSlice";
 import { rawMaterialService } from "../../../services/rawMaterialService";
-import { useRawMaterialCategories } from "../../../hooks/useRawMaterialCategories";
 import UOMSelect from "../../../components/form/SelectInput/UOMSelect";
 import { useSocketSync } from "../../../hooks/useSocketSync";
 import { z } from "zod";
 import BackButton from "../../../components/ui/BackButton/BackButton";
+import { categoryService } from "../../../services/categoryService";
 import { convertToPrimaryUom } from "../../../utils/uomConversion";
 
 const initialFormState = {
     rawMaterialId: "",
     materialName: "",
-    categoryId: "",
+    categoryId: "" as string | number,
     hsnCode: "",
     minimumStock: "",
     storeId: "",
@@ -46,11 +46,6 @@ const rawMaterialSchema = z
                 /^(?=.*[A-Za-z])[A-Za-z0-9\s&().,-]+$/,
                 "Material Name must contain at least one letter and only valid characters"
             ),
-        categoryId: z
-            .string()
-            .trim()
-            .min(1, "Raw Material Category is required"),
-
         hsnCode: z
             .string()
             .trim()
@@ -153,20 +148,30 @@ const RawMaterialForm: React.FC = () => {
     const [openingStockUom, setOpeningStockUom] = useState("");
     const [minimumStockUom, setMinimumStockUom] = useState("");
     const [reorderLevelUom, setReorderLevelUom] = useState("");
+    const [categoryOptions, setCategoryOptions] = useState<{ label: string; value: string | number }[]>([]);
 
     const { data: stores } = useAppSelector(state => state.stores);
-    const { rawMaterialCategories, loadCategories } = useRawMaterialCategories();
-
     const fetchStoresData = useCallback(() => {
         dispatch(fetchStores({ storeCategory: "RAW_MATERIAL" }));
     }, [dispatch]);
 
-    const fetchCategoriesData = useCallback(() => {
-        loadCategories();
-    }, [loadCategories]);
-
     useSocketSync("store", undefined, fetchStoresData);
-    useSocketSync("rawMaterialCategory", undefined, fetchCategoriesData);
+
+    const fetchCategoriesData = useCallback(() => {
+        categoryService.fetchAll({ type: "RAW_MATERIAL", isActive: true }).then((res) => {
+            const list = res?.categories ?? res ?? [];
+            setCategoryOptions(
+                Array.isArray(list) ? list.map((c: any) => ({ label: c.name, value: c.id })) : []
+            );
+        }).catch(() => {});
+    }, []);
+
+    useEffect(() => {
+        fetchCategoriesData();
+    }, [fetchCategoriesData]);
+
+    // Keep category dropdown fresh when categories change in another tab
+    useSocketSync("category", undefined, fetchCategoriesData);
 
     useEffect(() => {
         setOpeningStockUom("");
@@ -178,7 +183,7 @@ const RawMaterialForm: React.FC = () => {
         setFormData({
             rawMaterialId: data.rawMaterialId || "",
             materialName: data.materialName || "",
-            categoryId: data.categoryId ? String(data.categoryId) : data.category?.id ? String(data.category.id) : "",
+            categoryId: data.categoryId ?? "",
             hsnCode: data.hsnCode || "",
             minimumStock: data.minimumStock !== null && data.minimumStock !== undefined ? String(data.minimumStock) : "",
             storeId: data.storeId || data.store?.storeId || "",
@@ -196,7 +201,6 @@ const RawMaterialForm: React.FC = () => {
 
     useEffect(() => {
         fetchStoresData();
-        fetchCategoriesData();
 
         if (isEditMode && id) {
             const stateData = (location.state as any);
@@ -221,11 +225,9 @@ const RawMaterialForm: React.FC = () => {
                 .then(nextId => {
                     setFormData(prev => ({ ...prev, rawMaterialId: nextId }));
                 })
-                .catch(err => {
-                    console.error("Failed to fetch next raw material ID", err);
-                });
+                .catch(() => {});
         }
-    }, [isEditMode, id, location.state, fetchStoresData, fetchCategoriesData, populateFormData, navigate]);
+    }, [isEditMode, id, location.state, fetchStoresData, populateFormData, navigate]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
@@ -251,6 +253,7 @@ const RawMaterialForm: React.FC = () => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (isSubmitting) return;
 
         try {
             rawMaterialSchema.parse(formData);
@@ -270,7 +273,6 @@ const RawMaterialForm: React.FC = () => {
             }
         }
 
-        if (isSubmitting) return;
         setIsSubmitting(true);
         try {
             const primaryUom = formData.baseUom.split(",")[0]?.trim() || "";
@@ -306,6 +308,7 @@ const RawMaterialForm: React.FC = () => {
                 narration: formData.narration || null,
                 status: formData.status,
                 isActive: formData.status === "Active",
+                itemType: "RAW_MATERIAL",
             };
 
             if (isEditMode && id) {
@@ -361,19 +364,12 @@ const RawMaterialForm: React.FC = () => {
                                 onChange={handleChange}
                             />
                             <SelectInput
-                                label="Raw Material Category"
+                                label="Category"
                                 name="categoryId"
                                 value={formData.categoryId}
-                                options={[
-                                    { label: "Select Category", value: "" },
-                                    ...(rawMaterialCategories || []).map((cat: any) => ({
-                                        label: cat.name,
-                                        value: String(cat.id)
-                                    }))
-                                ]}
-                                required
-                                error={errors.categoryId}
+                                options={categoryOptions}
                                 onChange={handleChange}
+                                searchable
                             />
                             <SelectInput
                                 label="Store"
@@ -406,9 +402,9 @@ const RawMaterialForm: React.FC = () => {
                                 isMulti
                                 category={["length", "mass", "each", "volume"]}
                                 allowedCodes={[
-                                    "kg", "g", "t", "ton",
-                                    "l", "ml", "ltr",
-                                    "m", "cm", "mtr",
+                                    "kg", "g", "mt",
+                                    "l", "ml",
+                                    "m", "cm", "mm",
                                     "dz", "ea"
                                 ]}
                                 onChange={(value) => {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 
 import { toast } from "react-toastify";
 
@@ -9,11 +9,16 @@ import ViewButton from "../../../components/ui/viewbutton/ViewButton";
 import DataTable from "../../../components/ui/table/DataTable";
 import SearchInput from "../../../components/ui/SearchInput/SearchInput";
 import ExportCSVButton from "../../../components/ui/ExportCSVButton/ExportCSVButton";
-import { storeService } from "../../../services/storeService";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import CommonViewModal from "../../../components/ui/CommonViewModal/CommonViewModal";
+import { formatLocationAddress } from "../../../utils/addressUtils";
 
-const ITEMS_PER_PAGE = 10;
+import FilterPopover from "../../../components/ui/FilterPopover/FilterPopover";
+import SelectInput from "../../../components/form/SelectInput/SelectInput";
+import { categoryService } from "../../../services/categoryService";
+import { usePermission } from "../../../hooks/usePermission";
+
+const ITEMS_PER_PAGE = 20;
 
 interface StockListProps {
     storeId?: string;
@@ -31,47 +36,69 @@ const parseBaseUom = (uomStr?: string) => {
 
 const StockList: React.FC<StockListProps> = ({ storeId: propStoreId }) => {
     const dispatch = useAppDispatch();
+    const { can } = usePermission();
 
-    const { data, loading, error } = useAppSelector((state) => state.rawMaterialStocks);
+    const { data, loading, error, totalPages, total } = useAppSelector((state) => state.rawMaterialStocks);
 
     const [searchTerm, setSearchTerm] = useState("");
     const [debouncedSearch, setDebouncedSearch] = useState("");
-    const [internalStoreId] = useState("");
-    const [stores, setStores] = useState<any[]>([]);
 
-    const activeStoreId = propStoreId !== undefined ? propStoreId : internalStoreId;
+    const activeStoreId = propStoreId ?? "";
     const [currentPage, setCurrentPage] = useState(1);
     const [showView, setShowView] = useState(false);
     const [selectedItem, setSelectedItem] = useState<any>(null);
 
-    // Fetch stores for dropdown
-    useEffect(() => {
-        const fetchStores = async () => {
-            try {
-                const res = await storeService.fetchAll();
-                setStores(res?.stores || res || []);
-            } catch (err) {
-                console.error(err);
-            }
-        };
-        fetchStores();
+    const [categoryFilter, setCategoryFilter] = useState("");
+    const [appliedCategory, setAppliedCategory] = useState("");
+    const [statusFilter, setStatusFilter] = useState("");
+    const [appliedStatus, setAppliedStatus] = useState("");
+    const [categoryOptions, setCategoryOptions] = useState<{ value: string; label: string }[]>([]);
+
+    const fetchCategoriesData = useCallback(async () => {
+        try {
+            const res = await categoryService.fetchAll({ type: "RAW_MATERIAL", isActive: true });
+            const list = res?.categories ?? (Array.isArray(res) ? res : []);
+            setCategoryOptions(list.map((c: any) => ({ value: String(c.id), label: c.name || c.categoryName || c.code })));
+        } catch {
+            // silent
+        }
     }, []);
 
-    // Debounce search
     useEffect(() => {
-        const timer = setTimeout(() => setDebouncedSearch(searchTerm), 500);
-        return () => clearTimeout(timer);
+        fetchCategoriesData();
+    }, [fetchCategoriesData]);
+
+    // Debounce search — 300 ms
+    const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    useEffect(() => {
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        debounceRef.current = setTimeout(() => {
+            setDebouncedSearch(searchTerm);
+            setCurrentPage(1);
+        }, 300);
+        return () => {
+            if (debounceRef.current) clearTimeout(debounceRef.current);
+        };
     }, [searchTerm]);
 
-    // Fetch stocks based on search and storeId
-    useEffect(() => {
-        dispatch(fetchRawMaterialStocks({ search: debouncedSearch, storeId: activeStoreId, storeCategory: "RAW_MATERIAL" }));
-    }, [dispatch, debouncedSearch, activeStoreId]);
+    // Server-side fetch with all filters
+    const loadData = useCallback(() => {
+        dispatch(fetchRawMaterialStocks({
+            search: debouncedSearch || undefined,
+            storeId: activeStoreId || undefined,
+            categoryId: appliedCategory || undefined,
+            status: appliedStatus || undefined,
+            page: currentPage,
+            limit: ITEMS_PER_PAGE,
+        }));
+    }, [dispatch, debouncedSearch, activeStoreId, appliedCategory, appliedStatus, currentPage]);
 
     useEffect(() => {
-        if (error) {
-            toast.error(error);
-        }
+        loadData();
+    }, [loadData]);
+
+    useEffect(() => {
+        if (error) toast.error(error);
     }, [error]);
 
     useSocketSync("rawMaterialStock", {
@@ -80,14 +107,34 @@ const StockList: React.FC<StockListProps> = ({ storeId: propStoreId }) => {
         deleted: rawMaterialStockDeleted,
     });
 
-    const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
-        setSearchTerm(e.target.value);
-        setCurrentPage(1);
-    };
+    // Re-fetch category filter options whenever a category is created/updated/deleted
+    useSocketSync("category", undefined, fetchCategoriesData);
 
-    const totalPages = Math.ceil((data?.length || 0) / ITEMS_PER_PAGE);
-    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-    const paginatedData = (data || []).slice(startIndex, startIndex + ITEMS_PER_PAGE);
+    const handleSearch = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+        setSearchTerm(e.target.value);
+    }, []);
+
+    const hasActiveFilters = !!(appliedCategory || appliedStatus);
+    const activeFilterCount = (appliedCategory ? 1 : 0) + (appliedStatus ? 1 : 0);
+
+    const handleApplyFilters = useCallback(() => {
+        setAppliedCategory(categoryFilter);
+        setAppliedStatus(statusFilter);
+        setCurrentPage(1);
+    }, [categoryFilter, statusFilter]);
+
+    const handleClearFilters = useCallback(() => {
+        setCategoryFilter("");
+        setAppliedCategory("");
+        setStatusFilter("");
+        setAppliedStatus("");
+        setCurrentPage(1);
+    }, []);
+
+    const handleOpenView = useCallback((item: any) => {
+        setSelectedItem(item);
+        setShowView(true);
+    }, []);
 
     const formatExportQty = (qty: any, uom: string) => {
         const num = Number(qty) || 0;
@@ -112,25 +159,24 @@ const StockList: React.FC<StockListProps> = ({ storeId: propStoreId }) => {
     const exportColumns = [
         { header: "NAME", accessor: (item: any) => (item as any).materialName || item.rawMaterial?.materialName || "-" },
         { header: "ID", accessor: (item: any) => item.rawMaterialId || "-" },
-        { header: "CATEGORY", accessor: (item: any) => (item as any).category?.categoryName || item.rawMaterial?.category?.name || (item as any).categoryId || "-" },
+        { header: "CATEGORY", accessor: (item: any) => (item as any).category?.name || item.rawMaterial?.category?.name || "-" },
         { header: "STORE", accessor: (item: any) => item.store?.storeName || item.storeId || "-" },
         { header: "LOCATION", accessor: (item: any) => (item as any).storeLocation?.locationCode || item.locationId || "-" },
         { header: "PHYSICAL STOCK", accessor: (item: any) => formatExportQty(item.onHandQty ?? 0, (item as any).baseUom || item.rawMaterial?.baseUom || "") },
-        { header: "MIN STOCK", accessor: (item: any) => formatExportQty(Number((item as any).minimumStock || item.rawMaterial?.minimumStock || 0), (item as any).baseUom || item.rawMaterial?.baseUom || "") },
-        { header: "RESERVED", accessor: (item: any) => formatExportQty(item.reservedQty ?? 0, (item as any).baseUom || item.rawMaterial?.baseUom || "") },
-        { header: "AVAILABLE", accessor: (item: any) => formatExportQty(Number(item.onHandQty ?? 0) - Number(item.reservedQty ?? 0), (item as any).baseUom || item.rawMaterial?.baseUom || "") },
+        { header: "MIN STOCK", accessor: (item: any) => formatExportQty(Number((item as any).minimumStock || 0), (item as any).baseUom || "") },
+        { header: "RESERVED", accessor: (item: any) => formatExportQty(item.reservedQty ?? 0, (item as any).baseUom || "") },
+        { header: "AVAILABLE", accessor: (item: any) => formatExportQty(Number(item.onHandQty ?? 0) - Number(item.reservedQty ?? 0), (item as any).baseUom || "") },
         { header: "STATUS", accessor: (item: any) => item.status || "Active" },
     ];
 
     return (
-        <div className="p-4 md:p-6 ">
-            <div className=" rounded-2xl shadow-sm border border-line overflow-hidden">
+        <div className="p-4 md:p-6">
+            <div className="rounded-2xl shadow-sm border border-line overflow-hidden">
                 {/* Page Header */}
                 <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 p-6 border-b border-line">
                     <div>
-                        <h2 className="text-2xl font-bold text-ink">
-                            {stores.find((s) => s.storeId === activeStoreId)?.storeName || "Stock Ledger Management"}
-                        </h2>
+                        <h2 className="text-2xl font-bold text-ink">Stock Ledger Management</h2>
+                        <p className="text-sm text-ink-subtle mt-1">Raw material stock levels and balances</p>
                     </div>
 
                     <div className="flex flex-wrap items-center gap-3 relative w-full lg:w-auto">
@@ -139,30 +185,65 @@ const StockList: React.FC<StockListProps> = ({ storeId: propStoreId }) => {
                             onChange={handleSearch}
                             placeholder="Search stock..."
                         />
-                        <ExportCSVButton
-                            data={data || []}
-                            columns={exportColumns}
-                            filename="stock_ledger_balances.csv"
-                        />
-                        {/* <CustomButton
-                            text="Add Raw Material"
-                            icon={FaPlus}
-                            onClick={() => navigate("/raw-materials/create")}
-                        /> */}
+                        <FilterPopover
+                            activeFilterCount={activeFilterCount}
+                            hasActiveFilters={hasActiveFilters}
+                            onApply={handleApplyFilters}
+                            onClear={handleClearFilters}
+                        >
+                            <div className="space-y-3">
+                                <div>
+                                    <label className="block text-xs font-semibold text-ink-muted mb-1.5 uppercase tracking-wider">
+                                        Category
+                                    </label>
+                                    <SelectInput
+                                        name="categoryFilter"
+                                        value={categoryFilter}
+                                        onChange={(e) => setCategoryFilter(e.target.value)}
+                                        options={categoryOptions}
+                                        defaultOptionLabel="All Categories"
+                                        noMargin
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-semibold text-ink-muted mb-1.5 uppercase tracking-wider">
+                                        Status
+                                    </label>
+                                    <SelectInput
+                                        name="statusFilter"
+                                        value={statusFilter}
+                                        onChange={(e) => setStatusFilter(e.target.value)}
+                                        options={[
+                                            { value: "Active", label: "Active" },
+                                            { value: "Inactive", label: "Inactive" }
+                                        ]}
+                                        defaultOptionLabel="All Statuses"
+                                        noMargin
+                                    />
+                                </div>
+                            </div>
+                        </FilterPopover>
+                        {can("raw_material_stocks.view") && (
+                            <ExportCSVButton
+                                data={data || []}
+                                columns={exportColumns}
+                                filename="stock_ledger_balances.csv"
+                            />
+                        )}
                     </div>
                 </div>
 
                 {/* Table */}
                 <DataTable
-                    data={paginatedData || []}
-                    rowKey={(item) => item.id}
+                    data={data || []}
+                    rowKey={(item) => item.rawMaterialId || item.id}
                     loading={loading}
                     emptyMessage="No stock records found."
-                    pagination={{
-                        currentPage,
-                        totalPages,
-                        onPageChange: (page) => setCurrentPage(page)
-                    }}
+                    pagination={
+                        totalPages > 1
+                            ? { currentPage, totalPages, onPageChange: setCurrentPage }
+                            : undefined
+                    }
                     columns={[
                         {
                             header: "#",
@@ -191,21 +272,15 @@ const StockList: React.FC<StockListProps> = ({ storeId: propStoreId }) => {
                         {
                             header: "CATEGORY",
                             render: (item) => {
-                                const catName = (item as any).category?.categoryName || item.rawMaterial?.category?.name || (item as any).categoryId || "-";
+                                const catName = (item as any).category?.name || item.rawMaterial?.category?.name || "-";
                                 return <span className="text-ink-muted">{catName}</span>;
                             }
                         },
                         {
-                            header: "STORE / LOCATION",
-                            render: (item) => {
-                                const locCode = (item as any).storeLocation?.locationCode || (item as any).store?.location?.locationCode || (item as any).store?.location?.locationName || (item as any).store?.locationDesc || item.locationId || "-";
-                                return (
-                                    <div className="flex flex-col">
-                                        <span className="font-medium text-ink-muted">{item.store?.storeName || item.storeId || "-"}</span>
-                                        <span className="text-xs text-ink-subtle">Loc: {locCode}</span>
-                                    </div>
-                                );
-                            }
+                            header: "STORE",
+                            render: (item) => (
+                                <span className="font-medium text-ink-muted">{item.store?.storeName || item.storeId || "-"}</span>
+                            )
                         },
                         {
                             header: "PHYSICAL STOCK",
@@ -236,11 +311,8 @@ const StockList: React.FC<StockListProps> = ({ storeId: propStoreId }) => {
                                 const available = Number(item.onHandQty ?? 0) - Number(item.reservedQty ?? 0);
 
                                 let availColorClass = "text-green-600";
-                                if (available <= minStock) {
-                                    availColorClass = "text-red-600";
-                                } else if (available <= reorderLevel) {
-                                    availColorClass = "text-amber-600";
-                                }
+                                if (available <= minStock) availColorClass = "text-red-600";
+                                else if (available <= reorderLevel) availColorClass = "text-amber-600";
 
                                 return <span className={`font-semibold ${availColorClass}`}>{formatDisplayQty(available, baseUom)}</span>;
                             }
@@ -253,18 +325,15 @@ const StockList: React.FC<StockListProps> = ({ storeId: propStoreId }) => {
                             header: "ACTIONS",
                             render: (item) => (
                                 <div className="flex items-center gap-2">
-                                    <ViewButton
-                                        onClick={() => {
-                                            setSelectedItem(item);
-                                            setShowView(true);
-                                        }}
-                                    />
+                                    <ViewButton onClick={() => handleOpenView(item)} />
                                 </div>
                             )
                         }
                     ]}
                 />
-
+                <div className="px-4 pb-2 text-xs text-ink-subtle text-right">
+                    Total: {total} record(s)
+                </div>
             </div>
 
             <CommonViewModal
@@ -273,23 +342,23 @@ const StockList: React.FC<StockListProps> = ({ storeId: propStoreId }) => {
                 modalTitle="Stock Details"
                 avatarText={selectedItem ? ((selectedItem as any).materialName || selectedItem.rawMaterial?.materialName || "S").charAt(0).toUpperCase() : ""}
                 headerTitle={selectedItem ? ((selectedItem as any).materialName || selectedItem.rawMaterial?.materialName || selectedItem.rawMaterialId) : ""}
+                headerSubtitle={selectedItem ? `ID: ${selectedItem.rawMaterialId}` : ""}
                 sections={selectedItem ? [
                     {
                         fields: [
                             { label: "Material ID", value: selectedItem.rawMaterialId },
                             { label: "Material Name", value: (selectedItem as any).materialName || selectedItem.rawMaterial?.materialName || "N/A" },
-                            { label: "Category", value: (selectedItem as any).category?.categoryName || selectedItem.rawMaterial?.category?.name || "N/A" },
+                            { label: "Category", value: (selectedItem as any).category?.name || selectedItem.rawMaterial?.category?.name || "N/A" },
                             { label: "Primary UOM", value: parseBaseUom((selectedItem as any).baseUom || selectedItem.rawMaterial?.baseUom).primary },
                             { label: "Secondary UOM(s)", value: parseBaseUom((selectedItem as any).baseUom || selectedItem.rawMaterial?.baseUom).secondary },
-                            { label: "Reorder Level", value: ((selectedItem as any).reorderLevel || selectedItem.rawMaterial?.reorderLevel) != null ? formatExportQty((selectedItem as any).reorderLevel || selectedItem.rawMaterial?.reorderLevel, (selectedItem as any).baseUom || selectedItem.rawMaterial?.baseUom || "") : "N/A" },
-                            { label: "Minimum Stock", value: ((selectedItem as any).minimumStock || selectedItem.rawMaterial?.minimumStock) != null ? formatExportQty((selectedItem as any).minimumStock || selectedItem.rawMaterial?.minimumStock, (selectedItem as any).baseUom || selectedItem.rawMaterial?.baseUom || "") : "N/A" },
+                            { label: "Reorder Level", value: (selectedItem as any).reorderLevel != null ? formatExportQty((selectedItem as any).reorderLevel, (selectedItem as any).baseUom || "") : "N/A" },
+                            { label: "Minimum Stock", value: (selectedItem as any).minimumStock != null ? formatExportQty((selectedItem as any).minimumStock, (selectedItem as any).baseUom || "") : "N/A" },
                             { label: "Store", value: selectedItem.store?.storeName || selectedItem.storeId || "N/A" },
-                            { label: "Store Location", value: (selectedItem as any).storeLocation?.locationCode || (selectedItem as any).store?.location?.locationCode || (selectedItem as any).store?.location?.locationName || (selectedItem as any).store?.locationDesc || selectedItem.locationId || "N/A" },
-                            { label: "Physical Stock", value: formatExportQty(selectedItem.onHandQty ?? 0, (selectedItem as any).baseUom || selectedItem.rawMaterial?.baseUom || "") },
-                            { label: "Reserved Stock", value: formatExportQty(selectedItem.reservedQty ?? 0, (selectedItem as any).baseUom || selectedItem.rawMaterial?.baseUom || "") },
-                            { label: "Available Stock", value: formatExportQty(Number(selectedItem.onHandQty ?? 0) - Number(selectedItem.reservedQty ?? 0), (selectedItem as any).baseUom || selectedItem.rawMaterial?.baseUom || "") },
-                            { label: "Average Cost (₹)", value: selectedItem.avgCost != null ? String(selectedItem.avgCost) : "N/A" },
-                            { label: "Status", value: selectedItem.status || "Active" }
+                            { label: "Store Location", value: formatLocationAddress((selectedItem as any).storeLocation?.locationCode || selectedItem.locationId) || "N/A" },
+                            { label: "Physical Stock", value: formatExportQty(selectedItem.onHandQty ?? 0, (selectedItem as any).baseUom || "") },
+                            { label: "Reserved Stock", value: formatExportQty(selectedItem.reservedQty ?? 0, (selectedItem as any).baseUom || "") },
+                            { label: "Available Stock", value: formatExportQty(Number(selectedItem.onHandQty ?? 0) - Number(selectedItem.reservedQty ?? 0), (selectedItem as any).baseUom || "") },
+                            { label: "Status", value: selectedItem.status || "Active" },
                         ]
                     }
                 ] : []}

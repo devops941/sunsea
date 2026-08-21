@@ -1,34 +1,42 @@
-import { z } from 'zod';
+import { z } from "zod";
 
-// CAT-004 fix: wrapped in body: z.object({}) so validateMiddleware can parse it correctly
-const categoryBodySchema = z.object({
-  categoryCode: z
-    .string()
-    .min(2, 'Category code is required')
-    .max(20),
-
-  categoryName: z
-    .string()
-    .min(2, 'Category name is required')
-    .max(100),
-
-  description: z.string().optional(),
-
-  isActive: z.boolean().optional(),
-});
+export const CategoryTypeEnum = z.enum(["PRODUCT", "RAW_MATERIAL", "WASTAGE"]);
 
 export const createCategorySchema = z.object({
-  body: categoryBodySchema,
+  body: z.object({
+    code: z
+      .string()
+      .min(1, "Category code is required")
+      .max(20, "Code cannot exceed 20 characters"),
+
+    name: z
+      .string()
+      .min(1, "Category name is required")
+      .max(100, "Name cannot exceed 100 characters"),
+
+    description: z.string().max(255).optional().nullable(),
+
+    type: CategoryTypeEnum,
+
+    isActive: z.boolean().optional(),
+  }),
 });
 
 export const updateCategorySchema = z.object({
-  body: categoryBodySchema.partial(),
-  params: z.object({ id: z.string().regex(/^\d+$/, 'Invalid category id') }),
+  body: createCategorySchema.shape.body
+    .omit({ code: true })
+    .partial(),
+
+  params: z.object({
+    id: z.string().regex(/^\d+$/, "ID must be a number"),
+  }),
 });
 
 export const categoryIdSchema = z.object({
-  params: z.object({ id: z.string().regex(/^\d+$/, 'Invalid category id') }),
+  params: z.object({
+    id: z.string().regex(/^\d+$/, "ID must be a number"),
+  }),
 });
 
-export type CreateCategoryInput = z.infer<typeof createCategorySchema>['body'];
-export type UpdateCategoryInput = z.infer<typeof updateCategorySchema>['body'];
+export type CreateCategoryInput = z.infer<typeof createCategorySchema>["body"];
+export type UpdateCategoryInput = z.infer<typeof updateCategorySchema>["body"];

@@ -17,7 +17,7 @@ import { salesOrderService } from "../../../services/salesOrderService";
 import { useEmployees } from "../../../hooks/useEmployees";
 import { salesProductService } from "../../../services/salesProductService";
 import { ORDER_TYPE_OPTIONS } from "../../../constants/selectOption";
-import { useSocketSync } from "../../../hooks/useSocketSync";
+import { companyService } from "../../../services/companyService";
 import { usePermission } from "../../../hooks/usePermission";
 
 // ─── Zod Schemas ──────────────────────────────────────────────────────────────
@@ -372,7 +372,6 @@ const SalesOrderForm: React.FC = () => {
 
     const { customers, loadCustomers } = useCustomers();
     const { loadEmployees } = useEmployees();
-    const { socket } = useSocketSync();
 
     const [salesProducts, setSalesProducts] = useState<any[]>([]);
     const [orderId, setOrderId] = useState<number | null>(null);
@@ -395,38 +394,10 @@ const SalesOrderForm: React.FC = () => {
 
     const { fields, append, remove } = useFieldArray({ control, name: "items" });
 
-    // ─── Socket Sync ─────────────────────────────────────────────────
-    useEffect(() => {
-        if (!socket) return;
-        const handleOrderUpdated = (data: { orderId: number }) => {
-            if (targetId && Number(data.orderId) === Number(targetId)) {
-                toast.info("This sales order was updated elsewhere. Refreshing...");
-                salesOrderService.fetchById(targetId).then(orderData => {
-                    const formItems = reconstructFormItems(orderData.items || [], salesProducts);
-                    reset({
-                        id: orderData.id,
-                        orderNo: orderData.orderNo || "",
-                        orderDate: orderData.orderDate ? orderData.orderDate.split("T")[0] : today,
-                        orderType: orderData.orderType || "",
-                        customerId: orderData.customerId != null ? String(orderData.customerId) : "",
-                        mobile: orderData.mobile || "",
-                        referenceText: orderData.referenceText || "",
-                        salesPersonName: orderData.salesPersonName || "",
-                        narration: orderData.remarks || orderData.internalNotes || "",
-                        items: formItems,
-                        isInterState: Boolean(orderData.isInterState),
-                    });
-                });
-            }
-        };
-        socket.on("salesOrder:updated", handleOrderUpdated);
-        return () => { socket.off("salesOrder:updated", handleOrderUpdated); };
-    }, [socket, targetId, salesProducts, reset]);
-
     // ─── Load company info for inter-state ───────────────────────────
     useEffect(() => {
-        salesOrderService.fetchCompanyState()
-            .then(st => setCompanyState(st || ""))
+        companyService.getCompany()
+            .then(c => setCompanyState(c?.state || ""))
             .catch(() => setCompanyState(""));
     }, []);
 
@@ -567,7 +538,7 @@ const SalesOrderForm: React.FC = () => {
     }, [computedIsInterState, setValue]);
 
     // ─── Submit ──────────────────────────────────────────────────────
-    const onSubmit = async (data: SalesOrderFormValues, action: "draft" | "quotation") => {
+    const onSubmit = async (data: SalesOrderFormValues, action: "draft" | "quotation" | "order") => {
         setIsSubmitting(true);
         try {
             const expandedMap = new Map<number, number>();

@@ -1,39 +1,59 @@
 import { useCallback } from "react";
-import { useAppDispatch, useAppSelector } from "./reduxHooks";
-import { fetchCategories, createCategory, updateCategory, deleteCategory, categoryCreated, categoryUpdated, categoryDeleted } from "../features/categories/categorySlice";
-import type { Category, CreateCategoryDto, UpdateCategoryDto } from "../features/categories/types";
-import { useSocketSync } from "./useSocketSync";
+import { useDispatch, useSelector } from "react-redux";
+import type { RootState, AppDispatch } from "../app/store";
+import {
+  fetchCategories,
+  createCategory,
+  updateCategory,
+  deleteCategory,
+} from "../features/categories/categorySlice";
+import type {
+  CreateCategoryDto,
+  UpdateCategoryDto,
+  FetchCategoriesParams,
+} from "../features/categories/types";
 
 export const useCategories = () => {
-  const dispatch = useAppDispatch();
-  const { data: categories, loading, error } = useAppSelector((state) => state.categories);
+  const dispatch = useDispatch<AppDispatch>();
+  const { data, loading, error, total, page, totalPages } = useSelector(
+    (state: RootState) => state.categories
+  );
 
-  useSocketSync<Category>("category", {
-    created: categoryCreated,
-    updated: categoryUpdated,
-    deleted: categoryDeleted,
-  });
+  const loadCategories = useCallback(
+    (params?: FetchCategoriesParams) => {
+      dispatch(fetchCategories(params));
+    },
+    [dispatch]
+  );
 
-  const loadCategories = useCallback((args?: { search?: string; isActive?: boolean } | string) => {
-    dispatch(fetchCategories(args ?? {}));
-  }, [dispatch]);
+  const addCategory = useCallback(
+    async (data: CreateCategoryDto) => {
+      return await dispatch(createCategory(data)).unwrap();
+    },
+    [dispatch]
+  );
 
-  const addCategory = useCallback((data: CreateCategoryDto) => {
-    return dispatch(createCategory(data)).unwrap();
-  }, [dispatch]);
+  const editCategory = useCallback(
+    async (id: number, data: UpdateCategoryDto) => {
+      return await dispatch(updateCategory({ id, data })).unwrap();
+    },
+    [dispatch]
+  );
 
-  const editCategory = useCallback((id: number, data: UpdateCategoryDto) => {
-    return dispatch(updateCategory({ id, data })).unwrap();
-  }, [dispatch]);
-
-  const removeCategory = useCallback((id: number) => {
-    return dispatch(deleteCategory(id)).unwrap();
-  }, [dispatch]);
+  const removeCategory = useCallback(
+    async (id: number) => {
+      return await dispatch(deleteCategory(id)).unwrap();
+    },
+    [dispatch]
+  );
 
   return {
-    categories,
+    categories: data,
     loading,
     error,
+    total,
+    page,
+    totalPages,
     loadCategories,
     addCategory,
     editCategory,

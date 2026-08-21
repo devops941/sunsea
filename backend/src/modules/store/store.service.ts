@@ -12,6 +12,16 @@ class StoreService {
       throw new ApiError(409, `Store with ID ${data.storeId} already exists`);
     }
 
+    const existingName = await prisma.store.findFirst({
+      where: {
+        storeName: { equals: data.storeName, mode: "insensitive" },
+      },
+    });
+
+    if (existingName) {
+      throw new ApiError(409, `Store Name "${data.storeName}" already exists. Please use a unique Store Name.`);
+    }
+
     return prisma.store.create({
       data: {
         storeId: data.storeId,
@@ -33,6 +43,7 @@ class StoreService {
   async findAll(params: {
     search?: string;
     storeCategory?: string;
+    isActive?: boolean;
     page?: number;
     limit?: number;
     sortBy?: string;
@@ -41,10 +52,11 @@ class StoreService {
     const {
       search,
       storeCategory,
+      isActive,
       page,
       limit,
       sortBy = "createdAt",
-      sortOrder = "desc",
+      sortOrder = "asc",
     } = params;
 
     const whereClause: any = {};
@@ -78,6 +90,10 @@ class StoreService {
 
     if (storeCategory) {
       whereClause.storeCategory = storeCategory;
+    }
+
+    if (isActive !== undefined) {
+      whereClause.isActive = isActive;
     }
 
     const queryOptions: any = {
@@ -172,6 +188,19 @@ class StoreService {
           400,
           "Cannot deactivate this store because it contains active physical stock (on-hand quantity > 0)."
         );
+      }
+    }
+
+    if (data.storeName) {
+      const existingName = await prisma.store.findFirst({
+        where: {
+          storeName: { equals: data.storeName, mode: "insensitive" },
+          NOT: { storeId },
+        },
+      });
+
+      if (existingName) {
+        throw new ApiError(409, `Store Name "${data.storeName}" already exists. Please use a unique Store Name.`);
       }
     }
 

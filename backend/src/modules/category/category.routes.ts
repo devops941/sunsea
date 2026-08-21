@@ -11,8 +11,31 @@ import {
 
 const router = Router();
 
-router.get("/next-id", authMiddleware, categoryController.getNextId);
+/**
+ * Get Next Category Code
+ * Query: ?type=PRODUCT|RAW_MATERIAL|WASTAGE
+ */
+router.get(
+  "/next-code",
+  authMiddleware,
+  requirePermission("categories.view"),
+  categoryController.getNextCode
+);
 
+/**
+ * Get All Categories
+ * Query: ?type=PRODUCT|RAW_MATERIAL|WASTAGE&search=&isActive=&page=&limit=
+ */
+router.get(
+  "/",
+  authMiddleware,
+  requirePermission("categories.view"),
+  categoryController.findAll
+);
+
+/**
+ * Create Category
+ */
 router.post(
   "/",
   authMiddleware,
@@ -21,13 +44,9 @@ router.post(
   categoryController.create
 );
 
-router.get(
-  "/",
-  authMiddleware,
-  requirePermission("categories.view"),
-  categoryController.findAll
-);
-
+/**
+ * Get Category By ID
+ */
 router.get(
   "/:id",
   authMiddleware,
@@ -36,6 +55,9 @@ router.get(
   categoryController.findById
 );
 
+/**
+ * Update Category
+ */
 router.put(
   "/:id",
   authMiddleware,
@@ -44,6 +66,9 @@ router.put(
   categoryController.update
 );
 
+/**
+ * Delete Category
+ */
 router.delete(
   "/:id",
   authMiddleware,

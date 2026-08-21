@@ -11,7 +11,6 @@ import customerRoutes from "../modules/customer/customer.routes";
 import customerTypeRoutes from "../modules/customer-type/customer-type.routes";
 import customerGradeRoutes from "../modules/customer-grade/customer-grade.routes";
 import supplierRoutes from "../modules/supplier/supplier.routes";
-import categoryRoutes from "../modules/category/category.routes";
 import uomRoutes from "../modules/uom/uom.routes";
 import productImageRoutes from "../modules/product-image/product-image.routes";
 import productRoutes from "../modules/product/product.routes";
@@ -19,11 +18,9 @@ import companyRoutes from "../modules/company/company.routes";
 import shiftRoutes from "../modules/shift/shift.routes";
 import storeRoutes from "../modules/store/store.routes";
 import rawMaterialRoutes from "../modules/raw-material/raw-material.routes";
-import rawMaterialCategoryRoutes from "../modules/raw-material-category/raw-material-category.routes";
 import rawMaterialStockRoutes from "../modules/raw-material-stock/raw-material-stock.routes";
 import finishedGoodsStockRoutes from "../modules/finished-goods-stock/finished-goods-stock.routes";
 import finishedGoodsTransactionRoutes from "../modules/finished-goods-transaction/finished-goods-transaction.routes";
-import locationRoutes from "../modules/location/location.routes";
 import machineRoutes from "../modules/machine/machine.routes";
 import productionOrderRoutes from "../modules/production-order/production-order.routes";
 import hourlyProductionRoutes from "../modules/hourly-production/hourly-production.routes";
@@ -58,6 +55,7 @@ import returnRoutes from "../modules/returns/returns.routes";
 import pettyCashRoutes from "../modules/petty-cash/petty-cash.routes";
 import payrollRoutes from "../modules/payroll/payroll.routes";
 import dashboardRoutes from "../modules/dashboard/dashboard.routes";
+import categoryRoutes from "../modules/category/category.routes";
 
 const router = Router();
 
@@ -79,7 +77,6 @@ router.use("/suppliers", supplierRoutes);
 router.use("/purchase-orders", purchaseOrderRoutes);
 router.use("/supplier-material-prices", supplierMaterialPriceRoutes);
 
-router.use("/product/categories", categoryRoutes);
 router.use("/product/uoms", uomRoutes);
 router.use("/uom", uomRoutes);
 router.use("/product-images", productImageRoutes);
@@ -87,12 +84,10 @@ router.use("/products", productRoutes);
 router.use("/companies", companyRoutes);
 
 router.use("/stores", storeRoutes);
-router.use("/raw-material-categories", rawMaterialCategoryRoutes);
 router.use("/raw-materials", rawMaterialRoutes);
 router.use("/raw-material-stocks", rawMaterialStockRoutes);
 router.use("/finished-goods-stocks", finishedGoodsStockRoutes);
 router.use("/finished-goods-transactions", finishedGoodsTransactionRoutes);
-router.use("/locations", locationRoutes);
 router.use("/machines", machineRoutes);
 router.use("/production-orders", productionOrderRoutes);
 router.use("/hourly-productions", hourlyProductionRoutes);
@@ -125,6 +120,7 @@ router.use("/returns", returnRoutes);
 router.use("/petty-cash", pettyCashRoutes);
 router.use("/payroll", payrollRoutes);
 router.use("/dashboard", dashboardRoutes);
+router.use("/categories", categoryRoutes);
 
 router.get("/", (req, res) => {
     res.status(200).json({

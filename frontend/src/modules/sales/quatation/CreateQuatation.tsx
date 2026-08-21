@@ -143,21 +143,9 @@ const QuotationForm: React.FC = () => {
     const { id: idParam } = useParams<{ id: string }>();
     const { can, isSuperAdmin, permissions } = usePermission();
 
-    // ── Estimate User: Holds sales-orders.view-estimate AND NOT sales-orders.view-gst ──
-    //    Estimate users get Create Estimate, DO No, DO Date, Estimate Items, WITH Include GST checkbox.
-    const isEstimateUser = !isSuperAdmin && permissions.includes("sales-orders.view-estimate") && !permissions.includes("sales-orders.view-gst");
-
-    // ── GST User: Everyone else (Super Admin, GST users, or non-estimate users) ──
-    //    GST users get Create Quotation, Quotation No, Quotation Date, Quotation Items, NO Include GST checkbox, compulsory GST.
-    const isGstUser = !isEstimateUser;
-
-    // ── GST toggle — only relevant for estimated users. GST users always have GST on.
-    const [includeGstInEstimate, setIncludeGstInEstimate] = useState(false);
-    const gstEnabled = isGstUser || includeGstInEstimate;
-
-    // ── Doc number label: estimated users see "DO No", GST users see "Quotation No"
-    const docNoLabel = isEstimateUser ? "DO No" : "Quotation No";
-    const docNoPrefix = isEstimateUser ? "DO" : "QT";
+    const docNoLabel = "Quotation No";
+    const docNoPrefix = "QT";
+    const gstEnabled = true;
 
     // ─── State ──────────────────────────────────────────────────
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -928,9 +916,7 @@ const QuotationForm: React.FC = () => {
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                             <div>
                                 <h2 className="text-xl font-bold text-ink">
-                                    {isEditMode
-                                        ? (isEstimateUser ? "Edit Estimate" : "Edit Quotation")
-                                        : (isEstimateUser ? "Create Estimate" : "Create Quotation")}
+                                    {isEditMode ? "Edit Quotation" : "Create Quotation"}
                                 </h2>
                             </div>
                             <div>
@@ -967,7 +953,7 @@ const QuotationForm: React.FC = () => {
                                         name="quotationDate"
                                         control={control}
                                         render={({ field: f }) => (
-                                            <CtrlText field={f} label={isEstimateUser ? "DO Date" : "Quotation Date"} type="date" disabled error={errors.quotationDate?.message} />
+                                            <CtrlText field={f} label="Quotation Date" type="date" disabled error={errors.quotationDate?.message} />
                                         )}
                                     />
                                 </div>
@@ -1028,20 +1014,8 @@ const QuotationForm: React.FC = () => {
 
                                 {/* ── Items Table Header with Top-Right Add Product Button ── */}
                                 <div className="flex items-center justify-between mb-3">
-                                    <h3 className="text-base font-semibold text-ink">{isEstimateUser ? "Estimate Items" : "Quotation Items"}</h3>
+                                    <h3 className="text-base font-semibold text-ink">Quotation Items</h3>
                                     <div className="flex items-center gap-4">
-                                        {/* GST toggle — estimated users only. GST users always calculate GST. */}
-                                        {isEstimateUser && (
-                                            <label className="flex items-center gap-2 text-sm text-ink cursor-pointer select-none">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={includeGstInEstimate}
-                                                    onChange={(e) => setIncludeGstInEstimate(e.target.checked)}
-                                                    className="w-4 h-4 rounded accent-blue-600 cursor-pointer"
-                                                />
-                                                Include GST
-                                            </label>
-                                        )}
                                         <CustomButton
                                             text="Add Product"
                                             variant="secondary"

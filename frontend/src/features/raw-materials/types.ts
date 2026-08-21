@@ -1,11 +1,9 @@
 import type { Store } from "../stores/types";
-import type { RawMaterialCategory } from "../raw-material-categories/types";
+import type { Category } from "../categories/types";
+
 export interface RawMaterial {
   rawMaterialId: string;
   materialName: string;
-
-  categoryId?: number | null;
-  category?: RawMaterialCategory | null;
 
   hsnCode?: string | null;
 
@@ -44,17 +42,20 @@ export interface RawMaterial {
   createdBy?: string | null;
   updatedBy?: string | null;
 
+  categoryId?: number | null;
+  category?: Category | null;
+
   storeLocation?: {
     id: string;
     locationCode: string;
   } | null;
 }
+
 export interface CreateRawMaterialDto {
   rawMaterialId: string;
   materialCode?: string;
 
   materialName: string;
-  categoryId?: number | null;
   hsnCode?: string | null;
 
   minimumStock?: number | null;
@@ -71,10 +72,12 @@ export interface CreateRawMaterialDto {
   lastMovementAt?: string | null;
 
   isActive?: boolean;
+  categoryId?: number | null;
+  itemType?: "RAW_MATERIAL" | "WASTAGE" | null;
 }
+
 export interface UpdateRawMaterialDto {
   materialName?: string;
-  categoryId?: number | null;
   hsnCode?: string | null;
 
   minimumStock?: number | null;
@@ -95,10 +98,15 @@ export interface UpdateRawMaterialDto {
 
   status?: string;
   isActive?: boolean;
+  categoryId?: number | null;
+  itemType?: "RAW_MATERIAL" | "WASTAGE" | null;
 }
 
 export interface RawMaterialState {
   data: RawMaterial[];
+  total: number;
+  page: number;
+  totalPages: number;
   loading: boolean;
   error: string | null;
 }
@@ -147,6 +155,9 @@ export interface UpdateRawMaterialStockDto {
 
 export interface RawMaterialStockState {
   data: RawMaterialStock[];
+  total: number;
+  page: number;
+  totalPages: number;
   loading: boolean;
   error: string | null;
 }

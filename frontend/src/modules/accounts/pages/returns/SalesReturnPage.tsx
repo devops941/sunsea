@@ -635,7 +635,7 @@ export const SalesReturnPage: React.FC = () => {
                               {item.quantity}
                             </td>
                             <td className="px-3 py-2.5 text-center font-medium text-slate-700">
-                              {item.weight != null ? formatStockQty(item.weight, item.uom) : '—'}
+                              {item.weight != null ? formatStockQty(item.weight, item.uom || undefined) : '—'}
                             </td>
                             <td className="px-3 py-2.5 text-right font-mono">
                               ₹{Number(item.unitPrice).toFixed(2)}
