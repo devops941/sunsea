@@ -189,6 +189,7 @@ const SelectInput: React.FC<SelectInputProps> = ({
         {searchable ? (
           <input
             type="text"
+            autoComplete="off"
             ref={triggerRef}
             disabled={disabled}
             value={isOpen ? searchTerm : toPlainText(displayLabel)}
@@ -211,6 +212,7 @@ const SelectInput: React.FC<SelectInputProps> = ({
               border rounded-md outline-none
               text-[15px] font-semibold flex items-center justify-between
               transition-all duration-250 text-left
+              [&:-webkit-autofill]:shadow-[inset_0_0_0px_1000px_var(--color-card-2)] [&:-webkit-autofill]:[-webkit-text-fill-color:var(--color-ink)]
               ${value ? "text-ink" : "text-ink-subtle font-normal"}
               ${error
                 ? "border-red-500 bg-card-2 focus:border-red-500 focus:ring-4 focus:ring-red-500/15"

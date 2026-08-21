@@ -19,7 +19,6 @@ const INCLUDE_GST = {
     items: {
         include: {
             product: { select: { id: true, productCode: true, productName: true } },
-            gstTaxRate: { select: { id: true, taxName: true, taxRate: true, taxType: true } },
         },
     },
     customer: { select: { id: true, firmName: true, displayName: true, addresses: true, openingBalance: true, openingBalanceType: true } },
@@ -31,7 +30,6 @@ const INCLUDE_GST = {
 type IncomingItem = { productId: string | number | bigint; quantity: number | string };
 
 interface GstItemInput {
-    gstTaxRateId?: string | null;
     cgstRate?:     number | null;
     sgstRate?:     number | null;
     igstRate?:     number | null;
@@ -115,46 +113,17 @@ class SalesOrderService {
     }
 
     /**
-     * Builds a map of gstTaxRateId → taxRate so item GST amounts can be derived
-     * when the client sends only the gstTaxRateId (no explicit cgst/sgst/igst rates).
+     * Resolves GST rates from explicit cgst/sgst/igst rates sent by the client.
+     * Intra-state: CGST+SGST. Inter-state: full IGST.
      */
-    private async buildGstRateMap(items: any[]): Promise<Map<string, Prisma.Decimal>> {
-        const ids = [...new Set(
-            items.map(i => i.gstTaxRateId).filter((id: any): id is string => Boolean(id))
-        )];
-        if (ids.length === 0) return new Map();
-        const taxes = await prisma.gstTaxRate.findMany({
-            where: { id: { in: ids } },
-            select: { id: true, taxRate: true },
-        });
-        return new Map(taxes.map(t => [t.id, new Prisma.Decimal(t.taxRate as any)]));
-    }
-
-    /**
-     * Fills in cgst/sgst/igst rates from the GST tax master when the item only
-     * carries a gstTaxRateId. Intra-state: rate split 50/50 CGST+SGST. Inter-state: full IGST.
-     */
-    private resolveGstRates(raw: any, gstRateMap: Map<string, Prisma.Decimal>, isInterState: boolean): GstItemInput {
+    private resolveGstRates(raw: any, isInterState: boolean): GstItemInput {
         const hasExplicit = raw.cgstRate != null || raw.sgstRate != null || raw.igstRate != null;
         if (hasExplicit) {
-            return { gstTaxRateId: raw.gstTaxRateId, cgstRate: raw.cgstRate, sgstRate: raw.sgstRate, igstRate: raw.igstRate };
+            return { cgstRate: raw.cgstRate, sgstRate: raw.sgstRate, igstRate: raw.igstRate };
         }
-        if (!raw.gstTaxRateId) {
-            // No GST selection — default to 18% (matches the quotation form default)
-            // so sales-order amounts always carry a proper GST breakdown.
-            return isInterState
-                ? { gstTaxRateId: null, igstRate: 18 }
-                : { gstTaxRateId: null, cgstRate: 9, sgstRate: 9 };
-        }
-        const taxRate = gstRateMap.get(raw.gstTaxRateId);
-        if (!taxRate) {
-            return { gstTaxRateId: raw.gstTaxRateId, cgstRate: raw.cgstRate, sgstRate: raw.sgstRate, igstRate: raw.igstRate };
-        }
-        if (isInterState) {
-            return { gstTaxRateId: raw.gstTaxRateId, igstRate: taxRate.toNumber() };
-        }
-        const half = taxRate.div(2).toNumber();
-        return { gstTaxRateId: raw.gstTaxRateId, cgstRate: half, sgstRate: half };
+        return isInterState
+            ? { igstRate: 18 }
+            : { cgstRate: 9, sgstRate: 9 };
     }
 
     private computeGstAmounts(lineTotal: Prisma.Decimal, gst: GstItemInput, isInterState: boolean) {
@@ -198,12 +167,11 @@ class SalesOrderService {
         );
 
         const isInterState = data.isInterState ?? false;
-        const gstRateMap = await this.buildGstRateMap(data.items);
         const itemsWithGst = lineItems.map((l, idx) => {
             const raw = data.items[idx] as any;
-            const gstInput = this.resolveGstRates(raw, gstRateMap, isInterState);
+            const gstInput = this.resolveGstRates(raw, isInterState);
             const gst = this.computeGstAmounts(l.lineTotal, gstInput, isInterState);
-            return { ...l, gstTaxRateId: raw.gstTaxRateId ?? null, ...gst };
+            return { ...l, ...gst };
         });
 
         const isDraft = data.status === "DRAFT";
@@ -251,7 +219,6 @@ class SalesOrderService {
                         quantity:      l.quantity,
                         unitPrice:     l.rate,
                         lineTotal:     l.lineTotal,
-                        gstTaxRateId:  l.gstTaxRateId,
                         taxableAmount: l.taxableAmount,
                         cgstRate:      l.cgstRate,
                         cgstAmount:    l.cgstAmount,
@@ -370,12 +337,11 @@ class SalesOrderService {
             );
 
             const isInterState = data.isInterState ?? (existing as any).isInterState ?? false;
-            const updGstRateMap = await this.buildGstRateMap(data.items);
             const itemsWithGst = lineItems.map((l, idx) => {
                 const raw = data.items![idx] as any;
-                const gstInput = this.resolveGstRates(raw, updGstRateMap, isInterState);
+                const gstInput = this.resolveGstRates(raw, isInterState);
                 const gst = this.computeGstAmounts(l.lineTotal, gstInput, isInterState);
-                return { ...l, gstTaxRateId: raw.gstTaxRateId ?? null, ...gst };
+                return { ...l, ...gst };
             });
 
             await prisma.salesOrderItem.deleteMany({ where: { salesOrderId: id } });
@@ -407,7 +373,6 @@ class SalesOrderService {
                     quantity:      l.quantity,
                     unitPrice:     l.rate,
                     lineTotal:     l.lineTotal,
-                    gstTaxRateId:  l.gstTaxRateId,
                     taxableAmount: l.taxableAmount,
                     cgstRate:      l.cgstRate,
                     cgstAmount:    l.cgstAmount,
@@ -550,7 +515,6 @@ class SalesOrderService {
                         quantity: true,
                         unitPrice: true,
                         lineTotal: true,
-                        gstTaxRateId: true,
                         product: { select: { id: true, productCode: true, productName: true } },
                     },
                 },

@@ -71,39 +71,43 @@ class PurchaseOrderController {
         const po = await purchaseOrderService.updatePurchaseOrder(id, req.body);
 
         if (oldPo.status !== "APPROVED" && po.status === "APPROVED") {
-            try {
-                const fullPo = await purchaseOrderService.getPurchaseOrderById(id);
-                const companyDetails = await prisma.company.findFirst();
-                const supplier = fullPo.supplier;
-                
-                let recipientPhone = "";
-                if (supplier?.mobile) {
-                    if (Array.isArray(supplier.mobile) && supplier.mobile.length > 0) {
-                        const firstMobile: any = supplier.mobile[0];
-                        recipientPhone = firstMobile.number || firstMobile.value || "";
-                    } else if (typeof supplier.mobile === "string") {
-                        recipientPhone = supplier.mobile as string;
-                    }
-                }
-                
-                if (!recipientPhone && supplier?.altPhone) {
-                    recipientPhone = supplier.altPhone;
-                }
+            // Fire-and-forget: send WhatsApp notification in the background
+            // so the API response returns immediately
+            (async () => {
+                try {
+                    const fullPo = await purchaseOrderService.getPurchaseOrderById(id);
+                    const companyDetails = await prisma.company.findFirst();
+                    const supplier = fullPo.supplier;
 
-                if (recipientPhone && companyDetails && supplier) {
-                    const formattedPhone = recipientPhone.replace(/^\+/, "");
-                    const html = generatePoInvoiceHtml(fullPo, companyDetails, supplier);
-                    const pdfBuffer = await generatePdfFromHtml(html);
-                    const filename = `PO-${fullPo.poNumber}.pdf`;
-                    
-                    const mediaId = await WhatsappService.uploadMedia(pdfBuffer, filename, "application/pdf");
-                    const message = `Dear ${supplier.supplierName},\n\nYour Purchase Order ${fullPo.poNumber} has been approved. Please find the attached document for your reference.\n\nBest regards,\n${companyDetails.companyName}`;
-                    
-                    await WhatsappService.sendDocumentMessage(formattedPhone, mediaId, filename, message);
+                    let recipientPhone = "";
+                    if (supplier?.mobile) {
+                        if (Array.isArray(supplier.mobile) && supplier.mobile.length > 0) {
+                            const firstMobile: any = supplier.mobile[0];
+                            recipientPhone = firstMobile.number || firstMobile.value || "";
+                        } else if (typeof supplier.mobile === "string") {
+                            recipientPhone = supplier.mobile as string;
+                        }
+                    }
+
+                    if (!recipientPhone && supplier?.altPhone) {
+                        recipientPhone = supplier.altPhone;
+                    }
+
+                    if (recipientPhone && companyDetails && supplier) {
+                        const formattedPhone = recipientPhone.replace(/^\+/, "");
+                        const html = generatePoInvoiceHtml(fullPo, companyDetails, supplier);
+                        const pdfBuffer = await generatePdfFromHtml(html);
+                        const filename = `PO-${fullPo.poNumber}.pdf`;
+
+                        const mediaId = await WhatsappService.uploadMedia(pdfBuffer, filename, "application/pdf");
+                        const message = `Dear ${supplier.supplierName},\n\nYour Purchase Order ${fullPo.poNumber} has been approved. Please find the attached document for your reference.\n\nBest regards,\n${companyDetails.companyName}`;
+
+                        await WhatsappService.sendDocumentMessage(formattedPhone, mediaId, filename, message);
+                    }
+                } catch (err) {
+                    console.error("Failed to auto-send WhatsApp on PO approval", err);
                 }
-            } catch (err) {
-                console.error("Failed to auto-send WhatsApp on PO approval", err);
-            }
+            })();
         }
 
         getIO().emit("purchaseOrder:updated", po);

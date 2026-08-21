@@ -23,9 +23,9 @@ import type { RawMaterial } from "../../../../features/raw-materials/types";
 import { usePurchaseOrders } from "../../../../hooks/usePurchaseOrder";
 import { purchaseOrderService } from "../../../../services/purchaseOrderService";
 import BackButton from "../../../../components/ui/BackButton/BackButton";
+import DeleteButton from "../../../../components/ui/DeleteButton/DeleteButton";
 import AddressForm from "../../../../components/form/AddressFrom/AddressFrom";
 import { useAppDispatch, useAppSelector } from "../../../../hooks/reduxHooks";
-import { selectActiveGstTaxes, fetchGstTaxes } from "../../../../features/gst/gstSlice";
 import { fetchStores } from "../../../../features/stores/storeSlice";
 import { useSocketSync } from "../../../../hooks/useSocketSync";
 
@@ -164,9 +164,6 @@ const PurchaseOrderForm: React.FC = () => {
   const { data: stores } = useAppSelector(state => state.stores);
   const { activeUOMs, loadActiveUOMs } = useUOMs();
   const companyState = company?.state;
-  const gstTaxes = useAppSelector(selectActiveGstTaxes);
-  const gstLoading = useAppSelector((state) => state.gst.loading);
-
   const [loading, setLoading] = useState(isEdit);
   const [poNotFound, setPoNotFound] = useState(false);
   const [fetchError, setFetchError] = useState(false);
@@ -282,7 +279,7 @@ const PurchaseOrderForm: React.FC = () => {
       const materials = await rawMaterialService.fetchAll();
       setRawMaterials(materials ?? []);
     } catch {
-      console.error("Failed to load raw materials");
+      toast.error("Failed to load raw materials");
     }
   }, []);
 
@@ -296,8 +293,8 @@ const PurchaseOrderForm: React.FC = () => {
       if (nextCode) {
         setFormData((prev) => ({ ...prev, poNumber: nextCode }));
       }
-    } catch (err) {
-      console.error("Error fetching next PO code:", err);
+    } catch {
+      // Silently fail - PO number will be generated server-side
     }
   }, []);
 
@@ -309,7 +306,6 @@ const PurchaseOrderForm: React.FC = () => {
 
   useEffect(() => {
     refreshSuppliers();
-    dispatch(fetchGstTaxes(undefined));
     refreshStores();
     loadActiveUOMs();
     refreshRawMaterials();
@@ -347,8 +343,7 @@ const PurchaseOrderForm: React.FC = () => {
           setFormData(poData);
 
         }
-      } catch (err) {
-        console.error("Failed to fetch purchase order:", err);
+      } catch {
         if (mounted) {
           setFetchError(true);
           toast.error("Failed to load purchase order");
@@ -426,11 +421,11 @@ const PurchaseOrderForm: React.FC = () => {
       setFormData((prev) => ({
         ...prev,
         supplierId: value,
-        billingAddressLine1: selectedSup?.billingAddressLine1 || "",
-        billingCity: selectedSup?.billingCity || "",
-        billingState: selectedSup?.billingState || "",
-        billingPincode: selectedSup?.billingPincode || "",
-        billingCountry: selectedSup?.billingCountry || "India",
+        billingAddressLine1: company?.addressLine1 || "",
+        billingCity: company?.city || "",
+        billingState: company?.state || "",
+        billingPincode: company?.zipcode || "",
+        billingCountry: company?.country || "India",
         items: [],
         subtotal: 0,
         totalDiscount: 0,
@@ -669,8 +664,7 @@ const PurchaseOrderForm: React.FC = () => {
           ? (typeof rawMaterial.unitPrice === "string" ? parseFloat(rawMaterial.unitPrice) : Number(rawMaterial.unitPrice))
           : 0);
 
-      const defaultTaxRateObj = gstTaxes?.find((t: any) => String(t.id) === String(rawMaterial?.gstTaxRateId));
-      const defaultTaxRate = defaultTaxRateObj ? Number(defaultTaxRateObj.taxRate) : 0;
+      const defaultTaxRate = 0;
 
       const defaultUom = rawMaterial?.baseUom ? rawMaterial.baseUom.split(",")[0].trim() : "";
       const mult = getUomMultiplier(defaultUom, rawMaterial?.baseUom);
@@ -902,14 +896,6 @@ const PurchaseOrderForm: React.FC = () => {
     label: s?.displayName || s?.legalName || "",
   }));
 
-  const gstOptions = [
-    { value: "", label: gstLoading ? "Loading GST rates..." : "-- Select GST Rate --" },
-    ...(gstTaxes || []).map((t: any) => ({
-      value: String(t.taxRate),
-      label: `${t.taxName} (${t.taxRate}%)`,
-    })),
-  ];
-
   const uomOptions = [
     { value: "", label: "-- Select UOM --" },
     ...(activeUOMs || []).map((uom: any) => ({
@@ -1123,14 +1109,15 @@ const PurchaseOrderForm: React.FC = () => {
                         />
                       </td>
                       <td className="px-3 py-2 whitespace-nowrap">
-                        <SelectInput
-                          label=""
-                          noMargin={true}
+                        <TextInput
                           name={`items[${index}].tax`}
-                          options={gstOptions}
+                          type="number"
                           value={String(item.tax || 0)}
                           onChange={(e) => handleItemChange(index, "tax", Number(e.target.value))}
-                          hideLabel
+                          min={0}
+                          max={100}
+                          step={0.01}
+                          placeholder="0"
                           disabled={isLocked}
                         />
                       </td>

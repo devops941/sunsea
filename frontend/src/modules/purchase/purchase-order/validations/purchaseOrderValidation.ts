@@ -1,63 +1,52 @@
+import { z } from "zod";
 import type { PurchaseOrderFormData } from "../../../../features/purchaseOrder/types";
 
+const purchaseOrderItemSchema = z.object({
+  productId: z.string().min(1, "Product is required"),
+  uom: z.string().min(1, "UOM is required"),
+  quantity: z.number().min(0.01, "Quantity must be greater than 0"),
+  unitPrice: z.number().min(0, "Unit price cannot be negative"),
+  tax: z.number().min(0).max(100, "Tax must be between 0 and 100"),
+});
+
+export const purchaseOrderSchema = z.object({
+  poDate: z.string().min(1, "PO Date is required"),
+  supplierId: z.union([z.string().min(1), z.number().min(1)], {
+    errorMap: () => ({ message: "Supplier is required" }),
+  }),
+  storeId: z.string().min(1, "Store is required"),
+  billingAddressLine1: z.string().min(1, "Billing address line is required"),
+  billingCity: z.string().min(1, "Billing city is required"),
+  billingState: z.string().min(1, "Billing state is required"),
+  billingPincode: z.string().regex(/^\d{6}$/, "Invalid pincode format"),
+  items: z.array(purchaseOrderItemSchema).min(1, "At least one item is required"),
+});
 
 export const validatePurchaseOrder = (data: PurchaseOrderFormData): Record<string, string> => {
+  const result = purchaseOrderSchema.safeParse({
+    poDate: data.poDate,
+    supplierId: data.supplierId,
+    storeId: data.storeId,
+    billingAddressLine1: data.billingAddressLine1,
+    billingCity: data.billingCity,
+    billingState: data.billingState,
+    billingPincode: data.billingPincode,
+    items: data.items.map((item) => ({
+      productId: item.productId,
+      uom: item.uom,
+      quantity: Number(item.quantity),
+      unitPrice: Number(item.unitPrice),
+      tax: Number(item.tax),
+    })),
+  });
+
+  if (result.success) return {};
+
   const errors: Record<string, string> = {};
-
-  // PO Date
-  if (!data.poDate) {
-    errors.poDate = "PO Date is required";
-  }
-
-
-
-  // Supplier
-  if (!data.supplierId) {
-    errors.supplierId = "Supplier is required";
-  }
-
-  if (!data.storeId) {
-    errors.storeId = "store is required";
-  }
-
-  // Billing Address
-  if (!data.billingAddressLine1) {
-    errors.billingAddressLine1 = "Billing address line is required";
-  }
-  if (!data.billingCity) {
-    errors.billingCity = "Billing city is required";
-  }
-  if (!data.billingState) {
-    errors.billingState = "Billing state is required";
-  }
-  if (!data.billingPincode) {
-    errors.billingPincode = "Billing pincode is required";
-  } else if (!/^\d{6}$/.test(data.billingPincode)) {
-    errors.billingPincode = "Invalid pincode format";
-  }
-
-  // Shipping Address (only if not same as billing)
-
-
-  // Items
-  if (data.items.length === 0) {
-    errors.items = "At least one item is required";
-  }
-
-  data.items.forEach((item, index) => {
-    if (!item.productId) {
-      errors[`items.${index}.productId`] = "Product is required";
-    }
-    if (!item.uom)
-      errors[`items.${index}.uom`] = "UOM is required";
-    if (!item.quantity || item.quantity <= 0) {
-      errors[`items.${index}.quantity`] = "Quantity must be greater than 0";
-    }
-    if (item.unitPrice < 0) {
-      errors[`items.${index}.unitPrice`] = "Unit price cannot be negative";
-    }
-    if (item.tax < 0 || item.tax > 100) {
-      errors[`items.${index}.tax`] = "Tax must be between 0 and 100";
+  result.error.issues.forEach((issue) => {
+    const path = issue.path.join(".");
+    if (!errors[path]) {
+      errors[path] = issue.message;
     }
   });
 

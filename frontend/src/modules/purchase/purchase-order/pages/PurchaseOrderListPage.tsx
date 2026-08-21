@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { FaPlus, FaSearch, FaFileInvoice, FaWhatsapp } from "react-icons/fa";
+import React, { useState, useEffect, useCallback } from "react";
+import { FaPlus, FaWhatsapp } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useSelector } from "react-redux";
@@ -21,21 +21,11 @@ import DataTable from "../../../../components/ui/table/DataTable";
 import SearchInput from "../../../../components/ui/SearchInput/SearchInput";
 import StatusBadge from "../../../../components/ui/StatusBadge/Badge";
 import FilterPopover from "../../../../components/ui/FilterPopover/FilterPopover";
+import TextInput from "../../../../components/form/TextInput/TextInput";
+import SelectInput from "../../../../components/form/SelectInput/SelectInput";
 
 const ITEMS_PER_PAGE = 10;
 
-const STATUS_COLORS: Record<PurchaseOrderStatus, string> = {
-  DRAFT: "secondary",
-  PENDING: "warning",
-  APPROVED: "success",
-  REJECTED: "danger",
-  COMPLETED: "info",
-  CANCELLED: "dark",
-  RECEIVED: "info",
-  OPEN: "success",
-  PARTIALLY_RECEIVED: "warning",
-  CLOSED: "secondary",
-};
 
 const PurchaseOrderListPage: React.FC = () => {
   const navigate = useNavigate();
@@ -95,7 +85,6 @@ const PurchaseOrderListPage: React.FC = () => {
       setPurchaseOrders(response?.data || []);
       setTotal(Math.ceil((response?.total ?? 0) / ITEMS_PER_PAGE));
     } catch (err: any) {
-      console.error(err);
       toast.error(err?.response?.data?.message || "Failed to fetch purchase orders");
       setPurchaseOrders([]);
       setTotal(0);
@@ -113,10 +102,11 @@ const PurchaseOrderListPage: React.FC = () => {
     return () => clearTimeout(timer);
   }, [fetchPOs]);
 
-  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleSearch = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(e.target.value);
+    setCurrentPage(1);
     setPoToDelete(null);
-  };
+  }, []);
 
   const handleOpenEmailModal = async (item: any) => {
     try {
@@ -206,14 +196,14 @@ const PurchaseOrderListPage: React.FC = () => {
     }
   };
 
-  const handleApplyFilters = () => {
+  const handleApplyFilters = useCallback(() => {
     setStatusFilter(draftStatusFilter);
     setFromDate(draftFromDate);
     setToDate(draftToDate);
     setCurrentPage(1);
-  };
+  }, [draftStatusFilter, draftFromDate, draftToDate]);
 
-  const handleClearFilters = () => {
+  const handleClearFilters = useCallback(() => {
     setDraftStatusFilter("");
     setDraftFromDate("");
     setDraftToDate("");
@@ -221,13 +211,13 @@ const PurchaseOrderListPage: React.FC = () => {
     setFromDate("");
     setToDate("");
     setCurrentPage(1);
-  };
+  }, []);
 
-  const handleOpenFilter = () => {
+  const handleOpenFilter = useCallback(() => {
     setDraftStatusFilter(statusFilter);
     setDraftFromDate(fromDate);
     setDraftToDate(toDate);
-  };
+  }, [statusFilter, fromDate, toDate]);
 
   const handleView = useCallback((po: PurchaseOrder) => {
     setSelectedPO(po);
@@ -286,50 +276,35 @@ const PurchaseOrderListPage: React.FC = () => {
               onClear={handleClearFilters}
               onOpen={handleOpenFilter}
             >
-              <div className="mb-3">
-                <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-semibold">
-                  From Date
-                </label>
-                <input
-                  type="date"
-                  className="w-full border border-line rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
-                  value={draftFromDate}
-                  max={draftToDate || undefined}
-                  onChange={(e) => setDraftFromDate(e.target.value)}
-                />
-              </div>
-
-              <div className="mb-3">
-                <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-semibold">
-                  To Date
-                </label>
-                <input
-                  type="date"
-                  className="w-full border border-line rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
-                  value={draftToDate}
-                  min={draftFromDate || undefined}
-                  onChange={(e) => setDraftToDate(e.target.value)}
-                />
-              </div>
-
-              <div className="mb-4">
-                <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-semibold">
-                  Status
-                </label>
-                <select
-                  className="w-full border border-line rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary bg-card"
-                  value={draftStatusFilter}
-                  onChange={(e) => setDraftStatusFilter(e.target.value as PurchaseOrderStatus | "")}
-                >
-                  <option value="">All Status</option>
-                  <option value="DRAFT">Draft</option>
-                  <option value="PENDING">Pending</option>
-                  <option value="APPROVED">Approved</option>
-                  <option value="REJECTED">Rejected</option>
-                  <option value="COMPLETED">Completed</option>
-                  <option value="CANCELLED">Cancelled</option>
-                </select>
-              </div>
+              <TextInput
+                label="From Date"
+                name="draftFromDate"
+                type="date"
+                value={draftFromDate}
+                onChange={(e) => setDraftFromDate(e.target.value)}
+              />
+              <TextInput
+                label="To Date"
+                name="draftToDate"
+                type="date"
+                value={draftToDate}
+                onChange={(e) => setDraftToDate(e.target.value)}
+              />
+              <SelectInput
+                label="Status"
+                name="draftStatusFilter"
+                value={draftStatusFilter}
+                options={[
+                  { value: "", label: "All Status" },
+                  { value: "DRAFT", label: "Draft" },
+                  { value: "PENDING", label: "Pending" },
+                  { value: "APPROVED", label: "Approved" },
+                  { value: "REJECTED", label: "Rejected" },
+                  { value: "COMPLETED", label: "Completed" },
+                  { value: "CANCELLED", label: "Cancelled" },
+                ]}
+                onChange={(e) => setDraftStatusFilter(e.target.value as PurchaseOrderStatus | "")}
+              />
             </FilterPopover>
 
 
@@ -391,28 +366,7 @@ const PurchaseOrderListPage: React.FC = () => {
                     )}
                     {item.status !== "REJECTED" && item.status !== "CANCELLED" && item.status !== "PENDING" && item.status !== "DRAFT" && (
                       <>
-                        <button
-                          type="button"
-                          onClick={() => navigate(`/po-invoice/${item.id}`)}
-                          title="View PO Invoice Format"
-                          className="
-                            w-10 h-10
-                            flex items-center justify-center
-                            border-none rounded-xl
-                            cursor-pointer
-                            bg-emerald-500/[0.12]
-                            text-emerald-600
-                            transition-all duration-[250ms] ease-in-out
-                            hover:-translate-y-[3px]
-                            hover:bg-emerald-500/[0.22]
-                            hover:shadow-[0_8px_18px_rgba(16,185,129,0.18)]
-                            active:scale-95
-                            disabled:opacity-50
-                            disabled:cursor-not-allowed
-                          "
-                        >
-                          <FaFileInvoice className="text-[17px] opacity-90" />
-                        </button>
+                        <ViewButton onClick={() => navigate(`/po-invoice/${item.id}`)} />
                         <EmailButton 
                           onClick={() => handleOpenEmailModal(item)} 
                           disabled={sendingEmail && emailPo?.id === item.id} 
@@ -445,6 +399,7 @@ const PurchaseOrderListPage: React.FC = () => {
           message="Are you sure you want to delete this purchase order? This action cannot be undone."
           confirmText="Delete"
           confirmVariant="danger"
+          isDangerous={true}
           onConfirm={handleDeleteConfirm}
           onHide={() => setShowDeleteModal(false)}
         />

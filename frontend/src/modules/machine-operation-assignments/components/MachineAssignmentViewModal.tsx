@@ -43,8 +43,6 @@ const MachineAssignmentViewModal: React.FC<MachineAssignmentViewModalProps> = ({
         </div>
     );
 
-    const inchargeName = assignment.inchargeEmployee?.fullName || assignment.machine?.operatorName || assignment.machine?.operatorId || "N/A";
-
     const sections = [
         {
             title: "General Information",
@@ -67,8 +65,6 @@ const MachineAssignmentViewModal: React.FC<MachineAssignmentViewModalProps> = ({
         {
             title: "Assigned Personnel",
             fields: [
-                { label: "Incharge Name", value: inchargeName },
-                { label: "Incharge Role", value: assignment.inchargeRole?.name || (inchargeName !== "N/A" ? "Machine Operator" : "N/A") },
                 { label: "Operators", value: operatorsTable, xs: 12 }
             ]
         },

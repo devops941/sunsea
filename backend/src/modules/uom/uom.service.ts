@@ -1,4 +1,5 @@
 import { standardConverter } from "../../utils/convert.util";
+import { prisma } from "../../config/prisma";
 
 export interface DynamicUnitResponse {
   code: string;
@@ -7,6 +8,16 @@ export interface DynamicUnitResponse {
 }
 
 class UOMService {
+  /**
+   * Returns all active UOMs from the database.
+   */
+  async getActiveUOMs() {
+    return prisma.unitOfMeasure.findMany({
+      where: { isActive: true },
+      orderBy: { uomName: "asc" },
+    });
+  }
+
   /**
    * Returns all measurement categories dynamically from convert-units.
    */

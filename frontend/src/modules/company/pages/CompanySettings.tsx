@@ -4,7 +4,6 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useDispatch, useSelector } from 'react-redux';
 import TextInput from "../../../components/form/TextInput/TextInput";
-import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import ImageUpload from "../../../components/form/ImageUpload/ImageUpload";
 import Button from "../../../components/ui/Button/Button";
 // import BackButton from "../../../components/ui/BackButton/BackButton";
@@ -111,7 +110,6 @@ const CompanySettings: React.FC = () => {
     const newErrors: any = {};
     if (!formData.companyCode?.trim()) newErrors.companyCode = "Company code is required";
     if (!formData.legalName?.trim()) newErrors.legalName = "Legal name is required";
-    if (!formData.currencyCode?.trim()) newErrors.currencyCode = "Currency code is required";
     if (!formData.email?.trim()) newErrors.email = "Email is required";
     if (!formData.addressLine1?.trim()) newErrors.addressLine1 = "Address Line 1 is required";
     if (!formData.city?.trim()) newErrors.city = "City is required";
@@ -194,11 +192,6 @@ const CompanySettings: React.FC = () => {
                   </div>
                   <div className="hidden">
                     <TextInput label="Company Code (Auto Generated)" name="companyCode" value={formData.companyCode || ""} onChange={handleChange} placeholder="Auto Generated" disabled error={errors.companyCode} />
-                  </div>
-                  <div>
-                    <SelectInput label="Currency Code" name="currencyCode" value={formData.currencyCode || "INR"} onChange={handleChange as any} required disabled={isEditMode} options={[
-                      { value: "INR", label: "INR - Indian Rupee" }
-                    ]} />
                   </div>
                   <div className="md:col-span-3">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -329,11 +322,6 @@ const CompanySettings: React.FC = () => {
               </div>
               <div className="hidden">
                 <TextInput label="Company Code" name="companyCode" value={formData.companyCode || ""} onChange={handleChange} placeholder="Auto Generated" disabled error={errors.companyCode} />
-              </div>
-              <div>
-                <SelectInput label="Currency Code" name="currencyCode" value={formData.currencyCode || "INR"} onChange={handleChange as any} required disabled={isEditMode} options={[
-                  { value: "INR", label: "INR - Indian Rupee" }
-                ]} />
               </div>
             </div>
           </div>

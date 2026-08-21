@@ -312,12 +312,12 @@ export const PurchaseReturnPage: React.FC = () => {
   );
 
   return (
-    <div className="bg-white rounded-xl shadow-xs border border-slate-100 p-4 space-y-4">
+    <div className="bg-card rounded-xl shadow-xs border border-line-soft p-4 space-y-4">
       {/* Header & Controls */}
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6">
         <div>
-          <h1 className="text-xl font-bold text-slate-900">Purchase Returns (Debit Note)</h1>
-          <p className="text-sm text-slate-500 mt-1">
+          <h1 className="text-xl font-bold text-ink">Purchase Returns (Debit Note)</h1>
+          <p className="text-sm text-ink-subtle mt-1">
             Manage supplier purchase returns, stock deductions, and debit notes.
           </p>
         </div>
@@ -401,7 +401,7 @@ export const PurchaseReturnPage: React.FC = () => {
           },
           {
             header: "REASON",
-            render: (item) => <span className="text-slate-500 max-w-xs truncate block">{item.reason || "-"}</span>,
+            render: (item) => <span className="text-ink-subtle max-w-xs truncate block">{item.reason || "-"}</span>,
           },
           {
             header: "ACTIONS",
@@ -511,7 +511,7 @@ export const PurchaseReturnPage: React.FC = () => {
           <div className="pt-2">
             <div className="flex items-center justify-between mb-2">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase">Return Raw Materials</label>
+                <label className="block text-xs font-semibold text-ink uppercase">Return Raw Materials</label>
                 {selectedGrnId && (
                   <p className="text-[11px] text-amber-700 font-medium">
                     Showing purchased items from selected GRN/PO. Only purchased items can be returned.
@@ -532,13 +532,13 @@ export const PurchaseReturnPage: React.FC = () => {
             </div>
 
             {returnRows.length === 0 ? (
-              <div className="p-4 border border-dashed border-slate-200 rounded-lg text-center text-xs text-slate-400">
+              <div className="p-4 border border-dashed border-line-soft rounded-lg text-center text-xs text-ink-subtle">
                 {selectedGrnId ? "No returnable items found for this GRN." : "Select a GRN Invoice or click '+ Add Item Row' to select raw materials."}
               </div>
             ) : (
-              <div className="border border-slate-200 rounded-lg overflow-hidden">
-                <table className="w-full text-left text-xs text-slate-700">
-                  <thead className="bg-slate-50 uppercase font-semibold text-slate-600 border-b border-slate-200">
+              <div className="border border-line-soft rounded-lg overflow-hidden">
+                <table className="w-full text-left text-xs text-ink">
+                  <thead className="bg-card-2 uppercase font-semibold text-ink-muted border-b border-line-soft">
                     <tr>
                       <th className="px-3 py-2">Raw Material</th>
                       <th className="px-3 py-2 w-28 text-center">Return Qty</th>
@@ -547,19 +547,19 @@ export const PurchaseReturnPage: React.FC = () => {
                       {!selectedGrnId && <th className="px-3 py-2 w-10 text-center"></th>}
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-200 bg-white">
+                  <tbody className="divide-y divide-line-soft bg-card">
                     {returnRows.map((row, idx) => {
                       const lineTot = row.quantity * row.unitPrice;
                       return (
-                        <tr key={idx} className="hover:bg-slate-50">
+                        <tr key={idx} className="hover:bg-card-2/50">
                           <td className="px-3 py-2">
                             {row.isGrnLinked ? (
                               <div>
-                                <div className="font-bold text-slate-800 text-xs">
+                                <div className="font-bold text-ink text-xs">
                                   {row.materialName}
                                 </div>
-                                <div className="flex items-center gap-2 text-[10px] text-slate-500 mt-0.5 font-mono">
-                                  <span>Purchased Qty: <strong className="text-slate-700">{row.purchasedQty}</strong></span>
+                                <div className="flex items-center gap-2 text-[10px] text-ink-subtle mt-0.5 font-mono">
+                                  <span>Purchased Qty: <strong className="text-ink-muted">{row.purchasedQty}</strong></span>
                                   {row.alreadyReturnedQty > 0 && (
                                     <span>| Already Returned: <strong className="text-amber-700">{row.alreadyReturnedQty}</strong></span>
                                   )}
@@ -570,7 +570,7 @@ export const PurchaseReturnPage: React.FC = () => {
                               <select
                                 value={row.rawMaterialId}
                                 onChange={(e) => handleRowMaterialChange(idx, e.target.value)}
-                                className="w-full px-2 py-1 border border-slate-200 rounded text-xs font-medium focus:outline-none focus:border-blue-500"
+                                className="w-full px-2 py-1 border border-line-soft rounded text-xs font-medium bg-card-2 text-ink focus:outline-none focus:border-blue-500"
                               >
                                 {materials.map((m) => {
                                   const rmId = String(m.rawMaterialId || m.id);
@@ -594,7 +594,7 @@ export const PurchaseReturnPage: React.FC = () => {
                               placeholder="0"
                               disabled={row.maxReturnable <= 0}
                               onChange={(e) => handleRowQuantityChange(idx, parseFloat(e.target.value) || 0)}
-                              className="w-20 px-2 py-1 border border-slate-200 rounded text-center font-bold text-blue-600 focus:outline-none focus:border-blue-500 disabled:bg-slate-100 disabled:text-slate-400"
+                              className="w-20 px-2 py-1 border border-line-soft rounded text-center font-bold text-blue-600 bg-card-2 focus:outline-none focus:border-blue-500 disabled:opacity-60 disabled:cursor-not-allowed"
                             />
                           </td>
                           <td className="px-3 py-2 text-right">
@@ -605,10 +605,10 @@ export const PurchaseReturnPage: React.FC = () => {
                               value={row.unitPrice || ""}
                               disabled={row.isGrnLinked}
                               onChange={(e) => handleRowPriceChange(idx, parseFloat(e.target.value) || 0)}
-                              className="w-24 px-2 py-1 border border-slate-200 rounded text-right font-mono focus:outline-none focus:border-blue-500 disabled:bg-slate-50 disabled:text-slate-700"
+                              className="w-24 px-2 py-1 border border-line-soft rounded text-right font-mono bg-card-2 text-ink focus:outline-none focus:border-blue-500 disabled:opacity-60 disabled:cursor-not-allowed"
                             />
                           </td>
-                          <td className="px-3 py-2 text-right font-mono font-semibold text-slate-900">
+                          <td className="px-3 py-2 text-right font-mono font-semibold text-ink">
                             ₹{lineTot.toFixed(2)}
                           </td>
                           {!selectedGrnId && (
@@ -616,7 +616,7 @@ export const PurchaseReturnPage: React.FC = () => {
                               <button
                                 type="button"
                                 onClick={() => handleRemoveRow(idx)}
-                                className="text-slate-400 hover:text-rose-600 p-1"
+                                className="text-ink-subtle hover:text-rose-600 p-1"
                                 title="Remove item"
                               >
                                 <FaTrash size={12} />
@@ -634,8 +634,8 @@ export const PurchaseReturnPage: React.FC = () => {
 
           {/* Totals Summary */}
           {returnRows.length > 0 && (
-            <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 flex flex-col items-end space-y-1 text-xs">
-              <div className="flex justify-between w-48 font-bold text-slate-900 text-sm">
+            <div className="bg-card-2 p-3 rounded-lg border border-line-soft flex flex-col items-end space-y-1 text-xs">
+              <div className="flex justify-between w-48 font-bold text-ink text-sm">
                 <span>Grand Total:</span>
                 <span className="font-mono text-blue-600">₹{grandTotal.toFixed(2)}</span>
               </div>
@@ -655,18 +655,18 @@ export const PurchaseReturnPage: React.FC = () => {
       </CommonModal>
       {/* PO Return Detail Modal */}
       {selectedViewReturn && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 overflow-y-auto">
-          <div className="bg-white rounded-xl shadow-xl border border-slate-200 w-full max-w-2xl overflow-hidden my-8">
-            <div className="p-5 border-b border-slate-200 bg-amber-50/50 flex items-center justify-between">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="bg-card rounded-xl shadow-xl border border-line-soft w-full max-w-2xl overflow-hidden my-8">
+            <div className="p-5 border-b border-line-soft bg-amber-500/10 flex items-center justify-between">
               <div>
                 <span className="text-xs font-semibold text-amber-700 uppercase tracking-wider">Purchase Return Detail</span>
-                <h3 className="text-xl font-bold text-slate-900 font-mono flex items-center gap-2 mt-0.5">
+                <h3 className="text-xl font-bold text-ink font-mono flex items-center gap-2 mt-0.5">
                   {selectedViewReturn.returnNo}
                 </h3>
               </div>
               <button
                 onClick={() => setSelectedViewReturn(null)}
-                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition"
+                className="text-ink-subtle hover:text-ink p-1.5 rounded-lg hover:bg-card-2 transition"
               >
                 <FaTimes />
               </button>
@@ -674,30 +674,30 @@ export const PurchaseReturnPage: React.FC = () => {
 
             <div className="p-6 space-y-6 max-h-[75vh] overflow-y-auto text-sm">
               {/* Key Metadata */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 bg-card-2 p-4 rounded-xl border border-line-soft">
                 <div>
-                  <div className="text-xs text-slate-500 font-medium">Return Date</div>
-                  <div className="font-semibold text-slate-800 mt-0.5">
+                  <div className="text-xs text-ink-subtle font-medium">Return Date</div>
+                  <div className="font-semibold text-ink mt-0.5">
                     {new Date(selectedViewReturn.returnDate).toLocaleDateString("en-IN")}
                   </div>
                 </div>
 
                 <div>
-                  <div className="text-xs text-slate-500 font-medium">Supplier</div>
-                  <div className="font-semibold text-slate-800 mt-0.5">
+                  <div className="text-xs text-ink-subtle font-medium">Supplier</div>
+                  <div className="font-semibold text-ink mt-0.5">
                     {selectedViewReturn.supplier?.legalName || "-"}
                   </div>
                 </div>
 
                 <div>
-                  <div className="text-xs text-slate-500 font-medium">GRN Invoice Ref</div>
-                  <div className="font-semibold text-slate-800 mt-0.5 font-mono text-xs">
+                  <div className="text-xs text-ink-subtle font-medium">GRN Invoice Ref</div>
+                  <div className="font-semibold text-ink mt-0.5 font-mono text-xs">
                     {selectedViewReturn.grnInvoice?.invoiceNo || (selectedViewReturn.grnInvoiceId ? `GRN #${selectedViewReturn.grnInvoiceId}` : "Direct Return")}
                   </div>
                 </div>
 
                 <div>
-                  <div className="text-xs text-slate-500 font-medium">Status</div>
+                  <div className="text-xs text-ink-subtle font-medium">Status</div>
                   <div className="mt-0.5">
                     <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
                       {selectedViewReturn.status}
@@ -706,15 +706,15 @@ export const PurchaseReturnPage: React.FC = () => {
                 </div>
 
                 <div>
-                  <div className="text-xs text-slate-500 font-medium">Grand Total</div>
+                  <div className="text-xs text-ink-subtle font-medium">Grand Total</div>
                   <div className="font-bold text-amber-700 mt-0.5 font-mono">
                     ₹{Number(selectedViewReturn.grandTotal).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                   </div>
                 </div>
 
                 <div>
-                  <div className="text-xs text-slate-500 font-medium">Reason</div>
-                  <div className="font-medium text-slate-700 mt-0.5 truncate">
+                  <div className="text-xs text-ink-subtle font-medium">Reason</div>
+                  <div className="font-medium text-ink-muted mt-0.5 truncate">
                     {selectedViewReturn.reason || "-"}
                   </div>
                 </div>
@@ -722,13 +722,13 @@ export const PurchaseReturnPage: React.FC = () => {
 
               {/* Items Table */}
               <div>
-                <h4 className="font-semibold text-slate-800 mb-3 flex items-center justify-between">
+                <h4 className="font-semibold text-ink mb-3 flex items-center justify-between">
                   <span>Returned Raw Materials</span>
-                  <span className="text-xs font-normal text-slate-500">Items: {selectedViewReturn.items?.length || 0}</span>
+                  <span className="text-xs font-normal text-ink-subtle">Items: {selectedViewReturn.items?.length || 0}</span>
                 </h4>
-                <div className="border border-slate-200 rounded-lg overflow-hidden">
-                  <table className="w-full text-left text-xs text-slate-700">
-                    <thead className="bg-slate-100 uppercase font-semibold text-slate-600 border-b border-slate-200">
+                <div className="border border-line-soft rounded-lg overflow-hidden">
+                  <table className="w-full text-left text-xs text-ink">
+                    <thead className="bg-card-2 uppercase font-semibold text-ink-muted border-b border-line-soft">
                       <tr>
                         <th className="px-3 py-2.5">Material ID</th>
                         <th className="px-3 py-2.5">Material Name</th>
@@ -737,30 +737,30 @@ export const PurchaseReturnPage: React.FC = () => {
                         <th className="px-3 py-2.5 text-right">Line Total (₹)</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-200 bg-white">
+                    <tbody className="divide-y divide-line-soft bg-card">
                       {selectedViewReturn.items && selectedViewReturn.items.length > 0 ? (
                         selectedViewReturn.items.map((item, i) => (
-                          <tr key={item.id || i} className="hover:bg-slate-50">
+                          <tr key={item.id || i} className="hover:bg-card-2/50">
                             <td className="px-3 py-2.5 font-mono text-amber-700 font-medium">
                               {item.rawMaterialId}
                             </td>
-                            <td className="px-3 py-2.5 font-medium text-slate-900">
+                            <td className="px-3 py-2.5 font-medium text-ink">
                               {item.rawMaterial?.materialName || item.rawMaterial?.name || item.rawMaterialId}
                             </td>
-                            <td className="px-3 py-2.5 text-center font-bold text-slate-800">
+                            <td className="px-3 py-2.5 text-center font-bold text-ink">
                               {item.quantity}
                             </td>
                             <td className="px-3 py-2.5 text-right font-mono">
                               ₹{Number(item.unitPrice).toFixed(2)}
                             </td>
-                            <td className="px-3 py-2.5 text-right font-mono font-semibold text-slate-900">
+                            <td className="px-3 py-2.5 text-right font-mono font-semibold text-ink">
                               ₹{(Number(item.lineTotal) || Number(item.quantity) * Number(item.unitPrice)).toFixed(2)}
                             </td>
                           </tr>
                         ))
                       ) : (
                         <tr>
-                          <td colSpan={5} className="px-4 py-6 text-center text-slate-400">
+                          <td colSpan={5} className="px-4 py-6 text-center text-ink-subtle">
                             No item details found for this return.
                           </td>
                         </tr>
@@ -771,17 +771,17 @@ export const PurchaseReturnPage: React.FC = () => {
               </div>
 
               {selectedViewReturn.narration && (
-                <div className="bg-slate-50 p-3.5 rounded-lg border border-slate-200 text-xs">
-                  <span className="font-semibold text-slate-700 block mb-1">Narration / Notes:</span>
-                  <p className="text-slate-600 leading-relaxed">{selectedViewReturn.narration}</p>
+                <div className="bg-card-2 p-3.5 rounded-lg border border-line-soft text-xs">
+                  <span className="font-semibold text-ink block mb-1">Narration / Notes:</span>
+                  <p className="text-ink-muted leading-relaxed">{selectedViewReturn.narration}</p>
                 </div>
               )}
             </div>
 
-            <div className="p-4 border-t border-slate-200 bg-slate-50 flex justify-end">
+            <div className="p-4 border-t border-line-soft bg-card-2 flex justify-end">
               <button
                 onClick={() => setSelectedViewReturn(null)}
-                className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg font-medium text-sm transition shadow-sm"
+                className="px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-lg font-medium text-sm transition shadow-sm"
               >
                 Close
               </button>

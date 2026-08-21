@@ -157,8 +157,6 @@ const MachineAssignmentList: React.FC = () => {
         "Week Start Date",
         "Week End Date",
         "Operators",
-        "Incharge Name",
-        "Incharge Role",
         "Status",
         "Created Date",
         "Remarks",
@@ -169,9 +167,6 @@ const MachineAssignmentList: React.FC = () => {
           ? item.operators.map((op: any) => `${op.employee?.fullName || "N/A"} (${op.role?.name || "N/A"})`).join(" | ")
           : "No operators";
 
-        const inchargeName = item.inchargeEmployee?.fullName || item.machine?.operatorName || item.machine?.operatorId || "N/A";
-        const inchargeRole = item.inchargeRole?.name || (inchargeName !== "N/A" ? "Machine Operator" : "N/A");
-
         return [
           item.id,
           item.machineId,
@@ -180,8 +175,6 @@ const MachineAssignmentList: React.FC = () => {
           item.weekStartDate ? item.weekStartDate.split("T")[0] : "",
           item.weekEndDate ? item.weekEndDate.split("T")[0] : "",
           `"${opString}"`,
-          `"${inchargeName}"`,
-          `"${inchargeRole}"`,
           item.isActive ? "Active" : "Closed",
           item.createdAt ? formatDate(item.createdAt) : "",
           `"${item.remarks || ""}"`,
@@ -357,30 +350,6 @@ const MachineAssignmentList: React.FC = () => {
                     )}
                   </div>
                 ),
-              },
-              {
-                header: "MACHINE INCHARGE",
-                render: (item) => {
-                  const inchargeName = item.inchargeEmployee?.fullName || (item.machine as any)?.operatorName || (item.machine as any)?.operatorId || null;
-                  return (
-                    <div>
-                      {inchargeName ? (
-                        <>
-                          <div className="font-semibold text-ink text-sm">
-                            {inchargeName}
-                          </div>
-                          <div className="text-xs text-ink-subtle mt-0.5">
-                            <span className="px-1.5 py-0.5 bg-emerald-50 text-emerald-700 rounded text-[10px] font-semibold border border-emerald-200">
-                              {item.inchargeRole?.name || "Machine Operator"}
-                            </span>
-                          </div>
-                        </>
-                      ) : (
-                        <span className="text-ink-subtle text-sm">— Not Assigned —</span>
-                      )}
-                    </div>
-                  );
-                },
               },
               {
                 header: "STATUS",

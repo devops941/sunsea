@@ -24,7 +24,6 @@ import purchaseOrderReducer from "../features/purchaseOrder/purchaseOrderSlice";
 import productionWastageReducer from "../features/production-wastage/productionWastageSlice";
 import companyReducer from "../features/company/companySlice";
 import finishedGoodsStockReducer from "../features/finished-goods-stock/finishedGoodsStockSlice";
-import gstReducer from "../features/gst/gstSlice";
 import dailyPlanReducer from "../features/daily-plans/dailyPlanSlice";
 import goodsDispatchReducer from "../features/goods-dispatch/goodsDispatchSlice";
 import productShiftRecordReducer from "../features/product-shift-records/productShiftRecordSlice";
@@ -49,7 +48,6 @@ export const store = configureStore({
         suppliers: supplierReducer,
         shifts: shiftReducer,
         profile: profileReducer,
-        gst: gstReducer,
         stores: storeReducer,
         rawMaterials: rawMaterialReducer,
         rawMaterialStocks: rawMaterialStockReducer,

@@ -1,11 +1,10 @@
 import React from "react";
 import { Container, Row, Col } from "react-bootstrap";
-import { FaCog, FaFileInvoiceDollar, FaBuilding, FaUsersCog, FaChevronRight, FaChevronLeft } from "react-icons/fa";
+import { FaCog, FaBuilding, FaUsersCog, FaChevronRight, FaChevronLeft } from "react-icons/fa";
 import type { TabItem } from "../../components/ui/tab/Tabs";
 import Tabs from "../../components/ui/tab/Tabs";
 import ViewButton from "../../components/ui/viewbutton/ViewButton";
 import StatusBadge from "../../components/ui/StatusBadge/Badge";
-import GstTaxListPage from "./GstTaxListPage";
 
 
 // ─── Report-style Section wrapper (reuse the same pattern as your other pages) ──
@@ -51,10 +50,6 @@ const GeneralSettingsTab: React.FC = () => (
     </Section>
 );
 
-const GstSettingsTab: React.FC = () => (
-    <GstTaxListPage />
-);
-
 const CompanyProfileTab: React.FC = () => (
     <Section title="Company Profile" icon={<FaBuilding />}>
         <p className="text-muted mb-0">Address, logo, registration details, etc.</p>
@@ -66,7 +61,6 @@ const CompanyProfileTab: React.FC = () => (
 const SettingPage: React.FC = () => {
     const tabs: TabItem[] = [
         { key: "general", label: "General Settings", icon: <FaCog />, content: <GeneralSettingsTab /> },
-        { key: "gst", label: "GST", icon: <FaFileInvoiceDollar />, content: <GstSettingsTab /> },
         { key: "company", label: "Company Profile", icon: <FaBuilding />, content: <CompanyProfileTab /> },
     ];
 

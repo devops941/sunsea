@@ -212,7 +212,6 @@ const MODULE_GROUPS: ModuleGroup[] = [
       { key: "suppliers", label: "Suppliers" },
       { key: "supplierpricelist", label: "Supplier Pricing" },
       { key: "purchaseOrders", label: "Purchase Orders" },
-      { key: "purchase-order-approvals", label: "MD Approvals" },
       { key: "invoice", label: "Bill & Invoice" },
       { key: "expenses", label: "Expenses" },
       { key: "purchase-returns", label: "Purchase Returns" },

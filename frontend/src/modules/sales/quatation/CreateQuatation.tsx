@@ -19,7 +19,6 @@ import { useEmployees } from "../../../hooks/useEmployees";
 import { salesOrderService, type SalesOrder } from "../../../services/salesOrderService";
 import { customerService } from "../../../services/customerService";
 import { DISPATCH_TYPE_OPTIONS, ORDER_TYPE_OPTIONS } from "../../../constants/selectOption";
-import { fetchGstTaxes, selectActiveGstTaxes } from "../../../features/gst/gstSlice";
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
 import { useSelector } from "react-redux";
 import { usePermission } from "../../../hooks/usePermission";
@@ -42,7 +41,6 @@ const orderItemSchema = z.object({
     exportPrice: z.string().optional(),
     gstRate: z.string().optional(),
     cessRate: z.string().optional(),
-    gstTaxRateId: z.string().optional(),
 });
 
 const quotationSchema = z.object({
@@ -95,7 +93,7 @@ const defaultValues: QuotationFormValues = {
     items: [{
         productId: "", quantity: "", unitPrice: "",
         mrp: "", b2b: "", b2c: "", exportPrice: "",
-        gstRate: "", cessRate: "", gstTaxRateId: "",
+        gstRate: "", cessRate: "",
     }],
     remarks: "",
     internalNotes: "",
@@ -220,9 +218,6 @@ const QuotationForm: React.FC = () => {
     const { data: company } = useSelector((state: any) => state.company);
     const companyState = company?.state;
 
-    const gstTaxes = useAppSelector(selectActiveGstTaxes);
-    const gstLoading = useAppSelector((state) => state.gst.loading);
-
     const customerName = useMemo(() => {
         const c = customers.find(c => String(c.id) === customerId);
         return c?.displayName || c?.firmName || null;
@@ -242,14 +237,6 @@ const QuotationForm: React.FC = () => {
         () => DISPATCH_TYPE_OPTIONS.find(o => o.value === dispatchType)?.label || dispatchType,
         [dispatchType]
     );
-
-    const gstOptions = useMemo(() => [
-        { value: "", label: gstLoading ? "Loading GST rates..." : "-- Select GST Rate --" },
-        ...(gstTaxes || []).map((t: any) => ({
-            value: String(t.id),
-            label: `${t.taxName} (${t.taxRate}%)`,
-        })),
-    ], [gstTaxes, gstLoading]);
 
     const productsOptions = useMemo(() => [
         { value: "", label: productsLoading ? "Loading products..." : "-- Select Product --" },
@@ -289,12 +276,6 @@ const QuotationForm: React.FC = () => {
             label: `${o.orderNo} — ${o.status}`,
         })),
     ], [customerOrders, loadingCustomerOrders]);
-
-    // Default GST tax (18%) — auto-applied when a product is selected
-    const defaultGstTax = useMemo(
-        () => (gstTaxes || []).find((t: any) => Number(t.taxRate) === 18) || null,
-        [gstTaxes]
-    );
 
     const formatDate = (val?: string | null) => {
         if (!val) return "—";
@@ -366,13 +347,12 @@ const QuotationForm: React.FC = () => {
                         ? String(combinedGstRate)
                         : (item.gstRate != null ? String(item.gstRate) : "0"),
                     cessRate: item.cessRate != null ? String(item.cessRate) : "0",
-                    gstTaxRateId: item.gstTaxRateId != null ? String(item.gstTaxRateId) : "",
                 };
             })
             : [{
                 productId: "", quantity: "", unitPrice: "",
                 mrp: "", b2b: "", b2c: "", exportPrice: "",
-                gstRate: "", cessRate: "", gstTaxRateId: "",
+                gstRate: "", cessRate: "",
             }];
 
         reset({
@@ -416,8 +396,6 @@ const QuotationForm: React.FC = () => {
     // ── Load order ──
     useEffect(() => {
         const state = location.state as any;
-        dispatch(fetchGstTaxes({ status: "ACTIVE" }));
-
         // Edit target: prefer the URL param (survives refresh), fall back to nav state
         const editId = idParam ? Number(idParam) : (state?.id ? Number(state.id) : null);
 
@@ -654,13 +632,6 @@ const QuotationForm: React.FC = () => {
         if (isNaN(gstRate)) gstRate = 0;
         if (isNaN(cessRate)) cessRate = 0;
 
-        if (item.gstTaxRateId) {
-            const selectedTax = (gstTaxes || []).find((t: any) => String(t.id) === item.gstTaxRateId);
-            if (selectedTax) {
-                gstRate = Number(selectedTax.taxRate) || 0;
-            }
-        }
-
         // Custom entered unit price takes priority; falls back to grade price / rate
         const customUnitPrice = item.unitPrice !== undefined && item.unitPrice !== "" ? Number(item.unitPrice) : NaN;
         const product = products.find((p: any) => String(p.id) === item.productId);
@@ -786,10 +757,6 @@ const QuotationForm: React.FC = () => {
                     exportPrice: product ? String(product.exportPrice ?? "") : "",
                     gstRate: item.gstRate != null ? String(item.gstRate) : (product ? String(product.gstRate ?? "") : ""),
                     cessRate: item.cessRate != null ? String(item.cessRate) : (product ? String(product.cess ?? "") : ""),
-                    // Keep the order's GST rate if it had one; otherwise default to 18%
-                    gstTaxRateId: item.gstTaxRateId != null
-                        ? String(item.gstTaxRateId)
-                        : (defaultGstTax ? String(defaultGstTax.id) : ""),
                 };
             });
             setValue("items", newItems);
@@ -811,12 +778,19 @@ const QuotationForm: React.FC = () => {
 
             // Pass unitPrice if manually specified.
             // When GST is disabled (estimated mode without "Include GST"), strip GST entirely.
-            const transformedItems = data.items.map(item => ({
-                productId: Number(item.productId),
-                quantity: Number(item.quantity),
-                unitPrice: item.unitPrice ? Number(item.unitPrice) : undefined,
-                gstTaxRateId: gstEnabled ? (item.gstTaxRateId || undefined) : undefined,
-            }));
+            const transformedItems = data.items.map(item => {
+                const totalRate = gstEnabled ? (Number(item.gstRate) || 0) : 0;
+                return {
+                    productId: Number(item.productId),
+                    quantity: Number(item.quantity),
+                    unitPrice: item.unitPrice ? Number(item.unitPrice) : undefined,
+                    ...(gstEnabled && totalRate > 0 && {
+                        cgstRate: data.isInterState ? 0 : totalRate / 2,
+                        sgstRate: data.isInterState ? 0 : totalRate / 2,
+                        igstRate: data.isInterState ? totalRate : 0,
+                    }),
+                };
+            });
 
             // idParam from the URL is the single source of truth for edit mode.
             // State/refs can lag on HMR remounts; the URL param never lies.
@@ -1019,7 +993,7 @@ const QuotationForm: React.FC = () => {
                                         <CustomButton
                                             text="Add Product"
                                             variant="secondary"
-                                            onClick={() => append({ productId: "", quantity: "1", unitPrice: "", mrp: "", b2b: "", b2c: "", exportPrice: "", gstRate: "", cessRate: "", gstTaxRateId: defaultGstTax ? String(defaultGstTax.id) : "" })}
+                                            onClick={() => append({ productId: "", quantity: "1", unitPrice: "", mrp: "", b2b: "", b2c: "", exportPrice: "", gstRate: "18", cessRate: "" })}
                                         />
                                     </div>
                                 </div>
@@ -1077,10 +1051,10 @@ const QuotationForm: React.FC = () => {
                                                                                 setValue(`items.${index}.exportPrice`, String(product.exportPrice ?? ""));
                                                                                 setValue(`items.${index}.gstRate`, String(product.gstRate ?? ""));
                                                                                 setValue(`items.${index}.cessRate`, String(product.cess ?? ""));
-                                                                                // Default GST to 18% if not already chosen
-                                                                                const currentGst = (items?.[index] as any)?.gstTaxRateId;
-                                                                                if (!currentGst && defaultGstTax) {
-                                                                                    setValue(`items.${index}.gstTaxRateId`, String(defaultGstTax.id));
+                                                                                // Default GST to 18% if not already set
+                                                                                const currentGstRate = (items?.[index] as any)?.gstRate;
+                                                                                if (!currentGstRate) {
+                                                                                    setValue(`items.${index}.gstRate`, "18");
                                                                                 }
                                                                             }
                                                                         }}
@@ -1131,19 +1105,20 @@ const QuotationForm: React.FC = () => {
                                                             {rowSubtotal > 0 ? `₹${rowSubtotal.toFixed(2)}` : "—"}
                                                         </td>
                                                         {gstEnabled && (
-                                                            <td className="py-2 px-2 min-w-[12rem]">
+                                                            <td className="py-2 px-2 min-w-[8rem]">
                                                                 <Controller
-                                                                    name={`items.${index}.gstTaxRateId`}
+                                                                    name={`items.${index}.gstRate`}
                                                                     control={control}
                                                                     render={({ field: f }) => (
-                                                                        <SelectInput
-                                                                            hideLabel
-                                                                            noMargin={true}
-                                                                            label=""
+                                                                        <TextInput
                                                                             name={f.name}
+                                                                            type="number"
                                                                             value={f.value ?? ""}
-                                                                            options={gstOptions}
                                                                             onChange={f.onChange}
+                                                                            min={0}
+                                                                            max={100}
+                                                                            step={0.01}
+                                                                            placeholder="0"
                                                                         />
                                                                     )}
                                                                 />
