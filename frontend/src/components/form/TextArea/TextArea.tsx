@@ -32,10 +32,10 @@ const TextArea: React.FC<TextAreaProps> = ({
           htmlFor={name}
           className={`
             flex items-center gap-[6px] mb-2
-            text-xs font-bold uppercase
+            text-xs font-extrabold uppercase
             tracking-[0.5px]
             transition-colors duration-200
-            ${error ? "text-red-500" : "text-slate-500"}
+            ${error ? "text-red-400" : "text-ink"}
             group-focus-within:text-primary
           `}
         >
@@ -44,7 +44,7 @@ const TextArea: React.FC<TextAreaProps> = ({
               className={`
                 flex items-center text-sm
                 transition-colors duration-200
-                ${error ? "text-red-500" : "text-primary"}
+                ${error ? "text-red-400" : "text-primary"}
                 group-focus-within:text-primary
               `}
             >
@@ -68,16 +68,16 @@ const TextArea: React.FC<TextAreaProps> = ({
           disabled={disabled}
           rows={rows}
           className={`
-            w-full min-h-[35px] px-4 py-[5px] text-[15px] font-medium
+            w-full min-h-[35px] px-4 py-[5px] text-[15px] font-semibold
             border rounded-[10px] outline-none
             transition-all duration-200
-            placeholder-slate-400
-            text-slate-800
+            placeholder:text-ink-subtle/80 placeholder:font-normal
+            text-ink
             ${error
-              ? "border-red-500 bg-white focus:border-red-500 focus:ring-4 focus:ring-red-500/15"
-              : "border-slate-300 bg-white hover:border-slate-400 focus:border-primary focus:ring-4 focus:ring-primary/15"
+              ? "border-red-500 bg-card-2 focus:border-red-500 focus:ring-4 focus:ring-red-500/15"
+              : "border-line-soft bg-card-2 hover:border-line-soft/80 focus:border-primary focus:ring-4 focus:ring-primary/15"
             }
-            ${disabled ? "bg-white cursor-not-allowed text-slate-400" : ""}
+            ${disabled ? "bg-card-2/50 cursor-not-allowed text-ink-subtle opacity-70" : ""}
             resize-y
           `}
         />

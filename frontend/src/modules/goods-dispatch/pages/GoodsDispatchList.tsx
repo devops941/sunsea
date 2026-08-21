@@ -110,26 +110,28 @@ const GoodsDispatchList: React.FC = () => {
     {
       header: "Dispatch No",
       accessor: "dispatchNumber",
-      render: (item: any) => <span className="font-medium text-gray-900">{item.dispatchNumber}</span>,
+      render: (item: any) => <span className="font-bold text-ink tracking-tight">{item.dispatchNumber}</span>,
     },
     {
       header: "Date",
       accessor: "dispatchDate",
-      render: (item: any) => formatDate(item.dispatchDate),
+      render: (item: any) => <span className="text-ink font-semibold">{formatDate(item.dispatchDate)}</span>,
     },
     {
       header: "Vehicle",
       accessor: "vehicleNumber",
+      render: (item: any) => <span className="text-ink font-semibold">{item.vehicleNumber}</span>,
     },
     {
       header: "Driver",
       accessor: "driverName",
+      render: (item: any) => <span className="text-ink font-semibold">{item.driverName}</span>,
     },
     {
       header: "Items",
       accessor: "items",
       render: (item: any) => (
-        <span className="text-gray-600 font-medium">{item.items?.length || 0} PO(s)</span>
+        <span className="text-ink-subtle font-bold">{item.items?.length || 0} PO(s)</span>
       ),
     },
     {
@@ -159,13 +161,13 @@ const GoodsDispatchList: React.FC = () => {
   ];
 
   return (
-    <div className="p-4 md:p-6 bg-white">
+    <div className="p-4 md:p-6 bg-card rounded-2xl border border-line-soft shadow-xs">
       <div className="w-full">
         {/* Page Header */}
         <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 mb-6">
           <div>
-            <h2 className="text-2xl font-bold text-slate-800">Goods Dispatch</h2>
-            <div className="text-sm text-slate-500 mt-1">Manage finished goods dispatches to warehouse</div>
+            <h2 className="text-2xl font-extrabold text-ink tracking-tight">Goods Dispatch</h2>
+            <div className="text-sm font-semibold text-ink-subtle mt-1">Manage finished goods dispatches to warehouse</div>
           </div>
 
           <div className="flex flex-wrap items-center gap-3 relative w-full lg:w-auto">
@@ -184,11 +186,11 @@ const GoodsDispatchList: React.FC = () => {
               onOpen={handleOpenFilter}
             >
               <div className="mb-3">
-                <label className="block mb-1 text-[11px] uppercase tracking-wider text-gray-500 font-semibold">
+                <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-bold">
                   Status
                 </label>
                 <select
-                  className="w-full border border-gray-200 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary bg-white"
+                  className="w-full border border-line-soft rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary bg-card-2 text-ink font-semibold"
                   value={draftFilterStatus}
                   onChange={(e) => setDraftFilterStatus(e.target.value)}
                 >
@@ -202,7 +204,7 @@ const GoodsDispatchList: React.FC = () => {
               </div>
 
               <div className="mb-3">
-                <label className="block mb-1 text-[11px] uppercase tracking-wider text-gray-500 font-semibold">
+                <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-bold">
                   Date From
                 </label>
                 <DatePickerCalendar
@@ -214,7 +216,7 @@ const GoodsDispatchList: React.FC = () => {
               </div>
 
               <div className="mb-4">
-                <label className="block mb-1 text-[11px] uppercase tracking-wider text-gray-500 font-semibold">
+                <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-bold">
                   Date To
                 </label>
                 <DatePickerCalendar
@@ -238,13 +240,13 @@ const GoodsDispatchList: React.FC = () => {
 
         {/* Error State */}
         {error && (
-          <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-6">
-            <p className="text-red-700">{error}</p>
+          <div className="bg-red-500/15 border-l-4 border-red-500 p-4 mb-6 rounded-r-xl">
+            <p className="text-red-400 font-semibold">{error}</p>
           </div>
         )}
 
         {/* Data Table */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="bg-card rounded-2xl shadow-xs border border-line-soft overflow-hidden">
           <DataTable
             columns={columns}
             data={dispatches || []}

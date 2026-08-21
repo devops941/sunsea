@@ -705,11 +705,11 @@ const DailyPlanCreate: React.FC = () => {
   // ── Render ───────────────────────────────────────────────────────────────
   return (
 
-    <form onSubmit={handleSubmit} className="bg-white  border border-slate-200">
+    <form onSubmit={handleSubmit} className="bg-card rounded-2xl border border-line-soft shadow-xs overflow-hidden">
       {/* Page Header */}
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 p-6 border-b border-slate-200">
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 p-6 border-b border-line-soft">
         <div>
-          <h2 className="text-2xl font-bold text-slate-800">
+          <h2 className="text-2xl font-bold text-ink">
             {isEdit ? "Edit Daily Production Plan" : "New Daily Production Plan"}
           </h2>
         </div>
@@ -720,37 +720,37 @@ const DailyPlanCreate: React.FC = () => {
       </div>
 
       {submitError && (
-        <div className="mx-6  p-4 rounded-xl bg-red-50 border border-red-200 flex items-center gap-3">
-          <FaExclamationTriangle className="text-red-500" size={20} />
+        <div className="mx-6 mt-4 p-4 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center gap-3">
+          <FaExclamationTriangle className="text-red-400" size={20} />
           <div>
-            <p className="font-bold text-red-700 text-sm">Failed to Save Plan</p>
-            <p className="text-red-600 text-xs">{submitError}</p>
+            <p className="font-bold text-red-400 text-sm">Failed to Save Plan</p>
+            <p className="text-red-300 text-xs">{submitError}</p>
           </div>
         </div>
       )}
 
       {assignmentError && (
-        <div className="mx-6 mt-4 p-4 rounded-xl bg-red-50 border border-red-200 flex items-center gap-3">
-          <FaExclamationTriangle className="text-red-500" size={20} />
+        <div className="mx-6 mt-4 p-4 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center gap-3">
+          <FaExclamationTriangle className="text-red-400" size={20} />
           <div>
-            <p className="font-bold text-red-700 text-sm">Assignment Validation Failed</p>
-            <p className="text-red-600 text-xs">{assignmentError}</p>
+            <p className="font-bold text-red-400 text-sm">Assignment Validation Failed</p>
+            <p className="text-red-300 text-xs">{assignmentError}</p>
           </div>
         </div>
       )}
 
       {/* ── Carry Forward Banner ──────────────────────────── */}
       {carryForwardFromPlanId && (
-        <div className="mx-6 mt-4 p-4 rounded-xl bg-amber-50 border border-amber-200 flex items-center gap-3">
-          <FaArrowLeft className="text-amber-600 rotate-180" size={18} />
+        <div className="mx-6 mt-4 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center gap-3">
+          <FaArrowLeft className="text-amber-400 rotate-180" size={18} />
           <div>
-            <p className="font-bold text-amber-800 text-sm">Carry Forward from {carryForwardFromPlanId}</p>
+            <p className="font-bold text-amber-400 text-sm">Carry Forward from {carryForwardFromPlanId}</p>
             {carryForwardFromInfo && (
-              <p className="text-amber-700 text-xs">
+              <p className="text-amber-300 text-xs">
                 {carryForwardFromInfo.shiftName || carryForwardFromInfo.shiftId} — {carryForwardFromInfo.productionDate ? new Date(carryForwardFromInfo.productionDate).toLocaleDateString() : ""}
               </p>
             )}
-            <p className="text-amber-600 text-xs mt-0.5">The remaining quantity from plan <strong>{carryForwardFromPlanId}</strong> has been pre-filled below.</p>
+            <p className="text-amber-300 text-xs mt-0.5">The remaining quantity from plan <strong>{carryForwardFromPlanId}</strong> has been pre-filled below.</p>
           </div>
         </div>
       )}
@@ -762,11 +762,10 @@ const DailyPlanCreate: React.FC = () => {
 
           {/* Section 1: Weekly Program */}
 
-          <div className="px-5 py-4  flex items-center gap-2">
-
-            <h6 className="font-bold text-lg text-slate-800">Step 1 — Select Weekly Program</h6>
+          <div className="px-6 py-4 flex items-center gap-2 border-b border-line-soft">
+            <h6 className="font-extrabold text-xl text-ink tracking-wide">Step 1 — Select Weekly Program</h6>
           </div>
-          <div className="px-5">
+          <div className="px-6 pt-4">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
               <SelectInput
                 label="Weekly Program"
@@ -783,12 +782,13 @@ const DailyPlanCreate: React.FC = () => {
 
                   let tagNode: React.ReactNode = null;
                   if (wp._poRemaining !== undefined) {
-                    tagNode = <span className="text-amber-600 font-semibold">REMAINING: {wp._poRemaining} pcs</span>;
+                    tagNode = <span className="text-amber-400 font-semibold">REMAINING: {wp._poRemaining} pcs</span>;
                   } else if (wp._isBacklog) {
-                    tagNode = <span className="text-orange-600 font-semibold">PENDING FROM PREVIOUS WEEK</span>;
+                    tagNode = <span className="text-orange-400 font-semibold">PENDING FROM PREVIOUS WEEK</span>;
                   }
                   return {
                     value: wp.weeklyProgramId,
+                    selectedLabel: `${productName} — ${targetQty} pcs`,
                     label: <span>{productName} — {targetQty} pcs{tagNode ? <span className="ml-2">{tagNode}</span> : null}</span>
                   };
                 })}
@@ -798,55 +798,47 @@ const DailyPlanCreate: React.FC = () => {
             {/* Auto-filled info banner */}
             {selectedWeeklyProg && (
 
-              <div className="rounded-xl p-4 mt-4 bg-green-50 border border-green-200">
+              <div className="rounded-xl p-4 mt-4 bg-emerald-500/10 border border-emerald-500/20 text-ink">
                 <div className="grid grid-cols-2 xl:grid-cols-8 gap-4">
                   <div>
-                    <div className="text-slate-500 text-xs font-bold uppercase mb-1">Production Order</div>
-                    <div className="font-bold text-slate-800">{selectedWeeklyProg.productionOrderId}</div>
+                    <div className="text-ink-subtle text-xs font-bold uppercase mb-1">Production Order</div>
+                    <div className="font-bold text-ink">{selectedWeeklyProg.productionOrderId}</div>
                   </div>
 
                    <div>
-                    <div className="text-slate-500 text-xs font-bold uppercase mb-1">Product</div>
-                    <div className="text-sm font-bold text-slate-800">
+                    <div className="text-ink-subtle text-xs font-bold uppercase mb-1">Product</div>
+                    <div className="text-sm font-bold text-ink">
                       {selectedWeeklyProg.productionOrder?.productItem?.productName || "—"}
                     </div>
                   </div>
                   
 
                   <div>
-                    <div className="text-slate-500 text-xs font-bold uppercase mb-1">PO Target Qty</div>
-                    <div className="font-bold text-slate-800">{selectedWeeklyProg.productionOrder?.targetQty || "—"} pcs</div>
+                    <div className="text-ink-subtle text-xs font-bold uppercase mb-1">PO Target Qty</div>
+                    <div className="font-bold text-ink">{selectedWeeklyProg.productionOrder?.targetQty || "—"} pcs</div>
                   </div>
 
-
-                  {/* 
                   <div>
-                    <div className="text-slate-500 text-xs font-bold uppercase mb-1">Weekly Target</div>
-                    <div className="font-bold text-slate-800">{Number(selectedWeeklyProg.plannedQty) > 0 ? selectedWeeklyProg.plannedQty : (selectedWeeklyProg.productionOrder?.targetQty || 0)} pcs</div>
-                  </div> */}
-                  <div>
-                    <div className="text-slate-500 text-xs font-bold uppercase mb-1">Remaining Quantity</div>
+                    <div className="text-ink-subtle text-xs font-bold uppercase mb-1">Remaining Quantity</div>
                     {(() => {
                       const tgt = Number(selectedWeeklyProg.productionOrder?.targetQty || 0);
                       const produced = Number(selectedWeeklyProg.productionOrder?.producedQty || 0) - Number(selectedWeeklyProg.productionOrder?.rejectedQty || 0);
                       const rem = Math.max(0, tgt - produced);
                       return (
-                        <div className={`font-bold ${rem <= 0 ? "text-red-600" : "text-green-600"}`}>
+                        <div className={`font-bold ${rem <= 0 ? "text-red-400" : "text-emerald-400"}`}>
                           {rem} pcs
                         </div>
                       );
                     })()}
                   </div>
-                 
-
 
                   <div>
-                    <div className="text-slate-500 text-xs font-bold uppercase mb-1">Produced So Far</div>
-                    <div className="font-bold text-slate-800">{Number(selectedWeeklyProg.productionOrder?.producedQty || 0) - Number(selectedWeeklyProg.productionOrder?.rejectedQty || 0)} pcs</div>
+                    <div className="text-ink-subtle text-xs font-bold uppercase mb-1">Produced So Far</div>
+                    <div className="font-bold text-ink">{Number(selectedWeeklyProg.productionOrder?.producedQty || 0) - Number(selectedWeeklyProg.productionOrder?.rejectedQty || 0)} pcs</div>
                   </div>
                   <div>
-                    <div className="text-slate-500 text-xs font-bold uppercase mb-1">Already Planned</div>
-                    <div className="font-bold text-slate-800">
+                    <div className="text-ink-subtle text-xs font-bold uppercase mb-1">Already Planned</div>
+                    <div className="font-bold text-ink">
                       {(() => {
                         const plans = selectedWeeklyProg.productionOrder?.dailyProductionPlans || [];
                         const total = plans
@@ -861,8 +853,8 @@ const DailyPlanCreate: React.FC = () => {
                   </div>
                   {machineId && (
                     <div>
-                      <div className="text-slate-500 text-xs font-bold uppercase mb-1">Product Capacity</div>
-                      <div className="font-bold text-slate-800">
+                      <div className="text-ink-subtle text-xs font-bold uppercase mb-1">Product Capacity</div>
+                      <div className="font-bold text-ink">
                         {machineProductCapacity != null
                           ? `${machineProductCapacity.toLocaleString()} / Shift`
                           : "—"}
@@ -877,12 +869,12 @@ const DailyPlanCreate: React.FC = () => {
 
 
           {/* Section 2: Schedule */}
-          <div className="bg-white">
-            <div className="px-5 py-4  flex items-center gap-2">
+          <div className="bg-card">
+            <div className="px-6 py-4 flex items-center gap-2 border-b border-line-soft">
 
-              <h6 className="font-bold text-lg text-slate-800">Step 2 — Schedule Details</h6>
+              <h6 className="font-extrabold text-xl text-ink tracking-wide">Step 2 — Schedule Details</h6>
             </div>
-            <div className="px-5">
+            <div className="px-6 pt-4">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {/* Production Date */}
                 <div>
@@ -912,67 +904,6 @@ const DailyPlanCreate: React.FC = () => {
                   />
                 </div>
 
-                {/* ─── Machine OEE Panel ─────────────────────────────────── */}
-                {/* {machineId && (
-                      <div className="md:col-span-2">
-                        {loadingOee ? (
-                          <div className="flex items-center gap-2 py-2 text-slate-500 text-sm">
-                            <div className="inline-block w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin"></div>
-                            Loading machine OEE...
-                          </div>
-                        ) : machineOeeSummary ? (
-                          <div className="rounded-xl p-4 bg-blue-50 border border-blue-200">
-                            <div className="flex items-center justify-between mb-3">
-                              <span className="font-bold text-sm text-blue-800 flex items-center">
-                                <FaIndustry className="mr-2" />
-                                {machineOeeSummary.machineName} — Today's OEE
-                              </span>
-                              <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${machineOeeSummary.machineStatus === 'RUNNING' ? 'bg-green-100 text-green-800' : machineOeeSummary.machineStatus === 'BREAKDOWN' ? 'bg-red-100 text-red-800' : 'bg-slate-100 text-slate-700'}`}>
-                                {machineOeeSummary.machineStatus === 'RUNNING' ? '● ' : '○ '}{machineOeeSummary.machineStatus || 'IDLE'}
-                              </span>
-                            </div>
-                            <div className="grid grid-cols-4 gap-2">
-                              {machineOeeSummary.oeeToday ? (
-                                <>
-                                  <div className="text-center">
-                                    <div className="text-lg font-extrabold text-blue-700">
-                                      {machineOeeSummary.oeeToday.oeePercent}%
-                                    </div>
-                                    <div className="text-slate-500 text-[10px] uppercase">OEE</div>
-                                  </div>
-                                  <div className="text-center">
-                                    <div className="text-sm font-bold text-green-700">
-                                      {machineOeeSummary.oeeToday.availability}%
-                                    </div>
-                                    <div className="text-slate-500 text-[10px] uppercase">Availability</div>
-                                  </div>
-                                  <div className="text-center">
-                                    <div className="text-sm font-bold text-amber-700">
-                                      {machineOeeSummary.oeeToday.performance}%
-                                    </div>
-                                    <div className="text-slate-500 text-[10px] uppercase">Performance</div>
-                                  </div>
-                                  <div className="text-center">
-                                    <div className="text-sm font-bold text-purple-700">
-                                      {machineOeeSummary.oeeToday.quality}%
-                                    </div>
-                                    <div className="text-slate-500 text-[10px] uppercase">Quality</div>
-                                  </div>
-                                </>
-                              ) : (
-                                <div className="col-span-4 text-center text-slate-500 text-sm py-2">No production logged today — OEE will appear after first hourly entry</div>
-                              )}
-                            </div>
-                            <div className="flex gap-4 mt-3 text-xs text-slate-500 justify-center border-t border-blue-200/50 pt-2">
-                              <span>📋 Today: {machineOeeSummary.todayPlannedHours}h planned</span>
-                              <span>⏱ Downtime: {machineOeeSummary.downtimeToday} min</span>
-                              <span>🔄 Active orders: {machineOeeSummary.runningOrdersCount}</span>
-                            </div>
-                          </div>
-                        ) : null}
-                      </div>
-                    )} */}
-
                 {/* Shift */}
                 <div>
                   <SelectInput
@@ -999,10 +930,10 @@ const DailyPlanCreate: React.FC = () => {
                     if (!sel) return null;
                     const hrs = computeShiftHours(sel.startTime, sel.endTime);
                     return (
-                      <div className="mt-2 flex items-center gap-2 text-slate-500 text-xs">
+                      <div className="mt-2 flex items-center gap-2 text-ink-subtle text-xs">
                         <FaClock size={12} />
                         {sel.startTime} → {sel.endTime} &nbsp;|&nbsp;
-                        <strong className="text-slate-800">{hrs} hrs</strong>
+                        <strong className="text-ink">{hrs} hrs</strong>
                       </div>
                     );
                   })()}
@@ -1012,13 +943,13 @@ const DailyPlanCreate: React.FC = () => {
                 <div>
                   {loadingAssignment ? (
                     <div>
-                      <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">
+                      <label className="block text-xs font-extrabold text-ink uppercase tracking-[0.5px] mb-2">
                         Operators <span className="text-red-500">*</span>
                       </label>
-                      <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-slate-500 text-sm">
+                      <div className="p-3 bg-card-2 border border-line-soft rounded-lg text-ink-subtle text-sm">
                         <div className="animate-pulse flex gap-2 items-center">
-                          <div className="w-4 h-4 bg-slate-200 rounded-full"></div>
-                          <div className="h-2 bg-slate-200 rounded w-24"></div>
+                          <div className="w-4 h-4 bg-card rounded-full"></div>
+                          <div className="h-2 bg-card rounded w-24"></div>
                         </div>
                       </div>
                     </div>
@@ -1041,8 +972,8 @@ const DailyPlanCreate: React.FC = () => {
                     />
                   )}
                   {availableOperators.length === 0 && !loadingAssignment && (
-                    <div className="mt-2 p-2.5 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-xs flex items-center gap-2">
-                      <FaExclamationTriangle className="text-amber-500 shrink-0" size={12} />
+                    <div className="mt-2.5 p-3 bg-amber-500/15 border border-amber-500/30 rounded-xl text-amber-300 text-xs font-semibold flex items-center gap-2">
+                      <FaExclamationTriangle className="text-amber-400 shrink-0 text-sm" />
                       <span>No operator assigned to this machine in Weekly Machine Operator Assignment.</span>
                     </div>
                   )}
@@ -1070,12 +1001,12 @@ const DailyPlanCreate: React.FC = () => {
           </div>
 
           {/* Section 3: Quantity & Hours */}
-          <div className="bg-white ">
-            <div className="px-5 py-4  flex items-center gap-2">
+          <div className="bg-card">
+            <div className="px-6 py-4 flex items-center gap-2 border-b border-line-soft">
 
-              <h6 className="font-bold text-lg text-slate-800">Step 3 — Quantity & Time</h6>
+              <h6 className="font-extrabold text-xl text-ink tracking-wide">Step 3 — Quantity & Time</h6>
             </div>
-            <div className="px-5">
+            <div className="px-6 pt-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {/* Planned Qty */}
                 <div>
@@ -1090,23 +1021,23 @@ const DailyPlanCreate: React.FC = () => {
                     onChange={(e) => setPlannedQty(e.target.value)}
                   />
                   {machineId && machineProductCapacity != null && (
-                    <div className="text-[11px] text-blue-600 font-semibold mt-1">
+                    <div className="text-[11px] text-primary font-semibold mt-1">
                       Product Capacity: {machineProductCapacity.toLocaleString()} / Shift
                     </div>
                   )}
                   {machineId && machineProductCapacity != null && Number(plannedQty) < machineProductCapacity && (
-                    <div className="text-[11px] text-indigo-600 font-semibold mt-1">
+                    <div className="text-[11px] text-indigo-400 font-semibold mt-1">
                       Available shift capacity: {machineProductCapacity - Number(plannedQty)} pcs remaining.
                     </div>
                   )}
                   {overCapacity && (
-                    <div className="text-amber-500 text-xs flex items-center mt-1">
+                    <div className="text-amber-400 text-xs flex items-center mt-1">
                       <FaExclamationTriangle className="mr-1" />
                       Exceeds PO remaining quantity ({remainingQty} pcs) — Overproduction allowed
                     </div>
                   )}
                   {remainingQty !== null && !overCapacity && Number(plannedQty) > 0 && (
-                    <div className="text-slate-500 text-xs mt-1">
+                    <div className="text-ink-subtle text-xs mt-1">
                       Remaining after this plan: {remainingQty - Number(plannedQty)} pcs
                     </div>
                   )}
@@ -1123,18 +1054,18 @@ const DailyPlanCreate: React.FC = () => {
                     placeholder="Auto-filled from shift"
                     onChange={(e) => setPlannedHours(e.target.value)}
                   />
-                  <div className="flex items-center gap-1.5 mt-2 text-xs text-slate-500">
-                    <FaInfoCircle className="text-slate-400" />
+                  <div className="flex items-center gap-1.5 mt-2 text-xs text-ink-muted font-medium">
+                    <FaInfoCircle className="text-primary text-xs" />
                     Max available: {availableShiftHours}/{totalShiftHours}h (based on selected shift and other plans)
                   </div>
                 </div>
 
                 {/* Priority — auto-filled from PO */}
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
+                  <label className="block text-xs font-extrabold text-ink uppercase mb-1">
                     Priority
                     {selectedWeeklyProg?.productionOrder?.priority && (
-                      <span className="ml-2 text-green-600 font-normal text-[10px] inline-flex items-center">
+                      <span className="ml-2 text-emerald-400 font-normal text-[10px] inline-flex items-center">
                         <FaCheckCircle className="mr-1" />auto from PO
                       </span>
                     )}
@@ -1169,10 +1100,10 @@ const DailyPlanCreate: React.FC = () => {
         </div>
 
         {/* ─── Action Buttons ─── */}
-        <div className="flex justify-end items-center gap-3 px-6 py-5 border-t border-slate-200">
+        <div className="flex justify-end items-center gap-3 px-6 py-5 border-t border-line-soft bg-card-2">
           <CustomButton
             text="Cancel"
-
+            variant="secondary"
             onClick={() => navigate("/daily-machine-planning")}
           />
           {(isEdit ? can("daily-machine-planning.edit") : can("daily-machine-planning.create")) && (

@@ -197,16 +197,16 @@ export default function DatePickerCalendar({
         <label
           className={`
             flex items-center gap-[6px] mb-2
-            text-xs font-bold uppercase
+            text-xs font-extrabold uppercase
             tracking-[0.5px]
             transition-colors duration-250
-            ${error ? "text-red-500" : "text-slate-500"}
+            ${error ? "text-red-400" : "text-ink"}
             group-focus-within:text-primary
           `}
         >
           <span>{label}</span>
           {required && (
-            <span className="text-[#e53935] ml-0.5">*</span>
+            <span className="text-red-500 ml-0.5">*</span>
           )}
         </label>
       )}
@@ -217,25 +217,25 @@ export default function DatePickerCalendar({
           type="button"
           disabled={disabled}
           onClick={() => setOpen((o) => !o)}
-          className={`flex w-full h-[40px] items-center justify-between rounded-[10px] border px-4 text-[15px] font-medium transition-all duration-250 outline-none text-left
+          className={`flex w-full h-[40px] items-center justify-between rounded-[10px] border px-4 text-[15px] font-semibold transition-all duration-250 outline-none text-left
             ${error
-              ? "border-red-500 bg-white focus:border-red-500 focus:ring-4 focus:ring-red-500/15"
+              ? "border-red-500 bg-card-2 focus:border-red-500 focus:ring-4 focus:ring-red-500/15"
               : open
-                ? "border-primary bg-white ring-4 ring-primary/15"
-                : "border-slate-300 bg-white hover:border-slate-400 focus:border-primary focus:ring-4 focus:ring-primary/15"
+                ? "border-primary bg-card-2 ring-4 ring-primary/15"
+                : "border-line-soft bg-card-2 hover:border-line-soft/80 focus:border-primary focus:ring-4 focus:ring-primary/15"
             }
-            ${disabled ? "bg-[#E5E7EB] cursor-not-allowed text-[#6B7280]" : "bg-white"}
+            ${disabled ? "bg-card-2/50 cursor-not-allowed text-ink-subtle opacity-70" : ""}
           `}
         >
-          <span className={selected ? "text-[#1f2937]" : "text-[#9ca3af]"}>
+          <span className={selected ? "text-ink font-semibold" : "text-ink-subtle font-normal"}>
             {selected ? formatLocalDate(selected) : placeholder}
           </span>
-          <CalendarIcon size={16} className={disabled ? "text-[#6B7280]" : "text-primary"} />
+          <CalendarIcon size={16} className={disabled ? "text-ink-subtle" : "text-primary"} />
         </button>
 
         {/* Popover */}
         {open && !disabled && (
-          <div className="absolute left-0 top-full z-50 mt-1 w-60 rounded-xl border border-gray-100 bg-white p-2 shadow-lg">
+          <div className="absolute left-0 top-full z-50 mt-1 w-60 rounded-xl border border-line-soft bg-card p-2 shadow-xl text-ink">
 
             {/* Header: prev arrow | month select | year select | next arrow */}
             <div className="mb-1 flex items-center justify-between gap-1">
@@ -243,7 +243,7 @@ export default function DatePickerCalendar({
                 type="button"
                 onClick={goPrevMonth}
                 aria-label="Previous month"
-                className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded bg-gray-100 text-gray-600 hover:bg-gray-200"
+                className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded bg-card-2 text-ink-muted hover:bg-card-2/80 hover:text-ink transition-colors"
               >
                 <ChevronLeft size={14} />
               </button>
@@ -252,10 +252,10 @@ export default function DatePickerCalendar({
               <select
                 value={viewMonth}
                 onChange={(e) => setViewMonth(Number(e.target.value))}
-                className="flex-1 min-w-0 rounded border border-gray-200 bg-white px-1 py-0.5 text-[11px] font-semibold text-gray-800 focus:outline-none focus:border-primary cursor-pointer"
+                className="flex-1 min-w-0 rounded border border-line-soft bg-card-2 px-1 py-0.5 text-[11px] font-semibold text-ink focus:outline-none focus:border-primary cursor-pointer"
               >
                 {MONTHS.map((m, i) => (
-                  <option key={m} value={i}>{m}</option>
+                  <option key={m} value={i} className="bg-card text-ink">{m}</option>
                 ))}
               </select>
 
@@ -264,10 +264,10 @@ export default function DatePickerCalendar({
                 ref={yearSelectRef}
                 value={viewYear}
                 onChange={(e) => setViewYear(Number(e.target.value))}
-                className="w-16 flex-shrink-0 rounded border border-gray-200 bg-white px-1 py-0.5 text-[11px] font-semibold text-gray-800 focus:outline-none focus:border-primary cursor-pointer"
+                className="w-16 flex-shrink-0 rounded border border-line-soft bg-card-2 px-1 py-0.5 text-[11px] font-semibold text-ink focus:outline-none focus:border-primary cursor-pointer"
               >
                 {yearOptions.map((y) => (
-                  <option key={y} value={y}>{y}</option>
+                  <option key={y} value={y} className="bg-card text-ink">{y}</option>
                 ))}
               </select>
 
@@ -275,7 +275,7 @@ export default function DatePickerCalendar({
                 type="button"
                 onClick={goNextMonth}
                 aria-label="Next month"
-                className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded bg-gray-100 text-gray-600 hover:bg-gray-200"
+                className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded bg-card-2 text-ink-muted hover:bg-card-2/80 hover:text-ink transition-colors"
               >
                 <ChevronRight size={14} />
               </button>
@@ -284,7 +284,7 @@ export default function DatePickerCalendar({
             {/* Weekday labels */}
             <div className="mb-0.5 grid grid-cols-7">
               {WEEKDAYS.map((w) => (
-                <div key={w} className="pb-0.5 text-center text-[10px] font-semibold text-gray-400">
+                <div key={w} className="pb-0.5 text-center text-[10px] font-semibold text-ink-subtle">
                   {w}
                 </div>
               ))}
@@ -304,15 +304,15 @@ export default function DatePickerCalendar({
                     disabled={disabledCell}
                     onClick={() => handleSelect(date)}
                     className={`aspect-square rounded text-[11px] transition
-                      ${disabledCell ? "cursor-not-allowed text-gray-300" : "cursor-pointer"}
+                      ${disabledCell ? "cursor-not-allowed text-ink-subtle/40" : "cursor-pointer"}
                       ${isSelected
-                        ? "bg-primary font-bold text-white"
+                        ? "bg-primary font-bold text-white shadow-xs"
                         : !disabledCell && inMonth
-                          ? "font-normal text-gray-900 hover:bg-primary/10"
+                          ? "font-semibold text-ink hover:bg-primary/20"
                           : !disabledCell
-                            ? "font-normal text-gray-300 hover:bg-primary/10"
+                            ? "font-normal text-ink-subtle/60 hover:bg-primary/15"
                             : ""}
-                      ${isToday && !isSelected ? "ring-1 ring-inset ring-primary font-bold" : ""}
+                      ${isToday && !isSelected ? "ring-1 ring-inset ring-primary font-bold text-primary" : ""}
                     `}
                   >
                     {date.getDate()}
@@ -322,18 +322,18 @@ export default function DatePickerCalendar({
             </div>
 
             {/* Footer */}
-            <div className="mt-1.5 flex justify-between border-t border-gray-100 pt-1.5">
+            <div className="mt-1.5 flex justify-between border-t border-line-soft pt-1.5">
               <button
                 type="button"
                 onClick={goToday}
-                className="rounded px-1 py-0.5 text-[10px] font-semibold text-primary hover:bg-primary/10"
+                className="rounded px-1 py-0.5 text-[10px] font-semibold text-primary hover:bg-primary/15 transition-colors"
               >
                 Today
               </button>
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                className="rounded px-1 py-0.5 text-[10px] font-semibold text-gray-400 hover:bg-gray-50"
+                className="rounded px-1 py-0.5 text-[10px] font-semibold text-ink-subtle hover:bg-card-2 hover:text-ink transition-colors"
               >
                 Close
               </button>

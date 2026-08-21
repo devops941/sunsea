@@ -95,15 +95,15 @@ const SinglePhoneField: React.FC<SinglePhoneFieldProps> = ({
             <div className="flex items-center gap-2">
                 <div className={`
                     relative flex-1 flex items-center gap-2
-                    h-10 px-4 border rounded-[10px] bg-white
+                    h-10 px-4 border rounded-[10px] bg-card-2
                     transition-all duration-250
                     ${error
                         ? "border-red-500 focus-within:border-red-500 focus-within:ring-4 focus-within:ring-red-500/15"
-                        : "border-slate-300 hover:border-slate-400 focus-within:border-primary focus-within:ring-4 focus-within:ring-primary/15"
+                        : "border-line-soft hover:border-line-soft/80 focus-within:border-primary focus-within:ring-4 focus-within:ring-primary/15"
                     }
                 `}>
                     {/* Country Code with Flag */}
-                    <div className="flex items-center gap-1.5 shrink-0 select-none text-[15px] font-medium text-slate-500 border-r border-slate-200 pr-2">
+                    <div className="flex items-center gap-1.5 shrink-0 select-none text-[15px] font-semibold text-ink-subtle border-r border-line-soft pr-2">
                         {/* <span className="text-base">🇮🇳</span> */}
                         <span>+91</span>
                     </div>
@@ -118,7 +118,7 @@ const SinglePhoneField: React.FC<SinglePhoneFieldProps> = ({
                         value={displayValue}
                         onChange={handleInputChange}
                         onBlur={onBlur}
-                        className="flex-1 h-full border-none outline-none bg-transparent text-[15px] font-medium text-slate-800 placeholder:text-slate-400 p-0"
+                        className="flex-1 h-full border-none outline-none bg-transparent text-[15px] font-semibold text-ink placeholder:text-ink-subtle/60 p-0"
                     />
                 </div>
 
@@ -130,8 +130,8 @@ const SinglePhoneField: React.FC<SinglePhoneFieldProps> = ({
                         className="
                             flex items-center justify-center
                             w-9 h-9 rounded-[10px] shrink-0
-                            border border-slate-300 text-slate-500
-                            hover:border-red-400 hover:text-red-500 hover:bg-red-50
+                            border border-line-soft text-ink-subtle
+                            hover:border-red-400 hover:text-red-500 hover:bg-red-500/10
                             transition-colors duration-200
                         "
                     >
@@ -141,7 +141,7 @@ const SinglePhoneField: React.FC<SinglePhoneFieldProps> = ({
             </div>
 
             {error && (
-                <div className="text-[#dc3545] text-sm font-medium mt-1">
+                <div className="text-red-500 text-xs font-semibold mt-1">
                     {error}
                 </div>
             )}
@@ -348,7 +348,7 @@ const IndiaPhoneInput: React.FC<IndiaPhoneInputProps> = (props) => {
         return (
             <div className="group w-full" ref={wrapperRef}>
                 {label && (
-                    <label className={`flex items-center gap-1.5 mb-2 text-xs font-bold uppercase tracking-[0.5px] transition-colors duration-250 ${displayError ? 'text-red-500' : 'text-slate-500'} group-focus-within:text-primary`}>
+                    <label className={`flex items-center gap-1.5 mb-2 text-xs font-extrabold uppercase tracking-[0.5px] transition-colors duration-250 ${displayError ? 'text-red-500' : 'text-ink'} group-focus-within:text-primary`}>
                         <span>{label}</span>
                         {required && <span className="text-[#e53935] ml-0.5">*</span>}
                     </label>
@@ -362,14 +362,14 @@ const IndiaPhoneInput: React.FC<IndiaPhoneInputProps> = (props) => {
                         className={`
                             w-full min-h-10 pl-4 pr-3 py-1.5
                             flex items-center justify-between gap-2
-                            border rounded-md bg-white
-                            text-[15px] font-medium text-left
+                            border rounded-md bg-card-2
+                            text-[15px] font-semibold text-ink text-left
                             transition-all duration-250
                             ${displayError
                                 ? 'border-red-500 focus:border-red-500 focus:ring-4 focus:ring-red-500/15'
                                 : isOpen
                                     ? 'border-primary ring-4 ring-primary/15'
-                                    : 'border-slate-300 hover:border-slate-400'
+                                    : 'border-line-soft hover:border-line-soft/80'
                             }
                         `}
                     >
@@ -565,10 +565,10 @@ const IndiaPhoneInput: React.FC<IndiaPhoneInputProps> = (props) => {
                     htmlFor={name}
                     className={`
                         flex items-center gap-[6px] mb-2
-                        text-xs font-bold uppercase
+                        text-xs font-extrabold uppercase
                         tracking-[0.5px]
                         transition-colors duration-250
-                        ${displayError ? "text-red-500" : "text-slate-500"}
+                        ${displayError ? "text-red-500" : "text-ink"}
                         group-focus-within:text-primary
                     `}
                 >

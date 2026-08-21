@@ -111,7 +111,7 @@ function DataTable<T>({
   // 1. `max-content` ensures the column is always wide enough for its content without squishing/wrapping text.
   // 2. `1fr` ensures any leftover table space is distributed equally, so the table stretches to fill 100% width.
   // 3. If the total max-content exceeds the screen, it naturally forces the responsive horizontal scrollbar!
-  const gridTemplateColumns = columns.map((col) => col.width ?? "minmax(max-content, 1fr)").join(" ");
+  const gridTemplateColumns = columns.map((col) => col.width ?? "minmax(0, 1fr)").join(" ");
 
   // True while the table is showing the loader or the empty message instead of
   // real rows. In that case the grid holds only the header and the message is
@@ -125,6 +125,7 @@ function DataTable<T>({
   const outerGridStyle: React.CSSProperties = {
     display: "grid",
     gridTemplateColumns,
+    width: "100%",
     minWidth: "100%",
   };
 
@@ -153,7 +154,7 @@ function DataTable<T>({
           className="w-full flex-1 min-h-0 overflow-auto overscroll-contain flex flex-col"
           style={{ WebkitOverflowScrolling: "touch" }}
         >
-          <div role="table" className="text-sm" style={outerGridStyle}>
+          <div role="table" className="w-full text-sm" style={outerGridStyle}>
             {/* Header row — cells are individually sticky (rather than the row)
                 because a `subgrid` row is not a reliable sticky containing box
                 across browsers. Each carries its own background so the header

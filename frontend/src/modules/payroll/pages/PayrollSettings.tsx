@@ -52,10 +52,10 @@ const Toggle: React.FC<{
     className="inline-flex items-center gap-3 cursor-pointer select-none"
     onClick={() => onChange(!checked)}
   >
-    <div className={`relative shrink-0 w-11 h-6 rounded-full transition-colors duration-200 ${checked ? 'bg-primary' : 'bg-slate-300'}`}>
-      <span className={`absolute top-[3px] w-[18px] h-[18px] rounded-full bg-white shadow-sm transition-transform duration-200 ${checked ? 'translate-x-[22px]' : 'translate-x-[3px]'}`} />
+    <div className={`relative shrink-0 w-11 h-6 rounded-full transition-colors duration-200 ${checked ? 'bg-primary' : 'bg-card-2 border border-line-soft'}`}>
+      <span className={`absolute top-[3px] w-[18px] h-[18px] rounded-full bg-white shadow-xs transition-transform duration-200 ${checked ? 'translate-x-[22px]' : 'translate-x-[3px]'}`} />
     </div>
-    {label && <span className="text-sm font-medium text-text-primary leading-none">{label}</span>}
+    {label && <span className="text-sm font-bold text-ink leading-none">{label}</span>}
   </div>
 );
 
@@ -100,11 +100,10 @@ const SlabConfigurator: React.FC<{
   };
 
   // Shared form fields — 3 reusable TextInput components
-  // Shared form fields — 3 reusable TextInput components
   const renderSlabForm = (onSave: () => void, onCancel: () => void) => {
     const actionVal = (draft.action ?? 'DEDUCT_AMOUNT') as string;
     return (
-      <div className="border border-primary/30 rounded-xl p-4 bg-primary/[0.03] space-y-3">
+      <div className="border border-primary/30 rounded-xl p-4 bg-primary/10 space-y-3">
         <TextInput
           label="Label"
           name="slab-label"
@@ -132,11 +131,11 @@ const SlabConfigurator: React.FC<{
           />
           {/* Action dropdown — only shown when this is used as Permission Slab */}
           <div>
-            <label className="block text-xs font-semibold text-text-muted mb-1.5">Action</label>
+            <label className="block text-xs font-semibold text-ink-subtle mb-1.5 uppercase tracking-wider">Action</label>
             <select
               value={actionVal}
               onChange={e => setDraft(d => ({ ...d, action: e.target.value as SlabEntry['action'], amount: 0, otHours: 0 }))}
-              className="w-full border border-border rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary bg-white"
+              className="w-full border border-line-soft rounded-xl px-3 py-2 text-sm text-ink font-semibold focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary bg-card-2"
             >
               <option value="DEDUCT_AMOUNT">₹ Deduct Amount</option>
               <option value="HALF_DAY">Half Day (LOP)</option>
@@ -167,20 +166,20 @@ const SlabConfigurator: React.FC<{
           />
         )}
         {actionVal === 'HALF_DAY' && (
-          <p className="text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
+          <p className="text-xs text-primary bg-primary/10 border border-primary/20 rounded-xl px-3 py-2 font-medium">
             This slab will automatically convert the day to <strong>Half Day (0.5 LOP)</strong> with no ₹ deduction.
           </p>
         )}
         <div className="flex gap-2 pt-1">
           <button
             onClick={onSave}
-            className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-primary rounded-lg hover:bg-primary/90 transition-colors"
+            className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-primary rounded-xl hover:bg-primary/90 transition-colors"
           >
             <Check size={13} /> Save Slab
           </button>
           <button
             onClick={onCancel}
-            className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-text-secondary border border-border rounded-lg hover:bg-slate-50 transition-colors"
+            className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-ink-subtle bg-card-2 border border-line-soft rounded-xl hover:bg-card transition-colors"
           >
             <X size={13} /> Cancel
           </button>
@@ -193,11 +192,11 @@ const SlabConfigurator: React.FC<{
     <div className="space-y-3">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h4 className="text-sm font-semibold text-text-primary">{title}</h4>
+        <h4 className="text-sm font-bold text-ink">{title}</h4>
         {canEdit && !adding && !editing && (
           <button
             onClick={startAdd}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-primary border border-primary rounded-lg hover:bg-primary/5 transition-colors"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-primary border border-primary/30 rounded-xl hover:bg-primary/10 transition-colors"
           >
             <Plus size={13} /> Add Slab
           </button>
@@ -206,7 +205,7 @@ const SlabConfigurator: React.FC<{
 
       {/* Warning note when no slabs */}
       {warningNote && (
-        <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800">
+        <div className="flex items-start gap-2 p-3 bg-amber-500/15 border border-amber-500/30 rounded-xl text-xs text-amber-400 font-medium">
           <AlertTriangle size={14} className="mt-0.5 shrink-0" />
           <span>{warningNote}</span>
         </div>
@@ -218,35 +217,35 @@ const SlabConfigurator: React.FC<{
           {editing === s.id ? (
             renderSlabForm(saveEdit, cancelEdit)
           ) : (
-            <div className="flex items-center gap-3 px-4 py-3 border border-border rounded-xl bg-white hover:border-primary/30 transition-colors group">
+            <div className="flex items-center gap-3 px-4 py-3 border border-line-soft rounded-2xl bg-card-2 hover:border-primary/50 transition-colors group">
               {/* Slab label */}
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-text-primary truncate">{s.label || '—'}</p>
+                <p className="text-sm font-bold text-ink truncate">{s.label || '—'}</p>
               </div>
               {/* Range badge */}
               <div className="flex items-center gap-1.5 shrink-0">
-                <span className="px-2.5 py-1 text-xs font-medium bg-slate-100 text-text-secondary rounded-md">
+                <span className="px-2.5 py-1 text-xs font-bold bg-card border border-line-soft text-ink-subtle rounded-lg">
                   {s.fromMinutes}{s.toMinutes === 0 ? '+ min' : ` – ${s.toMinutes} min`}
                 </span>
-                <span className="text-text-muted text-xs">→</span>
+                <span className="text-ink-subtle text-xs">→</span>
                 {/* Action badge */}
                 {(!s.action || s.action === 'DEDUCT_AMOUNT') && (
-                  <span className="px-2.5 py-1 text-xs font-semibold bg-emerald-50 text-emerald-700 rounded-md font-mono">
+                  <span className="px-2.5 py-1 text-xs font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 rounded-lg font-mono">
                     ₹{s.amount}
                   </span>
                 )}
                 {s.action === 'HALF_DAY' && (
-                  <span className="px-2.5 py-1 text-xs font-semibold bg-amber-50 text-amber-700 rounded-md">
+                  <span className="px-2.5 py-1 text-xs font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30 rounded-lg">
                     ½ Day LOP
                   </span>
                 )}
                 {s.action === 'HALF_DAY_PLUS_OT' && (
                   <>
-                    <span className="px-2.5 py-1 text-xs font-semibold bg-amber-50 text-amber-700 rounded-md">
+                    <span className="px-2.5 py-1 text-xs font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30 rounded-lg">
                       ½ Day LOP
                     </span>
-                    <span className="text-text-muted text-xs">+</span>
-                    <span className="px-2.5 py-1 text-xs font-semibold bg-blue-50 text-blue-700 rounded-md">
+                    <span className="text-ink-subtle text-xs">+</span>
+                    <span className="px-2.5 py-1 text-xs font-bold bg-primary/15 text-primary border border-primary/30 rounded-lg">
                       {s.otHours ?? 0} hrs OT
                     </span>
                   </>
@@ -257,14 +256,14 @@ const SlabConfigurator: React.FC<{
                 <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button
                     onClick={() => startEdit(s)}
-                    className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
+                    className="p-1.5 text-blue-400 hover:bg-card rounded-lg transition-colors"
                     title="Edit slab"
                   >
                     <Edit3 size={13} />
                   </button>
                   <button
                     onClick={() => remove(s.id)}
-                    className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                    className="p-1.5 text-red-400 hover:bg-card rounded-lg transition-colors"
                     title="Delete slab"
                   >
                     <Trash2 size={13} />
@@ -278,12 +277,12 @@ const SlabConfigurator: React.FC<{
 
       {/* Empty state */}
       {slabs.length === 0 && !adding && (
-        <div className="flex flex-col items-center justify-center py-6 border border-dashed border-border rounded-xl text-text-muted">
+        <div className="flex flex-col items-center justify-center py-6 border border-dashed border-line-soft rounded-2xl text-ink-subtle font-semibold">
           <p className="text-xs">No slabs configured.</p>
           {canEdit && (
             <button
               onClick={startAdd}
-              className="mt-2 text-xs text-primary font-semibold hover:underline"
+              className="mt-2 text-xs text-primary font-bold hover:underline"
             >
               + Add your first slab
             </button>
@@ -583,8 +582,8 @@ const SalaryComponentsEditor: React.FC<{
 
 // ─── Section wrapper ──────────────────────────────────────────────────────────
 const Section: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
-  <div className="bg-white rounded-xl border border-border p-5 shadow-sm space-y-4">
-    <h3 className="text-sm font-bold text-text-primary border-b border-border pb-3">{title}</h3>
+  <div className="bg-card rounded-2xl border border-line-soft p-6 shadow-xs space-y-4 text-ink">
+    <h3 className="text-sm font-extrabold text-ink border-b border-line-soft pb-3">{title}</h3>
     {children}
   </div>
 );
@@ -659,7 +658,7 @@ const PayrollSettings: React.FC = () => {
       <div className="min-h-screen bg-page flex items-center justify-center">
         <div className="text-center space-y-3">
           <AlertTriangle size={40} className="text-red-400 mx-auto" />
-          <p className="text-sm text-text-secondary">{error}</p>
+          <p className="text-sm text-ink-subtle">{error}</p>
           <Button text="Retry" onClick={() => window.location.reload()} variant="primary" size="sm" />
         </div>
       </div>
@@ -686,25 +685,7 @@ const PayrollSettings: React.FC = () => {
               value={String(config.fixedDays ?? 26)}
               onChange={e => set({ fixedDays: Number(e.target.value) })}
             />
-            {/* <TextInput label="Working Hours / Day" name="defaultWorkingHoursPerDay" type="number"
-              value={String(config.defaultWorkingHoursPerDay ?? 8)}
-              onChange={e => set({ defaultWorkingHoursPerDay: Number(e.target.value) })}
-            /> */}
           </div>
-          {/* <div>
-            <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-2">Weekly Off Days</p>
-            <div className="flex flex-wrap gap-3">
-              {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map((d, i) => (
-                <CheckboxInput key={d} label={d} name={`woff-${i}`}
-                  checked={(config.weeklyOffDays ?? [0]).includes(i)}
-                  onChange={e => {
-                    const curr = (config.weeklyOffDays ?? [0]) as number[];
-                    set({ weeklyOffDays: e.target.checked ? [...curr, i] : curr.filter(x => x !== i) });
-                  }}
-                />
-              ))}
-            </div>
-          </div> */}
         </Section>
       ),
     },
@@ -722,7 +703,7 @@ const PayrollSettings: React.FC = () => {
             ]}
             onChange={e => set({ dailySalaryFormula: e.target.value })}
           />
-          <div className="flex items-start gap-2 bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-800 mt-2">
+          <div className="flex items-start gap-2 bg-primary/10 border border-primary/20 rounded-xl p-3.5 text-xs text-primary font-medium mt-2">
             <Info size={14} className="mt-0.5 shrink-0" />
             <span>
               {config.dailySalaryFormula === 'MONTHLY_BY_CALENDAR'
@@ -875,14 +856,14 @@ const PayrollSettings: React.FC = () => {
           </div>
 
           {/* ── How grace + slabs work together ── */}
-          <div className="flex items-start gap-2 bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-800">
+          <div className="flex items-start gap-2 bg-primary/10 border border-primary/20 rounded-xl p-3.5 text-xs text-primary font-medium">
             <Info size={14} className="mt-0.5 shrink-0" />
             <div>
-              <p className="font-semibold mb-1">How Late Entry Deduction works</p>
+              <p className="font-bold mb-1">How Late Entry Deduction works</p>
               <p>If an employee is late by ≤ <strong>{config.lateEntryGraceMinutes ?? 5} min</strong> (grace period), <strong>no deduction</strong> is applied.</p>
               <p className="mt-1">If late by more than the grace period, the <strong>total late minutes</strong> are looked up in the slab table below and that fixed amount is deducted.</p>
-              <p className="mt-1 text-blue-600">Example: Late 30 min → matches slab "21–60 min → ₹50" → ₹50 deducted.</p>
-              <p className="mt-1 text-blue-600">If no slabs are configured, a per-minute rate (Daily Rate ÷ Working Minutes) is used as fallback.</p>
+              <p className="mt-1 text-primary">Example: Late 30 min → matches slab "21–60 min → ₹50" → ₹50 deducted.</p>
+              <p className="mt-1 text-primary">If no slabs are configured, a per-minute rate (Daily Rate ÷ Working Minutes) is used as fallback.</p>
             </div>
           </div>
 
@@ -908,14 +889,14 @@ const PayrollSettings: React.FC = () => {
                 : undefined
             }
           />
-          <div className="flex items-start gap-2 bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-800 mt-1">
+          <div className="flex items-start gap-2 bg-primary/10 border border-primary/20 rounded-xl p-3.5 text-xs text-primary font-medium mt-1">
             <Info size={14} className="mt-0.5 shrink-0" />
             <div>
-              <p className="font-semibold mb-1">Permission Slab Actions</p>
+              <p className="font-bold mb-1">Permission Slab Actions</p>
               <p><strong>₹ Deduct Amount</strong> — Deduct a fixed rupee amount from net salary.</p>
               <p className="mt-1"><strong>Half Day (LOP)</strong> — Convert the day to half day (0.5 LOP). No ₹ deduction.</p>
               <p className="mt-1"><strong>Half Day + OT</strong> — Mark half day LOP <em>and</em> automatically add the configured OT hours to that employee's OT pay.</p>
-              <p className="mt-1 text-blue-600">Example: 09:00–21:00 shift. Employee arrives at 12:00 (180 min permission). Slab: <em>180+ min → Half Day + OT (3 hrs)</em>. Engine deducts 0.5 day salary and adds 3 hrs OT pay automatically.</p>
+              <p className="mt-1 text-primary">Example: 09:00–21:00 shift. Employee arrives at 12:00 (180 min permission). Slab: <em>180+ min → Half Day + OT (3 hrs)</em>. Engine deducts 0.5 day salary and adds 3 hrs OT pay automatically.</p>
             </div>
           </div>
         </Section>
@@ -977,11 +958,11 @@ const PayrollSettings: React.FC = () => {
   return (
     <div className="min-h-screen bg-page">
       {/* Header */}
-      <div className="bg-white border-b border-border px-6 py-4 sticky top-0 z-20">
+      <div className="bg-card border-b border-line-soft px-6 py-4 sticky top-0 z-20">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-bold text-text-primary">Payroll Settings</h1>
-            <p className="text-sm text-text-secondary mt-0.5">
+            <h1 className="text-xl font-bold text-ink">Payroll Settings</h1>
+            <p className="text-sm text-ink-muted mt-0.5">
               Configure payroll policies, statutory deductions, and salary components.
             </p>
           </div>

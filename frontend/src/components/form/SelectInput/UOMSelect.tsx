@@ -89,23 +89,23 @@ const CustomSingleSelect = ({
           border rounded-md outline-none
           text-[15px] font-medium flex items-center justify-between
           transition-all duration-250 text-left
-          ${value ? "text-[#1f2937]" : "text-[#9ca3af]"}
+          ${value ? "text-ink" : "text-ink-subtle"}
           ${error
-            ? "border-red-500 bg-white focus:border-red-500 focus:ring-4 focus:ring-red-500/15"
-            : "border-slate-300 bg-white hover:border-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/15"
+            ? "border-red-500 bg-card-2 focus:border-red-500 focus:ring-4 focus:ring-red-500/15"
+            : "border-line-soft bg-card-2 hover:border-line focus:border-primary focus:ring-4 focus:ring-primary/15"
           }
-          ${isOpen ? (error ? "border-red-500 ring-4 ring-red-500/15" : "border-blue-500 ring-4 ring-blue-500/15") : ""}
-          ${disabled ? "bg-[#E5E7EB] cursor-not-allowed text-[#6B7280]" : "bg-white"}
+          ${isOpen ? (error ? "border-red-500 ring-4 ring-red-500/15" : "border-primary ring-4 ring-primary/15") : ""}
+          ${disabled ? "bg-card-2/50 opacity-60 cursor-not-allowed text-ink-subtle" : ""}
         `}
       >
         <span className="truncate">{displayLabel}</span>
-        <span className="absolute right-4 text-gray-500">
+        <span className="absolute right-4 text-ink-muted">
           <FaChevronDown className={`text-xs transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
         </span>
       </button>
 
       {isOpen && (
-        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-100 rounded-lg shadow-lg max-h-60 overflow-y-auto py-1 animate-in fade-in zoom-in-95 duration-100">
+        <div className="absolute z-50 w-full mt-1 bg-card border border-line-soft rounded-lg shadow-xl max-h-60 overflow-y-auto py-1 animate-in fade-in zoom-in-95 duration-100">
           <div
             onClick={() => {
               onChange("");
@@ -114,7 +114,7 @@ const CustomSingleSelect = ({
             className={`
               px-4 py-2.5 text-sm cursor-pointer
               transition-colors duration-150
-              ${!value ? "bg-blue-50 text-blue-600 font-semibold" : "text-gray-500 hover:bg-gray-50"}
+              ${!value ? "bg-primary/15 text-primary font-semibold" : "text-ink-muted hover:bg-card-2"}
             `}
           >
             {placeholder}
@@ -130,8 +130,8 @@ const CustomSingleSelect = ({
                 px-4 py-2.5 text-sm cursor-pointer
                 transition-colors duration-150
                 ${value === u.code
-                  ? "bg-blue-50 text-blue-600 font-semibold"
-                  : "text-gray-700 hover:bg-gray-50"
+                  ? "bg-primary/15 text-primary font-semibold"
+                  : "text-ink hover:bg-card-2"
                 }
               `}
             >
@@ -202,39 +202,87 @@ export const UOMSelect: React.FC<UOMSelectProps> = ({
       borderRadius: '0.375rem',
       fontSize: '15px',
       boxShadow: state.isFocused ? '0 0 0 4px rgba(59, 130, 246, 0.15)' : 'none',
-      borderColor: isError ? '#ef4444' : state.isFocused ? '#3b82f6' : '#cbd5e1',
+      borderColor: isError ? '#ef4444' : state.isFocused ? '#3b82f6' : 'var(--border-line-soft, #202A3C)',
       '&:hover': {
-        borderColor: isError ? '#ef4444' : state.isFocused ? '#3b82f6' : '#94a3b8'
+        borderColor: isError ? '#ef4444' : state.isFocused ? '#3b82f6' : 'var(--border-line, #334155)'
       },
-      backgroundColor: disabled ? '#f8fafc' : '#ffffff',
-    })
+      backgroundColor: disabled ? 'var(--bg-card-2, #1C2536)' : 'var(--bg-card-2, #1C2536)',
+      color: 'var(--text-ink, #E2E8F0)',
+    }),
+    singleValue: (base: any) => ({
+      ...base,
+      color: 'var(--text-ink, #E2E8F0)',
+    }),
+    multiValue: (base: any) => ({
+      ...base,
+      backgroundColor: 'var(--bg-card, #151D2C)',
+      borderRadius: '0.25rem',
+      border: '1px solid var(--border-line-soft, #202A3C)',
+    }),
+    multiValueLabel: (base: any) => ({
+      ...base,
+      color: 'var(--text-ink, #E2E8F0)',
+    }),
+    multiValueRemove: (base: any) => ({
+      ...base,
+      color: 'var(--text-ink-subtle, #64748B)',
+      ':hover': {
+        backgroundColor: 'rgba(239, 68, 68, 0.2)',
+        color: '#ef4444',
+      },
+    }),
+    menu: (base: any) => ({
+      ...base,
+      backgroundColor: 'var(--bg-card, #151D2C)',
+      border: '1px solid var(--border-line-soft, #202A3C)',
+      boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.3)',
+      zIndex: 9999,
+    }),
+    option: (base: any, state: any) => ({
+      ...base,
+      backgroundColor: state.isSelected
+        ? 'var(--color-primary, #3b82f6)'
+        : state.isFocused
+        ? 'var(--bg-card-2, #1C2536)'
+        : 'transparent',
+      color: state.isSelected ? '#ffffff' : 'var(--text-ink, #E2E8F0)',
+      cursor: 'pointer',
+    }),
+    input: (base: any) => ({
+      ...base,
+      color: 'var(--text-ink, #E2E8F0)',
+    }),
+    placeholder: (base: any) => ({
+      ...base,
+      color: 'var(--text-ink-subtle, #64748B)',
+    }),
   });
 
   return (
     <div className="mb-[18px] group flex flex-col w-full">
       <label className={`
         flex items-center gap-[6px] mb-2
-        text-xs font-bold uppercase
+        text-xs font-extrabold uppercase
         tracking-[0.5px]
         transition-colors duration-250
-        ${error ? "text-red-500" : "text-slate-500"}
+        ${error ? "text-red-400" : "text-ink"}
         group-focus-within:text-primary
       `}>
         <span>{label}</span>
         {required && (
-          <span className="text-[#e53935] ml-0.5">*</span>
+          <span className="text-red-500 ml-0.5">*</span>
         )}
       </label>
 
       {loading ? (
         <div className="flex items-center gap-2 py-1">
-          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
-          <span className="text-slate-500 text-sm font-medium">Loading units...</span>
+          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+          <span className="text-ink-muted text-sm font-medium">Loading units...</span>
         </div>
       ) : fetchError ? (
-        <div className="flex items-center gap-2 border border-red-500 rounded-lg p-2 bg-red-50">
+        <div className="flex items-center gap-2 border border-red-500 rounded-lg p-2 bg-red-500/10">
           <span className="text-red-500 text-sm font-medium">{fetchError}</span>
-          <button type="button" className="text-sm font-bold text-red-500 border border-red-500 px-2 py-0.5 rounded hover:bg-red-100 transition-colors" onClick={retry}>
+          <button type="button" className="text-sm font-bold text-red-500 border border-red-500 px-2 py-0.5 rounded hover:bg-red-500/20 transition-colors" onClick={retry}>
             Retry
           </button>
         </div>

@@ -45,3 +45,12 @@
 
   cursor: pointer;
 }
+
+:root[data-theme="dark"] .checkbox-group .form-check-label {
+  color: #E2E8F0;
+}
+
+:root[data-theme="dark"] .checkbox-group .form-check-input {
+  border-color: #334155;
+  background-color: #1C2536;
+}

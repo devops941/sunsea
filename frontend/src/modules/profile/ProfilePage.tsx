@@ -37,20 +37,20 @@ const ProfilePage: React.FC = () => {
     }
 
     return (
-        <div className="min-h-full bg-slate-50/50 p-4 md:p-8 flex justify-center">
-            <div className="w-full max-w-5xl bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="min-h-full bg-page p-4 md:p-8 flex justify-center">
+            <div className="w-full max-w-5xl bg-card rounded-3xl shadow-md border border-line-soft overflow-hidden">
                 {/* HEADER */}
-                <div className="bg-linear-to-r from-primary/5 to-transparent p-6 md:p-10 border-b border-slate-200">
+                <div className="bg-card-2 p-6 md:p-10 border-b border-line-soft">
                     <div className="flex flex-col md:flex-row items-center md:items-start justify-between gap-6">
                         <div className="flex flex-col md:flex-row items-center gap-6">
-                            <div className="w-24 h-24 rounded-full bg-primary text-white flex items-center justify-center text-3xl font-bold shadow-lg ring-4 ring-white shrink-0">
+                            <div className="w-24 h-24 rounded-full bg-primary text-white flex items-center justify-center text-3xl font-bold shadow-lg ring-4 ring-card shrink-0">
                                 {getInitials(employee.fullName)}
                             </div>
                             <div className="text-center md:text-left">
-                                <h2 className="text-2xl md:text-3xl font-bold text-slate-800 tracking-tight">
+                                <h2 className="text-2xl md:text-3xl font-bold text-ink tracking-tight">
                                     {employee.fullName || "N/A"}
                                 </h2>
-                                <span className="flex items-center justify-center md:justify-start gap-2 mt-2 text-slate-600 font-medium bg-white px-3 py-1 rounded-full border border-slate-200 shadow-sm w-fit mx-auto md:mx-0">
+                                <span className="flex items-center justify-center md:justify-start gap-2 mt-2 text-ink-muted font-medium bg-card px-3 py-1 rounded-full border border-line-soft shadow-xs w-fit mx-auto md:mx-0">
                                     <FaIdBadge className="text-primary/70" />
                                     {employee.department?.name || "Employee Profile"}
                                 </span>
@@ -58,9 +58,9 @@ const ProfilePage: React.FC = () => {
                         </div>
                         <div className="flex flex-col items-center md:items-end gap-3 mt-4 md:mt-0">
                             <StatusBadge status={employee.status || "UNKNOWN"} />
-                            <div className="flex items-center gap-2 text-sm font-semibold text-slate-500 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200">
-                                <FaBriefcase className="text-slate-400" />
-                                Code: <span className="text-slate-700">{employee.empCode || "-"}</span>
+                            <div className="flex items-center gap-2 text-sm font-semibold text-ink-muted bg-card px-3 py-1.5 rounded-lg border border-line-soft">
+                                <FaBriefcase className="text-ink-subtle" />
+                                Code: <span className="text-ink font-mono">{employee.empCode || "-"}</span>
                             </div>
                         </div>
                     </div>
@@ -70,75 +70,75 @@ const ProfilePage: React.FC = () => {
                 <div className="p-6 md:p-10 space-y-10">
                     {/* Professional Info */}
                     <section>
-                        <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2.5 pb-3 border-b border-slate-100 mb-6">
+                        <h3 className="text-lg font-bold text-ink flex items-center gap-2.5 pb-3 border-b border-line-soft mb-6">
                             <div className="p-2 bg-primary/10 text-primary rounded-lg">
                                 <FaBriefcase size={16} />
                             </div>
                             Professional Info
                         </h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            <div className="flex flex-col gap-1.5 p-4 rounded-xl bg-slate-50 border border-slate-100 hover:border-primary/20 hover:bg-primary/5 transition-all">
-                                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Employee Code</span>
-                                <span className="text-sm font-semibold text-slate-700">{employee.empCode || "N/A"}</span>
+                            <div className="flex flex-col gap-1.5 p-4 rounded-xl bg-card-2 border border-line-soft hover:border-primary/30 transition-all">
+                                <span className="text-xs font-bold text-ink-subtle uppercase tracking-wider">Employee Code</span>
+                                <span className="text-sm font-semibold text-ink font-mono">{employee.empCode || "N/A"}</span>
                             </div>
-                            <div className="flex flex-col gap-1.5 p-4 rounded-xl bg-slate-50 border border-slate-100 hover:border-primary/20 hover:bg-primary/5 transition-all">
-                                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Department</span>
-                                <span className="text-sm font-semibold text-slate-700">{employee.department?.name || "N/A"}</span>
+                            <div className="flex flex-col gap-1.5 p-4 rounded-xl bg-card-2 border border-line-soft hover:border-primary/30 transition-all">
+                                <span className="text-xs font-bold text-ink-subtle uppercase tracking-wider">Department</span>
+                                <span className="text-sm font-semibold text-ink">{employee.department?.name || "N/A"}</span>
                             </div>
-                            <div className="flex flex-col gap-1.5 p-4 rounded-xl bg-slate-50 border border-slate-100 hover:border-primary/20 hover:bg-primary/5 transition-all">
-                                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Date of Joining</span>
-                                <span className="text-sm font-semibold text-slate-700">{formatDate(employee.dateOfJoining)}</span>
+                            <div className="flex flex-col gap-1.5 p-4 rounded-xl bg-card-2 border border-line-soft hover:border-primary/30 transition-all">
+                                <span className="text-xs font-bold text-ink-subtle uppercase tracking-wider">Date of Joining</span>
+                                <span className="text-sm font-semibold text-ink">{formatDate(employee.dateOfJoining)}</span>
                             </div>
                         </div>
                     </section>
 
                     {/* Personal Info */}
                     <section>
-                        <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2.5 pb-3 border-b border-slate-100 mb-6">
-                            <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
+                        <h3 className="text-lg font-bold text-ink flex items-center gap-2.5 pb-3 border-b border-line-soft mb-6">
+                            <div className="p-2 bg-blue-500/10 text-blue-500 rounded-lg">
                                 <FaUser size={16} />
                             </div>
                             Personal Information
                         </h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            <div className="flex flex-col gap-1.5 p-4 rounded-xl bg-slate-50 border border-slate-100 hover:border-blue-500/20 hover:bg-blue-50 transition-all">
-                                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Full Name</span>
-                                <span className="text-sm font-semibold text-slate-700">{employee.fullName || "N/A"}</span>
+                            <div className="flex flex-col gap-1.5 p-4 rounded-xl bg-card-2 border border-line-soft hover:border-blue-500/30 transition-all">
+                                <span className="text-xs font-bold text-ink-subtle uppercase tracking-wider">Full Name</span>
+                                <span className="text-sm font-semibold text-ink">{employee.fullName || "N/A"}</span>
                             </div>
-                            <div className="flex flex-col gap-1.5 p-4 rounded-xl bg-slate-50 border border-slate-100 hover:border-blue-500/20 hover:bg-blue-50 transition-all">
-                                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">System Role</span>
-                                <span className="text-sm font-semibold text-slate-700">{employee.designation?.name || "Standard User"}</span>
+                            <div className="flex flex-col gap-1.5 p-4 rounded-xl bg-card-2 border border-line-soft hover:border-blue-500/30 transition-all">
+                                <span className="text-xs font-bold text-ink-subtle uppercase tracking-wider">System Role</span>
+                                <span className="text-sm font-semibold text-ink">{employee.designation?.name || "Standard User"}</span>
                             </div>
-                            <div className="flex flex-col gap-1.5 p-4 rounded-xl bg-slate-50 border border-slate-100 hover:border-blue-500/20 hover:bg-blue-50 transition-all">
-                                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Account Created</span>
-                                <span className="text-sm font-semibold text-slate-700">{formatDate(employee.createdAt)}</span>
+                            <div className="flex flex-col gap-1.5 p-4 rounded-xl bg-card-2 border border-line-soft hover:border-blue-500/30 transition-all">
+                                <span className="text-xs font-bold text-ink-subtle uppercase tracking-wider">Account Created</span>
+                                <span className="text-sm font-semibold text-ink">{formatDate(employee.createdAt)}</span>
                             </div>
                         </div>
                     </section>
 
                     {/* Contact Details */}
                     <section>
-                        <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2.5 pb-3 border-b border-slate-100 mb-6">
-                            <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg">
+                        <h3 className="text-lg font-bold text-ink flex items-center gap-2.5 pb-3 border-b border-line-soft mb-6">
+                            <div className="p-2 bg-emerald-500/10 text-emerald-500 rounded-lg">
                                 <FaPhoneAlt size={16} />
                             </div>
                             Contact Details
                         </h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="flex flex-col gap-1.5 p-4 rounded-xl bg-slate-50 border border-slate-100 hover:border-emerald-500/20 hover:bg-emerald-50 transition-all">
-                                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Mobile Number</span>
-                                <span className="text-sm font-semibold text-slate-700">{employee.mobile || "N/A"}</span>
+                            <div className="flex flex-col gap-1.5 p-4 rounded-xl bg-card-2 border border-line-soft hover:border-emerald-500/30 transition-all">
+                                <span className="text-xs font-bold text-ink-subtle uppercase tracking-wider">Mobile Number</span>
+                                <span className="text-sm font-semibold text-ink">{employee.mobile || "N/A"}</span>
                             </div>
-                            <div className="flex flex-col gap-1.5 p-4 rounded-xl bg-slate-50 border border-slate-100 hover:border-emerald-500/20 hover:bg-emerald-50 transition-all">
-                                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Email Address</span>
-                                <span className="text-sm font-semibold text-slate-700 break-all">{employee.email || "N/A"}</span>
+                            <div className="flex flex-col gap-1.5 p-4 rounded-xl bg-card-2 border border-line-soft hover:border-emerald-500/30 transition-all">
+                                <span className="text-xs font-bold text-ink-subtle uppercase tracking-wider">Email Address</span>
+                                <span className="text-sm font-semibold text-ink break-all">{employee.email || "N/A"}</span>
                             </div>
                         </div>
                     </section>
                 </div>
 
                 {/* FOOTER */}
-                <div className="p-6 bg-slate-50 border-t border-slate-200 flex justify-end">
+                <div className="p-6 bg-card-2 border-t border-line-soft flex justify-end">
                     <CustomButton 
                         text="Go Back" 
                         icon={FaArrowLeft} 

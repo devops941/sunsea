@@ -170,10 +170,10 @@ const ShiftCreate: React.FC = () => {
 
     return (
         <div className="w-full mx-auto">
-            <div className="bg-white shadow-sm border border-slate-200 overflow-visible">
-                <div className="px-6 py-5 border-b border-slate-200">
+            <div className="bg-card rounded-xl shadow-xs border border-line-soft overflow-visible">
+                <div className="px-6 py-5 border-b border-line-soft">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                        <h2 className="text-xl font-bold text-slate-800">Create Shift</h2>
+                        <h2 className="text-xl font-bold text-ink">Create Shift</h2>
                         <BackButton text="Back to List" to="/shifts" />
                     </div>
                 </div>
@@ -181,8 +181,8 @@ const ShiftCreate: React.FC = () => {
                 <form onSubmit={handleSubmit} className="px-6 py-5 space-y-8" noValidate>
                     {/* General Info */}
                     <div>
-                        <div className="flex items-center gap-2 mb-6 pb-2 border-b border-gray-100">
-                            <h3 className="text-lg font-semibold text-gray-700">Shift Details</h3>
+                        <div className="flex items-center gap-2 mb-6 pb-2 border-b border-line-soft">
+                            <h3 className="text-lg font-bold text-ink">Shift Details</h3>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -260,10 +260,11 @@ const ShiftCreate: React.FC = () => {
                         </div>
                     </div>
 
-                    <div className="flex flex-wrap justify-end gap-3 mt-8 pt-4 border-t border-gray-200">
+                    <div className="flex flex-wrap justify-end gap-3 mt-8 pt-4 border-t border-line-soft">
                         <CustomButton
                             text="Clear"
                             icon={FaEraser}
+                            variant="secondary"
                             onClick={handleClear}
                             disabled={loading}
 

@@ -6,6 +6,7 @@ import { reportsService } from "../../../services/reportsService";
 import { storeService } from "../../../services/storeService";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import ExportCSVButton from "../../../components/ui/ExportCSVButton/ExportCSVButton";
+import Button from "../../../components/ui/Button/Button";
 import ColumnToggle from "../../../components/ui/ColumnToggle/ColumnToggle";
 import DataTable from "../../../components/ui/table/DataTable";
 import type { DataTableColumn } from "../../../components/ui/table/DataTable";
@@ -247,18 +248,18 @@ const InventoryReportsCenter: React.FC = () => {
               />
             </div>
             <div className="flex items-center gap-3">
-              <button
+              <Button
+                text="Clear All"
+                variant="secondary"
+                size="sm"
                 onClick={handleClearFilters}
-                className="px-4 py-2 text-sm font-semibold text-ink-muted hover:text-ink hover:bg-card-2 rounded-md transition-colors"
-              >
-                Clear All
-              </button>
-              <button
+              />
+              <Button
+                text="Apply Filters"
+                variant="primary"
+                size="sm"
                 onClick={handleApplyFilters}
-                className="px-6 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-md shadow-sm transition-colors"
-              >
-                Apply Filters
-              </button>
+              />
             </div>
           </div>
         </div>

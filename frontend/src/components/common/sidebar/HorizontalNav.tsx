@@ -95,6 +95,15 @@ const HorizontalNav = () => {
     if (menu.activePaths && menu.activePaths.some((p: string) => location.pathname.startsWith(p))) {
       return true;
     }
+    if (menu.children) {
+      return menu.children.some((child: any) => {
+        if (child.path && location.pathname.startsWith(child.path)) return true;
+        if (child.children) {
+          return child.children.some((sc: any) => sc.path && location.pathname.startsWith(sc.path.split('?')[0]));
+        }
+        return false;
+      });
+    }
     return false;
   }, [location.pathname]);
 
@@ -105,6 +114,7 @@ const HorizontalNav = () => {
 
   const formatRole = (userObj?: any) => {
     if (!userObj) return "User";
+    if (userObj.isSuperAdmin) return "Super Admin";
     if (userObj.role && typeof userObj.role === 'object' && userObj.role.name) return userObj.role.name;
     if (typeof userObj.role === 'string') return userObj.role;
     if (userObj.roles && userObj.roles.length > 0 && userObj.roles[0].name) return userObj.roles[0].name;
@@ -124,7 +134,7 @@ const HorizontalNav = () => {
   };
 
   return (
-    <div className="w-full bg-nav text-nav-fg shadow-md relative z-40 hidden lg:flex items-center justify-between px-4 py-2">
+    <div className="w-full bg-nav text-nav-fg shadow-xs border-b border-black/10 dark:border-line-soft relative z-40 hidden lg:flex items-center justify-between px-4 py-2">
       
       {/* ── BACKGROUND OVERLAY TO CLOSE MENUS ── */}
       {activeMenuId && (
@@ -168,15 +178,33 @@ const HorizontalNav = () => {
       </div>
 
       {/* ── RIGHT: Theme switch & Logout ── */}
-      <div className="flex items-center gap-3 pl-3 shrink-0">
-        {user && (
-          <div className="hidden xl:flex items-center gap-2 px-2.5 py-1 rounded-lg bg-nav-hover border border-white/10 text-xs">
-            <span className="font-semibold text-nav-fg">{user.fullName || "User"}</span>
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-nav-fg/80 font-mono">
-              {formatRole(user)}
-            </span>
-          </div>
-        )}
+      <div className="flex items-center gap-2.5 pl-3 shrink-0">
+        {user && (() => {
+          const name = user.fullName || user.username || "User";
+          const role = formatRole(user);
+          const isSame = name.toLowerCase().trim() === role.toLowerCase().trim() ||
+                         (user.isSuperAdmin && (name.toLowerCase().includes("admin") || name.toLowerCase().includes("super")));
+          return (
+            <button
+              type="button"
+              onClick={() => navigate("/profile")}
+              title="View Profile"
+              className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-800/90 hover:bg-slate-700/90 text-white border border-slate-700/80 shadow-xs cursor-pointer transition-all duration-200 group"
+            >
+              <div className="w-5 h-5 rounded-full bg-blue-500/20 text-blue-300 flex items-center justify-center text-[10px] font-extrabold border border-blue-400/40 shrink-0">
+                {getInitials(name)}
+              </div>
+              <span className="font-bold text-xs text-slate-100 tracking-tight whitespace-nowrap group-hover:text-white">
+                {name}
+              </span>
+              {!isSame && (
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-blue-500/20 text-blue-300 border border-blue-400/30 font-mono uppercase tracking-wider">
+                  {role}
+                </span>
+              )}
+            </button>
+          );
+        })()}
 
         <ThemeToggle />
 
@@ -201,7 +229,7 @@ const HorizontalNav = () => {
           <div className="w-64 bg-card rounded-xl shadow-xl border border-line-soft py-2">
             {activeMenuData.children.map((child) => {
               const hasSubChildren = !!child.children && child.children.length > 0;
-              const isChildActive = child.path === location.pathname;
+              const isChildActive = child.path ? location.pathname.startsWith(child.path) : false;
               const isSubOpen = activeSubMenuId === child.title;
 
               return (
@@ -209,9 +237,9 @@ const HorizontalNav = () => {
                   {hasSubChildren ? (
                     <div 
                       onClick={(e) => handleSubMenuClick(e, child.title)}
-                      className={`w-full cursor-pointer px-4 py-2.5 rounded-lg flex items-center justify-between transition-all duration-300 bg-transparent hover:bg-card-2 ${isSubOpen ? 'bg-card-2' : ''}`}
+                      className={`w-full cursor-pointer px-4 py-2.5 rounded-lg flex items-center justify-between transition-all duration-300 ${isSubOpen || isChildActive ? 'bg-accent/15 text-accent font-bold' : 'bg-transparent text-ink-muted hover:bg-card-2 hover:text-accent'}`}
                     >
-                      <span className={`text-[14px] font-semibold transition-colors ${isSubOpen ? 'text-accent' : 'text-ink-muted'}`}>{child.title}</span>
+                      <span className={`text-[14px] font-semibold transition-colors ${isSubOpen || isChildActive ? 'text-accent font-bold' : 'text-ink-muted'}`}>{child.title}</span>
                       <FaChevronRight className={`text-[12px] transition-transform ${isSubOpen ? 'rotate-90 text-accent' : 'text-ink-subtle'}`} />
                     </div>
                   ) : (
@@ -219,9 +247,9 @@ const HorizontalNav = () => {
                       <NavLink
                         to={child.path}
                         onClick={() => setActiveMenuId(null)}
-                        className={`px-4 py-2.5 group/link rounded-lg flex items-center gap-3 no-underline transition-all duration-300 ${isChildActive ? "bg-nav" : "bg-transparent hover:bg-card-2"}`}
+                        className={`px-4 py-2.5 group/link rounded-lg flex items-center gap-3 no-underline transition-all duration-300 ${isChildActive ? "bg-accent/15 text-accent font-bold" : "bg-transparent text-ink-muted hover:bg-card-2 hover:text-accent"}`}
                       >
-                        <span className={`text-[14px] font-semibold ${isChildActive ? "text-nav-fg" : "text-ink-muted group-hover/link:text-accent"}`}>{child.title}</span>
+                        <span className={`text-[14px] font-semibold ${isChildActive ? "text-accent font-bold" : "text-ink-muted group-hover/link:text-accent"}`}>{child.title}</span>
                       </NavLink>
                     )
                   )}
@@ -231,15 +259,15 @@ const HorizontalNav = () => {
                     <div className="absolute top-0 left-full ml-1 z-50">
                       <div className="w-56 bg-card rounded-xl shadow-xl border border-line-soft py-2 animate-in fade-in slide-in-from-left-2">
                         {child.children?.map((subChild) => {
-                          const isSubChildActive = subChild.path === location.pathname + location.search;
+                          const isSubChildActive = subChild.path ? (location.pathname === subChild.path || location.pathname + location.search === subChild.path) : false;
                           return subChild.path ? (
                             <div key={subChild.title} className="px-2 py-1">
                               <NavLink
                                 to={subChild.path}
                                 onClick={() => setActiveMenuId(null)}
-                                className={`px-4 py-2.5 group/sublink rounded-lg flex items-center gap-3 no-underline transition-all duration-300 ${isSubChildActive ? "bg-nav" : "bg-transparent hover:bg-card-2"}`}
+                                className={`px-4 py-2.5 group/sublink rounded-lg flex items-center gap-3 no-underline transition-all duration-300 ${isSubChildActive ? "bg-accent/15 text-accent font-bold" : "bg-transparent text-ink-muted hover:bg-card-2 hover:text-accent"}`}
                               >
-                                <span className={`text-[14px] font-semibold ${isSubChildActive ? "text-nav-fg" : "text-ink-muted group-hover/sublink:text-accent"}`}>{subChild.title}</span>
+                                <span className={`text-[14px] font-semibold ${isSubChildActive ? "text-accent font-bold" : "text-ink-muted group-hover/sublink:text-accent"}`}>{subChild.title}</span>
                               </NavLink>
                             </div>
                           ) : null;

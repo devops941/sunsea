@@ -92,28 +92,28 @@ const TotalCompensationSection: React.FC<Props> = ({ employeeId }) => {
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="rounded-xl border border-indigo-100 bg-gradient-to-br from-indigo-50 via-white to-blue-50 shadow-sm overflow-hidden">
+    <div className="rounded-xl border border-line-soft bg-card shadow-xs overflow-hidden">
 
       {/* Header */}
-      <div className="flex items-center gap-2 px-4 py-3 bg-indigo-600">
+      <div className="flex items-center gap-2 px-4 py-3 bg-primary">
         <FaShieldAlt className="text-white text-sm" />
         <span className="text-sm font-bold text-white tracking-wide uppercase">
           Total Compensation
         </span>
-        <FaLock className="text-indigo-200 text-xs ml-auto" />
+        <FaLock className="text-white/80 text-xs ml-auto" />
       </div>
 
-      <div className="p-4 space-y-4">
+      <div className="p-4 space-y-4 bg-card text-ink">
         {loading ? (
-          <div className="flex items-center justify-center py-6 gap-2 text-slate-400 text-sm">
-            <FaSpinner className="animate-spin" />
+          <div className="flex items-center justify-center py-6 gap-2 text-ink-subtle text-sm">
+            <FaSpinner className="animate-spin text-primary" />
             <span>Loading...</span>
           </div>
         ) : (
           <>
             {/* Amount input */}
             <div>
-              <label className="block text-xs font-bold uppercase tracking-[0.5px] text-slate-500 mb-1">
+              <label className="block text-xs font-extrabold uppercase tracking-[0.5px] text-ink mb-1">
                 Cash in Hand Amount (₹)
               </label>
               <input
@@ -123,7 +123,7 @@ const TotalCompensationSection: React.FC<Props> = ({ employeeId }) => {
                 min={0}
                 step={0.01}
                 placeholder="e.g. 10000"
-                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400"
+                className="w-full rounded-lg border border-line-soft bg-card-2 px-3 py-2 text-sm font-semibold text-ink placeholder:text-ink-subtle/60 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
               />
             </div>
 

@@ -2177,27 +2177,27 @@ model SalesReturn {
   @@index([salesInvoiceId])
   @@map("sales_returns")
 }
-
 model SalesReturnItem {
-  id                 Int               @id @default(autoincrement())
-  salesReturnId      String            @db.Uuid
-  productId          BigInt
-  salesInvoiceItemId String?           @db.Uuid
-  quantity           Decimal           @db.Decimal(12, 3)
-  unitPrice          Decimal           @db.Decimal(14, 2)
-  taxRate            Decimal           @default(0) @db.Decimal(5, 2)
-  lineTotal          Decimal           @db.Decimal(14, 2)
-  reason             String?           @db.VarChar(255)
-  salesReturn        SalesReturn       @relation(fields: [salesReturnId], references: [id], onDelete: Cascade)
-  product            Product           @relation(fields: [productId], references: [id])
-  salesInvoiceItem   SalesInvoiceItem? @relation(fields: [salesInvoiceItemId], references: [id])
+  id                 Int               @id @default(autoincrement())
+  salesReturnId      String            @db.Uuid
+  productId          BigInt
+  salesInvoiceItemId String?           @db.Uuid
+  quantity           Decimal           @db.Decimal(12, 3)
+  weight             Decimal?          @db.Decimal(12, 3)
+  uom                String?           @db.VarChar(20)
+  unitPrice          Decimal           @db.Decimal(14, 2)
+  taxRate            Decimal           @default(0) @db.Decimal(5, 2)
+  lineTotal          Decimal           @db.Decimal(14, 2)
+  reason             String?           @db.VarChar(255)
+  salesReturn        SalesReturn       @relation(fields: [salesReturnId], references: [id], onDelete: Cascade)
+  product            Product           @relation(fields: [productId], references: [id])
+  salesInvoiceItem   SalesInvoiceItem? @relation(fields: [salesInvoiceItemId], references: [id])
 
-  @@index([salesReturnId])
-  @@index([productId])
-  @@index([salesInvoiceItemId])
-  @@map("sales_return_items")
+  @@index([salesReturnId])
+  @@index([productId])
+  @@index([salesInvoiceItemId])
+  @@map("sales_return_items")
 }
-
 model PurchaseReturn {
   id           String               @id @default(uuid()) @db.Uuid
   returnNo     String               @unique @db.VarChar(30)

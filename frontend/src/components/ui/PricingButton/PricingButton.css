@@ -34,3 +34,16 @@
   box-shadow: none;
   transform: none;
 }
+
+/* Dark Theme Overrides */
+:root[data-theme="dark"] .pricing-btn {
+  background: rgba(99, 102, 241, 0.2);
+  color: #818cf8;
+  border: 1px solid rgba(99, 102, 241, 0.3);
+}
+
+:root[data-theme="dark"] .pricing-btn:hover {
+  background: #6366f1;
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.4);
+}

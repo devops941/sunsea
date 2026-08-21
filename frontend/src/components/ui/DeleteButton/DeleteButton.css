@@ -31,3 +31,16 @@
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+/* Dark Theme Overrides */
+:root[data-theme="dark"] .delete-btn {
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+:root[data-theme="dark"] .delete-btn:hover {
+  background: #ef4444;
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(239, 68, 68, 0.4);
+}

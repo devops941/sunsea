@@ -137,10 +137,10 @@ const PayrollDashboard: React.FC = () => {
         if (canViewCashInHand && addlComp > 0) {
           return (
             <div className="flex flex-col items-end">
-              <span className="font-mono font-bold text-slate-900">
+              <span className="font-mono font-bold text-ink">
                 {fmtRs(combNet)}
               </span>
-              <span className="text-[10px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded flex items-center gap-1">
+              <span className="text-[10px] font-semibold text-accent bg-accent/15 border border-accent/20 px-1.5 py-0.5 rounded flex items-center gap-1">
                 <span>Net: {fmtRs(netSal)}</span>
                 <span>+</span>
                 <span>Cash: {fmtRs(addlComp)}</span>
@@ -150,7 +150,7 @@ const PayrollDashboard: React.FC = () => {
         }
 
         return (
-          <span className="font-mono font-semibold">
+          <span className="font-mono font-semibold text-ink">
             {netSal > 0 ? fmtRs(netSal) : '—'}
           </span>
         );
@@ -202,20 +202,20 @@ const PayrollDashboard: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen  p-6 space-y-6">
+    <div className="min-h-screen bg-page p-6 space-y-6">
 
       {/* ── Header ── */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-extrabold text-slate-800 tracking-tight"> </h1>
-          <p className="text-xs text-slate-500 mt-1 flex items-center gap-1.5">
+          <h1 className="text-2xl font-extrabold text-ink tracking-tight">Payroll Overview</h1>
+          <p className="text-xs text-ink-muted mt-1 flex items-center gap-1.5">
             <span>Sunsea Plastics</span>
             <span>•</span>
-            <span>Payroll Overview</span>
+            <span>Payroll Dashboard</span>
             {currentPeriod !== '—' && (
               <>
                 <span>•</span>
-                <span className="font-bold text-slate-700 bg-slate-200/60 px-2 py-0.5 rounded-md">{currentPeriod}</span>
+                <span className="font-bold text-ink bg-card-2 border border-line-soft px-2 py-0.5 rounded-md">{currentPeriod}</span>
               </>
             )}
           </p>
@@ -246,72 +246,72 @@ const PayrollDashboard: React.FC = () => {
       {/* ── Top KPI Summary Cards ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Total Employees */}
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm hover:shadow-md transition-all duration-200">
+        <div className="bg-card rounded-2xl border border-line-soft p-5 shadow-xs hover:shadow-md transition-all duration-200">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Employees</p>
-              <h3 className="text-3xl font-extrabold text-slate-800 mt-2 tracking-tight">{totalEmployees}</h3>
+              <p className="text-[11px] font-bold text-ink-subtle uppercase tracking-wider">Total Employees</p>
+              <h3 className="text-3xl font-extrabold text-ink mt-2 tracking-tight">{totalEmployees}</h3>
             </div>
-            <div className="h-12 w-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center">
+            <div className="h-12 w-12 rounded-2xl bg-blue-500/10 text-blue-500 flex items-center justify-center">
               <Users size={22} />
             </div>
           </div>
-          <div className="mt-3 flex items-center gap-1.5 text-xs text-slate-500 font-medium">
+          <div className="mt-3 flex items-center gap-1.5 text-xs text-ink-muted font-medium">
             <span className="inline-block w-2 h-2 rounded-full bg-blue-500" />
             <span>{empWithPayroll.length} configured for payroll</span>
           </div>
         </div>
 
         {/* Last Pay Run */}
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm hover:shadow-md transition-all duration-200">
+        <div className="bg-card rounded-2xl border border-line-soft p-5 shadow-xs hover:shadow-md transition-all duration-200">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Last Pay Run</p>
-              <h3 className="text-3xl font-extrabold text-slate-800 mt-2 tracking-tight">
+              <p className="text-[11px] font-bold text-ink-subtle uppercase tracking-wider">Last Pay Run</p>
+              <h3 className="text-3xl font-extrabold text-ink mt-2 tracking-tight">
                 {lastRunNet > 0 ? fmtRs(lastRunNet) : '—'}
               </h3>
             </div>
-            <div className="h-12 w-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+            <div className="h-12 w-12 rounded-2xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
               <IndianRupee size={22} />
             </div>
           </div>
-          <div className="mt-3 flex items-center gap-1.5 text-xs text-slate-500 font-medium">
+          <div className="mt-3 flex items-center gap-1.5 text-xs text-ink-muted font-medium">
             <span className="inline-block w-2 h-2 rounded-full bg-emerald-500" />
             <span>{lockedPeriods ? lockedPeriods : 'No locked run yet'}</span>
           </div>
         </div>
 
         {/* Pending Approval */}
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm hover:shadow-md transition-all duration-200">
+        <div className="bg-card rounded-2xl border border-line-soft p-5 shadow-xs hover:shadow-md transition-all duration-200">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Pending Approval</p>
-              <h3 className="text-3xl font-extrabold text-amber-600 mt-2 tracking-tight">
+              <p className="text-[11px] font-bold text-ink-subtle uppercase tracking-wider">Pending Approval</p>
+              <h3 className="text-3xl font-extrabold text-amber-500 mt-2 tracking-tight">
                 {pendingRun ? 1 : 0}
               </h3>
             </div>
-            <div className="h-12 w-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center">
+            <div className="h-12 w-12 rounded-2xl bg-amber-500/10 text-amber-500 flex items-center justify-center">
               <AlertCircle size={22} />
             </div>
           </div>
-          <div className="mt-3 flex items-center gap-1.5 text-xs text-slate-500 font-medium">
+          <div className="mt-3 flex items-center gap-1.5 text-xs text-ink-muted font-medium">
             <span className="inline-block w-2 h-2 rounded-full bg-amber-500" />
             <span>{pendingRun ? `${pendingRun.period} ${pendingRun.type} (Draft)` : 'No pending runs'}</span>
           </div>
         </div>
 
         {/* Total Runs */}
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm hover:shadow-md transition-all duration-200">
+        <div className="bg-card rounded-2xl border border-line-soft p-5 shadow-xs hover:shadow-md transition-all duration-200">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Runs</p>
-              <h3 className="text-3xl font-extrabold text-slate-800 mt-2 tracking-tight">{runs.length}</h3>
+              <p className="text-[11px] font-bold text-ink-subtle uppercase tracking-wider">Total Runs</p>
+              <h3 className="text-3xl font-extrabold text-ink mt-2 tracking-tight">{runs.length}</h3>
             </div>
-            <div className="h-12 w-12 rounded-2xl bg-violet-50 text-violet-600 flex items-center justify-center">
+            <div className="h-12 w-12 rounded-2xl bg-violet-500/10 text-violet-500 flex items-center justify-center">
               <CheckCircle2 size={22} />
             </div>
           </div>
-          <div className="mt-3 flex items-center gap-1.5 text-xs text-slate-500 font-medium">
+          <div className="mt-3 flex items-center gap-1.5 text-xs text-ink-muted font-medium">
             <span className="inline-block w-2 h-2 rounded-full bg-violet-500" />
             <span>{runs.filter(r => r.status === 'LOCKED').length} locked · {runs.filter(r => r.status === 'APPROVED').length} approved</span>
           </div>
@@ -321,25 +321,25 @@ const PayrollDashboard: React.FC = () => {
       {/* ── Category Breakdown Cards ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {[
-          { label: 'Fixed Monthly (Admin)',  count: categoryCounts.FIXED_MONTHLY, color: 'bg-blue-500',    light: 'bg-blue-50/70 border-blue-200/60',    text: 'text-blue-700'    },
-          { label: 'PF Workers (Monthly)',   count: categoryCounts.PF_MONTHLY,    color: 'bg-violet-500',  light: 'bg-violet-50/70 border-violet-200/60',text: 'text-violet-700'  },
-          { label: 'Cash Workers (Monthly)', count: categoryCounts.CASH_MONTHLY,  color: 'bg-emerald-500', light: 'bg-emerald-50/70 border-emerald-200/60', text: 'text-emerald-700' },
-          { label: 'Daily Wage (Weekly)',    count: categoryCounts.DAILY_WEEKLY,  color: 'bg-amber-500',   light: 'bg-amber-50/70 border-amber-200/60',  text: 'text-amber-700'   },
+          { label: 'Fixed Monthly (Admin)',  count: categoryCounts.FIXED_MONTHLY, color: 'bg-blue-500',    light: 'bg-blue-500/10 border-blue-500/30',    text: 'text-blue-500'    },
+          { label: 'PF Workers (Monthly)',   count: categoryCounts.PF_MONTHLY,    color: 'bg-violet-500',  light: 'bg-violet-500/10 border-violet-500/30',text: 'text-violet-500'  },
+          { label: 'Cash Workers (Monthly)', count: categoryCounts.CASH_MONTHLY,  color: 'bg-emerald-500', light: 'bg-emerald-500/10 border-emerald-500/30', text: 'text-emerald-500' },
+          { label: 'Daily Wage (Weekly)',    count: categoryCounts.DAILY_WEEKLY,  color: 'bg-amber-500',   light: 'bg-amber-500/10 border-amber-500/30',  text: 'text-amber-500'   },
         ].map(cat => (
-          <div key={cat.label} className={`rounded-2xl border p-4 shadow-sm hover:shadow transition-all ${cat.light}`}>
+          <div key={cat.label} className={`rounded-2xl border p-4 shadow-xs hover:shadow-md transition-all ${cat.light}`}>
             <div className="flex items-center gap-2 mb-2">
               <span className={`w-2.5 h-2.5 rounded-full ${cat.color}`} />
-              <span className="text-xs font-bold text-slate-700">{cat.label}</span>
+              <span className="text-xs font-bold text-ink">{cat.label}</span>
             </div>
             <p className={`text-2xl font-extrabold ${cat.text}`}>
-              {cat.count} <span className="text-xs font-semibold opacity-70">employees</span>
+              {cat.count} <span className="text-xs font-semibold text-ink-muted opacity-80">employees</span>
             </p>
           </div>
         ))}
       </div>
 
       {/* ── Module Navigation Tabs ── */}
-      <div className="bg-slate-100/80 border border-slate-200/60 p-1.5 rounded-2xl inline-flex flex-wrap items-center gap-1.5 w-full">
+      <div className="bg-card-2 border border-line-soft p-1.5 rounded-2xl inline-flex flex-wrap items-center gap-1.5 w-full">
         {[
           // { label: 'Overview',         path: '/payroll/dashboard',        icon: BarChart3,     active: true,  show: true },
           { label: 'Attendance',       path: '/payroll/attendance',       icon: ClipboardList, active: false, show: can("payroll-attendance.view") },
@@ -355,22 +355,22 @@ const PayrollDashboard: React.FC = () => {
             onClick={() => navigate(tab.path)}
             className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 cursor-pointer ${
               tab.active
-                ? 'bg-white text-slate-800 shadow-sm border border-slate-200/80'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+                ? 'bg-card text-ink shadow-xs border border-line-soft'
+                : 'text-ink-muted hover:text-ink hover:bg-card/50'
             }`}
           >
-            <tab.icon size={15} className={tab.active ? 'text-primary' : 'text-slate-400'} />
+            <tab.icon size={15} className={tab.active ? 'text-primary' : 'text-ink-subtle'} />
             <span>{tab.label}</span>
           </button>
         ))}
       </div>
 
       {/* ── Recent Payroll Runs Table (Full Width 100%) ── */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between px-6 py-4 border-b border-slate-100 gap-3">
+      <div className="bg-card rounded-2xl border border-line-soft shadow-xs overflow-hidden">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between px-6 py-4 border-b border-line-soft gap-3">
           <div className="flex items-center gap-2">
-            <h2 className="text-base font-bold text-slate-800">Recent Payroll Runs</h2>
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-600">
+            <h2 className="text-base font-bold text-ink">Recent Payroll Runs</h2>
+            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-card-2 text-ink-muted border border-line-soft">
               {runs.length}
             </span>
             {runsLoading && <Loader2 size={16} className="animate-spin text-primary ml-2" />}
@@ -378,13 +378,13 @@ const PayrollDashboard: React.FC = () => {
 
           {/* Month Filter controls */}
           <div className="flex items-center gap-2 flex-wrap">
-            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5">
-              <Calendar size={14} className="text-slate-400" />
+            <div className="flex items-center gap-1.5 bg-card-2 border border-line-soft rounded-xl px-3 py-1.5">
+              <Calendar size={14} className="text-ink-subtle" />
               <input
                 type="month"
                 value={selectedMonth}
                 onChange={(e) => setSelectedMonth(e.target.value)}
-                className="bg-transparent text-xs font-bold text-slate-700 outline-none cursor-pointer"
+                className="bg-transparent text-xs font-bold text-ink outline-none cursor-pointer"
               />
             </div>
 
@@ -404,7 +404,7 @@ const PayrollDashboard: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setSelectedMonth('')}
-                className="px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-500 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                className="px-3 py-1.5 rounded-xl text-xs font-semibold text-ink-muted hover:text-ink hover:bg-card-2 transition-colors"
                 title="Show all payroll runs"
               >
                 All Months

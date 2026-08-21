@@ -387,6 +387,7 @@ class SalesInvoiceService {
             firmName: true,
             displayName: true,
             email: true,
+            gstin: true,
             addresses: true,
             mobile: true,
           },
@@ -395,10 +396,6 @@ class SalesInvoiceService {
           select: {
             id: true,
             orderNo: true,
-            shippingAddressLine1: true,
-            shippingCity: true,
-            shippingState: true,
-            shippingPincode: true,
             mobile: true,
           },
         },

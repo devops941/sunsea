@@ -1052,19 +1052,19 @@ const QuotationForm: React.FC = () => {
                                 {errors.items?.root && (
                                     <div className="text-red-500 text-sm mb-3">{errors.items.root.message}</div>
                                 )}
-                                <div className="border border-gray-200 rounded-lg overflow-visible mb-4">
+                                <div className="border border-line-soft rounded-xl overflow-visible mb-4 bg-card shadow-xs">
                                     <table className="min-w-full text-sm">
                                         <thead>
-                                            <tr className="bg-gray-50 border-b border-gray-200">
-                                                <th className="py-3 pl-4 pr-2 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wide w-[4%]">#</th>
-                                                <th className="py-3 px-2 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wide w-[28%]">Product</th>
-                                                <th className="py-3 px-2 text-center text-[11px] font-bold text-gray-600 uppercase tracking-wide w-[10%]">Qty</th>
-                                                <th className="py-3 px-2 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wide w-[12%]">Unit Price</th>
-                                                <th className="py-3 px-2 text-right text-[11px] font-bold text-gray-600 uppercase tracking-wide w-[13%]">Subtotal</th>
+                                            <tr className="bg-card-2 border-b border-line-soft">
+                                                <th className="py-3 pl-4 pr-2 text-left text-[11px] font-bold text-ink-muted uppercase tracking-wide w-[4%]">#</th>
+                                                <th className="py-3 px-2 text-left text-[11px] font-bold text-ink-muted uppercase tracking-wide w-[28%]">Product</th>
+                                                <th className="py-3 px-2 text-center text-[11px] font-bold text-ink-muted uppercase tracking-wide w-[10%]">Qty</th>
+                                                <th className="py-3 px-2 text-right text-[11px] font-bold text-ink-muted uppercase tracking-wide w-[12%]">Unit Price</th>
+                                                <th className="py-3 px-2 text-right text-[11px] font-bold text-ink-muted uppercase tracking-wide w-[13%]">Subtotal</th>
                                                 {gstEnabled && (
-                                                    <th className="py-3 px-2 text-left text-[11px] font-bold text-gray-600 uppercase tracking-wide w-[23%]">GST Rate</th>
+                                                    <th className="py-3 px-2 text-left text-[11px] font-bold text-ink-muted uppercase tracking-wide w-[23%]">GST Rate</th>
                                                 )}
-                                                <th className="py-3 px-2 text-center text-[11px] font-bold text-gray-600 uppercase tracking-wide w-[10%]">Remove</th>
+                                                <th className="py-3 px-2 text-center text-[11px] font-bold text-ink-muted uppercase tracking-wide w-[10%]">Remove</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -1076,8 +1076,8 @@ const QuotationForm: React.FC = () => {
                                                 const rowQty = Number(itemValue?.quantity) || 0;
                                                 const rowSubtotal = rowCalc.subtotal;
                                                 return (
-                                                    <tr key={field.id} className="border-b border-gray-100 last:border-b-0 bg-white">
-                                                        <td className="py-3 pl-4 pr-2 text-gray-700">{index + 1}</td>
+                                                    <tr key={field.id} className="border-b border-line-soft last:border-b-0 bg-card hover:bg-card-2/40">
+                                                        <td className="py-3 pl-4 pr-2 text-ink font-medium">{index + 1}</td>
                                                         <td className="py-2 px-2 min-w-[12rem]">
                                                             <Controller
                                                                 name={`items.${index}.productId`}
@@ -1153,7 +1153,7 @@ const QuotationForm: React.FC = () => {
                                                                 )}
                                                             />
                                                         </td>
-                                                        <td className="py-3 px-2 text-right font-medium text-gray-900">
+                                                        <td className="py-3 px-2 text-right font-semibold text-ink">
                                                             {rowSubtotal > 0 ? `₹${rowSubtotal.toFixed(2)}` : "—"}
                                                         </td>
                                                         {gstEnabled && (

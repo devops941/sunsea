@@ -157,6 +157,26 @@ const getPrimaryUom = (uomStr?: string) => {
   return first;
 };
 
+const getItemPrimaryUom = (item: any) => {
+  if (!item) return "";
+  if (item.uom) {
+    const raw = typeof item.uom === "object" ? (item.uom.uomCode || item.uom.uomName || item.uom.code || item.uom.name) : String(item.uom);
+    if (raw) return getPrimaryUom(raw);
+  }
+  const isProduct = item.itemType === "PRODUCT" || item.itemType === "FINISHED_GOODS" || !!item.product || !!item.productItemId;
+  if (isProduct) {
+    const pUom = item.product?.uom;
+    const prodUom = typeof pUom === "object"
+      ? (pUom.uomCode || pUom.uomName || pUom.code || pUom.name)
+      : (pUom || item.product?.baseUom || item.product?.unit);
+    if (prodUom) return getPrimaryUom(String(prodUom));
+    return "pcs";
+  }
+  const rmUom = item.rawMaterial?.baseUom || item.rawMaterial?.uom;
+  if (rmUom) return getPrimaryUom(String(rmUom));
+  return "";
+};
+
 const StockAdjustmentList: React.FC = () => {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
@@ -458,8 +478,7 @@ const StockAdjustmentList: React.FC = () => {
                 const firstItem = item.items?.[0];
                 if (!firstItem || firstItem.currentQty == null) return <span className="text-ink-subtle">—</span>;
                 const qty = Number(firstItem.currentQty);
-                const uom = firstItem.uom || firstItem.product?.baseUom || firstItem.rawMaterial?.baseUom || "";
-                const primaryUom = getPrimaryUom(uom);
+                const primaryUom = getItemPrimaryUom(firstItem);
                 const uomStr = primaryUom ? ` ${primaryUom}` : "";
                 return (
                   <div>
@@ -478,8 +497,7 @@ const StockAdjustmentList: React.FC = () => {
                 if (!firstItem || firstItem.adjustedQty == null) return <span className="text-ink-subtle">—</span>;
                 const qty = Number(firstItem.adjustedQty);
                 const diff = Number(firstItem.difference || 0);
-                const uom = firstItem.uom || firstItem.product?.baseUom || firstItem.rawMaterial?.baseUom || "";
-                const primaryUom = getPrimaryUom(uom);
+                const primaryUom = getItemPrimaryUom(firstItem);
                 const uomStr = primaryUom ? ` ${primaryUom}` : "";
                 const diffColor = diff > 0 ? "text-green-600 bg-green-50 border border-green-200" : diff < 0 ? "text-red-600 bg-red-50 border border-red-200" : "text-ink-subtle bg-card-2";
                 const diffSign = diff > 0 ? `+${diff}${primaryUom ? ` ${primaryUom}` : ''}` : `${diff}${primaryUom ? ` ${primaryUom}` : ''}`;

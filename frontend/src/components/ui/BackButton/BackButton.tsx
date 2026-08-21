@@ -29,7 +29,7 @@ const BackButton: React.FC<BackButtonProps> = ({
 
   return (
     <CustomButton
-      variant='danger'
+      variant='secondary'
       text={text}
       icon={FaArrowLeft}
       onClick={handleBack}

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { FaBars, FaUser, FaSignOutAlt } from 'react-icons/fa';
+import { FaBars, FaUser, FaSignOutAlt, FaSun, FaMoon, FaCheckCircle } from 'react-icons/fa';
 import { useDispatch } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
 import { logoutUser } from '../../features/auth/authSlice';
 import CommonConfirmModal from '../ui/CommonConfirmModal/CommonConfirmModal';
 
@@ -28,8 +29,18 @@ const TopNavbar: React.FC<NavbarProps> = ({
 }) => {
   const [showDropdown, setShowDropdown] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [isDark, setIsDark] = useState<boolean>(() => {
+    return localStorage.getItem('sunsea-theme') === 'dark';
+  });
   const dropdownRef = useRef<HTMLDivElement>(null);
   const dispatch = useDispatch<any>();
+  const navigate = useNavigate();
+
+  // Apply theme on mount and whenever isDark changes
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+    localStorage.setItem('sunsea-theme', isDark ? 'dark' : 'light');
+  }, [isDark]);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -116,6 +127,32 @@ const TopNavbar: React.FC<NavbarProps> = ({
             </span>
           </div>
         </div>
+
+        {/* MD Approval Shortcut */}
+        <button
+          type="button"
+          onClick={() => navigate('/pending-quotations')}
+          title="MD Approvals"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-50 text-teal-700 hover:bg-teal-500 hover:text-white transition-all font-semibold text-xs border border-teal-200 cursor-pointer shadow-xs"
+        >
+          <FaCheckCircle size={13} />
+          <span className="hidden sm:inline">MD Approvals</span>
+        </button>
+
+        {/* Theme Toggle Button */}
+        <button
+          type="button"
+          onClick={() => setIsDark((prev) => !prev)}
+          title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+          className="w-9 h-9 flex items-center justify-center rounded-full border transition-all cursor-pointer"
+          style={{
+            background: isDark ? '#1C2536' : '#F1F5F9',
+            borderColor: isDark ? '#2A3548' : '#E2E8F0',
+            color: isDark ? '#FACC15' : '#475569',
+          }}
+        >
+          {isDark ? <FaSun size={15} /> : <FaMoon size={15} />}
+        </button>
 
         {/* Direct Logout Button */}
         <button

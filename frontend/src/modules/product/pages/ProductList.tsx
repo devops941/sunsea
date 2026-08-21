@@ -21,6 +21,7 @@ import { useCategories } from "../../../hooks/useCategories";
 import { productCapacityHistoryService } from "../../../services/productCapacityHistoryService";
 import { employeeService } from "../../../services/employeeService";
 import { departmentService } from "../../../services/departmentService";
+import { roleService } from "../../../services/roleService";
 import { shiftService } from "../../../services/shiftService";
 import { machineService } from "../../../services/machineService";
 import { useSocketSync } from "../../../hooks/useSocketSync";
@@ -57,7 +58,7 @@ const ProductList: React.FC = () => {
     const [capProduct, setCapProduct] = useState<any>(null);
     const [capDate, setCapDate] = useState(new Date().toISOString().split("T")[0]);
     const [capShift, setCapShift] = useState("");
-    const [capDeptId, setCapDeptId] = useState("");
+    const [capRoleId, setCapRoleId] = useState("");
     const [capOps, setCapOps] = useState<string[]>([]);
     const [capMachine, setCapMachine] = useState("");
     const [capQty, setCapQty] = useState("");
@@ -65,6 +66,7 @@ const ProductList: React.FC = () => {
     const [capErrors, setCapErrors] = useState<Record<string, string>>({});
     const [capHistoryRecords, setCapHistoryRecords] = useState<any[]>([]);
     const [employees, setEmployees] = useState<any[]>([]);
+    const [roles, setRoles] = useState<any[]>([]);
     const [departments, setDepartments] = useState<any[]>([]);
     const [shifts, setShifts] = useState<any[]>([]);
     const [machines, setMachines] = useState<any[]>([]);
@@ -80,6 +82,10 @@ const ProductList: React.FC = () => {
             employeeService.fetchAll({ limit: 500 }).then((res: any) => {
                 const data = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : Array.isArray(res?.employees) ? res.employees : [];
                 setEmployees(data);
+            }).catch(() => { });
+            roleService.fetchAll({ limit: 100 }).then((res: any) => {
+                const roleList = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
+                setRoles(roleList);
             }).catch(() => { });
             departmentService.fetchAll().then((res: any) => {
                 const depts = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : [];
@@ -161,7 +167,7 @@ const ProductList: React.FC = () => {
         setCapProduct(product);
         setCapDate(new Date().toISOString().split("T")[0]);
         setCapShift("");
-        setCapDeptId("");
+        setCapRoleId("");
         setCapOps([]);
         setCapMachine("");
         setCapQty("");
@@ -188,7 +194,7 @@ const ProductList: React.FC = () => {
         const errs: Record<string, string> = {};
         if (!capDate) errs.capDate = "Date is required";
         if (!capShift) errs.capShift = "Shift is required";
-        if (!capDeptId) errs.capDeptId = "Role is required";
+        if (!capRoleId) errs.capRoleId = "Role is required";
         if (!capOps.length) errs.capOps = "Select at least one operator";
         if (!capQty || Number(capQty) <= 0) {
             errs.capQty = "Valid quantity required";
@@ -629,17 +635,36 @@ const ProductList: React.FC = () => {
                                     <div>
                                         <SelectInput
                                             label="Role"
-                                            name="capDeptId"
-                                            value={capDeptId}
-                                            options={[{ value: "", label: "-- Role --" }, ...departments.map(d => ({ value: String(d.id), label: d.name }))]}
-                                            onChange={(e) => { setCapDeptId(e.target.value); setCapOps([]); setCapErrors(prev => ({ ...prev, capDeptId: "", capOps: "" })); }}
-                                            error={capErrors.capDeptId}
+                                            name="capRoleId"
+                                            value={capRoleId}
+                                            options={[
+                                                { value: "", label: "-- Role --" },
+                                                ...roles.map(r => ({ value: String(r.id || r.roleId || r.code), label: r.name || r.roleName || r.code || r.roleId }))
+                                            ]}
+                                            onChange={(e) => { setCapRoleId(e.target.value); setCapOps([]); setCapErrors(prev => ({ ...prev, capRoleId: "", capOps: "" })); }}
+                                            error={capErrors.capRoleId}
                                             required
-
                                         />
                                     </div>
                                     <div className="col-span-2">
-                                        <MultiSelect label="Operators" name="capOps" options={employees.filter(emp => !capDeptId || String(emp.departmentId) === capDeptId).map(emp => ({ value: String(emp.id), label: emp.fullName }))} value={capOps} onChange={(_, vals) => { setCapOps(vals); setCapErrors(prev => ({ ...prev, capOps: "" })); }} placeholder={capDeptId ? "Select operators" : "Select role first"} error={capErrors.capOps} />
+                                        <MultiSelect
+                                            label="Operators"
+                                            name="capOps"
+                                            options={employees
+                                                .filter(emp => {
+                                                    if (!capRoleId) return true;
+                                                    const empRoleId = emp.roleId || emp.role?.id || emp.designationId;
+                                                    if (empRoleId && String(empRoleId) === capRoleId) return true;
+                                                    const matchedRole = roles.find(r => String(r.id || r.roleId || r.code) === capRoleId);
+                                                    if (matchedRole && (emp.role?.name === matchedRole.name || emp.roleName === matchedRole.name || emp.designation?.name === matchedRole.name)) return true;
+                                                    return false;
+                                                })
+                                                .map(emp => ({ value: String(emp.id), label: emp.fullName }))}
+                                            value={capOps}
+                                            onChange={(_, vals) => { setCapOps(vals); setCapErrors(prev => ({ ...prev, capOps: "" })); }}
+                                            placeholder={capRoleId ? "Select operators" : "Select role first"}
+                                            error={capErrors.capOps}
+                                        />
                                     </div>
                                     <div>
                                         <TextInput

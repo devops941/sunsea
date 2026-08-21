@@ -30,10 +30,37 @@ const ADJUSTMENT_TYPE_LABELS: Record<string, string> = {
   OTHER: "Other",
 };
 
+const formatUomStr = (raw: string): string => {
+  if (!raw) return "";
+  const first = String(raw).split(",")[0].trim().toLowerCase();
+  if (first === "ea" || first === "each") return "pcs";
+  return first;
+};
+
+const getItemUom = (item: any): string => {
+  if (!item) return "pcs";
+  if (item.uom) {
+    const raw = typeof item.uom === "object" ? (item.uom.uomCode || item.uom.uomName || item.uom.code || item.uom.name) : String(item.uom);
+    if (raw) return formatUomStr(raw);
+  }
+  const isProduct = item.itemType === "PRODUCT" || item.itemType === "FINISHED_GOODS" || !!item.product || !!item.productItemId;
+  if (isProduct) {
+    const pUom = item.product?.uom;
+    const prodUom = typeof pUom === "object"
+      ? (pUom.uomCode || pUom.uomName || pUom.code || pUom.name)
+      : (pUom || item.product?.baseUom || item.product?.unit);
+    if (prodUom) return formatUomStr(prodUom);
+    return "pcs";
+  }
+  const rmUom = item.rawMaterial?.baseUom || item.rawMaterial?.uom;
+  if (rmUom) return formatUomStr(rmUom);
+  return "kg";
+};
+
 const InfoField = ({ label, value }: { label: string; value: React.ReactNode }) => (
   <div>
-    <p className="text-[11px] uppercase tracking-wider text-slate-400 font-semibold mb-1">{label}</p>
-    <div className="text-sm font-semibold text-slate-700">{value || "—"}</div>
+    <p className="text-[11px] uppercase tracking-wider text-ink-subtle font-bold mb-1">{label}</p>
+    <div className="text-sm font-extrabold text-ink">{value || "—"}</div>
   </div>
 );
 
@@ -81,12 +108,12 @@ const StockAdjustmentView: React.FC = () => {
   const isPending = !isApproved && !isRejected;
 
   return (
-    <div className="p-4 md:p-6 min-h-screen bg-white">
+    <div className="p-4 md:p-6 min-h-screen bg-card rounded-2xl border border-line-soft shadow-xs">
       <div className="w-full mx-auto">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-6">
           <div>
-            <h2 className="text-2xl font-bold text-slate-800">Stock Adjustment Details</h2>
-            <p className="text-slate-500 text-sm mt-0.5">
+            <h2 className="text-2xl font-extrabold text-ink tracking-tight">Stock Adjustment Details</h2>
+            <p className="text-ink-subtle text-sm font-semibold mt-0.5">
               {currentAdjustment.adjustmentNumber} &middot; {ADJUSTMENT_TYPE_LABELS[currentAdjustment.adjustmentType] || currentAdjustment.adjustmentType}
             </p>
           </div>
@@ -118,11 +145,11 @@ const StockAdjustmentView: React.FC = () => {
         </div>
 
         {isApproved && isPMI && (
-          <div className="mb-5 rounded-xl bg-emerald-50 border border-emerald-200 p-4 flex items-start gap-3">
-            <FaCheckCircle className="text-emerald-500 mt-0.5 shrink-0" size={18} />
+          <div className="mb-5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 p-4 flex items-start gap-3">
+            <FaCheckCircle className="text-emerald-400 mt-0.5 shrink-0" size={18} />
             <div>
-              <p className="font-semibold text-emerald-800 text-sm">Material Issue Approved</p>
-              <p className="text-emerald-700 text-xs mt-0.5">
+              <p className="font-bold text-emerald-300 text-sm">Material Issue Approved</p>
+              <p className="text-emerald-400/90 text-xs mt-0.5 font-medium">
                 Production Order <strong>{currentAdjustment.productionOrderId}</strong> is now eligible to start production. Raw material stock has been deducted.
               </p>
             </div>
@@ -130,11 +157,11 @@ const StockAdjustmentView: React.FC = () => {
         )}
 
         {currentAdjustment.status === "DRAFT" && isPMI && (
-          <div className="mb-5 rounded-xl bg-amber-50 border border-amber-200 p-4 flex items-start gap-3">
-            <FaInfoCircle className="text-amber-500 mt-0.5 shrink-0" size={18} />
+          <div className="mb-5 rounded-xl bg-amber-500/15 border border-amber-500/30 p-4 flex items-start gap-3">
+            <FaInfoCircle className="text-amber-400 mt-0.5 shrink-0" size={18} />
             <div>
-              <p className="font-semibold text-amber-800 text-sm">Draft — Pending Approval</p>
-              <p className="text-amber-700 text-xs mt-0.5">
+              <p className="font-bold text-amber-300 text-sm">Draft — Pending Approval</p>
+              <p className="text-amber-400/90 text-xs mt-0.5 font-medium">
                 This Material Issue is in <strong>Draft</strong> status. Approve it to deduct stock and allow Production Start.
               </p>
             </div>
@@ -142,12 +169,12 @@ const StockAdjustmentView: React.FC = () => {
         )}
 
         {isRejected && (
-          <div className="mb-5 rounded-xl bg-red-50 border border-red-200 p-4 flex items-start gap-3">
-            <FaTimesCircle className="text-red-500 mt-0.5 shrink-0" size={18} />
+          <div className="mb-5 rounded-xl bg-red-500/15 border border-red-500/30 p-4 flex items-start gap-3">
+            <FaTimesCircle className="text-red-400 mt-0.5 shrink-0" size={18} />
             <div>
-              <p className="font-semibold text-red-800 text-sm">Adjustment Rejected</p>
+              <p className="font-bold text-red-300 text-sm">Adjustment Rejected</p>
               {currentAdjustment.approvedBy && (
-                <p className="text-red-700 text-xs mt-0.5">
+                <p className="text-red-400/90 text-xs mt-0.5 font-medium">
                   Rejected by <strong>{currentAdjustment.approvedBy}</strong> on {formatDate(currentAdjustment.approvedAt)}.
                 </p>
               )}
@@ -155,14 +182,13 @@ const StockAdjustmentView: React.FC = () => {
           </div>
         )}
 
-        <div className="rounded-2xl border border-slate-200 shadow-sm mb-5 overflow-hidden">
-          <div className="flex items-center gap-3 px-5 py-4 bg-slate-50 border-b border-slate-200">
-           
-            <h3 className="font-bold text-slate-700 text-base">Adjustment Information</h3>
+        <div className="rounded-2xl border border-line-soft shadow-xs mb-5 overflow-hidden bg-card-2">
+          <div className="flex items-center gap-3 px-5 py-4 border-b border-line-soft bg-card-2">
+            <h3 className="font-extrabold text-ink text-base">Adjustment Information</h3>
           </div>
           <div className="p-5 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-5">
             <InfoField label="Adjustment No." value={
-              <span className="font-mono text-primary text-sm">{currentAdjustment.adjustmentNumber}</span>
+              <span className="font-mono text-primary text-sm font-extrabold">{currentAdjustment.adjustmentNumber}</span>
             } />
             <InfoField label="Date" value={formatDate(currentAdjustment.adjustmentDate)} />
             <InfoField label="Type" value={
@@ -178,7 +204,7 @@ const StockAdjustmentView: React.FC = () => {
             )}
           </div>
           {!isPMI && (currentAdjustment.sourceDocument || currentAdjustment.sourceDocId) && (
-            <div className="px-5 pb-5 pt-2 grid grid-cols-2 sm:grid-cols-4 gap-5 border-t border-slate-100">
+            <div className="px-5 pb-5 pt-2 grid grid-cols-2 sm:grid-cols-4 gap-5 border-t border-line-soft">
               <InfoField label="Source Document" value={currentAdjustment.sourceDocument} />
               <InfoField label="Source Doc Reference" value={currentAdjustment.sourceDocId} />
               <InfoField label="Auto Generated" value={
@@ -191,22 +217,22 @@ const StockAdjustmentView: React.FC = () => {
         </div>
 
         {isPMI && po && (
-          <div className="rounded-2xl border border-slate-200 shadow-sm mb-5 overflow-hidden">
-            <div className="flex items-center gap-3 px-5 py-4 bg-slate-50 border-b border-slate-200">
-              <div className="h-8 w-8 rounded-lg bg-blue-100 flex items-center justify-center">
-                <FaBoxes className="text-blue-600" size={15} />
+          <div className="rounded-2xl border border-line-soft shadow-xs mb-5 overflow-hidden bg-card-2">
+            <div className="flex items-center gap-3 px-5 py-4 border-b border-line-soft bg-card-2">
+              <div className="h-8 w-8 rounded-lg bg-blue-500/20 border border-blue-500/30 flex items-center justify-center">
+                <FaBoxes className="text-blue-400" size={15} />
               </div>
-              <h3 className="font-bold text-slate-700 text-base">Production Order Information</h3>
+              <h3 className="font-extrabold text-ink text-base">Production Order Information</h3>
             </div>
             <div className="p-5 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-5">
               <InfoField label="PO Number" value={
-                <span className="font-mono text-primary text-sm">{po.productionOrderId}</span>
+                <span className="font-mono text-primary text-sm font-extrabold">{po.productionOrderId}</span>
               } />
               <InfoField label="Product" value={
                 <div>
-                  <div className="font-semibold text-slate-700 text-sm">{po.productItem?.productName || "—"}</div>
+                  <div className="font-extrabold text-ink text-sm">{po.productItem?.productName || "—"}</div>
                   {po.productItem?.productCode && (
-                    <div className="text-xs text-slate-400 font-mono">{po.productItem.productCode}</div>
+                    <div className="text-xs text-ink-subtle font-mono mt-0.5 font-semibold">{po.productItem.productCode}</div>
                   )}
                 </div>
               } />
@@ -220,13 +246,12 @@ const StockAdjustmentView: React.FC = () => {
           </div>
         )}
 
-        <div className="rounded-2xl border border-slate-200 shadow-sm mb-5 overflow-hidden">
-          <div className="flex items-center gap-3 px-5 py-4 bg-slate-50 border-b border-slate-200">
-         
-            <h3 className="font-bold text-slate-700 text-base">
+        <div className="rounded-2xl border border-line-soft shadow-xs mb-5 overflow-hidden bg-card-2">
+          <div className="flex items-center gap-3 px-5 py-4 border-b border-line-soft bg-card-2">
+            <h3 className="font-extrabold text-ink text-base">
               {isPMI ? "Issued Materials" : "Adjustment Items"}
             </h3>
-            <span className="ml-auto text-xs font-semibold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full">
+            <span className="ml-auto text-xs font-bold text-ink-subtle bg-card border border-line-soft px-3 py-1 rounded-full">
               {currentAdjustment.items?.length || 0} item{currentAdjustment.items?.length !== 1 ? "s" : ""}
             </span>
           </div>
@@ -234,70 +259,58 @@ const StockAdjustmentView: React.FC = () => {
             {isPMI ? (
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="bg-slate-50 border-b border-slate-200">
+                  <tr className="bg-card-2 border-b border-line-soft">
                     {["RM Code","Material Name","Store","Stock Before","Stock After","Issued Qty","Remarks"].map((h, i) => (
-                      <th key={h} className={`text-[11px] uppercase tracking-wider text-slate-500 font-semibold px-4 py-3 ${i >= 3 && i <= 5 ? "text-right" : "text-left"}`}>{h}</th>
+                      <th key={h} className={`text-[11px] uppercase tracking-wider text-ink-subtle font-extrabold px-4 py-3 ${i >= 3 && i <= 5 ? "text-right" : "text-left"}`}>{h}</th>
                     ))}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-line-soft">
                   {currentAdjustment.items?.map((item: any, idx: number) => {
-                    const rawUom = item.uom ||
-                      (item.itemType === "PRODUCT"
-                        ? item.product?.uom || item.product?.baseUom
-                        : (item.rawMaterial?.baseUom || item.rawMaterial?.uom)
-                      ) || "kg";
-                    const uomLower = rawUom.split(",")[0].trim().toLowerCase();
-                    const itemUom = (uomLower === "ea" || uomLower === "each") ? "pcs" : uomLower;
+                    const itemUom = getItemUom(item);
 
                     return (
-                      <tr key={item.id || idx} className="hover:bg-slate-50/60 transition-colors">
+                      <tr key={item.id || idx} className="hover:bg-card/60 transition-colors">
                         <td className="px-4 py-3">
-                          <code className="text-xs bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-mono">{item.rawMaterialId}</code>
+                          <code className="text-xs bg-card text-ink border border-line-soft px-2 py-0.5 rounded font-mono font-bold">{item.rawMaterialId}</code>
                         </td>
-                        <td className="px-4 py-3 font-semibold text-slate-700">{item.rawMaterial?.materialName || item.rawMaterialId}</td>
-                        <td className="px-4 py-3 text-slate-600">{item.store?.storeName || item.storeId}</td>
-                        <td className="px-4 py-3 text-right font-mono text-xs text-slate-600">{Number(item.currentQty).toFixed(3)} {itemUom}</td>
-                        <td className="px-4 py-3 text-right font-mono text-xs text-slate-600">{Number(item.adjustedQty).toFixed(3)} {itemUom}</td>
+                        <td className="px-4 py-3 font-extrabold text-ink">{item.rawMaterial?.materialName || item.rawMaterialId}</td>
+                        <td className="px-4 py-3 text-ink font-medium">{item.store?.storeName || item.storeId}</td>
+                        <td className="px-4 py-3 text-right font-mono text-xs text-ink font-semibold">{Number(item.currentQty).toFixed(3)} {itemUom}</td>
+                        <td className="px-4 py-3 text-right font-mono text-xs text-ink font-semibold">{Number(item.adjustedQty).toFixed(3)} {itemUom}</td>
                         <td className="px-4 py-3 text-right">
-                          <span className="font-bold text-red-600 font-mono text-xs">{Math.abs(Number(item.difference)).toFixed(3)} {itemUom}</span>
+                          <span className="font-extrabold text-red-400 font-mono text-xs">{Math.abs(Number(item.difference)).toFixed(3)} {itemUom}</span>
                         </td>
                         <td className="px-4 py-3">
                           {item.remarks ? (
-                            <div className="bg-slate-50 border-l-2 border-slate-400 text-slate-700 text-xs px-2.5 py-1 rounded-r-md font-medium inline-block max-w-xs leading-normal">
+                            <div className="bg-card border-l-2 border-primary text-ink text-xs px-2.5 py-1 rounded-r-md font-semibold inline-block max-w-xs leading-normal">
                               {item.remarks}
                             </div>
                           ) : (
-                            <span className="text-slate-300 text-xs">—</span>
+                            <span className="text-ink-subtle text-xs">—</span>
                           )}
                         </td>
                       </tr>
                     );
                   })}
                   {(!currentAdjustment.items || currentAdjustment.items.length === 0) && (
-                    <tr><td colSpan={7} className="text-center py-10 text-slate-400 text-sm">No items found</td></tr>
+                    <tr><td colSpan={7} className="text-center py-10 text-ink-subtle text-sm font-semibold">No items found</td></tr>
                   )}
                 </tbody>
               </table>
             ) : (
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="bg-slate-50 border-b border-slate-200">
+                  <tr className="bg-card-2 border-b border-line-soft">
                     {["Item Type","Item Details","Store","Current Qty","Adjusted Qty","Difference","Remarks"].map((h, i) => (
-                      <th key={h} className={`text-[11px] uppercase tracking-wider text-slate-500 font-semibold px-4 py-3 ${i >= 3 && i <= 5 ? "text-right" : "text-left"}`}>{h}</th>
+                      <th key={h} className={`text-[11px] uppercase tracking-wider text-ink-subtle font-extrabold px-4 py-3 ${i >= 3 && i <= 5 ? "text-right" : "text-left"}`}>{h}</th>
                     ))}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-line-soft">
                   {currentAdjustment.items?.map((item: any, idx: number) => {
                     const diff = Number(item.difference);
-                    const rawUom = item.uom ||
-                      (item.itemType === "PRODUCT"
-                        ? item.product?.uom || item.product?.baseUom
-                        : (item.rawMaterial?.baseUom || item.rawMaterial?.uom)
-                      ) || "kg";
-                    const uomLower = rawUom.split(",")[0].trim().toLowerCase();
-                    const itemUom = (uomLower === "ea" || uomLower === "each") ? "pcs" : uomLower;
+                    const itemUom = getItemUom(item);
 
                     const isWastage = item.itemType === "WASTAGE" || item.rawMaterial?.itemType === "WASTAGE";
                     const isRM = (item.itemType === "RAW_MATERIAL" || !!item.rawMaterial) && !isWastage;
@@ -307,7 +320,7 @@ const StockAdjustmentView: React.FC = () => {
                     const itemCode = item.rawMaterial?.rawMaterialId || item.product?.productCode || "";
 
                     return (
-                      <tr key={item.id || idx} className="hover:bg-slate-50/60 transition-colors">
+                      <tr key={item.id || idx} className="hover:bg-card/60 transition-colors">
                         <td className="px-4 py-3">
                           <StatusBadge 
                             status={isWastage ? "WASTAGE" : (isRM ? "RAW_MATERIAL" : "FINISHED_GOODS")} 
@@ -315,31 +328,31 @@ const StockAdjustmentView: React.FC = () => {
                           />
                         </td>
                         <td className="px-4 py-3">
-                          <div className="font-semibold text-slate-700">{itemName}</div>
-                          {itemCode && <div className="text-xs text-slate-400 font-mono mt-0.5">{itemCode}</div>}
+                          <div className="font-extrabold text-ink">{itemName}</div>
+                          {itemCode && <div className="text-xs text-ink-subtle font-mono mt-0.5 font-semibold">{itemCode}</div>}
                         </td>
-                        <td className="px-4 py-3 text-slate-600">{item.store?.storeName || "—"}</td>
-                        <td className="px-4 py-3 text-right font-mono text-xs text-slate-600">{Number(item.currentQty).toFixed(3)} {itemUom}</td>
-                        <td className="px-4 py-3 text-right font-mono text-xs text-slate-600">{Number(item.adjustedQty).toFixed(3)} {itemUom}</td>
+                        <td className="px-4 py-3 text-ink font-medium">{item.store?.storeName || "—"}</td>
+                        <td className="px-4 py-3 text-right font-mono text-xs text-ink font-semibold">{Number(item.currentQty).toFixed(3)} {itemUom}</td>
+                        <td className="px-4 py-3 text-right font-mono text-xs text-ink font-semibold">{Number(item.adjustedQty).toFixed(3)} {itemUom}</td>
                         <td className="px-4 py-3 text-right">
-                          <span className={`font-bold font-mono text-xs ${diff > 0 ? "text-emerald-600" : diff < 0 ? "text-red-600" : "text-slate-500"}`}>
+                          <span className={`font-extrabold font-mono text-xs ${diff > 0 ? "text-emerald-400" : diff < 0 ? "text-red-400" : "text-ink-subtle"}`}>
                             {diff > 0 ? `+${diff.toFixed(3)}` : diff.toFixed(3)} {itemUom}
                           </span>
                         </td>
                          <td className="px-4 py-3">
                           {item.remarks ? (
-                            <div className="bg-slate-50 border-l-2 border-slate-400 text-slate-700 text-xs px-2.5 py-1 rounded-r-md font-medium inline-block max-w-xs leading-normal">
+                            <div className="bg-card border-l-2 border-primary text-ink text-xs px-2.5 py-1 rounded-r-md font-semibold inline-block max-w-xs leading-normal">
                               {item.remarks}
                             </div>
                           ) : (
-                            <span className="text-slate-300 text-xs">—</span>
+                            <span className="text-ink-subtle text-xs">—</span>
                           )}
                          </td>
                       </tr>
                     );
                   })}
                   {(!currentAdjustment.items || currentAdjustment.items.length === 0) && (
-                    <tr><td colSpan={9} className="text-center py-10 text-slate-400 text-sm">No items found</td></tr>
+                    <tr><td colSpan={9} className="text-center py-10 text-ink-subtle text-sm font-semibold">No items found</td></tr>
                   )}
                 </tbody>
               </table>

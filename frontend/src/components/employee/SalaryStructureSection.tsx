@@ -92,9 +92,9 @@ const SectionHeader: React.FC<{
   title: string;
   color?: string;
 }> = ({ icon: Icon, title, color = 'text-primary' }) => (
-  <div className="flex items-center gap-2 mb-4 pb-2 border-b border-slate-100">
+  <div className="flex items-center gap-2 mb-4 pb-2 border-b border-line-soft">
     <Icon className={`${color} text-base`} />
-    <h3 className="text-sm font-semibold text-slate-700 uppercase tracking-wide">{title}</h3>
+    <h3 className="text-sm font-extrabold text-ink uppercase tracking-wide">{title}</h3>
   </div>
 );
 
@@ -105,7 +105,7 @@ const Toggle: React.FC<{
   disabled?: boolean;
 }> = ({ label, value, onChange, disabled }) => (
   <div className={`flex items-center gap-3 ${disabled ? 'opacity-50' : ''}`}>
-    <label className="text-xs font-bold uppercase tracking-[0.5px] text-slate-500 select-none">
+    <label className="text-xs font-extrabold uppercase tracking-[0.5px] text-ink select-none">
       {label}
     </label>
     <label className={`relative inline-flex items-center ${disabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
@@ -117,7 +117,7 @@ const Toggle: React.FC<{
         onChange={(e) => !disabled && onChange(e.target.checked)}
       />
       <div
-        className={`block w-12 h-7 rounded-full transition-colors duration-300 ${value ? 'bg-primary' : 'bg-gray-300'
+        className={`block w-12 h-7 rounded-full transition-colors duration-300 ${value ? 'bg-primary' : 'bg-card-2 border border-line-soft'
           }`}
       />
       <div
@@ -125,7 +125,7 @@ const Toggle: React.FC<{
           }`}
       />
     </label>
-    <span className={`text-xs font-semibold ${value ? 'text-primary' : 'text-slate-400'}`}>
+    <span className={`text-xs font-bold ${value ? 'text-primary' : 'text-ink-subtle'}`}>
       {value ? 'YES' : 'NO'}
     </span>
   </div>
@@ -160,26 +160,26 @@ const SalaryPreview: React.FC<PreviewProps> = ({
   const isEmpty = primaryAmount <= 0;
 
   return (
-    <div className="rounded-xl border border-indigo-100 bg-gradient-to-br from-indigo-50 via-white to-blue-50 shadow-sm overflow-hidden">
+    <div className="rounded-xl border border-line-soft bg-card shadow-xs overflow-hidden">
       {/* Header */}
-      <div className="flex items-center gap-2 px-4 py-3 bg-indigo-600">
+      <div className="flex items-center gap-2 px-4 py-3 bg-primary">
         <FaCalculator className="text-white text-sm" />
         <span className="text-sm font-bold text-white tracking-wide uppercase">
           Salary Preview
         </span>
         {loading && (
-          <span className="ml-auto text-xs text-indigo-200 animate-pulse">
+          <span className="ml-auto text-xs text-white/80 animate-pulse">
             Loading config…
           </span>
         )}
       </div>
 
       {/* Body */}
-      <div className="p-4 space-y-3">
+      <div className="p-4 space-y-3 bg-card text-ink">
         {isEmpty ? (
-          <div className="flex flex-col items-center justify-center py-6 gap-2 text-slate-400">
-            <FaInfoCircle size={22} />
-            <p className="text-xs text-center">
+          <div className="flex flex-col items-center justify-center py-6 gap-2 text-ink-subtle">
+            <FaInfoCircle size={22} className="text-primary/70" />
+            <p className="text-xs text-center font-medium">
               Enter a salary amount to see the live breakdown.
             </p>
           </div>
@@ -209,8 +209,8 @@ const SalaryPreview: React.FC<PreviewProps> = ({
               </>
             )}
 
-            <div className="border-t border-indigo-100 pt-3 mt-2 space-y-2">
-              <div className="text-[10px] font-bold uppercase text-indigo-400 tracking-widest mb-1">
+            <div className="border-t border-line-soft pt-3 mt-2 space-y-2">
+              <div className="text-[10px] font-bold uppercase text-primary tracking-widest mb-1">
                 Company Policy
               </div>
               <PreviewMeta label="Salary Type" value={SALARY_TYPE_LABELS[salaryType] ?? salaryType} />
@@ -229,12 +229,12 @@ const SalaryPreview: React.FC<PreviewProps> = ({
 const PreviewRow: React.FC<{ label: string; value: string; highlight?: boolean }> = ({
   label, value, highlight,
 }) => (
-  <div className={`flex items-center justify-between gap-2 rounded-lg px-3 py-2 ${highlight ? 'bg-indigo-600 text-white' : 'bg-white/70 text-slate-700 border border-slate-100'
+  <div className={`flex items-center justify-between gap-2 rounded-lg px-3 py-2 ${highlight ? 'bg-primary text-white' : 'bg-card-2 text-ink border border-line-soft'
     }`}>
-    <span className={`text-xs font-medium ${highlight ? 'text-indigo-100' : 'text-slate-500'}`}>
+    <span className={`text-xs font-medium ${highlight ? 'text-white/90' : 'text-ink-subtle'}`}>
       {label}
     </span>
-    <span className={`text-sm font-bold tabular-nums ${highlight ? 'text-white' : 'text-slate-800'}`}>
+    <span className={`text-sm font-bold tabular-nums ${highlight ? 'text-white' : 'text-ink'}`}>
       {value}
     </span>
   </div>
@@ -242,8 +242,8 @@ const PreviewRow: React.FC<{ label: string; value: string; highlight?: boolean }
 
 const PreviewMeta: React.FC<{ label: string; value: string }> = ({ label, value }) => (
   <div className="flex items-center justify-between text-xs">
-    <span className="text-slate-500">{label}</span>
-    <span className="font-semibold text-slate-700">{value}</span>
+    <span className="text-ink-subtle">{label}</span>
+    <span className="font-semibold text-ink">{value}</span>
   </div>
 );
 

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import convert from "convert-units";
 
 interface QuantityInputProps {
   name: string;
@@ -30,36 +31,28 @@ const QuantityInput: React.FC<QuantityInputProps> = ({
   onUomChange,
 }) => {
   const rawList = baseUoms ? baseUoms.split(",").map((u) => u.trim()).filter(Boolean) : [];
-  
+
+  // Custom peers for count-based units not known to convert-units
+  const CUSTOM_PEERS: Record<string, string[]> = {
+    pcs: ["pcs", "dz", "box"], ea: ["pcs", "dz", "box"], each: ["pcs", "dz", "box"],
+    dz: ["dz", "pcs"], box: ["box", "pcs"],
+  };
+  const PREFERRED = new Set(["g", "kg", "t", "ml", "l", "mm", "cm", "m", "km"]);
+
   const expandUoms = (list: string[]): string[] => {
-    const res: string[] = [];
     const source = list.length > 0 ? list : [uom || "kg"];
-    source.forEach(u => {
-      const cleaned = u.trim();
-      const lower = cleaned.toLowerCase();
-      if (lower === "kg" || lower === "g" || lower === "kilogram" || lower === "gram") {
-        if (!res.some(r => r.toLowerCase() === "kg")) res.push("kg");
-        if (!res.some(r => r.toLowerCase() === "g")) res.push("g");
-      } else if (lower === "l" || lower === "ml" || lower === "litre" || lower === "liter") {
-        if (!res.some(r => r.toLowerCase() === "l")) res.push("l");
-        if (!res.some(r => r.toLowerCase() === "ml")) res.push("ml");
-      } else if (lower === "pcs" || lower === "ea" || lower === "each" || lower === "box") {
-        if (!res.some(r => r.toLowerCase() === "pcs")) res.push("pcs");
-        if (!res.some(r => r.toLowerCase() === "box")) res.push("box");
-      } else if (lower === "m" || lower === "cm" || lower === "mm" || lower === "meter") {
-        if (!res.some(r => r.toLowerCase() === "m")) res.push("m");
-        if (!res.some(r => r.toLowerCase() === "cm")) res.push("cm");
-        if (!res.some(r => r.toLowerCase() === "mm")) res.push("mm");
-      } else {
-        if (!res.some(r => r.toLowerCase() === lower)) res.push(cleaned);
-      }
-    });
-    if (res.length <= 1) {
-      const first = (res[0] || "kg").toLowerCase();
-      if (first !== "g") res.push("g");
-      else res.unshift("kg");
+    if (source.length > 1) return source; // already explicit
+
+    const primary = source[0].toLowerCase().trim();
+    if (CUSTOM_PEERS[primary]) return CUSTOM_PEERS[primary];
+
+    try {
+      const all = (convert() as any).from(primary).possibilities() as string[];
+      const peers = [primary, ...all.filter((u: string) => u !== primary && PREFERRED.has(u))];
+      return peers.length > 1 ? peers : [primary];
+    } catch {
+      return [primary];
     }
-    return res;
   };
 
   const uomList = expandUoms(rawList);
@@ -98,21 +91,21 @@ const QuantityInput: React.FC<QuantityInputProps> = ({
         <label
           className={`
             flex items-center gap-[6px] mb-2
-            text-xs font-bold uppercase
+            text-xs font-extrabold uppercase
             tracking-[0.5px]
             transition-colors duration-250
-            ${error ? "text-red-500" : "text-slate-500"}
+            ${error ? "text-red-400" : "text-ink"}
             group-focus-within:text-primary
           `}
         >
           <span>{label}</span>
           {required && (
-            <span className="text-[#e53935] ml-0.5">*</span>
+            <span className="text-red-500 ml-0.5">*</span>
           )}
         </label>
       )}
 
-      <div className="flex relative rounded-md h-10 border border-slate-200 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 overflow-hidden transition-all bg-white">
+      <div className="flex relative rounded-md h-10 border border-line-soft focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 overflow-hidden transition-all bg-card-2">
         <input
           type="number"
           value={displayValue}
@@ -120,7 +113,7 @@ const QuantityInput: React.FC<QuantityInputProps> = ({
           disabled={disabled || !primaryUom}
           placeholder="0.00"
           step={step || "any"}
-          className={`flex-1 w-full bg-transparent px-3 py-2 text-[15px] text-slate-800 placeholder-slate-400 focus:outline-none border-r border-slate-200 h-full ${disabled ? "bg-white opacity-60 cursor-not-allowed" : ""}`}
+          className={`flex-1 w-full bg-transparent px-3 py-2 text-[15px] font-semibold text-ink placeholder:text-ink-subtle/80 placeholder:font-normal focus:outline-none border-r border-line-soft h-full ${disabled ? "bg-card-2/50 opacity-60 cursor-not-allowed text-ink-subtle" : ""}`}
         />
         {uomList.length > 1 ? (
           <select
@@ -132,19 +125,19 @@ const QuantityInput: React.FC<QuantityInputProps> = ({
               onChange({ target: { name, value: displayValue, uom: val } });
             }}
             disabled={disabled}
-            className="px-2 text-sm font-medium text-slate-700 bg-slate-50 border-0 focus:outline-none h-full cursor-pointer min-w-17.5"
+            className="px-2 text-sm font-medium text-ink bg-card-2 border-0 focus:outline-none h-full cursor-pointer min-w-17.5"
           >
             {uomList.map((u) => {
               const display = u.toLowerCase() === 'ea' ? 'pcs' : u;
               return (
-                <option key={u} value={u}>
+                <option key={u} value={u} className="bg-card text-ink">
                   {display}
                 </option>
               );
             })}
           </select>
         ) : (
-          <span className="px-3 text-sm font-medium text-slate-700 bg-slate-50 flex items-center justify-center min-w-15 h-full border-l border-slate-200">
+          <span className="px-3 text-sm font-medium text-ink-muted bg-card-2 flex items-center justify-center min-w-15 h-full border-l border-line-soft">
             {activeUom ? (activeUom.toLowerCase() === 'ea' ? 'pcs' : activeUom) : "UOM"}
           </span>
         )}

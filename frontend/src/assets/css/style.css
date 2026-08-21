@@ -5,34 +5,15 @@
     --color-primary: var(--color-red-600);
 
     /* ── Nav / sidebar chrome ─────────────────────────────────────────────
-       The bar inverts between themes: a LIGHT teal bar in light mode and a
-       BRIGHT teal bar in dark mode. Because the background flips, the text
-       cannot be a fixed white — each background is paired with its own
-       foreground token so contrast survives both themes.
-
-         nav            bar background
-         nav-fg         label text on the bar
-         nav-active     active pill / selected row background
-         nav-active-fg  text inside that pill
-         nav-hover      hover wash on the bar
-         accent         teal used for text on normal cards (dropdowns)
-
-       The bar keeps the SAME bright teal in both themes — it is a brand
-       surface, not a page surface, so it does not invert. Consequently the
-       nav tokens are defined once here and are NOT overridden in the dark
-       block below; only `accent` differs, because that one paints text on
-       card surfaces, which do invert.
-
-       The text on the bar is dark in both themes by necessity: #14B8A6 is
-       mid-luminance, so #042F2E reaches 5.8:1 while white manages only
-       2.5:1 and pale teal #CCFBF1 just 2.2:1 — both well under the 4.5:1 AA
-       floor. Do not switch the bar text to white. */
-    --color-nav: #14B8A6;
-    --color-nav-fg: #042F2E;
-    --color-nav-active: #042F2E;
-    --color-nav-active-fg: #CCFBF1;
-    --color-nav-hover: #2DD4BF;
-    --color-accent: #0F766E;
+       Nav tokens adapt seamlessly between Light theme (rich deep teal)
+       and Dark theme (sleek dark surface with teal active pills).
+    ------------------------------------------------------------------- */
+    --color-nav: #0F172A;
+    --color-nav-fg: #F8FAFC;
+    --color-nav-active: #0D9488;
+    --color-nav-active-fg: #FFFFFF;
+    --color-nav-hover: #1E293B;
+    --color-accent: #0D9488;
 
     /* ── Semantic theme tokens ────────────────────────────────────────────
        Tailwind emits these as var() references (e.g. .bg-card resolves to
@@ -77,10 +58,11 @@
    the handful of components still using them inline follow the theme.
    ------------------------------------------------------------------------- */
 :root[data-theme="dark"] {
-    /* Nav tokens are intentionally absent here — the bar is identical in both
-       themes (see the note in @theme). Only `accent` flips, because it paints
-       text on card surfaces and those do invert: the light-mode teal is too
-       dark to read on a dark card. */
+    --color-nav: #0F172A;
+    --color-nav-fg: #94A3B8;
+    --color-nav-active: #0D9488;
+    --color-nav-active-fg: #FFFFFF;
+    --color-nav-hover: #1E293B;
     --color-accent: #2DD4BF;
 
     --color-page: #0B1120;
@@ -779,4 +761,27 @@ ul {
         overflow: visible !important;
         background: #fff !important;
     }
+}
+
+/* ===========================
+   Browser Autofill Styling Overrides
+=========================== */
+input:-webkit-autofill,
+input:-webkit-autofill:hover, 
+input:-webkit-autofill:focus, 
+input:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 30px #ffffff inset !important;
+    -webkit-text-fill-color: #0f172a !important;
+    caret-color: #0f172a !important;
+    transition: background-color 5000s ease-in-out 0s;
+}
+
+.login-input:-webkit-autofill,
+.login-input:-webkit-autofill:hover,
+.login-input:-webkit-autofill:focus,
+.login-input:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 30px #ffffff inset !important;
+    -webkit-text-fill-color: #0f172a !important;
+    caret-color: #0f172a !important;
+    transition: background-color 5000s ease-in-out 0s;
 }

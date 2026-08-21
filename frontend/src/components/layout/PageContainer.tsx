@@ -17,7 +17,7 @@ import { Outlet } from "react-router-dom";
  * inside a tab wrapper and stay full-width, exactly as before.
  */
 const PageContainer = () => (
-  <div className="inner-container">
+  <div className="w-full min-w-0 my-3">
     <Outlet />
   </div>
 );

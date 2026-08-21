@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { FaCheck, FaFilter } from "react-icons/fa";
-import CustomButton from "../Button/Button";
+import Button from "../Button/Button";
 
 interface ColumnToggleProps {
   columns: { header: string; accessor?: any }[];
@@ -41,21 +41,23 @@ const ColumnToggle: React.FC<ColumnToggleProps> = ({ columns, visibleColumns, se
 
   return (
     <div className="relative inline-block text-left" ref={dropdownRef}>
-      <CustomButton
+      <Button
         text="Columns"
         icon={FaFilter}
+        variant="secondary"
+        size="sm"
         onClick={() => setIsOpen(!isOpen)}
-        className="!bg-card !text-blue-600 !border !border-blue-600 hover:!bg-blue-50 shadow-sm"
+        className="!text-primary font-semibold"
       />
 
       {isOpen && (
-        <div className={`absolute ${align === 'right' ? 'right-0' : 'left-0'} mt-2 w-64 rounded-xl bg-card/95 backdrop-blur-md shadow-2xl ring-1 ring-slate-900/10 z-50 overflow-hidden border border-line-soft transform origin-top transition-all duration-200`}>
-          <div className="p-3 flex justify-between items-center text-[11px] uppercase tracking-wider text-ink-subtle font-bold bg-card-2/80 border-b border-line-soft">
-            <span>Show/Hide Columns</span>
-            <div className="flex gap-2">
-              <button className="text-blue-600 hover:text-blue-800 transition-colors" onClick={selectAll}>All</button>
-              <span className="text-ink-subtle">|</span>
-              <button className="text-ink-subtle hover:text-ink-muted transition-colors" onClick={deselectAll}>None</button>
+        <div className={`absolute ${align === 'right' ? 'right-0' : 'left-0'} mt-2 w-64 rounded-xl bg-card shadow-xl z-50 overflow-hidden border border-line-soft transition-all duration-200 text-ink`}>
+          <div className="p-3 flex justify-between items-center text-[11px] uppercase tracking-wider text-ink-subtle font-bold bg-card-2 border-b border-line-soft">
+            <span>Show / Hide Columns</span>
+            <div className="flex gap-2 items-center">
+              <button type="button" className="text-primary hover:underline font-bold transition-colors cursor-pointer" onClick={selectAll}>All</button>
+              <span className="text-line-soft">|</span>
+              <button type="button" className="text-ink-subtle hover:text-ink transition-colors font-bold cursor-pointer" onClick={deselectAll}>None</button>
             </div>
           </div>
           <div className="max-h-72 overflow-y-auto p-1.5 custom-scrollbar">
@@ -64,13 +66,14 @@ const ColumnToggle: React.FC<ColumnToggleProps> = ({ columns, visibleColumns, se
               return (
                 <button
                   key={index}
+                  type="button"
                   onClick={() => toggleColumn(col.header)}
-                  className="w-full text-left px-3 py-2 text-sm text-ink-muted hover:bg-blue-50/50 hover:text-blue-700 flex items-center gap-3 rounded-lg transition-all duration-150 group"
+                  className="w-full text-left px-3 py-2 text-xs text-ink hover:bg-card-2 flex items-center gap-3 rounded-lg transition-colors group cursor-pointer"
                 >
-                  <div className={`w-4 h-4 rounded-md border flex items-center justify-center flex-shrink-0 transition-colors ${isVisible ? 'bg-blue-600 border-blue-600 text-white shadow-sm' : 'border-line bg-card group-hover:border-blue-400'}`}>
-                    {isVisible && <FaCheck size={10} />}
+                  <div className={`w-4 h-4 rounded-md border flex items-center justify-center flex-shrink-0 transition-colors ${isVisible ? 'bg-primary border-primary text-white shadow-xs' : 'border-line-soft bg-card-2 group-hover:border-primary/50'}`}>
+                    {isVisible && <FaCheck size={9} />}
                   </div>
-                  <span className="truncate font-medium capitalize text-xs">
+                  <span className="truncate font-semibold capitalize">
                     {col.header.toLowerCase()}
                   </span>
                 </button>

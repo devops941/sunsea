@@ -213,9 +213,9 @@ const WastageStoreForm: React.FC = () => {
 
     return (
         <div className="w-full mx-auto h-full flex flex-col">
-            <div className="bg-white shadow-sm border border-gray-200 flex flex-col flex-1 h-full">
-                <div className="px-6 py-4 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <h2 className="text-xl font-bold text-gray-800">
+            <div className="bg-card rounded-xl shadow-xs border border-line-soft flex flex-col flex-1 h-full">
+                <div className="px-6 py-4 border-b border-line-soft flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <h2 className="text-xl font-bold text-ink">
                         {isEditMode ? "Edit Wastage Product" : "Create Wastage Product"}
                     </h2>
                     <BackButton text="Back to List" to="/wastage-store" />
@@ -318,12 +318,13 @@ const WastageStoreForm: React.FC = () => {
                         </div>
                     </div>
 
-                    <div className="px-6 py-4 flex justify-end gap-3 border-t border-gray-100 bg-gray-50">
+                    <div className="px-6 py-4 flex justify-end gap-3 border-t border-line-soft bg-card-2">
                         {!isEditMode && (
                             <CustomButton
                                 type="button"
                                 text="Clear"
                                 icon={FaEraser}
+                                variant="secondary"
                                 onClick={handleClear}
                                 disabled={isSubmitting}
                             />

@@ -215,9 +215,9 @@ const INITIAL_STATE: FormState = {
 const SectionHeader: React.FC<{ icon: React.ElementType; title: string; color?: string }> = ({
   icon: Icon, title, color = "text-primary",
 }) => (
-  <div className="flex items-center gap-2 mb-5 pb-2 border-b border-slate-100">
+  <div className="flex items-center gap-2 mb-5 pb-2 border-b border-line-soft">
     <Icon className={`${color} text-lg`} />
-    <h3 className="text-base font-semibold text-slate-700">{title}</h3>
+    <h3 className="text-base font-extrabold text-ink tracking-wide">{title}</h3>
   </div>
 );
 
@@ -745,7 +745,7 @@ const EmployeeEdit: React.FC = () => {
         <SectionHeader icon={FaCamera} title="Profile Photo" />
         <div className="flex items-center gap-6">
           <div
-            className="w-28 h-28 rounded-full border-2 border-dashed border-slate-300 flex items-center justify-center bg-slate-50 overflow-hidden cursor-pointer hover:border-primary transition-colors"
+            className="w-28 h-28 rounded-full border-2 border-dashed border-line-soft flex items-center justify-center bg-card-2 overflow-hidden cursor-pointer hover:border-primary transition-colors shadow-xs"
             onClick={() => photoInputRef.current?.click()}
           >
             {form.photoPreview ? (
@@ -761,9 +761,9 @@ const EmployeeEdit: React.FC = () => {
                 className="w-full h-full object-cover"
               />
             ) : (
-              <div className="flex flex-col items-center gap-1 text-slate-400">
-                <FaCamera size={24} />
-                <span className="text-xs">Upload Photo</span>
+              <div className="flex flex-col items-center gap-1 text-ink-subtle">
+                <FaCamera size={24} className="text-primary" />
+                <span className="text-xs font-semibold">Upload Photo</span>
               </div>
             )}
           </div>
@@ -771,11 +771,11 @@ const EmployeeEdit: React.FC = () => {
             <button
               type="button"
               onClick={() => photoInputRef.current?.click()}
-              className="px-4 py-2 text-sm font-medium text-primary border border-primary rounded-lg hover:bg-primary/5 transition-colors"
+              className="px-4 py-2 text-sm font-bold text-primary bg-primary/15 border border-primary/30 rounded-lg hover:bg-primary/25 transition-colors"
             >
               {form.existingPhotoUrl || form.photoPreview ? "Replace Photo" : "Choose Photo"}
             </button>
-            <p className="text-xs text-slate-400 mt-1">JPG, PNG, GIF up to 5MB</p>
+            <p className="text-xs text-ink-subtle mt-1.5 font-medium">JPG, PNG, GIF up to 5MB</p>
             {form.photoFile && (
               <p className="text-xs text-emerald-600 mt-1">New photo selected: {form.photoFile.name}</p>
             )}

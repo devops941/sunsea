@@ -261,10 +261,10 @@ const ItemRow: React.FC<ItemRowProps> = ({
         components.length === 0;
 
     return (
-        <div className="border border-slate-200 rounded-lg p-4 bg-white mb-3">
+        <div className="border border-line-soft rounded-xl p-4 bg-card mb-3">
             {/* ── Top row: number + product + qty + delete ── */}
             <div className="flex items-end gap-3">
-                <span className="text-sm font-medium text-slate-400 pb-2 w-5 shrink-0">{index + 1}</span>
+                <span className="text-sm font-medium text-ink-subtle pb-2 w-5 shrink-0">{index + 1}</span>
 
                 <div className="flex-1 min-w-0">
                     <SelectInput
@@ -311,20 +311,20 @@ const ItemRow: React.FC<ItemRowProps> = ({
                 )}
 
                 {hasComponents && (
-                    <div className="rounded-md border border-slate-100 overflow-hidden">
+                    <div className="rounded-md border border-line-soft overflow-hidden">
                         {/* Header */}
-                        <div className="grid grid-cols-[auto_1fr_auto_120px] gap-2 px-3 py-2 bg-slate-50 border-b border-slate-100">
+                        <div className="grid grid-cols-[auto_1fr_auto_120px] gap-2 px-3 py-2 bg-card-2 border-b border-line-soft">
                             <div className="w-5" />
-                            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Component</span>
-                            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider text-center w-16">Per Unit</span>
-                            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider text-center">Quantity</span>
+                            <span className="text-[11px] font-bold text-ink-subtle uppercase tracking-wider">Component</span>
+                            <span className="text-[11px] font-bold text-ink-subtle uppercase tracking-wider text-center w-16">Per Unit</span>
+                            <span className="text-[11px] font-bold text-ink-subtle uppercase tracking-wider text-center">Quantity</span>
                         </div>
 
                         {/* Component rows */}
                         {components.map((comp, compIdx) => (
                             <div
                                 key={comp.componentProductId}
-                                className={`grid grid-cols-[auto_1fr_auto_120px] gap-2 items-center px-3 py-2 border-b border-slate-50 last:border-b-0 transition-colors ${comp.included ? "bg-white" : "bg-slate-50 opacity-60"}`}
+                                className={`grid grid-cols-[auto_1fr_auto_120px] gap-2 items-center px-3 py-2 border-b border-line-soft last:border-b-0 transition-colors ${comp.included ? "bg-card" : "bg-card-2 opacity-60"}`}
                             >
                                 <input
                                     type="checkbox"
@@ -333,12 +333,12 @@ const ItemRow: React.FC<ItemRowProps> = ({
                                     className="w-4 h-4 rounded accent-blue-600 cursor-pointer"
                                 />
 
-                                <span className={`text-sm ${comp.included ? "text-slate-700" : "line-through text-slate-400"}`}>
+                                <span className={`text-sm ${comp.included ? "text-ink font-medium" : "line-through text-ink-subtle"}`}>
                                     {comp.productName}
                                 </span>
 
                                 {/* Per-unit badge */}
-                                <span className="text-xs text-slate-400 text-center w-16">×{comp.perUnit}</span>
+                                <span className="text-xs text-ink-subtle text-center w-16">×{comp.perUnit}</span>
 
                                 {/* Per-component Qty input */}
                                 <input
@@ -347,11 +347,9 @@ const ItemRow: React.FC<ItemRowProps> = ({
                                     value={comp.quantity}
                                     disabled={!comp.included}
                                     onChange={e => setCompQty(compIdx, e.target.value)}
-                                    className={`w-full text-sm border rounded px-2 py-1 text-center focus:outline-none focus:ring-1 focus:ring-blue-400 transition
-                                        ${comp.included
-                                            ? "border-slate-300 bg-white text-slate-800"
-                                            : "border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed"
-                                        }`}
+                                    className={`w-full text-sm border border-line-soft rounded px-2 py-1 text-center bg-card-2 text-ink focus:outline-none focus:border-primary transition
+                                        ${!comp.included ? "cursor-not-allowed opacity-50" : ""}
+                                    `}
                                 />
                             </div>
                         ))}
@@ -362,40 +360,77 @@ const ItemRow: React.FC<ItemRowProps> = ({
     );
 };
 
-// ─── Main Component ───────────────────────────────────────────────────────────
+// ─── Main Form Component ──────────────────────────────────────────────────────
 
 const SalesOrderForm: React.FC = () => {
     const navigate = useNavigate();
     const location = useLocation();
-    const { id: idParam } = useParams<{ id: string }>();
-    const [isSubmitting, setIsSubmitting] = useState(false);
-    const [orderId, setOrderId] = useState<number | null>(null);
-    const [salesProducts, setSalesProducts] = useState<any[]>([]);
-
-    const state = location.state as any;
-    const targetId = idParam ? Number(idParam) : state?.id ? Number(state.id) : null;
+    const { id: routeId } = useParams<{ id?: string }>();
+    const { can } = usePermission();
+    const targetId = routeId ? Number(routeId) : null;
     const isEditMode = Boolean(targetId);
 
-    const { data: company } = useSelector((state: any) => state.company);
-    const companyState = company?.state;
-
-    const { control, handleSubmit, watch, setValue, reset, formState: { errors } } =
-        useForm<SalesOrderFormValues>({
-            resolver: zodResolver(salesOrderSchema) as any,
-            defaultValues,
-        });
-
-    const { fields, append, remove } = useFieldArray({ control, name: "items" });
-
-    const { can } = usePermission();
-    const { loadCustomers, customers } = useCustomers();
+    const { customers, loadCustomers } = useCustomers();
     const { loadEmployees } = useEmployees();
+    const { socket } = useSocketSync();
 
-    useSocketSync("customer", undefined, loadCustomers);
+    const [salesProducts, setSalesProducts] = useState<any[]>([]);
+    const [orderId, setOrderId] = useState<number | null>(null);
+    const [companyState, setCompanyState] = useState<string>("");
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     const justResetRef = React.useRef(false);
 
-    // ─── Load Sales Products & Order Data ──────────────────────────────
+    const {
+        control,
+        handleSubmit,
+        watch,
+        setValue,
+        reset,
+        formState: { errors },
+    } = useForm<SalesOrderFormValues>({
+        resolver: zodResolver(salesOrderSchema),
+        defaultValues,
+    });
+
+    const { fields, append, remove } = useFieldArray({ control, name: "items" });
+
+    // ─── Socket Sync ─────────────────────────────────────────────────
+    useEffect(() => {
+        if (!socket) return;
+        const handleOrderUpdated = (data: { orderId: number }) => {
+            if (targetId && Number(data.orderId) === Number(targetId)) {
+                toast.info("This sales order was updated elsewhere. Refreshing...");
+                salesOrderService.fetchById(targetId).then(orderData => {
+                    const formItems = reconstructFormItems(orderData.items || [], salesProducts);
+                    reset({
+                        id: orderData.id,
+                        orderNo: orderData.orderNo || "",
+                        orderDate: orderData.orderDate ? orderData.orderDate.split("T")[0] : today,
+                        orderType: orderData.orderType || "",
+                        customerId: orderData.customerId != null ? String(orderData.customerId) : "",
+                        mobile: orderData.mobile || "",
+                        referenceText: orderData.referenceText || "",
+                        salesPersonName: orderData.salesPersonName || "",
+                        narration: orderData.remarks || orderData.internalNotes || "",
+                        items: formItems,
+                        isInterState: Boolean(orderData.isInterState),
+                    });
+                });
+            }
+        };
+        socket.on("salesOrder:updated", handleOrderUpdated);
+        return () => { socket.off("salesOrder:updated", handleOrderUpdated); };
+    }, [socket, targetId, salesProducts, reset]);
+
+    // ─── Load company info for inter-state ───────────────────────────
+    useEffect(() => {
+        salesOrderService.fetchCompanyState()
+            .then(st => setCompanyState(st || ""))
+            .catch(() => setCompanyState(""));
+    }, []);
+
+    // ─── Load sales products & order data ────────────────────────────
     useEffect(() => {
         let isMounted = true;
 
@@ -429,7 +464,6 @@ const SalesOrderForm: React.FC = () => {
                 } else {
                     setOrderId(null);
                     reset(defaultValues);
-                    // Auto-fetch next order number for new orders
                     try {
                         const nextCode = await salesOrderService.getNextOrderNo();
                         if (isMounted && nextCode) {
@@ -449,7 +483,7 @@ const SalesOrderForm: React.FC = () => {
         return () => {
             isMounted = false;
         };
-    }, [targetId, reset]);
+    }, [targetId, reset, setValue]);
 
     // ─── Load on mount ───────────────────────────────────────────────
     useEffect(() => {
@@ -512,7 +546,7 @@ const SalesOrderForm: React.FC = () => {
         } else {
             setValue("mobile", "", { shouldValidate: true });
         }
-    }, [mobileOptions, setValue, isEditMode]);
+    }, [mobileOptions, setValue, isEditMode, watch]);
 
     // ─── Clear salesperson/reference ────────────────────────────────
     useEffect(() => {
@@ -536,7 +570,6 @@ const SalesOrderForm: React.FC = () => {
     const onSubmit = async (data: SalesOrderFormValues, action: "draft" | "quotation") => {
         setIsSubmitting(true);
         try {
-            // Flatten per-component quantities, merging duplicates
             const expandedMap = new Map<number, number>();
 
             data.items.forEach(item => {
@@ -548,33 +581,34 @@ const SalesOrderForm: React.FC = () => {
                     });
             });
 
-            if (expandedMap.size === 0) {
-                toast.error("Please add at least one component with a quantity > 0.");
-                return;
-            }
-
-            const transformedItems = Array.from(expandedMap.entries()).map(([productId, quantity]) => ({
+            const mergedItems = Array.from(expandedMap.entries()).map(([productId, quantity]) => ({
                 productId,
                 quantity,
             }));
 
+            if (mergedItems.length === 0) {
+                toast.error("At least one component product must be included with a quantity > 0.");
+                setIsSubmitting(false);
+                return;
+            }
+
             const payload: any = {
                 orderNo: data.orderNo,
-                orderDate: new Date(data.orderDate).toISOString(),
-                customerId: data.customerId,
+                orderDate: data.orderDate,
+                customerId: Number(data.customerId),
                 mobile: data.mobile || null,
-                orderType: data.orderType,
-                referenceText: data.referenceText || null,
-                salesPersonName: data.salesPersonName || null,
+                orderType: data.orderType || null,
+                salesPersonName: data.orderType === "salesperson" ? data.salesPersonName : null,
+                referenceText: data.orderType === "reference" ? data.referenceText : null,
+                remarks: data.narration || null,
+                status: action === "draft" ? "DRAFT" : "SUBMITTED",
                 isInterState: data.isInterState,
-                narration: data.narration,
-                items: transformedItems,
-                status: action === "order" || action === "confirm" ? "CONFIRMED" : "DRAFT",
+                items: mergedItems,
             };
 
-            if (isEditMode && orderId) {
-                await salesOrderService.update(orderId, payload);
-                toast.success(payload.status === "DRAFT" ? "Sales Order Draft updated successfully!" : "Sales Order updated successfully!");
+            if (targetId) {
+                await salesOrderService.update(targetId, payload);
+                toast.success("Sales Order updated successfully!");
             } else {
                 await salesOrderService.create(payload);
                 toast.success(payload.status === "DRAFT" ? "Sales Order Draft created successfully!" : "Sales Order created successfully!");
@@ -592,11 +626,11 @@ const SalesOrderForm: React.FC = () => {
     // ─── Render ──────────────────────────────────────────────────────
     return (
         <div className="w-full mx-auto">
-            <div className="bg-white border border-gray-200">
+            <div className="bg-card rounded-xl border border-line-soft shadow-xs">
                 {/* Header */}
-                <div className="px-6 py-4">
+                <div className="px-6 py-4 border-b border-line-soft">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                        <h2 className="text-xl font-bold text-gray-800">
+                        <h2 className="text-xl font-bold text-ink">
                             {isEditMode ? "Edit Sales Order" : "Create Sales Order"}
                         </h2>
                         <BackButton text="Back to List" />
@@ -660,7 +694,7 @@ const SalesOrderForm: React.FC = () => {
                     {/* ── Order Items ── */}
                     <div>
                         <div className="flex justify-between items-center mb-3">
-                            <span className="text-lg font-semibold text-gray-800">Order Items</span>
+                            <span className="text-lg font-semibold text-ink">Order Items</span>
                             <CustomButton
                                 text="Add Sales Product"
                                 variant="secondary"
@@ -695,7 +729,7 @@ const SalesOrderForm: React.FC = () => {
                     </div>
 
                     {/* ── Actions ── */}
-                    <div className="flex flex-wrap justify-end gap-3 mt-8 pt-4 border-t border-gray-200">
+                    <div className="flex flex-wrap justify-end gap-3 mt-8 pt-4 border-t border-line-soft">
                         <CustomButton text="Clear" variant="danger" onClick={() => reset(defaultValues)} disabled={isSubmitting} />
                         <CustomButton variant="secondary" text={isSubmitting ? "Saving..." : "Save as Draft"} type="button" onClick={handleSubmit((data) => onSubmit(data as SalesOrderFormValues, "draft"))} disabled={isSubmitting} />
                         <CustomButton text={isSubmitting ? "Saving..." : "Save Order"} type="button" onClick={handleSubmit((data) => onSubmit(data as SalesOrderFormValues, "order"))} disabled={isSubmitting} />

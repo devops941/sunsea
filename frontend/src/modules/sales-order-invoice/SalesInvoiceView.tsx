@@ -31,10 +31,19 @@ const getMobileFromCustomer = (cust: any) => {
     return "";
 };
 
-const getTransportStation = (cust: any, transportName: string | null | undefined) => {
-    if (!cust || !transportName || !Array.isArray(cust.transports)) return "—";
-    const t = cust.transports.find((item: any) => item && item.transportName === transportName);
-    return t ? t.city || "—" : "—";
+// Extracts address from CustomerAddress[] (addresses stored as JSON in each record)
+const getCustomerAddress = (cust: any) => {
+    if (!cust || !Array.isArray(cust.addresses) || cust.addresses.length === 0) return null;
+    const defaultEntry = cust.addresses.find((a: any) => a.is_default) || cust.addresses[0];
+    const addr = defaultEntry?.address;
+    if (!addr || typeof addr !== "object") return null;
+    return {
+        addressLine1: addr.addressLine1 || addr.line1 || "",
+        addressLine2: addr.addressLine2 || addr.line2 || "",
+        city: addr.city || "",
+        state: addr.state || "",
+        pincode: addr.pincode || "",
+    };
 };
 
 // Basic number-to-words for Indian Rupees (integer part only, extend as needed)
@@ -93,37 +102,48 @@ const SalesInvoiceView: React.FC = () => {
     }, [fetchList]);
 
     const loadDetail = useCallback(async (idToLoad: string) => {
+        if (!idToLoad) return;
         setLoading(true);
         try {
             const data = await salesInvoiceService.fetchById(idToLoad);
             setInvoice(data);
-        } catch (error) {
-            toast.error("Failed to load invoice details");
+        } catch (error: any) {
+            const status = error?.response?.status;
+            if (status === 404) {
+                toast.error("Invoice not found");
+                navigate("/sales-invoices");
+            } else {
+                toast.error("Failed to load invoice details");
+            }
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [navigate]);
 
+    // Load invoice details when idParam changes
     useEffect(() => {
         const id = idParam || (location.state as any)?.id;
-        if (!id) {
-            if (invoicesList.length > 0) {
-                navigate(`/sales-invoices/details/${invoicesList[0].id}`);
-            }
-            return;
-        }
-
+        if (!id) return;
         loadDetail(id.toString());
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [idParam, invoicesList, loadDetail]);
+    }, [idParam]);
+
+    // Auto-navigate to first invoice only when there is no id at all
+    useEffect(() => {
+        const id = idParam || (location.state as any)?.id;
+        if (!id && !loadingList && invoicesList.length > 0) {
+            navigate(`/sales-invoices/details/${invoicesList[0].id}`);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [invoicesList, loadingList]);
 
     const handleSocketUpdate = useCallback(() => {
         fetchList();
-        const id = idParam || (location.state as any)?.id;
-        if (id) {
-            loadDetail(id.toString());
+        // Re-load current invoice detail only if we have a valid database id (from URL param)
+        if (idParam) {
+            loadDetail(idParam);
         }
-    }, [fetchList, idParam, location.state, loadDetail]);
+    }, [fetchList, idParam, loadDetail]);
 
     useSocketSync("salesInvoice", undefined, handleSocketUpdate);
 
@@ -246,14 +266,14 @@ const SalesInvoiceView: React.FC = () => {
     };
 
     return (
-        <div className="flex bg-gray-100 overflow-hidden h-[calc(100vh-115px)] print:block print:h-auto print:overflow-visible print:bg-white">
+        <div className="flex bg-page overflow-hidden h-[calc(100vh-115px)] print:block print:h-auto print:overflow-visible print:bg-white">
             {/* ── Left Sidebar (Invoice List) ── */}
-            <div className="hidden md:flex w-72 md:w-80 flex-shrink-0 bg-white border-r border-gray-200 flex-col h-full no-print">
-                <div className="p-4 border-b border-gray-200 flex flex-col gap-3">
+            <div className="hidden md:flex w-72 md:w-80 flex-shrink-0 bg-card border-r border-line flex-col h-full no-print">
+                <div className="p-4 border-b border-line flex flex-col gap-3">
                     <div className="flex items-center justify-between">
                         <button
                             onClick={() => navigate("/sales-invoices")}
-                            className="flex items-center gap-2 text-gray-700 hover:text-gray-900 font-bold text-lg"
+                            className="flex items-center gap-2 text-ink hover:text-primary font-bold text-lg transition-colors"
                         >
                             <FaArrowLeft className="text-sm" /> Sales Invoices
                         </button>
@@ -267,10 +287,10 @@ const SalesInvoiceView: React.FC = () => {
                     />
                 </div>
 
-                <div className="flex-1 overflow-y-auto divide-y divide-gray-100">
+                <div className="flex-1 overflow-y-auto divide-y divide-line-soft">
                     {loadingList ? (
                         <div className="flex items-center justify-center py-8">
-                            <FaCircleNotch className="animate-spin text-gray-400 text-xl" />
+                            <FaCircleNotch className="animate-spin text-ink-subtle text-xl" />
                         </div>
                     ) : filteredInvoices.map((inv) => {
                         const isSelected = String(inv.id) === String(idParam || invoice?.id);
@@ -278,11 +298,10 @@ const SalesInvoiceView: React.FC = () => {
                             <div
                                 key={inv.id}
                                 onClick={() => navigate(`/sales-invoices/details/${inv.id}`)}
-                                className={`p-4 cursor-pointer hover:bg-gray-50 transition-colors ${isSelected ? "bg-primary/10 border-l-4 border-primary" : ""
-                                    }`}
+                                className={`p-4 cursor-pointer hover:bg-card-2 transition-colors ${isSelected ? "bg-primary/10 border-l-4 border-primary" : ""}`}
                             >
                                 <div className="flex justify-between items-start mb-1">
-                                    <span className="font-bold text-gray-900">{inv.invoiceNo}</span>
+                                    <span className="font-bold text-ink">{inv.invoiceNo}</span>
                                     <span className={`px-2 py-0.5 rounded text-xs font-semibold ${inv.status?.toUpperCase() === "PAID"
                                         ? "bg-green-100 text-green-800"
                                         : "bg-yellow-100 text-yellow-800"
@@ -290,18 +309,18 @@ const SalesInvoiceView: React.FC = () => {
                                         {inv.status || "Draft"}
                                     </span>
                                 </div>
-                                <div className="text-sm text-gray-600 mb-2">
+                                <div className="text-sm text-ink-muted mb-2">
                                     {inv.customer?.displayName || inv.customer?.firmName || "N/A"}
                                 </div>
-                                <div className="flex justify-between items-center text-xs text-gray-400">
+                                <div className="flex justify-between items-center text-xs text-ink-subtle">
                                     <span>{formatDate(inv.invoiceDate)}</span>
-                                    <span className="font-bold text-gray-900">₹{formatMoney(inv.grandTotal)}</span>
+                                    <span className="font-bold text-ink">₹{formatMoney(inv.grandTotal)}</span>
                                 </div>
                             </div>
                         );
                     })}
                     {!loadingList && filteredInvoices.length === 0 && (
-                        <div className="p-8 text-center text-gray-500 text-sm">No invoices found.</div>
+                        <div className="p-8 text-center text-ink-muted text-sm">No invoices found.</div>
                     )}
                 </div>
             </div>
@@ -311,13 +330,13 @@ const SalesInvoiceView: React.FC = () => {
                 {loading || !invoice ? (
                     <div className="flex flex-col items-center justify-center h-full min-h-[400px]">
                         <FaCircleNotch className="animate-spin text-primary text-4xl mb-4" />
-                        <p className="text-gray-500 font-medium">Loading invoice details...</p>
+                        <p className="text-ink-muted font-medium">Loading invoice details...</p>
                     </div>
                 ) : (
                     <div className="max-w-5xl mx-auto">
                         {/* Action buttons */}
                         <div className="flex items-center justify-between gap-4 mb-6 no-print">
-                            <h2 className="text-xl font-bold text-gray-800 m-0">
+                            <h2 className="text-xl font-bold text-ink m-0">
                                 Sales Invoice #{invoice.invoiceNo}
                             </h2>
                             <div className="flex items-center gap-3">
@@ -326,43 +345,46 @@ const SalesInvoiceView: React.FC = () => {
                             </div>
                         </div>
 
-                        {/* Print stylesheet */}
+                        {/* Print + screen overrides — invoice card always white/black regardless of theme */}
                         <style>{`
+                            #printable-invoice-card,
+                            #printable-invoice-card * {
+                                color: #000 !important;
+                                border-color: #000 !important;
+                            }
+                            #printable-invoice-card {
+                                background: #fff !important;
+                            }
                             @media print {
-                                @page {
-                                    size: A4 portrait;
-                                    margin: 8mm;
-                                }
-                                body * {
-                                    visibility: hidden !important;
-                                }
-                                #printable-invoice-card, #printable-invoice-card * {
-                                    visibility: visible !important;
-                                }
-                                #printable-invoice-card {
-                                    position: absolute;
-                                    left: 0;
-                                    top: 0;
-                                    width: 100%;
-                                    min-height: auto !important;
-                                    background: #fff !important;
-                                    box-shadow: none !important;
-                                    margin: 0 !important;
-                                }
-                                .no-print {
-                                    display: none !important;
-                                }
+                                @page { size: A4 portrait; margin: 8mm; }
                                 html, body {
+                                    background: #fff !important;
                                     height: auto;
                                     overflow: visible !important;
                                 }
+                                body * { visibility: hidden !important; }
+                                #printable-invoice-card,
+                                #printable-invoice-card * {
+                                    visibility: visible !important;
+                                    -webkit-print-color-adjust: exact;
+                                    print-color-adjust: exact;
+                                }
+                                #printable-invoice-card {
+                                    position: absolute;
+                                    left: 0; top: 0;
+                                    width: 100%;
+                                    min-height: auto !important;
+                                    box-shadow: none !important;
+                                    margin: 0 !important;
+                                }
+                                .no-print { display: none !important; }
                             }
                         `}</style>
 
-                        {/* GST Tax Invoice Card */}
+                        {/* GST Tax Invoice Card — always white bg, black text */}
                         <div
                             id="printable-invoice-card"
-                            className="font-[Arial,sans-serif] text-black bg-white border-[1.5px] border-black w-full min-h-[262mm] flex flex-col justify-between box-border text-[14px] shadow-lg font-medium"
+                            className="font-[Arial,sans-serif] border-[1.5px] w-full min-h-[262mm] flex flex-col justify-between box-border text-[14px] shadow-lg font-medium"
                         >
                             <div>
                                 {/* Top bar */}
@@ -390,16 +412,16 @@ const SalesInvoiceView: React.FC = () => {
                                     <div className="flex-1 border-r-[1.5px] border-black p-2 space-y-1">
                                         <MetaRow label="Invoice No." value={invoice.invoiceNo} />
                                         <MetaRow label="Dated" value={formatDate(invoice.invoiceDate)} />
-                                        <MetaRow label="Place of Supply" value={invoice.customer?.billingState || "-"} />
-                                        <MetaRow label="Due Date" value={formatDate(invoice.dueDate)} />
+                                        <MetaRow label="Place of Supply" value={getCustomerAddress(invoice.customer)?.state || "-"} />
+                                        <MetaRow label="Due Date" value={invoice.dueDate ? formatDate(invoice.dueDate) : "-"} />
                                         <MetaRow label="Reverse Charge" value="N" />
                                         <MetaRow label="GR/RR No" value="" />
                                     </div>
                                     <div className="flex-1 p-2 space-y-1">
 
-                                        <MetaRow label="Transport" value={invoice.salesOrder?.transportName || "—"} />
+                                        <MetaRow label="Transport" value={invoice.transportName || "—"} />
                                         <MetaRow label="Vehicle No" value="—" />
-                                        <MetaRow label="Station" value={getTransportStation(invoice.customer, invoice.salesOrder?.transportName)} />
+                                        <MetaRow label="Station" value="—" />
                                         <MetaRow label="E-way Bill no" value="—" />
                                         {invoice.salesOrder?.orderNo && (
                                             <MetaRow label="Ref. Order No." value={invoice.salesOrder.orderNo} />
@@ -408,34 +430,41 @@ const SalesInvoiceView: React.FC = () => {
                                 </div>
 
                                 {/* Billed To / Shipped To */}
-                                <div className="flex border-b-[1.5px] border-black">
-                                    <div className="flex-1 border-r-[1.5px] border-black p-2">
-                                        <div className="font-bold mb-1">Billed to :</div>
-                                        <div className="font-semibold">
-                                            {invoice.customer?.displayName || invoice.customer?.firmName || "N/A"}
+                                {(() => {
+                                    const addr = getCustomerAddress(invoice.customer);
+                                    const custName = invoice.customer?.displayName || invoice.customer?.firmName || "N/A";
+                                    const mobile = invoice.salesOrder?.mobile || getMobileFromCustomer(invoice.customer);
+                                    return (
+                                        <div className="flex border-b-[1.5px] border-black">
+                                            <div className="flex-1 border-r-[1.5px] border-black p-2">
+                                                <div className="font-bold mb-1">Billed to :</div>
+                                                <div className="font-semibold">{custName}</div>
+                                                {addr && (
+                                                    <div className="font-semibold">
+                                                        {addr.addressLine1}{addr.addressLine2 ? `, ${addr.addressLine2}` : ""}<br />
+                                                        {addr.city}{addr.state ? `, ${addr.state}` : ""}{addr.pincode ? ` - ${addr.pincode}` : ""}
+                                                    </div>
+                                                )}
+                                                {invoice.customer?.gstin && (
+                                                    <div className="mt-1">GSTIN / UIN : {invoice.customer.gstin}</div>
+                                                )}
+                                                {mobile && (
+                                                    <div className="mt-1 font-semibold">Mobile: {mobile}</div>
+                                                )}
+                                            </div>
+                                            <div className="flex-1 p-2">
+                                                <div className="font-bold mb-1">Shipped to :</div>
+                                                <div className="font-semibold">{custName}</div>
+                                                {addr && (
+                                                    <div className="font-semibold">
+                                                        {addr.addressLine1}{addr.addressLine2 ? `, ${addr.addressLine2}` : ""}<br />
+                                                        {addr.city}{addr.state ? `, ${addr.state}` : ""}{addr.pincode ? ` - ${addr.pincode}` : ""}
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
-                                        <div className="font-semibold">
-                                            {invoice.customer?.billingAddressLine1}<br />
-                                            {invoice.customer?.billingCity}, {invoice.customer?.billingState} - {invoice.customer?.billingPincode}
-                                        </div>
-                                        {invoice.customer?.gstin && (
-                                            <div className="mt-1">GSTIN / UIN : {invoice.customer.gstin}</div>
-                                        )}
-                                        {(invoice.salesOrder?.mobile || getMobileFromCustomer(invoice.customer)) && (
-                                            <div className="mt-1 font-semibold">Mobile: {invoice.salesOrder?.mobile || getMobileFromCustomer(invoice.customer)}</div>
-                                        )}
-                                    </div>
-                                    <div className="flex-1 p-2">
-                                        <div className="font-bold mb-1">Shipped to :</div>
-                                        <div className="font-semibold">
-                                            {invoice.customer?.displayName || invoice.customer?.firmName || "N/A"}
-                                        </div>
-                                        <div className="font-semibold">
-                                            {invoice.salesOrder?.shippingAddressLine1 || invoice.customer?.shippingAddressLine1 || invoice.customer?.billingAddressLine1}<br />
-                                            {invoice.salesOrder?.shippingCity || invoice.customer?.shippingCity || invoice.customer?.billingCity}, {invoice.salesOrder?.shippingState || invoice.customer?.shippingState || invoice.customer?.billingState} - {invoice.salesOrder?.shippingPincode || invoice.customer?.shippingPincode || invoice.customer?.billingPincode}
-                                        </div>
-                                    </div>
-                                </div>
+                                    );
+                                })()}
 
                                 {/* Items Table */}
                                 <table className="w-full border-collapse text-[13px]">

@@ -19,10 +19,11 @@ class RawMaterialStockController {
   });
 
   findAll = asyncHandler(async (req: Request, res: Response) => {
-    const { search, storeId } = req.query;
+    const { search, storeId, storeCategory } = req.query;
     const stocks = await rawMaterialStockService.findAll({
       search: search as string,
-      storeId: storeId as string
+      storeId: storeId as string,
+      storeCategory: storeCategory as string,
     });
 
     return res.status(200).json(

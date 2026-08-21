@@ -55,18 +55,18 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
 
     return (
         <div className="relative w-full" ref={ref}>
-            <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">
+            <label className="block text-xs font-extrabold text-ink uppercase tracking-[0.5px] mb-2">
                 {label}
                 {required && <span className="text-red-500 ml-1">*</span>}
             </label>
 
             <div
-                className={`flex items-center justify-between w-full min-h-10 py-1 px-3 bg-white border rounded-md ${error ? 'border-red-500' : 'border-slate-300'} cursor-pointer ${open ? 'ring-1 ring-primary border-primary' : 'hover:border-slate-400'}`}
+                className={`flex items-center justify-between w-full min-h-10 py-1 px-3 bg-card-2 border rounded-md ${error ? 'border-red-500' : 'border-line-soft'} cursor-pointer ${open ? 'ring-1 ring-primary border-primary' : 'hover:border-line-soft/80'}`}
                 onClick={() => setOpen((prev) => !prev)}
             >
                 <div className="flex flex-wrap gap-1 flex-1">
                     {selectedLabels.length === 0 ? (
-                        <span className="text-xs font-semibold text-slate-400 py-1">{placeholder}</span>
+                        <span className="text-xs font-semibold text-ink-subtle py-1">{placeholder}</span>
                     ) : (
                         selectedLabels.map((label, i) => (
                             <span key={i} className="flex items-center gap-1 bg-primary/10 text-primary px-2 py-0.5 rounded text-[11px] font-bold">
@@ -85,27 +85,27 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
                         ))
                     )}
                 </div>
-                <div className="text-slate-400 pl-2">
+                <div className="text-ink-subtle pl-2">
                     {open ? <FaChevronUp size={12} /> : <FaChevronDown size={12} />}
                 </div>
             </div>
 
             {open && (
-                <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                <div className="absolute z-50 w-full mt-1 bg-card border border-line-soft rounded-md shadow-xl max-h-60 overflow-y-auto text-ink">
                     {options.length === 0 ? (
-                        <div className="p-3 text-xs text-slate-500 text-center">No options available</div>
+                        <div className="p-3 text-xs text-ink-subtle text-center">No options available</div>
                     ) : (
                         <div className="py-1">
                             {options.map((option) => (
                                 <div
                                     key={option.value}
-                                    className={`flex items-center px-3 py-2 text-xs font-semibold cursor-pointer hover:bg-slate-50 transition-colors  ${value.includes(option.value) ? "bg-primary/5 text-primary" : "text-slate-700"}`}
+                                    className={`flex items-center px-3 py-2 text-xs font-semibold cursor-pointer hover:bg-card-2 transition-colors ${value.includes(option.value) ? "bg-primary/10 text-primary" : "text-ink"}`}
                                     onClick={() => handleToggle(option.value)}
                                 >
                                     <div className="flex-shrink-0 mr-2 flex items-center justify-center">
                                         <input
                                             type="checkbox"
-                                            className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary focus:ring-offset-0 pointer-events-none"
+                                            className="w-4 h-4 rounded border-line-soft text-primary focus:ring-primary focus:ring-offset-0 pointer-events-none"
                                             checked={value.includes(option.value)}
                                             readOnly
                                         />

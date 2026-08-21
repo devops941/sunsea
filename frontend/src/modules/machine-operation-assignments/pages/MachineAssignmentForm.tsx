@@ -333,10 +333,10 @@ export const MachineAssignmentForm: React.FC = () => {
 
   return (
     <div className="w-full mx-auto">
-      <div className="bg-white  shadow-sm border border-slate-200 overflow-hidden">
-        <div className="px-6 py-5 border-b border-slate-200">
+      <div className="bg-card rounded-xl shadow-xs border border-line-soft overflow-hidden">
+        <div className="px-6 py-5 border-b border-line-soft">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <h2 className="text-xl font-bold text-slate-800">
+            <h2 className="text-xl font-bold text-ink">
               {isEdit ? "Edit Machine Assignment" : "Assign Machine Operation"}
             </h2>
             <BackButton text="Back to List" to="/machines/assignments" />
@@ -346,7 +346,7 @@ export const MachineAssignmentForm: React.FC = () => {
         <form onSubmit={handleSubmit} className="px-6 py-5 space-y-6" noValidate>
           {/* Section 1: Week, Machine & Shift Selection */}
           <div className="space-y-4">
-            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+            <h3 className="text-xs font-semibold text-ink-subtle uppercase tracking-wider">
               1. Week, Machine & Shift Selection
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
@@ -415,9 +415,9 @@ export const MachineAssignmentForm: React.FC = () => {
           </div>
 
           {/* Section 2: Machine Operator Assignment */}
-          <div className="space-y-4 pt-5 border-t border-slate-100">
+          <div className="space-y-4 pt-5 border-t border-line-soft">
             <div className="flex justify-between items-center">
-              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+              <h3 className="text-xs font-semibold text-ink-subtle uppercase tracking-wider">
                 2. Machine Operator Assignment (Weekly)
               </h3>
               <CustomButton
@@ -432,14 +432,14 @@ export const MachineAssignmentForm: React.FC = () => {
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               {formData.operators.map((operator, index) => (
-                <div key={index} className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-4 relative group">
+                <div key={index} className="bg-card-2 p-4 rounded-xl border border-line-soft space-y-4 relative group">
                   <div className="flex justify-between items-center">
-                    <span className="text-sm font-semibold text-slate-700">Operator {index + 1}</span>
+                    <span className="text-sm font-semibold text-ink">Operator {index + 1}</span>
                     {formData.operators.length > 1 && (
                       <button
                         type="button"
                         onClick={() => handleRemoveOperator(index)}
-                        className="text-red-400 hover:text-red-600 p-1 bg-red-50 hover:bg-red-100 rounded transition-colors"
+                        className="text-red-400 hover:text-red-300 p-1 bg-red-500/10 hover:bg-red-500/20 rounded transition-colors"
                         title="Remove Operator"
                       >
                         <FaTimes size={13} />
@@ -490,8 +490,8 @@ export const MachineAssignmentForm: React.FC = () => {
           </div>
 
           {/* Section 3: Machine Incharge */}
-          <div className="space-y-4 pt-5 border-t border-slate-100">
-            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+          <div className="space-y-4 pt-5 border-t border-line-soft">
+            <h3 className="text-xs font-semibold text-ink-subtle uppercase tracking-wider">
               3. Machine Incharge (Optional Override)
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -533,7 +533,7 @@ export const MachineAssignmentForm: React.FC = () => {
           </div>
 
           {/* Section 4: Remarks */}
-          <div className="space-y-4 pt-5 border-t border-slate-100">
+          <div className="space-y-4 pt-5 border-t border-line-soft">
             <div className="grid grid-cols-1 gap-5">
               <TextInput
                 label="Remarks / Notes (Optional)"
@@ -546,10 +546,11 @@ export const MachineAssignmentForm: React.FC = () => {
           </div>
 
           {/* Actions */}
-          <div className="flex justify-end gap-3 mt-8 pt-5 border-t border-slate-100">
+          <div className="flex justify-end gap-3 mt-8 pt-5 border-t border-line-soft">
             <CustomButton
               text="Clear"
               icon={FaEraser}
+              variant="secondary"
               onClick={handleClear}
               disabled={loading}
             />

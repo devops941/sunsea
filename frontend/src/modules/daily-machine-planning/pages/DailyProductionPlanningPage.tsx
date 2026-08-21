@@ -451,7 +451,7 @@ const DailyProductionPlanningPage: React.FC = () => {
       width: "52px",
       align: "center",
       render: (_row: any, idx: number) => (
-        <span className="text-xs font-medium text-slate-400">{(currentPage - 1) * itemsPerPage + idx + 1}</span>
+        <span className="text-xs font-semibold text-ink-subtle">{(currentPage - 1) * itemsPerPage + idx + 1}</span>
       )
     },
     {
@@ -459,22 +459,22 @@ const DailyProductionPlanningPage: React.FC = () => {
       render: (plan: any) => (
         <div className="flex flex-col gap-0.5 py-1">
           <button
-            className="text-sm font-semibold text-indigo-600 hover:text-indigo-800 hover:underline cursor-pointer bg-transparent border-none p-0 text-left leading-tight"
+            className="text-sm font-bold text-primary hover:underline cursor-pointer bg-transparent border-none p-0 text-left leading-tight"
             onClick={() => { setSelectedPOForView(plan.productionOrder); setShowPOViewModal(true); }}
             title="View Production Order details"
           >
             {plan.productionOrderId}
           </button>
-          <span className="text-xs text-slate-500 leading-tight line-clamp-1" title={plan.productionOrder?.productItem?.productName}>
+          <span className="text-xs text-ink font-medium leading-tight line-clamp-1" title={plan.productionOrder?.productItem?.productName}>
             {plan.productionOrder?.productItem?.productName || "—"}
           </span>
           {plan.carryForwardFromPlanId && (
-            <span className="inline-flex items-center gap-1 mt-0.5 bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded text-[9px] font-bold w-fit">
+            <span className="inline-flex items-center gap-1 mt-0.5 bg-amber-500/15 text-amber-300 border border-amber-500/30 px-1.5 py-0.5 rounded text-[9px] font-bold w-fit">
               ↩ From {plan.carryForwardFromPlanId}
             </span>
           )}
           {Array.isArray(plan.carryForwardTo) && plan.carryForwardTo.length > 0 && (
-            <span className="inline-flex items-center gap-1 mt-0.5 bg-sky-50 text-sky-700 border border-sky-200 px-1.5 py-0.5 rounded text-[9px] font-bold w-fit">
+            <span className="inline-flex items-center gap-1 mt-0.5 bg-sky-500/15 text-sky-300 border border-sky-500/30 px-1.5 py-0.5 rounded text-[9px] font-bold w-fit">
               ↪ To {plan.carryForwardTo[0].dailyPlanId}
             </span>
           )}
@@ -485,16 +485,16 @@ const DailyProductionPlanningPage: React.FC = () => {
       header: "Machine / Shift",
       render: (plan: any) => (
         <div className="flex flex-col gap-1 py-1">
-          <div className="flex items-center gap-1.5 text-sm font-medium text-slate-700">
-            <FaIndustry className="text-slate-400 flex-shrink-0" size={12} />
+          <div className="flex items-center gap-1.5 text-sm font-bold text-ink">
+            <FaIndustry className="text-primary flex-shrink-0" size={13} />
             <span className="leading-tight">{plan.machine?.machineName || plan.machineId || "—"}</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="bg-slate-100 text-slate-600 border border-slate-200 px-2 py-0.5 rounded text-[10px] font-semibold">
+            <span className="bg-card-2 text-ink border border-line-soft px-2 py-0.5 rounded text-[10px] font-bold">
               {plan.shift?.shiftName || plan.shiftId || "—"}
             </span>
             {plan.shift?.startTime && plan.shift?.endTime && (
-              <span className="text-slate-400 text-[10px]">
+              <span className="text-ink-subtle text-[11px] font-semibold">
                 {plan.shift.startTime.slice(0, 5)} – {plan.shift.endTime.slice(0, 5)}
               </span>
             )}
@@ -509,10 +509,10 @@ const DailyProductionPlanningPage: React.FC = () => {
         const plannedQty = Number(plan.plannedQty || 0);
         return (
           <div className="flex flex-col items-center gap-0.5">
-            <span className="text-sm font-bold text-slate-800">{plannedQty.toLocaleString()}</span>
-            <span className="text-[10px] text-slate-400 font-medium">pcs</span>
+            <span className="text-sm font-extrabold text-ink">{plannedQty.toLocaleString()}</span>
+            <span className="text-[10px] text-ink-subtle font-bold">pcs</span>
             {plan.plannedHours && (
-              <span className="text-[10px] text-slate-400">{plan.plannedHours} hrs</span>
+              <span className="text-[11px] text-ink font-semibold">{plan.plannedHours} hrs</span>
             )}
           </div>
         );
@@ -532,12 +532,12 @@ const DailyProductionPlanningPage: React.FC = () => {
         return (
           <div className="flex flex-col items-center gap-1 w-full min-w-[80px]">
             <div className="flex items-baseline gap-1">
-              <span className="text-sm font-bold text-slate-800">{progressPercent}%</span>
+              <span className="text-sm font-extrabold text-ink">{progressPercent}%</span>
             </div>
-            <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+            <div className="w-full h-2 bg-card-2 border border-line-soft rounded-full overflow-hidden">
               <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${progressPercent}%` }} />
             </div>
-            <span className="text-[10px] text-slate-400">{producedQty} / {plannedQty} pcs</span>
+            <span className="text-[11px] font-semibold text-ink-subtle">{producedQty} / {plannedQty} pcs</span>
           </div>
         );
       }
@@ -555,11 +555,11 @@ const DailyProductionPlanningPage: React.FC = () => {
         return (
           <div className="flex justify-center">
             {producedQty > plannedQty ? (
-              <StatusBadge status="COMPLETED" customText={`+${producedQty - plannedQty} Extra`} customColor={{ bg: '#d1fae5', text: '#065f46' }} />
+              <StatusBadge status="COMPLETED" customText={`+${producedQty - plannedQty} Extra`} customColor={{ bg: 'rgba(16, 185, 129, 0.15)', text: '#34d399' }} />
             ) : (pendingQty > 0 && plan.status !== "CANCELLED") ? (
-              <StatusBadge status="PENDING" customText={`${pendingQty} Pending`} customColor={{ bg: '#fee2e2', text: '#b91c1c' }} />
+              <StatusBadge status="PENDING" customText={`${pendingQty} Pending`} customColor={{ bg: 'rgba(239, 68, 68, 0.15)', text: '#f87171' }} />
             ) : (
-              <span className="text-slate-300 text-xs">—</span>
+              <span className="text-ink-subtle text-xs font-semibold">—</span>
             )}
           </div>
         );
@@ -965,13 +965,13 @@ const DailyProductionPlanningPage: React.FC = () => {
   ], [viewPlan?.dailyPlanId]);
 
   return (
-    <div className="p-4 md:p-6 bg-white">
+    <div className="p-4 md:p-6 bg-card rounded-2xl border border-line-soft shadow-xs">
       <div className="w-full">
         {/* Page Header */}
         <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 mb-6">
           <div>
-            <h2 className="text-2xl font-bold text-slate-800">Daily Production Planning</h2>
-            <p className="text-sm text-slate-500 mt-0.5">Manage and track daily machine production runs</p>
+            <h2 className="text-2xl font-extrabold text-ink tracking-tight">Daily Production Planning</h2>
+            <p className="text-sm font-semibold text-ink-subtle mt-0.5">Manage and track daily machine production runs</p>
           </div>
 
           <div className="flex flex-wrap items-center gap-3 relative w-full lg:w-auto">
@@ -983,7 +983,7 @@ const DailyProductionPlanningPage: React.FC = () => {
               onOpen={handleOpenFilter}
             >
               <div className="mb-3">
-                <label className="block mb-1 text-[11px] uppercase tracking-wider text-gray-500 font-semibold">Date</label>
+                <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-bold">Date</label>
                 <DatePickerCalendar
                   name="filterDate"
                   value={draftFilterDate}
@@ -991,9 +991,9 @@ const DailyProductionPlanningPage: React.FC = () => {
                 />
               </div>
               <div className="mb-3">
-                <label className="block mb-1 text-[11px] uppercase tracking-wider text-gray-500 font-semibold">Machine</label>
+                <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-bold">Machine</label>
                 <select
-                  className="w-full border border-gray-200 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary bg-white"
+                  className="w-full border border-line-soft rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary bg-card-2 text-ink font-semibold"
                   value={draftFilterMachine}
                   onChange={(e) => setDraftFilterMachine(e.target.value)}
                 >
@@ -1004,9 +1004,9 @@ const DailyProductionPlanningPage: React.FC = () => {
                 </select>
               </div>
               <div className="mb-3">
-                <label className="block mb-1 text-[11px] uppercase tracking-wider text-gray-500 font-semibold">Shift</label>
+                <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-bold">Shift</label>
                 <select
-                  className="w-full border border-gray-200 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary bg-white"
+                  className="w-full border border-line-soft rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary bg-card-2 text-ink font-semibold"
                   value={draftFilterShift}
                   onChange={(e) => setDraftFilterShift(e.target.value)}
                 >
@@ -1017,9 +1017,9 @@ const DailyProductionPlanningPage: React.FC = () => {
                 </select>
               </div>
               <div className="mb-4">
-                <label className="block mb-1 text-[11px] uppercase tracking-wider text-gray-500 font-semibold">Status</label>
+                <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-bold">Status</label>
                 <select
-                  className="w-full border border-gray-200 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary bg-white"
+                  className="w-full border border-line-soft rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary bg-card-2 text-ink font-semibold"
                   value={draftFilterStatus}
                   onChange={(e) => setDraftFilterStatus(e.target.value)}
                 >
@@ -1054,25 +1054,25 @@ const DailyProductionPlanningPage: React.FC = () => {
         {/* Stats Cards */}
         <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
           {[
-            { label: "Total Plans", value: stats.total, icon: FaCalendarAlt, colorClass: "text-indigo-600", iconBg: "bg-indigo-100", iconColor: "text-indigo-500" },
-            { label: "Planned", value: stats.planned, icon: FaCheckCircle, colorClass: "text-amber-600", iconBg: "bg-amber-100", iconColor: "text-amber-500" },
-            { label: "In Progress", value: stats.running, icon: FaPlay, colorClass: "text-sky-600", iconBg: "bg-sky-100", iconColor: "text-sky-500" },
-            { label: "Completed", value: stats.completed, icon: FaStop, colorClass: "text-emerald-600", iconBg: "bg-emerald-100", iconColor: "text-emerald-500" },
+            { label: "Total Plans", value: stats.total, icon: FaCalendarAlt, colorClass: "text-indigo-400", iconBg: "bg-indigo-500/20 border border-indigo-500/30", iconColor: "text-indigo-400" },
+            { label: "Planned", value: stats.planned, icon: FaCheckCircle, colorClass: "text-amber-400", iconBg: "bg-amber-500/20 border border-amber-500/30", iconColor: "text-amber-400" },
+            { label: "In Progress", value: stats.running, icon: FaPlay, colorClass: "text-sky-400", iconBg: "bg-sky-500/20 border border-sky-500/30", iconColor: "text-sky-400" },
+            { label: "Completed", value: stats.completed, icon: FaStop, colorClass: "text-emerald-400", iconBg: "bg-emerald-500/20 border border-emerald-500/30", iconColor: "text-emerald-400" },
           ].map((stat) => (
-            <div key={stat.label} className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 flex items-center gap-4 hover:-translate-y-0.5 transition-transform cursor-default">
+            <div key={stat.label} className="bg-card-2 rounded-xl border border-line-soft shadow-xs p-4 flex items-center gap-4 hover:-translate-y-0.5 transition-transform cursor-default">
               <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${stat.iconBg}`}>
                 <stat.icon size={20} className={stat.iconColor} />
               </div>
               <div>
-                <p className="text-xs font-medium text-slate-500 mb-0.5">{stat.label}</p>
-                <p className={`text-2xl font-bold m-0 leading-tight ${stat.colorClass}`}>{stat.value}</p>
+                <p className="text-xs font-extrabold uppercase tracking-wide text-ink mb-1">{stat.label}</p>
+                <p className={`text-2xl font-black m-0 leading-tight ${stat.colorClass}`}>{stat.value}</p>
               </div>
             </div>
           ))}
         </div>
 
         {/* Daily Plans Table */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="bg-card rounded-2xl shadow-xs border border-line-soft overflow-hidden">
           <DataTable
             columns={columns}
             data={paginatedPlans}

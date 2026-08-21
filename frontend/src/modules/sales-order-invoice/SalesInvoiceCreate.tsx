@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { FaSave, FaPlus, FaTrash, FaFileInvoiceDollar, FaExclamationTriangle, FaCreditCard } from "react-icons/fa";
 import { toast } from "react-toastify";
 import { useSelector, useDispatch } from "react-redux";
@@ -153,6 +153,8 @@ const calculateInvoiceNumber = (dateStr: string, settings: any, orders: any[]) =
 const SalesInvoiceForm: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
+  const location = useLocation();
+  const preselectedOrderId: string | undefined = (location.state as any)?.preselectedOrderId;
   const isEditMode = Boolean(id);
   const dispatch = useDispatch<any>();
   const { data: company } = useSelector((state: any) => state.company);
@@ -261,7 +263,7 @@ const SalesInvoiceForm: React.FC = () => {
       productService.fetchAll().catch(() => []),
       invoiceSettingsService.getConfig().catch(() => null),
       salesInvoiceService.fetchAll({ pageSize: 100 }).catch(() => ({ data: [] } as any)),
-      salesOrderService.fetchAll({ pageSize: 100, status: "IN_PRODUCTION" as SalesOrderStatus }).catch(() => ({ data: [] } as any)),
+      salesOrderService.fetchAll({ pageSize: 500 }).catch(() => ({ data: [] } as any)),
       finishedGoodsStockService.fetchAll().catch(() => []),
       gstTaxService.fetchAll().catch(() => ({ data: [] } as any)),
     ])
@@ -289,24 +291,11 @@ const SalesInvoiceForm: React.FC = () => {
 
         const rawSalesOrdersList = salesOrdersResponse?.data || salesOrdersResponse || [];
 
-        // Use invoicedQty field on each SalesOrderItem (like receivedQty on PurchaseOrderItem)
-        // to compute remaining quantity and filter out fully-invoiced orders
-        const salesOrdersList = rawSalesOrdersList
-          .map((so: any) => {
-            const remainingItems = (so.items || [])
-              .map((item: any) => {
-                const ordered = Number(item.quantity || 0);
-                const invoiced = Number(item.invoicedQty || 0);
-                const remaining = ordered - invoiced;
-                if (remaining <= 0) return null;
-                return { ...item, quantity: remaining };
-              })
-              .filter(Boolean);
-
-            if (remainingItems.length === 0) return null; // fully invoiced
-            return { ...so, items: remainingItems };
-          })
-          .filter(Boolean);
+        // Keep all active orders for the dropdown; exclude only cancelled orders
+        const EXCLUDED_STATUSES = ['CANCELLED'];
+        const salesOrdersList = rawSalesOrdersList.filter(
+          (so: any) => !EXCLUDED_STATUSES.includes(so.status)
+        );
 
         // Map Finished Goods Stock to onHandQty by productItemId
         const fgList: any[] = Array.isArray(fgStockResponse) ? fgStockResponse : (fgStockResponse as any).data || [];
@@ -323,6 +312,64 @@ const SalesInvoiceForm: React.FC = () => {
         setStockMap(fgStockMap);
 
         setSalesOrders(salesOrdersList);
+
+        // Auto-populate when navigated from Quotation List with a preselected order
+        // fetchAll doesn't include items — fetch the full order detail directly
+        if (preselectedOrderId) {
+          salesOrderService.fetchById(preselectedOrderId)
+            .then((fullOrder: any) => {
+              if (!fullOrder) return;
+
+              // Set customer first so the SO dropdown enables
+              const custId = fullOrder.customerId?.toString() || fullOrder.customer?.id?.toString() || "";
+              if (custId) setCustomerId(custId);
+
+              // Set selected sales order
+              setSelectedSalesOrderId(String(fullOrder.id));
+
+              // Make sure this order exists in salesOrders state for dropdown display
+              setSalesOrders((prev: any[]) => {
+                const exists = prev.some((o: any) => String(o.id) === String(fullOrder.id));
+                return exists ? prev : [...prev, fullOrder];
+              });
+
+              // Populate line items from the full order
+              const orderItems = fullOrder.items || [];
+              if (orderItems.length > 0) {
+                const newLines = orderItems.map((item: any) => {
+                  const qty = Number(item.quantity || item.qty || 1);
+                  const discountAmount = Number(item.discountAmount || 0);
+                  let rate = 0;
+                  if (Number(item.unitPrice) > 0) rate = Number(item.unitPrice);
+                  else if (Number(item.rate) > 0) rate = Number(item.rate);
+                  else if (Number(item.b2b) > 0) rate = Number(item.b2b);
+                  else if (Number(item.mrp) > 0) rate = Number(item.mrp);
+                  const taxPercent = Number(item.igstRate) > 0
+                    ? Number(item.igstRate)
+                    : (Number(item.cgstRate || 0) + Number(item.sgstRate || 0));
+                  const amount = qty * rate;
+                  const taxableAmount = amount - discountAmount;
+                  const taxAmount = (taxableAmount * taxPercent) / 100;
+                  return {
+                    id: crypto.randomUUID(),
+                    itemId: String(item.productId || ""),
+                    itemName: item.product?.productName || item.productName || "Unknown Item",
+                    qty,
+                    rate,
+                    discountAmount,
+                    taxPercent,
+                    amount,
+                    taxAmount,
+                    total: taxableAmount + taxAmount,
+                  };
+                });
+                setLines(newLines);
+              }
+            })
+            .catch(() => {
+              // If fetch fails, user can still select manually
+            });
+        }
 
         const gstList = gstResponse?.data || [];
         setGstRates(gstList);
@@ -351,6 +398,7 @@ const SalesInvoiceForm: React.FC = () => {
       setPreviewInvoiceNo(calculatedNo);
     }
   }, [id, invoiceDate, invoiceSettings, allOrders]);
+
 
   const handleSalesOrderChange = (soId: string) => {
     setSelectedSalesOrderId(soId);
