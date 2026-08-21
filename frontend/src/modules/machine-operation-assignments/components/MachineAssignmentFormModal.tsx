@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { FaTimes, FaUserCheck, FaCogs, FaCheck, FaInfoCircle, FaPlus } from "react-icons/fa";
+import { FaTimes, FaCogs, FaCheck, FaInfoCircle, FaPlus } from "react-icons/fa";
 import { toast } from "react-toastify";
 import CustomButton from "../../../components/ui/Button/Button";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
@@ -46,8 +46,6 @@ export const MachineAssignmentFormModal: React.FC<Props> = ({
     shiftId: "",
     weekStartDate: currentWeek.start,
     weekEndDate: currentWeek.end,
-    inchargeRoleId: "",
-    inchargeEmployeeId: "",
     operators: [] as { roleId: string; employeeId: string }[],
     remarks: "",
     isActive: true,
@@ -56,9 +54,7 @@ export const MachineAssignmentFormModal: React.FC<Props> = ({
   const [machines, setMachines] = useState<any[]>([]);
   const [shifts, setShifts] = useState<any[]>([]);
   const [roles, setRoles] = useState<any[]>([]);
-  const [inchargeEmployees, setInchargeEmployees] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [inchargeAutoFilled, setInchargeAutoFilled] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [employeesByRole, setEmployeesByRole] = useState<Record<string, any[]>>({});
 
@@ -87,14 +83,13 @@ export const MachineAssignmentFormModal: React.FC<Props> = ({
   const refreshEmployees = useCallback(() => {
     // Re-fetch employees for all currently selected roles
     const roleIds = new Set<string>();
-    if (formData.inchargeRoleId) roleIds.add(formData.inchargeRoleId);
     formData.operators.forEach(op => { if (op.roleId) roleIds.add(op.roleId); });
     roleIds.forEach(roleId => {
       machineOperationAssignmentService.getEmployeesByRole(Number(roleId))
         .then(res => setEmployeesByRole(prev => ({ ...prev, [roleId]: res.data || [] })))
         .catch(err => console.error(err));
     });
-  }, [formData.inchargeRoleId, formData.operators]);
+  }, [formData.operators]);
 
   // Real-time socket sync for dropdowns
   useSocketSync("machine", undefined, fetchRefData);
@@ -143,8 +138,6 @@ export const MachineAssignmentFormModal: React.FC<Props> = ({
         shiftId: initialData.shiftId || "",
         weekStartDate: initialData.weekStartDate ? initialData.weekStartDate.split("T")[0] : currentWeek.start,
         weekEndDate: initialData.weekEndDate ? initialData.weekEndDate.split("T")[0] : currentWeek.end,
-        inchargeRoleId: initialData.inchargeRoleId ? String(initialData.inchargeRoleId) : "",
-        inchargeEmployeeId: initialData.inchargeEmployeeId ? String(initialData.inchargeEmployeeId) : "",
         operators: initialData.operators ? initialData.operators.map((o: any) => ({
           roleId: String(o.roleId),
           employeeId: String(o.employeeId),
@@ -163,15 +156,12 @@ export const MachineAssignmentFormModal: React.FC<Props> = ({
         shiftId: "",
         weekStartDate: currentWeek.start,
         weekEndDate: currentWeek.end,
-        inchargeRoleId: "",
-        inchargeEmployeeId: "",
         operators: [
           { roleId: "", employeeId: "" }
         ],
         remarks: "",
         isActive: true,
       });
-      setInchargeAutoFilled(false);
     }
     setErrors({});
   }, [initialData, isOpen]);
@@ -304,8 +294,6 @@ export const MachineAssignmentFormModal: React.FC<Props> = ({
         shiftId: formData.shiftId,
         weekStartDate: formData.weekStartDate,
         weekEndDate: formData.weekEndDate,
-        inchargeRoleId: formData.inchargeRoleId ? Number(formData.inchargeRoleId) : null,
-        inchargeEmployeeId: formData.inchargeEmployeeId ? String(formData.inchargeEmployeeId) : null,
         operators: formData.operators.map(o => ({
           roleId: Number(o.roleId),
           employeeId: String(o.employeeId),
@@ -501,51 +489,7 @@ export const MachineAssignmentFormModal: React.FC<Props> = ({
           </div>
 
 
-          {/* Section 3.5: Incharge Assignment (Optional override) */}
-          <div className="pt-4 border-t border-slate-100">
-            <h3 className="text-[13px] font-bold text-slate-700 uppercase tracking-wider mb-4 flex items-center gap-2">
-              <FaUserCheck className="text-emerald-500" />
-              Machine Incharge (Optional Override)
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <SelectInput
-                label="Incharge Role"
-                name="inchargeRole"
-                value={formData.inchargeRoleId}
-                onChange={(e) => {
-                  setFormData(prev => ({ ...prev, inchargeRoleId: e.target.value, inchargeEmployeeId: "" }));
-                  if (e.target.value) {
-                    fetchEmployeesForRole(e.target.value);
-                  }
-                }}
-                options={[
-                  { label: "-- Default (From Machine) --", value: "" },
-                  ...roles.map((r) => ({
-                    label: r.name,
-                    value: String(r.id),
-                  })),
-                ]}
-              />
-
-              <SelectInput
-                label="Incharge Employee"
-                name="inchargeEmp"
-                value={formData.inchargeEmployeeId}
-                onChange={(e) => setFormData(prev => ({ ...prev, inchargeEmployeeId: e.target.value }))}
-                disabled={!formData.inchargeRoleId}
-                options={[
-                  { label: "-- Select Incharge --", value: "" },
-                  ...(employeesByRole[formData.inchargeRoleId] || []).map((e: any) => ({
-                    label: `${e.fullName} (${e.empCode})`,
-                    value: String(e.id),
-                    disabled: selectedEmpIds.has(String(e.id)) && formData.inchargeEmployeeId !== String(e.id)
-                  })),
-                ]}
-              />
-            </div>
-          </div>
-
-          {/* Section 4: Remarks */}
+          {/* Section 3: Remarks */}
           <div className="pt-4 border-t border-slate-100">
             <TextInput
               label="Remarks / Notes (Optional)"

@@ -31,7 +31,6 @@ export const sidebarItems: SidebarItem[] = [
       { permission: "roles.view", path: "/roles" },
       { permission: "departments.view", path: "/departments" },
       { permission: "role-permissions.view", path: "/role-permissions" },
-      { permission: "gst_tax.view", path: "/settings/gst-taxes" },
       { permission: "whatsapp.view", path: "/whatsapp" },
       { permission: "email-config.view", path: "/email-config" },
       { permission: "invoice-settings.view", path: "/settings/invoice" },
@@ -56,14 +55,6 @@ export const sidebarItems: SidebarItem[] = [
       },
       { title: "Permissions", path: "/role-permissions", permission: "role-permissions.view" },
       { title: "Company Settings", path: "/settings/company", permission: "company-settings.view" },
-      {
-        title: "% GST Tax Rates",
-        permission: "gst_tax.view",
-        children: [
-          { title: "GST Tax Rate List", path: "/settings/gst-taxes", permission: "gst_tax.view" },
-          { title: "Add GST Tax Rate", path: "/settings/gst-taxes?action=add", permission: "gst_tax.create" }
-        ]
-      },
       { title: "Whatsapp", path: "/whatsapp", permission: "whatsapp.view" },
       { title: "Email", path: "/email-config", permission: "email-config.view" },
       { title: "Invoice", path: "/settings/invoice", permission: "invoice-settings.view" },
@@ -71,7 +62,6 @@ export const sidebarItems: SidebarItem[] = [
     activePaths: [
       "/company/view",
       "/settings/company",
-      "/settings/gst-taxes",
       "/whatsapp",
       "/settings/invoice",
       "/roles",
@@ -85,7 +75,6 @@ export const sidebarItems: SidebarItem[] = [
       "roles.view",
       "departments.view",
       "role-permissions.view",
-      "gst_tax.view",
       "whatsapp.view",
       "email-config.view",
       "invoice-settings.view",
@@ -254,7 +243,6 @@ export const sidebarItems: SidebarItem[] = [
         ]
       },
       { title: "Purchase Orders", path: "/purchase-orders", permission: "purchaseOrders.view" },
-      { title: "MD Approvals", path: "/purchase-order-approvals", permission: "purchase-order-approvals.view" },
       { title: "Bill & Invoice", path: "/invoice", permission: "invoice.view" },
       { title: "Expenses", path: "/expenses", permission: "expenses.view" },
       { title: "Purchase Return", path: "/purchase-returns", permission: "purchase-returns.view" },

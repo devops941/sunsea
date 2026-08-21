@@ -6,6 +6,7 @@ const router = Router();
 
 router.use(authMiddleware);
 
+router.get("/active", uomController.getActive);
 router.get("/categories", uomController.getCategories);
 router.get("/units", uomController.getUnits);
 

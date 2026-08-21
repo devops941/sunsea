@@ -20,13 +20,7 @@ const machineSchema = z.object({
     technologyType: z.string().min(1, "Technology Type is required"),
     machineType: z.string().min(1, "Machine Type is required"),
     targetTemperature: z.coerce.number().optional().nullable(),
-    targetLoadPercent: z.coerce.number().optional().nullable(),
-    manufacturer: z.string().trim().max(100, "Maximum 100 characters allowed").optional().nullable(),
-    modelNumber: z.string().trim().max(50, "Maximum 50 characters allowed").optional().nullable(),
-    cycleTime: z.coerce.number().optional().nullable(),
     operatorId: z.string().min(1, "Machine Incharge is required").max(20, "Maximum 20 characters allowed"),
-    machineStatus: z.string().optional().nullable(),
-    description: z.string().trim().max(255, "Maximum 255 characters allowed").optional().nullable(),
     isActive: z.boolean().optional(),
 });
 
@@ -36,13 +30,7 @@ const initialFormState = {
     technologyType: "",
     machineType: "",
     targetTemperature: "",
-    targetLoadPercent: "",
-    manufacturer: "",
-    modelNumber: "",
-    cycleTime: "",
     operatorId: "",
-    machineStatus: "IDLE",
-    description: "",
     isActive: true,
 };
 
@@ -134,9 +122,6 @@ const MachineCreate: React.FC = () => {
         const payload = {
             ...formData,
             targetTemperature: formData.targetTemperature ? Number(formData.targetTemperature) : null,
-            targetLoadPercent: formData.targetLoadPercent ? Number(formData.targetLoadPercent) : null,
-            cycleTime: formData.cycleTime ? Number(formData.cycleTime) : null,
-            description: formData.description || null,
             operatorId: formData.operatorId,
         };
 
@@ -299,82 +284,6 @@ const MachineCreate: React.FC = () => {
                                 value={formData.targetTemperature}
                                 placeholder="e.g. 220"
                                 error={errors.targetTemperature}
-                                onChange={handleChange}
-                            />
-                        </div>
-
-                        <div>
-                            <TextInput
-                                label="Target Load (%)"
-                                name="targetLoadPercent"
-                                type="number"
-                                value={formData.targetLoadPercent}
-                                placeholder="e.g. 85"
-                                error={errors.targetLoadPercent}
-                                onChange={handleChange}
-                            />
-                        </div>
-
-                        <div>
-                            <TextInput
-                                label="Manufacturer"
-                                name="manufacturer"
-                                value={formData.manufacturer}
-                                placeholder="Manufacturer Name"
-                                error={errors.manufacturer}
-                                onChange={handleChange}
-                            />
-                        </div>
-
-                        <div>
-                            <TextInput
-                                label="Model Number"
-                                name="modelNumber"
-                                value={formData.modelNumber}
-                                placeholder="e.g. X100"
-                                error={errors.modelNumber}
-                                onChange={handleChange}
-                            />
-                        </div>
-
-                        <div>
-                            <TextInput
-                                label="Cycle Time"
-                                name="cycleTime"
-                                type="number"
-                                value={formData.cycleTime}
-                                placeholder="e.g. 60"
-                                error={errors.cycleTime}
-                                onChange={handleChange}
-                            />
-                        </div>
-
-
-
-                        <div>
-                            <SelectInput
-                                label="Machine Status"
-                                name="machineStatus"
-                                value={formData.machineStatus}
-                                defaultOptionLabel="Select Status"
-                                options={[
-                                    { label: 'Idle', value: 'IDLE' },
-                                    { label: 'Running', value: 'RUNNING' },
-                                    { label: 'Breakdown', value: 'BREAKDOWN' },
-                                    { label: 'Maintenance', value: 'MAINTENANCE' }
-                                ]}
-                                error={errors.machineStatus}
-                                onChange={handleChange}
-                            />
-                        </div>
-
-                        <div>
-                            <TextInput
-                                label="Description"
-                                name="description"
-                                value={formData.description}
-                                placeholder="Machine description..."
-                                error={errors.description}
                                 onChange={handleChange}
                             />
                         </div>

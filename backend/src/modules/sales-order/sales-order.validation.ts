@@ -86,7 +86,6 @@ const salesOrderItemInputSchema = z.object({
     unitPrice: z.union([z.number(), z.string()]).optional().nullable()
         .transform((val) => (val != null && val !== "" && !isNaN(Number(val)) && Number(val) > 0 ? Number(val) : undefined)),
     // GST fields (optional — stored in sales_order_items)
-    gstTaxRateId: z.string().uuid("GST Tax Rate ID must be a valid UUID").optional().nullable(),
     cgstRate: z.number().min(0).max(100).optional().nullable(),
     sgstRate: z.number().min(0).max(100).optional().nullable(),
     igstRate: z.number().min(0).max(100).optional().nullable(),
@@ -278,7 +277,6 @@ export const createSalesOrderItemSchema = z.object({
                 "Quantity must be a valid positive number"
             ),
 
-        gstTaxRateId: z.string().uuid("GST Tax Rate ID must be a valid UUID").optional().nullable(),
     })
 });
 

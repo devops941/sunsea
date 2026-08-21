@@ -1229,7 +1229,6 @@ model SalesOrderItem {
   invoicedQty   Decimal      @default(0) @db.Decimal(14, 3)
   unitPrice     Decimal      @default(0) @map("unit_price") @db.Decimal(14, 2)
   lineTotal     Decimal      @default(0) @db.Decimal(14, 2)
-  gstTaxRateId  String?      @map("gst_tax_rate_id")
   taxableAmount Decimal      @default(0) @map("taxable_amount") @db.Decimal(14, 2)
   cgstRate      Decimal      @default(0) @map("cgst_rate") @db.Decimal(5, 2)
   cgstAmount    Decimal      @default(0) @map("cgst_amount") @db.Decimal(14, 2)
@@ -1237,7 +1236,6 @@ model SalesOrderItem {
   sgstAmount    Decimal      @default(0) @map("sgst_amount") @db.Decimal(14, 2)
   igstRate      Decimal      @default(0) @map("igst_rate") @db.Decimal(5, 2)
   igstAmount    Decimal      @default(0) @map("igst_amount") @db.Decimal(14, 2)
-  gstTaxRate    GstTaxRate?  @relation("SalesOrderItemGstRate", fields: [gstTaxRateId], references: [id])
   product       Product      @relation("SalesOrderItemProduct", fields: [productId], references: [id])
   salesOrder    SalesOrder   @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
 
@@ -1423,19 +1421,6 @@ model GrnInvoicePayment {
 
   @@index([grnInvoiceId])
   @@map("grn_invoice_payments")
-}
-
-model GstTaxRate {
-  id              String           @id @default(uuid())
-  taxName         String           @db.VarChar(50)
-  taxType         TaxType
-  taxRate         Decimal          @db.Decimal(5, 2)
-  status          Status           @default(ACTIVE)
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
-  salesOrderItems SalesOrderItem[] @relation("SalesOrderItemGstRate")
-
-  @@map("gst_tax_rates")
 }
 
 model ProductionWastage {
@@ -1884,11 +1869,6 @@ enum SalesOrderStatus {
   READY_FOR_DISPATCH
   PARTIALLY_DISPATCHED
   DISPATCHED
-}
-
-enum TaxType {
-  INTRA_STATE
-  INTER_STATE
 }
 
 enum Status {

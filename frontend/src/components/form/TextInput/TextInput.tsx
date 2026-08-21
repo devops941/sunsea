@@ -143,6 +143,7 @@ const TextInput: React.FC<TextInputProps> = ({
             min={isNumberType ? (rest.min ?? "0") : rest.min}
             step={step}
             disabled={disabled}
+            autoComplete="off"
             className={`
               w-full h-10 px-4
               border rounded-[5px] outline-none
@@ -151,6 +152,9 @@ const TextInput: React.FC<TextInputProps> = ({
               transition-all duration-250
               placeholder:text-ink-subtle/80 placeholder:font-normal
               text-ink
+              [&:-webkit-autofill]:shadow-[inset_0_0_0px_1000px_var(--color-card-2)] [&:-webkit-autofill]:[-webkit-text-fill-color:var(--color-ink)]
+              [&:-webkit-autofill:hover]:shadow-[inset_0_0_0px_1000px_var(--color-card-2)]
+              [&:-webkit-autofill:focus]:shadow-[inset_0_0_0px_1000px_var(--color-card-2)]
               ${error
                 ? "border-red-500 bg-card-2 focus:border-red-500 focus:ring-4 focus:ring-red-500/15"
                 : "border-line-soft bg-card-2 hover:border-line-soft/80 focus:border-primary focus:ring-4 focus:ring-primary/15"

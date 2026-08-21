@@ -27,7 +27,6 @@ const CompanySettings = lazy(() => import("../modules/company/pages/CompanySetti
 const RoleList = lazy(() => import("../modules/roles/pages/RoleList"));
 const RolePermissionMapping = lazy(() => import("../modules/role-permissions/pages/RolePermissionMapping"));
 const DepartmentList = lazy(() => import("../modules/departments/pages/DepartmentList"));
-const GstTaxList = lazy(() => import("../modules/settings/GstTaxListPage"));
 const WhatsappSettings = lazy(() => import("../modules/whatsapp/WhatsappCreate"));
 const EmailConfigPage = lazy(() => import("../modules/email-config/pages/EmailConfigPage"));
 const InvoiceSettings = lazy(() => import("../modules/sales-order-invoice/sales-invoiceCreate"));
@@ -193,8 +192,6 @@ const PurchaseOrderListPage = lazy(() => import("../modules/purchase/purchase-or
 
 const PurchaseOrderForm = lazy(() => import("../modules/purchase/purchase-order/pages/PurchaseOrderForm"));
 
-const PurchaseOrderViewPage = lazy(() => import("../modules/purchase/purchase-order/purchaseordeappovals/PurchaseOrderapprovalEdit"));
-const POMDApproval = lazy(() => import("../modules/purchase/purchase-order/purchaseordeappovals/PurchaseOrderapprovalList"));
 
 const ExpensesList = lazy(() => import("../modules/expenses/ExpensesList"));
 
@@ -279,7 +276,6 @@ const AppRoutes = () => {
               {/* ---------- Organization & Settings ---------- */}
               <Route path="/company/view" element={<ProfilePage />} />
               <Route path="/settings/company" element={<CompanySettings />} />
-              <Route path="/settings/gst-taxes" element={<GstTaxList />} />
               <Route path="/whatsapp" element={<WhatsappSettings />} />
               <Route path="/email-config" element={<EmailConfigPage />} />
               <Route path="/settings/invoice" element={<InvoiceSettings />} />
@@ -425,9 +421,6 @@ const AppRoutes = () => {
               </Route>
               <Route element={<ProtectedRoute permission="purchaseOrders.view" />}>
                 <Route path="/purchase-orders" element={<PurchaseOrderListPage />} />
-              </Route>
-              <Route element={<ProtectedRoute permission="purchase-order-approvals.view" />}>
-                <Route path="/purchase-order-approvals" element={<POMDApproval />} />
               </Route>
               <Route element={<ProtectedRoute permission="invoice.view" />}>
                 <Route path="/invoice" element={<InvoiceList />} />
@@ -651,7 +644,7 @@ const AppRoutes = () => {
 
             {/* ---------- Purchase ---------- */}
             <Route element={<ProtectedRoute permission="purchaseOrders.view" />}>
-              <Route path="/purchase-orders/view/:id" element={<PurchaseOrderViewPage />} />
+              <Route path="/purchase-orders/view/:id" element={<PurchaseOrderForm />} />
             </Route>
             <Route element={<ProtectedRoute permission="purchaseOrders.create" />}>
               <Route path="/purchase-orders/create" element={<PurchaseOrderForm />} />

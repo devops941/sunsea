@@ -33,7 +33,6 @@ export const PERMISSION_REGISTRY: ModulePermission[] = [
   { module: "role-permissions",  actions: ["view","edit"],                   description: "Role Permission Mapping" },
   { module: "profile",           actions: ["view","edit"],                   description: "User Profile" },
   { module: "company-settings",  actions: ["view","edit"],                   description: "Company Settings" },
-  { module: "gst_tax",           actions: ["view","create","edit","delete"], description: "GST Tax Rates" },
   { module: "whatsapp",          actions: ["view","edit"],                   description: "WhatsApp Settings" },
   { module: "email-config",      actions: ["view","edit"],                   description: "Email Config" },
   { module: "invoice-settings",  actions: ["view","edit"],                   description: "Invoice Settings" },
@@ -61,7 +60,6 @@ export const PERMISSION_REGISTRY: ModulePermission[] = [
   { module: "suppliers",                actions: ["view","create","edit","delete"], description: "Suppliers" },
   { module: "supplierpricelist",        actions: ["view","create","edit","delete"], description: "Supplier Pricing" },
   { module: "purchaseOrders",           actions: ["view","create","edit","delete"], description: "Purchase Orders" },
-  { module: "purchase-order-approvals", actions: ["view","edit"],                   description: "Purchase MD Approvals" },
   { module: "invoice",                  actions: ["view","create","edit","delete"], description: "Bill & Invoice" },
   { module: "expenses",                 actions: ["view","create","edit","delete"], description: "Expenses" },
 

@@ -450,27 +450,26 @@ const SupplierForm: React.FC = () => {
 
     if (isLoadingData) {
         return (
-            <div className="flex items-center justify-center min-h-screen bg-slate-50">
-                <div className="text-lg font-semibold text-slate-600 animate-pulse">Loading Supplier Details...</div>
+            <div className="flex items-center justify-center min-h-screen">
+                <div className="text-lg font-semibold text-ink-subtle animate-pulse">Loading Supplier Details...</div>
             </div>
         );
     }
 
     return (
-        <div className="p-4 md:p-1 min-h-screen bg-white">
-            <div className=" space-y-3">
-                <div className="bg-white  ">
-                    <div className="p-6 border-b border-slate-200 flex items-center justify-between">
-                        <h2 className="text-2xl font-bold text-slate-800">
-                            {isEdit ? "Edit Supplier" : "Add New Supplier"}
-                        </h2>
-                        <BackButton text="Back" />
-                    </div>
+        <div className="w-full mx-auto">
+            <div className="bg-card rounded-2xl border border-line-soft shadow-xs">
+                <div className="px-6 py-5 border-b border-line-soft flex items-center justify-between">
+                    <h2 className="text-2xl font-extrabold text-ink tracking-tight">
+                        {isEdit ? "Edit Supplier" : "Add New Supplier"}
+                    </h2>
+                    <BackButton text="Back" />
+                </div>
 
-                    <form onSubmit={handleSubmit} className="p-6 space-y-4" noValidate>
+                    <form onSubmit={handleSubmit} className="px-6 py-6 space-y-6" noValidate>
                         {/* SUPPLIER IDENTIFICATION */}
                         <div>
-                            <h3 className="text-lg font-semibold text-slate-700 mb-2">Identification & Status</h3>
+                            <h3 className="text-lg font-bold text-ink mb-2">Identification & Status</h3>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                                 <div>
                                     <TextInput
@@ -504,7 +503,7 @@ const SupplierForm: React.FC = () => {
 
                         {/* BASIC INFORMATION */}
                         <div>
-                            <h3 className="text-lg font-semibold text-slate-700 mb-2">Basic Information</h3>
+                            <h3 className="text-lg font-bold text-ink mb-2">Basic Information</h3>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                                 <TextInput
                                     label="LEGAL NAME"
@@ -560,7 +559,7 @@ const SupplierForm: React.FC = () => {
 
                         {/* GST & TAX */}
                         <div>
-                            <h3 className="text-lg font-semibold text-slate-700 mb-2">GST & MSME</h3>
+                            <h3 className="text-lg font-bold text-ink mb-2">GST & MSME</h3>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                                 <TextInput
                                     label="GSTIN"
@@ -583,7 +582,7 @@ const SupplierForm: React.FC = () => {
 
                         {/* BILLING ADDRESS */}
                         <div>
-                            <h3 className="text-lg font-semibold text-slate-700 mb-2">Billing Address</h3>
+                            <h3 className="text-lg font-bold text-ink mb-2">Billing Address</h3>
                             <div className="grid grid-cols-1 gap-10">
                                 <div className="space-y-2">
                                     <AddressForm
@@ -622,7 +621,7 @@ const SupplierForm: React.FC = () => {
                         {/* ADDITIONAL DELIVERY ADDRESSES */}
                         <div>
                             <div className="flex items-center justify-between mb-2">
-                                <h3 className="text-lg font-semibold text-slate-700"> Delivery / Plant Addresses</h3>
+                                <h3 className="text-lg font-bold text-ink"> Delivery / Plant Addresses</h3>
                                 <CustomButton
                                     text="Add Address"
                                     icon={FaPlus}
@@ -630,9 +629,9 @@ const SupplierForm: React.FC = () => {
                                     type="button"
                                 />
                             </div>
-                            <div className="bg-white border border-slate-200 p-4 rounded-xl mb-4 space-y-4">
+                            <div className="border border-line-soft p-4 rounded-xl mb-4 space-y-4">
                                 {addresses.length === 0 && (
-                                    <div className="text-center text-sm text-slate-500 py-4">No additional addresses added.</div>
+                                    <div className="text-center text-sm text-ink-subtle py-4">No additional addresses added.</div>
                                 )}
                                 {(() => {
                                     const isAnyAddressSameAsBilling = addresses.some((addr) =>
@@ -653,15 +652,15 @@ const SupplierForm: React.FC = () => {
                                         const showSameAsBillingCheckbox = isThisSameAsBilling || !isAnyAddressSameAsBilling;
 
                                         return (
-                                            <div key={index} className="p-4 border border-slate-200 rounded-md bg-slate-50 relative">
-                                                <div className="flex items-center justify-between mb-3 border-b border-slate-200 pb-2">
-                                                    <h4 className="text-sm font-semibold text-slate-700 uppercase">Address {index + 1}</h4>
+                                            <div key={index} className="p-4 border border-line-soft rounded-xl bg-card-2 relative">
+                                                <div className="flex items-center justify-between mb-3 border-b border-line-soft pb-2">
+                                                    <h4 className="text-sm font-semibold text-ink uppercase">Address {index + 1}</h4>
                                                     <div className="flex items-center gap-4">
                                                         {showSameAsBillingCheckbox && (
-                                                            <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer hover:text-slate-800">
+                                                            <label className="flex items-center gap-2 text-sm text-ink-subtle cursor-pointer hover:text-ink">
                                                                 <input
                                                                     type="checkbox"
-                                                                    className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                                                    className="w-4 h-4 rounded accent-primary cursor-pointer"
                                                                     checked={isThisSameAsBilling}
                                                                     onChange={(e) => toggleSameAsBilling(index, e.target.checked)}
                                                                 />
@@ -701,7 +700,7 @@ const SupplierForm: React.FC = () => {
                         {/* OPENING BALANCE DETAILS - ONLY FOR CREATE */}
                         {!isEdit && (
                             <div>
-                                <h3 className="text-lg font-semibold text-slate-700 mb-2">Opening Balance Details</h3>
+                                <h3 className="text-lg font-bold text-ink mb-2">Opening Balance Details</h3>
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                                     <div>
                                         <TextInput
@@ -732,7 +731,7 @@ const SupplierForm: React.FC = () => {
                         )}
 
                         {/* FORM ACTIONS */}
-                        <div className="flex justify-end gap-3 pt-6 border-t border-slate-200">
+                        <div className="flex justify-end gap-3 pt-6 border-t border-line-soft">
                             <CustomButton
                                 text="Clear Form"
                                 icon={FaEraser}
@@ -747,7 +746,6 @@ const SupplierForm: React.FC = () => {
                             />
                         </div>
                     </form>
-                </div>
             </div>
         </div>
     );

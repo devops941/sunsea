@@ -41,7 +41,6 @@ const MachineViewModal: React.FC<MachineViewModalProps> = ({ show, onHide, machi
             title: "General Information",
             fields: [
                 { label: "Status", value: <StatusBadge status={machine.isActive ? "ACTIVE" : "INACTIVE"} /> },
-                { label: "Operating State", value: machine.machineStatus || "IDLE" }
             ]
         },
         {
@@ -49,22 +48,7 @@ const MachineViewModal: React.FC<MachineViewModalProps> = ({ show, onHide, machi
             fields: [
                 { label: "Type", value: machine.machineType || "N/A" },
                 { label: "Technology", value: machine.technologyType || "N/A" },
-                { label: "Manufacturer", value: machine.manufacturer || "N/A" }
-            ]
-        },
-        {
-            title: "Additional Details",
-            fields: [
-                { label: "Model Number", value: machine.modelNumber || "N/A" },
                 { label: "Target Temp", value: machine.targetTemperature ? `${machine.targetTemperature} °C` : "N/A" },
-                { label: "Target Load", value: machine.targetLoadPercent ? `${machine.targetLoadPercent}%` : "N/A" },
-                { label: "Cycle Time", value: machine.cycleTime ? `${machine.cycleTime} min` : "N/A" }
-            ]
-        },
-        {
-            title: "Description",
-            fields: [
-                { label: "Notes", value: machine.description || "N/A", xs: 12 }
             ]
         }
     ];
@@ -106,14 +90,9 @@ const MachineViewModal: React.FC<MachineViewModalProps> = ({ show, onHide, machi
             </div>
         );
 
-        const inchargeName = currentAssignment.inchargeEmployee?.fullName || currentAssignment.machine?.operatorName || currentAssignment.machine?.operatorId || "N/A";
-        const inchargeRole = currentAssignment.inchargeRole?.name || (inchargeName !== "N/A" ? "Machine Operator" : "N/A");
-
         sections.push({
             title: "Active Assignment (Current Week)",
             fields: [
-                { label: "Incharge Name", value: inchargeName },
-                { label: "Incharge Role", value: inchargeRole },
                 { label: "Operators", value: operatorsTable }
             ]
         });

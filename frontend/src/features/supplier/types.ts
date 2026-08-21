@@ -33,6 +33,7 @@ export interface Supplier {
   openingBalanceType?: string | null;
   status: string;
   addresses?: SupplierAddress[];
+  materialPrices?: SupplierMaterialPrice[];
   createdAt: string;
   updatedAt: string;
 }

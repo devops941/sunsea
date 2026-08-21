@@ -236,11 +236,11 @@ const ExpensesCreate: React.FC<ExpensesCreateProps> = ({
 
   return (
     <div className="w-full mx-auto">
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+      <div className="bg-card rounded-lg shadow-sm border border-line-soft">
         <div className="px-6 py-4 ">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <h2 className="text-xl font-bold text-gray-800">
+              <h2 className="text-xl font-bold text-ink">
                 {isEdit ? `Edit Expense: ${formData.expenseNumber}` : "Create Expense"}
               </h2>
             </div>
@@ -257,7 +257,7 @@ const ExpensesCreate: React.FC<ExpensesCreateProps> = ({
         <form onSubmit={handleSubmit} className="px-6 py-3 space-y-4" noValidate>
           {/* Expense Info */}
           <div>
-            <h6 className="text-lg font-semibold text-gray-800 mb-4">Expense Info</h6>
+            <h6 className="text-lg font-semibold text-ink mb-4">Expense Info</h6>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
               <TextInput
                 label="Expense Number *"
@@ -332,7 +332,7 @@ const ExpensesCreate: React.FC<ExpensesCreateProps> = ({
 
           {/* Payment & Processing */}
           <div className="mt-6">
-            <h6 className="text-lg font-semibold text-gray-800 mb-4">Payment & Processing</h6>
+            <h6 className="text-lg font-semibold text-ink mb-4">Payment & Processing</h6>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
               <SelectInput
                 label="Payment Method *"
@@ -356,7 +356,7 @@ const ExpensesCreate: React.FC<ExpensesCreateProps> = ({
 
           {/* Descriptions & Notes */}
           <div className="mt-6">
-            <h6 className="text-lg font-semibold text-gray-800 mb-4">Descriptions & Notes</h6>
+            <h6 className="text-lg font-semibold text-ink mb-4">Descriptions & Notes</h6>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
               <div>
                 <TextArea
@@ -385,7 +385,7 @@ const ExpensesCreate: React.FC<ExpensesCreateProps> = ({
           </div>
 
           {/* Form Actions */}
-          <div className="flex flex-wrap justify-end gap-3 mt-8 pt-4 border-t border-gray-200">
+          <div className="flex flex-wrap justify-end gap-3 mt-8 pt-4 border-t border-line-soft">
             <CustomButton
               text="Cancel"
               onClick={onCancel}

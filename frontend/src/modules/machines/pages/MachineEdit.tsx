@@ -20,13 +20,7 @@ const machineSchema = z.object({
     technologyType: z.string().min(1, "Technology Type is required"),
     machineType: z.string().min(1, "Machine Type is required"),
     targetTemperature: z.coerce.number().optional().nullable(),
-    targetLoadPercent: z.coerce.number().optional().nullable(),
-    manufacturer: z.string().trim().max(100, "Maximum 100 characters allowed").optional().nullable(),
-    modelNumber: z.string().trim().max(50, "Maximum 50 characters allowed").optional().nullable(),
-    cycleTime: z.coerce.number().optional().nullable(),
     operatorId: z.string().min(1, "Machine Incharge is required").max(20, "Maximum 20 characters allowed"),
-    machineStatus: z.string().optional().nullable(),
-    description: z.string().trim().max(255, "Maximum 255 characters allowed").optional().nullable(),
     isActive: z.boolean().optional(),
 });
 
@@ -36,13 +30,7 @@ const initialFormState = {
     technologyType: "",
     machineType: "",
     targetTemperature: "",
-    targetLoadPercent: "",
-    manufacturer: "",
-    modelNumber: "",
-    cycleTime: "",
     operatorId: "",
-    machineStatus: "",
-    description: "",
     isActive: true,
 };
 
@@ -108,13 +96,7 @@ const MachineEdit: React.FC = () => {
                 technologyType: s.technologyType || "",
                 machineType: s.machineType || "",
                 targetTemperature: s.targetTemperature ? String(s.targetTemperature) : "",
-                targetLoadPercent: s.targetLoadPercent ? String(s.targetLoadPercent) : "",
-                manufacturer: s.manufacturer || "",
-                modelNumber: s.modelNumber || "",
-                cycleTime: s.cycleTime ? String(s.cycleTime) : "",
                 operatorId: s.operatorId || "",
-                machineStatus: s.machineStatus || "IDLE",
-                description: s.description || "",
                 isActive: s.isActive ?? true,
             });
         } else if (idParam) {
@@ -130,13 +112,7 @@ const MachineEdit: React.FC = () => {
                         technologyType: s.technologyType || "",
                         machineType: s.machineType || "",
                         targetTemperature: s.targetTemperature ? String(s.targetTemperature) : "",
-                        targetLoadPercent: s.targetLoadPercent ? String(s.targetLoadPercent) : "",
-                        manufacturer: s.manufacturer || "",
-                        modelNumber: s.modelNumber || "",
-                        cycleTime: s.cycleTime ? String(s.cycleTime) : "",
                         operatorId: s.operatorId || "",
-                        machineStatus: s.machineStatus || "IDLE",
-                        description: s.description || "",
                         isActive: s.isActive ?? true,
                     });
                 })
@@ -175,8 +151,6 @@ const MachineEdit: React.FC = () => {
         const payload = {
             ...formData,
             targetTemperature: formData.targetTemperature ? Number(formData.targetTemperature) : null,
-            targetLoadPercent: formData.targetLoadPercent ? Number(formData.targetLoadPercent) : null,
-            cycleTime: formData.cycleTime ? Number(formData.cycleTime) : null,
             operatorId: formData.operatorId,
         };
 
@@ -205,13 +179,7 @@ const MachineEdit: React.FC = () => {
                     technologyType: payload.technologyType,
                     machineType: payload.machineType,
                     targetTemperature: payload.targetTemperature,
-                    targetLoadPercent: payload.targetLoadPercent,
-                    manufacturer: payload.manufacturer,
-                    modelNumber: payload.modelNumber,
-                    cycleTime: payload.cycleTime,
                     operatorId: payload.operatorId,
-                    machineStatus: payload.machineStatus,
-                    description: payload.description,
                     isActive: payload.isActive
                 }
             })).unwrap();
@@ -232,10 +200,10 @@ const MachineEdit: React.FC = () => {
             </div>
         ) : (
         <div className="w-full mx-auto">
-            <div className="bg-white  shadow-sm border border-slate-200 overflow-hidden">
-                <div className="px-6 py-5 border-b border-slate-200">
+            <div className="bg-card rounded-xl shadow-xs border border-line-soft overflow-hidden">
+                <div className="px-6 py-5 border-b border-line-soft">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                        <h2 className="text-xl font-bold text-slate-800">Edit Machine</h2>
+                        <h2 className="text-xl font-bold text-ink">Edit Machine</h2>
                         <BackButton text="Back to List" to="/machines" />
                     </div>
                 </div>
@@ -349,79 +317,6 @@ const MachineEdit: React.FC = () => {
                         </div>
                         
                         <div>
-                            <TextInput
-                                label="Target Load (%)"
-                                name="targetLoadPercent"
-                                type="number"
-                                value={formData.targetLoadPercent}
-                                placeholder="e.g. 85"
-                                error={errors.targetLoadPercent}
-                                onChange={handleChange}
-                            />
-                        </div>
-                        
-                        <div>
-                            <TextInput
-                                label="Manufacturer"
-                                name="manufacturer"
-                                value={formData.manufacturer}
-                                placeholder="Manufacturer Name"
-                                error={errors.manufacturer}
-                                onChange={handleChange}
-                            />
-                        </div>
-
-                        <div>
-                            <TextInput
-                                label="Model Number"
-                                name="modelNumber"
-                                value={formData.modelNumber}
-                                placeholder="e.g. X100"
-                                error={errors.modelNumber}
-                                onChange={handleChange}
-                            />
-                        </div>
-                        
-                        <div>
-                            <TextInput
-                                label="Cycle Time"
-                                name="cycleTime"
-                                type="number"
-                                value={formData.cycleTime}
-                                placeholder="e.g. 60"
-                                error={errors.cycleTime}
-                                onChange={handleChange}
-                            />
-                        </div>
-                        
-                        <div>
-                            <SelectInput
-                                label="Machine Status"
-                                name="machineStatus"
-                                value={formData.machineStatus}
-                                defaultOptionLabel="Select Status"
-                                options={[
-                                    { label: 'Idle', value: 'IDLE' },
-                                    { label: 'Running', value: 'RUNNING' },
-                                    { label: 'Breakdown', value: 'BREAKDOWN' },
-                                    { label: 'Maintenance', value: 'MAINTENANCE' }
-                                ]}
-                                error={errors.machineStatus}
-                                onChange={handleChange}
-                            />
-                        </div>
-
-                        <div>
-                            <TextInput
-                                label="Description"
-                                name="description"
-                                value={formData.description}
-                                placeholder="Enter machine description"
-                                error={errors.description}
-                                onChange={handleChange}
-                            />
-                        </div>
-                        <div>
                             <SelectInput
                                 label="Active Status"
                                 name="isActive"
@@ -438,7 +333,7 @@ const MachineEdit: React.FC = () => {
                         </div>
                     </div>
 
-                    <div className="flex justify-end gap-3 mt-8 pt-5 border-t border-slate-100">
+                    <div className="flex justify-end gap-3 mt-8 pt-5 border-t border-line-soft">
                         <CustomButton
                             text="Cancel"
                             icon={FaEraser}

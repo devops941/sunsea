@@ -2,6 +2,19 @@ import { Request, Response, NextFunction } from "express";
 import uomService from "./uom.service";
 
 class UOMController {
+  getActive = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const uoms = await uomService.getActiveUOMs();
+      res.status(200).json({
+        success: true,
+        message: "Active UOMs retrieved successfully",
+        data: uoms,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
   getCategories = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const categories = uomService.getCategories();

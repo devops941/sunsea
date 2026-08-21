@@ -27,6 +27,11 @@ export interface Supplier {
     mobile?: string;
     email?: string;
     gstin?: string;
+    materialPrices?: Array<{
+        rawMaterialId: string;
+        unitPrice: number;
+        gstRate?: number;
+    }>;
 }
 
 export interface Product {

@@ -16,7 +16,6 @@ import { productService } from "../../services/productService";
 import { salesInvoiceService } from "../../services/salesInvoiceService";
 import { salesOrderService, type SalesOrderStatus } from "../../services/salesOrderService";
 import { finishedGoodsStockService } from "../../services/finishedGoodsStockService";
-import { gstTaxService } from "../../services/gstTaxService";
 import DatePickerCalendar from "../../components/ui/DatePickerCalendar/DatePickerCalendar";
 
 // ---- Types ----
@@ -180,7 +179,6 @@ const SalesInvoiceForm: React.FC = () => {
   const [salesOrders, setSalesOrders] = useState<any[]>([]);
   const [editInvoiceSalesOrder, setEditInvoiceSalesOrder] = useState<any>(null);
   const [selectedSalesOrderId, setSelectedSalesOrderId] = useState("");
-  const [gstRates, setGstRates] = useState<any[]>([]);
   const [stockMap, setStockMap] = useState<Map<string, number>>(new Map());
 
   const [payments, setPayments] = useState<any[]>([]);
@@ -265,9 +263,8 @@ const SalesInvoiceForm: React.FC = () => {
       salesInvoiceService.fetchAll({ pageSize: 100 }).catch(() => ({ data: [] } as any)),
       salesOrderService.fetchAll({ pageSize: 500 }).catch(() => ({ data: [] } as any)),
       finishedGoodsStockService.fetchAll().catch(() => []),
-      gstTaxService.fetchAll().catch(() => ({ data: [] } as any)),
     ])
-      .then(([customerList, productList, settings, ordersResponse, salesOrdersResponse, fgStockResponse, gstResponse]) => {
+      .then(([customerList, productList, settings, ordersResponse, salesOrdersResponse, fgStockResponse]) => {
         const customersArray = Array.isArray(customerList)
           ? customerList
           : (customerList as any)?.customers || [];
@@ -370,9 +367,6 @@ const SalesInvoiceForm: React.FC = () => {
               // If fetch fails, user can still select manually
             });
         }
-
-        const gstList = gstResponse?.data || [];
-        setGstRates(gstList);
 
         if (settings) {
           setInvoiceSettings(settings);
@@ -912,20 +906,17 @@ const SalesInvoiceForm: React.FC = () => {
                       <td className="px-4 py-2 align-middle font-medium text-slate-700">
                         ₹{line.amount.toFixed(2)}
                       </td>
-                      {/* GST Rate select dropdown */}
+                      {/* GST Rate input */}
                       <td className="px-4 py-2">
-                        <SelectInput
-                          label=""
+                        <TextInput
                           name="taxPercent"
-                          noMargin={true}
-                          hideLabel={true}
+                          type="number"
                           value={String(line.taxPercent)}
                           disabled={isEditMode}
-                          options={gstRates.map((g) => ({
-                            label: `${g.taxName} (${g.taxRate}%)`,
-                            value: String(g.taxRate),
-                          }))}
-                          defaultOptionLabel="Select GST"
+                          min={0}
+                          max={100}
+                          step={0.01}
+                          placeholder="0"
                           onChange={(e) => updateLine(line.id, "taxPercent", Number(e.target.value))}
                         />
                       </td>

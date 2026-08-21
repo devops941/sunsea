@@ -114,13 +114,6 @@ const config = {
     company: {
         base: "/companies",
     },
-    gstTax: {
-        getAllGstTax: "/gst-tax",
-        getById: "/gst-tax",
-        addGstTax: "/gst-tax",
-        updateGstTax: "/gst-tax",
-        deleteGstTax: "/gst-tax",
-    },
     grnInvoice: {
         base: "/grn-invoices",
         nextCode: "/grn-invoices/next-code",

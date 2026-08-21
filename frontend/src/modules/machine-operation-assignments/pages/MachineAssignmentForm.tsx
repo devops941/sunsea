@@ -55,8 +55,6 @@ export const MachineAssignmentForm: React.FC = () => {
     shiftId: "",
     weekStartDate: currentWeek.start,
     weekEndDate: currentWeek.end,
-    inchargeRoleId: "",
-    inchargeEmployeeId: "",
     operators: [
       { roleId: "", employeeId: "" }
     ],
@@ -106,14 +104,13 @@ export const MachineAssignmentForm: React.FC = () => {
   const refreshEmployees = useCallback(() => {
     // Re-fetch employees for all currently selected roles
     const roleIds = new Set<string>();
-    if (formData.inchargeRoleId) roleIds.add(formData.inchargeRoleId);
     formData.operators.forEach(op => { if (op.roleId) roleIds.add(op.roleId); });
     roleIds.forEach(roleId => {
       machineOperationAssignmentService.getEmployeesByRole(Number(roleId))
         .then(res => setEmployeesByRole(prev => ({ ...prev, [roleId]: res.data || [] })))
         .catch(err => console.error(err));
     });
-  }, [formData.inchargeRoleId, formData.operators]);
+  }, [formData.operators]);
 
   // Real-time socket sync for dropdowns
   useSocketSync("machine", undefined, fetchRefData);
@@ -143,8 +140,6 @@ export const MachineAssignmentForm: React.FC = () => {
             shiftId: data.shiftId || "",
             weekStartDate: data.weekStartDate ? data.weekStartDate.split("T")[0] : currentWeek.start,
             weekEndDate: data.weekEndDate ? data.weekEndDate.split("T")[0] : currentWeek.end,
-            inchargeRoleId: data.inchargeRoleId ? String(data.inchargeRoleId) : "",
-            inchargeEmployeeId: data.inchargeEmployeeId ? String(data.inchargeEmployeeId) : "",
             operators: data.operators ? data.operators.map((o: any) => ({
               roleId: String(o.roleId),
               employeeId: String(o.employeeId),
@@ -158,9 +153,6 @@ export const MachineAssignmentForm: React.FC = () => {
             data.operators.forEach((op: any) => {
               if (op.roleId) fetchEmployeesForRole(String(op.roleId));
             });
-          }
-          if (data.inchargeRoleId) {
-            fetchEmployeesForRole(String(data.inchargeRoleId));
           }
         }
       } catch (err: any) {
@@ -294,8 +286,6 @@ export const MachineAssignmentForm: React.FC = () => {
         shiftId: formData.shiftId,
         weekStartDate: formData.weekStartDate,
         weekEndDate: formData.weekEndDate,
-        inchargeRoleId: formData.inchargeRoleId ? Number(formData.inchargeRoleId) : null,
-        inchargeEmployeeId: formData.inchargeEmployeeId ? String(formData.inchargeEmployeeId) : null,
         operators: formData.operators.map(o => ({
           roleId: Number(o.roleId),
           employeeId: String(o.employeeId),
@@ -489,50 +479,7 @@ export const MachineAssignmentForm: React.FC = () => {
             </div>
           </div>
 
-          {/* Section 3: Machine Incharge */}
-          <div className="space-y-4 pt-5 border-t border-line-soft">
-            <h3 className="text-xs font-semibold text-ink-subtle uppercase tracking-wider">
-              3. Machine Incharge (Optional Override)
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <SelectInput
-                label="Incharge Role"
-                name="inchargeRole"
-                value={formData.inchargeRoleId}
-                onChange={(e) => {
-                  setFormData(prev => ({ ...prev, inchargeRoleId: e.target.value, inchargeEmployeeId: "" }));
-                  if (e.target.value) {
-                    fetchEmployeesForRole(e.target.value);
-                  }
-                }}
-                options={[
-                  { label: "-- Default (From Machine) --", value: "" },
-                  ...roles.map((r) => ({
-                    label: r.name,
-                    value: String(r.id),
-                  })),
-                ]}
-              />
-
-              <SelectInput
-                label="Incharge Employee"
-                name="inchargeEmp"
-                value={formData.inchargeEmployeeId}
-                onChange={(e) => setFormData(prev => ({ ...prev, inchargeEmployeeId: e.target.value }))}
-                disabled={!formData.inchargeRoleId}
-                options={[
-                  { label: "-- Select Incharge --", value: "" },
-                  ...(employeesByRole[formData.inchargeRoleId] || []).map((e: any) => ({
-                    label: `${e.fullName} (${e.empCode})`,
-                    value: String(e.id),
-                    disabled: selectedEmpIds.has(String(e.id)) && formData.inchargeEmployeeId !== String(e.id)
-                  })),
-                ]}
-              />
-            </div>
-          </div>
-
-          {/* Section 4: Remarks */}
+          {/* Section 3: Remarks */}
           <div className="space-y-4 pt-5 border-t border-line-soft">
             <div className="grid grid-cols-1 gap-5">
               <TextInput
