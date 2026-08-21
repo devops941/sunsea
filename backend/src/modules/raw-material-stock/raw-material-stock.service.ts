@@ -43,13 +43,27 @@ class RawMaterialStockService {
     });
   }
 
-  async findAll(query?: { search?: string; storeId?: string; storeCategory?: string }) {
+  async findAll(query?: {
+    search?: string;
+    storeId?: string;
+    storeCategory?: string;
+    categoryId?: string;
+    status?: string;
+    page?: number;
+    limit?: number;
+  }) {
     const whereClause: any = {};
     if (query?.storeId) {
       whereClause.storeId = query.storeId;
     }
     if (query?.storeCategory) {
       whereClause.store = { storeCategory: query.storeCategory };
+    }
+    if (query?.categoryId) {
+      whereClause.categoryId = Number(query.categoryId);
+    }
+    if (query?.status) {
+      whereClause.status = query.status;
     }
     if (query?.search) {
       whereClause.OR = [
@@ -59,23 +73,31 @@ class RawMaterialStockService {
       ];
     }
 
-    // Return all raw materials as they represent the stock now
-    const stockItems = await prisma.rawMaterial.findMany({
-      where: whereClause,
-      include: {
-        store: {
-          include: {
-            location: true
-          }
+    const page = query?.page ?? 1;
+    const limit = query?.limit ?? 20;
+
+    const [stockItems, total] = await Promise.all([
+      prisma.rawMaterial.findMany({
+        where: whereClause,
+        include: {
+          store: { include: { location: true } },
+          category: true,
+          storeLocation: true,
         },
-        category: true,
-        storeLocation: true
-      },
-      orderBy: {
-        updatedAt: "desc",
-      },
-    });
-    return stockItems;
+        orderBy: { createdAt: "desc" },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      prisma.rawMaterial.count({ where: whereClause }),
+    ]);
+
+    return {
+      data: stockItems,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 
   async findById(id: string) {
@@ -137,10 +159,6 @@ class RawMaterialStockService {
   ) {
     const db = txClient || prisma;
     for (const item of items) {
-      console.log(
-        `[PurchaseReturn] Deducting ${item.quantity} of raw material ${item.rawMaterialId} from store ${item.storeId}`
-      );
-
       const rawMaterial = await db.rawMaterial.findUnique({
         where: { rawMaterialId: item.rawMaterialId },
       });
@@ -178,9 +196,6 @@ class RawMaterialStockService {
         },
       });
 
-      console.log(
-        `[PurchaseReturn] Successfully deducted ${item.quantity} of raw material ${item.rawMaterialId}. New on-hand: ${currentStock - item.quantity}`
-      );
     }
   }
 }

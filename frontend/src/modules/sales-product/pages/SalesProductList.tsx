@@ -40,20 +40,20 @@ const SalesProductList: React.FC = () => {
     useEffect(() => {
         const delayDebounceFn = setTimeout(() => {
             if (can("sales_products.view")) loadData(searchTerm);
-        }, 500);
+        }, 300);
         return () => clearTimeout(delayDebounceFn);
     }, [searchTerm, loadData, can]);
 
-    const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleSearch = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
         setSearchTerm(e.target.value);
         setCurrentPage(1);
-    };
+    }, []);
 
     const totalPages = Math.ceil(salesProducts.length / ITEMS_PER_PAGE);
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
     const paginatedData = salesProducts.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
-    const handleOpenAdd = () => navigate("/sales-products/create");
+    const handleOpenAdd = useCallback(() => navigate("/sales-products/create"), [navigate]);
     const handleOpenEdit = useCallback((item: any) => {
         navigate(`/sales-products/edit/${item.id}`, { state: item });
     }, [navigate]);
@@ -64,7 +64,7 @@ const SalesProductList: React.FC = () => {
     }, []);
 
     const handleDeleteConfirm = async () => {
-        if (itemToDelete === null) return;
+        if (itemToDelete === null || isDeleting) return;
         setIsDeleting(true);
         try {
             await salesProductService.delete(itemToDelete);
@@ -166,15 +166,14 @@ const SalesProductList: React.FC = () => {
             </div>
 
             <CommonConfirmModal
-                isOpen={showDeleteModal}
-                onClose={() => setShowDeleteModal(false)}
+                show={showDeleteModal}
+                onHide={() => setShowDeleteModal(false)}
                 onConfirm={handleDeleteConfirm}
                 title="Confirm Delete"
                 message="Are you sure you want to delete this sales product?"
                 confirmText={isDeleting ? "Deleting..." : "Delete"}
-                cancelText="Cancel"
+                confirmVariant="danger"
                 isDangerous={true}
-                isLoading={isDeleting}
             />
         </div>
     );

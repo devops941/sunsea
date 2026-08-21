@@ -9,7 +9,6 @@ import MultiSelect from "../../../components/form/multiSelect/MultiSelect";
 import CustomButton from "../../../components/ui/Button/Button";
 import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
 import { useProducts } from "../../../hooks/useProducts";
-import { useCategories } from "../../../hooks/useCategories";
 import { productService } from "../../../services/productService";
 import { storeService } from "../../../services/storeService";
 import { rawMaterialService } from "../../../services/rawMaterialService";
@@ -22,6 +21,7 @@ import { roleService } from "../../../services/roleService";
 import { shiftService } from "../../../services/shiftService";
 import { machineService } from "../../../services/machineService";
 import { customerGradeService, type CustomerGrade } from "../../../services/customerGradeService";
+import { categoryService } from "../../../services/categoryService";
 
 const MAX_IMAGES = 3;
 
@@ -63,7 +63,6 @@ const ProductForm: React.FC = () => {
     const navigate = useNavigate();
 
     const { addProduct, editProduct } = useProducts();
-    const { categories, loadCategories } = useCategories();
 
     const fileInputRef = useRef<HTMLInputElement | null>(null);
     const [existingImages, setExistingImages] = useState<ExistingProductImage[]>([]);
@@ -88,8 +87,8 @@ const ProductForm: React.FC = () => {
     const [customerGrades, setCustomerGrades] = useState<CustomerGrade[]>([]);
     // Grade-based dynamic pricing: { "<gradeName>": "<rate>" }
     const [gradeRates, setGradeRates] = useState<Record<string, string>>({});
+    const [categories, setCategories] = useState<any[]>([]);
 
-    const fetchCategoriesData = useCallback(() => { loadCategories({ isActive: true }); }, [loadCategories]);
     const fetchStoresData = useCallback(() => {
         storeService.fetchAll({ storeCategory: "FINISHED_GOODS" }).then(res => {
             const data = Array.isArray(res?.stores) ? res.stores : Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
@@ -133,8 +132,20 @@ const ProductForm: React.FC = () => {
             setCustomerGrades(data);
         }).catch(() => {});
     }, []);
+    const fetchCategoriesData = useCallback(() => {
+        categoryService.fetchAll({ type: "PRODUCT", isActive: true }).then((res: any) => {
+            const list = res?.categories ?? res ?? [];
+            if (Array.isArray(list) && list.length > 0) {
+                setCategories(list);
+            } else {
+                categoryService.fetchAll({ isActive: true }).then((allRes: any) => {
+                    const allList = allRes?.categories ?? allRes ?? [];
+                    setCategories(Array.isArray(allList) ? allList : []);
+                });
+            }
+        }).catch(() => {});
+    }, []);
 
-    useSocketSync("category", undefined, fetchCategoriesData);
     useSocketSync("store", undefined, fetchStoresData);
     useSocketSync("rawMaterial", undefined, fetchRawMaterialsData);
     useSocketSync("employee", undefined, fetchEmployeesData);
@@ -142,6 +153,7 @@ const ProductForm: React.FC = () => {
     useSocketSync("shift", undefined, fetchShiftsData);
     useSocketSync("machine", undefined, fetchMachinesData);
     useSocketSync("customerGrade", undefined, fetchCustomerGradesData);
+    useSocketSync("category", undefined, fetchCategoriesData);
 
     const populateFormData = useCallback((productData: any) => {
         let latestStock: any = null;
@@ -152,7 +164,7 @@ const ProductForm: React.FC = () => {
         setFormData({
             productCode: productData.productCode || "",
             productName: productData.productName || "",
-            categoryId: productData.categoryId ? String(productData.categoryId) : "",
+            categoryId: productData.categoryId ? String(productData.categoryId) : (productData.category?.id ? String(productData.category.id) : ""),
             weightPerPiece: productData.weightPerPiece != null ? String(productData.weightPerPiece) : "",
             weightUom: productData.weightUom || "kg",
             productType: productData.productType || "SALES_PRODUCTION",
@@ -301,6 +313,18 @@ const ProductForm: React.FC = () => {
             rawMaterials.forEach((rm, index) => {
                 if (!rm.rawMaterialId) newErrors[`rawMaterials.${index}.rawMaterialId`] = "Required";
                 if (!rm.percentage || Number(rm.percentage) <= 0) newErrors[`rawMaterials.${index}.percentage`] = "Invalid %";
+            });
+        }
+
+        // Validate Initial Capacity Setup fields — all fields mandatory when a setup is added
+        if (initialCapacities.length > 0) {
+            initialCapacities.forEach((cap, idx) => {
+                if (!cap.capDate) newErrors[`cap_${idx}_date`] = "Date is required";
+                if (!cap.capShiftId) newErrors[`cap_${idx}_shift`] = "Shift is required";
+                if (!cap.capMachine) newErrors[`cap_${idx}_machine`] = "Machine is required";
+                if (!cap.capRoleId) newErrors[`cap_${idx}_role`] = "Role is required";
+                if (cap.capOperatorIds.length === 0) newErrors[`cap_${idx}_operators`] = "At least one operator is required";
+                if (!cap.capQty || Number(cap.capQty) <= 0) newErrors[`cap_${idx}_qty`] = "Qty / Shift must be > 0";
             });
         }
 
@@ -469,7 +493,7 @@ const ProductForm: React.FC = () => {
 
             if (initialCapacities.length > 0) {
                 const capacityHistory = initialCapacities
-                    .filter(cap => cap.capQty && cap.capOperatorIds.length > 0)
+                    .filter(cap => cap.capQty && Number(cap.capQty) > 0)
                     .map(cap => ({
                         recordedAt: cap.capDate,
                         shiftId: cap.capShiftId,
@@ -506,10 +530,9 @@ const ProductForm: React.FC = () => {
     };
 
     // ─── Options for dropdowns ───────────────────────────────────────────
-    const categoryOptions = useMemo(() => [
-        { value: "", label: "-- Select Category --" },
-        ...(categories || []).map(c => ({ value: String(c.id), label: c.name })),
-    ], [categories]);
+    const categoryOptions = useMemo(() => (
+        (categories || []).map(c => ({ value: String(c.id), label: c.name }))
+    ), [categories]);
 
     const storeOptions = useMemo(() => [
         { value: "", label: "-- Select Store --" },
@@ -573,6 +596,7 @@ const ProductForm: React.FC = () => {
                                 name="categoryId"
                                 value={formData.categoryId}
                                 options={categoryOptions}
+                                defaultOptionLabel="-- Select Category --"
                                 required
                                 onChange={handleChange}
                                 error={errors.categoryId}
@@ -791,6 +815,8 @@ const ProductForm: React.FC = () => {
                                                     name={`capDate-${idx}`}
                                                     value={cap.capDate}
                                                     onChange={(e) => handleInitialCapacityChange(idx, "capDate", e.target.value)}
+                                                    required
+                                                    error={errors[`cap_${idx}_date`]}
                                                 />
                                             </div>
                                             <div>
@@ -803,6 +829,8 @@ const ProductForm: React.FC = () => {
                                                         ...shifts.map(s => ({ value: s.shiftName || s.shiftCode, label: s.shiftName || s.shiftCode }))
                                                     ]}
                                                     onChange={(e) => handleInitialCapacityChange(idx, "capShiftId", e.target.value)}
+                                                    required
+                                                    error={errors[`cap_${idx}_shift`]}
                                                 />
                                             </div>
                                             <div>
@@ -820,6 +848,8 @@ const ProductForm: React.FC = () => {
                                                             .map(m => ({ value: String(m.machineId), label: `${m.machineId} - ${m.machineName}` }))
                                                     ]}
                                                     onChange={(e) => handleInitialCapacityChange(idx, "capMachine", e.target.value)}
+                                                    required
+                                                    error={errors[`cap_${idx}_machine`]}
                                                 />
                                             </div>
                                             <div>
@@ -832,6 +862,8 @@ const ProductForm: React.FC = () => {
                                                         ...roles.map(role => ({ value: String(role.id), label: role.name }))
                                                     ]}
                                                     onChange={(e) => handleInitialCapacityChange(idx, "capRoleId", e.target.value)}
+                                                    required
+                                                    error={errors[`cap_${idx}_role`]}
                                                 />
                                             </div>
                                             <div className="col-span-full xl:col-span-3">
@@ -840,7 +872,7 @@ const ProductForm: React.FC = () => {
                                                     name={`capOperatorIds-${idx}`}
                                                     options={employees
                                                         .filter(emp => {
-                                                            if (!cap.capRoleId) return true;
+                                                            if (!cap.capRoleId) return false;
                                                             const empRoleId = emp.roleId ?? emp.role?.id ?? emp.user?.roleId ?? emp.user?.role?.id;
                                                             return String(empRoleId) === String(cap.capRoleId);
                                                         })
@@ -848,6 +880,8 @@ const ProductForm: React.FC = () => {
                                                     value={cap.capOperatorIds}
                                                     onChange={(_, vals) => handleInitialCapacityChange(idx, "capOperatorIds", vals)}
                                                     placeholder={cap.capRoleId ? "Select operators" : "Select role first"}
+                                                    required
+                                                    error={errors[`cap_${idx}_operators`]}
                                                 />
                                             </div>
                                             <div>
@@ -859,6 +893,8 @@ const ProductForm: React.FC = () => {
                                                     value={cap.capQty}
                                                     onChange={(e) => handleInitialCapacityChange(idx, "capQty", e.target.value)}
                                                     placeholder="0"
+                                                    required
+                                                    error={errors[`cap_${idx}_qty`]}
                                                 />
                                             </div>
                                         </div>

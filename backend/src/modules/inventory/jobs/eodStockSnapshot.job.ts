@@ -231,6 +231,5 @@ export const runEodStockSnapshot = async (targetDateStr?: string) => {
     fgCount++;
   }
 
-  console.log(`✅ EOD snapshot done: ${rmCount} RM, ${fgCount} FG rows at ${now.toISOString()} (locked recordedAt to ${recordedAtFixed.toISOString()})`);
   getIO().emit("inventorySnapshot:completed", { date: dateStr, timestamp: now.toISOString() });
 };

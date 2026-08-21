@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import {
-  FaCheck, FaTimes, FaBoxes, FaEdit,
-  FaClipboardList, FaInfoCircle, FaExclamationTriangle,
+  FaBoxes, FaEdit,
+  FaInfoCircle,
   FaCheckCircle, FaTimesCircle,
 } from "react-icons/fa";
 import { useNavigate, useParams } from "react-router-dom";
@@ -13,6 +13,7 @@ import {
   approveStockAdjustment,
   clearCurrent,
 } from "../../../features/stock-adjustments/stockAdjustmentSlice";
+import { usePermission } from "../../../hooks/usePermission";
 import CustomButton from "../../../components/ui/Button/Button";
 import BackButton from "../../../components/ui/BackButton/BackButton";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
@@ -68,10 +69,12 @@ const StockAdjustmentView: React.FC = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
+  const { can } = usePermission();
 
   const { currentAdjustment, loading } = useAppSelector(
     (state) => state.stockAdjustments
   );
+  const [isApproving, setIsApproving] = useState(false);
 
   useEffect(() => {
     if (id) dispatch(fetchStockAdjustmentById(id));
@@ -79,7 +82,8 @@ const StockAdjustmentView: React.FC = () => {
   }, [dispatch, id]);
 
   const handleApprove = async (targetStatus: string) => {
-    if (!id) return;
+    if (!id || isApproving) return;
+    setIsApproving(true);
     try {
       await dispatch(approveStockAdjustment({ id, status: targetStatus })).unwrap();
       if (targetStatus === "APPROVED") {
@@ -90,6 +94,8 @@ const StockAdjustmentView: React.FC = () => {
       dispatch(fetchStockAdjustmentById(id));
     } catch (err: any) {
       toast.error(err || "Failed to process approval");
+    } finally {
+      setIsApproving(false);
     }
   };
 
@@ -105,7 +111,6 @@ const StockAdjustmentView: React.FC = () => {
   const po = currentAdjustment.productionOrder;
   const isApproved = currentAdjustment.status === "APPROVED";
   const isRejected = currentAdjustment.status === "REJECTED";
-  const isPending = !isApproved && !isRejected;
 
   return (
     <div className="p-4 md:p-6 min-h-screen bg-card rounded-2xl border border-line-soft shadow-xs">
@@ -118,27 +123,31 @@ const StockAdjustmentView: React.FC = () => {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            {currentAdjustment.status === "DRAFT" && (
+            {currentAdjustment.status === "DRAFT" && can("stock-adjustments.edit") && (
               <>
                 <CustomButton
-                  text="Approve (MD Approval)"
+                  text={isApproving ? "Processing..." : "Approve (MD Approval)"}
                   icon={FaCheckCircle}
                   variant="primary"
                   onClick={() => handleApprove("APPROVED")}
+                  disabled={isApproving}
                 />
                 <CustomButton
                   text="Reject"
                   icon={FaTimesCircle}
                   variant="danger"
                   onClick={() => handleApprove("REJECTED")}
-                />
-                <CustomButton
-                  text="Edit"
-                  icon={FaEdit}
-                  variant="secondary"
-                  onClick={() => navigate(`/inventory/stock-adjustments/edit/${currentAdjustment.id}`)}
+                  disabled={isApproving}
                 />
               </>
+            )}
+            {currentAdjustment.status === "DRAFT" && can("stock-adjustments.edit") && (
+              <CustomButton
+                text="Edit"
+                icon={FaEdit}
+                variant="secondary"
+                onClick={() => navigate(`/inventory/stock-adjustments/edit/${currentAdjustment.id}`)}
+              />
             )}
             <BackButton text="Back" to="/inventory/stock-adjustments" />
           </div>

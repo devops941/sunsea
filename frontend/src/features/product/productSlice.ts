@@ -53,7 +53,7 @@ const productSlice = createSlice({
     productCreated: (state, action: PayloadAction<Product>) => {
       const exists = state.products.find((p) => String(p.id) === String(action.payload.id));
       if (!exists) {
-        state.products.unshift(action.payload);
+        state.products.push(action.payload);
       }
     },
     productUpdated: (state, action: PayloadAction<Product>) => {

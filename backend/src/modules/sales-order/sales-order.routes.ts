@@ -49,7 +49,7 @@ router.get(
 router.get(
     "/source-orders",
     authMiddleware,
-    requireAnyPermission("sales-orders.view", "sales-orders.view-estimate"),
+    requirePermission("sales-orders.view"),
     SalesOrderController.getSourceOrders
 );
 
@@ -166,7 +166,7 @@ router.patch(
 router.patch(
     "/:id/mark-in-quotation",
     authMiddleware,
-    requireAnyPermission("sales-orders.create", "sales-orders.view-estimate"),
+    requirePermission("sales-orders.create"),
     validateMiddleware(salesOrderIdSchema),
     SalesOrderController.markInQuotation
 );

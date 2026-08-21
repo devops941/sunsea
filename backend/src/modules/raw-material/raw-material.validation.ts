@@ -37,7 +37,7 @@ export const createRawMaterialSchema = z.object({
     baseUom: z
       .string()
       .min(1, "Base UOM is required")
-      .max(10, "Base UOM cannot exceed 10 characters"),
+      .max(100, "Base UOM cannot exceed 100 characters"),
 
     reorderLevel: z
       .number()
@@ -101,8 +101,7 @@ export const createRawMaterialSchema = z.object({
       .optional(),
 
     itemType: z
-      .string()
-      .max(50, "Item Type cannot exceed 50 characters")
+      .enum(["RAW_MATERIAL", "WASTAGE"])
       .optional()
       .nullable(),
   }),

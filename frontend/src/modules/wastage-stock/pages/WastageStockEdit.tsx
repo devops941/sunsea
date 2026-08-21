@@ -130,9 +130,9 @@ const WastageStockEdit: React.FC = () => {
                                 onChange={(val) => handleChange({ target: { name: "uom", value: val } } as any)}
                                 category={["length", "mass", "each"]}
                                 allowedCodes={[
-                                    "kg", "g", "t", "ton",
-                                    "l", "ml", "ltr",
-                                    "m", "cm", "mtr",
+                                    "kg", "g", "mt",
+                                    "l", "ml",
+                                    "m", "cm", "mm",
                                     "ea", "dz"
                                 ]}
                             />

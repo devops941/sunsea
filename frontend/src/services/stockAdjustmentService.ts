@@ -37,4 +37,9 @@ export const stockAdjustmentService = {
     const response = await apiClient.get(`${BASE_URL}/production-orders`);
     return response.data.data;
   },
+
+  fetchNextNumber: async () => {
+    const response = await apiClient.get(`${BASE_URL}/next-number`);
+    return response.data.data as string;
+  },
 };

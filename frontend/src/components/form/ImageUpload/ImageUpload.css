@@ -8,16 +8,16 @@
   font-weight: 800;
   letter-spacing: 0.5px;
   text-transform: uppercase;
-  color: var(--text-ink, #1E293B);
+  color: var(--color-ink, #1E293B);
   margin-bottom: 8px;
 }
 
 .image-upload-box {
   width: 100%;
   min-height: 140px;
-  border: 2px dashed var(--border-line-soft, #d7ddd9);
+  border: 2px dashed var(--color-line-soft, #d7ddd9);
   border-radius: 12px;
-  background: var(--bg-card-2, #f8faf9);
+  background: var(--color-card-2, #f8faf9);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -29,7 +29,7 @@
 
 .image-upload-box:hover {
   border-color: var(--color-primary);
-  background: var(--bg-card, #f0fdf4);
+  background: var(--color-card, #f0fdf4);
 }
 
 .image-upload-placeholder {
@@ -37,7 +37,7 @@
   flex-direction: column;
   align-items: center;
   gap: 10px;
-  color: var(--text-ink-subtle, #94a3b8);
+  color: var(--color-ink-subtle, #94a3b8);
   font-size: 14px;
   font-weight: 500;
 }
@@ -57,20 +57,20 @@
 
 /* Dark Theme Overrides */
 :root[data-theme="dark"] .image-upload-label {
-  color: var(--text-ink, #E2E8F0);
+  color: var(--color-ink, #E2E8F0);
   font-weight: 800;
 }
 
 :root[data-theme="dark"] .image-upload-box {
-  border-color: var(--border-line-soft, #202A3C);
-  background: var(--bg-card-2, #1C2536);
+  border-color: var(--color-line-soft, #202A3C);
+  background: var(--color-card-2, #1C2536);
 }
 
 :root[data-theme="dark"] .image-upload-box:hover {
   border-color: var(--color-primary);
-  background: var(--bg-card, #151D2C);
+  background: var(--color-card, #151D2C);
 }
 
 :root[data-theme="dark"] .image-upload-placeholder {
-  color: var(--text-ink-subtle, #64748B);
+  color: var(--color-ink-subtle, #64748B);
 }

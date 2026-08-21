@@ -7,6 +7,7 @@ export const storeService = {
     params?: {
       search?: string;
       storeCategory?: string;
+      isActive?: boolean;
       page?: number;
       limit?: number;
       sortBy?: string;

@@ -31,9 +31,8 @@ const ITEMS_PER_PAGE = 10;
 
 const AllSalesOrderList: React.FC = () => {
     const navigate = useNavigate();
-    const { can, isSuperAdmin, permissions } = usePermission();
-    const isEstimateUser = !isSuperAdmin && permissions.includes("sales-orders.view-estimate") && !permissions.includes("sales-orders.view-gst");
-    const isGstUser = !isEstimateUser;
+    const { can } = usePermission();
+    const isGstUser = true;
     const [data, setData] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const location = useLocation();

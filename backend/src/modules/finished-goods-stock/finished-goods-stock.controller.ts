@@ -21,12 +21,13 @@ class FinishedGoodsStockController {
   findAll = asyncHandler(async (req: Request, res: Response) => {
     const page = req.query.page ? Number(req.query.page) : undefined;
     const limit = req.query.limit ? Number(req.query.limit) : undefined;
-    const { storeId, search } = req.query;
+    const { storeId, search, categoryId } = req.query;
     const result = await finishedGoodsStockService.findAll({
       page,
       limit,
       storeId: storeId as string,
       search: search as string,
+      categoryId: categoryId as string,
     });
 
     return res.status(200).json(

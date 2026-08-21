@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   FaPlus,
 } from "react-icons/fa";
@@ -6,16 +6,25 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
-import { fetchStockAdjustments, stockAdjustmentCreated, stockAdjustmentUpdated, stockAdjustmentDeleted } from "../../../features/stock-adjustments/stockAdjustmentSlice";
+import {
+  fetchStockAdjustments,
+  deleteStockAdjustment,
+  stockAdjustmentCreated,
+  stockAdjustmentUpdated,
+  stockAdjustmentDeleted,
+} from "../../../features/stock-adjustments/stockAdjustmentSlice";
 import { useSocketSync } from "../../../hooks/useSocketSync";
+import { usePermission } from "../../../hooks/usePermission";
 
 import CustomButton from "../../../components/ui/Button/Button";
 import DataTable from "../../../components/ui/table/DataTable";
 import SearchInput from "../../../components/ui/SearchInput/SearchInput";
 import FilterPopover from "../../../components/ui/FilterPopover/FilterPopover";
-import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import ViewButton from "../../../components/ui/viewbutton/ViewButton";
+import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
+import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
 import DatePickerCalendar from "../../../components/ui/DatePickerCalendar/DatePickerCalendar";
+import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import { formatDate } from "../../../utils/dateUtils";
 
 const ITEMS_PER_PAGE = 10;
@@ -149,6 +158,19 @@ const getStockAdjustmentSourceInfo = (item: any) => {
   };
 };
 
+const getTypeBadgeClass = (type: string) => {
+  switch (ADJUSTMENT_TYPE_BADGE[type]) {
+    case "primary": return "bg-blue-100 text-blue-800";
+    case "info": return "bg-cyan-100 text-cyan-800";
+    case "success": return "bg-green-100 text-green-800";
+    case "warning": return "bg-yellow-100 text-yellow-800";
+    case "danger": return "bg-red-100 text-red-800";
+    case "dark": return "bg-gray-800 text-gray-100";
+    case "light": return "bg-card-2 text-ink";
+    default: return "bg-card-2 text-ink";
+  }
+};
+
 const getPrimaryUom = (uomStr?: string) => {
   if (!uomStr) return "";
   const first = uomStr.split(",")[0].trim();
@@ -180,11 +202,14 @@ const getItemPrimaryUom = (item: any) => {
 const StockAdjustmentList: React.FC = () => {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
+  const { can } = usePermission();
 
   const { data, meta, loading, error } = useAppSelector(
     (state) => state.stockAdjustments
   );
 
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [status, setStatus] = useState("");
@@ -202,9 +227,17 @@ const StockAdjustmentList: React.FC = () => {
   const hasActiveFilters = !!(status || adjustmentType || dateFrom || dateTo);
   const activeFilterCount = [status, adjustmentType, dateFrom, dateTo].filter(Boolean).length;
 
+  // Debounce search — 300 ms
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(searchTerm), 500);
-    return () => clearTimeout(timer);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+      setCurrentPage(1);
+    }, 300);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
   }, [searchTerm]);
 
   useEffect(() => {
@@ -231,22 +264,26 @@ const StockAdjustmentList: React.FC = () => {
     deleted: stockAdjustmentDeleted,
   });
 
-  const handleOpenFilter = () => {
+  const handleSearch = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchTerm(e.target.value);
+  }, []);
+
+  const handleOpenFilter = useCallback(() => {
     setDraftStatus(status);
     setDraftAdjustmentType(adjustmentType);
     setDraftDateFrom(dateFrom);
     setDraftDateTo(dateTo);
-  };
+  }, [status, adjustmentType, dateFrom, dateTo]);
 
-  const handleApplyFilters = () => {
+  const handleApplyFilters = useCallback(() => {
     setStatus(draftStatus);
     setAdjustmentType(draftAdjustmentType);
     setDateFrom(draftDateFrom);
     setDateTo(draftDateTo);
     setCurrentPage(1);
-  };
+  }, [draftStatus, draftAdjustmentType, draftDateFrom, draftDateTo]);
 
-  const handleClearFilters = () => {
+  const handleClearFilters = useCallback(() => {
     setDraftStatus("");
     setDraftAdjustmentType("");
     setDraftDateFrom("");
@@ -256,20 +293,21 @@ const StockAdjustmentList: React.FC = () => {
     setDateFrom("");
     setDateTo("");
     setCurrentPage(1);
-  };
+  }, []);
 
-  const getTypeBadgeClass = (type: string) => {
-    switch (ADJUSTMENT_TYPE_BADGE[type]) {
-      case "primary": return "bg-blue-100 text-blue-800";
-      case "info": return "bg-cyan-100 text-cyan-800";
-      case "success": return "bg-green-100 text-green-800";
-      case "warning": return "bg-yellow-100 text-yellow-800";
-      case "danger": return "bg-red-100 text-red-800";
-      case "dark": return "bg-gray-800 text-gray-100";
-      case "light": return "bg-card-2 text-ink";
-      default: return "bg-card-2 text-ink";
+  const handleDeleteConfirm = useCallback(async () => {
+    if (!deleteId || isDeleting) return;
+    setIsDeleting(true);
+    try {
+      await dispatch(deleteStockAdjustment(deleteId)).unwrap();
+      toast.success("Stock Adjustment deleted successfully");
+      setDeleteId(null);
+    } catch (err: any) {
+      toast.error(err || "Failed to delete stock adjustment");
+    } finally {
+      setIsDeleting(false);
     }
-  };
+  }, [deleteId, isDeleting, dispatch]);
 
   const getTypeBadge = (type: string) => (
     <span className={`px-2.5 py-1 rounded-full text-[11px] font-semibold tracking-wider ${getTypeBadgeClass(type)}`}>
@@ -277,7 +315,7 @@ const StockAdjustmentList: React.FC = () => {
     </span>
   );
 
-  const totalPages = meta?.totalPages || Math.ceil((data?.length || 0) / ITEMS_PER_PAGE);
+  const totalPages = meta?.totalPages || 1;
 
   return (
     <div className="p-4 md:p-1 ">
@@ -292,10 +330,7 @@ const StockAdjustmentList: React.FC = () => {
             {/* Search */}
             <SearchInput
               value={searchTerm}
-              onChange={(e) => {
-                setSearchTerm(e.target.value);
-                setCurrentPage(1);
-              }}
+              onChange={handleSearch}
               placeholder="Search by No, Reason, PO..."
             />
 
@@ -307,75 +342,83 @@ const StockAdjustmentList: React.FC = () => {
               onClear={handleClearFilters}
               onOpen={handleOpenFilter}
             >
-              <div className="mb-3">
-                <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-semibold">
-                  Status
-                </label>
-                <select
-                  className="w-full border border-line rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary bg-card text-ink-muted font-medium"
-                  value={draftStatus}
-                  onChange={(e) => setDraftStatus(e.target.value)}
-                >
-                  <option value="">All Statuses</option>
-                  <option value="DRAFT">Draft</option>
-                  <option value="PENDING_APPROVAL">Pending Approval</option>
-                  <option value="APPROVED">Approved</option>
-                  <option value="REJECTED">Rejected</option>
-                </select>
-              </div>
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-semibold text-ink-muted mb-1.5 uppercase tracking-wider">
+                    Status
+                  </label>
+                  <SelectInput
+                    name="draftStatus"
+                    value={draftStatus}
+                    onChange={(e) => setDraftStatus(e.target.value)}
+                    options={[
+                      { value: "DRAFT", label: "Draft" },
+                      { value: "PENDING_APPROVAL", label: "Pending Approval" },
+                      { value: "APPROVED", label: "Approved" },
+                      { value: "REJECTED", label: "Rejected" },
+                    ]}
+                    defaultOptionLabel="All Statuses"
+                    noMargin
+                  />
+                </div>
 
-              <div className="mb-3">
-                <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-semibold">
-                  Adjustment Type
-                </label>
-                <select
-                  className="w-full border border-line rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary bg-card text-ink-muted font-medium"
-                  value={draftAdjustmentType}
-                  onChange={(e) => setDraftAdjustmentType(e.target.value)}
-                >
-                  <option value="">All Types</option>
-                  <option value="PRODUCTION_MATERIAL_ISSUE">Production Material Issue</option>
-                  <option value="PRODUCTION_MATERIAL_RETURN">Production Material Return</option>
-                  <option value="STOCK_INCREASE">Stock Increase</option>
-                  <option value="STOCK_DECREASE">Stock Decrease</option>
-                  <option value="DAMAGE">Damage</option>
-                  <option value="SCRAP">Scrap</option>
-                  <option value="OPENING_STOCK">Opening Stock</option>
-                  <option value="MANUAL_CORRECTION">Manual Correction</option>
-                  <option value="OTHER">Other</option>
-                </select>
-              </div>
+                <div>
+                  <label className="block text-xs font-semibold text-ink-muted mb-1.5 uppercase tracking-wider">
+                    Adjustment Type
+                  </label>
+                  <SelectInput
+                    name="draftAdjustmentType"
+                    value={draftAdjustmentType}
+                    onChange={(e) => setDraftAdjustmentType(e.target.value)}
+                    options={[
+                      { value: "PRODUCTION_MATERIAL_ISSUE", label: "Production Material Issue" },
+                      { value: "PRODUCTION_MATERIAL_RETURN", label: "Production Material Return" },
+                      { value: "STOCK_INCREASE", label: "Stock Increase" },
+                      { value: "STOCK_DECREASE", label: "Stock Decrease" },
+                      { value: "DAMAGE", label: "Damage" },
+                      { value: "SCRAP", label: "Scrap" },
+                      { value: "OPENING_STOCK", label: "Opening Stock" },
+                      { value: "MANUAL_CORRECTION", label: "Manual Correction" },
+                      { value: "OTHER", label: "Other" },
+                    ]}
+                    defaultOptionLabel="All Types"
+                    noMargin
+                  />
+                </div>
 
-              <div className="mb-3">
-                <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-semibold">
-                  From Date
-                </label>
-                <DatePickerCalendar
-                  name="fromDate"
-                  value={draftDateFrom}
-                  maxDate={draftDateTo || undefined}
-                  onChange={(e) => setDraftDateFrom(e.target.value)}
-                />
-              </div>
+                <div>
+                  <label className="block text-xs font-semibold text-ink-muted mb-1.5 uppercase tracking-wider">
+                    From Date
+                  </label>
+                  <DatePickerCalendar
+                    name="fromDate"
+                    value={draftDateFrom}
+                    maxDate={draftDateTo || undefined}
+                    onChange={(e) => setDraftDateFrom(e.target.value)}
+                  />
+                </div>
 
-              <div className="mb-3">
-                <label className="block mb-1 text-[11px] uppercase tracking-wider text-ink-subtle font-semibold">
-                  To Date
-                </label>
-                <DatePickerCalendar
-                  name="toDate"
-                  value={draftDateTo}
-                  minDate={draftDateFrom || undefined}
-                  onChange={(e) => setDraftDateTo(e.target.value)}
-                />
+                <div>
+                  <label className="block text-xs font-semibold text-ink-muted mb-1.5 uppercase tracking-wider">
+                    To Date
+                  </label>
+                  <DatePickerCalendar
+                    name="toDate"
+                    value={draftDateTo}
+                    minDate={draftDateFrom || undefined}
+                    onChange={(e) => setDraftDateTo(e.target.value)}
+                  />
+                </div>
               </div>
             </FilterPopover>
 
-            <CustomButton
-              text="New Adjustment"
-              icon={FaPlus}
-              onClick={() => navigate("/inventory/stock-adjustments/create")}
-            />
+            {can("stock-adjustments.create") && (
+              <CustomButton
+                text="New Adjustment"
+                icon={FaPlus}
+                onClick={() => navigate("/inventory/stock-adjustments/create")}
+              />
+            )}
           </div>
         </div>
 
@@ -545,10 +588,23 @@ const StockAdjustmentList: React.FC = () => {
               render: (item: any) => (
                 <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                   <ViewButton onClick={() => navigate(`/inventory/stock-adjustments/view/${item.id}`)} />
+                  {can("stock-adjustments.delete") && item.status !== "APPROVED" && (
+                    <DeleteButton onClick={() => setDeleteId(String(item.id))} />
+                  )}
                 </div>
               )
             },
           ]}
+        />
+
+        <CommonConfirmModal
+          isOpen={!!deleteId}
+          onClose={() => setDeleteId(null)}
+          onConfirm={handleDeleteConfirm}
+          title="Delete Stock Adjustment"
+          message="Are you sure you want to delete this stock adjustment? This action cannot be undone."
+          isDangerous
+          isLoading={isDeleting}
         />
       </div>
     </div>

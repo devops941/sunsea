@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
@@ -7,17 +7,13 @@ import { useSocketSync } from "../../../hooks/useSocketSync";
 import { fetchMachines } from "../../../features/machines/machineSlice";
 import { fetchProducts } from "../../../features/product/productSlice";
 import { fetchShifts } from "../../../features/shifts/shiftSlice";
-import CustomButton from "../../../components/ui/Button/Button";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import CommonConfirmModal from "../../../components/ui/CommonConfirmModal/CommonConfirmModal";
-import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import EditButton from "../../../components/ui/EditButton/EditButton";
 import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
 import ViewButton from "../../../components/ui/viewbutton/ViewButton";
-import FilterCard from "../../../components/ui/FilterCard/FilterCard";
 import WastageViewModal from "../components/WastageViewModal";
 import DataTable from "../../../components/ui/table/DataTable";
-import { FaPlus } from "react-icons/fa";
 const ITEMS_PER_PAGE = 10;
 
 const WastageList: React.FC = () => {
@@ -36,6 +32,7 @@ const WastageList: React.FC = () => {
   const [selectedWastage, setSelectedWastage] = useState<any>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -65,65 +62,55 @@ const WastageList: React.FC = () => {
     }
   }, [error]);
 
-  const handleDeleteClick = (id: string) => {
+  const handleDeleteClick = useCallback((id: string) => {
     setItemToDelete(id);
     setShowDeleteModal(true);
-  };
+  }, []);
 
   const handleDeleteConfirm = async () => {
-    if (itemToDelete) {
+    if (itemToDelete && !isDeleting) {
+      setIsDeleting(true);
       try {
         await dispatch(deleteProductionWastage(itemToDelete)).unwrap();
         toast.success("Production wastage log deleted successfully");
-        dispatch(fetchProductionWastages({
-          page: currentPage,
-          limit: ITEMS_PER_PAGE,
-        }));
       } catch (err: any) {
         toast.error(err || "Failed to delete log");
       } finally {
+        setIsDeleting(false);
         setShowDeleteModal(false);
         setItemToDelete(null);
       }
     }
   };
 
-  const handleApprove = async (id: string) => {
+  const handleApprove = useCallback(async (id: string) => {
     try {
       await dispatch(approveProductionWastage(id)).unwrap();
       toast.success("Wastage log approved successfully");
       if (selectedWastage && String(selectedWastage.id) === String(id)) {
         setShowViewModal(false);
       }
-      dispatch(fetchProductionWastages({
-        page: currentPage,
-        limit: ITEMS_PER_PAGE,
-      }));
     } catch (err: any) {
       toast.error(err || "Failed to approve log");
     }
-  };
+  }, [dispatch, selectedWastage]);
 
-  const handleReject = async (id: string) => {
+  const handleReject = useCallback(async (id: string) => {
     try {
       await dispatch(rejectProductionWastage(id)).unwrap();
       toast.success("Wastage log rejected successfully");
       if (selectedWastage && String(selectedWastage.id) === String(id)) {
         setShowViewModal(false);
       }
-      dispatch(fetchProductionWastages({
-        page: currentPage,
-        limit: ITEMS_PER_PAGE,
-      }));
     } catch (err: any) {
       toast.error(err || "Failed to reject log");
     }
-  };
+  }, [dispatch, selectedWastage]);
 
-  const handleView = (wastage: any) => {
+  const handleView = useCallback((wastage: any) => {
     setSelectedWastage(wastage);
     setShowViewModal(true);
-  };
+  }, []);
 
   const totalPages = Math.ceil((total || 0) / ITEMS_PER_PAGE) || 1;
   const displayWastages = wastages || [];
@@ -136,14 +123,7 @@ const WastageList: React.FC = () => {
           <div>
             <h2 className="text-2xl font-bold text-ink">Production Wastage Auditing</h2>
           </div>
-          {/* <div className="flex items-center gap-3">
-            <CustomButton
-              text="Add Wastage Log"
-              onClick={() => navigate("/production-wastages/create")}
-              icon={FaPlus}
-            />
-          </div> */}
-        </div>
+          </div>
 
         {/* Table */}
         <DataTable
@@ -220,8 +200,9 @@ const WastageList: React.FC = () => {
         onConfirm={handleDeleteConfirm}
         title="Delete Wastage Log"
         message="Are you sure you want to delete this wastage log? This action cannot be undone."
-        confirmText="Delete"
+        confirmText={isDeleting ? "Deleting..." : "Delete"}
         confirmVariant="danger"
+        isDangerous={true}
       />
 
       <WastageViewModal

@@ -86,7 +86,7 @@ class SalesProductService {
     return prisma.salesProduct.findMany({
       where: whereClause,
       include: includeDefaults,
-      orderBy: { createdAt: "desc" },
+      orderBy: { createdAt: "asc" },
     });
   }
 

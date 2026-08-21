@@ -1,20 +1,17 @@
 import React, { useState, useEffect } from "react";
-import { FaSave, FaEraser, FaArrowLeft, FaUser, FaInfoCircle, FaMapMarkerAlt, FaFileInvoiceDollar, FaBuilding } from "react-icons/fa";
+import { FaArrowLeft, FaUser, FaInfoCircle, FaMapMarkerAlt, FaFileInvoiceDollar, FaPlus } from "react-icons/fa";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 import { z } from "zod";
 import { useForm, Controller, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import type { StateCityOption } from "../../../components/ui/CityStateSelect/CityStateSelect";
 import TextInput from "../../../components/form/TextInput/TextInput";
 import SelectInput from "../../../components/form/SelectInput/SelectInput";
 import CustomButton from "../../../components/ui/Button/Button";
 import AddressForm from "../../../components/form/AddressFrom/AddressFrom";
 import { useCustomers } from "../../../hooks/useCustomers";
 import { customerService } from "../../../services/customerService";
-import { useSelector } from "react-redux";
-import MultiSelect from "../../../components/form/multiSelect/MultiSelect";
-import IndiaPhoneInput, { type PhoneEntry, validatePhoneNumber } from "../../../components/ui/PhoneInput/PhoneInput";
+import IndiaPhoneInput, { validatePhoneNumber } from "../../../components/ui/PhoneInput/PhoneInput";
 import DeleteButton from "../../../components/ui/DeleteButton/DeleteButton";
 import { useCustomerTypes } from "../../../hooks/useCustomerTypes";
 import { useCustomerGrades } from "../../../hooks/useCustomerGrades";
@@ -34,8 +31,8 @@ const customerFormSchema = z.object({
   isActive: z.string().min(1, "Status is required"),
   firmName: z.string().min(3, "Firm Name must be at least 3 characters"),
   displayName: z.string().min(3, "Display Name must be at least 3 characters"),
-  customerTypeId: z.number({ message: "Customer Type is required" }),
-  customerGradeId: z.number({ message: "Customer Grade is required" }),
+  customerTypeId: z.number({ message: "Customer Type is required" }).nullable(),
+  customerGradeId: z.number({ message: "Customer Grade is required" }).nullable(),
   phones: z.any().superRefine((val, ctx) => {
     const primaryMobileNumber = Array.isArray(val) && val.length > 0 ? val[0].number : (typeof val === "string" ? val : "");
     const error = validatePhoneNumber(primaryMobileNumber, true);
@@ -138,7 +135,6 @@ const CustomerFormPage: React.FC = () => {
   const isEditMode = !!id;
 
   const { addCustomer, editCustomer } = useCustomers();
-  const user = useSelector((state: any) => state.auth.user);
 
   const [loading, setLoading] = useState(isEditMode);
 
@@ -147,8 +143,6 @@ const CustomerFormPage: React.FC = () => {
 
   const { customerTypes, createCustomerType, updateCustomerType, deleteCustomerType, isLoading: isTypesLoading } = useCustomerTypes();
   const { customerGrades, isLoading: isGradesLoading, createCustomerGrade, updateCustomerGrade, deleteCustomerGrade } = useCustomerGrades();
-
-  const [shippingResetKey, setShippingResetKey] = useState(0);
 
   const {
     control,
@@ -204,10 +198,17 @@ const CustomerFormPage: React.FC = () => {
 
 
 
-  const handleClear = () => {
+  const handleClear = async () => {
     if (!isEditMode) {
       reset(initialFormData);
-      setShippingResetKey((k) => k + 1);
+      try {
+        const nextCode = await customerService.fetchNextCode();
+        if (nextCode) {
+          setValue("customerId", nextCode, { shouldValidate: true });
+        }
+      } catch (err) {
+        console.error("Error fetching next customer code:", err);
+      }
     }
   };
 
@@ -405,17 +406,14 @@ const CustomerFormPage: React.FC = () => {
           {/* Billing Address */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h5 className="font-bold text-slate-700 flex items-center gap-2">
-                <FaMapMarkerAlt className="text-blue-500" size={14} />
-                Address
-              </h5>
-              <button
+              
+              <CustomButton
                 type="button"
+                text="Add Address"
+                icon={FaPlus}
+                variant="secondary"
                 onClick={() => append({ address: { addressLine1: "", addressLine2: "", city: "", state: "Tamil Nadu", pincode: "" } })}
-                className="text-sm px-3 py-1.5 bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100 font-medium border border-blue-200 transition-colors"
-              >
-                + Add Address
-              </button>
+              />
             </div>
           </div>
 
@@ -489,7 +487,7 @@ const CustomerFormPage: React.FC = () => {
             try {
               await deleteCustomerType(deleteModalState.idToDelete);
               if (watch("customerTypeId") === deleteModalState.idToDelete) {
-                setValue("customerTypeId", null, { shouldValidate: true });
+                setValue("customerTypeId", null as any, { shouldValidate: true });
               }
             } catch (e) { /* Error handled in hook */ }
           }
@@ -508,7 +506,7 @@ const CustomerFormPage: React.FC = () => {
             try {
               await deleteCustomerGrade(deleteGradeModalState.idToDelete);
               if (watch("customerGradeId") === deleteGradeModalState.idToDelete) {
-                setValue("customerGradeId", null, { shouldValidate: true });
+                setValue("customerGradeId", null as any, { shouldValidate: true });
               }
             } catch (e) { /* Error handled in hook */ }
           }

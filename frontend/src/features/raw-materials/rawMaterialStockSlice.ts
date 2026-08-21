@@ -63,6 +63,9 @@ export const deleteRawMaterialStock = createAsyncThunk(
 
 const initialState: RawMaterialStockState = {
   data: [],
+  total: 0,
+  page: 1,
+  totalPages: 1,
   loading: false,
   error: null,
 };
@@ -76,15 +79,23 @@ const rawMaterialStockSlice = createSlice({
     },
     rawMaterialStockCreated: (state, action) => {
       if (Array.isArray(state.data)) {
-        const exists = state.data.find((m: any) => String(m.id) === String(action.payload.id));
+        const exists = state.data.find(
+          (m: any) =>
+            String(m.rawMaterialId || m.id) ===
+            String(action.payload.rawMaterialId || action.payload.id)
+        );
         if (!exists) {
-          state.data.unshift(action.payload);
+          state.data.push(action.payload);
         }
       }
     },
     rawMaterialStockUpdated: (state, action) => {
       if (Array.isArray(state.data)) {
-        const index = state.data.findIndex((m: any) => String(m.id) === String(action.payload.id));
+        const index = state.data.findIndex(
+          (m: any) =>
+            String(m.rawMaterialId || m.id) ===
+            String(action.payload.rawMaterialId || action.payload.id)
+        );
         if (index !== -1) {
           state.data[index] = action.payload;
         }
@@ -92,7 +103,10 @@ const rawMaterialStockSlice = createSlice({
     },
     rawMaterialStockDeleted: (state, action) => {
       if (Array.isArray(state.data)) {
-        state.data = state.data.filter((m: any) => String(m.id) !== String(action.payload.id));
+        const payloadId = String(action.payload.id ?? action.payload);
+        state.data = state.data.filter(
+          (m: any) => String(m.rawMaterialId || m.id) !== payloadId
+        );
       }
     },
   },
@@ -104,9 +118,19 @@ const rawMaterialStockSlice = createSlice({
       })
       .addCase(
         fetchRawMaterialStocks.fulfilled,
-        (state, action: PayloadAction<RawMaterialStock[]>) => {
+        (state, action: PayloadAction<any>) => {
           state.loading = false;
-          state.data = action.payload;
+          if (action.payload && "data" in action.payload) {
+            state.data = action.payload.data;
+            state.total = action.payload.total;
+            state.page = action.payload.page;
+            state.totalPages = action.payload.totalPages;
+          } else {
+            state.data = Array.isArray(action.payload) ? action.payload : [];
+            state.total = state.data.length;
+            state.page = 1;
+            state.totalPages = 1;
+          }
         }
       )
       .addCase(fetchRawMaterialStocks.rejected, (state, action) => {

@@ -64,7 +64,7 @@ export const creditCheckService = {
           { mdApprovalReason: { contains: "CREDIT_LIMIT_EXCEEDED" } },
           { mdApprovalReason: { contains: "OVERDUE_INVOICE" } },
         ],
-      },
+      } as any,
       select: {
         id: true,
         orderNo: true,

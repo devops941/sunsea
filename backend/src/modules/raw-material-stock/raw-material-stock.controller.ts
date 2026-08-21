@@ -19,15 +19,21 @@ class RawMaterialStockController {
   });
 
   findAll = asyncHandler(async (req: Request, res: Response) => {
-    const { search, storeId, storeCategory } = req.query;
-    const stocks = await rawMaterialStockService.findAll({
+    const { search, storeId, storeCategory, categoryId, status } = req.query;
+    const page = req.query.page ? Number(req.query.page) : 1;
+    const limit = req.query.limit ? Number(req.query.limit) : 20;
+    const result = await rawMaterialStockService.findAll({
       search: search as string,
       storeId: storeId as string,
       storeCategory: storeCategory as string,
+      categoryId: categoryId as string,
+      status: status as string,
+      page,
+      limit,
     });
 
     return res.status(200).json(
-      new ApiResponse("Raw Material Stocks fetched successfully", stocks)
+      new ApiResponse("Raw Material Stocks fetched successfully", result)
     );
   });
 

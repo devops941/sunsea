@@ -17,47 +17,53 @@ router.use(authMiddleware);
 // Must be before /:id to avoid param conflict
 router.get(
   "/production-orders",
-  requirePermission("raw_material_stocks.view"),
+  requirePermission("stock-adjustments.view"),
   StockAdjustmentController.getProductionOrdersForIssue
+);
+
+router.get(
+  "/next-number",
+  requirePermission("stock-adjustments.create"),
+  StockAdjustmentController.getNextAdjustmentNumber
 );
 
 router.post(
   "/",
-  requirePermission("raw_material_stocks.create"),
+  requirePermission("stock-adjustments.create"),
   validateMiddleware(createStockAdjustmentSchema),
   StockAdjustmentController.createStockAdjustment
 );
 
 router.get(
   "/",
-  requirePermission("raw_material_stocks.view"),
+  requirePermission("stock-adjustments.view"),
   StockAdjustmentController.getStockAdjustments
 );
 
 router.get(
   "/:id",
-  requirePermission("raw_material_stocks.view"),
+  requirePermission("stock-adjustments.view"),
   validateMiddleware(stockAdjustmentIdSchema),
   StockAdjustmentController.getStockAdjustmentById
 );
 
 router.put(
   "/:id",
-  requirePermission("raw_material_stocks.edit"),
+  requirePermission("stock-adjustments.edit"),
   validateMiddleware(updateStockAdjustmentSchema),
   StockAdjustmentController.updateStockAdjustment
 );
 
 router.put(
   "/:id/approve",
-  requirePermission("raw_material_stocks.edit"),
+  requirePermission("stock-adjustments.edit"),
   validateMiddleware(updateStockAdjustmentStatusSchema),
   StockAdjustmentController.approveStockAdjustment
 );
 
 router.delete(
   "/:id",
-  requirePermission("raw_material_stocks.delete"),
+  requirePermission("stock-adjustments.delete"),
   validateMiddleware(stockAdjustmentIdSchema),
   StockAdjustmentController.deleteStockAdjustment
 );

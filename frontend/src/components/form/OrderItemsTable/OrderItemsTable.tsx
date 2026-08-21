@@ -33,8 +33,8 @@ const RowItem: React.FC<{
     const lineTotal = unitRate * qty;
 
     return (
-        <tr key={field.id} className="hover:bg-slate-50/50 transition-colors duration-200">
-            <td className="px-3 py-2 whitespace-nowrap text-sm font-medium text-slate-400 text-center">{index + 1}</td>
+        <tr key={field.id} className="hover:bg-card-2/50 transition-colors duration-200">
+            <td className="px-3 py-2 whitespace-nowrap text-sm font-medium text-ink-subtle text-center">{index + 1}</td>
 
             <td className="px-3 py-2 whitespace-nowrap">
                 <Controller
@@ -57,7 +57,7 @@ const RowItem: React.FC<{
                 />
             </td>
 
-            <td className="px-3 py-2 whitespace-nowrap text-sm text-slate-700 font-medium">
+            <td className="px-3 py-2 whitespace-nowrap text-sm text-ink font-medium">
                 {selectedProd ? `₹${unitRate.toFixed(2)}` : "-"}
             </td>
 
@@ -80,7 +80,7 @@ const RowItem: React.FC<{
                 />
             </td>
 
-            <td className="px-3 py-2 whitespace-nowrap text-sm font-semibold text-slate-800">
+            <td className="px-3 py-2 whitespace-nowrap text-sm font-semibold text-ink">
                 {selectedProd ? `₹${lineTotal.toFixed(2)}` : "-"}
             </td>
 
@@ -113,21 +113,21 @@ const OrderItemsTable: React.FC<OrderItemsTableProps> = ({
     }, [products]);
 
     return (
-        <div className="rounded-xl border border-slate-200 bg-white [&_.mb-\[18px\]]:!mb-0 [&_.select-input-group]:!mb-0 overflow-x-auto">
-            <table className="min-w-full divide-y divide-slate-200">
-                <thead className="bg-slate-50/80">
+        <div className="rounded-xl border border-line bg-card [&_.mb-\[18px\]]:!mb-0 [&_.select-input-group]:!mb-0 overflow-x-auto">
+            <table className="min-w-full divide-y divide-line">
+                <thead className="bg-card-2">
                     <tr>
-                        <th className="px-3 py-3 text-center text-[11px] font-bold text-slate-500 uppercase tracking-widest w-12 border-b border-slate-200">#</th>
-                        <th className="px-3 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-200">Product</th>
-                        <th className="px-3 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-widest w-32 border-b border-slate-200">Unit Rate (₹)</th>
-                        <th className="px-3 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-widest w-32 border-b border-slate-200">Quantity</th>
-                        <th className="px-3 py-3 text-left text-[11px] font-bold text-slate-500 uppercase tracking-widest w-32 border-b border-slate-200">Amount (₹)</th>
+                        <th className="px-3 py-3 text-center text-[11px] font-bold text-ink-muted uppercase tracking-widest w-12 border-b border-line">#</th>
+                        <th className="px-3 py-3 text-left text-[11px] font-bold text-ink-muted uppercase tracking-widest border-b border-line">Product</th>
+                        <th className="px-3 py-3 text-left text-[11px] font-bold text-ink-muted uppercase tracking-widest w-32 border-b border-line">Unit Rate (₹)</th>
+                        <th className="px-3 py-3 text-left text-[11px] font-bold text-ink-muted uppercase tracking-widest w-32 border-b border-line">Quantity</th>
+                        <th className="px-3 py-3 text-left text-[11px] font-bold text-ink-muted uppercase tracking-widest w-32 border-b border-line">Amount (₹)</th>
                         {editable && (
-                            <th className="px-3 py-3 text-center text-[11px] font-bold text-slate-500 uppercase tracking-widest w-16 border-b border-slate-200"></th>
+                            <th className="px-3 py-3 text-center text-[11px] font-bold text-ink-muted uppercase tracking-widest w-16 border-b border-line"></th>
                         )}
                     </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-line">
                     {fields.map((field, index) => (
                         <RowItem
                             key={field.id}

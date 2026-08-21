@@ -27,11 +27,21 @@ const FilterPopover: React.FC<FilterPopoverProps> = ({
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (
+        target &&
+        (target.closest("[data-select-portal]") ||
+         target.closest(".react-select__menu") ||
+         target.closest("[class*='select-menu']"))
+      ) {
+        return;
+      }
+
       if (
         popoverRef.current &&
-        !popoverRef.current.contains(e.target as Node) &&
+        !popoverRef.current.contains(target) &&
         filterBtnRef.current &&
-        !filterBtnRef.current.contains(e.target as Node)
+        !filterBtnRef.current.contains(target)
       ) {
         setShow(false);
         if (onClose) onClose();

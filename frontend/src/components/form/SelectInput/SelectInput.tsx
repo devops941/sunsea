@@ -255,7 +255,7 @@ const SelectInput: React.FC<SelectInputProps> = ({
 
         {/* Custom Dropdown Menu (portal to avoid overflow clipping) */}
         {isOpen && createPortal(
-          <div ref={portalRef} className="bg-card border border-line-soft rounded-lg shadow-xl max-h-60 flex flex-col py-1 animate-in fade-in zoom-in-95 duration-100 overflow-hidden text-ink" style={dropdownStyle}>
+          <div data-select-portal="true" ref={portalRef} className="bg-card border border-line-soft rounded-lg shadow-xl max-h-60 flex flex-col py-1 animate-in fade-in zoom-in-95 duration-100 overflow-hidden text-ink" style={dropdownStyle}>
             <div className="overflow-y-auto min-h-0 flex-1">
               {defaultOptionLabel && !searchTerm && (
                 <div

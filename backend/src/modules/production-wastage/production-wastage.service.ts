@@ -134,13 +134,15 @@ class ProductionWastageService {
         sentForRework: data.sentForRework ?? false,
         status: data.status ?? "DRAFT",
         createdBy: userId,
+        categoryId: data.categoryId ?? null,
       },
       include: {
         productionOrder: true,
         machine: true,
         shift: true,
-        product: true,
-        rawMaterial: true
+        product: { include: { category: true } },
+        rawMaterial: { include: { category: true } },
+        category: true,
       }
     });
   }
@@ -176,8 +178,9 @@ class ProductionWastageService {
         },
         machine: true,
         shift: true,
-        product: true,
-        rawMaterial: true
+        product: { include: { category: true } },
+        rawMaterial: { include: { category: true } },
+        category: true,
       },
       orderBy: {
         createdAt: "desc"
@@ -212,8 +215,9 @@ class ProductionWastageService {
         },
         machine: true,
         shift: true,
-        product: true,
-        rawMaterial: true
+        product: { include: { category: true } },
+        rawMaterial: { include: { category: true } },
+        category: true,
       }
     });
 
@@ -256,6 +260,7 @@ class ProductionWastageService {
     if (data.remarks !== undefined) updatedData.remarks = data.remarks;
     if (data.isRecyclable !== undefined) updatedData.isRecyclable = data.isRecyclable;
     if (data.sentForRework !== undefined) updatedData.sentForRework = data.sentForRework;
+    if (data.categoryId !== undefined) updatedData.categoryId = data.categoryId ?? null;
 
     return prisma.productionWastage.update({
       where: { id },
@@ -264,8 +269,9 @@ class ProductionWastageService {
         productionOrder: true,
         machine: true,
         shift: true,
-        product: true,
-        rawMaterial: true
+        product: { include: { category: true } },
+        rawMaterial: { include: { category: true } },
+        category: true,
       }
     });
   }
@@ -302,9 +308,10 @@ class ProductionWastageService {
           productionOrder: true,
           machine: true,
           shift: true,
-          product: true,
-          rawMaterial: true,
+          product: { include: { category: true } },
+          rawMaterial: { include: { category: true } },
           targetWastageProduct: true,
+          category: true,
         }
       });
 
@@ -361,8 +368,9 @@ class ProductionWastageService {
         productionOrder: true,
         machine: true,
         shift: true,
-        product: true,
-        rawMaterial: true
+        product: { include: { category: true } },
+        rawMaterial: { include: { category: true } },
+        category: true,
       }
     });
   }

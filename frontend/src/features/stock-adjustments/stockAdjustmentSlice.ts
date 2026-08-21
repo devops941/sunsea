@@ -86,6 +86,33 @@ export const fetchProductionOrdersForIssue = createAsyncThunk(
   }
 );
 
+export const fetchNextAdjustmentNumber = createAsyncThunk(
+  "stockAdjustments/fetchNextNumber",
+  async (_, { rejectWithValue }) => {
+    try {
+      return await stockAdjustmentService.fetchNextNumber();
+    } catch (error: any) {
+      return rejectWithValue(
+        error.response?.data?.message || "Failed to fetch next adjustment number"
+      );
+    }
+  }
+);
+
+export const deleteStockAdjustment = createAsyncThunk(
+  "stockAdjustments/delete",
+  async (id: string | number, { rejectWithValue }) => {
+    try {
+      await stockAdjustmentService.delete(id);
+      return id;
+    } catch (error: any) {
+      return rejectWithValue(
+        error.response?.data?.message || "Failed to delete stock adjustment"
+      );
+    }
+  }
+);
+
 interface StockAdjustmentState {
   data: any[];
   meta: any | null;
@@ -223,7 +250,25 @@ const stockAdjustmentSlice = createSlice({
       })
       .addCase(fetchProductionOrdersForIssue.rejected, (state) => {
         state.loading = false;
-      });
+      })
+      // Delete
+      .addCase(deleteStockAdjustment.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(deleteStockAdjustment.fulfilled, (state, action) => {
+        state.loading = false;
+        state.data = state.data.filter(a => String(a.id) !== String(action.payload));
+        if (state.currentAdjustment && String(state.currentAdjustment.id) === String(action.payload)) {
+          state.currentAdjustment = null;
+        }
+      })
+      .addCase(deleteStockAdjustment.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
+      })
+      // Fetch Next Number (no loading state change needed — handled locally in form)
+      .addCase(fetchNextAdjustmentNumber.fulfilled, (_state, _action) => {});
   },
 });
 

@@ -1,6 +1,7 @@
 import { prisma } from "../../config/prisma";
 import { ApiError } from "../../utils/ApiError";
 import { getIO } from "../../socket/socket";
+import Decimal from "decimal.js";
 
 export class StockAdjustmentService {
   static async getNextAdjustmentNumber(): Promise<string> {
@@ -85,8 +86,8 @@ export class StockAdjustmentService {
     if (productionOrderId) where.productionOrderId = { contains: productionOrderId, mode: "insensitive" };
     if (dateFrom || dateTo) {
       where.adjustmentDate = {};
-      if (dateFrom) where.adjustmentDate.gte = new Date(dateFrom);
-      if (dateTo) where.adjustmentDate.lte = new Date(dateTo);
+      if (dateFrom) where.adjustmentDate.gte = new Date(dateFrom.includes("T") ? dateFrom : `${dateFrom}T00:00:00.000Z`);
+      if (dateTo) where.adjustmentDate.lte = new Date(dateTo.includes("T") ? dateTo : `${dateTo}T23:59:59.999Z`);
     }
     if (search) {
       where.OR = [
@@ -333,7 +334,7 @@ export class StockAdjustmentService {
               storeId: item.storeId,
               rawMaterialId: item.rawMaterialId,
               txnType: item.difference.toNumber() > 0 ? "STOCK_ADJUSTMENT_IN" : "STOCK_ADJUSTMENT_OUT",
-              qty: new (require('decimal.js').Decimal)(Math.abs(item.difference.toNumber())),
+              qty: new Decimal(Math.abs(item.difference.toNumber())),
               remarks: `Adjustment ${existing.adjustmentNumber}: ${item.remarks || ""}`,
             },
           });
@@ -376,7 +377,7 @@ export class StockAdjustmentService {
               storeId: item.storeId,
               productItemId: item.productItemId,
               txnType: item.difference.toNumber() > 0 ? "STOCK_ADJUSTMENT_IN" : "STOCK_ADJUSTMENT_OUT",
-              qty: new (require('decimal.js').Decimal)(Math.abs(item.difference.toNumber())),
+              qty: new Decimal(Math.abs(item.difference.toNumber())),
               relatedDocNo: existing.adjustmentNumber,
               remarks: `Adjustment ${existing.adjustmentNumber}: ${item.remarks || ""}`,
               createdBy: userId,

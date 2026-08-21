@@ -3,7 +3,6 @@ import authReducer from "../features/auth/authSlice";
 import { baseApi } from "../services/baseApi";
 import roleReducer from "../features/roles/roleSlice";
 import departmentReducer from "../features/departments/departmentSlice";
-import categoryReducer from "../features/categories/categorySlice";
 import uomReducer from "../features/uoms/uomSlice";
 import userReducer from "../features/user/userSlice";
 import employeeReducer from "../features/employee/employeeSlice";
@@ -13,15 +12,12 @@ import permissionReducer from "../features/permissions/permissionSlice";
 import supplierReducer from "../features/supplier/supplierSlice";
 import shiftReducer from "../features/shifts/shiftSlice";
 import storeReducer from "../features/stores/storeSlice";
-import locationReducer from "../features/locations/locationSlice";
 import rawMaterialReducer from "../features/raw-materials/rawMaterialSlice";
-import rawMaterialCategoryReducer from "../features/raw-material-categories/rawMaterialCategorySlice";
 import rawMaterialStockReducer from "../features/raw-materials/rawMaterialStockSlice";
 import machineReducer from "../features/machines/machineSlice";
 import weeklyProgramReducer from "../features/weekly-programs/weeklyProgramSlice";
 import productionOrderReducer from "../features/production-orders/productionOrderSlice";
 import hourlyProductionReducer from "../features/hourly-productions/hourlyProductionSlice";
-import storeLocationReducer from "../features/locations/locationSlice";
 import profileReducer from "../features/profiles/profileSlice";
 import stockAdjustmentReducer from "../features/stock-adjustments/stockAdjustmentSlice";
 import purchaseOrderReducer from "../features/purchaseOrder/purchaseOrderSlice";
@@ -35,6 +31,8 @@ import productShiftRecordReducer from "../features/product-shift-records/product
 import productCapacityHistoryReducer from "../features/product-capacity-history/productCapacityHistorySlice";
 import payrollSettingsReducer from "../features/payroll/payrollSettingsSlice";
 import payrollRunReducer from "../features/payroll/payrollRunSlice";
+import categoryReducer from "../features/categories/categorySlice";
+import eodStockReducer from "../features/eod-stock/eodStockSlice";
 
 
 export const store = configureStore({
@@ -42,7 +40,6 @@ export const store = configureStore({
         auth: authReducer,
         roles: roleReducer,
         departments: departmentReducer,
-        categories: categoryReducer,
         uoms: uomReducer,
         users: userReducer,
         employees: employeeReducer,
@@ -54,11 +51,8 @@ export const store = configureStore({
         profile: profileReducer,
         gst: gstReducer,
         stores: storeReducer,
-        locations: locationReducer,
         rawMaterials: rawMaterialReducer,
-        rawMaterialCategories: rawMaterialCategoryReducer,
         rawMaterialStocks: rawMaterialStockReducer,
-        storeLocations: storeLocationReducer,
         machines: machineReducer,
         weeklyPrograms: weeklyProgramReducer,
         productionOrders: productionOrderReducer,
@@ -75,6 +69,8 @@ export const store = configureStore({
         productCapacityHistory: productCapacityHistoryReducer,
         payrollSettings: payrollSettingsReducer,
         payrollRun: payrollRunReducer,
+        categories: categoryReducer,
+        eodStock: eodStockReducer,
     },
     middleware: (getDefaultMiddleware) =>
         getDefaultMiddleware().concat(baseApi.middleware),

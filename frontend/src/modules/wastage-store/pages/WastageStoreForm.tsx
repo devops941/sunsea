@@ -15,14 +15,14 @@ import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
 import { createRawMaterial, updateRawMaterial } from "../../../features/raw-materials/rawMaterialSlice";
 import { fetchStores } from "../../../features/stores/storeSlice";
 import { rawMaterialService } from "../../../services/rawMaterialService";
-import { useRawMaterialCategories } from "../../../hooks/useRawMaterialCategories";
 import { useSocketSync } from "../../../hooks/useSocketSync";
 import { convertToPrimaryUom } from "../../../utils/uomConversion";
+import { categoryService } from "../../../services/categoryService";
 
 const initialFormState = {
     rawMaterialId: "",
     materialName: "",
-    categoryId: "",
+    categoryId: "" as string | number,
     storeId: "",
     baseUom: "",
     onHandQty: "",
@@ -40,10 +40,6 @@ const wastageSchema = z.object({
             /^(?=.*[A-Za-z])[A-Za-z0-9\s&().,-]+$/,
             "Material Name must contain at least one letter and only valid characters"
         ),
-    categoryId: z
-        .string()
-        .trim()
-        .min(1, "Raw Material Category is required"),
     storeId: z
         .string()
         .trim()
@@ -78,20 +74,29 @@ const WastageStoreForm: React.FC = () => {
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [openingStockUom, setOpeningStockUom] = useState("");
+    const [categoryOptions, setCategoryOptions] = useState<{ label: string; value: string | number }[]>([]);
 
     const { data: stores } = useAppSelector(state => state.stores);
-    const { rawMaterialCategories, loadCategories } = useRawMaterialCategories();
 
     const fetchStoresData = useCallback(() => {
         dispatch(fetchStores({ storeCategory: "WASTAGE" }));
     }, [dispatch]);
 
-    const fetchCategoriesData = useCallback(() => {
-        loadCategories();
-    }, [loadCategories]);
-
     useSocketSync("store", undefined, fetchStoresData);
-    useSocketSync("rawMaterialCategory", undefined, fetchCategoriesData);
+
+    useEffect(() => {
+        categoryService.fetchAll({ type: "WASTAGE", isActive: true }).then((res) => {
+            const list = res?.categories ?? res ?? [];
+            if (Array.isArray(list) && list.length > 0) {
+                setCategoryOptions(list.map((c: any) => ({ label: c.name, value: c.id })));
+            } else {
+                categoryService.fetchAll({ isActive: true }).then((allRes) => {
+                    const allList = allRes?.categories ?? allRes ?? [];
+                    setCategoryOptions(Array.isArray(allList) ? allList.map((c: any) => ({ label: c.name, value: c.id })) : []);
+                });
+            }
+        }).catch(() => {});
+    }, []);
 
     useEffect(() => {
         setOpeningStockUom("");
@@ -99,13 +104,12 @@ const WastageStoreForm: React.FC = () => {
 
     useEffect(() => {
         fetchStoresData();
-        fetchCategoriesData();
 
         if (isEditMode && locationState.state) {
             setFormData({
                 rawMaterialId: locationState.state.rawMaterialId,
                 materialName: locationState.state.materialName,
-                categoryId: locationState.state.categoryId ? String(locationState.state.categoryId) : locationState.state.category?.id ? String(locationState.state.category.id) : "",
+                categoryId: locationState.state.categoryId ?? locationState.state.category?.id ?? "",
                 storeId: locationState.state.storeId || locationState.state.store?.storeId || "",
                 baseUom: locationState.state.baseUom || "",
                 onHandQty: locationState.state.onHandQty !== null && locationState.state.onHandQty !== undefined ? String(locationState.state.onHandQty) : "",
@@ -117,13 +121,13 @@ const WastageStoreForm: React.FC = () => {
                 try {
                     const nextId = await rawMaterialService.fetchNextId();
                     setFormData(prev => ({ ...prev, rawMaterialId: nextId }));
-                } catch (err) {
-                    console.error("Failed to fetch next ID", err);
+                } catch {
+                    // silent — next ID is non-critical
                 }
             };
             getNextId();
         }
-    }, [dispatch, loadCategories, isEditMode, locationState.state, fetchStoresData, fetchCategoriesData]);
+    }, [isEditMode, locationState.state, fetchStoresData]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
@@ -138,7 +142,7 @@ const WastageStoreForm: React.FC = () => {
             setFormData({
                 rawMaterialId: locationState.state.rawMaterialId,
                 materialName: locationState.state.materialName,
-                categoryId: locationState.state.categoryId ? String(locationState.state.categoryId) : locationState.state.category?.id ? String(locationState.state.category.id) : "",
+                categoryId: locationState.state.categoryId ?? locationState.state.category?.id ?? "",
                 storeId: locationState.state.storeId || locationState.state.store?.storeId || "",
                 baseUom: locationState.state.baseUom || "",
                 onHandQty: locationState.state.onHandQty !== null && locationState.state.onHandQty !== undefined ? String(locationState.state.onHandQty) : "",
@@ -154,6 +158,8 @@ const WastageStoreForm: React.FC = () => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        if (isSubmitting) return;
 
         try {
             wastageSchema.parse(formData);
@@ -173,7 +179,6 @@ const WastageStoreForm: React.FC = () => {
             }
         }
 
-        if (isSubmitting) return;
         setIsSubmitting(true);
         try {
             const primaryUom = formData.baseUom.split(",")[0]?.trim() || "";
@@ -241,15 +246,12 @@ const WastageStoreForm: React.FC = () => {
                                     required
                                 />
                                 <SelectInput
-                                    label="Raw Material Category"
+                                    label="Category"
                                     name="categoryId"
                                     value={formData.categoryId}
                                     onChange={handleChange}
-                                    options={rawMaterialCategories.map(c => ({ value: String(c.id), label: c.name }))}
+                                    options={categoryOptions}
                                     defaultOptionLabel="Select Category"
-                                    error={errors.categoryId}
-                                    required
-                                    disabled={isEditMode}
                                 />
                                 <SelectInput
                                     label="Store"
@@ -270,9 +272,9 @@ const WastageStoreForm: React.FC = () => {
                                     isMulti
                                     category={["length", "mass", "each", "volume"]}
                                     allowedCodes={[
-                                        "g", "kg", "t", "ton",
-                                        "l", "ml", "ltr",
-                                        "m", "cm", "mtr",
+                                        "kg", "g", "mt",
+                                        "l", "ml",
+                                        "m", "cm", "mm",
                                         "dz", "ea"
                                     ]}
                                     onChange={(value) => {
@@ -284,7 +286,7 @@ const WastageStoreForm: React.FC = () => {
                                     error={errors.baseUom}
                                     disabled={isEditMode}
                                 />
-                               
+
                                 <QuantityInput
                                     label="Opening Stock"
                                     name="onHandQty"
@@ -297,7 +299,7 @@ const WastageStoreForm: React.FC = () => {
                                     required
                                     disabled={isEditMode}
                                 />
-                                 <SelectInput
+                                <SelectInput
                                     label="Status"
                                     name="status"
                                     value={formData.status}

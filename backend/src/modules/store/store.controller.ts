@@ -19,6 +19,7 @@ class StoreController {
     const {
       search,
       storeCategory,
+      isActive,
       page,
       limit,
       sortBy,
@@ -28,6 +29,7 @@ class StoreController {
     const stores = await storeService.findAll({
       search: search as string | undefined,
       storeCategory: storeCategory as string | undefined,
+      isActive: isActive !== undefined ? isActive === "true" : undefined,
       page: page ? parseInt(page as string, 10) : undefined,
       limit: limit ? parseInt(limit as string, 10) : undefined,
       sortBy: sortBy as string | undefined,

@@ -44,46 +44,62 @@ export const parseBaseUom = (uomStr?: string): { primary: string; secondary: str
     return { primary, secondary, list };
 };
 
+// Mass units supported by convert-units (display target: kg)
+const MASS_UNITS = new Set(['mcg', 'mg', 'g', 'kg', 'mt', 'oz', 'lb', 't']);
+// Volume units supported by convert-units (display target: l)
+const VOLUME_UNITS = new Set(['ml', 'l', 'fl-oz', 'cup', 'pnt', 'qt', 'gal', 'ft3', 'yd3']);
+// Length units supported by convert-units (display target: m)
+const LENGTH_UNITS = new Set(['mm', 'cm', 'm', 'km', 'in', 'ft-us', 'ft', 'fathom', 'mi', 'nMi']);
+
 /**
- * Formats a stock quantity for display, normalizing it to the display unit
- * implied by the primary (first-listed) code in a comma-separated baseUom
- * string (e.g. 200 with baseUom "g,kg" -> "0.2 kg").
+ * Formats a stock quantity for display, converting from the primary (first-listed)
+ * UOM code in a comma-separated baseUom string to a human-readable display unit.
+ *
+ * Mass   → kg  (e.g. 1 mt → "1000 kg",  500 g → "0.5 kg")
+ * Volume → L   (e.g. 500 ml → "0.5 L")
+ * Length → m   (e.g. 100 cm → "1 m")
+ * Each   → pcs (e.g. 2 dz → "24 pcs")
+ *
+ * Uses convert-units library for all conversions — no hardcoded factors.
  */
 export const formatStockQty = (qty: number | string | null | undefined, uomStr?: string): string => {
     const num = Number(qty ?? 0);
     if (isNaN(num)) return `0 kg`;
     if (!uomStr) return `${num} kg`;
 
-    const firstCode = uomStr.split(',')[0].trim().toLowerCase();
+    const primaryCode = uomStr.split(',')[0].trim();
+    const code = primaryCode.toLowerCase();
 
-    // Mass conversion to primary unit kg (e.g., 200 g -> 0.2 kg)
-    if (firstCode === 'g' || firstCode === 'gram' || firstCode === 'grams' || firstCode === 'gm') {
-        const kgVal = num / 1000;
-        return `${Number(kgVal.toFixed(3))} kg`;
-    }
-    if (firstCode === 't' || firstCode === 'ton' || firstCode === 'tons') {
-        return `${Number((num * 1000).toFixed(3))} kg`;
-    }
-    if (firstCode === 'kg' || firstCode === 'kilogram' || firstCode === 'kilo' || firstCode === 'kgs') {
-        return `${Number(num.toFixed(3))} kg`;
+    // Mass → kg
+    if (MASS_UNITS.has(code)) {
+        if (code === 'kg') return `${Number(num.toFixed(3))} kg`;
+        const inKg = convertUomQty(num, primaryCode, 'kg');
+        return `${Number(inKg.toFixed(3))} kg`;
     }
 
-    // Volume conversion to L
-    if (firstCode === 'ml') {
-        const lVal = num / 1000;
-        return `${Number(lVal.toFixed(3))} L`;
-    }
-    if (firstCode === 'l' || firstCode === 'ltr' || firstCode === 'litre' || firstCode === 'litres') {
-        return `${Number(num.toFixed(3))} L`;
+    // Volume → L
+    if (VOLUME_UNITS.has(code)) {
+        if (code === 'l') return `${Number(num.toFixed(3))} L`;
+        const inL = convertUomQty(num, primaryCode, 'l');
+        return `${Number(inL.toFixed(3))} L`;
     }
 
-    // Count
-    if (firstCode === 'ea' || firstCode === 'each' || firstCode === 'pcs') {
+    // Length → m
+    if (LENGTH_UNITS.has(code)) {
+        if (code === 'm') return `${Number(num.toFixed(3))} m`;
+        const inM = convertUomQty(num, primaryCode, 'm');
+        return `${Number(inM.toFixed(3))} m`;
+    }
+
+    // Each / count
+    if (code === 'ea' || code === 'each' || code === 'pcs') {
         return `${num} pcs`;
     }
-    if (firstCode === 'dz' || firstCode === 'dozen') {
-        return `${num * 12} pcs`;
+    if (code === 'dz') {
+        const inPcs = convertUomQty(num, 'dz', 'ea');
+        return `${inPcs} pcs`;
     }
 
-    return `${num} ${firstCode}`;
+    // Unknown unit — show raw value with unit code
+    return `${num} ${primaryCode}`;
 };

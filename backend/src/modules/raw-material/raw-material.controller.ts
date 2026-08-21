@@ -19,14 +19,24 @@ class RawMaterialController {
   findAll = asyncHandler(async (req: Request, res: Response) => {
     const search = req.query.search as string | undefined;
     const storeId = req.query.storeId as string | undefined;
+    const itemType = req.query.itemType as string | undefined;
+    const categoryId = req.query.categoryId as string | undefined;
+    const status = req.query.status as string | undefined;
     const isActive =
       req.query.isActive === "true" ? true :
         req.query.isActive === "false" ? false :
           undefined;
-    const rawMaterials = await rawMaterialService.findAll({ search, storeId, isActive });
+    const page = req.query.page ? parseInt(req.query.page as string, 10) : undefined;
+    const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : undefined;
+    const sortBy = req.query.sortBy as string | undefined;
+    const sortOrder = req.query.sortOrder as "asc" | "desc" | undefined;
+
+    const result = await rawMaterialService.findAll({
+      search, storeId, isActive, itemType, categoryId, status, page, limit, sortBy, sortOrder,
+    });
 
     return res.status(200).json(
-      new ApiResponse("Raw Materials fetched successfully", rawMaterials)
+      new ApiResponse("Raw Materials fetched successfully", result)
     );
   });
 

@@ -6,7 +6,7 @@ import type {
 } from "../features/raw-materials/types";
 
 export const rawMaterialStockService = {
-    fetchAll: async (params?: any): Promise<RawMaterialStock[]> => {
+    fetchAll: async (params?: any): Promise<{ data: RawMaterialStock[]; total: number; page: number; totalPages: number }> => {
         const response = await apiClient.get("/raw-material-stocks", { params });
         return response.data.data;
     },

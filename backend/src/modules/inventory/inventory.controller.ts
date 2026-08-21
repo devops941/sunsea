@@ -68,6 +68,7 @@ class InventoryController {
         page: Number(page),
         limit: Number(limit),
         total: result.total,
+        totalPages: Math.ceil(result.total / Number(limit)),
       },
     });
   });

@@ -36,13 +36,17 @@ const PermissionList = lazy(() => import("../modules/permissions/pages/Permissio
 const Settings = lazy(() => import("../modules/settings/Setting"));
 
 // ===========================================================================
+// CATEGORY MASTER
+// ===========================================================================
+const CategoryList = lazy(() => import("../modules/category/pages/CategoryList"));
+const CategoryForm = lazy(() => import("../modules/category/pages/CategoryForm"));
+
+// ===========================================================================
 // PRODUCT MASTER
 // ===========================================================================
 const ProductList = lazy(() => import("../modules/product/pages/ProductList"));
-const CategoryList = lazy(() => import("../modules/product/pages/CategoryList"));
 const UomList = lazy(() => import("../modules/product/pages/UOMList"));
 const RawMaterialList = lazy(() => import("../modules/raw-materials/pages/RawMaterialList"));
-const RawMaterialCategoryList = lazy(() => import("../modules/raw-material-categories/pages/RawMaterialCategoryList"));
 const WastageStoreList = lazy(() => import("../modules/wastage-store/pages/WastageStoreList"));
 const SalesProductList = lazy(() => import("../modules/sales-product/pages/SalesProductList"));
 
@@ -96,9 +100,7 @@ const MachineAssignmentForm = lazy(() => import("../modules/machine-operation-as
 // STORES & LOCATIONS
 // ===========================================================================
 const StorageStoreList = lazy(() => import("../modules/storage-stores/pages/StorageStoreList"));
-const StoreTypeList = lazy(() => import("../modules/store-types/pages/StoreTypeList"));
-const LocationList = lazy(() => import("../modules/locations/pages/LocationList"));
-
+const StorageStoreForm = lazy(() => import("../modules/storage-stores/pages/StorageStoreForm"));
 // ===========================================================================
 // INVENTORY
 // ===========================================================================
@@ -295,21 +297,20 @@ const AppRoutes = () => {
                 <Route path="/departments" element={<DepartmentList />} />
               </Route>
 
+              {/* ---------- Category Master ---------- */}
+              <Route element={<ProtectedRoute permission="categories.view" />}>
+                <Route path="/categories" element={<CategoryList />} />
+              </Route>
+
               {/* ---------- Product Master ---------- */}
               <Route element={<ProtectedRoute permission="products.view" />}>
                 <Route path="/products" element={<ProductList />} />
-              </Route>
-              <Route element={<ProtectedRoute permission="categories.view" />}>
-                <Route path="/categories" element={<CategoryList />} />
               </Route>
               <Route element={<ProtectedRoute permission="uoms.view" />}>
                 <Route path="/uoms" element={<UomList />} />
               </Route>
               <Route element={<ProtectedRoute permission="raw_materials.view" />}>
                 <Route path="/raw-materials" element={<RawMaterialList />} />
-              </Route>
-              <Route element={<ProtectedRoute permission="raw_material_categories.view" />}>
-                <Route path="/raw-material-categories" element={<RawMaterialCategoryList />} />
               </Route>
               <Route element={<ProtectedRoute permission="wastage-store.view" />}>
                 <Route path="/wastage-store" element={<WastageStoreList />} />
@@ -336,11 +337,12 @@ const AppRoutes = () => {
               <Route element={<ProtectedRoute permission="stores.view" />}>
                 <Route path="/storage-stores" element={<StorageStoreList />} />
               </Route>
-              <Route path="/store-types" element={<StoreTypeList />} />
-              <Route element={<ProtectedRoute permission="locations.view" />}>
-                <Route path="/locations" element={<LocationList />} />
+              <Route element={<ProtectedRoute permission="stores.create" />}>
+                <Route path="/storage-stores/create" element={<StorageStoreForm />} />
               </Route>
-
+              <Route element={<ProtectedRoute permission="stores.edit" />}>
+                <Route path="/storage-stores/edit/:id" element={<StorageStoreForm />} />
+              </Route>
               {/* ---------- Inventory ---------- */}
               <Route element={<ProtectedRoute permission="raw_material_stocks.view" />}>
                 <Route path="/stock" element={<StockList />} />
@@ -459,6 +461,14 @@ const AppRoutes = () => {
             {/* ================================================================= */}
             {/* FULL-WIDTH PAGES (forms, detail views, dashboards)                */}
             {/* ================================================================= */}
+
+            {/* ---------- Categories ---------- */}
+            <Route element={<ProtectedRoute permission="categories.create" />}>
+              <Route path="/categories/create" element={<CategoryForm />} />
+            </Route>
+            <Route element={<ProtectedRoute permission="categories.edit" />}>
+              <Route path="/categories/edit/:id" element={<CategoryForm />} />
+            </Route>
 
             {/* ---------- Customers ---------- */}
             <Route element={<ProtectedRoute permission="customers.create" />}>

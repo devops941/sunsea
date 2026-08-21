@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
+
 import { toast } from "react-toastify";
 
 import { useAppDispatch, useAppSelector } from "../../../hooks/reduxHooks";
@@ -10,8 +11,13 @@ import SearchInput from "../../../components/ui/SearchInput/SearchInput";
 import ExportCSVButton from "../../../components/ui/ExportCSVButton/ExportCSVButton";
 import StatusBadge from "../../../components/ui/StatusBadge/Badge";
 import CommonViewModal from "../../../components/ui/CommonViewModal/CommonViewModal";
+import { formatLocationAddress } from "../../../utils/addressUtils";
 
-const ITEMS_PER_PAGE = 10;
+import FilterPopover from "../../../components/ui/FilterPopover/FilterPopover";
+import SelectInput from "../../../components/form/SelectInput/SelectInput";
+import { categoryService } from "../../../services/categoryService";
+
+const ITEMS_PER_PAGE = 20;
 
 const parseBaseUom = (uomStr?: string) => {
     if (!uomStr) return { primary: "N/A", secondary: "None", list: [] };
@@ -26,7 +32,7 @@ const parseBaseUom = (uomStr?: string) => {
 const WastageStockList: React.FC = () => {
     const dispatch = useAppDispatch();
 
-    const { data, loading, error } = useAppSelector((state) => state.rawMaterialStocks);
+    const { data, loading, error, totalPages, total } = useAppSelector((state) => state.rawMaterialStocks);
 
     const [searchTerm, setSearchTerm] = useState("");
     const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -34,21 +40,57 @@ const WastageStockList: React.FC = () => {
     const [showView, setShowView] = useState(false);
     const [selectedItem, setSelectedItem] = useState<any>(null);
 
-    // Debounce search
+    const [categoryFilter, setCategoryFilter] = useState("");
+    const [appliedCategory, setAppliedCategory] = useState("");
+    const [statusFilter, setStatusFilter] = useState("");
+    const [appliedStatus, setAppliedStatus] = useState("");
+    const [categoryOptions, setCategoryOptions] = useState<{ value: string; label: string }[]>([]);
+
+    const fetchCategoriesData = useCallback(async () => {
+        try {
+            const res = await categoryService.fetchAll({ type: "WASTAGE", isActive: true });
+            const list = res?.categories ?? (Array.isArray(res) ? res : []);
+            setCategoryOptions(list.map((c: any) => ({ value: String(c.id), label: c.name || c.categoryName || c.code })));
+        } catch {
+            // silent
+        }
+    }, []);
+
     useEffect(() => {
-        const timer = setTimeout(() => setDebouncedSearch(searchTerm), 500);
-        return () => clearTimeout(timer);
+        fetchCategoriesData();
+    }, [fetchCategoriesData]);
+
+    // Debounce search — 300 ms
+    const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    useEffect(() => {
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        debounceRef.current = setTimeout(() => {
+            setDebouncedSearch(searchTerm);
+            setCurrentPage(1);
+        }, 300);
+        return () => {
+            if (debounceRef.current) clearTimeout(debounceRef.current);
+        };
     }, [searchTerm]);
 
-    // Fetch only wastage-store items
-    useEffect(() => {
-        dispatch(fetchRawMaterialStocks({ search: debouncedSearch, storeCategory: "WASTAGE" }));
-    }, [dispatch, debouncedSearch]);
+    // Server-side fetch with all filters
+    const loadData = useCallback(() => {
+        dispatch(fetchRawMaterialStocks({
+            search: debouncedSearch || undefined,
+            storeCategory: "WASTAGE",
+            categoryId: appliedCategory || undefined,
+            status: appliedStatus || undefined,
+            page: currentPage,
+            limit: ITEMS_PER_PAGE,
+        }));
+    }, [dispatch, debouncedSearch, appliedCategory, appliedStatus, currentPage]);
 
     useEffect(() => {
-        if (error) {
-            toast.error(error);
-        }
+        loadData();
+    }, [loadData]);
+
+    useEffect(() => {
+        if (error) toast.error(error);
     }, [error]);
 
     useSocketSync("rawMaterialStock", {
@@ -57,14 +99,31 @@ const WastageStockList: React.FC = () => {
         deleted: rawMaterialStockDeleted,
     });
 
-    const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleSearch = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
         setSearchTerm(e.target.value);
-        setCurrentPage(1);
-    };
+    }, []);
 
-    const totalPages = Math.ceil((data?.length || 0) / ITEMS_PER_PAGE);
-    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-    const paginatedData = (data || []).slice(startIndex, startIndex + ITEMS_PER_PAGE);
+    const hasActiveFilters = !!(appliedCategory || appliedStatus);
+    const activeFilterCount = (appliedCategory ? 1 : 0) + (appliedStatus ? 1 : 0);
+
+    const handleApplyFilters = useCallback(() => {
+        setAppliedCategory(categoryFilter);
+        setAppliedStatus(statusFilter);
+        setCurrentPage(1);
+    }, [categoryFilter, statusFilter]);
+
+    const handleClearFilters = useCallback(() => {
+        setCategoryFilter("");
+        setAppliedCategory("");
+        setStatusFilter("");
+        setAppliedStatus("");
+        setCurrentPage(1);
+    }, []);
+
+    const handleOpenView = useCallback((item: any) => {
+        setSelectedItem(item);
+        setShowView(true);
+    }, []);
 
     const formatExportQty = (qty: any, uom: string) => {
         const num = Number(qty) || 0;
@@ -89,7 +148,7 @@ const WastageStockList: React.FC = () => {
     const exportColumns = [
         { header: "NAME", accessor: (item: any) => item.materialName || "-" },
         { header: "ID", accessor: (item: any) => item.rawMaterialId || "-" },
-        { header: "CATEGORY", accessor: (item: any) => item.category?.categoryName || item.categoryId || "-" },
+        { header: "CATEGORY", accessor: (item: any) => item.category?.name || item.category?.categoryName || "-" },
         { header: "STORE", accessor: (item: any) => item.store?.storeName || item.storeId || "-" },
         { header: "LOCATION", accessor: (item: any) => item.storeLocation?.locationCode || item.locationId || "-" },
         { header: "PHYSICAL STOCK", accessor: (item: any) => formatExportQty(item.onHandQty ?? 0, item.baseUom || "") },
@@ -114,6 +173,44 @@ const WastageStockList: React.FC = () => {
                             onChange={handleSearch}
                             placeholder="Search wastage stock..."
                         />
+                        <FilterPopover
+                            activeFilterCount={activeFilterCount}
+                            hasActiveFilters={hasActiveFilters}
+                            onApply={handleApplyFilters}
+                            onClear={handleClearFilters}
+                        >
+                            <div className="space-y-3">
+                                <div>
+                                    <label className="block text-xs font-semibold text-ink-muted mb-1.5 uppercase tracking-wider">
+                                        Category
+                                    </label>
+                                    <SelectInput
+                                        name="categoryFilter"
+                                        value={categoryFilter}
+                                        onChange={(e) => setCategoryFilter(e.target.value)}
+                                        options={categoryOptions}
+                                        defaultOptionLabel="All Categories"
+                                        noMargin
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-semibold text-ink-muted mb-1.5 uppercase tracking-wider">
+                                        Status
+                                    </label>
+                                    <SelectInput
+                                        name="statusFilter"
+                                        value={statusFilter}
+                                        onChange={(e) => setStatusFilter(e.target.value)}
+                                        options={[
+                                            { value: "Active", label: "Active" },
+                                            { value: "Inactive", label: "Inactive" }
+                                        ]}
+                                        defaultOptionLabel="All Statuses"
+                                        noMargin
+                                    />
+                                </div>
+                            </div>
+                        </FilterPopover>
                         <ExportCSVButton
                             data={data || []}
                             columns={exportColumns}
@@ -124,15 +221,15 @@ const WastageStockList: React.FC = () => {
 
                 {/* Table */}
                 <DataTable
-                    data={paginatedData || []}
-                    rowKey={(item) => item.rawMaterialId}
+                    data={data || []}
+                    rowKey={(item) => item.rawMaterialId || item.id}
                     loading={loading}
                     emptyMessage="No wastage stock records found."
-                    pagination={{
-                        currentPage,
-                        totalPages,
-                        onPageChange: (page) => setCurrentPage(page)
-                    }}
+                    pagination={
+                        totalPages > 1
+                            ? { currentPage, totalPages, onPageChange: setCurrentPage }
+                            : undefined
+                    }
                     columns={[
                         {
                             header: "#",
@@ -150,20 +247,14 @@ const WastageStockList: React.FC = () => {
                         {
                             header: "CATEGORY",
                             render: (item) => (
-                                <span className="text-ink-muted">{item.category?.categoryName || item.categoryId || "-"}</span>
+                                <span className="text-ink-muted">{item.category?.name || item.category?.categoryName || "-"}</span>
                             )
                         },
                         {
-                            header: "STORE / LOCATION",
-                            render: (item) => {
-                                const locCode = item.storeLocation?.locationCode || item.store?.location?.locationCode || item.store?.location?.locationName || item.locationId || "-";
-                                return (
-                                    <div className="flex flex-col">
-                                        <span className="font-medium text-ink-muted">{item.store?.storeName || item.storeId || "-"}</span>
-                                        <span className="text-xs text-ink-subtle">Loc: {locCode}</span>
-                                    </div>
-                                );
-                            }
+                            header: "STORE",
+                            render: (item) => (
+                                <span className="font-medium text-ink-muted">{item.store?.storeName || item.storeId || "-"}</span>
+                            )
                         },
                         {
                             header: "PHYSICAL STOCK",
@@ -193,11 +284,8 @@ const WastageStockList: React.FC = () => {
                                 const reorderLevel = Number(item.reorderLevel || 0);
 
                                 let availColorClass = "text-green-600";
-                                if (available <= minStock) {
-                                    availColorClass = "text-red-600";
-                                } else if (available <= reorderLevel) {
-                                    availColorClass = "text-amber-600";
-                                }
+                                if (available <= minStock) availColorClass = "text-red-600";
+                                else if (available <= reorderLevel) availColorClass = "text-amber-600";
 
                                 return <span className={`font-semibold ${availColorClass}`}>{formatDisplayQty(available, baseUom)}</span>;
                             }
@@ -210,17 +298,15 @@ const WastageStockList: React.FC = () => {
                             header: "ACTIONS",
                             render: (item) => (
                                 <div className="flex items-center gap-2">
-                                    <ViewButton
-                                        onClick={() => {
-                                            setSelectedItem(item);
-                                            setShowView(true);
-                                        }}
-                                    />
+                                    <ViewButton onClick={() => handleOpenView(item)} />
                                 </div>
                             )
                         }
                     ]}
                 />
+                <div className="px-4 pb-2 text-xs text-ink-subtle text-right">
+                    Total: {total} record(s)
+                </div>
             </div>
 
             <CommonViewModal
@@ -229,22 +315,37 @@ const WastageStockList: React.FC = () => {
                 modalTitle="Wastage Stock Details"
                 avatarText={selectedItem ? (selectedItem.materialName || "W").charAt(0).toUpperCase() : ""}
                 headerTitle={selectedItem ? (selectedItem.materialName || selectedItem.rawMaterialId) : ""}
+                headerSubtitle={selectedItem ? `ID: ${selectedItem.rawMaterialId}` : ""}
                 sections={selectedItem ? [
                     {
                         fields: [
                             { label: "Material ID", value: selectedItem.rawMaterialId },
                             { label: "Material Name", value: selectedItem.materialName || "N/A" },
-                            { label: "Category", value: selectedItem.category?.categoryName || "N/A" },
+                            { label: "Category", value: selectedItem.category?.name || selectedItem.category?.categoryName || "N/A" },
                             { label: "Primary UOM", value: parseBaseUom(selectedItem.baseUom).primary },
                             { label: "Secondary UOM(s)", value: parseBaseUom(selectedItem.baseUom).secondary },
                             { label: "Store", value: selectedItem.store?.storeName || selectedItem.storeId || "N/A" },
-                            { label: "Store Location", value: selectedItem.storeLocation?.locationCode || selectedItem.store?.location?.locationCode || selectedItem.locationId || "N/A" },
+                            { label: "Store Location", value: formatLocationAddress(selectedItem.storeLocation?.locationCode || selectedItem.locationId) || "N/A" },
                             { label: "Physical Stock", value: formatExportQty(selectedItem.onHandQty ?? 0, selectedItem.baseUom || "") },
                             { label: "Reserved Stock", value: formatExportQty(selectedItem.reservedQty ?? 0, selectedItem.baseUom || "") },
                             { label: "Available Stock", value: formatExportQty(Number(selectedItem.onHandQty ?? 0) - Number(selectedItem.reservedQty ?? 0), selectedItem.baseUom || "") },
                             { label: "Batch No", value: selectedItem.batchNo || "N/A" },
                             { label: "Narration", value: selectedItem.narration || "N/A" },
-                            { label: "Status", value: selectedItem.status || "Active" }
+                            { label: "Status", value: selectedItem.status || "Active" },
+                            {
+                                label: "Created Date",
+                                value: (() => {
+                                    const d = selectedItem?.createdAt || selectedItem?.rawMaterial?.createdAt;
+                                    return d ? new Date(d).toLocaleString() : "N/A";
+                                })()
+                            },
+                            {
+                                label: "Updated Date",
+                                value: (() => {
+                                    const d = selectedItem?.updatedAt || selectedItem?.rawMaterial?.updatedAt;
+                                    return d ? new Date(d).toLocaleString() : "N/A";
+                                })()
+                            }
                         ]
                     }
                 ] : []}

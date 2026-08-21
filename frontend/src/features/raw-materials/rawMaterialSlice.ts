@@ -5,8 +5,20 @@ import type { RawMaterial, RawMaterialState, CreateRawMaterialDto, UpdateRawMate
 
 export const fetchRawMaterials = createAsyncThunk(
   "rawMaterials/fetchAll",
-  async (arg: string | { search?: string; isActive?: boolean } | undefined, { rejectWithValue }) => {
-    const params = typeof arg === "string" || arg === undefined ? { search: arg } : arg;
+  async (
+    params: {
+      search?: string;
+      isActive?: boolean;
+      itemType?: string;
+      storeId?: string;
+      categoryId?: string;
+      page?: number;
+      limit?: number;
+      sortBy?: string;
+      sortOrder?: string;
+    } | undefined,
+    { rejectWithValue }
+  ) => {
     try {
       return await rawMaterialService.fetchAll(params);
     } catch (error: any) {
@@ -42,6 +54,9 @@ export const deleteRawMaterial = createAsyncThunk("rawMaterials/delete", async (
 
 const initialState: RawMaterialState = {
   data: [],
+  total: 0,
+  page: 1,
+  totalPages: 1,
   loading: false,
   error: null,
 };
@@ -54,7 +69,8 @@ const rawMaterialSlice = createSlice({
       const mapped = mapRawMaterial(action.payload);
       const exists = state.data.find((item) => String(item.rawMaterialId) === String(mapped.rawMaterialId));
       if (!exists) {
-        state.data.unshift(mapped);
+        state.data.push(mapped);
+        state.total += 1;
       }
     },
     rawMaterialUpdated: (state, action: PayloadAction<any>) => {
@@ -68,6 +84,7 @@ const rawMaterialSlice = createSlice({
       const index = state.data.findIndex((item) => String(item.rawMaterialId) === String(action.payload));
       if (index !== -1) {
         state.data.splice(index, 1);
+        state.total = Math.max(0, state.total - 1);
       }
     },
   },
@@ -77,9 +94,19 @@ const rawMaterialSlice = createSlice({
         state.loading = true;
         state.error = null;
       })
-      .addCase(fetchRawMaterials.fulfilled, (state, action: PayloadAction<RawMaterial[]>) => {
+      .addCase(fetchRawMaterials.fulfilled, (state, action: PayloadAction<any>) => {
         state.loading = false;
-        state.data = action.payload;
+        if (action.payload && "rawMaterials" in action.payload) {
+          state.data = action.payload.rawMaterials;
+          state.total = action.payload.total;
+          state.page = action.payload.page;
+          state.totalPages = action.payload.totalPages;
+        } else {
+          state.data = Array.isArray(action.payload) ? action.payload : [];
+          state.total = state.data.length;
+          state.page = 1;
+          state.totalPages = 1;
+        }
       })
       .addCase(fetchRawMaterials.rejected, (state, action) => {
         state.loading = false;
@@ -89,7 +116,8 @@ const rawMaterialSlice = createSlice({
         const mapped = mapRawMaterial(action.payload);
         const exists = state.data.find((item) => String(item.rawMaterialId) === String(mapped.rawMaterialId));
         if (!exists) {
-          state.data.unshift(mapped);
+          state.data.push(mapped);
+          state.total += 1;
         }
       })
       .addCase(updateRawMaterial.fulfilled, (state, action: PayloadAction<RawMaterial>) => {
@@ -100,6 +128,7 @@ const rawMaterialSlice = createSlice({
       })
       .addCase(deleteRawMaterial.fulfilled, (state, action: PayloadAction<string>) => {
         state.data = state.data.filter((item) => item.rawMaterialId !== action.payload);
+        state.total = Math.max(0, state.total - 1);
       });
   },
 });

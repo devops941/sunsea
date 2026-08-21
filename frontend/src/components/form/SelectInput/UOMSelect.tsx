@@ -1,4 +1,5 @@
 import React from "react";
+import { createPortal } from "react-dom";
 import { Controller } from "react-hook-form";
 import type { Control } from "react-hook-form";
 import Select, { components } from "react-select";
@@ -59,11 +60,52 @@ const CustomSingleSelect = ({
   error?: boolean;
 }) => {
   const [isOpen, setIsOpen] = React.useState(false);
+  const [dropdownStyle, setDropdownStyle] = React.useState<React.CSSProperties>({});
   const dropdownRef = React.useRef<HTMLDivElement>(null);
+  const triggerRef = React.useRef<HTMLButtonElement>(null);
+  const portalRef = React.useRef<HTMLDivElement>(null);
+
+  const updateDropdownPosition = React.useCallback(() => {
+    if (triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect();
+      const viewportHeight = window.innerHeight;
+      const spaceBelow = viewportHeight - rect.bottom;
+      const spaceAbove = rect.top;
+      const dropdownEstHeight = 240;
+
+      let style: React.CSSProperties = {
+        position: "fixed",
+        left: `${rect.left}px`,
+        width: `${rect.width}px`,
+        zIndex: 100000,
+      };
+
+      if (spaceBelow < dropdownEstHeight && spaceAbove > spaceBelow) {
+        const maxH = Math.min(240, spaceAbove - 16);
+        style = {
+          ...style,
+          bottom: `${viewportHeight - rect.top + 4}px`,
+          maxHeight: `${Math.max(120, maxH)}px`,
+        };
+      } else {
+        const maxH = Math.min(240, spaceBelow - 16);
+        style = {
+          ...style,
+          top: `${rect.bottom + 4}px`,
+          maxHeight: `${Math.max(120, maxH)}px`,
+        };
+      }
+
+      setDropdownStyle(style);
+    }
+  }, []);
 
   React.useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      const isOutsideWrapper = dropdownRef.current && !dropdownRef.current.contains(target);
+      const isOutsidePortal = portalRef.current && !portalRef.current.contains(target);
+      if (isOutsideWrapper && isOutsidePortal) {
         setIsOpen(false);
       }
     };
@@ -72,6 +114,17 @@ const CustomSingleSelect = ({
     }
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isOpen]);
+
+  React.useEffect(() => {
+    if (!isOpen) return;
+    updateDropdownPosition();
+    window.addEventListener("scroll", updateDropdownPosition, true);
+    window.addEventListener("resize", updateDropdownPosition);
+    return () => {
+      window.removeEventListener("scroll", updateDropdownPosition, true);
+      window.removeEventListener("resize", updateDropdownPosition);
+    };
+  }, [isOpen, updateDropdownPosition]);
 
   const selectedOpt = options.find((u) => u.code === value);
   const displayLabel = selectedOpt
@@ -82,8 +135,14 @@ const CustomSingleSelect = ({
     <div className="relative" ref={dropdownRef}>
       <button
         type="button"
+        ref={triggerRef}
         disabled={disabled}
-        onClick={() => !disabled && setIsOpen(!isOpen)}
+        onClick={() => {
+          if (!disabled) {
+            if (!isOpen) updateDropdownPosition();
+            setIsOpen(!isOpen);
+          }
+        }}
         className={`
           w-full h-10 pl-4 pr-10
           border rounded-md outline-none
@@ -104,8 +163,8 @@ const CustomSingleSelect = ({
         </span>
       </button>
 
-      {isOpen && (
-        <div className="absolute z-50 w-full mt-1 bg-card border border-line-soft rounded-lg shadow-xl max-h-60 overflow-y-auto py-1 animate-in fade-in zoom-in-95 duration-100">
+      {isOpen && createPortal(
+        <div ref={portalRef} className="bg-card border border-line-soft rounded-lg shadow-xl max-h-60 overflow-y-auto py-1 animate-in fade-in zoom-in-95 duration-100 text-ink" style={dropdownStyle}>
           <div
             onClick={() => {
               onChange("");
@@ -138,7 +197,8 @@ const CustomSingleSelect = ({
               {u.code.toLowerCase() === 'ea' ? 'pcs' : `${u.label} (${u.code})`}
             </div>
           ))}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
@@ -236,7 +296,11 @@ export const UOMSelect: React.FC<UOMSelectProps> = ({
       backgroundColor: 'var(--bg-card, #151D2C)',
       border: '1px solid var(--border-line-soft, #202A3C)',
       boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.3)',
-      zIndex: 9999,
+      zIndex: 100000,
+    }),
+    menuPortal: (base: any) => ({
+      ...base,
+      zIndex: 100000,
     }),
     option: (base: any, state: any) => ({
       ...base,
@@ -314,6 +378,7 @@ export const UOMSelect: React.FC<UOMSelectProps> = ({
                 <>
                   <Select
                     isMulti
+                    menuPortalTarget={typeof document !== "undefined" ? document.body : null}
                     closeMenuOnSelect={false}
                     blurInputOnSelect={false}
                     isDisabled={disabled}
@@ -395,6 +460,7 @@ export const UOMSelect: React.FC<UOMSelectProps> = ({
               return (
                 <Select
                   isMulti
+                  menuPortalTarget={typeof document !== "undefined" ? document.body : null}
                   closeMenuOnSelect={false}
                   blurInputOnSelect={false}
                   isDisabled={disabled}

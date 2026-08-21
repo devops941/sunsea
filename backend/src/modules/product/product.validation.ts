@@ -9,8 +9,6 @@ export const createProductSchema = z.object({
     productCode: z.string().trim().min(1).max(20),
     productName: z.string().trim().min(1).max(160),
 
-    categoryId: z.string(),
-
     description: z.string().trim().max(255).optional(),
 
     uomId: z.string().optional(),
@@ -27,6 +25,8 @@ export const createProductSchema = z.object({
     gradeRates: z.any().optional(),
 
     minimumQty: z.string().max(20).optional(),
+
+    categoryId: z.coerce.number().int().positive().optional().nullable(),
 
     // FormData booleans also arrive as the literal strings "true"/"false"
     isActive: z

@@ -82,14 +82,15 @@ class ProductService {
       }
     }
 
-    const payload: Prisma.ProductUncheckedCreateInput & { gradeRates?: any } = {
+    const payload: any = {
       productCode: cleanRequiredString(data.productCode, 20),
       productName: cleanRequiredString(data.productName, 160),
       description: cleanString(data.description, 255),
       productType: data.productType === "SALES_PRODUCTION" ? "SALES_PRODUCTION" : "PRODUCTION",
 
-      categoryId: Number(data.categoryId),
       uomId: await this.resolvePcsUomId(),
+
+      categoryId: data.categoryId ? Number(data.categoryId) : null,
 
       weightPerPiece: toNumberOrNull(data.weightPerPiece),
       weightUom: cleanString(data.weightUom, 10) || "kg",
@@ -146,7 +147,7 @@ class ProductService {
     }
 
     try {
-      return await prisma.product.create({
+      return await (prisma.product.create as any)({
         data: {
           ...payload,
           ...(data.openingStockQty && data.openingStockStoreId
@@ -200,7 +201,6 @@ class ProductService {
         },
 
         include: {
-          category: true,
           uom: true,
           images: true,
           finishedGoodsStocks: { include: { store: true } },
@@ -243,7 +243,7 @@ class ProductService {
         capacityHistories: { orderBy: { createdAt: "desc" } },
       },
       orderBy: {
-        createdAt: "desc",
+        createdAt: "asc",
       },
     });
   }
@@ -527,7 +527,16 @@ class ProductService {
 
   async delete(id: bigint) {
     await this.findById(id);
-    const [salesCount, prodOrderCount, dispatchCount, realTxnCount, usedAsComponentCount] = await Promise.all([
+    const [
+      salesCount,
+      prodOrderCount,
+      dispatchCount,
+      realTxnCount,
+      usedAsComponentCount,
+      invoiceCount,
+      returnCount,
+      wastageCount,
+    ] = await Promise.all([
       prisma.salesOrderItem.count({ where: { productId: id } }),
       prisma.productionOrder.count({ where: { productItemId: id } }),
       prisma.goodsDispatchItem.count({ where: { productItemId: id } }),
@@ -538,14 +547,23 @@ class ProductService {
         },
       }),
       prisma.salesProductComponent.count({ where: { componentProductId: id } }),
+      prisma.salesInvoiceItem.count({ where: { productId: id } }),
+      prisma.salesReturnItem.count({ where: { productId: id } }),
+      prisma.productionWastage.count({ where: { productId: id } }),
     ]);
 
-    if (salesCount > 0 || prodOrderCount > 0 || dispatchCount > 0 || realTxnCount > 0) {
-      throw new ApiError(400, "Cannot delete product as it is referenced in sales orders, production orders, dispatch, or stock transactions.");
+    if (salesCount > 0 || prodOrderCount > 0 || dispatchCount > 0 || realTxnCount > 0 || invoiceCount > 0 || returnCount > 0 || wastageCount > 0) {
+      throw new ApiError(
+        400,
+        "Cannot delete product because it is referenced in active orders, invoices, production records, or inventory transactions."
+      );
     }
 
     if (usedAsComponentCount > 0) {
-      throw new ApiError(400, "Cannot delete this product because it is used as a component in one or more sales products. Remove it from those sales products first.");
+      throw new ApiError(
+        400,
+        "Cannot delete this product because it is used as a component in one or more sales products. Remove it from those sales products first."
+      );
     }
 
     return executeDeleteWithValidation(
@@ -555,6 +573,10 @@ class ProductService {
         await tx.billOfMaterial.deleteMany({ where: { productId: id } });
         await tx.productionStep.deleteMany({ where: { productId: id } });
         await tx.productImage.deleteMany({ where: { productId: id } });
+        await tx.productCapacityHistory.deleteMany({ where: { productId: id } });
+        await tx.productShiftRecord.deleteMany({ where: { productId: id } });
+        await tx.weeklyMachineProgram.deleteMany({ where: { productId: id } });
+        await tx.stockAdjustmentItem.deleteMany({ where: { productItemId: id } });
         return tx.product.delete({ where: { id } });
       }),
       "Product"
