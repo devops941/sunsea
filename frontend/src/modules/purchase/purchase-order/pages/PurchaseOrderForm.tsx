@@ -276,8 +276,9 @@ const PurchaseOrderForm: React.FC = () => {
 
   const refreshRawMaterials = useCallback(async () => {
     try {
-      const materials = await rawMaterialService.fetchAll();
-      setRawMaterials(materials ?? []);
+      const res = await rawMaterialService.fetchAll();
+      const materials = Array.isArray(res) ? res : (res?.data ?? []);
+      setRawMaterials(materials);
     } catch {
       toast.error("Failed to load raw materials");
     }
@@ -908,9 +909,10 @@ const PurchaseOrderForm: React.FC = () => {
     ? selectedSupplier.materialPrices.map((mp: any) => String(mp.rawMaterialId))
     : [];
 
+  const safeRawMaterials = Array.isArray(rawMaterials) ? rawMaterials : [];
   const filteredRawMaterials = supplierMaterialIds.length > 0
-    ? rawMaterials.filter((rm) => supplierMaterialIds.includes(String(rm.rawMaterialId)) || formData.items.some((item) => item.productId === rm.rawMaterialId))
-    : rawMaterials;
+    ? safeRawMaterials.filter((rm) => supplierMaterialIds.includes(String(rm.rawMaterialId)) || formData.items.some((item) => item.productId === rm.rawMaterialId))
+    : safeRawMaterials;
 
   const productOptions = filteredRawMaterials.map((rm) => ({
     value: String(rm.rawMaterialId || ""),
